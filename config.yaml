@@ -1,0 +1,7 @@
+catalog_path: "//nas/ccanales/Lightroom Server/FinalCatalog-v13-3.lrcat"
+db_path: "~/lightroom_tagger/library.db"
+mount_point: "/mnt/nas"
+workers: 4
+ai_model: "claude-3-5-sonnet-20241022"
+skip_ai: false
+verbose: false
