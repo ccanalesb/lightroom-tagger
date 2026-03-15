@@ -23,10 +23,25 @@ def store_image(db, record: dict) -> str:
     key = generate_key(record)
     record['key'] = key
     
+    default_instagram_fields = {
+        'instagram_posted': False,
+        'instagram_post_date': None,
+        'instagram_url': None,
+        'instagram_index': 0,
+        'image_hash': None,
+    }
+    for field, default_val in default_instagram_fields.items():
+        if field not in record:
+            record[field] = default_val
+    
     Image = Query()
     existing = db.search(Image.key == key)
     
     if existing:
+        existing_record = existing[0]
+        for field, value in default_instagram_fields.items():
+            if field not in record:
+                record[field] = existing_record.get(field, value)
         db.update(record, Image.key == key)
     else:
         db.insert(record)
@@ -107,6 +122,82 @@ def clear_all(db) -> int:
     """Clear all images. Returns count."""
     count = len(db)
     db.truncate()
+    return count
+
+
+def update_instagram_status(db, key: str, posted: bool = True, post_date: str = None, 
+                           url: str = None, index: int = 0) -> bool:
+    """Update Instagram status for an image.
+    
+    Args:
+        db: TinyDB instance
+        key: Image key
+        posted: Whether image was posted
+        post_date: Date of Instagram post (ISO format)
+        url: Instagram post URL
+        index: Index in carousel (0 for single image)
+    
+    Returns:
+        True if updated, False if not found
+    """
+    Image = Query()
+    existing = db.search(Image.key == key)
+    
+    if not existing:
+        return False
+    
+    updates = {
+        'instagram_posted': posted,
+        'instagram_post_date': post_date,
+        'instagram_url': url,
+        'instagram_index': index,
+    }
+    
+    db.update(updates, Image.key == key)
+    return True
+
+
+def search_by_instagram_posted(db, posted: bool = True) -> list[dict]:
+    """Search images by Instagram posted status."""
+    Image = Query()
+    return db.search(Image.instagram_posted == posted)
+
+
+def get_images_without_hash(db) -> list[dict]:
+    """Get all images that don't have a computed hash yet."""
+    Image = Query()
+    return db.search(Image.image_hash == None)
+
+
+def update_image_hash(db, key: str, image_hash: str) -> bool:
+    """Update the image hash for an image."""
+    Image = Query()
+    existing = db.search(Image.key == key)
+    
+    if not existing:
+        return False
+    
+    db.update({'image_hash': image_hash}, Image.key == key)
+    return True
+
+
+def batch_update_hashes(db, updates: list[dict]) -> int:
+    """Batch update image hashes.
+    
+    Args:
+        db: TinyDB instance
+        updates: List of dicts with 'key' and 'image_hash'
+    
+    Returns:
+        Number of updates made
+    """
+    count = 0
+    for update in updates:
+        key = update.get('key')
+        image_hash = update.get('image_hash')
+        if key and image_hash:
+            if update_image_hash(db, key, image_hash):
+                count += 1
     return count
 
 

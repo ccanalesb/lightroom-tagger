@@ -3,6 +3,9 @@ from pathlib import Path
 import os
 import re
 import yaml
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 @dataclass
@@ -14,6 +17,13 @@ class Config:
     ai_model: str = "claude-3-5-sonnet-20241022"
     skip_ai: bool = False
     verbose: bool = False
+    instagram_url: str = "https://www.instagram.com/im.canales"
+    instagram_keyword: str = "Posted"
+    hash_threshold: int = 5
+    small_catalog_path: str = ""
+    cloudflare_account_id: str = ""
+    cloudflare_api_token: str = ""
+    instagram_session_id: str = ""
 
     def __post_init__(self):
         self.catalog_path = self._resolve_path(self.catalog_path)
@@ -49,6 +59,12 @@ def load_config(config_path: str = "config.yaml") -> Config:
         "ai_model": "claude-3-5-sonnet-20241022",
         "skip_ai": False,
         "verbose": False,
+        "instagram_url": "https://www.instagram.com/im.canales",
+        "instagram_keyword": "Posted",
+        "hash_threshold": 5,
+        "cloudflare_account_id": "",
+        "cloudflare_api_token": "",
+        "instagram_session_id": "",
     }
 
     for key, value in defaults.items():
@@ -67,6 +83,12 @@ def _load_from_env(data: dict) -> dict:
         "LIGHTRoom_AI_MODEL": "ai_model",
         "LIGHTRoom_SKIP_AI": "skip_ai",
         "LIGHTRoom_VERBOSE": "verbose",
+        "LIGHTRoom_INSTAGRAM_URL": "instagram_url",
+        "LIGHTRoom_INSTAGRAM_KEYWORD": "instagram_keyword",
+        "LIGHTRoom_HASH_THRESHOLD": "hash_threshold",
+        "CLOUDFLARE_ACCOUNT_ID": "cloudflare_account_id",
+        "CLOUDFLARE_API_TOKEN": "cloudflare_api_token",
+        "INSTAGRAM_SESSION_ID": "instagram_session_id",
     }
 
     for env_var, config_key in env_mappings.items():
@@ -76,6 +98,8 @@ def _load_from_env(data: dict) -> dict:
                 value = int(value)
             elif config_key in ("skip_ai", "verbose"):
                 value = value.lower() in ("true", "1", "yes")
+            elif config_key == "hash_threshold":
+                value = int(value)
             data[config_key] = value
 
     return data

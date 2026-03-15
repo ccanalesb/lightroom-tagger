@@ -3,6 +3,8 @@ __pycache__/
 *.pyo
 *.db
 .env
+.env.*
+config.yaml
 .venv/
 venv/
 *.egg-info/
