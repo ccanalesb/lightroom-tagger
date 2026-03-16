@@ -240,11 +240,14 @@ class BrowserAgent:
 
 def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_images", 
                             limit: int = 50, session_name: str = "instagram") -> tuple[list, dict]:
-    """Convenience function to crawl Instagram using browser screenshots.
+    """Convenience function to crawl Instagram using browser to extract image URLs.
     
-    Uses pre-saved post URLs and browser screenshots to minimize API requests.
+    Uses pre-saved post URLs and extracts image URLs via JS, then downloads with curl.
     """
     import json
+    import re
+    import time
+    import subprocess
     
     os.makedirs(output_dir, exist_ok=True)
     
@@ -262,30 +265,96 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
     url_to_local = {}
     posts = []
     
+    # JS to extract all images with dimensions, sorted by largest first
+    js_extract = '''(function() {
+        const imgs = Array.from(document.querySelectorAll('img'));
+        const results = imgs
+            .filter(img => img.src && img.src.includes('instagram'))
+            .map(img => ({
+                src: img.src,
+                width: img.naturalWidth || 0,
+                height: img.naturalHeight || 0
+            }))
+            .sort((a, b) => (b.width * b.height) - (a.width * a.height))
+            .slice(0, 5);
+        return results;
+    })()'''
+    
     for i, url in enumerate(post_urls):
         post_id = url.split("/p/")[-1].split("/")[0]
-        filename = f"insta_{i}_{post_id}.png"
+        filename = f"insta_{i}_{post_id}.jpg"
         local_path = os.path.join(output_dir, filename)
         
-        # Use browser to take screenshot - each command separately
+        print(f"Processing {i+1}/{len(post_urls)}: {post_id}")
+        
+        # Navigate to post
         subprocess.run(["agent-browser", "--session-name", session_name, "open", url], 
                       capture_output=True, timeout=30)
-        subprocess.run(["agent-browser", "--session-name", session_name, "wait", "2"], 
-                      capture_output=True, timeout=30)
-        result = subprocess.run(["agent-browser", "--session-name", session_name, "screenshot", local_path], 
-                      capture_output=True, text=True, timeout=30)
         
-        if os.path.exists(local_path) and os.path.getsize(local_path) > 1000:
-            url_to_local[url] = local_path
-            print(f"Screenshot: {filename}")
-        else:
-            print(f"Failed: {filename} - {result.stdout[:100] if result.stdout else result.stderr[:100]}")
+        # Wait for images to load
+        subprocess.run(["agent-browser", "--session-name", session_name, "wait", "3"], 
+                      capture_output=True, timeout=30)
+        
+        # Extract image URLs via JS
+        result = subprocess.run(
+            ["agent-browser", "--session-name", session_name, "eval", js_extract],
+            capture_output=True, text=True, timeout=30
+        )
+        
+        image_url = None
+        
+        if result.returncode == 0 and result.stdout.strip():
+            try:
+                images = json.loads(result.stdout.strip())
+                # Get highest resolution image
+                if images and len(images) > 0:
+                    image_url = images[0]['src']
+                    print(f"  Found image: {images[0]['width']}x{images[0]['height']}")
+            except Exception as e:
+                print(f"  Parse error: {e}")
+        
+        # Try download with curl
+        downloaded = False
+        if image_url and "cdn" in image_url:
+            # Try curl with timeout
+            curl_cmd = [
+                "curl", "-sL", "--max-time", "30",
+                "-o", local_path, image_url
+            ]
+            curl_result = subprocess.run(curl_cmd, capture_output=True, timeout=35)
+            
+            # Check if downloaded successfully (file exists and not empty/12bytes error)
+            if os.path.exists(local_path):
+                file_size = os.path.getsize(local_path)
+                if file_size > 100:
+                    url_to_local[url] = local_path
+                    print(f"  Downloaded: {filename} ({file_size} bytes)")
+                    downloaded = True
+                else:
+                    os.remove(local_path)
+        
+        # Fallback to screenshot if curl failed
+        if not downloaded:
+            png_path = local_path.replace('.jpg', '.png')
+            subprocess.run(
+                ["agent-browser", "--session-name", session_name, "screenshot", png_path],
+                capture_output=True, timeout=30
+            )
+            if os.path.exists(png_path) and os.path.getsize(png_path) > 1000:
+                url_to_local[url] = png_path
+                print(f"  Screenshot fallback: {png_path}")
+            else:
+                print(f"  Failed: both curl and screenshot failed")
         
         posts.append(BrowserPost(
             post_url=url,
-            image_url=local_path,
+            image_url=image_url or local_path,
             index=i
         ))
+        
+        # Delay between posts to avoid rate limiting
+        if i < len(post_urls) - 1:
+            time.sleep(3)
     
     return posts, url_to_local
 
