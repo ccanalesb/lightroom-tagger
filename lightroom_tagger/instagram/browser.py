@@ -356,7 +356,7 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
                 seen_ids.add(img_id)
                 unique_images.append({'src': src, 'width': 0, 'height': 0})
         
-        images = unique_images[:10]
+        images = unique_images
         print(f"  Found {len(images)} unique images")
         
         downloaded_paths = []
