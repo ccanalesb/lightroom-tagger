@@ -296,46 +296,26 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
     url_to_local = {}
     posts = []
     
-    # JS to extract post images - click through carousel with delays
-    js_extract = '''(async function() {
+    # Simple JS to get images - extract just the image ID for deduplication
+    js_extract = '''(function() {
         const results = [];
         const seen = new Set();
         
-        const getImages = () => {
-            Array.from(document.querySelectorAll('img'))
-                .filter(i => i.naturalWidth >= 1000 && i.src.includes('instagram'))
-                .forEach(i => {
-                    const url = i.src.split('?')[0];
-                    if (!seen.has(url)) {
-                        seen.add(url);
-                        results.push({src: i.src, width: i.naturalWidth, height: i.naturalHeight});
-                    }
-                });
-        };
-        
-        // Wait for initial page load
-        await new Promise(r => setTimeout(r, 1500));
-        
-        // Get initial images
-        getImages();
-        
-        // Click through carousel - wait between each click
-        for (let i = 0; i < 10; i++) {
-            const nextBtn = document.querySelector('button[aria-label="Next"]');
-            if (!nextBtn || nextBtn.disabled) break;
-            
-            nextBtn.click();
-            
-            // Wait 1-2 seconds for images to load
-            const waitTime = 1500 + Math.random() * 1000;
-            await new Promise(r => setTimeout(r, waitTime));
-            
-            getImages();
-        }
+        Array.from(document.querySelectorAll('img'))
+            .filter(i => i.naturalWidth >= 1000 && i.src.includes('instagram'))
+            .forEach(i => {
+                // Extract just the image ID from URL for deduplication
+                const match = i.src.match(/v\\/t51[^_]*/);
+                const id = match ? match[0] : i.src.split('?')[0];
+                if (!seen.has(id)) {
+                    seen.add(id);
+                    results.push({src: i.src, width: i.naturalWidth, height: i.naturalHeight, id: id});
+                }
+            });
         
         return results.slice(0, 10);
     })()'''
-    
+
     for i, url in enumerate(post_urls):
         post_id = url.split("/p/")[-1].split("/")[0]
         filename = f"insta_{i}_{post_id}.jpg"
@@ -343,29 +323,41 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
         
         print(f"Processing {i+1}/{len(post_urls)}: {post_id}")
         
-        # Navigate to post
-        subprocess.run(["agent-browser", "--session-name", session_name, "open", url], 
-                      capture_output=True, timeout=30)
+        # Try img_index URLs to get all carousel images
+        all_image_urls = set()
         
-        # Wait for images to load
-        subprocess.run(["agent-browser", "--session-name", session_name, "wait", "3"], 
-                      capture_output=True, timeout=30)
+        for idx in range(6):
+            img_url = f"{url}?img_index={idx}"
+            subprocess.run(["agent-browser", "--session-name", session_name, "open", img_url], 
+                          capture_output=True, timeout=30)
+            subprocess.run(["agent-browser", "--session-name", session_name, "wait", "3"], 
+                          capture_output=True, timeout=30)
+            
+            result = subprocess.run(
+                ["agent-browser", "--session-name", session_name, "eval", js_extract],
+                capture_output=True, text=True, timeout=30
+            )
+            
+            if result.returncode == 0 and result.stdout.strip():
+                try:
+                    images = json.loads(result.stdout.strip())
+                    for img in images:
+                        # Use ID for deduplication
+                        img_id = img.get('id', img['src'].split('?')[0])
+                        all_image_urls.add((img['src'], img_id))
+                except:
+                    pass
         
-        # Extract image URLs via JS
-        result = subprocess.run(
-            ["agent-browser", "--session-name", session_name, "eval", js_extract],
-            capture_output=True, text=True, timeout=30
-        )
+        # Deduplicate by ID
+        unique_images = []
+        seen_ids = set()
+        for src, img_id in all_image_urls:
+            if img_id not in seen_ids:
+                seen_ids.add(img_id)
+                unique_images.append({'src': src, 'width': 0, 'height': 0})
         
-        # Parse image URLs from JS result
-        images = []
-        if result.returncode == 0 and result.stdout.strip():
-            try:
-                images = json.loads(result.stdout.strip())
-                if images:
-                    print(f"  Found {len(images)} image(s)")
-            except Exception as e:
-                print(f"  Parse error: {e}")
+        images = unique_images[:10]
+        print(f"  Found {len(images)} unique images")
         
         downloaded_paths = []
         if images and len(images) > 0:
