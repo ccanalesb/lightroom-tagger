@@ -94,15 +94,26 @@ class BrowserAgent:
             
             # Check snapshot for login page (not logged in)
             snapshot = self.snapshot()
-            if "/accounts/login/" in snapshot or 'button "Log in"' in snapshot:
+            
+            # If we see login form elements, we're not logged in
+            if 'textbox "Mobile number' in snapshot or 'button "Log In"' in snapshot:
+                return False
+            
+            # Also check for "Create new account" which appears on login page
+            if 'link "Create new account"' in snapshot:
                 return False
             
             # Check DOM for logged-in elements
             js_check = """(function() {
-                const hasNav = document.querySelector('nav') !== null;
-                const hasHomeIcon = document.querySelector('svg[aria-label="Home"]') !== null;
-                const hasProfileLink = document.querySelector('a[href*="/accounts/"]') !== null;
-                return hasNav || hasHomeIcon || hasProfileLink;
+                // If we can find the stories bar or home feed, we're logged in
+                const hasStories = document.querySelector('header') !== null || 
+                                   document.querySelector('main') !== null;
+                const hasHomeLink = document.querySelector('a[href*="/"] svg[aria-label="Home"]') !== null ||
+                                   document.querySelector('svg[aria-label="Home"]') !== null;
+                // Check for username in URL or profile elements
+                const url = window.location.href;
+                const hasUsername = url.includes('/im.canales') || url === 'https://www.instagram.com/';
+                return hasStories || hasHomeLink;
             })()"""
             
             returncode, result, stderr = self._run_command(["eval", js_check])
