@@ -296,20 +296,36 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
     url_to_local = {}
     posts = []
     
-    # JS to extract ALL post images (handles carousels with multiple images)
+    # JS to extract post images - filter by high resolution (main carousel images)
     js_extract = '''(function() {
+        // Get high-res images that are likely the main post/carousel
         const imgs = Array.from(document.querySelectorAll('img'));
-        // Find all images with alt text containing username (handles carousels)
-        const postImgs = imgs.filter(img => img.alt && img.alt.includes('Canales'));
-        if (postImgs.length > 0) {
-            return postImgs.map(img => ({src: img.src, width: img.naturalWidth, height: img.naturalHeight}));
+        const postImgs = imgs.filter(img => 
+            img.naturalWidth >= 1400 && 
+            img.naturalHeight >= 1400 &&
+            img.src.includes('instagram')
+        );
+        
+        // Also try to get images with alt text containing username
+        const altImgs = imgs.filter(img => 
+            img.alt && img.alt.includes('Canales') && img.src.includes('instagram')
+        );
+        
+        // Use alt images if available, otherwise fall back to high-res
+        const results = altImgs.length > 0 ? altImgs : postImgs;
+        
+        // Deduplicate by URL
+        const seen = new Set();
+        const unique = [];
+        for (const img of results) {
+            const url = img.src.split('?')[0];
+            if (!seen.has(url)) {
+                seen.add(url);
+                unique.push({src: img.src, width: img.naturalWidth, height: img.naturalHeight});
+            }
         }
-        // Fallback: get largest image
-        return imgs
-            .filter(img => img.src && img.src.includes('instagram'))
-            .map(img => ({src: img.src, width: img.naturalWidth || 0, height: img.naturalHeight || 0}))
-            .sort((a, b) => (b.width * b.height) - (a.width * a.height))
-            .slice(0, 1);
+        
+        return unique.slice(0, 10); // Max 10 images
     })()'''
     
     for i, url in enumerate(post_urls):
