@@ -440,13 +440,30 @@ def cmd_instagram_sync(args, config):
         from lightroom_tagger.instagram.browser import BrowserAgent
         
         if do_login:
-            print("Opening browser for manual Instagram login...")
-            print("(A browser window will appear - log in, then close the window when done)")
-            agent = BrowserAgent(output_dir, headed=True)
+            print("Opening headed browser for Instagram login...")
+            print("(A browser window will appear)")
+            print("1. Log in to your Instagram account")
+            print("2. After logging in, close the browser window")
+            print("3. Your session will be saved automatically")
+            agent = BrowserAgent(output_dir, headed=True, session_name="instagram")
             agent.login(instagram_url)
+            print("Browser opened. Please log in and close when done...")
+            import time
+            time.sleep(5)  # Give user time to interact
             agent.close()
             print("Session saved! You can now run without --login")
             return 0
+
+        # Check session validity before scraping
+        print("Checking session validity...")
+        agent = BrowserAgent(output_dir, session_name="instagram")
+        if not agent.is_logged_in():
+            agent.close()
+            print("Not logged in to Instagram.")
+            print("Run with --login to authenticate: lightroom-tagger instagram-sync --browser --login")
+            return 1
+        agent.close()
+        print("Session valid. Proceeding with scraping...")
 
         username = instagram_url.split('/')[-2] if '/' in instagram_url else instagram_url
         print("Using browser-based scraping...")

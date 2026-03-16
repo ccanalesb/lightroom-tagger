@@ -83,15 +83,35 @@ class BrowserAgent:
         return self.open_url(url)
 
     def is_logged_in(self) -> bool:
-        """Check if session appears to be logged in.
+        """Check if session is logged in.
         
-        Takes snapshot and checks for presence of profile elements.
+        Checks both URL and DOM for logged-in state.
         """
         try:
+            # Navigate to Instagram homepage
+            self.open_url("https://www.instagram.com/")
+            self.wait(3)
+            
+            # Check snapshot for login page (not logged in)
             snapshot = self.snapshot()
-            logged_in_indicators = ["profile", "settings", "logout"]
-            return any(indicator in snapshot.lower() for indicator in logged_in_indicators)
-        except Exception:
+            if "/accounts/login/" in snapshot or 'button "Log in"' in snapshot:
+                return False
+            
+            # Check DOM for logged-in elements
+            js_check = """(function() {
+                const hasNav = document.querySelector('nav') !== null;
+                const hasHomeIcon = document.querySelector('svg[aria-label="Home"]') !== null;
+                const hasProfileLink = document.querySelector('a[href*="/accounts/"]') !== null;
+                return hasNav || hasHomeIcon || hasProfileLink;
+            })()"""
+            
+            returncode, result, stderr = self._run_command(["eval", js_check])
+            if returncode == 0 and "true" in result.lower():
+                return True
+            
+            return False
+        except Exception as e:
+            print(f"Session check error: {e}")
             return False
 
     def navigate_to_profile(self, username: str) -> bool:
