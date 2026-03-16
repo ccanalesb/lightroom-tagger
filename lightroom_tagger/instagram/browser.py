@@ -296,7 +296,7 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
     url_to_local = {}
     posts = []
     
-    # JS to extract post images - click through carousel properly
+    # JS to extract post images - click through carousel with delays
     js_extract = '''(async function() {
         const results = [];
         const seen = new Set();
@@ -313,22 +313,24 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
                 });
         };
         
+        // Wait for initial page load
+        await new Promise(r => setTimeout(r, 1500));
+        
         // Get initial images
         getImages();
         
-        // Click through carousel - Instagram shows "1 of X" or similar
-        // Try up to 10 clicks until Next button is disabled/gone
+        // Click through carousel - wait between each click
         for (let i = 0; i < 10; i++) {
             const nextBtn = document.querySelector('button[aria-label="Next"]');
             if (!nextBtn || nextBtn.disabled) break;
             
             nextBtn.click();
-            await new Promise(r => setTimeout(r, 600));
-            getImages();
             
-            // Check if we're at the end
-            const currentBtn = document.querySelector('button[aria-label="Next"]');
-            if (!currentBtn) break;
+            // Wait 1-2 seconds for images to load
+            const waitTime = 1500 + Math.random() * 1000;
+            await new Promise(r => setTimeout(r, waitTime));
+            
+            getImages();
         }
         
         return results.slice(0, 10);
