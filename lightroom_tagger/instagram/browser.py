@@ -271,9 +271,20 @@ class BrowserAgent:
 
 def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_images", 
                             limit: int = 50, session_name: str = "instagram") -> tuple[list, dict]:
-    """Convenience function to crawl Instagram using browser to extract image URLs.
+    """Crawl Instagram using browser to extract and download post images.
     
-    Uses pre-saved post URLs and extracts image URLs via JS, then downloads with curl.
+    Uses pre-saved post URLs and extracts image URLs via img_index to get all carousel images.
+    
+    File Structure:
+        output_dir/
+            {post_id}/
+                img_0.jpg   (first image)
+                img_1.jpg   (second image, if carousel)
+                img_2.jpg   (third image, if carousel)
+                ...
+    
+    Returns:
+        Tuple of (list of BrowserPost, dict mapping post_url -> list of local_paths)
     """
     import json
     import re
@@ -366,10 +377,12 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
                 if not image_url or "cdn" not in image_url:
                     continue
                     
-                # Use sub-index for carousel images
-                sub_idx = f"{i}_{j}" if len(images) > 1 else str(i)
-                filename = f"insta_{sub_idx}_{post_id}.jpg"
-                local_path = os.path.join(output_dir, filename)
+                # Create folder per post and use image index
+                post_folder = os.path.join(output_dir, post_id)
+                os.makedirs(post_folder, exist_ok=True)
+                
+                filename = f"img_{j}.jpg"
+                local_path = os.path.join(post_folder, filename)
                 
                 curl_cmd = [
                     "curl", "-sL", "--max-time", "30",
@@ -381,7 +394,7 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
                     file_size = os.path.getsize(local_path)
                     if file_size > 100:
                         downloaded_paths.append(local_path)
-                        print(f"  Downloaded[{j}]: {img_data['width']}x{img_data['height']} ({file_size} bytes)")
+                        print(f"  Downloaded[{j}]: ({file_size} bytes)")
                     else:
                         os.remove(local_path)
                 
@@ -391,7 +404,9 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
         
         # If no images downloaded, try screenshot fallback
         if not downloaded_paths:
-            png_path = os.path.join(output_dir, f"insta_{i}_{post_id}.png")
+            post_folder = os.path.join(output_dir, post_id)
+            os.makedirs(post_folder, exist_ok=True)
+            png_path = os.path.join(post_folder, "screenshot.png")
             subprocess.run(
                 ["agent-browser", "--session-name", session_name, "screenshot", png_path],
                 capture_output=True, timeout=30
@@ -400,11 +415,11 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
                 downloaded_paths.append(png_path)
                 print(f"  Screenshot fallback: {png_path}")
         
-        # Store first image path in url_to_local for compatibility
+        # Store all image paths for this post
         if downloaded_paths:
-            url_to_local[url] = downloaded_paths[0]
+            url_to_local[url] = downloaded_paths
         
-        # Add post with image URL (use first downloaded image or the JS result)
+        # Add post with first image URL
         post_image_url = downloaded_paths[0] if downloaded_paths else (images[0]['src'] if images and images[0].get('src') else "")
         posts.append(BrowserPost(
             post_url=url,
