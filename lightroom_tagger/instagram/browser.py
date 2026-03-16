@@ -297,42 +297,33 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
     posts = []
     
     # JS to extract post images by clicking through carousel
-    js_extract = '''(function() {
+    js_extract = '''(async function() {
         const results = [];
         const seen = new Set();
         
-        // Get images at current position
         const getImages = () => {
-            const imgs = Array.from(document.querySelectorAll('img')).filter(i => 
-                i.naturalWidth >= 1000 && i.src.includes('instagram')
-            );
-            for (const img of imgs) {
-                const url = img.src.split('?')[0];
-                if (!seen.has(url)) {
-                    seen.add(url);
-                    results.push({src: img.src, width: img.naturalWidth, height: img.naturalHeight});
-                }
-            }
+            Array.from(document.querySelectorAll('img'))
+                .filter(i => i.naturalWidth >= 1000 && i.src.includes('instagram'))
+                .forEach(i => {
+                    const url = i.src.split('?')[0];
+                    if (!seen.has(url)) {
+                        seen.add(url);
+                        results.push({src: i.src, width: i.naturalWidth, height: i.naturalHeight});
+                    }
+                });
         };
         
         // Get initial images
         getImages();
         
-        // Try to navigate through carousel using arrow key
-        let maxClicks = 10;
-        while (maxClicks > 0) {
-            // Simulate arrow right key press
-            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', keyCode: 39}));
-            // Wait a bit for images to load
-            const start = Date.now();
-            while (Date.now() - start < 500) {}
+        // Navigate through carousel by clicking Next button
+        for (let i = 0; i < 8; i++) {
+            const btn = document.querySelector('button[aria-label="Next"]');
+            if (!btn) break;
             
-            const beforeCount = results.length;
+            btn.click();
+            await new Promise(r => setTimeout(r, 500));
             getImages();
-            
-            // If no new images, we've reached the end
-            if (results.length >= beforeCount && maxClicks < 10) break;
-            maxClicks--;
         }
         
         return results.slice(0, 10);
