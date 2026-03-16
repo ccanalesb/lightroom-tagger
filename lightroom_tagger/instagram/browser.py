@@ -265,19 +265,20 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
     url_to_local = {}
     posts = []
     
-    # JS to extract all images with dimensions, sorted by largest first
+    # JS to extract post image (target by alt text containing username)
     js_extract = '''(function() {
         const imgs = Array.from(document.querySelectorAll('img'));
-        const results = imgs
+        // Find image with alt text containing the username (post image)
+        const postImg = imgs.find(img => img.alt && img.alt.includes('Canales'));
+        if (postImg) {
+            return [{src: postImg.src, width: postImg.naturalWidth, height: postImg.naturalHeight}];
+        }
+        // Fallback: get largest image
+        return imgs
             .filter(img => img.src && img.src.includes('instagram'))
-            .map(img => ({
-                src: img.src,
-                width: img.naturalWidth || 0,
-                height: img.naturalHeight || 0
-            }))
+            .map(img => ({src: img.src, width: img.naturalWidth || 0, height: img.naturalHeight || 0}))
             .sort((a, b) => (b.width * b.height) - (a.width * a.height))
-            .slice(0, 5);
-        return results;
+            .slice(0, 1);
     })()'''
     
     for i, url in enumerate(post_urls):
@@ -306,10 +307,10 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
         if result.returncode == 0 and result.stdout.strip():
             try:
                 images = json.loads(result.stdout.strip())
-                # Get highest resolution image
+                # Get the image (now returns array with 1 element)
                 if images and len(images) > 0:
                     image_url = images[0]['src']
-                    print(f"  Found image: {images[0]['width']}x{images[0]['height']}")
+                    print(f"  Found: {images[0]['width']}x{images[0]['height']}")
             except Exception as e:
                 print(f"  Parse error: {e}")
         
