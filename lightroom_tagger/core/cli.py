@@ -2,6 +2,7 @@ import argparse
 import json
 import csv
 import sys
+import subprocess
 from pathlib import Path
 
 from lightroom_tagger.core.config import load_config
@@ -443,15 +444,31 @@ def cmd_instagram_sync(args, config):
             print("Opening headed browser for Instagram login...")
             print("(A browser window will appear)")
             print("1. Log in to your Instagram account")
-            print("2. After logging in, close the browser window")
-            print("3. Your session will be saved automatically")
+            print("2. Close the browser window when done")
+            print("The system will wait for the browser to close...")
             agent = BrowserAgent(output_dir, headed=True, session_name="instagram")
             agent.login(instagram_url)
-            print("Browser opened. Please log in and close when done...")
+            
+            # Wait for browser to be closed by user
             import time
-            time.sleep(5)  # Give user time to interact
-            agent.close()
-            print("Session saved! You can now run without --login")
+            while True:
+                time.sleep(2)
+                # Check if browser process is still running by trying a simple command
+                result = subprocess.run(
+                    ["agent-browser", "--session-name", "instagram", "snapshot"],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode != 0:
+                    break
+            
+            print("Browser closed. Verifying session...")
+            agent2 = BrowserAgent(output_dir, session_name="instagram")
+            if agent2.is_logged_in():
+                agent2.close()
+                print("Login successful! Session saved.")
+            else:
+                agent2.close()
+                print("Login failed or cancelled. Please try again with --login")
             return 0
 
         # Check session validity before scraping
