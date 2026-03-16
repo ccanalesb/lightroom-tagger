@@ -296,36 +296,46 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
     url_to_local = {}
     posts = []
     
-    # JS to extract post images - filter by high resolution (main carousel images)
+    # JS to extract post images by clicking through carousel
     js_extract = '''(function() {
-        // Get high-res images that are likely the main post/carousel
-        const imgs = Array.from(document.querySelectorAll('img'));
-        const postImgs = imgs.filter(img => 
-            img.naturalWidth >= 1400 && 
-            img.naturalHeight >= 1400 &&
-            img.src.includes('instagram')
-        );
-        
-        // Also try to get images with alt text containing username
-        const altImgs = imgs.filter(img => 
-            img.alt && img.alt.includes('Canales') && img.src.includes('instagram')
-        );
-        
-        // Use alt images if available, otherwise fall back to high-res
-        const results = altImgs.length > 0 ? altImgs : postImgs;
-        
-        // Deduplicate by URL
+        const results = [];
         const seen = new Set();
-        const unique = [];
-        for (const img of results) {
-            const url = img.src.split('?')[0];
-            if (!seen.has(url)) {
-                seen.add(url);
-                unique.push({src: img.src, width: img.naturalWidth, height: img.naturalHeight});
+        
+        // Get images at current position
+        const getImages = () => {
+            const imgs = Array.from(document.querySelectorAll('img')).filter(i => 
+                i.naturalWidth >= 1000 && i.src.includes('instagram')
+            );
+            for (const img of imgs) {
+                const url = img.src.split('?')[0];
+                if (!seen.has(url)) {
+                    seen.add(url);
+                    results.push({src: img.src, width: img.naturalWidth, height: img.naturalHeight});
+                }
             }
+        };
+        
+        // Get initial images
+        getImages();
+        
+        // Try to navigate through carousel using arrow key
+        let maxClicks = 10;
+        while (maxClicks > 0) {
+            // Simulate arrow right key press
+            document.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', keyCode: 39}));
+            // Wait a bit for images to load
+            const start = Date.now();
+            while (Date.now() - start < 500) {}
+            
+            const beforeCount = results.length;
+            getImages();
+            
+            // If no new images, we've reached the end
+            if (results.length >= beforeCount && maxClicks < 10) break;
+            maxClicks--;
         }
         
-        return unique.slice(0, 10); // Max 10 images
+        return results.slice(0, 10);
     })()'''
     
     for i, url in enumerate(post_urls):
