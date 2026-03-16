@@ -265,13 +265,13 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
     url_to_local = {}
     posts = []
     
-    # JS to extract post image (target by alt text containing username)
+    # JS to extract ALL post images (handles carousels with multiple images)
     js_extract = '''(function() {
         const imgs = Array.from(document.querySelectorAll('img'));
-        // Find image with alt text containing the username (post image)
-        const postImg = imgs.find(img => img.alt && img.alt.includes('Canales'));
-        if (postImg) {
-            return [{src: postImg.src, width: postImg.naturalWidth, height: postImg.naturalHeight}];
+        // Find all images with alt text containing username (handles carousels)
+        const postImgs = imgs.filter(img => img.alt && img.alt.includes('Canales'));
+        if (postImgs.length > 0) {
+            return postImgs.map(img => ({src: img.src, width: img.naturalWidth, height: img.naturalHeight}));
         }
         // Fallback: get largest image
         return imgs
@@ -302,54 +302,66 @@ def crawl_instagram_browser(username: str, output_dir: str = "/tmp/instagram_ima
             capture_output=True, text=True, timeout=30
         )
         
-        image_url = None
-        
+        # Parse image URLs from JS result
+        images = []
         if result.returncode == 0 and result.stdout.strip():
             try:
                 images = json.loads(result.stdout.strip())
-                # Get the image (now returns array with 1 element)
-                if images and len(images) > 0:
-                    image_url = images[0]['src']
-                    print(f"  Found: {images[0]['width']}x{images[0]['height']}")
+                if images:
+                    print(f"  Found {len(images)} image(s)")
             except Exception as e:
                 print(f"  Parse error: {e}")
         
-        # Try download with curl
-        downloaded = False
-        if image_url and "cdn" in image_url:
-            # Try curl with timeout
-            curl_cmd = [
-                "curl", "-sL", "--max-time", "30",
-                "-o", local_path, image_url
-            ]
-            curl_result = subprocess.run(curl_cmd, capture_output=True, timeout=35)
-            
-            # Check if downloaded successfully (file exists and not empty/12bytes error)
-            if os.path.exists(local_path):
-                file_size = os.path.getsize(local_path)
-                if file_size > 100:
-                    url_to_local[url] = local_path
-                    print(f"  Downloaded: {filename} ({file_size} bytes)")
-                    downloaded = True
-                else:
-                    os.remove(local_path)
+        downloaded_paths = []
+        if images and len(images) > 0:
+            for j, img_data in enumerate(images):
+                image_url = img_data['src']
+                if not image_url or "cdn" not in image_url:
+                    continue
+                    
+                # Use sub-index for carousel images
+                sub_idx = f"{i}_{j}" if len(images) > 1 else str(i)
+                filename = f"insta_{sub_idx}_{post_id}.jpg"
+                local_path = os.path.join(output_dir, filename)
+                
+                curl_cmd = [
+                    "curl", "-sL", "--max-time", "30",
+                    "-o", local_path, image_url
+                ]
+                curl_result = subprocess.run(curl_cmd, capture_output=True, timeout=35)
+                
+                if os.path.exists(local_path):
+                    file_size = os.path.getsize(local_path)
+                    if file_size > 100:
+                        downloaded_paths.append(local_path)
+                        print(f"  Downloaded[{j}]: {img_data['width']}x{img_data['height']} ({file_size} bytes)")
+                    else:
+                        os.remove(local_path)
+                
+                # Delay between images to avoid rate limiting
+                if j < len(images) - 1:
+                    time.sleep(2)
         
-        # Fallback to screenshot if curl failed
-        if not downloaded:
-            png_path = local_path.replace('.jpg', '.png')
+        # If no images downloaded, try screenshot fallback
+        if not downloaded_paths:
+            png_path = os.path.join(output_dir, f"insta_{i}_{post_id}.png")
             subprocess.run(
                 ["agent-browser", "--session-name", session_name, "screenshot", png_path],
                 capture_output=True, timeout=30
             )
             if os.path.exists(png_path) and os.path.getsize(png_path) > 1000:
-                url_to_local[url] = png_path
+                downloaded_paths.append(png_path)
                 print(f"  Screenshot fallback: {png_path}")
-            else:
-                print(f"  Failed: both curl and screenshot failed")
         
+        # Store first image path in url_to_local for compatibility
+        if downloaded_paths:
+            url_to_local[url] = downloaded_paths[0]
+        
+        # Add post with image URL (use first downloaded image or the JS result)
+        post_image_url = downloaded_paths[0] if downloaded_paths else (images[0]['src'] if images and images[0].get('src') else "")
         posts.append(BrowserPost(
             post_url=url,
-            image_url=image_url or local_path,
+            image_url=post_image_url,
             index=i
         ))
         
