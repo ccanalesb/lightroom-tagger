@@ -70,3 +70,4 @@ instructions.md
 skills-lock.json
 .agents/
 .opencode/
+.worktrees/
