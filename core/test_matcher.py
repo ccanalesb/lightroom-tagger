@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import Mock, patch
-from core.matcher import match_image, match_batch
+from core.matcher import match_image, match_batch, score_candidates_with_vision
+
 
 def test_match_filters_by_exif():
     """Should filter candidates by EXIF first."""
@@ -18,7 +19,7 @@ def test_match_filters_by_exif():
     ]
     
     with patch('core.matcher.query_by_exif', return_value=[catalog_candidates[0]]), \
-         patch('core.matcher.score_candidates', return_value=[{'catalog_key': 'cat1', 'total_score': 0.9}]):
+         patch('core.matcher.score_candidates_with_vision', return_value=[{'catalog_key': 'cat1', 'total_score': 0.9}]):
         
         result = match_image(mock_db, insta_image, threshold=0.7)
     
@@ -38,3 +39,27 @@ def test_match_batch():
         result = match_batch(mock_db, insta_images, threshold=0.7)
     
     assert result['total_matches'] == 2
+
+
+def test_score_candidates_includes_vision():
+    """Should include vision score when comparing."""
+    insta_image = {
+        'key': 'insta_test',
+        'phash': 'a1b2c3d4e5f6g7h8',
+        'description': 'sunset over bay',
+        'local_path': '/tmp/insta.jpg'
+    }
+    
+    candidates = [
+        {'key': 'cat1', 'phash': 'a1b2c3d4e5f6g7h8', 'description': 'sunset', 'filepath': '/tmp/local1.jpg'},
+    ]
+    
+    with patch('core.analyzer.compare_with_vision', return_value='SAME') as vision_mock:
+        results = score_candidates_with_vision(
+            insta_image, candidates,
+            phash_weight=0.4, desc_weight=0.3, vision_weight=0.3
+        )
+    
+    assert len(results) == 1
+    assert results[0]['vision_result'] == 'SAME'
+    assert results[0]['vision_score'] == 1.0

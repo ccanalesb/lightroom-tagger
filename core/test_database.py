@@ -203,7 +203,7 @@ class TestInstagramStatus(unittest.TestCase):
 
     def test_store_catalog_image(self):
         """Store catalog image with analysis data."""
-        from lightroom_tagger.core.database import store_catalog_image
+        from core.database import store_catalog_image
         
         key = store_catalog_image(self.db, {
             'key': '2024-01-15_sunset.jpg',
@@ -221,7 +221,7 @@ class TestInstagramStatus(unittest.TestCase):
 
     def test_store_instagram_image(self):
         """Store Instagram image with analysis data."""
-        from lightroom_tagger.core.database import store_instagram_image
+        from core.database import store_instagram_image
         
         key = store_instagram_image(self.db, {
             'post_url': 'https://instagram.com/p/abc123',
@@ -238,7 +238,7 @@ class TestInstagramStatus(unittest.TestCase):
 
     def test_store_match(self):
         """Store match between catalog and Instagram image."""
-        from lightroom_tagger.core.database import store_match
+        from core.database import store_match
         
         store_match(self.db, {
             'catalog_key': '2024-01-15_sunset.jpg',
@@ -255,6 +255,22 @@ class TestInstagramStatus(unittest.TestCase):
         result = self.db.table('matches').search(Match.catalog_key == '2024-01-15_sunset.jpg')
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]['total_score'], 0.85)
+
+    def test_store_match_includes_vision(self):
+        """Store match should include vision result."""
+        from core.database import store_match
+        
+        store_match(self.db, {
+            'catalog_key': '2024-01-15_sunset.jpg',
+            'insta_key': 'insta_2024-01-16_post123',
+            'vision_result': 'SAME',
+            'total_score': 0.85
+        })
+        
+        Match = Query()
+        result = self.db.table('matches').search(Match.catalog_key == '2024-01-15_sunset.jpg')
+        assert len(result) == 1
+        assert result[0]['vision_result'] == 'SAME'
 
 
 if __name__ == "__main__":

@@ -66,3 +66,48 @@ def run_local_agent(path: str) -> str:
 def run_external_agent(path: str) -> str:
     """Run external API (e.g., Claude, GPT-4V)."""
     return ""
+
+
+def compare_with_vision(local_path: str, insta_path: str) -> str:
+    """Compare two images using vision model via Ollama.
+    
+    Returns: 'SAME' | 'DIFFERENT' | 'UNCERTAIN'
+    """
+    return run_vision_ollama(local_path, insta_path)
+
+
+def run_vision_ollama(local_path: str, insta_path: str) -> str:
+    """Run Qwen2.5-VL via Ollama to compare images."""
+    import subprocess
+    
+    prompt = """You are given two images. Determine if they depict the same subject or scene.
+Image 1 may be lower quality, compressed, or degraded.
+Focus on semantic content, not pixel-level accuracy.
+
+Reply with ONLY: SAME / DIFFERENT / UNCERTAIN"""
+
+    try:
+        result = subprocess.run([
+            'ollama', 'run', 'qwen2.5-vl:7b',
+            f'Image 1: {local_path}',
+            f'Image 2: {insta_path}',
+            prompt
+        ], capture_output=True, text=True, timeout=120)
+        
+        output = result.stdout.strip().upper()
+        if 'SAME' in output:
+            return 'SAME'
+        elif 'DIFFERENT' in output:
+            return 'DIFFERENT'
+        return 'UNCERTAIN'
+    except Exception:
+        return 'UNCERTAIN'
+
+
+def vision_score(result: str) -> float:
+    """Convert vision result to score."""
+    if result == 'SAME':
+        return 1.0
+    elif result == 'DIFFERENT':
+        return 0.0
+    return 0.5  # UNCERTAIN

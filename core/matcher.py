@@ -59,8 +59,58 @@ def text_similarity(text1: str, text2: str) -> float:
     
     return intersection / union if union > 0 else 0.0
 
-def match_image(db, insta_image: dict, threshold: float = 0.7, phash_weight: float = 0.5, desc_weight: float = 0.5) -> List[dict]:
-    """Match single Instagram image against catalog."""
+
+def score_candidates_with_vision(insta_image: dict, candidates: list, 
+                                  phash_weight: float = 0.4, desc_weight: float = 0.3, 
+                                  vision_weight: float = 0.3) -> List[dict]:
+    """Score candidates including vision comparison (one-by-one)."""
+    from core.phash import hamming_distance
+    from core.analyzer import compare_with_vision, vision_score
+    
+    results = []
+    
+    for candidate in candidates:
+        phash_dist = hamming_distance(insta_image.get('phash', ''), candidate.get('phash', ''))
+        phash_score_val = max(0, 1 - (phash_dist / 16))
+        
+        desc_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
+        
+        insta_path = insta_image.get('local_path')
+        local_path = candidate.get('filepath')
+        
+        if insta_path and local_path:
+            try:
+                vision_result = compare_with_vision(local_path, insta_path)
+                vision_score_val = vision_score(vision_result)
+            except Exception:
+                vision_result = 'UNCERTAIN'
+                vision_score_val = 0.5
+        else:
+            vision_result = 'UNCERTAIN'
+            vision_score_val = 0.5
+        
+        total = (phash_weight * phash_score_val) + \
+                (desc_weight * desc_sim) + \
+                (vision_weight * vision_score_val)
+        
+        results.append({
+            'catalog_key': candidate.get('key'),
+            'insta_key': insta_image.get('key'),
+            'phash_distance': phash_dist,
+            'phash_score': phash_score_val,
+            'desc_similarity': desc_sim,
+            'vision_result': vision_result,
+            'vision_score': vision_score_val,
+            'total_score': total
+        })
+    
+    return sorted(results, key=lambda x: x['total_score'], reverse=True)
+
+
+def match_image(db, insta_image: dict, threshold: float = 0.7, 
+                phash_weight: float = 0.4, desc_weight: float = 0.3, 
+                vision_weight: float = 0.3) -> List[dict]:
+    """Match single Instagram image against catalog with vision comparison."""
     insta_exif = insta_image.get('exif', {})
     
     candidates = query_by_exif(db, insta_exif)
@@ -68,7 +118,10 @@ def match_image(db, insta_image: dict, threshold: float = 0.7, phash_weight: flo
     if not candidates:
         return []
     
-    scored = score_candidates(insta_image, candidates, phash_weight, desc_weight)
+    scored = score_candidates_with_vision(
+        insta_image, candidates, 
+        phash_weight, desc_weight, vision_weight
+    )
     
     matches = [m for m in scored if m['total_score'] >= threshold]
     
@@ -77,13 +130,18 @@ def match_image(db, insta_image: dict, threshold: float = 0.7, phash_weight: flo
     
     return matches
 
-def match_batch(db, insta_images: list, threshold: float = 0.7, phash_weight: float = 0.5, desc_weight: float = 0.5) -> dict:
+def match_batch(db, insta_images: list, threshold: float = 0.7, 
+                phash_weight: float = 0.4, desc_weight: float = 0.3, 
+                vision_weight: float = 0.3) -> dict:
     """Match multiple Instagram images against catalog."""
     total_matches = 0
     total_candidates = 0
     
     for insta_image in insta_images:
-        matches = match_image(db, insta_image, threshold, phash_weight, desc_weight)
+        matches = match_image(
+            db, insta_image, threshold, 
+            phash_weight, desc_weight, vision_weight
+        )
         if matches:
             total_matches += 1
             total_candidates += len(matches)

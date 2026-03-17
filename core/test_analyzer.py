@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from core.analyzer import analyze_image, describe_image
+from core.analyzer import analyze_image, describe_image, compare_with_vision
+
 
 def test_analyze_image_returns_all_signals():
     """Analyzer should return phash, exif, and description."""
@@ -26,3 +27,21 @@ def test_describe_image_uses_configured_agent():
         # Test external agent
         describe_image('/fake/path.jpg', agent_type='external')
         ext_mock.assert_called_once()
+
+
+def test_compare_with_vision_returns_result():
+    """Vision comparison should return SAME, DIFFERENT, or UNCERTAIN."""
+    with patch('core.analyzer.run_vision_ollama', return_value='SAME'):
+        result = compare_with_vision('/tmp/local.jpg', '/tmp/insta.jpg')
+    
+    assert result in ['SAME', 'DIFFERENT', 'UNCERTAIN']
+    assert result == 'SAME'
+
+
+def test_vision_score_converts_correctly():
+    """Vision score should convert result to float."""
+    from core.analyzer import vision_score
+    
+    assert vision_score('SAME') == 1.0
+    assert vision_score('DIFFERENT') == 0.0
+    assert vision_score('UNCERTAIN') == 0.5

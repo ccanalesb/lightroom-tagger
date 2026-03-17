@@ -267,8 +267,14 @@ def create_parser() -> argparse.ArgumentParser:
     match_parser.add_argument(
         "--phash-weight",
         type=float,
-        default=0.5,
-        help="Phash weight in scoring (default 0.5)"
+        default=0.4,
+        help="Phash weight in scoring (default 0.4)"
+    )
+    match_parser.add_argument(
+        "--vision-weight",
+        type=float,
+        default=0.3,
+        help="Vision model weight in scoring (default 0.3)"
     )
 
     return parser
@@ -677,7 +683,9 @@ def cmd_match(args, config):
     init_instagram_table(db)
     
     threshold = args.threshold or 0.7
-    phash_weight = args.phash_weight or 0.5
+    phash_weight = args.phash_weight or 0.4
+    desc_weight = 0.3
+    vision_weight = args.vision_weight or 0.3
     
     insta_images = db.table('instagram_images').all()
     
@@ -686,7 +694,7 @@ def cmd_match(args, config):
         return 1
     
     print(f"Matching {len(insta_images)} Instagram images...")
-    result = match_batch(db, insta_images, threshold, phash_weight)
+    result = match_batch(db, insta_images, threshold, phash_weight, desc_weight, vision_weight)
     
     print(f"Matched: {result['total_matches']} Instagram images")
     print(f"Total candidates: {result['total_candidates']}")
