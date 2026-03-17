@@ -1,6 +1,7 @@
 from tinydb import TinyDB, Query
 from typing import Optional
 import os
+from datetime import datetime
 
 
 def init_database(db_path: str) -> TinyDB:
@@ -294,3 +295,86 @@ if __name__ == "__main__":
     db.close()
     os.unlink(db_path)
     print("\nAll tests passed!")
+
+
+def init_catalog_table(db: TinyDB):
+    """Ensure catalog_images table exists."""
+    if 'catalog_images' not in db.tables:
+        db.table('catalog_images')
+
+
+def init_instagram_table(db: TinyDB):
+    """Ensure instagram_images table exists."""
+    if 'instagram_images' not in db.tables:
+        db.table('instagram_images')
+
+
+def init_matches_table(db: TinyDB):
+    """Ensure matches table exists."""
+    if 'matches' not in db.tables:
+        db.table('matches')
+
+
+def store_catalog_image(db, record: dict) -> str:
+    """Store catalog image with analysis. Idempotent."""
+    Catalog = Query()
+    
+    key = record.get('key')
+    record['analyzed_at'] = datetime.now().isoformat()
+    
+    existing = db.table('catalog_images').search(Catalog.key == key)
+    if existing:
+        db.table('catalog_images').update(record, Catalog.key == key)
+    else:
+        db.table('catalog_images').insert(record)
+    
+    return key
+
+
+def store_instagram_image(db, record: dict) -> str:
+    """Store Instagram image with analysis. Idempotent by post_url."""
+    Insta = Query()
+    
+    post_url = record.get('post_url')
+    key = f"insta_{datetime.now().strftime('%Y-%m-%d')}_{post_url.split('/')[-2]}"
+    record['key'] = key
+    record['crawled_at'] = datetime.now().isoformat()
+    
+    existing = db.table('instagram_images').search(Insta.post_url == post_url)
+    if existing:
+        db.table('instagram_images').update(record, Insta.post_url == post_url)
+    else:
+        db.table('instagram_images').insert(record)
+    
+    return key
+
+
+def store_match(db, record: dict) -> str:
+    """Store match between catalog and Instagram image."""
+    Match = Query()
+    
+    catalog_key = record.get('catalog_key')
+    insta_key = record.get('insta_key')
+    record['matched_at'] = datetime.now().isoformat()
+    
+    existing = db.table('matches').search(
+        (Match.catalog_key == catalog_key) & (Match.insta_key == insta_key)
+    )
+    if existing:
+        db.table('matches').update(record, (Match.catalog_key == catalog_key) & (Match.insta_key == insta_key))
+    else:
+        db.table('matches').insert(record)
+    
+    return f"{catalog_key} <-> {insta_key}"
+
+
+def get_catalog_images_needing_analysis(db) -> list:
+    """Get catalog images without phash."""
+    Catalog = Query()
+    return db.table('catalog_images').search(Catalog.phash == None)
+
+
+def get_instagram_images_needing_analysis(db) -> list:
+    """Get Instagram images without phash."""
+    Insta = Query()
+    return db.table('instagram_images').search(Insta.phash == None)

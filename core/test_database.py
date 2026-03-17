@@ -1,6 +1,7 @@
 import unittest
 import tempfile
 import os
+from tinydb import Query
 from lightroom_tagger.core.database import (
     init_database,
     generate_key,
@@ -15,6 +16,9 @@ from lightroom_tagger.core.database import (
     get_images_without_hash,
     update_image_hash,
     batch_update_hashes,
+    store_catalog_image,
+    store_instagram_image,
+    store_match,
 )
 
 
@@ -196,6 +200,61 @@ class TestInstagramStatus(unittest.TestCase):
         ]
         count = batch_update_hashes(self.db, updates)
         self.assertEqual(count, 2)
+
+    def test_store_catalog_image(self):
+        """Store catalog image with analysis data."""
+        from lightroom_tagger.core.database import store_catalog_image
+        
+        key = store_catalog_image(self.db, {
+            'key': '2024-01-15_sunset.jpg',
+            'filepath': '/mnt/nas/photos/sunset.jpg',
+            'phash': 'a1b2c3d4e5f6g7h8',
+            'exif': {'camera': 'Canon EOS R5', 'lens': 'RF 24-70mm'},
+            'description': 'Golden hour sunset'
+        })
+        
+        self.assertEqual(key, '2024-01-15_sunset.jpg')
+        Catalog = Query()
+        result = self.db.table('catalog_images').search(Catalog.key == key)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['phash'], 'a1b2c3d4e5f6g7h8')
+
+    def test_store_instagram_image(self):
+        """Store Instagram image with analysis data."""
+        from lightroom_tagger.core.database import store_instagram_image
+        
+        key = store_instagram_image(self.db, {
+            'post_url': 'https://instagram.com/p/abc123',
+            'local_path': '/tmp/insta.jpg',
+            'phash': 'a1b2c3d4e5f6g7h8',
+            'exif': {'camera': 'Canon EOS R5'},
+            'description': 'Beautiful sunset'
+        })
+        
+        self.assertTrue(key.startswith('insta_'))
+        Insta = Query()
+        result = self.db.table('instagram_images').search(Insta.post_url == 'https://instagram.com/p/abc123')
+        self.assertEqual(len(result), 1)
+
+    def test_store_match(self):
+        """Store match between catalog and Instagram image."""
+        from lightroom_tagger.core.database import store_match
+        
+        store_match(self.db, {
+            'catalog_key': '2024-01-15_sunset.jpg',
+            'insta_key': 'insta_2024-01-16_post123',
+            'phash_distance': 2,
+            'phash_score': 0.875,
+            'desc_similarity': 0.82,
+            'exif_camera_match': True,
+            'exif_lens_match': True,
+            'total_score': 0.85
+        })
+        
+        Match = Query()
+        result = self.db.table('matches').search(Match.catalog_key == '2024-01-15_sunset.jpg')
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['total_score'], 0.85)
 
 
 if __name__ == "__main__":
