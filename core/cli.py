@@ -218,6 +218,59 @@ def create_parser() -> argparse.ArgumentParser:
         help="Open browser for manual Instagram login (use with --browser)"
     )
 
+    enrich_parser = subparsers.add_parser("enrich-catalog", help="Analyze Lightroom catalog images")
+    enrich_parser.add_argument(
+        "--db",
+        help="Path to TinyDB (overrides global)"
+    )
+    enrich_parser.add_argument(
+        "--catalog",
+        help="Path to .lrcat file (overrides global)"
+    )
+    enrich_parser.add_argument(
+        "--limit",
+        type=int,
+        help="Limit number of images to process"
+    )
+
+    crawl_parser = subparsers.add_parser("crawl-instagram", help="Crawl Instagram and analyze images")
+    crawl_parser.add_argument(
+        "--db",
+        help="Path to TinyDB (overrides global)"
+    )
+    crawl_parser.add_argument(
+        "--username",
+        help="Instagram username"
+    )
+    crawl_parser.add_argument(
+        "--output-dir",
+        default="/tmp/instagram_images",
+        help="Directory to download Instagram images"
+    )
+    crawl_parser.add_argument(
+        "--limit",
+        type=int,
+        help="Limit number of posts to crawl"
+    )
+
+    match_parser = subparsers.add_parser("match", help="Match Instagram images against catalog")
+    match_parser.add_argument(
+        "--db",
+        help="Path to TinyDB (overrides global)"
+    )
+    match_parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.7,
+        help="Match threshold (0-1, default 0.7)"
+    )
+    match_parser.add_argument(
+        "--phash-weight",
+        type=float,
+        default=0.5,
+        help="Phash weight in scoring (default 0.5)"
+    )
+
     return parser
 
 
@@ -604,6 +657,102 @@ def cmd_instagram_sync(args, config):
         return 1
 
 
+def cmd_match(args, config):
+    """Match Instagram images against catalog."""
+    from core.matcher import match_batch
+    from core.database import init_matches_table, init_catalog_table, init_instagram_table
+    
+    db_path = args.db or config.db_path
+    if not db_path:
+        print("Error: No database path provided. Use --db or config.yaml")
+        return 1
+    
+    if not Path(db_path).exists():
+        print(f"Error: Database not found: {db_path}")
+        return 1
+    
+    db = init_database(db_path)
+    init_matches_table(db)
+    init_catalog_table(db)
+    init_instagram_table(db)
+    
+    threshold = args.threshold or 0.7
+    phash_weight = args.phash_weight or 0.5
+    
+    insta_images = db.table('instagram_images').all()
+    
+    if not insta_images:
+        print("No Instagram images to match. Run crawl-instagram first.")
+        return 1
+    
+    print(f"Matching {len(insta_images)} Instagram images...")
+    result = match_batch(db, insta_images, threshold, phash_weight)
+    
+    print(f"Matched: {result['total_matches']} Instagram images")
+    print(f"Total candidates: {result['total_candidates']}")
+    
+    db.close()
+    return 0
+
+
+def cmd_enrich_catalog(args, config):
+    """Analyze and store metadata for catalog images."""
+    from lightroom.enricher import enrich_catalog_images
+    from core.database import init_catalog_table
+    
+    db_path = args.db or config.db_path
+    if not db_path:
+        print("Error: No database path provided. Use --db or config.yaml")
+        return 1
+    
+    db = init_database(db_path)
+    init_catalog_table(db)
+    
+    catalog_path = args.catalog or config.small_catalog_path
+    if not catalog_path:
+        print("Error: No catalog path provided. Use --catalog or config.yaml")
+        return 1
+    
+    print(f"Analyzing images from: {catalog_path}")
+    result = enrich_catalog_images(db, catalog_path, limit=args.limit)
+    
+    print(f"Processed: {result['processed']}")
+    print(f"Skipped: {result['skipped']}")
+    print(f"Errors: {result['errors']}")
+    
+    db.close()
+    return 0
+
+
+def cmd_crawl_instagram(args, config):
+    """Crawl Instagram and analyze images."""
+    from instagram.crawler import crawl_and_analyze
+    from core.database import init_instagram_table
+    
+    db_path = args.db or config.db_path
+    if not db_path:
+        print("Error: No database path provided. Use --db or config.yaml")
+        return 1
+    
+    db = init_database(db_path)
+    init_instagram_table(db)
+    
+    username = args.username or config.instagram_url
+    if not username:
+        print("Error: No Instagram username provided. Use --username or config")
+        return 1
+    
+    print(f"Crawling Instagram: {username}")
+    result = crawl_and_analyze(db, username, args.output_dir or '/tmp', limit=args.limit or 50)
+    
+    print(f"Processed: {result['processed']}")
+    print(f"Skipped: {result['skipped']}")
+    print(f"Errors: {result['errors']}")
+    
+    db.close()
+    return 0
+
+
 def main():
     """Main entry point."""
     parser = create_parser()
@@ -644,6 +793,12 @@ def main():
         return cmd_stats(args, config)
     elif args.command == "instagram-sync":
         return cmd_instagram_sync(args, config)
+    elif args.command == "enrich-catalog":
+        return cmd_enrich_catalog(args, config)
+    elif args.command == "crawl-instagram":
+        return cmd_crawl_instagram(args, config)
+    elif args.command == "match":
+        return cmd_match(args, config)
     else:
         parser.print_help()
         return 1
