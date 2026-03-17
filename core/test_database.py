@@ -2,7 +2,7 @@ import unittest
 import tempfile
 import os
 from tinydb import Query
-from lightroom_tagger.core.database import (
+from core.database import (
     init_database,
     generate_key,
     store_image,
