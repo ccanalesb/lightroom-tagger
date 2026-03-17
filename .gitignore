@@ -1,12 +1,7 @@
-# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -24,18 +19,10 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
-
-# Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
-
-# Unit test / coverage reports
 htmlcov/
 .tox/
 .nox/
@@ -44,21 +31,15 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
-*.cover
 *.py,cover
 .hypothesis/
 .pytest_cache/
-# mypy
 .mypy_cache/
 .dmypy.json
 dmypy.json
 .pyre/
-# Pytype static type analyzer
 .pytype/
-# Cython debug symbols
 cython_debug*
-
-# Environments
 .env
 .venv
 env/
@@ -69,23 +50,12 @@ virtualenv/
 activate.fish
 activate.csh
 activate.bash
-
-# IDEs and editors
 .vscode/
 .idea/
 *.sublime-project
 *.sublime-workspace
 *.komodoproject
-
-# VS Code
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
 *.code-workspace
-
-# OS
 .DS_Store
 .DS_Store?
 ._*
@@ -93,15 +63,8 @@ activate.bash
 .Trashes
 ehthumbs.db
 Thumbs.db
-
-# Logs
 logs
 *.log
-
-# Misc
-.cache
-
-# Project specific
 *.db
 instructions.md
 skills-lock.json
