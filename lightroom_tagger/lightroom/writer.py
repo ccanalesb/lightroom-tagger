@@ -59,26 +59,32 @@ def get_image_local_id(conn: sqlite3.Connection, image_key: str) -> Optional[int
     """Get image local ID from our key (date_taken_filename format)."""
     cursor = conn.cursor()
     
+    # Extract filename - handle formats like "2026-01-15_L1007168.JPG" or just "L1007168"
+    filename = image_key
+    if '_' in image_key:
+        filename = image_key.split('_')[1]
+    # Remove extension if present
+    if '.' in filename:
+        filename = filename.rsplit('.', 1)[0]
+    
+    # Try by baseName (without extension)
     cursor.execute("""
         SELECT f.id_local 
         FROM AgLibraryFile f
-        JOIN Adobe_images img ON f.id_local = img.rootFile
-        WHERE f.id_local = ?
-    """, (int(image_key.split('_')[1]) if image_key.split('_')[1].isdigit() else 0,))
-    
+        WHERE f.baseName = ?
+    """, (filename,))
     row = cursor.fetchone()
     
-    if not row:
-        date_part = image_key.split('_')[0] if '_' in image_key else ''
-        filename = image_key.split('_')[1] if '_' in image_key else image_key
-        
-        cursor.execute("""
-            SELECT f.id_local 
-            FROM AgLibraryFile f
-            JOIN AgLibraryFolder fl ON f.folder = fl.id_local
-            WHERE f.baseName = ?
-        """, (filename,))
-        row = cursor.fetchone()
+    if row:
+        return row[0]
+    
+    # Try by originalFilename
+    cursor.execute("""
+        SELECT f.id_local 
+        FROM AgLibraryFile f
+        WHERE f.originalFilename LIKE ?
+    """, (f"%{filename}%",))
+    row = cursor.fetchone()
     
     return row[0] if row else None
 

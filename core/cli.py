@@ -217,6 +217,11 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Open browser for manual Instagram login (use with --browser)"
     )
+    instagram_parser.add_argument(
+        "--from-matches",
+        action="store_true",
+        help="Read matches from 'matches' table (created by 'match' command)"
+    )
 
     enrich_parser = subparsers.add_parser("enrich-catalog", help="Analyze Lightroom catalog images")
     enrich_parser.add_argument(
@@ -261,20 +266,30 @@ def create_parser() -> argparse.ArgumentParser:
     match_parser.add_argument(
         "--threshold",
         type=float,
-        default=0.7,
-        help="Match threshold (0-1, default 0.7)"
+        default=None,
+        help="Match threshold (0-1, default from config)"
     )
     match_parser.add_argument(
         "--phash-weight",
         type=float,
-        default=0.4,
-        help="Phash weight in scoring (default 0.4)"
+        default=None,
+        help="Phash weight in scoring (default from config)"
+    )
+    match_parser.add_argument(
+        "--desc-weight",
+        type=float,
+        default=None,
+        help="Description weight in scoring (default from config)"
     )
     match_parser.add_argument(
         "--vision-weight",
         type=float,
-        default=0.3,
-        help="Vision model weight in scoring (default 0.3)"
+        default=None,
+        help="Vision model weight in scoring (default from config)"
+    )
+    match_parser.add_argument(
+        "--vision-model",
+        help="Vision model to use (overrides config)"
     )
 
     return parser
@@ -488,6 +503,7 @@ def cmd_instagram_sync(args, config):
     limit = args.limit
     use_browser = args.browser
     do_login = args.login
+    from_matches = args.from_matches
 
     print(f"Instagram URL: {instagram_url}")
     print(f"Keyword: {keyword}")
@@ -495,6 +511,7 @@ def cmd_instagram_sync(args, config):
     print(f"Catalog: {catalog_path}")
     print(f"Dry run: {dry_run}")
     print(f"Browser mode: {use_browser}")
+    print(f"From matches table: {from_matches}")
     print()
 
     if use_browser:
@@ -552,67 +569,104 @@ def cmd_instagram_sync(args, config):
             print(f"Browser scraping failed: {e}")
             print("Try running with --login first to authenticate")
             return 1
+    elif from_matches:
+        # Skip crawling - we already have matches
+        posts = []
+        url_to_path = {}
     else:
         print("Using API-based scraping...")
         posts, url_to_path = crawl_instagram(config, output_dir, limit=limit or 50)
 
     try:
+        from core.database import init_matches_table, init_catalog_table, init_instagram_table
         db = init_database(db_path)
         
-        print("Step 1: Computing hashes for local images...")
-        local_images = get_all_images(db)
+        if from_matches:
+            # Just init tables and read matches
+            init_matches_table(db)
+            init_catalog_table(db)
+            init_instagram_table(db)
+        else:
+            print("Step 1: Computing hashes for local images...")
+            local_images = get_all_images(db)
+            
+            images_needing_hash = get_images_without_hash(db)
+            print(f"  {len(images_needing_hash)} images need hashes")
+            
+            # Load config to resolve NAS paths
+            from lightroom_tagger.core.config import load_config
+            config = load_config()
+            
+            hash_updates = []
+            for record in images_needing_hash:
+                filepath = record.get('filepath')
+                if filepath:
+                    # Resolve NAS path (e.g., //tnas/... -> /mnt/tnas/...)
+                    resolved_path = config._resolve_path(filepath)
+                    if resolved_path and Path(resolved_path).exists():
+                        image_hash = compute_phash(resolved_path)
+                        if image_hash:
+                            hash_updates.append({'key': record['key'], 'image_hash': image_hash})
+            
+            if hash_updates:
+                batch_update_hashes(db, hash_updates)
+                print(f"  Computed {len(hash_updates)} hashes")
+            
+            local_images = get_all_images(db)
+            local_with_hash = [img for img in local_images if img.get('image_hash')]
+            print(f"  Total images with hash: {len(local_with_hash)}")
         
-        images_needing_hash = get_images_without_hash(db)
-        print(f"  {len(images_needing_hash)} images need hashes")
+        if not from_matches:
+            print("\nStep 2: Crawling Instagram...")
+            
+            if not posts:
+                print("No Instagram posts found!")
+                return 1
+            
+            insta_images = []
+            for i, post in enumerate(posts):
+                local_paths = url_to_path.get(post.post_url)
+                if local_paths:
+                    for local_path in local_paths:
+                        if os.path.exists(local_path):
+                            image_hash = compute_phash(local_path)
+                            insta_images.append({
+                                'url': post.post_url,
+                                'local_path': local_path,
+                                'image_hash': image_hash,
+                                'index': post.index,
+                            })
+            
+            print(f"  Found {len(insta_images)} Instagram images with hashes")
         
-        # Load config to resolve NAS paths
-        from lightroom_tagger.core.config import load_config
-        config = load_config()
-        
-        hash_updates = []
-        for record in images_needing_hash:
-            filepath = record.get('filepath')
-            if filepath:
-                # Resolve NAS path (e.g., //tnas/... -> /mnt/tnas/...)
-                resolved_path = config._resolve_path(filepath)
-                if resolved_path and Path(resolved_path).exists():
-                    image_hash = compute_phash(resolved_path)
-                    if image_hash:
-                        hash_updates.append({'key': record['key'], 'image_hash': image_hash})
-        
-        if hash_updates:
-            batch_update_hashes(db, hash_updates)
-            print(f"  Computed {len(hash_updates)} hashes")
-        
-        local_images = get_all_images(db)
-        local_with_hash = [img for img in local_images if img.get('image_hash')]
-        print(f"  Total images with hash: {len(local_with_hash)}")
-        
-        print("\nStep 2: Crawling Instagram...")
-        
-        if not posts:
-            print("No Instagram posts found!")
-            return 1
-        
-        insta_images = []
-        for i, post in enumerate(posts):
-            local_paths = url_to_path.get(post.post_url)
-            if local_paths:
-                for local_path in local_paths:
-                    if os.path.exists(local_path):
-                        image_hash = compute_phash(local_path)
-                        insta_images.append({
-                            'url': post.post_url,
-                            'local_path': local_path,
-                            'image_hash': image_hash,
-                            'index': post.index,
-                        })
-        
-        print(f"  Found {len(insta_images)} Instagram images with hashes")
-        
-        print("\nStep 3: Finding matches...")
-        matches = find_matches(local_with_hash, insta_images, threshold)
-        print(f"  Found {len(matches)} matches")
+        if from_matches:
+            print("\nStep 3: Reading matches from 'matches' table...")
+            init_matches_table(db)
+            matches = db.table('matches').all()
+            print(f"  Found {len(matches)} matches in table")
+            
+            # Convert matches to same format as find_matches for downstream processing
+            # Format: {'local_key': catalog_key, 'insta_url': ...}
+            formatted_matches = []
+            for m in matches:
+                # Get Instagram URL from instagram_images table
+                insta_key = m.get('insta_key', '')
+                insta_table = db.table('instagram_images')
+                insta_imgs = insta_table.search(lambda x: x.get('key') == insta_key)
+                insta_url = insta_imgs[0].get('url', '') if insta_imgs else ''
+                
+                formatted_matches.append({
+                    'local_key': m.get('catalog_key', ''),
+                    'insta_url': insta_url,
+                    'hash_distance': m.get('phash_distance', 0),
+                    'vision_result': m.get('vision_result', ''),
+                    'total_score': m.get('total_score', 0),
+                })
+            matches = formatted_matches
+        else:
+            print("\nStep 3: Finding matches...")
+            matches = find_matches(local_with_hash, insta_images, threshold)
+            print(f"  Found {len(matches)} matches")
         
         if not matches:
             print("\nNo matches found!")
@@ -682,10 +736,15 @@ def cmd_match(args, config):
     init_catalog_table(db)
     init_instagram_table(db)
     
-    threshold = args.threshold or 0.7
-    phash_weight = args.phash_weight or 0.4
-    desc_weight = 0.3
-    vision_weight = args.vision_weight or 0.3
+    threshold = args.threshold or config.match_threshold
+    phash_weight = args.phash_weight or config.phash_weight
+    desc_weight = args.desc_weight or config.desc_weight
+    vision_weight = args.vision_weight or config.vision_weight
+    vision_model = args.vision_model or config.vision_model
+    
+    # Set vision model for analyzer
+    import os
+    os.environ['VISION_MODEL'] = vision_model
     
     insta_images = db.table('instagram_images').all()
     

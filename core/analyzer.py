@@ -1,4 +1,14 @@
+import os
 from typing import Dict, Any, Optional
+from core.config import load_config
+
+def get_vision_model() -> str:
+    """Get vision model from config or env override."""
+    if 'VISION_MODEL' in os.environ:
+        return os.environ['VISION_MODEL']
+    return load_config().vision_model
+
+VISION_MODEL = os.environ.get('VISION_MODEL', 'gemma3:27b')
 
 def analyze_image(path: str) -> Dict[str, Any]:
     """Analyze image and return all matching signals.
@@ -77,7 +87,7 @@ def compare_with_vision(local_path: str, insta_path: str) -> str:
 
 
 def run_vision_ollama(local_path: str, insta_path: str) -> str:
-    """Run Qwen2.5-VL via Ollama to compare images."""
+    """Run vision model via Ollama to compare images."""
     import subprocess
     
     prompt = """You are given two images. Determine if they depict the same subject or scene.
@@ -88,16 +98,17 @@ Reply with ONLY: SAME / DIFFERENT / UNCERTAIN"""
 
     try:
         result = subprocess.run([
-            'ollama', 'run', 'qwen2.5-vl:7b',
+            'ollama', 'run', get_vision_model(),
             f'Image 1: {local_path}',
             f'Image 2: {insta_path}',
             prompt
         ], capture_output=True, text=True, timeout=120)
         
         output = result.stdout.strip().upper()
-        if 'SAME' in output:
+        
+        if output.startswith('SAME') and 'DIFFERENT' not in output[:20]:
             return 'SAME'
-        elif 'DIFFERENT' in output:
+        elif 'DIFFERENT' in output[:50]:
             return 'DIFFERENT'
         return 'UNCERTAIN'
     except Exception:

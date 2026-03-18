@@ -299,19 +299,19 @@ if __name__ == "__main__":
 
 def init_catalog_table(db: TinyDB):
     """Ensure catalog_images table exists."""
-    if 'catalog_images' not in db.tables:
+    if 'catalog_images' not in db.tables():
         db.table('catalog_images')
 
 
 def init_instagram_table(db: TinyDB):
     """Ensure instagram_images table exists."""
-    if 'instagram_images' not in db.tables:
+    if 'instagram_images' not in db.tables():
         db.table('instagram_images')
 
 
 def init_matches_table(db: TinyDB):
     """Ensure matches table exists."""
-    if 'matches' not in db.tables:
+    if 'matches' not in db.tables():
         db.table('matches')
 
 

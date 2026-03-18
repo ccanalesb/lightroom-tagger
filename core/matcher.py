@@ -25,7 +25,7 @@ def score_candidates(insta_image: dict, candidates: list, phash_weight: float = 
     results = []
     
     for candidate in candidates:
-        phash_dist = hamming_distance(insta_image.get('phash', ''), candidate.get('phash', ''))
+        phash_dist = hamming_distance(insta_image.get('image_hash', ''), candidate.get('image_hash', ''))
         phash_score = max(0, 1 - (phash_dist / 16))  # Normalize to 0-1
         
         desc_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
@@ -70,13 +70,13 @@ def score_candidates_with_vision(insta_image: dict, candidates: list,
     results = []
     
     for candidate in candidates:
-        phash_dist = hamming_distance(insta_image.get('phash', ''), candidate.get('phash', ''))
+        phash_dist = hamming_distance(insta_image.get('image_hash', ''), candidate.get('image_hash', ''))
         phash_score_val = max(0, 1 - (phash_dist / 16))
         
         desc_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
         
         insta_path = insta_image.get('local_path')
-        local_path = candidate.get('filepath')
+        local_path = candidate.get('local_path')
         
         if insta_path and local_path:
             try:
@@ -96,7 +96,7 @@ def score_candidates_with_vision(insta_image: dict, candidates: list,
         results.append({
             'catalog_key': candidate.get('key'),
             'insta_key': insta_image.get('key'),
-            'phash_distance': phash_dist,
+            'phash_distance': int(phash_dist),
             'phash_score': phash_score_val,
             'desc_similarity': desc_sim,
             'vision_result': vision_result,
@@ -123,12 +123,13 @@ def match_image(db, insta_image: dict, threshold: float = 0.7,
         phash_weight, desc_weight, vision_weight
     )
     
-    matches = [m for m in scored if m['total_score'] >= threshold]
-    
-    for match in matches:
+    # Get best match (highest score) if above threshold
+    if scored and scored[0]['total_score'] >= threshold:
+        match = scored[0]  # Already sorted by score descending
         store_match(db, match)
+        return [match]
     
-    return matches
+    return []
 
 def match_batch(db, insta_images: list, threshold: float = 0.7, 
                 phash_weight: float = 0.4, desc_weight: float = 0.3, 

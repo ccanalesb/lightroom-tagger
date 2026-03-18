@@ -45,13 +45,13 @@ def test_score_candidates_includes_vision():
     """Should include vision score when comparing."""
     insta_image = {
         'key': 'insta_test',
-        'phash': 'a1b2c3d4e5f6g7h8',
+        'image_hash': 'a1b2c3d4e5f6g7h8',
         'description': 'sunset over bay',
         'local_path': '/tmp/insta.jpg'
     }
     
     candidates = [
-        {'key': 'cat1', 'phash': 'a1b2c3d4e5f6g7h8', 'description': 'sunset', 'filepath': '/tmp/local1.jpg'},
+        {'key': 'cat1', 'image_hash': 'a1b2c3d4e5f6g7h8', 'description': 'sunset', 'local_path': '/tmp/local1.jpg'},
     ]
     
     with patch('core.analyzer.compare_with_vision', return_value='SAME') as vision_mock:

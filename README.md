@@ -1,14 +1,83 @@
 # Lightroom Tagger
 
-A Python tool to read Lightroom catalog (`.lrcat` SQLite database), index metadata to TinyDB, and export/search your photo library.
+A Python tool to read Lightroom catalog (`.lrcat` SQLite database), index metadata to TinyDB, and export/search your photo library. Includes Instagram matching with vision model support.
 
 ## Installation
 
 ```bash
-pip install tinydb pyyaml
+pip install tinydb pyyaml python-dotenv
 ```
 
-## Usage
+## Quick Start - Instagram Matching Flow
+
+Match Instagram photos to your Lightroom catalog using vision AI:
+
+```bash
+# 1. Scan your Lightroom catalog (only needed once)
+python -m lightroom_tagger scan --catalog "/path/to/Catalog.lrcat" --db library.db
+
+# 2. Crawl Instagram images
+python -m lightroom_tagger crawl-instagram --db library.db --output-dir /tmp/instagram_images
+
+# 3. Run vision-based matching
+python -m lightroom_tagger match --db library.db --threshold 0.2
+
+# 4. Write matches to Lightroom (adds keyword to matched images)
+python -m lightroom_tagger instagram-sync --db library.db --from-matches \
+    --catalog "/path/to/Catalog.lrcat" --keyword "posted"
+```
+
+### Parameters Explained
+
+| Command | Parameter | Description |
+|---------|-----------|-------------|
+| `scan` | `--catalog` | Path to your Lightroom .lrcat file |
+| `scan` | `--db` | Path to TinyDB database (will be created) |
+| `crawl-instagram` | `--db` | Database with catalog images |
+| `crawl-instagram` | `--output-dir` | Where to save downloaded Instagram images |
+| `crawl-instagram` | `--limit` | Limit number of posts to download |
+| `match` | `--db` | Database with catalog and Instagram images |
+| `match` | `--threshold` | Minimum score to consider a match (0.0-1.0, default 0.7) |
+| `match` | `--vision-model` | Override vision model (default: gemma3:27b) |
+| `instagram-sync` | `--from-matches` | Read matches from 'matches' table instead of re-matching |
+| `instagram-sync` | `--catalog` | Lightroom catalog to write keywords to |
+| `instagram-sync` | `--keyword` | Keyword to add to matched images |
+| `instagram-sync` | `--dry-run` | Preview changes without applying |
+
+### Matching Configuration
+
+Edit `config.yaml` or use environment variables to tune matching:
+
+```yaml
+# Matching weights (must sum to ~1.0)
+phash_weight: 0.4      # Perceptual hash similarity
+desc_weight: 0.3      # Description text similarity  
+vision_weight: 0.3     # Vision model similarity
+match_threshold: 0.7  # Minimum score to accept match
+
+# Vision model (requires Ollama)
+vision_model: "gemma3:27b"  # Best for accuracy, requires 17GB RAM
+# Alternative: "qwen2.5-vl:7b" - faster but less consistent
+```
+
+Environment variables:
+- `VISION_MODEL` - Override vision model
+- `PHASH_WEIGHT`, `DESC_WEIGHT`, `VISION_WEIGHT` - Override weights
+- `MATCH_THRESHOLD` - Override threshold
+
+### Vision Model Requirements
+
+The vision matching requires [Ollama](https://ollama.ai) to be installed:
+
+```bash
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull the recommended model (17GB)
+ollama pull gemma3:27b
+```
+
+## Basic Usage
 
 ```bash
 # Set PYTHONPATH if running from source
@@ -69,13 +138,17 @@ Enables running as: `python -m lightroom_tagger`
 Edit `config.yaml` or use environment variables:
 
 ```yaml
-catalog_path: "//nas/ccanales/Lightroom Server/Catalog.lrcat"
+catalog_path: "/path/to/Catalog.lrcat"
 db_path: "~/lightroom_tagger/library.db"
 mount_point: "/mnt/nas"
 workers: 4
-ai_model: "claude-3-5-sonnet-20241022"
-skip_ai: false
-verbose: false
+
+# Matching configuration
+vision_model: "gemma3:27b"
+phash_weight: 0.4
+desc_weight: 0.3
+vision_weight: 0.3
+match_threshold: 0.7
 ```
 
 ## Data Extracted

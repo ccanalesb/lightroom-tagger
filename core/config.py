@@ -24,6 +24,11 @@ class Config:
     cloudflare_account_id: str = ""
     cloudflare_api_token: str = ""
     instagram_session_id: str = ""
+    vision_model: str = "gemma3:27b"
+    phash_weight: float = 0.4
+    desc_weight: float = 0.3
+    vision_weight: float = 0.3
+    match_threshold: float = 0.7
 
     def __post_init__(self):
         self.catalog_path = self._resolve_path(self.catalog_path)
@@ -78,6 +83,11 @@ def load_config(config_path: str = "config.yaml") -> Config:
         "cloudflare_account_id": "",
         "cloudflare_api_token": "",
         "instagram_session_id": "",
+        "vision_model": "gemma3:27b",
+        "phash_weight": 0.4,
+        "desc_weight": 0.3,
+        "vision_weight": 0.3,
+        "match_threshold": 0.7,
     }
 
     for key, value in defaults.items():
@@ -102,6 +112,11 @@ def _load_from_env(data: dict) -> dict:
         "CLOUDFLARE_ACCOUNT_ID": "cloudflare_account_id",
         "CLOUDFLARE_API_TOKEN": "cloudflare_api_token",
         "INSTAGRAM_SESSION_ID": "instagram_session_id",
+        "VISION_MODEL": "vision_model",
+        "PHASH_WEIGHT": "phash_weight",
+        "DESC_WEIGHT": "desc_weight",
+        "VISION_WEIGHT": "vision_weight",
+        "MATCH_THRESHOLD": "match_threshold",
     }
 
     for env_var, config_key in env_mappings.items():
@@ -111,8 +126,10 @@ def _load_from_env(data: dict) -> dict:
                 value = int(value)
             elif config_key in ("skip_ai", "verbose"):
                 value = value.lower() in ("true", "1", "yes")
-            elif config_key == "hash_threshold":
+            elif config_key in ("hash_threshold", "match_threshold"):
                 value = int(value)
+            elif config_key in ("phash_weight", "desc_weight", "vision_weight"):
+                value = float(value)
             data[config_key] = value
 
     return data
