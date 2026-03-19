@@ -59,29 +59,38 @@ def get_or_create_keyword(conn: sqlite3.Connection, keyword_name: str) -> int:
 
 
 def get_image_local_id(conn: sqlite3.Connection, image_key: str) -> Optional[int]:
-    """Get image local ID from our key (date_taken_filename format)."""
+    """Get Adobe_images.id_local from our key (date_taken_filename format).
+    
+    NOTE: AgLibraryKeywordImage.image references Adobe_images.id_local,
+    NOT AgLibraryFile.id_local. We must join to get the correct ID.
+    
+    Args:
+        conn: Database connection
+        image_key: Key in format "YYYY-MM-DD_filename.ext" or just "filename.ext"
+    
+    Returns:
+        Adobe_images.id_local or None if not found
+    """
     cursor = conn.cursor()
-
-    # Extract filename from key: assume format "YYYY-MM-DD_filename.ext" or "date_filename"
-    parts = image_key.split('_', 1)
-    if len(parts) < 2:
-        return None
-    filename = parts[1]
+    
+    # Extract filename - handle formats like "2026-01-15_L1007168.JPG" or "L1007168.DNG"
+    filename = image_key
+    if '_' in image_key:
+        filename = image_key.split('_', 1)[1]
     # Remove extension to get baseName
-    base_name = Path(filename).stem
-    print(f"[DEBUG] Looking up image: key={image_key}, baseName={base_name}")
-
+    if '.' in filename:
+        filename = filename.rsplit('.', 1)[0]
+    
+    # CRITICAL FIX: Join AgLibraryFile -> Adobe_images to get correct ID
+    # AgLibraryKeywordImage.image references Adobe_images.id_local, not file ID
     cursor.execute("""
-        SELECT f.id_local
+        SELECT ai.id_local
         FROM AgLibraryFile f
+        JOIN Adobe_images ai ON ai.rootFile = f.id_local
         WHERE f.baseName = ?
-    """, (base_name,))
-
+    """, (filename,))
+    
     row = cursor.fetchone()
-    if row:
-        print(f"[DEBUG] Found id_local={row[0]}")
-    else:
-        print(f"[DEBUG] Not found")
     return row[0] if row else None
 
 
