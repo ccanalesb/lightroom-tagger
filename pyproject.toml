@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lightroom-tagger"
+version = "0.1.0"
+description = "AI-powered Lightroom image tagging and Instagram matching"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Cristian Canales"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "tinydb>=4.8.0",
+    "python-dotenv>=1.0.0",
+    "pyyaml>=6.0",
+    "pillow>=10.0.0",
+    "ollama>=0.1.0",
+    "requests>=2.31.0",
+    "tqdm>=4.66.0",
+    "flask>=3.0.0",
+    "flask-socketio>=5.3.0",
+    "flask-cors>=4.0.0",
+    "python-socketio>=5.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.6.0",
+]
+
+[project.scripts]
+lightroom-tagger = "lightroom_tagger.core.cli:main"
+lightroom-analyze-instagram = "lightroom_tagger.scripts.analyze_instagram_images:main"
+lightroom-run-matching = "lightroom_tagger.scripts.run_vision_matching:main"
+lightroom-generate-report = "lightroom_tagger.scripts.generate_validation_report:generate_html_report"
+
+[project.urls]
+Homepage = "https://github.com/canalescm/lightroom-tagger"
+Repository = "https://github.com/canalescm/lightroom-tagger"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["lightroom_tagger*"]
+
+[tool.setuptools.package-data]
+lightroom_tagger = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "I", "W", "UP", "B", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
