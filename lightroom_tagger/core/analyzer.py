@@ -1,7 +1,7 @@
 import os
 import tempfile
 from typing import Dict, Any, Optional
-from core.config import load_config
+from lightroom_tagger.core.config import load_config
 
 RAW_EXTENSIONS = {'.dng', '.raw', '.cr2', '.cr3', '.nef', '.arw', '.rw2', '.orf', '.raf', '.srw', '.x3f'}
 
@@ -116,7 +116,6 @@ def describe_image(path: str, agent_type: str = None) -> str:
     """Generate description using configured agent."""
     if agent_type is None:
         try:
-from lightroom_tagger.core.config import load_config
             config = load_config()
             agent_type = getattr(config, 'agent_type', 'local')
         except Exception:
