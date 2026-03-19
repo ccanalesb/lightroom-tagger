@@ -203,17 +203,22 @@ backend/                     # Flask + Flask-SocketIO
 ### Quick Start
 
 ```bash
-# Terminal 1: Start backend (from project root)
-cd backend
-pip install -r requirements.txt  # or: pip install flask flask-cors flask-socketio tinydb pillow python-dotenv pytest
-python3 app.py
+# One-time setup
+cd apps/visualizer/backend && pip install -r requirements.txt
+cd ../frontend && npm install --legacy-peer-deps
+cd ../../..
 
-# Terminal 2: Start frontend
-cd frontend
-npm install --legacy-peer-deps
-npm run dev
+# Start backend + frontend together
+make dev
+# or:
+./scripts/dev-up.sh
 
 # Open: http://localhost:5173
+
+# Stop both services
+make dev-down
+# or:
+./scripts/dev-down.sh
 ```
 
 ### Available Pages
