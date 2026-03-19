@@ -167,3 +167,161 @@ Each image record contains:
 - `gps_latitude`, `gps_longitude` - GPS coordinates
 - `width`, `height` - Image dimensions
 - `key` - Unique identifier (`{date_taken}_{filename}`)
+
+---
+
+## Visualizer (Web UI)
+
+A React 19 + Flask web interface for monitoring and controlling Lightroom Tagger workflows.
+
+### Architecture
+
+```
+frontend/                    # React 19 + TypeScript + Vite + Tailwind
+├── src/
+│   ├── components/         # Reusable UI components
+│   ├── pages/              # Page components (Dashboard, Jobs, etc.)
+│   ├── services/api.ts     # REST API client
+│   ├── stores/             # Zustand state (WebSocket connection)
+│   ├── constants/          # All UI strings (DRY)
+│   └── types/              # TypeScript interfaces
+
+backend/                     # Flask + Flask-SocketIO
+├── app.py                  # Flask app factory
+├── database.py             # TinyDB operations for jobs
+├── api/                    # REST API blueprints
+│   ├── jobs.py             # Job CRUD endpoints
+│   ├── images.py           # Instagram images
+│   └── system.py           # System status
+├── websocket/              # WebSocket handlers
+│   └── events.py           # Job subscriptions
+└── jobs/                   # Job execution
+    ├── runner.py           # Job runner framework
+    └── handlers.py         # Job type handlers
+```
+
+### Quick Start
+
+```bash
+# Terminal 1: Start backend (from project root)
+cd backend
+pip install -r requirements.txt  # or: pip install flask flask-cors flask-socketio tinydb pillow python-dotenv pytest
+python3 app.py
+
+# Terminal 2: Start frontend
+cd frontend
+npm install --legacy-peer-deps
+npm run dev
+
+# Open: http://localhost:5173
+```
+
+### Available Pages
+
+| Page | URL | Description |
+|------|-----|-------------|
+| Dashboard | `/` | Overview and stats |
+| Instagram | `/instagram` | Instagram image management |
+| Matching | `/matching` | Run vision matching workflows |
+| Jobs | `/jobs` | View and manage background jobs |
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/status` | GET | System status |
+| `/api/jobs/` | GET | List all jobs |
+| `/api/jobs/` | POST | Create new job |
+| `/api/jobs/<id>` | GET | Get job details |
+| `/api/jobs/<id>` | DELETE | Cancel job |
+| `/api/jobs/active` | GET | Get running jobs |
+
+### WebSocket Events
+
+| Event | Direction | Description |
+|-------|-----------|-------------|
+| `connect` | Client → Server | Establish connection |
+| `subscribe_job` | Client → Server | Subscribe to job updates |
+| `job_created` | Server → Client | New job created |
+| `job_updated` | Server → Client | Job status/progress updated |
+
+### Testing
+
+```bash
+# Backend tests
+cd backend && PYTHONPATH=. pytest ../tests/ -v
+
+# Frontend tests
+cd frontend && npm test -- --run
+
+# All tests
+cd backend && PYTHONPATH=. pytest ../tests/ -v && cd ../frontend && npm test -- --run
+```
+
+---
+
+## For Future Agents
+
+### Project Context
+
+This is a Lightroom catalog management tool with:
+1. **Core CLI** - Catalog scanning, searching, exporting
+2. **Instagram matching** - Vision-based matching with Ollama
+3. **Visualizer** - Web UI (new, in development)
+
+### Visualizer Development
+
+The visualizer is developed in a **git worktree** at `.worktrees/visualizer` on the `feature/visualizer` branch.
+
+```bash
+# Working directory for visualizer
+cd /home/cristian/lightroom_tagger/.worktrees/visualizer
+
+# Key files
+backend/           # Flask backend
+frontend/          # React frontend
+tests/             # Backend tests
+docs/plans/        # Implementation plan
+```
+
+### Implementation Plan
+
+See `docs/plans/2026-03-19-visualizer-implementation.md` for the complete TDD-based implementation plan with:
+- 6 phases
+- Bite-sized tasks (2-5 min each)
+- Complete code examples
+
+### Development Conventions
+
+1. **TDD**: Write failing test → Verify fail → Implement → Verify pass → Commit
+2. **All UI strings in constants**: Use `constants/strings.ts` (DRY principle)
+3. **Container/Presenter pattern**: Pages fetch data, components receive props
+4. **Minimal Zustand**: Only for WebSocket connection state
+5. **No real paths in git**: Use `.env` files (gitignored)
+
+### Running Tests
+
+```bash
+# Backend (from .worktrees/visualizer)
+cd backend && PYTHONPATH=. python3 -m pytest ../tests/ -v
+
+# Frontend
+cd frontend && npm test -- --run
+```
+
+### Adding New Features
+
+1. Read the plan document first
+2. Write failing tests (backend: `tests/test_*.py`, frontend: `src/**/__tests__/*.test.ts`)
+3. Implement minimal code to pass
+4. Run tests: `pytest -v` or `npm test`
+5. Commit with conventional message: `feat(scope): description`
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| `RuntimeError: Werkzeug not designed for production` | Add `allow_unsafe_werkzeug=True` to `socketio.run()` |
+| `Cannot find name 'global'` in tests | Use `(globalThis as any).fetch` instead of `global.fetch` |
+| npm peer dep conflict | Use `npm install --legacy-peer-deps` |
+| `import.meta.env` TypeScript errors | Add `/// <reference types="vite/client" />` to `vite-env.d.ts` |
