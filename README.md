@@ -284,13 +284,6 @@ tests/             # Backend tests
 docs/plans/        # Implementation plan
 ```
 
-### Implementation Plan
-
-See `docs/plans/2026-03-19-visualizer-implementation.md` for the complete TDD-based implementation plan with:
-- 6 phases
-- Bite-sized tasks (2-5 min each)
-- Complete code examples
-
 ### Development Conventions
 
 1. **TDD**: Write failing test → Verify fail → Implement → Verify pass → Commit
