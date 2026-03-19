@@ -332,17 +332,19 @@ def store_catalog_image(db, record: dict) -> str:
 
 
 def store_instagram_image(db, record: dict) -> str:
-    """Store Instagram image with analysis. Idempotent by post_url."""
+    """Store Instagram image with analysis. Idempotent by local_path."""
     Insta = Query()
     
+    local_path = record.get('local_path')
     post_url = record.get('post_url')
-    key = f"insta_{datetime.now().strftime('%Y-%m-%d')}_{post_url.split('/')[-2]}"
+    filename = record.get('filename', '')
+    key = f"insta_{datetime.now().strftime('%Y-%m-%d')}_{post_url.split('/')[-2]}_{filename}"
     record['key'] = key
     record['crawled_at'] = datetime.now().isoformat()
     
-    existing = db.table('instagram_images').search(Insta.post_url == post_url)
+    existing = db.table('instagram_images').search(Insta.local_path == local_path)
     if existing:
-        db.table('instagram_images').update(record, Insta.post_url == post_url)
+        db.table('instagram_images').update(record, Insta.local_path == local_path)
     else:
         db.table('instagram_images').insert(record)
     
