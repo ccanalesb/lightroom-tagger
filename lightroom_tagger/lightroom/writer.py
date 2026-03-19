@@ -1,4 +1,5 @@
 import sqlite3
+import uuid
 from typing import Optional
 from pathlib import Path
 
@@ -28,16 +29,18 @@ def keyword_exists(conn: sqlite3.Connection, keyword_name: str) -> bool:
 
 def create_keyword(conn: sqlite3.Connection, keyword_name: str) -> int:
     """Create a new keyword in the catalog.
-    
+
     Returns:
         Keyword ID
     """
     cursor = conn.cursor()
+    # Generate a proper UUID for id_global
+    new_uuid = uuid.uuid4().hex.upper()  # 32-char hex without dashes, matches Lightroom format
     cursor.execute(
-        """INSERT INTO AgLibraryKeyword 
-           (id_global, name, lc_name, dateCreated, keywordType) 
+        """INSERT INTO AgLibraryKeyword
+           (id_global, name, lc_name, dateCreated, keywordType)
            VALUES (?, ?, ?, datetime('now'), 0)""",
-        (keyword_name.lower(), keyword_name, keyword_name.lower())
+        (new_uuid, keyword_name, keyword_name.lower())
     )
     conn.commit()
     return cursor.lastrowid
