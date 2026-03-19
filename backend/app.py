@@ -22,7 +22,7 @@ def create_app():
     
     from api import jobs, images, system
     app.register_blueprint(jobs.bp, url_prefix='/api/jobs')
-    app.register_blueprint(images.bp, url_prefix='/api/instagram-images')
+    app.register_blueprint(images.bp, url_prefix='/api/images')
     app.register_blueprint(system.bp, url_prefix='/api')
     
     from websocket.events import register_socket_events
