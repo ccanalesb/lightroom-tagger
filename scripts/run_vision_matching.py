@@ -38,6 +38,7 @@ def match_with_vision_only(db, insta_image: dict, catalog_images: list) -> List[
     
     for i, catalog_img in enumerate(catalog_images):
         filepath = catalog_img.get('filepath', '')
+        # Convert path from Windows format
         catalog_path = filepath.replace('//tnas/ccanales/', '/mnt/tnas/')
         
         if not catalog_path or not os.path.exists(catalog_path):
