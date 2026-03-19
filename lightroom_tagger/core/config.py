@@ -42,10 +42,21 @@ class Config:
         return path
 
     def _resolve_nas_path(self, path: str) -> str:
-        nas_pattern = re.compile(r"^//nas/|\\\\nas\\")
-        if nas_pattern.match(path):
-            path = nas_pattern.sub(self.mount_point + "/", path)
-            path = path.replace("\\", "/")
+        if not path:
+            return path
+        # Handle common NAS patterns: //nas/, //tnas/, etc.
+        import re
+        # Match //nas/ or //tnas/ or any //<name>/
+        # Handle both //tnas/ccanales/... and //tnas/... formats
+        # Map //tnas/ccanales -> /mnt/tnas, //nas -> /mnt/nas, etc.
+        if path.startswith('//tnas/ccanales'):
+            path = path.replace('//tnas/ccanales', '/mnt/tnas', 1)
+        elif path.startswith('//tnas/'):
+            path = path.replace('//tnas/', '/mnt/tnas/', 1)
+        elif path.startswith('//nas/'):
+            path = path.replace('//nas/', '/mnt/nas/', 1)
+        
+        path = path.replace("\\", "/")
         return path
 
 
