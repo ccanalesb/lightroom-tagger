@@ -323,3 +323,21 @@ cd frontend && npm test -- --run
 | `Cannot find name 'global'` in tests | Use `(globalThis as any).fetch` instead of `global.fetch` |
 | npm peer dep conflict | Use `npm install --legacy-peer-deps` |
 | `import.meta.env` TypeScript errors | Add `/// <reference types="vite/client" />` to `vite-env.d.ts` |
+
+### OpenCLI Instagram Adapters
+
+This project contains custom `opencli` adapters located in `.opencli/clis/instagram/` designed to scrape Instagram securely via a local Chrome extension bridge.
+Future agents can use these commands natively from the project root instead of writing complex Python web scrapers:
+
+```bash
+# Get profile stats (Followers, Following, bio)
+opencli instagram profile --username <username> -f json
+
+# Get recent post URLs
+opencli instagram posts --username <username> --limit <num_posts> -f json
+
+# Get all image URLs from a specific post (auto-swipes carousels!)
+opencli instagram images --post_url "<url>" -f json
+```
+
+*Note: To use these commands, the `opencli` daemon must be active and the Chrome extension must be installed and connected in the host browser. Use `opencli doctor --live` to verify bridge connectivity.*
