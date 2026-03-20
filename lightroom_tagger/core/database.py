@@ -380,3 +380,63 @@ def get_instagram_images_needing_analysis(db) -> list:
     """Get Instagram images without phash."""
     Insta = Query()
     return db.table('instagram_images').search(Insta.phash == None)
+
+
+def init_vision_comparisons_table(db: TinyDB):
+    """Ensure vision_comparisons table exists."""
+    if 'vision_comparisons' not in db.tables():
+        db.table('vision_comparisons')
+
+
+def get_vision_comparison(db, catalog_key: str, insta_key: str) -> Optional[dict]:
+    """Get cached vision comparison result.
+    
+    Returns:
+        dict with 'result', 'vision_score', 'compared_at', 'model_used' or None if not cached.
+    """
+    Vision = Query()
+    results = db.table('vision_comparisons').search(
+        (Vision.catalog_key == catalog_key) & (Vision.insta_key == insta_key)
+    )
+    return results[0] if results else None
+
+
+def store_vision_comparison(db, catalog_key: str, insta_key: str, 
+                           result: str, vision_score: float, model_used: str) -> bool:
+    """Store vision comparison result in cache. Never expires.
+    
+    Args:
+        db: TinyDB instance
+        catalog_key: Key of catalog image
+        insta_key: Key of Instagram image
+        result: 'SAME' | 'DIFFERENT' | 'UNCERTAIN'
+        vision_score: float (1.0, 0.5, or 0.0)
+        model_used: Vision model identifier
+    
+    Returns:
+        True if stored successfully
+    """
+    Vision = Query()
+    
+    record = {
+        'catalog_key': catalog_key,
+        'insta_key': insta_key,
+        'result': result,
+        'vision_score': vision_score,
+        'compared_at': datetime.now().isoformat(),
+        'model_used': model_used
+    }
+    
+    existing = db.table('vision_comparisons').search(
+        (Vision.catalog_key == catalog_key) & (Vision.insta_key == insta_key)
+    )
+    
+    if existing:
+        db.table('vision_comparisons').update(
+            record,
+            (Vision.catalog_key == catalog_key) & (Vision.insta_key == insta_key)
+        )
+    else:
+        db.table('vision_comparisons').insert(record)
+    
+    return True

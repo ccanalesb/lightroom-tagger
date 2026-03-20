@@ -78,6 +78,31 @@ def get_instagram_thumbnail(image_key):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@bp.route('/catalog/<path:image_key>/thumbnail', methods=['GET'])
+def get_catalog_thumbnail(image_key):
+    try:
+        db_path = config.LIBRARY_DB
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Library database not found'}), 404
+        
+        db = TinyDB(db_path)
+        Image = Query()
+        images = db.table('images').search(Image.key == image_key)
+        db.close()
+        
+        if not images:
+            return jsonify({'error': 'Image not found'}), 404
+        
+        image = images[0]
+        filepath = image.get('filepath')
+        
+        if not filepath or not os.path.exists(filepath):
+            return jsonify({'error': 'Image file not found'}), 404
+        
+        return send_file(filepath, mimetype='image/jpeg')
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @bp.route('/catalog', methods=['GET'])
 def list_catalog_images():
     try:
@@ -120,15 +145,43 @@ def list_matches():
             return jsonify({'total': 0, 'matches': []})
         
         matches = db.table('matches').all()
+        
+        # Build lookup tables for images (avoid N+1 queries)
+        instagram_lookup = {}
+        if 'instagram_images' in db.tables():
+            for img in db.table('instagram_images').all():
+                instagram_lookup[img.get('key')] = img
+        
+        catalog_lookup = {}
+        for img in db.table('images').all():
+            catalog_lookup[img.get('key')] = img
+        
+        # Enrich matches with image data
+        enriched_matches = []
+        for match in matches:
+            enriched = {**match}
+            
+            # Add Instagram image details
+            insta_key = match.get('insta_key')
+            if insta_key and insta_key in instagram_lookup:
+                enriched['instagram_image'] = instagram_lookup[insta_key]
+            
+            # Add Catalog image details
+            catalog_key = match.get('catalog_key')
+            if catalog_key and catalog_key in catalog_lookup:
+                enriched['catalog_image'] = catalog_lookup[catalog_key]
+            
+            enriched_matches.append(enriched)
+        
         db.close()
         
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
         
-        paginated = matches[offset:offset+limit]
+        paginated = enriched_matches[offset:offset+limit]
         
         return jsonify({
-            'total': len(matches),
+            'total': len(enriched_matches),
             'matches': paginated,
         })
     except Exception as e:

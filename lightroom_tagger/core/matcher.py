@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 from tinydb import Query
-from lightroom_tagger.core.database import store_match
+from lightroom_tagger.core.database import store_match, get_vision_comparison, store_vision_comparison
 
 def query_by_exif(db, insta_exif: dict, date_window_days: int = 7) -> List[dict]:
     """Query catalog by EXIF (camera, lens, date within window)."""
@@ -60,12 +60,15 @@ def text_similarity(text1: str, text2: str) -> float:
     return intersection / union if union > 0 else 0.0
 
 
-def score_candidates_with_vision(insta_image: dict, candidates: list, 
+def score_candidates_with_vision(db, insta_image: dict, candidates: list, 
                                   phash_weight: float = 0.4, desc_weight: float = 0.3, 
                                   vision_weight: float = 0.3) -> List[dict]:
-    """Score candidates including vision comparison (one-by-one)."""
-    from core.phash import hamming_distance
-    from lightroom_tagger.core.analyzer import compare_with_vision, vision_score
+    """Score candidates including vision comparison (one-by-one).
+    
+    Uses vision comparison cache to avoid re-comparing already processed pairs.
+    """
+    from lightroom_tagger.core.phash import hamming_distance
+    from lightroom_tagger.core.analyzer import compare_with_vision, vision_score, get_vision_model
     
     results = []
     
@@ -75,13 +78,30 @@ def score_candidates_with_vision(insta_image: dict, candidates: list,
         
         desc_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
         
+        catalog_key = candidate.get('key')
+        insta_key = insta_image.get('key')
         insta_path = insta_image.get('local_path')
         local_path = candidate.get('local_path')
         
-        if insta_path and local_path:
+        # Check cache first
+        cached = get_vision_comparison(db, catalog_key, insta_key)
+        
+        if cached:
+            # Use cached result (never expires by design)
+            vision_result = cached['result']
+            vision_score_val = cached['vision_score']
+        elif insta_path and local_path:
+            # Run vision comparison
             try:
                 vision_result = compare_with_vision(local_path, insta_path)
                 vision_score_val = vision_score(vision_result)
+                
+                # Cache the result
+                store_vision_comparison(
+                    db, catalog_key, insta_key,
+                    vision_result, vision_score_val,
+                    get_vision_model()
+                )
             except Exception:
                 vision_result = 'UNCERTAIN'
                 vision_score_val = 0.5
@@ -94,8 +114,8 @@ def score_candidates_with_vision(insta_image: dict, candidates: list,
                 (vision_weight * vision_score_val)
         
         results.append({
-            'catalog_key': candidate.get('key'),
-            'insta_key': insta_image.get('key'),
+            'catalog_key': catalog_key,
+            'insta_key': insta_key,
             'phash_distance': int(phash_dist),
             'phash_score': phash_score_val,
             'desc_similarity': desc_sim,
@@ -119,7 +139,7 @@ def match_image(db, insta_image: dict, threshold: float = 0.7,
         return []
     
     scored = score_candidates_with_vision(
-        insta_image, candidates, 
+        db, insta_image, candidates, 
         phash_weight, desc_weight, vision_weight
     )
     

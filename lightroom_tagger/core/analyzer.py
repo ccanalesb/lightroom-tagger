@@ -1,9 +1,13 @@
 import os
 import tempfile
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from lightroom_tagger.core.config import load_config
 
 RAW_EXTENSIONS = {'.dng', '.raw', '.cr2', '.cr3', '.nef', '.arw', '.rw2', '.orf', '.raf', '.srw', '.x3f'}
+
+# Vision compression configuration
+VISION_MAX_DIMENSION = int(os.environ.get('VISION_MAX_DIMENSION', '1024'))
+VISION_COMPRESS_QUALITY = int(os.environ.get('VISION_COMPRESS_QUALITY', '80'))
 
 
 def get_vision_model() -> str:
@@ -13,6 +17,53 @@ def get_vision_model() -> str:
     return load_config().vision_model
 
 VISION_MODEL = os.environ.get('VISION_MODEL', 'gemma3:27b')
+
+
+def compress_image(input_path: str, max_size: Optional[Tuple[int, int]] = None, quality: Optional[int] = None) -> str:
+    """Compress image to reduce file size for vision comparison.
+    
+    Returns path to temporary compressed file.
+    Caller is responsible for cleaning up the temporary file.
+    
+    Args:
+        input_path: Path to input image
+        max_size: Max (width, height) tuple, defaults to VISION_MAX_DIMENSION
+        quality: JPEG quality (1-100), defaults to VISION_COMPRESS_QUALITY
+    
+    Returns:
+        Path to compressed temporary file, or original path on failure.
+    """
+    from PIL import Image
+    
+    if max_size is None:
+        max_size = (VISION_MAX_DIMENSION, VISION_MAX_DIMENSION)
+    if quality is None:
+        quality = VISION_COMPRESS_QUALITY
+    
+    try:
+        with Image.open(input_path) as img:
+            # Convert to RGB if necessary
+            if img.mode in ('RGBA', 'LA', 'P'):
+                img = img.convert('RGB')
+            
+            # Resize if larger than max_size
+            if img.width > max_size[0] or img.height > max_size[1]:
+                img.thumbnail(max_size, Image.Resampling.LANCZOS)
+            
+            # Save to temp file with compression
+            fd, temp_path = tempfile.mkstemp(suffix='.jpg')
+            os.close(fd)
+            img.save(temp_path, 'JPEG', quality=quality, optimize=True)
+            
+            # Log compression
+            original_size = os.path.getsize(input_path) / 1024  # KB
+            compressed_size = os.path.getsize(temp_path) / 1024  # KB
+            print(f"  Compressed: {original_size:.1f}KB -> {compressed_size:.1f}KB", flush=True)
+            
+            return temp_path
+    except Exception as e:
+        print(f"  Compression failed: {e}", flush=True)
+        return input_path
 
 
 def convert_raw_to_jpg(raw_path: str) -> Optional[str]:
@@ -101,7 +152,7 @@ def extract_exif(path: str) -> Dict[str, Any]:
     result = {}
     try:
         with Image.open(path) as img:
-            exif = img._getexif()
+            exif = img._getexif()  # type: ignore[attr-defined]
             if exif:
                 for tag_id, value in exif.items():
                     tag = TAGS.get(tag_id, tag_id)
@@ -112,7 +163,7 @@ def extract_exif(path: str) -> Dict[str, Any]:
         pass
     return result
 
-def describe_image(path: str, agent_type: str = None) -> str:
+def describe_image(path: str, agent_type: Optional[str] = None) -> str:
     """Generate description using configured agent."""
     if agent_type is None:
         try:
@@ -137,20 +188,52 @@ def run_external_agent(path: str) -> str:
 
 
 def compare_with_vision(local_path: str, insta_path: str) -> str:
-    """Compare two images using vision model via Ollama.
+    """Compare two images using vision model via Ollama with compression.
+    
+    Compresses images to max VISION_MAX_DIMENSION pixels before comparison
+    to reduce bandwidth and processing time.
     
     Returns: 'SAME' | 'DIFFERENT' | 'UNCERTAIN'
     """
-    viewable_local = get_viewable_path(local_path)
-    result = run_vision_ollama(viewable_local, insta_path)
+    # Track all temp files for cleanup
+    temp_files = []
     
-    if viewable_local != local_path and os.path.exists(viewable_local):
-        try:
-            os.unlink(viewable_local)
-        except Exception:
-            pass
-    
-    return result
+    try:
+        # Step 1: Get viewable paths (convert RAW/DNG if needed)
+        viewable_local = get_viewable_path(local_path)
+        if viewable_local != local_path:
+            temp_files.append(viewable_local)
+        else:
+            viewable_local = local_path
+        
+        viewable_insta = get_viewable_path(insta_path)
+        if viewable_insta != insta_path:
+            temp_files.append(viewable_insta)
+        else:
+            viewable_insta = insta_path
+        
+        # Step 2: Compress both images
+        compressed_local = compress_image(viewable_local)
+        if compressed_local != viewable_local:
+            temp_files.append(compressed_local)
+        
+        compressed_insta = compress_image(viewable_insta)
+        if compressed_insta != viewable_insta:
+            temp_files.append(compressed_insta)
+        
+        # Step 3: Run vision comparison
+        result = run_vision_ollama(compressed_local, compressed_insta)
+        
+        return result
+        
+    finally:
+        # Step 4: Clean up all temp files
+        for temp_file in temp_files:
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.unlink(temp_file)
+                except Exception:
+                    pass
 
 
 def run_vision_ollama(local_path: str, insta_path: str) -> str:

@@ -115,6 +115,11 @@ export interface Match {
   instagram_key: string
   catalog_key: string
   score: number
+  vision_result?: 'SAME' | 'DIFFERENT' | 'UNCERTAIN'
+  vision_score?: number
+  phash_score?: number
+  desc_similarity?: number
+  total_score?: number
   instagram_image?: InstagramImage
   catalog_image?: CatalogImage
 }
