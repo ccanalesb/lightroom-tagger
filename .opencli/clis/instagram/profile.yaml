@@ -1,0 +1,35 @@
+site: instagram
+name: profile
+description: "Get Instagram profile basic stats"
+domain: www.instagram.com
+strategy: cookie
+browser: true
+
+args:
+  username:
+    type: string
+    default: "im.canales"
+    description: "Instagram username to lookup"
+
+pipeline:
+  - navigate: https://www.instagram.com/${{ args.username }}/
+  
+  - wait: 3
+
+  - evaluate: |
+      (async () => {
+        const meta = document.querySelector('meta[property="og:description"]')?.content || "";
+        const title = document.title || "";
+        return [{
+          username: "${{ args.username }}",
+          title: title,
+          stats: meta
+        }];
+      })()
+
+  - map:
+      username: ${{ item.username }}
+      title: ${{ item.title }}
+      stats: ${{ item.stats }}
+
+columns: [username, title, stats]

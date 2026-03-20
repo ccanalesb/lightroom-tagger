@@ -1,0 +1,55 @@
+site: instagram
+name: posts
+description: "Get recent posts from an Instagram profile"
+domain: www.instagram.com
+strategy: cookie
+browser: true
+
+args:
+  username:
+    type: string
+    required: true
+    description: "Instagram username"
+  limit:
+    type: int
+    default: 12
+    description: "Number of posts to fetch (approx)"
+
+pipeline:
+  - navigate: https://www.instagram.com/${{ args.username }}/
+  
+  - wait: 8
+  
+  - evaluate: |
+      (async () => {
+        const sleep = ms => new Promise(res => setTimeout(res, ms));
+        const allLinks = Array.from(document.querySelectorAll('a'));
+        const links = allLinks.filter(a => typeof a.href === 'string' && (a.href.includes('/p/') || a.href.includes('/reel/')));
+        const posts = [];
+        const seen = new Set();
+        
+        for (const a of links) {
+          const href = String(a.href);
+          if (seen.has(href)) continue;
+          seen.add(href);
+          
+          let imgUrl = "";
+          let altText = "";
+          const img = a.querySelector('img');
+          if (img) {
+             imgUrl = img.src || "";
+             altText = img.alt || "";
+          }
+          posts.push({ url: href, image: imgUrl, description: altText });
+        }
+        return posts;
+      })()
+
+  - map:
+      url: ${{ item.url }}
+      image: ${{ item.image }}
+      description: ${{ item.description }}
+      
+  - limit: ${{ args.limit }}
+
+columns: [url, description, image]
