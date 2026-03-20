@@ -269,21 +269,156 @@ class TestVisionComparisonCache(unittest.TestCase):
         self.assertEqual(cached['vision_score'], 1.0)
         self.assertEqual(cached['model_used'], 'gemma3:27b-cloud')
 
-    def test_multiple_comparisons(self):
+def test_multiple_comparisons(self):
         """Test storing multiple comparisons."""
         store_vision_comparison(self.db, 'cat_001', 'insta_001', 'SAME', 1.0, 'gemma3:27b')
         store_vision_comparison(self.db, 'cat_001', 'insta_002', 'DIFFERENT', 0.0, 'gemma3:27b')
         store_vision_comparison(self.db, 'cat_002', 'insta_001', 'UNCERTAIN', 0.5, 'gemma3:27b')
-        
+
         # Each should be retrievable
         c1 = get_vision_comparison(self.db, 'cat_001', 'insta_001')
         self.assertEqual(c1['result'], 'SAME')
-        
+
         c2 = get_vision_comparison(self.db, 'cat_001', 'insta_002')
         self.assertEqual(c2['result'], 'DIFFERENT')
-        
+
         c3 = get_vision_comparison(self.db, 'cat_002', 'insta_001')
         self.assertEqual(c3['result'], 'UNCERTAIN')
+
+
+class TestInstagramDumpMedia(unittest.TestCase):
+    """Tests for Instagram dump media functions."""
+
+    def setUp(self):
+        """Create temporary database."""
+        self.temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.json')
+        self.temp_file.close()
+        self.db = init_database(self.temp_file.name)
+
+    def tearDown(self):
+        """Clean up."""
+        self.db.close()
+        os.unlink(self.temp_file.name)
+
+    def test_init_instagram_dump_table(self):
+        """Test instagram_dump_media table initialization."""
+        from lightroom_tagger.core.database import init_instagram_dump_table
+
+        init_instagram_dump_table(self.db)
+        # Table is created lazily in TinyDB - verify by inserting and retrieving
+        table = self.db.table('instagram_dump_media')
+        table.insert({'test': True})
+        self.assertIn('instagram_dump_media', self.db.tables())
+
+    def test_store_instagram_dump_media(self):
+        """Test storing Instagram dump media record."""
+        from lightroom_tagger.core.database import (
+            init_instagram_dump_table, store_instagram_dump_media, get_instagram_dump_media
+        )
+
+        init_instagram_dump_table(self.db)
+
+        record = {
+            'media_key': '202603/17940060624158613',
+            'file_path': '/home/cristian/instagram-dump/media/posts/202603/17940060624158613.jpg',
+            'caption': 'Spring is just around the corner',
+            'created_at': '2025-03-15T10:00:00',
+        }
+
+        store_instagram_dump_media(self.db, record)
+
+        # Verify stored
+        stored = get_instagram_dump_media(self.db, '202603/17940060624158613')
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored['media_key'], '202603/17940060624158613')
+        self.assertEqual(stored['file_path'], '/home/cristian/instagram-dump/media/posts/202603/17940060624158613.jpg')
+        self.assertEqual(stored['processed'], False)
+
+    def test_get_unprocessed_dump_media(self):
+        """Test getting unprocessed media."""
+        from lightroom_tagger.core.database import (
+            init_instagram_dump_table, store_instagram_dump_media, get_unprocessed_dump_media, mark_dump_media_processed
+        )
+
+        init_instagram_dump_table(self.db)
+
+        # Store processed and unprocessed
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/17940060624158613',
+            'file_path': '/path/to/file1.jpg',
+            'filename': 'file1.jpg',
+        })
+
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/17940060624158614',
+            'file_path': '/path/to/file2.jpg',
+            'filename': 'file2.jpg',
+        })
+
+        # Mark first as processed
+        mark_dump_media_processed(self.db, '202603/17940060624158613', matched_catalog_key='catalog_123')
+
+        # Verify only unprocessed returned
+        unprocessed = get_unprocessed_dump_media(self.db)
+        self.assertEqual(len(unprocessed), 1)
+        self.assertEqual(unprocessed[0]['media_key'], '202603/17940060624158614')
+
+    def test_mark_dump_media_processed(self):
+        """Test marking media as processed."""
+        from lightroom_tagger.core.database import (
+            init_instagram_dump_table, store_instagram_dump_media, get_instagram_dump_media, mark_dump_media_processed
+        )
+
+        init_instagram_dump_table(self.db)
+
+        # Store media
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/17940060624158613',
+            'file_path': '/path/to/file.jpg',
+            'filename': 'file.jpg',
+        })
+
+        # Mark as processed with match info
+        mark_dump_media_processed(
+            self.db, '202603/17940060624158613',
+            matched_catalog_key='catalog_123',
+            vision_result='SAME',
+            vision_score=0.95
+        )
+
+        # Verify updated
+        stored = get_instagram_dump_media(self.db, '202603/17940060624158613')
+        self.assertTrue(stored['processed'])
+        self.assertEqual(stored['matched_catalog_key'], 'catalog_123')
+        self.assertEqual(stored['vision_result'], 'SAME')
+        self.assertEqual(stored['vision_score'], 0.95)
+        self.assertIsNotNone(stored['processed_at'])
+
+    def test_store_instagram_dump_media_idempotent(self):
+        """Test that storing same media_key updates existing record."""
+        from lightroom_tagger.core.database import (
+            init_instagram_dump_table, store_instagram_dump_media, get_instagram_dump_media
+        )
+
+        init_instagram_dump_table(self.db)
+
+        # Store first time
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/17940060624158613',
+            'file_path': '/path/to/file.jpg',
+            'caption': 'Original caption',
+        })
+
+        # Store again with different caption
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/17940060624158613',
+            'file_path': '/path/to/file.jpg',
+            'caption': 'Updated caption',
+        })
+
+        # Verify updated
+        stored = get_instagram_dump_media(self.db, '202603/17940060624158613')
+        self.assertEqual(stored['caption'], 'Updated caption')
 
 
 if __name__ == "__main__":

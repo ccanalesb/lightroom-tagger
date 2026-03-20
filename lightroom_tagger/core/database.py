@@ -119,6 +119,85 @@ def delete_image(db, key: str) -> bool:
     return False
 
 
+def init_instagram_dump_table(db: TinyDB):
+    """Ensure instagram_dump_media table exists."""
+    if 'instagram_dump_media' not in db.tables():
+        db.table('instagram_dump_media')
+
+
+def store_instagram_dump_media(db, record: dict) -> str:
+    """Store Instagram dump media record. Idempotent by media_key.
+
+    Args:
+        db: TinyDB instance
+        record: Dict with media_key, file_path, caption, created_at
+
+    Returns:
+        media_key
+    """
+    Media = Query()
+
+    media_key = record.get('media_key')
+    if not media_key:
+        raise ValueError("media_key is required")
+
+    # Set defaults
+    record.setdefault('processed', False)
+    record.setdefault('matched_catalog_key', None)
+    record.setdefault('vision_result', None)
+    record.setdefault('vision_score', None)
+    record.setdefault('processed_at', None)
+    record.setdefault('added_at', datetime.now().isoformat())
+
+    existing = db.table('instagram_dump_media').search(Media.media_key == media_key)
+
+    if existing:
+        # Update only if not already processed (protect processed records)
+        if not existing[0].get('processed'):
+            db.table('instagram_dump_media').update(record, Media.media_key == media_key)
+    else:
+        db.table('instagram_dump_media').insert(record)
+
+    return media_key
+
+
+def get_instagram_dump_media(db, media_key: str) -> Optional[dict]:
+    """Get Instagram dump media by key."""
+    Media = Query()
+    results = db.table('instagram_dump_media').search(Media.media_key == media_key)
+    return results[0] if results else None
+
+
+def get_unprocessed_dump_media(db, limit: int = None) -> list:
+    """Get unprocessed Instagram dump media for matching."""
+    Media = Query()
+    results = db.table('instagram_dump_media').search(Media.processed == False)
+    if limit:
+        return results[:limit]
+    return results
+
+
+def mark_dump_media_processed(db, media_key: str, matched_catalog_key: str = None,
+                              vision_result: str = None, vision_score: float = None) -> bool:
+    """Mark Instagram dump media as processed with match results."""
+    Media = Query()
+
+    updates = {
+        'processed': True,
+        'matched_catalog_key': matched_catalog_key,
+        'vision_result': vision_result,
+        'vision_score': vision_score,
+        'processed_at': datetime.now().isoformat(),
+    }
+
+    existing = db.table('instagram_dump_media').search(Media.media_key == media_key)
+    if existing:
+        db.table('instagram_dump_media').update(updates, Media.media_key == media_key)
+        return True
+    return False
+    return False
+
+
 def clear_all(db) -> int:
     """Clear all images. Returns count."""
     count = len(db)
