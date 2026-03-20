@@ -31,3 +31,23 @@ stop_pid_file() {
 stop_pid_file "backend" "$BACKEND_PID_FILE"
 stop_pid_file "frontend" "$FRONTEND_PID_FILE"
 
+kill_port_if_busy() {
+  local port="$1"
+  local label="$2"
+
+  if ! command -v fuser >/dev/null 2>&1; then
+    echo "$label: 'fuser' not found; skip port cleanup for $port"
+    return
+  fi
+
+  if fuser "${port}/tcp" >/dev/null 2>&1; then
+    fuser -k "${port}/tcp" >/dev/null 2>&1 || true
+    echo "$label: killed process(es) on port $port"
+  else
+    echo "$label: port $port already free"
+  fi
+}
+
+kill_port_if_busy 5000 "backend"
+kill_port_if_busy 5173 "frontend"
+

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { ImagesAPI, InstagramImage } from '../services/api'
 import {
   MSG_ERROR_PREFIX,
-  MSG_NO_IMAGES,
   INSTAGRAM_DOWNLOADED,
 } from '../constants/strings'
 

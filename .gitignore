@@ -74,3 +74,5 @@ skills-lock.json
 .claude/settings.local.json
 library.json
 validation_report.html
+.run
+vision_matching_results.json

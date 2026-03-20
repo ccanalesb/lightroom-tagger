@@ -11,6 +11,19 @@ from lightroom_tagger.core.database import init_database
 from lightroom_tagger.core.analyzer import compare_with_vision, vision_score
 
 
+def resolve_catalog_path(filepath: str) -> str:
+    """Resolve catalog path across Windows UNC and WSL mount styles."""
+    if not filepath:
+        return ""
+    if os.path.exists(filepath):
+        return filepath
+
+    mapped_path = filepath.replace('//tnas/ccanales/', '/mnt/tnas/')
+    if mapped_path != filepath and os.path.exists(mapped_path):
+        return mapped_path
+    return ""
+
+
 def get_all_catalog_images(db) -> List[dict]:
     """Get all catalog images (no filtering)."""
     return db.table('images').all()
@@ -35,7 +48,7 @@ def match_with_vision_only(db, insta_image: dict, catalog_images: list) -> List[
     
     for i, catalog_img in enumerate(catalog_images):
         filepath = catalog_img.get('filepath', '')
-        catalog_path = filepath.replace('//tnas/ccanales/', '/mnt/tnas/')
+        catalog_path = resolve_catalog_path(filepath)
         
         if not catalog_path or not os.path.exists(catalog_path):
             continue

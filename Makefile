@@ -1,6 +1,7 @@
 dev:
-	./scripts/dev-up.sh
+	bash ./scripts/dev-down.sh || true
+	bash ./scripts/dev-up.sh
 
 dev-down:
-	./scripts/dev-down.sh
+	bash ./scripts/dev-down.sh
 
