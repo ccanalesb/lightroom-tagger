@@ -132,6 +132,46 @@ def list_catalog_images():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@bp.route('/dump-media', methods=['GET'])
+def list_dump_media():
+    try:
+        db_path = config.LIBRARY_DB
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Database not found'}), 404
+        
+        db = TinyDB(db_path)
+        
+        processed = request.args.get('processed')
+        matched = request.args.get('matched')
+        limit = request.args.get('limit', 50, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        
+        table = db.table('instagram_dump_media')
+        Media = Query()
+        
+        if processed == 'true':
+            media = table.search(Media.processed == True)
+        elif processed == 'false':
+            media = table.search(Media.processed == False)
+        elif matched == 'true':
+            media = table.search(Media.matched_catalog_key != None)
+        elif matched == 'false':
+            media = table.search(Media.matched_catalog_key == None)
+        else:
+            media = table.all()
+        
+        db.close()
+        
+        total = len(media)
+        paginated = media[offset:offset+limit]
+        
+        return jsonify({
+            'total': total,
+            'media': paginated,
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @bp.route('/matches', methods=['GET'])
 def list_matches():
     try:
