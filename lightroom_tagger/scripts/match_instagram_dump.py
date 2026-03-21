@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Match Instagram dump media against catalog images."""
+
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from lightroom_tagger.core.database import (
+    init_database,
+    init_instagram_dump_table,
+    init_catalog_table,
+    get_unprocessed_dump_media,
+    mark_dump_media_processed,
+    update_instagram_status,
+)
+from lightroom_tagger.core.matcher import score_candidates_with_vision
+from lightroom_tagger.core.analyzer import compute_phash
+
+
+def match_dump_media(db, threshold: float = 0.7, batch_size: int = None) -> dict:
+    """Match Instagram dump media against catalog images.
+    
+    Args:
+        db: TinyDB instance
+        threshold: Minimum score threshold for match (default 0.7)
+        batch_size: Maximum number of unprocessed media to process (None = all)
+    
+    Returns:
+        Dict with 'processed', 'matched', 'skipped' counts
+    """
+    stats = {
+        'processed': 0,
+        'matched': 0,
+        'skipped': 0,
+    }
+    
+    init_instagram_dump_table(db)
+    init_catalog_table(db)
+    
+    unprocessed = get_unprocessed_dump_media(db, limit=batch_size)
+    
+    if not unprocessed:
+        return stats
+    
+    catalog_images = db.table('catalog_images').all()
+    
+    if not catalog_images:
+        return stats
+    
+    for dump_media in unprocessed:
+        stats['processed'] += 1
+        
+        dump_image = {
+            'key': dump_media['media_key'],
+            'local_path': dump_media.get('file_path'),
+            'image_hash': None,
+            'description': dump_media.get('caption', ''),
+        }
+        
+        phash = None
+        if dump_image['local_path'] and os.path.exists(dump_image['local_path']):
+            phash = compute_phash(dump_image['local_path'])
+        dump_image['image_hash'] = phash
+        
+        candidates = []
+        for catalog_img in catalog_images:
+            candidate = {
+                'key': catalog_img.get('key'),
+                'local_path': catalog_img.get('filepath'),
+                'image_hash': catalog_img.get('phash'),
+                'description': catalog_img.get('description', ''),
+            }
+            candidates.append(candidate)
+        
+        if not candidates:
+            mark_dump_media_processed(db, dump_media['media_key'])
+            stats['skipped'] += 1
+            continue
+        
+        results = score_candidates_with_vision(
+            db, dump_image, candidates,
+            phash_weight=0.4, desc_weight=0.3, vision_weight=0.3
+        )
+        
+        if results and results[0]['total_score'] >= threshold:
+            best_match = results[0]
+            matched_catalog_key = best_match['catalog_key']
+            
+            mark_dump_media_processed(
+                db, dump_media['media_key'],
+                matched_catalog_key=matched_catalog_key,
+                vision_result=best_match.get('vision_result'),
+                vision_score=best_match.get('vision_score')
+            )
+            
+            update_instagram_status(db, matched_catalog_key, posted=True)
+            
+            stats['matched'] += 1
+        else:
+            mark_dump_media_processed(db, dump_media['media_key'])
+            stats['skipped'] += 1
+    
+    return stats
+
+
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Match Instagram dump media to catalog')
+    parser.add_argument('--db', default='library.db', help='Database path')
+    parser.add_argument('--threshold', type=float, default=0.7,
+                        help='Minimum score threshold for match')
+    parser.add_argument('--batch-size', type=int, default=None,
+                        help='Maximum number of unprocessed media to process')
+    parser.add_argument('--reprocess', action='store_true',
+                        help='Re-process already processed media')
+    
+    args = parser.parse_args()
+    
+    if not os.path.exists(args.db):
+        print(f"Error: Database not found: {args.db}")
+        sys.exit(1)
+    
+    db = init_database(args.db)
+    
+    try:
+        stats = match_dump_media(
+            db,
+            threshold=args.threshold,
+            batch_size=args.batch_size
+        )
+        
+        print(f"\nProcessed: {stats['processed']}")
+        print(f"Matched: {stats['matched']}")
+        print(f"Skipped: {stats['skipped']}")
+        
+    finally:
+        db.close()
+
+
+if __name__ == '__main__':
+    main()

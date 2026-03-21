@@ -71,6 +71,17 @@ export const MatchingAPI = {
     ),
 }
 
+export const DumpMediaAPI = {
+  list: (filters?: { processed?: boolean; matched?: boolean; limit?: number; offset?: number }) => {
+    const params = new URLSearchParams()
+    if (filters?.processed !== undefined) params.set('processed', String(filters.processed))
+    if (filters?.matched !== undefined) params.set('matched', String(filters.matched))
+    if (filters?.limit) params.set('limit', String(filters.limit))
+    if (filters?.offset) params.set('offset', String(filters.offset))
+    return request<{ total: number; media: DumpMedia[] }>(`/images/dump-media?${params.toString()}`)
+  },
+}
+
 export interface Stats {
   catalog_images: number
   instagram_images: number
@@ -80,7 +91,7 @@ export interface Stats {
 }
 
 export interface InstagramImage {
-  post_url: string
+  post_url?: string  // Optional - not available in dump
   local_path: string
   filename: string
   instagram_folder: string
@@ -122,4 +133,16 @@ export interface Match {
   total_score?: number
   instagram_image?: InstagramImage
   catalog_image?: CatalogImage
+}
+
+export interface DumpMedia {
+  media_key: string
+  file_path: string
+  filename?: string
+  caption?: string
+  created_at?: string
+  processed: boolean
+  matched_catalog_key?: string
+  vision_result?: 'SAME' | 'DIFFERENT' | 'UNCERTAIN' | 'NO_MATCH' | 'ERROR'
+  vision_score?: number
 }

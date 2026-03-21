@@ -19,7 +19,7 @@ def get_stats():
         db = TinyDB(db_path)
         
         images = db.table('images').all()
-        instagram_images = db.table('instagram_images').all()
+        instagram_images = db.table('instagram_dump_media').all()
         
         posted_count = sum(1 for img in images if img.get('instagram_posted'))
         matches = db.table('matches').all() if 'matches' in db.tables() else []
