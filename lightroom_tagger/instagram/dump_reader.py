@@ -128,28 +128,53 @@ def parse_posts_metadata(dump_path: str) -> Dict[str, Dict]:
                     date_folder = part
                     break
 
-            if date_folder and parts:
-                filename = parts[-1]
-                filename_without_ext = filename.split('.')[0]
-                media_key = f"{date_folder}/{filename_without_ext}"
+        if date_folder and parts:
+            filename = parts[-1]
+            filename_without_ext = filename.split('.')[0]
+            media_key = f"{date_folder}/{filename_without_ext}"
 
-                # Convert timestamp to ISO format
-                creation_ts = media.get('creation_timestamp') or post_timestamp
-                created_at = None
-                if creation_ts:
-                    try:
-                        created_at = datetime.fromtimestamp(creation_ts).isoformat()
-                    except (ValueError, OSError):
-                        pass
+            # Convert timestamp to ISO format
+            creation_ts = media.get('creation_timestamp') or post_timestamp
+            created_at = None
+            if creation_ts:
+                try:
+                    created_at = datetime.fromtimestamp(creation_ts).isoformat()
+                except (ValueError, OSError):
+                    pass
 
-                # Use media title if available, otherwise post title
-                caption = media.get('title', '') or post_caption
+            # Use media title if available, otherwise post title
+            caption = media.get('title', '') or post_caption
 
-                metadata[media_key] = {
-                    'caption': caption,
-                    'created_at': created_at,
-                    'creation_timestamp': creation_ts,
-                }
+            # Get EXIF data if present
+            exif_data = {}
+            media_metadata = media.get('media_metadata', {})
+            if 'photo_metadata' in media_metadata:
+                exif_list = media_metadata['photo_metadata'].get('exif_data', [])
+                if exif_list:
+                    exif_data = exif_list[0]
+
+            # Build record with EXIF fields
+            record = {
+                'caption': caption,
+                'created_at': created_at,
+                'creation_timestamp': creation_ts,
+                'exif_data': exif_data if exif_data else None,
+            }
+
+            # Extract specific EXIF fields if available
+            if exif_data:
+                record['exif_date_time_original'] = exif_data.get('date_time_original')
+                record['exif_latitude'] = exif_data.get('latitude')
+                record['exif_longitude'] = exif_data.get('longitude')
+                record['exif_device_id'] = exif_data.get('device_id')
+                record['exif_lens_model'] = exif_data.get('lens_model')
+                record['exif_iso'] = exif_data.get('iso')
+                record['exif_aperture'] = exif_data.get('aperture')
+                record['exif_shutter_speed'] = exif_data.get('shutter_speed')
+                record['exif_focal_length'] = exif_data.get('focal_length')
+                record['exif_lens_make'] = exif_data.get('lens_make')
+
+            metadata[media_key] = record
 
     return metadata
 
@@ -165,10 +190,10 @@ def _extract_media_key_from_uri(uri: str) -> Optional[str]:
                 date_folder = part
                 break
 
-    if date_folder and parts:
-        filename = parts[-1]
-        filename_without_ext = filename.split('.')[0]
-        return f"{date_folder}/{filename_without_ext}"
+        if date_folder and parts:
+            filename = parts[-1]
+            filename_without_ext = filename.split('.')[0]
+            return f"{date_folder}/{filename_without_ext}"
     return None
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Import Instagram dump media into database."""
+"""Import Instagram dump media into database with EXIF and URL extraction."""
 
 import os
 import sys
@@ -16,11 +16,40 @@ from lightroom_tagger.core.database import (
 from lightroom_tagger.instagram.dump_reader import (
     discover_media_files,
     parse_posts_metadata,
+    parse_archived_posts_metadata,
+    parse_other_content_metadata,
+    parse_saved_and_reposted_urls,
 )
 
 
+def combine_metadata(posts_meta, archived_meta, other_meta):
+    """Combine metadata from all JSON sources (aggregative)."""
+    combined = {}
+    
+    # Start with posts metadata
+    for key, data in posts_meta.items():
+        combined[key] = data.copy()
+    
+    # Merge archived posts (has best EXIF data)
+    for key, data in archived_meta.items():
+        if key in combined:
+            # Merge: EXIF from archived takes precedence
+            combined[key].update(data)
+        else:
+            combined[key] = data.copy()
+    
+    # Merge other content (minimal data)
+    for key, data in other_meta.items():
+        if key in combined:
+            combined[key].update(data)
+        else:
+            combined[key] = data.copy()
+    
+    return combined
+
+
 def import_dump(db, dump_path: str, skip_existing: bool = True) -> int:
-    """Import all media files from Instagram dump into database.
+    """Import all media files from Instagram dump into database with enhanced metadata.
     
     Args:
         db: TinyDB instance
@@ -33,16 +62,34 @@ def import_dump(db, dump_path: str, skip_existing: bool = True) -> int:
     # Ensure table exists
     init_instagram_dump_table(db)
     
-    # Discover all media files
+    # Discover all media files from filesystem
     media_files = discover_media_files(dump_path)
     print(f"Found {len(media_files)} media files in dump")
     
-    # Parse metadata from JSON
-    metadata = parse_posts_metadata(dump_path)
-    print(f"Parsed metadata for {len(metadata)} files from JSON")
+    # Parse metadata from all JSON sources
+    print("Parsing JSON metadata...")
+    posts_metadata = parse_posts_metadata(dump_path)
+    print(f"  posts_1.json: {len(posts_metadata)} items")
+    
+    archived_metadata = parse_archived_posts_metadata(dump_path)
+    print(f"  archived_posts.json: {len(archived_metadata)} items")
+    
+    other_metadata = parse_other_content_metadata(dump_path)
+    print(f"  other_content.json: {len(other_metadata)} items")
+    
+    # Combine metadata (aggregative)
+    combined_metadata = combine_metadata(posts_metadata, archived_metadata, other_metadata)
+    print(f"Combined unique metadata: {len(combined_metadata)} items")
+    
+    # Extract URLs from saved/reposted content
+    print("Extracting Instagram URLs...")
+    url_lookup = parse_saved_and_reposted_urls(dump_path)
+    print(f"  Found {len(url_lookup)} URLs")
     
     imported = 0
     skipped = 0
+    with_exif = 0
+    with_urls = 0
     
     for media in media_files:
         media_key = media['media_key']
@@ -54,7 +101,7 @@ def import_dump(db, dump_path: str, skip_existing: bool = True) -> int:
                 skipped += 1
                 continue
         
-        # Build record
+        # Build base record from filesystem
         record = {
             'media_key': media_key,
             'file_path': media['file_path'],
@@ -62,20 +109,31 @@ def import_dump(db, dump_path: str, skip_existing: bool = True) -> int:
             'date_folder': media['date_folder'],
         }
         
-        # Add metadata if available
-        meta = metadata.get(media_key, {})
-        if meta.get('caption'):
-            record['caption'] = meta['caption']
-        if meta.get('created_at'):
-            record['created_at'] = meta['created_at']
+        # Add metadata from JSON if available
+        meta = combined_metadata.get(media_key, {})
+        if meta:
+            record.update(meta)
+            if meta.get('exif_data'):
+                with_exif += 1
+        
+        # Match URL by timestamp
+        creation_ts = record.get('creation_timestamp')
+        if creation_ts and creation_ts in url_lookup:
+            record['post_url'] = url_lookup[creation_ts]
+            with_urls += 1
         
         # Store
         store_instagram_dump_media(db, record)
         imported += 1
+        
+        if imported % 500 == 0:
+            print(f"  Imported {imported}...")
     
-    print(f"Imported {imported} new media files")
-    if skipped > 0:
-        print(f"Skipped {skipped} existing files")
+    print(f"\n✓ Import complete:")
+    print(f"  Imported: {imported} new media files")
+    print(f"  Skipped: {skipped} existing files")
+    print(f"  With EXIF data: {with_exif}")
+    print(f"  With URLs: {with_urls}")
     
     return imported
 
@@ -83,12 +141,12 @@ def import_dump(db, dump_path: str, skip_existing: bool = True) -> int:
 def main():
     import argparse
     
-    parser = argparse.ArgumentParser(description='Import Instagram dump into database')
+    parser = argparse.ArgumentParser(description='Import Instagram dump with EXIF extraction')
     parser.add_argument('--db', default='library.db', help='Database path')
     parser.add_argument('--dump-path', default=os.environ.get('INSTAGRAM_DUMP_PATH', '/home/cristian/instagram-dump'),
-                        help='Path to Instagram dump directory')
-    parser.add_argument('--reimport', action='store_true', 
-                        help='Re-import all files (ignore existing)')
+                       help='Path to Instagram dump directory')
+    parser.add_argument('--reimport', action='store_true',
+                       help='Re-import all files (ignore existing)')
     
     args = parser.parse_args()
     
