@@ -84,9 +84,20 @@ function InstagramImageCard({ image }: { image: InstagramImage }) {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
   const thumbnailUrl = `/api/images/instagram/${encodeURIComponent(image.key)}/thumbnail`
-  
-  // Instagram carousel URL with specific image index
-  const postUrlWithIndex = `${image.post_url}?img_index=${image.image_index - 1}`
+
+  // Handle missing post_url from dump
+  const hasPostUrl = !!image.post_url
+  const postUrlWithIndex = hasPostUrl 
+    ? `${image.post_url}?img_index=${image.image_index - 1}`
+    : '#'
+
+  const handleViewClick = (e: React.MouseEvent) => {
+    if (!hasPostUrl) {
+      e.preventDefault()
+      // Open local file instead
+      window.open(`file://${image.local_path}`, '_blank')
+    }
+  }
 
   return (
     <div className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow group bg-white">
@@ -118,14 +129,25 @@ function InstagramImageCard({ image }: { image: InstagramImage }) {
           <p className="text-xs font-medium text-gray-900 truncate" title={image.instagram_folder}>
             {image.instagram_folder}
           </p>
-          <a
-            href={postUrlWithIndex}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-blue-600 hover:underline flex-shrink-0"
-          >
-            View
-          </a>
+          {hasPostUrl ? (
+            <a
+              href={postUrlWithIndex}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-600 hover:underline flex-shrink-0"
+            >
+              View
+            </a>
+          ) : (
+            <a
+              href={postUrlWithIndex}
+              onClick={handleViewClick}
+              className="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0 cursor-pointer"
+              title="Open local file"
+            >
+              View
+            </a>
+          )}
         </div>
         <p className="text-xs text-gray-400 mt-0.5">
           {new Date(image.crawled_at).toLocaleDateString()}

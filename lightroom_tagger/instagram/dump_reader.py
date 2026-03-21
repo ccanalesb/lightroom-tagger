@@ -58,17 +58,24 @@ def discover_media_files(dump_path: str) -> List[Dict]:
                     date_folder = part
                     break
 
+            filename_without_ext = file_path.stem
+            
             if date_folder:
-                filename_without_ext = file_path.stem
+                # Standard case: posts/202603/17940060624158613.jpg
                 media_key = f"{date_folder}/{filename_without_ext}"
+            else:
+                # No date folder: media/other/17980178165618670.jpg
+                # Use folder/filename: other/17980178165618670
+                folder = parts[0] if parts else 'unknown'
+                media_key = f"{folder}/{filename_without_ext}"
 
-                media_files.append({
-                    'media_key': media_key,
-                    'file_path': str(file_path),
-                    'relative_path': str(rel_path),
-                    'filename': file_path.name,
-                    'date_folder': date_folder,
-                })
+            media_files.append({
+                'media_key': media_key,
+                'file_path': str(file_path),
+                'relative_path': str(rel_path),
+                'filename': file_path.name,
+                'date_folder': date_folder,
+            })
 
     return sorted(media_files, key=lambda x: x['media_key'])
 
@@ -128,10 +135,16 @@ def parse_posts_metadata(dump_path: str) -> Dict[str, Dict]:
                     date_folder = part
                     break
 
-        if date_folder and parts:
+        if parts:
             filename = parts[-1]
             filename_without_ext = filename.split('.')[0]
-            media_key = f"{date_folder}/{filename_without_ext}"
+            if date_folder:
+                media_key = f"{date_folder}/{filename_without_ext}"
+            else:
+                # For URIs like media/other/17980178165618670.jpg (no date folder)
+                # Use the folder name and filename: other/17980178165618670
+                folder = parts[-2] if len(parts) >= 2 else 'unknown'
+                media_key = f"{folder}/{filename_without_ext}"
 
             # Convert timestamp to ISO format
             creation_ts = media.get('creation_timestamp') or post_timestamp

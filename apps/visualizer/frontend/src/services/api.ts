@@ -91,7 +91,7 @@ export interface Stats {
 }
 
 export interface InstagramImage {
-  post_url: string
+  post_url?: string  // Optional - not available in dump
   local_path: string
   filename: string
   instagram_folder: string

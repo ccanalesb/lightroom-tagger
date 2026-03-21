@@ -12,34 +12,24 @@ def list_instagram_images():
         if not os.path.exists(db_path):
             return jsonify({'error': 'Library database not found'}), 404
         
-        db = TinyDB(db_path)
-        images = db.table('instagram_images').all()
-        db.close()
-        
-        # Group by post to calculate totals
-        from collections import defaultdict
-        post_totals = defaultdict(int)
-        for img in images:
-            post_totals[img['instagram_folder']] += 1
-        
-        # Enrich images with index and total
-        post_counts = defaultdict(int)
-        enriched_images = []
-        for img in images:
-            folder = img['instagram_folder']
-            # Extract image index from filename (img_0.jpg -> 0)
-            filename = img['filename']
-            try:
-                idx = int(filename.replace('img_', '').replace('.jpg', ''))
-            except:
-                idx = post_counts[folder]
-            
-            enriched_images.append({
-                **img,
-                'image_index': idx + 1,  # 1-indexed for display
-                'total_in_post': post_totals[folder],
-            })
-            post_counts[folder] += 1
+    db = TinyDB(db_path)
+    media_items = db.table('instagram_dump_media').all()
+    db.close()
+
+    # Transform dump media to Instagram image format
+    enriched_images = []
+    for media in media_items:
+        enriched_images.append({
+            'key': media['media_key'],
+            'local_path': media['file_path'],
+            'filename': media.get('filename', ''),
+            'instagram_folder': media.get('date_folder', ''),
+            'description': media.get('caption', ''),
+            'crawled_at': media.get('added_at', ''),
+            'image_index': 1,
+            'total_in_post': 1,
+            'post_url': media.get('post_url'),  # Optional - may be null
+        })
         
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
@@ -60,23 +50,23 @@ def get_instagram_thumbnail(image_key):
         if not os.path.exists(db_path):
             return jsonify({'error': 'Library database not found'}), 404
         
-        db = TinyDB(db_path)
-        Image = Query()
-        images = db.table('instagram_images').search(Image.key == image_key)
-        db.close()
-        
-        if not images:
-            return jsonify({'error': 'Image not found'}), 404
-        
-        image = images[0]
-        local_path = image.get('local_path')
-        
-        if not local_path or not os.path.exists(local_path):
-            return jsonify({'error': 'Image file not found'}), 404
-        
-        return send_file(local_path, mimetype='image/jpeg')
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    db = TinyDB(db_path)
+    Media = Query()
+    media_items = db.table('instagram_dump_media').search(Media.media_key == image_key)
+    db.close()
+
+    if not media_items:
+        return jsonify({'error': 'Image not found'}), 404
+
+    media = media_items[0]
+    local_path = media.get('file_path')
+
+    if not local_path or not os.path.exists(local_path):
+        return jsonify({'error': 'Image file not found'}), 404
+
+    return send_file(local_path, mimetype='image/jpeg')
+except Exception as e:
+    return jsonify({'error': str(e)}), 500
 
 @bp.route('/catalog/<path:image_key>/thumbnail', methods=['GET'])
 def get_catalog_thumbnail(image_key):
