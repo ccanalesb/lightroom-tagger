@@ -1,6 +1,6 @@
 site: instagram
 name: images
-description: "Get image URLs from a specific Instagram post (handles carousels)"
+description: "Get image URLs from an Instagram post by reading network requests made by the browser"
 domain: www.instagram.com
 strategy: cookie
 browser: true
@@ -13,35 +13,27 @@ args:
 
 pipeline:
   - navigate: ${{ args.post_url }}
-  - wait: 4
+
+  - wait: 6
+
   - evaluate: |
       (async () => {
-        const sleep = ms => new Promise(res => setTimeout(res, ms));
+        // Dump all network resource requests the browser made on this page.
+        // Instagram loads images from fbcdn.net CDN — we filter for those.
+        const entries = performance.getEntriesByType('resource');
         const imageUrls = new Set();
-        
-        const collectImages = () => {
-          const article = document.querySelector('article');
-          if (!article) return;
-          const imgs = Array.from(article.querySelectorAll('img'));
-          for (const img of imgs) {
-            // Ignore tiny profile pics, fetch actual post content
-            if (img.src && img.src.includes('scontent') && !img.src.includes('150x150')) {
-              imageUrls.add(img.src);
-            }
+
+        for (const entry of entries) {
+          const url = entry.name;
+          // Only grab CDN image requests — skip scripts, fonts, API calls
+          if (
+            (url.includes('fbcdn.net') || url.includes('cdninstagram.com')) &&
+            (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.webp') || url.includes('.png')) &&
+            !url.includes('150x150') &&
+            !url.includes('_s.')
+          ) {
+            imageUrls.add(url);
           }
-        };
-
-        collectImages();
-
-        // Handle carousels by clicking Next until it disappears
-        let nextBtn = document.querySelector('button[aria-label="Next"]');
-        let attempts = 0;
-        while (nextBtn && attempts < 10) {
-          nextBtn.click();
-          await sleep(1000); 
-          collectImages();
-          nextBtn = document.querySelector('button[aria-label="Next"]');
-          attempts++;
         }
 
         return Array.from(imageUrls).map(url => ({ image_url: url }));

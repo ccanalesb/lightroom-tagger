@@ -12,15 +12,42 @@ from lightroom_tagger.core.analyzer import compare_with_vision, vision_score
 
 
 def resolve_catalog_path(filepath: str) -> str:
-    """Resolve catalog path across Windows UNC and WSL mount styles."""
+    """Resolve catalog path across UNC, WSL, and common mount styles."""
     if not filepath:
         return ""
     if os.path.exists(filepath):
         return filepath
 
-    mapped_path = filepath.replace('//tnas/ccanales/', '/mnt/tnas/')
-    if mapped_path != filepath and os.path.exists(mapped_path):
-        return mapped_path
+    normalized = filepath.replace("\\", "/")
+    if not normalized.startswith("//"):
+        return ""
+
+    # UNC style: //server/share/path/to/file
+    parts = [p for p in normalized.split("/") if p]
+    if len(parts) < 3:
+        return ""
+
+    server, share = parts[0], parts[1]
+    rest = "/".join(parts[2:])
+    
+    # Special case: tnas has share in the path, not as mount point
+    # //tnas/ccanales/Lightroom Server/... -> /mnt/tnas/Lightroom Server/...
+    if server == "tnas":
+        candidates = [
+            f"/mnt/tnas/{rest}",  # WSL mount of tnas directly
+            f"/mnt/{share}/{rest}",
+        ]
+    else:
+        candidates = [
+            f"/mnt/{share}/{rest}",
+            f"/Volumes/{share}/{rest}",
+            f"/media/{share}/{rest}",
+        ]
+    
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+
     return ""
 
 

@@ -1,0 +1,16 @@
+{
+  "site": "instagram",
+  "target_url": "https://www.instagram.com/im.canales/",
+  "final_url": "https://www.instagram.com/im.canales/",
+  "title": "(3) Instagram",
+  "framework": {
+    "nextjs": false,
+    "nuxt": false,
+    "react": true,
+    "vue2": false,
+    "vue3": false
+  },
+  "stores": [],
+  "top_strategy": "public",
+  "explored_at": "2026-03-20T03:32:41.485Z"
+}
