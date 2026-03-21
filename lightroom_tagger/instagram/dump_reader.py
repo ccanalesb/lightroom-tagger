@@ -116,39 +116,248 @@ def parse_posts_metadata(dump_path: str) -> Dict[str, Dict]:
             if not uri:
                 continue
 
-            # Extract media_key from URI
-            # URI: media/posts/202603/17940060624158613.jpg
-            # Key: 202603/17940060624158613
-            parts = uri.replace('\\', '/').split('/')
-            if len(parts) >= 2:
-                # Find date folder (6 digits)
-                date_folder = None
-                for part in parts:
-                    if len(part) == 6 and part.isdigit():
-                        date_folder = part
-                        break
+        # Extract media_key from URI
+        # URI: media/posts/202603/17940060624158613.jpg
+        # Key: 202603/17940060624158613
+        parts = uri.replace('\\', '/').split('/')
+        if len(parts) >= 2:
+            # Find date folder (6 digits)
+            date_folder = None
+            for part in parts:
+                if len(part) == 6 and part.isdigit():
+                    date_folder = part
+                    break
 
-                if date_folder and parts:
-                    filename = parts[-1]
-                    filename_without_ext = filename.split('.')[0]
-                    media_key = f"{date_folder}/{filename_without_ext}"
+            if date_folder and parts:
+                filename = parts[-1]
+                filename_without_ext = filename.split('.')[0]
+                media_key = f"{date_folder}/{filename_without_ext}"
 
-                    # Convert timestamp to ISO format
-                    creation_ts = media.get('creation_timestamp') or post_timestamp
-                    created_at = None
-                    if creation_ts:
-                        try:
-                            created_at = datetime.fromtimestamp(creation_ts).isoformat()
-                        except (ValueError, OSError):
-                            pass
+                # Convert timestamp to ISO format
+                creation_ts = media.get('creation_timestamp') or post_timestamp
+                created_at = None
+                if creation_ts:
+                    try:
+                        created_at = datetime.fromtimestamp(creation_ts).isoformat()
+                    except (ValueError, OSError):
+                        pass
 
-                    # Use media title if available, otherwise post title
-                    caption = media.get('title', '') or post_caption
+                # Use media title if available, otherwise post title
+                caption = media.get('title', '') or post_caption
 
-                    metadata[media_key] = {
-                        'caption': caption,
-                        'created_at': created_at,
-                        'creation_timestamp': creation_ts,
-                    }
+                metadata[media_key] = {
+                    'caption': caption,
+                    'created_at': created_at,
+                    'creation_timestamp': creation_ts,
+                }
 
     return metadata
+
+
+def _extract_media_key_from_uri(uri: str) -> Optional[str]:
+    """Extract media_key from URI like media/posts/202603/17940060624158613.jpg."""
+    parts = uri.replace('\\', '/').split('/')
+    if len(parts) >= 2:
+        # Find date folder (6 digits)
+        date_folder = None
+        for part in parts:
+            if len(part) == 6 and part.isdigit():
+                date_folder = part
+                break
+
+    if date_folder and parts:
+        filename = parts[-1]
+        filename_without_ext = filename.split('.')[0]
+        return f"{date_folder}/{filename_without_ext}"
+    return None
+
+
+def parse_archived_posts_metadata(dump_path: str) -> Dict[str, Dict]:
+    """Parse archived_posts.json to extract EXIF-rich metadata.
+
+    Args:
+        dump_path: Root path to instagram-dump directory
+
+    Returns:
+        Dict mapping media_key -> metadata with EXIF data
+    """
+    metadata = {}
+
+    json_path = Path(dump_path) / 'your_instagram_activity' / 'media' / 'archived_posts.json'
+    if not json_path.exists():
+        return metadata
+
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return metadata
+
+    archived_posts = data.get('ig_archived_post_media', [])
+
+    for post in archived_posts:
+        post_caption = post.get('title', '')
+        post_timestamp = post.get('creation_timestamp')
+
+        for media in post.get('media', []):
+            uri = media.get('uri', '')
+            if not uri:
+                continue
+
+            media_key = _extract_media_key_from_uri(uri)
+            if not media_key:
+                continue
+
+            exif_data = {}
+            media_metadata = media.get('media_metadata', {})
+            if 'photo_metadata' in media_metadata:
+                exif_list = media_metadata['photo_metadata'].get('exif_data', [])
+                if exif_list:
+                    exif_data = exif_list[0]
+
+            creation_ts = media.get('creation_timestamp') or post_timestamp
+            created_at = None
+            if creation_ts:
+                try:
+                    created_at = datetime.fromtimestamp(creation_ts).isoformat()
+                except (ValueError, OSError):
+                    pass
+
+            caption = media.get('title', '') or post_caption
+
+            record = {
+                'caption': caption,
+                'created_at': created_at,
+                'creation_timestamp': creation_ts,
+                'exif_data': exif_data if exif_data else None,
+            }
+
+            if exif_data:
+                record['exif_date_time_original'] = exif_data.get('date_time_original')
+                record['exif_latitude'] = exif_data.get('latitude')
+                record['exif_longitude'] = exif_data.get('longitude')
+                record['exif_device_id'] = exif_data.get('device_id')
+                record['exif_lens_model'] = exif_data.get('lens_model')
+                record['exif_iso'] = exif_data.get('iso')
+                record['exif_aperture'] = exif_data.get('aperture')
+                record['exif_shutter_speed'] = exif_data.get('shutter_speed')
+                record['exif_focal_length'] = exif_data.get('focal_length')
+                record['exif_lens_make'] = exif_data.get('lens_make')
+
+            metadata[media_key] = record
+
+    return metadata
+
+
+def parse_other_content_metadata(dump_path: str) -> Dict[str, Dict]:
+    """Parse other_content.json to extract metadata.
+
+    Args:
+        dump_path: Root path to instagram-dump directory
+
+    Returns:
+        Dict mapping media_key -> metadata (minimal, no EXIF)
+    """
+    metadata = {}
+
+    json_path = Path(dump_path) / 'your_instagram_activity' / 'media' / 'other_content.json'
+    if not json_path.exists():
+        return metadata
+
+    try:
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return metadata
+
+    other_posts = data.get('ig_other_media', [])
+
+    for post in other_posts:
+        post_caption = post.get('title', '')
+        post_timestamp = post.get('creation_timestamp')
+
+        for media in post.get('media', []):
+            uri = media.get('uri', '')
+            if not uri:
+                continue
+
+            media_key = _extract_media_key_from_uri(uri)
+            if not media_key:
+                continue
+
+            creation_ts = media.get('creation_timestamp') or post_timestamp
+            created_at = None
+            if creation_ts:
+                try:
+                    created_at = datetime.fromtimestamp(creation_ts).isoformat()
+                except (ValueError, OSError):
+                    pass
+
+            caption = media.get('title', '') or post_caption
+
+            metadata[media_key] = {
+                'caption': caption,
+                'created_at': created_at,
+                'creation_timestamp': creation_ts,
+                'exif_data': None,
+            }
+
+    return metadata
+
+
+def parse_saved_and_reposted_urls(dump_path: str) -> Dict[int, str]:
+    """Parse saved_posts.json and reposts.json to extract Instagram URLs.
+
+    Matches by creation_timestamp to link URLs to dump media.
+
+    Args:
+        dump_path: Root path to instagram-dump directory
+
+    Returns:
+        Dict mapping creation_timestamp -> Instagram URL
+    """
+    url_lookup = {}
+
+    saved_path = Path(dump_path) / 'your_instagram_activity' / 'saved' / 'saved_posts.json'
+    if saved_path.exists():
+        try:
+            with open(saved_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            saved_media = data.get('saved_saved_media', [])
+            for item in saved_media:
+                string_map = item.get('string_map_data', {})
+                saved_on = string_map.get('Saved on', {})
+
+                url = saved_on.get('href', '')
+                timestamp = saved_on.get('timestamp')
+
+                if url and timestamp:
+                    url_lookup[timestamp] = url
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    reposts_path = Path(dump_path) / 'your_instagram_activity' / 'media' / 'reposts.json'
+    if reposts_path.exists():
+        try:
+            with open(reposts_path, 'r', encoding='utf-8') as f:
+                reposts = json.load(f)
+
+            for repost in reposts:
+                timestamp = repost.get('timestamp')
+                label_values = repost.get('label_values', [])
+
+                if len(label_values) >= 3:
+                    media_section = label_values[2]
+                    if 'dict' in media_section and len(media_section['dict']) > 0:
+                        first_dict = media_section['dict'][0]
+                        if 'dict' in first_dict and len(first_dict['dict']) > 0:
+                            url_entry = first_dict['dict'][0]
+                            url = url_entry.get('href', '')
+
+                            if url and timestamp:
+                                url_lookup[timestamp] = url
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    return url_lookup

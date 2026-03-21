@@ -126,11 +126,11 @@ def init_instagram_dump_table(db: TinyDB):
 
 
 def store_instagram_dump_media(db, record: dict) -> str:
-    """Store Instagram dump media record. Idempotent by media_key.
+    """Store Instagram dump media record. Idempotent by media_key. Aggregative - merges data.
 
     Args:
         db: TinyDB instance
-        record: Dict with media_key, file_path, caption, created_at
+        record: Dict with media_key, file_path, caption, created_at, exif_data, post_url
 
     Returns:
         media_key
@@ -148,13 +148,20 @@ def store_instagram_dump_media(db, record: dict) -> str:
     record.setdefault('vision_score', None)
     record.setdefault('processed_at', None)
     record.setdefault('added_at', datetime.now().isoformat())
+    record.setdefault('exif_data', None)
+    record.setdefault('post_url', None)
 
     existing = db.table('instagram_dump_media').search(Media.media_key == media_key)
 
     if existing:
-        # Update only if not already processed (protect processed records)
-        if not existing[0].get('processed'):
-            db.table('instagram_dump_media').update(record, Media.media_key == media_key)
+        existing_record = existing[0]
+        # Aggregative: merge new data with existing (new data takes precedence)
+        merged = {**existing_record, **record}
+        # Keep original added_at
+        merged['added_at'] = existing_record.get('added_at', record.get('added_at'))
+        # Update only if not already processed
+        if not existing_record.get('processed'):
+            db.table('instagram_dump_media').update(merged, Media.media_key == media_key)
     else:
         db.table('instagram_dump_media').insert(record)
 
