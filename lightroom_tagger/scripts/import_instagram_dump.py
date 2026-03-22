@@ -53,17 +53,18 @@ def combine_metadata(posts_meta, archived_meta, other_meta):
     return combined
 
 
-def import_dump(db, dump_path: str, skip_existing: bool = True) -> int:
+def import_dump(db, dump_path: str, skip_existing: bool = True, skip_dedup: bool = False) -> int:
     """Import all media files from Instagram dump into database with enhanced metadata.
-    
+
     Prioritizes posts over archived_posts - if same media exists in both, use posts version
     but merge archived metadata (which has better EXIF data).
-    
+
     Args:
         db: TinyDB instance
         dump_path: Path to instagram-dump directory
         skip_existing: If True, skip files already in database
-    
+        skip_dedup: If True, skip visual duplicate detection
+
     Returns:
         Number of new media files imported
     """
@@ -75,17 +76,21 @@ def import_dump(db, dump_path: str, skip_existing: bool = True) -> int:
     print(f"Found {len(media_files)} media files in dump")
 
     # Visual deduplication: compute hashes and merge duplicates
-    print("\nComputing image hashes for visual duplicate detection...")
-    media_with_hashes = compute_image_hashes(media_files)
-    hash_groups = group_by_hash(media_with_hashes)
-    print(f"Found {len(hash_groups)} unique visual hashes")
+    if skip_dedup:
+        print("\nSkipping visual deduplication (--skip-dedup)")
+        deduplicated_media = media_files
+    else:
+        print("\nComputing image hashes for visual duplicate detection...")
+        media_with_hashes = compute_image_hashes(media_files)
+        hash_groups = group_by_hash(media_with_hashes)
+        print(f"Found {len(hash_groups)} unique visual hashes")
 
-    # Select best versions and merge EXIF data
-    print("Selecting best versions and merging EXIF data...")
-    deduplicated_media = select_best_versions(hash_groups)
-    duplicates_removed = len(media_files) - len(deduplicated_media)
-    print(f"After visual deduplication: {len(deduplicated_media)} unique images")
-    print(f"  (Removed {duplicates_removed} visual duplicates)")
+        # Select best versions and merge EXIF data
+        print("Selecting best versions and merging EXIF data...")
+        deduplicated_media = select_best_versions(hash_groups)
+        duplicates_removed = len(media_files) - len(deduplicated_media)
+        print(f"After visual deduplication: {len(deduplicated_media)} unique images")
+        print(f"  (Removed {duplicates_removed} visual duplicates)")
     
     # Parse metadata from all JSON sources
     print("Parsing JSON metadata...")
@@ -169,7 +174,9 @@ def main():
                        help='Path to Instagram dump directory')
     parser.add_argument('--reimport', action='store_true',
                        help='Re-import all files (ignore existing)')
-    
+    parser.add_argument('--skip-dedup', action='store_true',
+                       help='Skip visual duplicate detection')
+
     args = parser.parse_args()
     
     if not os.path.exists(args.dump_path):
@@ -180,7 +187,7 @@ def main():
     db = init_database(args.db)
     
     try:
-        count = import_dump(db, args.dump_path, skip_existing=not args.reimport)
+        count = import_dump(db, args.dump_path, skip_existing=not args.reimport, skip_dedup=args.skip_dedup)
         print(f"\n✓ Import complete: {count} files imported")
     finally:
         db.close()
