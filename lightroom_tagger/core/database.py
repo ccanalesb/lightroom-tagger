@@ -150,6 +150,7 @@ def store_instagram_dump_media(db, record: dict) -> str:
     record.setdefault('added_at', datetime.now().isoformat())
     record.setdefault('exif_data', None)
     record.setdefault('post_url', None)
+    record.setdefault('image_hash', None)
 
     existing = db.table('instagram_dump_media').search(Media.media_key == media_key)
 
@@ -173,6 +174,15 @@ def get_instagram_dump_media(db, media_key: str) -> Optional[dict]:
     Media = Query()
     results = db.table('instagram_dump_media').search(Media.media_key == media_key)
     return results[0] if results else None
+
+
+def get_dump_media_by_hash(db, image_hash: str) -> list:
+    """Get Instagram dump media by image hash.
+    
+    Returns all media with matching hash (for finding duplicates).
+    """
+    Media = Query()
+    return db.table('instagram_dump_media').search(Media.image_hash == image_hash)
 
 
 def get_unprocessed_dump_media(db, limit: int = None) -> list:

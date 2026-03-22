@@ -269,7 +269,7 @@ class TestVisionComparisonCache(unittest.TestCase):
         self.assertEqual(cached['vision_score'], 1.0)
         self.assertEqual(cached['model_used'], 'gemma3:27b-cloud')
 
-def test_multiple_comparisons(self):
+    def test_multiple_comparisons(self):
         """Test storing multiple comparisons."""
         store_vision_comparison(self.db, 'cat_001', 'insta_001', 'SAME', 1.0, 'gemma3:27b')
         store_vision_comparison(self.db, 'cat_001', 'insta_002', 'DIFFERENT', 0.0, 'gemma3:27b')
@@ -419,6 +419,36 @@ class TestInstagramDumpMedia(unittest.TestCase):
         # Verify updated
         stored = get_instagram_dump_media(self.db, '202603/17940060624158613')
         self.assertEqual(stored['caption'], 'Updated caption')
+
+    def test_store_instagram_dump_media_with_hash(self):
+        """Test storing media with image_hash."""
+        from lightroom_tagger.core.database import (
+            init_instagram_dump_table, store_instagram_dump_media, get_instagram_dump_media,
+            get_dump_media_by_hash
+        )
+
+        init_instagram_dump_table(self.db)
+
+        # Store with hash
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/111',
+            'file_path': '/path/to/file1.jpg',
+            'image_hash': 'abc123def456',
+        })
+
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/222',
+            'file_path': '/path/to/file2.jpg',
+            'image_hash': 'abc123def456',  # Same hash - duplicate
+        })
+
+        # Verify stored
+        stored1 = get_instagram_dump_media(self.db, '202603/111')
+        self.assertEqual(stored1['image_hash'], 'abc123def456')
+
+        # Verify get by hash returns both
+        by_hash = get_dump_media_by_hash(self.db, 'abc123def456')
+        self.assertEqual(len(by_hash), 2)
 
 
 if __name__ == "__main__":
