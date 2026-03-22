@@ -53,14 +53,14 @@ def list_instagram_images():
             # Filter to specific month
             enriched_images = [img for img in enriched_images if img['instagram_folder'] == date_folder]
         elif date_from or date_to:
-            # Filter by date range
+            # Filter by date range, handling None values
             if date_from:
-                enriched_images = [img for img in enriched_images if img['instagram_folder'] >= date_from]
+                enriched_images = [img for img in enriched_images if img['instagram_folder'] and img['instagram_folder'] >= date_from]
             if date_to:
-                enriched_images = [img for img in enriched_images if img['instagram_folder'] <= date_to]
+                enriched_images = [img for img in enriched_images if img['instagram_folder'] and img['instagram_folder'] <= date_to]
         
-        # Sort by date folder descending (newest first)
-        enriched_images.sort(key=lambda x: x['instagram_folder'], reverse=True)
+        # Sort by date folder descending (newest first), handling None values
+        enriched_images.sort(key=lambda x: x['instagram_folder'] or '', reverse=True)
         
         # Pagination
         limit = request.args.get('limit', 50, type=int)
