@@ -20,6 +20,11 @@ from lightroom_tagger.instagram.dump_reader import (
     parse_other_content_metadata,
     parse_saved_and_reposted_urls,
 )
+from lightroom_tagger.instagram.deduplicator import (
+    compute_image_hashes,
+    group_by_hash,
+    select_best_versions,
+)
 
 
 def combine_metadata(posts_meta, archived_meta, other_meta):
@@ -51,6 +56,9 @@ def combine_metadata(posts_meta, archived_meta, other_meta):
 def import_dump(db, dump_path: str, skip_existing: bool = True) -> int:
     """Import all media files from Instagram dump into database with enhanced metadata.
     
+    Prioritizes posts over archived_posts - if same media exists in both, use posts version
+    but merge archived metadata (which has better EXIF data).
+    
     Args:
         db: TinyDB instance
         dump_path: Path to instagram-dump directory
@@ -61,10 +69,23 @@ def import_dump(db, dump_path: str, skip_existing: bool = True) -> int:
     """
     # Ensure table exists
     init_instagram_dump_table(db)
-    
+
     # Discover all media files from filesystem
     media_files = discover_media_files(dump_path)
     print(f"Found {len(media_files)} media files in dump")
+
+    # Visual deduplication: compute hashes and merge duplicates
+    print("\nComputing image hashes for visual duplicate detection...")
+    media_with_hashes = compute_image_hashes(media_files)
+    hash_groups = group_by_hash(media_with_hashes)
+    print(f"Found {len(hash_groups)} unique visual hashes")
+
+    # Select best versions and merge EXIF data
+    print("Selecting best versions and merging EXIF data...")
+    deduplicated_media = select_best_versions(hash_groups)
+    duplicates_removed = len(media_files) - len(deduplicated_media)
+    print(f"After visual deduplication: {len(deduplicated_media)} unique images")
+    print(f"  (Removed {duplicates_removed} visual duplicates)")
     
     # Parse metadata from all JSON sources
     print("Parsing JSON metadata...")
@@ -91,41 +112,42 @@ def import_dump(db, dump_path: str, skip_existing: bool = True) -> int:
     with_exif = 0
     with_urls = 0
     
-    for media in media_files:
+    for media in deduplicated_media:
         media_key = media['media_key']
-        
+
         # Check if already exists
         if skip_existing:
             existing = get_instagram_dump_media(db, media_key)
             if existing:
                 skipped += 1
                 continue
-        
+
         # Build base record from filesystem
         record = {
             'media_key': media_key,
             'file_path': media['file_path'],
             'filename': media['filename'],
             'date_folder': media['date_folder'],
+            'image_hash': media.get('image_hash'),  # Store the visual hash
         }
-        
+
         # Add metadata from JSON if available
         meta = combined_metadata.get(media_key, {})
         if meta:
             record.update(meta)
             if meta.get('exif_data'):
                 with_exif += 1
-        
+
         # Match URL by timestamp
         creation_ts = record.get('creation_timestamp')
         if creation_ts and creation_ts in url_lookup:
             record['post_url'] = url_lookup[creation_ts]
             with_urls += 1
-        
+
         # Store
         store_instagram_dump_media(db, record)
         imported += 1
-        
+
         if imported % 500 == 0:
             print(f"  Imported {imported}...")
     
