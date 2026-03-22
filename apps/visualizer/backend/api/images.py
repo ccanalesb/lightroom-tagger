@@ -43,14 +43,47 @@ def list_instagram_images():
                 'post_url': media.get('post_url'),  # Optional - may be null
             })
 
+        # Get filter parameters
+        date_from = request.args.get('date_from', '')  # Format: YYYYMM
+        date_to = request.args.get('date_to', '')      # Format: YYYYMM
+        date_folder = request.args.get('date_folder', '')  # Specific month: YYYYMM
+        
+        # Filter by date range if specified
+        if date_folder:
+            # Filter to specific month
+            enriched_images = [img for img in enriched_images if img['instagram_folder'] == date_folder]
+        elif date_from or date_to:
+            # Filter by date range
+            if date_from:
+                enriched_images = [img for img in enriched_images if img['instagram_folder'] >= date_from]
+            if date_to:
+                enriched_images = [img for img in enriched_images if img['instagram_folder'] <= date_to]
+        
+        # Sort by date folder descending (newest first)
+        enriched_images.sort(key=lambda x: x['instagram_folder'], reverse=True)
+        
+        # Pagination
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
-
+        total = len(enriched_images)
+        
         paginated = enriched_images[offset:offset+limit]
+        
+        # Calculate pagination metadata
+        has_more = (offset + limit) < total
+        current_page = (offset // limit) + 1
+        total_pages = (total + limit - 1) // limit
 
         return jsonify({
-            'total': len(enriched_images),
+            'total': total,
             'images': paginated,
+            'pagination': {
+                'offset': offset,
+                'limit': limit,
+                'current_page': current_page,
+                'total_pages': total_pages,
+                'has_more': has_more,
+            }
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

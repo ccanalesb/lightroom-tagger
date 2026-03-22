@@ -48,10 +48,23 @@ export const SystemAPI = {
 }
 
 export const ImagesAPI = {
-  listInstagram: (limit?: number, offset?: number) =>
-    request<{ total: number; images: InstagramImage[] }>(
-      `/images/instagram?limit=${limit || 50}&offset=${offset || 0}`
-    ),
+  listInstagram: (params?: { limit?: number; offset?: number; date_folder?: string }) => {
+    const searchParams = new URLSearchParams()
+    if (params?.limit) searchParams.set('limit', String(params.limit))
+    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
+    if (params?.date_folder) searchParams.set('date_folder', params.date_folder)
+    return request<{ 
+      total: number; 
+      images: InstagramImage[];
+      pagination: {
+        offset: number;
+        limit: number;
+        current_page: number;
+        total_pages: number;
+        has_more: boolean;
+      }
+    }>(`/images/instagram?${searchParams.toString()}`)
+  },
   
   listCatalog: (posted?: boolean, limit?: number, offset?: number) => {
     const params = new URLSearchParams()
