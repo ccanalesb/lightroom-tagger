@@ -436,57 +436,61 @@ function ImageMetadataModal({ image, onClose }: { image: InstagramImage; onClose
                   </div>
                 )}
                 
-                {imageData.exif_data && Object.keys(imageData.exif_data).length > 0 && (
-                  <div>
+                <div>
                     <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
                       EXIF Data
                     </h4>
-                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                      {imageData.exif_data.latitude !== undefined && imageData.exif_data.longitude !== undefined && (
-                        <MetadataRow 
-                          label="GPS Coordinates" 
-                          value={`${imageData.exif_data.latitude.toFixed(6)}, ${imageData.exif_data.longitude.toFixed(6)}`} 
-                        />
-                      )}
-                      {imageData.exif_data.date_time_original && (
-                        <MetadataRow 
-                          label="Date Taken" 
-                          value={imageData.exif_data.date_time_original} 
-                        />
-                      )}
-                      {imageData.exif_data.device_id && (
-                        <MetadataRow 
-                          label="Camera" 
-                          value={imageData.exif_data.device_id} 
-                        />
-                      )}
-                      {imageData.exif_data.lens_model && (
-                        <MetadataRow 
-                          label="Lens" 
-                          value={imageData.exif_data.lens_model} 
-                        />
-                      )}
-                      {imageData.exif_data.iso !== undefined && (
-                        <MetadataRow 
-                          label="ISO" 
-                          value={String(imageData.exif_data.iso)} 
-                        />
-                      )}
-                      {imageData.exif_data.aperture && (
-                        <MetadataRow 
-                          label="Aperture" 
-                          value={imageData.exif_data.aperture} 
-                        />
-                      )}
-                      {imageData.exif_data.shutter_speed && (
-                        <MetadataRow 
-                          label="Shutter Speed" 
-                          value={imageData.exif_data.shutter_speed} 
-                        />
-                      )}
-                    </div>
+                    {imageData.exif_data && Object.keys(imageData.exif_data).length > 0 ? (
+                      <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                        {imageData.exif_data.latitude !== undefined && imageData.exif_data.longitude !== undefined && (
+                          <MetadataRow 
+                            label="GPS Coordinates" 
+                            value={`${imageData.exif_data.latitude.toFixed(6)}, ${imageData.exif_data.longitude.toFixed(6)}`} 
+                          />
+                        )}
+                        {imageData.exif_data.date_time_original && (
+                          <MetadataRow 
+                            label="Date Taken" 
+                            value={imageData.exif_data.date_time_original} 
+                          />
+                        )}
+                        {imageData.exif_data.device_id && (
+                          <MetadataRow 
+                            label="Camera" 
+                            value={imageData.exif_data.device_id} 
+                          />
+                        )}
+                        {imageData.exif_data.lens_model && (
+                          <MetadataRow 
+                            label="Lens" 
+                            value={imageData.exif_data.lens_model} 
+                          />
+                        )}
+                        {imageData.exif_data.iso !== undefined && (
+                          <MetadataRow 
+                            label="ISO" 
+                            value={String(imageData.exif_data.iso)} 
+                          />
+                        )}
+                        {imageData.exif_data.aperture && (
+                          <MetadataRow 
+                            label="Aperture" 
+                            value={imageData.exif_data.aperture} 
+                          />
+                        )}
+                        {imageData.exif_data.shutter_speed && (
+                          <MetadataRow 
+                            label="Shutter Speed" 
+                            value={imageData.exif_data.shutter_speed} 
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <p className="text-sm text-gray-500 italic">No EXIF data available</p>
+                      </div>
+                    )}
                   </div>
-                )}
                 
                 {imageData.description && (
                   <div>
