@@ -35,6 +35,7 @@ def list_instagram_images():
                 'filename': media.get('filename', ''),
                 'instagram_folder': media.get('date_folder', ''),
                 'source_folder': source_folder,
+                'image_hash': media.get('image_hash'),  # Visual hash for duplicate detection
                 'description': media.get('caption', ''),
                 'crawled_at': media.get('added_at', ''),
                 'image_index': 1,

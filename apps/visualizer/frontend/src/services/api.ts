@@ -96,6 +96,7 @@ export interface InstagramImage {
   filename: string
   instagram_folder: string
   source_folder: string  // posts, archived_posts, etc.
+  image_hash?: string  // Visual perceptual hash for duplicate detection
   phash?: string
   description?: string
   key: string
