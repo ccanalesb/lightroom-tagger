@@ -116,6 +116,16 @@ export interface InstagramImage {
   crawled_at: string
   image_index: number
   total_in_post: number
+  exif_data?: {
+    latitude?: number
+    longitude?: number
+    date_time_original?: string
+    device_id?: string
+    lens_model?: string
+    iso?: number
+    aperture?: string
+    shutter_speed?: string
+  }
 }
 
 export interface CatalogImage {

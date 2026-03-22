@@ -41,6 +41,7 @@ def list_instagram_images():
                 'image_index': 1,
                 'total_in_post': 1,
                 'post_url': media.get('post_url'),  # Optional - may be null
+                'exif_data': media.get('exif_data'),  # EXIF data (GPS, camera info, etc.)
             })
 
         # Get filter parameters
