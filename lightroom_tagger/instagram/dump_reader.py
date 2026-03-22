@@ -34,12 +34,14 @@ def discover_media_files(dump_path: str) -> List[Dict]:
         if ':Zone.Identifier' in file_path.name:
             continue
 
-        # Skip stories and reels - they are not relevant for catalog matching
+        # Skip stories, reels, and other - they are not relevant for catalog matching
         path_str = str(file_path)
         rel_parts = list(file_path.relative_to(media_dir).parts)
         if '/stories/' in path_str or rel_parts[0] == 'stories':
             continue
         if '/reels/' in path_str or rel_parts[0] == 'reels':
+            continue
+        if '/other/' in path_str or rel_parts[0] == 'other':
             continue
 
         # Check extension
