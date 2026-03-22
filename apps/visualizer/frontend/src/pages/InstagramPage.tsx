@@ -126,9 +126,14 @@ function InstagramImageCard({ image }: { image: InstagramImage }) {
       </div>
       <div className="p-2">
         <div className="flex items-start justify-between gap-1">
-          <p className="text-xs font-medium text-gray-900 truncate" title={image.instagram_folder}>
-            {image.instagram_folder}
-          </p>
+          <div className="flex flex-col min-w-0">
+            <p className="text-xs font-medium text-gray-900 truncate" title={image.instagram_folder}>
+              {image.instagram_folder}
+            </p>
+            <p className="text-[10px] text-gray-500 uppercase truncate" title={image.source_folder}>
+              {image.source_folder}
+            </p>
+          </div>
           {hasPostUrl ? (
             <a
               href={postUrlWithIndex}

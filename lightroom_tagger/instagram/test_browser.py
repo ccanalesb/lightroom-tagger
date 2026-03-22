@@ -95,32 +95,33 @@ class TestBrowserAgent(unittest.TestCase):
 
     @patch('subprocess.run')
     def test_extract_posts(self, mock_run):
-        """Test extracting posts from snapshot."""
-        snapshot = '''
-        - link "https://instagram.com/p/abc123" [ref=e5]:
-        - link "https://instagram.com/p/def456" [ref=e6]:
-        - link "https://instagram.com/p/ghi789" [ref=e7]:
-        '''
-        mock_run.return_value = MagicMock(returncode=0, stdout=snapshot, stderr="")
-        
+        """Test extracting posts from page via JS eval."""
+        # JS eval returns JSON array of URLs
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout='["https://instagram.com/p/abc123", "https://instagram.com/p/def456", "https://instagram.com/p/ghi789"]',
+            stderr=""
+        )
+
         agent = BrowserAgent()
         posts = agent.extract_posts(limit=10)
-        
+
         self.assertEqual(len(posts), 3)
         self.assertEqual(posts[0].post_url, 'https://instagram.com/p/abc123')
 
     @patch('subprocess.run')
     def test_extract_posts_reels(self, mock_run):
-        """Test extracting reel posts from snapshot."""
-        snapshot = '''
-        - link "https://instagram.com/reel/abc123" [ref=e5]:
-        - link "https://instagram.com/reel/def456" [ref=e6]:
-        '''
-        mock_run.return_value = MagicMock(returncode=0, stdout=snapshot, stderr="")
-        
+        """Test extracting reel posts from page via JS eval."""
+        # JS eval returns JSON array of reel URLs
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout='["https://instagram.com/reel/abc123", "https://instagram.com/reel/def456"]',
+            stderr=""
+        )
+
         agent = BrowserAgent()
         posts = agent.extract_posts(limit=10)
-        
+
         self.assertEqual(len(posts), 2)
         self.assertIn('/reel/', posts[0].post_url)
 

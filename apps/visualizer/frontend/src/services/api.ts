@@ -95,6 +95,7 @@ export interface InstagramImage {
   local_path: string
   filename: string
   instagram_folder: string
+  source_folder: string  // posts, archived_posts, etc.
   phash?: string
   description?: string
   key: string
