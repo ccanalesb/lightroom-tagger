@@ -61,3 +61,51 @@ export const ACTION_RUN_MATCHING = 'Run Matching'
 // API
 export const API_DEFAULT_URL = '/api'
 export const WS_DEFAULT_URL = ''
+
+// Messages
+export const MSG_NO_EXIF_DATA = 'No EXIF data available'
+export const MSG_CLICK_FOR_DETAILS = 'Click for details'
+export const MSG_PAGE_OF = 'Page {current} of {total}'
+export const MSG_SHOWING_RANGE = 'Showing {start}-{end} of {total}'
+
+// Modal
+export const MODAL_TITLE_IMAGE_DETAILS = 'Image Details'
+export const MODAL_CLOSE = 'Close'
+export const MODAL_VIEW_ON_INSTAGRAM = 'View on Instagram'
+export const MODAL_OPEN_LOCAL_FILE = 'Open Local File'
+
+// Metadata Sections
+export const META_SECTION_BASIC_INFO = 'Basic Information'
+export const META_SECTION_IMAGE_ANALYSIS = 'Image Analysis'
+export const META_SECTION_EXIF_DATA = 'EXIF Data'
+export const META_SECTION_CAPTION = 'Caption'
+export const META_SECTION_FILE_LOCATION = 'File Location'
+
+// Metadata Labels
+export const LABEL_FILENAME = 'Filename'
+export const LABEL_MEDIA_KEY = 'Media Key'
+export const LABEL_SOURCE_FOLDER = 'Source Folder'
+export const LABEL_DATE_FOLDER = 'Date Folder'
+export const LABEL_ADDED = 'Added'
+export const LABEL_VISUAL_HASH = 'Visual Hash (pHash)'
+export const LABEL_GPS_COORDINATES = 'GPS Coordinates'
+export const LABEL_DATE_TAKEN = 'Date Taken'
+export const LABEL_CAMERA = 'Camera'
+export const LABEL_LENS = 'Lens'
+export const LABEL_ISO = 'ISO'
+export const LABEL_APERTURE = 'Aperture'
+export const LABEL_SHUTTER_SPEED = 'Shutter Speed'
+
+// Hash explanation
+export const HASH_EXPLANATION = 'This hash is used to detect visually identical images across your collection.'
+
+// Pagination
+export const PAGINATION_PREVIOUS = '← Previous'
+export const PAGINATION_NEXT = 'Next →'
+
+// Filters
+export const FILTER_ALL_DATES = 'All dates'
+export const FILTER_CLEAR = 'Clear'
+
+// Config
+export const ITEMS_PER_PAGE = 48
