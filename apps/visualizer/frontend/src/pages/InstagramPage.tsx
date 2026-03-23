@@ -32,9 +32,6 @@ import { Modal, ModalHeader, ModalFooter } from '../components/modal'
 import { MetadataSection, MetadataRow } from '../components/metadata'
 import { ExifDataSection } from '../components/metadata/ExifDataSection'
 
-// Module-level flag to track initialization across StrictMode remounts
-let isInitialized = false
-
 export function InstagramPage() {
   const [images, setImages] = useState<InstagramImage[]>([])
   const [total, setTotal] = useState(0)
@@ -51,15 +48,35 @@ export function InstagramPage() {
 
   const { isOpen: isModalOpen, selectedItem: selectedImage, open: openModal, close: closeModal } = useModal<InstagramImage>()
 
-  // Single initialization effect - runs once
-  useEffect(() => {
-    if (isInitialized) return
-    isInitialized = true
+  // Fetch images with given offset and filter
+  const fetchImages = useCallback(async (newOffset: number, filter: string = dateFilter) => {
+    setIsLoading(true)
+    try {
+      const params = {
+        limit: ITEMS_PER_PAGE,
+        offset: newOffset,
+        ...(filter && { date_folder: filter }),
+      }
 
+      const data = await ImagesAPI.listInstagram(params)
+
+      setImages(data.images)
+      setTotal(data.total)
+      setPagination(data.pagination)
+      setOffset(newOffset)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [dateFilter])
+
+  // Initial load - fetch months and first page
+  useEffect(() => {
     const initialize = async () => {
       setIsLoading(true)
       try {
-        // Fetch months and first page in parallel
         const [monthsData, firstPageData] = await Promise.all([
           ImagesAPI.getInstagramMonths(),
           ImagesAPI.listInstagram({ limit: ITEMS_PER_PAGE, offset: 0 })
@@ -80,50 +97,29 @@ export function InstagramPage() {
     initialize()
   }, [])
 
-  // Fetch images when pagination or filter changes
-  const fetchImages = useCallback(async (newOffset: number = 0) => {
-    setIsLoading(true)
-    try {
-      const params = {
-        limit: ITEMS_PER_PAGE,
-        offset: newOffset,
-        ...(dateFilter && { date_folder: dateFilter }),
-      }
-
-      const data = await ImagesAPI.listInstagram(params)
-
-      setImages(data.images)
-      setTotal(data.total)
-      setPagination(data.pagination)
-      setOffset(newOffset)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [dateFilter])
-
   const handlePrevPage = () => {
     if (offset > 0) {
-      fetchImages(Math.max(0, offset - ITEMS_PER_PAGE))
+      fetchImages(Math.max(0, offset - ITEMS_PER_PAGE), dateFilter)
     }
   }
 
   const handleNextPage = () => {
     if (pagination.has_more) {
-      fetchImages(offset + ITEMS_PER_PAGE)
+      fetchImages(offset + ITEMS_PER_PAGE, dateFilter)
     }
   }
 
   const handleDateFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setDateFilter(e.target.value)
+    const newFilter = e.target.value
+    setDateFilter(newFilter)
     setOffset(0)
+    fetchImages(0, newFilter)
   }
 
   const clearDateFilter = () => {
     setDateFilter('')
     setOffset(0)
+    fetchImages(0, '')
   }
 
   if (error) {
