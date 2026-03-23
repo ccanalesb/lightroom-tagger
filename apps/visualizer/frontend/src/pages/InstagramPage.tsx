@@ -32,6 +32,9 @@ import { Modal, ModalHeader, ModalFooter } from '../components/modal'
 import { MetadataSection, MetadataRow } from '../components/metadata'
 import { ExifDataSection } from '../components/metadata/ExifDataSection'
 
+// Module-level flag to track initialization across StrictMode remounts
+let isInitialized = false
+
 export function InstagramPage() {
   const [images, setImages] = useState<InstagramImage[]>([])
   const [total, setTotal] = useState(0)
@@ -48,16 +51,36 @@ export function InstagramPage() {
 
   const { isOpen: isModalOpen, selectedItem: selectedImage, open: openModal, close: closeModal } = useModal<InstagramImage>()
 
-  const extractMonths = useCallback((imgs: InstagramImage[]) => {
-    const months = new Set<string>()
-    imgs.forEach(img => {
-      if (img.instagram_folder) {
-        months.add(img.instagram_folder)
+  // Single initialization effect - runs once
+  useEffect(() => {
+    if (isInitialized) return
+    isInitialized = true
+
+    const initialize = async () => {
+      setIsLoading(true)
+      try {
+        // Fetch months and first page in parallel
+        const [monthsData, firstPageData] = await Promise.all([
+          ImagesAPI.getInstagramMonths(),
+          ImagesAPI.listInstagram({ limit: ITEMS_PER_PAGE, offset: 0 })
+        ])
+
+        setAvailableMonths(monthsData.months)
+        setImages(firstPageData.images)
+        setTotal(firstPageData.total)
+        setPagination(firstPageData.pagination)
+        setError(null)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error')
+      } finally {
+        setIsLoading(false)
       }
-    })
-    return Array.from(months).sort().reverse()
+    }
+
+    initialize()
   }, [])
 
+  // Fetch images when pagination or filter changes
   const fetchImages = useCallback(async (newOffset: number = 0) => {
     setIsLoading(true)
     try {
@@ -74,21 +97,12 @@ export function InstagramPage() {
       setPagination(data.pagination)
       setOffset(newOffset)
       setError(null)
-
-      if (availableMonths.length === 0 && data.images.length > 0) {
-        const allData = await ImagesAPI.listInstagram({ limit: 10000, offset: 0 })
-        setAvailableMonths(extractMonths(allData.images))
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setIsLoading(false)
     }
-  }, [dateFilter, availableMonths.length, extractMonths])
-
-  useEffect(() => {
-    fetchImages(0)
-  }, [fetchImages])
+  }, [dateFilter])
 
   const handlePrevPage = () => {
     if (offset > 0) {

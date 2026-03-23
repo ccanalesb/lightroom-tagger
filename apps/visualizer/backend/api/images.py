@@ -100,6 +100,22 @@ def list_instagram_images(db):
         return error_server_error(str(e))
 
 
+@bp.route('/instagram/months', methods=['GET'])
+@with_db
+def get_instagram_months(db):
+    """Get unique months available in Instagram images."""
+    try:
+        media_items = db.table('instagram_dump_media').all()
+        months = set()
+        for media in media_items:
+            date_folder = media.get('date_folder', '')
+            if date_folder:
+                months.add(date_folder)
+        return jsonify({'months': sorted(months, reverse=True)})
+    except Exception as e:
+        return error_server_error(str(e))
+
+
 @bp.route('/instagram/<path:image_key>/thumbnail', methods=['GET'])
 @with_db
 def get_instagram_thumbnail(db, image_key):

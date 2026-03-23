@@ -53,8 +53,8 @@ export const ImagesAPI = {
     if (params?.limit) searchParams.set('limit', String(params.limit))
     if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
     if (params?.date_folder) searchParams.set('date_folder', params.date_folder)
-    return request<{ 
-      total: number; 
+    return request<{
+      total: number;
       images: InstagramImage[];
       pagination: {
         offset: number;
@@ -65,7 +65,10 @@ export const ImagesAPI = {
       }
     }>(`/images/instagram?${searchParams.toString()}`)
   },
-  
+
+  getInstagramMonths: () =>
+    request<{ months: string[] }>('/images/instagram/months'),
+
   listCatalog: (posted?: boolean, limit?: number, offset?: number) => {
     const params = new URLSearchParams()
     if (posted !== undefined) params.set('posted', String(posted))
