@@ -3,9 +3,34 @@ import { ImagesAPI, InstagramImage } from '../services/api'
 import {
   MSG_ERROR_PREFIX,
   INSTAGRAM_DOWNLOADED,
+  MODAL_TITLE_IMAGE_DETAILS,
+  MODAL_CLOSE,
+  MODAL_VIEW_ON_INSTAGRAM,
+  MODAL_OPEN_LOCAL_FILE,
+  META_SECTION_BASIC_INFO,
+  META_SECTION_IMAGE_ANALYSIS,
+  META_SECTION_CAPTION,
+  META_SECTION_FILE_LOCATION,
+  LABEL_FILENAME,
+  LABEL_MEDIA_KEY,
+  LABEL_SOURCE_FOLDER,
+  LABEL_DATE_FOLDER,
+  LABEL_ADDED,
+  LABEL_VISUAL_HASH,
+  HASH_EXPLANATION,
+  PAGINATION_PREVIOUS,
+  PAGINATION_NEXT,
+  FILTER_ALL_DATES,
+  FILTER_CLEAR,
+  MSG_CLICK_FOR_DETAILS,
+  MSG_PAGE_OF,
+  MSG_SHOWING_RANGE,
+  ITEMS_PER_PAGE,
 } from '../constants/strings'
-
-const ITEMS_PER_PAGE = 48
+import { useModal } from '../hooks/useModal'
+import { Modal, ModalHeader, ModalFooter } from '../components/modal'
+import { MetadataSection, MetadataRow } from '../components/metadata'
+import { ExifDataSection } from '../components/metadata/ExifDataSection'
 
 export function InstagramPage() {
   const [images, setImages] = useState<InstagramImage[]>([])
@@ -17,15 +42,12 @@ export function InstagramPage() {
     total_pages: 1,
     has_more: false,
   })
-  const [dateFilter, setDateFilter] = useState('') // Format: YYYYMM
+  const [dateFilter, setDateFilter] = useState('')
   const [availableMonths, setAvailableMonths] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  
-  // Modal state
-  const [selectedImage, setSelectedImage] = useState<InstagramImage | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
 
-  // Extract available months from images
+  const { isOpen: isModalOpen, selectedItem: selectedImage, open: openModal, close: closeModal } = useModal<InstagramImage>()
+
   const extractMonths = useCallback((imgs: InstagramImage[]) => {
     const months = new Set<string>()
     imgs.forEach(img => {
@@ -33,32 +55,27 @@ export function InstagramPage() {
         months.add(img.instagram_folder)
       }
     })
-    return Array.from(months).sort().reverse() // Newest first
+    return Array.from(months).sort().reverse()
   }, [])
 
   const fetchImages = useCallback(async (newOffset: number = 0) => {
     setIsLoading(true)
     try {
-      const params: { limit: number; offset: number; date_folder?: string } = {
+      const params = {
         limit: ITEMS_PER_PAGE,
         offset: newOffset,
+        ...(dateFilter && { date_folder: dateFilter }),
       }
-      
-      if (dateFilter) {
-        params.date_folder = dateFilter
-      }
-      
+
       const data = await ImagesAPI.listInstagram(params)
-      
+
       setImages(data.images)
       setTotal(data.total)
       setPagination(data.pagination)
       setOffset(newOffset)
       setError(null)
-      
-      // Extract available months on first load
+
       if (availableMonths.length === 0 && data.images.length > 0) {
-        // We need to get all images to extract months, so let's do a separate call
         const allData = await ImagesAPI.listInstagram({ limit: 10000, offset: 0 })
         setAvailableMonths(extractMonths(allData.images))
       }
@@ -88,22 +105,11 @@ export function InstagramPage() {
   const handleDateFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setDateFilter(e.target.value)
     setOffset(0)
-    // fetchImages will be called by useEffect when dateFilter changes
   }
 
   const clearDateFilter = () => {
     setDateFilter('')
     setOffset(0)
-  }
-  
-  const handleImageClick = (image: InstagramImage) => {
-    setSelectedImage(image)
-    setIsModalOpen(true)
-  }
-  
-  const handleCloseModal = () => {
-    setIsModalOpen(false)
-    setSelectedImage(null)
   }
 
   if (error) {
@@ -116,21 +122,20 @@ export function InstagramPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header with filters */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-xl font-bold text-gray-900">
           {INSTAGRAM_DOWNLOADED}
         </h2>
-        
+
         <div className="flex items-center gap-3">
-          {/* Date Filter */}
           <div className="flex items-center gap-2">
             <select
               value={dateFilter}
               onChange={handleDateFilterChange}
               className="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">All dates</option>
+              <option value="">{FILTER_ALL_DATES}</option>
               {availableMonths.map(month => (
                 <option key={month} value={month}>
                   {formatMonth(month)}
@@ -142,85 +147,60 @@ export function InstagramPage() {
                 onClick={clearDateFilter}
                 className="text-xs text-gray-500 hover:text-gray-700 underline"
               >
-                Clear
+                {FILTER_CLEAR}
               </button>
             )}
           </div>
-          
-          <p className="text-sm text-gray-500">
-            {total} images
-          </p>
+
+          <p className="text-sm text-gray-500">{total} images</p>
         </div>
       </div>
 
-      {/* Image Grid */}
+      {/* Grid */}
       {isLoading && images.length === 0 ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <ImageSkeleton key={i} />
-          ))}
-        </div>
+        <LoadingGrid />
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {images.map((image) => (
-              <InstagramImageCard 
-                key={image.key} 
-                image={image} 
-                onClick={() => handleImageClick(image)}
+              <InstagramImageCard
+                key={image.key}
+                image={image}
+                onClick={() => openModal(image)}
               />
             ))}
           </div>
 
-          {/* Pagination */}
           {pagination.total_pages > 1 && (
-            <div className="flex items-center justify-between pt-6 border-t border-gray-200">
-              <button
-                onClick={handlePrevPage}
-                disabled={offset === 0 || isLoading}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                ← Previous
-              </button>
-              
-              <div className="text-sm text-gray-600">
-                Page {pagination.current_page} of {pagination.total_pages}
-                <span className="text-gray-400 mx-2">|</span>
-                Showing {offset + 1}-{Math.min(offset + ITEMS_PER_PAGE, total)} of {total}
-              </div>
-              
-              <button
-                onClick={handleNextPage}
-                disabled={!pagination.has_more || isLoading}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next →
-              </button>
-            </div>
+            <Pagination
+              pagination={pagination}
+              total={total}
+              offset={offset}
+              onPrev={handlePrevPage}
+              onNext={handleNextPage}
+              isLoading={isLoading}
+            />
           )}
         </>
       )}
-      
-      {/* Metadata Modal */}
+
       {isModalOpen && selectedImage && (
-        <ImageMetadataModal 
-          image={selectedImage} 
-          onClose={handleCloseModal} 
-        />
+        <ImageDetailsModal image={selectedImage} onClose={closeModal} />
       )}
     </div>
   )
 }
 
-// Helper function to format YYYYMM to readable date
-function formatMonth(yyyymm: string): string {
-  if (yyyymm.length !== 6) return yyyymm
-  
-  const year = yyyymm.substring(0, 4)
-  const month = yyyymm.substring(4, 6)
-  
-  const date = new Date(parseInt(year), parseInt(month) - 1)
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+// Extracted sub-components...
+
+function LoadingGrid() {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      {Array.from({ length: 12 }).map((_, i) => (
+        <ImageSkeleton key={i} />
+      ))}
+    </div>
+  )
 }
 
 function ImageSkeleton() {
@@ -235,13 +215,51 @@ function ImageSkeleton() {
   )
 }
 
+function Pagination({ pagination, total, offset, onPrev, onNext, isLoading }: {
+  pagination: { current_page: number; total_pages: number; has_more: boolean }
+  total: number
+  offset: number
+  onPrev: () => void
+  onNext: () => void
+  isLoading: boolean
+}) {
+  return (
+    <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+      <button
+        onClick={onPrev}
+        disabled={offset === 0 || isLoading}
+        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {PAGINATION_PREVIOUS}
+      </button>
+
+      <div className="text-sm text-gray-600">
+        {MSG_PAGE_OF.replace('{current}', String(pagination.current_page)).replace('{total}', String(pagination.total_pages))}
+        <span className="text-gray-400 mx-2">|</span>
+        {MSG_SHOWING_RANGE
+          .replace('{start}', String(offset + 1))
+          .replace('{end}', String(Math.min(offset + ITEMS_PER_PAGE, total)))
+          .replace('{total}', String(total))}
+      </div>
+
+      <button
+        onClick={onNext}
+        disabled={!pagination.has_more || isLoading}
+        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {PAGINATION_NEXT}
+      </button>
+    </div>
+  )
+}
+
 function InstagramImageCard({ image, onClick }: { image: InstagramImage; onClick: () => void }) {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
   const thumbnailUrl = `/api/images/instagram/${encodeURIComponent(image.key)}/thumbnail`
 
   return (
-    <div 
+    <div
       className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow group bg-white cursor-pointer"
       onClick={onClick}
     >
@@ -267,9 +285,8 @@ function InstagramImageCard({ image, onClick }: { image: InstagramImage; onClick
             {image.image_index}/{image.total_in_post}
           </div>
         )}
-        {/* Info overlay on hover */}
         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <span className="text-white text-sm font-medium">Click for details</span>
+          <span className="text-white text-sm font-medium">{MSG_CLICK_FOR_DETAILS}</span>
         </div>
       </div>
       <div className="p-2">
@@ -291,257 +308,94 @@ function InstagramImageCard({ image, onClick }: { image: InstagramImage; onClick
   )
 }
 
-function ImageMetadataModal({ image, onClose }: { image: InstagramImage; onClose: () => void }) {
-  const [imageData, setImageData] = useState<InstagramImage | null>(null)
-  const [loading, setLoading] = useState(true)
-  
-  useEffect(() => {
-    // Fetch full image data including any additional metadata
-    const fetchImageData = async () => {
-      try {
-        // For now, use the passed image data
-        // In the future, we could fetch additional details from the API
-        setImageData(image)
-      } catch (err) {
-        console.error('Error fetching image data:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    fetchImageData()
-  }, [image])
-  
-  // Handle click outside to close
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose()
-    }
-  }
-  
-  // Handle escape key
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-      }
-    }
-    
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [onClose])
-  
-  // Prevent body scroll when modal is open
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [])
-  
+function ImageDetailsModal({ image, onClose }: { image: InstagramImage; onClose: () => void }) {
   const thumbnailUrl = `/api/images/instagram/${encodeURIComponent(image.key)}/thumbnail`
-  
+
   return (
-    <div 
-      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-      onClick={handleBackdropClick}
-    >
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Image Details</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        
-        {/* Modal Content */}
-        <div className="flex-1 overflow-auto p-4">
-          {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+    <Modal onClose={onClose}>
+      <ModalHeader title={MODAL_TITLE_IMAGE_DETAILS} onClose={onClose} />
+
+      <div className="flex-1 overflow-auto p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Image Preview */}
+          <div className="space-y-4">
+            <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+              <img src={thumbnailUrl} alt={image.filename} className="w-full h-full object-contain" />
             </div>
-          ) : imageData ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Image Preview */}
-              <div className="space-y-4">
-                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                  <img
-                    src={thumbnailUrl}
-                    alt={imageData.filename}
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-                
-                {/* Quick Actions */}
-                <div className="flex gap-2">
-                  {imageData.post_url ? (
-                    <a
-                      href={imageData.post_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 bg-blue-600 text-white text-center py-2 px-4 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
-                    >
-                      View on Instagram
-                    </a>
-                  ) : (
-                    <button
-                      onClick={() => window.open(`file://${imageData.local_path}`, '_blank')}
-                      className="flex-1 bg-gray-600 text-white text-center py-2 px-4 rounded-md hover:bg-gray-700 transition-colors text-sm font-medium"
-                    >
-                      Open Local File
-                    </button>
-                  )}
-                </div>
-              </div>
-              
-              {/* Metadata */}
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                    Basic Information
-                  </h4>
-                  <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                    <MetadataRow label="Filename" value={imageData.filename} />
-                    <MetadataRow label="Media Key" value={imageData.key} />
-                    <MetadataRow label="Source Folder" value={imageData.source_folder} />
-                    <MetadataRow label="Date Folder" value={imageData.instagram_folder} />
-                    <MetadataRow 
-                      label="Added" 
-                      value={new Date(imageData.crawled_at).toLocaleString()} 
-                    />
-                  </div>
-                </div>
-                
-                {imageData.image_hash && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                      Image Analysis
-                    </h4>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <MetadataRow 
-                        label="Visual Hash (pHash)" 
-                        value={imageData.image_hash} 
-                        monospace
-                      />
-                      <p className="text-xs text-gray-500 mt-2">
-                        This hash is used to detect visually identical images across your collection.
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
-                <div>
-                    <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                      EXIF Data
-                    </h4>
-                    {imageData.exif_data && Object.keys(imageData.exif_data).length > 0 ? (
-                      <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                        {imageData.exif_data.latitude !== undefined && imageData.exif_data.longitude !== undefined && (
-                          <MetadataRow 
-                            label="GPS Coordinates" 
-                            value={`${imageData.exif_data.latitude.toFixed(6)}, ${imageData.exif_data.longitude.toFixed(6)}`} 
-                          />
-                        )}
-                        {imageData.exif_data.date_time_original && (
-                          <MetadataRow 
-                            label="Date Taken" 
-                            value={imageData.exif_data.date_time_original} 
-                          />
-                        )}
-                        {imageData.exif_data.device_id && (
-                          <MetadataRow 
-                            label="Camera" 
-                            value={imageData.exif_data.device_id} 
-                          />
-                        )}
-                        {imageData.exif_data.lens_model && (
-                          <MetadataRow 
-                            label="Lens" 
-                            value={imageData.exif_data.lens_model} 
-                          />
-                        )}
-                        {imageData.exif_data.iso !== undefined && (
-                          <MetadataRow 
-                            label="ISO" 
-                            value={String(imageData.exif_data.iso)} 
-                          />
-                        )}
-                        {imageData.exif_data.aperture && (
-                          <MetadataRow 
-                            label="Aperture" 
-                            value={imageData.exif_data.aperture} 
-                          />
-                        )}
-                        {imageData.exif_data.shutter_speed && (
-                          <MetadataRow 
-                            label="Shutter Speed" 
-                            value={imageData.exif_data.shutter_speed} 
-                          />
-                        )}
-                      </div>
-                    ) : (
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-sm text-gray-500 italic">No EXIF data available</p>
-                      </div>
-                    )}
-                  </div>
-                
-                {imageData.description && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                      Caption
-                    </h4>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <p className="text-sm text-gray-800 whitespace-pre-wrap">
-                        {imageData.description}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
-                {/* File Path */}
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                    File Location
-                  </h4>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <code className="text-xs text-gray-600 break-all">
-                      {imageData.local_path}
-                    </code>
-                  </div>
-                </div>
-              </div>
+
+            <div className="flex gap-2">
+              {image.post_url ? (
+                <a
+                  href={image.post_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 bg-blue-600 text-white text-center py-2 px-4 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                >
+                  {MODAL_VIEW_ON_INSTAGRAM}
+                </a>
+              ) : (
+                <button
+                  onClick={() => window.open(`file://${image.local_path}`, '_blank')}
+                  className="flex-1 bg-gray-600 text-white text-center py-2 px-4 rounded-md hover:bg-gray-700 transition-colors text-sm font-medium"
+                >
+                  {MODAL_OPEN_LOCAL_FILE}
+                </button>
+              )}
             </div>
-          ) : null}
-        </div>
-        
-        {/* Modal Footer */}
-        <div className="border-t border-gray-200 p-4 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-          >
-            Close
-          </button>
+          </div>
+
+          {/* Metadata */}
+          <div className="space-y-4">
+            <MetadataSection title={META_SECTION_BASIC_INFO}>
+              <div className="space-y-2">
+                <MetadataRow label={LABEL_FILENAME} value={image.filename} />
+                <MetadataRow label={LABEL_MEDIA_KEY} value={image.key} />
+                <MetadataRow label={LABEL_SOURCE_FOLDER} value={image.source_folder} />
+                <MetadataRow label={LABEL_DATE_FOLDER} value={image.instagram_folder} />
+                <MetadataRow label={LABEL_ADDED} value={new Date(image.crawled_at).toLocaleString()} />
+              </div>
+            </MetadataSection>
+
+            {image.image_hash && (
+              <MetadataSection title={META_SECTION_IMAGE_ANALYSIS}>
+                <MetadataRow label={LABEL_VISUAL_HASH} value={image.image_hash} monospace />
+                <p className="text-xs text-gray-500 mt-2">{HASH_EXPLANATION}</p>
+              </MetadataSection>
+            )}
+
+            <ExifDataSection exifData={image.exif_data} />
+
+            {image.description && (
+              <MetadataSection title={META_SECTION_CAPTION}>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap">{image.description}</p>
+              </MetadataSection>
+            )}
+
+            <MetadataSection title={META_SECTION_FILE_LOCATION}>
+              <code className="text-xs text-gray-600 break-all">{image.local_path}</code>
+            </MetadataSection>
+          </div>
         </div>
       </div>
-    </div>
+
+      <ModalFooter>
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+        >
+          {MODAL_CLOSE}
+        </button>
+      </ModalFooter>
+    </Modal>
   )
 }
 
-function MetadataRow({ label, value, monospace = false }: { label: string; value: string; monospace?: boolean }) {
-  return (
-    <div className="flex flex-col sm:flex-row sm:justify-between sm:gap-4">
-      <span className="text-sm text-gray-500">{label}</span>
-      <span className={`text-sm text-gray-900 text-right ${monospace ? 'font-mono' : ''}`}>
-        {value}
-      </span>
-    </div>
-  )
+function formatMonth(yyyymm: string): string {
+  if (yyyymm.length !== 6) return yyyymm
+
+  const year = yyyymm.substring(0, 4)
+  const month = yyyymm.substring(4, 6)
+
+  const date = new Date(parseInt(year), parseInt(month) - 1)
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
 }
