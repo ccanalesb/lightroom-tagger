@@ -151,23 +151,51 @@ def match_image(db, insta_image: dict, threshold: float = 0.7,
     
     return []
 
-def match_batch(db, insta_images: list, threshold: float = 0.7, 
-                phash_weight: float = 0.4, desc_weight: float = 0.3, 
+def match_batch(db, insta_images: list, threshold: float = 0.7,
+                phash_weight: float = 0.4, desc_weight: float = 0.3,
                 vision_weight: float = 0.3) -> dict:
     """Match multiple Instagram images against catalog."""
     total_matches = 0
     total_candidates = 0
-    
+
     for insta_image in insta_images:
         matches = match_image(
-            db, insta_image, threshold, 
+            db, insta_image, threshold,
             phash_weight, desc_weight, vision_weight
         )
         if matches:
             total_matches += 1
             total_candidates += len(matches)
-    
+
     return {
         'total_matches': total_matches,
         'total_candidates': total_candidates
     }
+
+
+def find_candidates_by_date(db, insta_image: dict, days_before: int = 90) -> list:
+    """Find catalog candidates within date window before Instagram posting."""
+    from datetime import datetime, timedelta
+
+    date_folder = insta_image.get('date_folder', '')
+    if len(date_folder) != 6:
+        return []
+
+    post_year = int(date_folder[:4])
+    post_month = int(date_folder[4:6])
+    post_date = datetime(post_year, post_month, 15)
+    window_start = post_date - timedelta(days=days_before)
+
+    candidates = []
+    for img in db.table('images').all():
+        date_taken = img.get('date_taken', '')
+        if not date_taken:
+            continue
+        try:
+            img_date = datetime.fromisoformat(date_taken.replace('Z', '+00:00'))
+            if window_start <= img_date <= post_date:
+                candidates.append(img)
+        except:
+            continue
+
+    return candidates
