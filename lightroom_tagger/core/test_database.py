@@ -18,6 +18,7 @@ from lightroom_tagger.core.database import (
     init_vision_comparisons_table,
     get_vision_comparison,
     store_vision_comparison,
+    get_instagram_by_date_filter,
 )
 
 
@@ -449,6 +450,31 @@ class TestInstagramDumpMedia(unittest.TestCase):
         # Verify get by hash returns both
         by_hash = get_dump_media_by_hash(self.db, 'abc123def456')
         self.assertEqual(len(by_hash), 2)
+
+    def test_get_instagram_by_month_filter(self):
+        """Test filtering Instagram images by month."""
+        from lightroom_tagger.core.database import (
+            init_instagram_dump_table, store_instagram_dump_media
+        )
+
+        init_instagram_dump_table(self.db)
+
+        # Insert test data
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/123',
+            'date_folder': '202603',
+            'file_path': '/path/to/test1.jpg'
+        })
+        store_instagram_dump_media(self.db, {
+            'media_key': '202604/456',
+            'date_folder': '202604',
+            'file_path': '/path/to/test2.jpg'
+        })
+
+        # Test month filter
+        result = get_instagram_by_date_filter(self.db, month='202603')
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]['media_key'], '202603/123')
 
 
 if __name__ == "__main__":

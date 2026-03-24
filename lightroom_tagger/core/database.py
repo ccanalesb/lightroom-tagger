@@ -1,7 +1,7 @@
 from tinydb import TinyDB, Query
 from typing import Optional
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def init_database(db_path: str) -> TinyDB:
@@ -192,6 +192,32 @@ def get_unprocessed_dump_media(db, limit: int = None) -> list:
     if limit:
         return results[:limit]
     return results
+
+
+def get_instagram_by_date_filter(db, month: str = None, year: str = None,
+                                 last_months: int = None) -> list:
+    """Get Instagram dump media filtered by date.
+
+    Args:
+        month: Filter by month (e.g., '202603')
+        year: Filter by year (e.g., '2026')
+        last_months: Filter by last N months from now
+    """
+    Media = Query()
+    table = db.table('instagram_dump_media')
+
+    if month:
+        return table.search(Media.date_folder == month)
+
+    elif year:
+        return table.search(Media.date_folder.matches(f'{year}*'))
+
+    elif last_months:
+        from_date = (datetime.now() - timedelta(days=last_months * 30)).strftime('%Y%m')
+        all_media = table.all()
+        return [m for m in all_media if m.get('date_folder', '000000') >= from_date]
+
+    return table.all()
 
 
 def mark_dump_media_processed(db, media_key: str, matched_catalog_key: str = None,
