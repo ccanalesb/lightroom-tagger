@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { MatchingAPI, Match } from '../services/api'
+import { MatchingAPI, JobsAPI, Match } from '../services/api'
 import {
   MSG_LOADING,
   MSG_ERROR_PREFIX,
   MSG_NO_MATCHES,
   MATCHING_RESULTS,
+  ACTION_RUN_MATCHING,
 } from '../constants/strings'
 
 export function MatchingPage() {
@@ -12,6 +13,8 @@ export function MatchingPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showTrigger, setShowTrigger] = useState(false)
+  const [dateFilter, setDateFilter] = useState<'all' | '3months' | '6months' | '2026'>('all')
 
   useEffect(() => {
     let mounted = true
@@ -55,16 +58,63 @@ export function MatchingPage() {
     )
   }
 
+  async function startMatching() {
+    const metadata: Record<string, any> = {}
+    if (dateFilter === '3months') metadata.last_months = 3
+    else if (dateFilter === '6months') metadata.last_months = 6
+    else if (dateFilter === '2026') metadata.year = '2026'
+
+    try {
+      await JobsAPI.create('vision_match', metadata)
+      alert('Matching job started')
+      setShowTrigger(false)
+    } catch (err) {
+      alert(`Failed to start matching: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">
           {MATCHING_RESULTS}
         </h2>
-        <p className="text-sm text-gray-500">
-          {total} matches
-        </p>
+        <div className="flex items-center gap-4">
+          <p className="text-sm text-gray-500">
+            {total} matches
+          </p>
+          <button
+            onClick={() => setShowTrigger(!showTrigger)}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium"
+          >
+            {ACTION_RUN_MATCHING}
+          </button>
+        </div>
       </div>
+
+      {showTrigger && (
+        <div className="bg-gray-50 p-4 rounded-lg border">
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium text-gray-700">Date filter:</label>
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value as any)}
+              className="px-3 py-2 border rounded text-sm"
+            >
+              <option value="all">All time</option>
+              <option value="3months">Last 3 months</option>
+              <option value="6months">Last 6 months</option>
+              <option value="2026">2026 only</option>
+            </select>
+            <button
+              onClick={startMatching}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium"
+            >
+              Start
+            </button>
+          </div>
+        </div>
+      )}
 
       {matches.length === 0 ? (
         <div className="text-center py-12">
