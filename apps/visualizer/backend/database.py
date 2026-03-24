@@ -87,6 +87,14 @@ def list_jobs(db: TinyDB, status: str = None, limit: int = 50) -> list:
     return sorted(results, key=lambda j: j['created_at'], reverse=True)[:limit]
 
 def get_active_jobs(db: TinyDB) -> list:
-    """Get all running jobs."""
+    """Get all active jobs (pending or running)."""
     Job = Query()
-    return db.table('jobs').search(Job.status == 'running')
+    return db.table('jobs').search(
+        (Job.status == 'running') | (Job.status == 'pending')
+    )
+
+
+def get_pending_jobs(db: TinyDB) -> list:
+    """Get all pending jobs."""
+    Job = Query()
+    return db.table('jobs').search(Job.status == 'pending')

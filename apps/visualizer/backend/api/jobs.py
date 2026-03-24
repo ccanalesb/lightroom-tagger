@@ -36,15 +36,15 @@ def get_job_details(job_id):
 @bp.route('/<job_id>', methods=['DELETE'])
 def cancel_job(job_id):
     job = get_job(current_app.db, job_id)
-    
+
     if not job:
         return jsonify({'error': 'Job not found'}), 404
-    
-    if job['status'] == 'running':
+
+    if job['status'] in ['running', 'pending']:
         update_job_status(current_app.db, job_id, 'cancelled')
         return jsonify({'status': 'cancelled'})
-    
-    return jsonify({'error': 'Can only cancel running jobs'}), 400
+
+    return jsonify({'error': 'Can only cancel running or pending jobs'}), 400
 
 @bp.route('/active', methods=['GET'])
 def list_active_jobs():

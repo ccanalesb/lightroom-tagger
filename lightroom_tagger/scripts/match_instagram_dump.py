@@ -24,7 +24,8 @@ from lightroom_tagger.lightroom.writer import update_lightroom_from_matches
 
 
 def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
-                     month: str = None, year: str = None, last_months: int = None) -> tuple:
+                     month: str = None, year: str = None, last_months: int = None,
+                     progress_callback=None, log_callback=None) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -34,6 +35,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         month: Filter Instagram by month (e.g., '202603')
         year: Filter Instagram by year (e.g., '2026')
         last_months: Filter Instagram by last N months
+        progress_callback: Optional callback(current, total, message) for progress updates
+        log_callback: Optional callback(level, message) for detailed logging
 
     Returns:
         Tuple of (stats dict, matches list)
@@ -55,10 +58,11 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
     else:
         unprocessed = get_unprocessed_dump_media(db, limit=batch_size)
 
+    total = len(unprocessed)
     if not unprocessed:
         return stats, matches_found
 
-    for dump_media in unprocessed:
+    for idx, dump_media in enumerate(unprocessed, 1):
         stats['processed'] += 1
 
         # Find candidates within 90-day window before posting
@@ -120,6 +124,10 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         else:
             mark_dump_media_processed(db, dump_media['media_key'])
             stats['skipped'] += 1
+
+        # Report progress
+        if progress_callback:
+            progress_callback(idx, total, f'Processing {dump_media["media_key"]} ({idx}/{total})')
 
     return stats, matches_found
 

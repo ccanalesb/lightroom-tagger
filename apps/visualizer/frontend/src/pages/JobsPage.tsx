@@ -2,13 +2,40 @@ import { useEffect, useState } from 'react'
 import { Job } from '../types/job'
 import { JobsAPI } from '../services/api'
 import { useSocketStore } from '../stores/socketStore'
-import { MSG_LOADING, MSG_ERROR_PREFIX, MSG_CONNECTED, MSG_DISCONNECTED, MSG_NO_JOBS } from '../constants/strings'
+import { JobDetailModal } from '../components/JobDetailModal'
+import {
+  MSG_LOADING,
+  MSG_ERROR_PREFIX,
+  MSG_CONNECTED,
+  MSG_DISCONNECTED,
+  MSG_NO_JOBS,
+  ACTION_CANCEL,
+  ACTION_CANCELLING,
+} from '../constants/strings'
 
 export function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null)
+  const [cancellingId, setCancellingId] = useState<string | null>(null)
   const { socket, connected, connect, disconnect } = useSocketStore()
+
+  const cancelJob = async (jobId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setCancellingId(jobId)
+    try {
+      await JobsAPI.cancel(jobId)
+      // Update local state to show cancelled status immediately
+      setJobs(prev => prev.map(job =>
+        job.id === jobId ? { ...job, status: 'cancelled' as const } : job
+      ))
+    } catch (err) {
+      alert(`Failed to cancel job: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setCancellingId(null)
+    }
+  }
   
   useEffect(() => {
     connect()
@@ -86,20 +113,35 @@ export function JobsPage() {
       ) : (
         <div className="space-y-4">
           {jobs.map(job => (
-            <div key={job.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+            <div
+              key={job.id}
+              className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => setSelectedJob(job)}
+            >
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="font-semibold">{job.type}</h3>
                   <p className="text-sm text-gray-500">{job.id.slice(0, 8)}</p>
                 </div>
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  job.status === 'completed' ? 'bg-green-100 text-green-800' :
-                  job.status === 'failed' ? 'bg-red-100 text-red-800' :
-                  job.status === 'running' ? 'bg-blue-100 text-blue-800' :
-                  'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {job.status}
-                </span>
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                job.status === 'completed' ? 'bg-green-100 text-green-800' :
+                job.status === 'failed' ? 'bg-red-100 text-red-800' :
+                job.status === 'running' ? 'bg-blue-100 text-blue-800' :
+                'bg-yellow-100 text-yellow-800'
+              }`}>
+                {job.status}
+              </span>
+              {(job.status === 'pending' || job.status === 'running') && (
+                <button
+                  onClick={(e) => cancelJob(job.id, e)}
+                  disabled={cancellingId === job.id}
+                  className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                >
+                  {cancellingId === job.id ? 'Cancelling...' : 'Cancel'}
+                </button>
+              )}
+            </div>
               </div>
               <p className="text-xs text-gray-500 mt-2">
                 {new Date(job.created_at).toLocaleString()}
@@ -107,6 +149,14 @@ export function JobsPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Job Detail Modal */}
+      {selectedJob && (
+        <JobDetailModal
+          job={selectedJob}
+          onClose={() => setSelectedJob(null)}
+        />
       )}
     </div>
   )
