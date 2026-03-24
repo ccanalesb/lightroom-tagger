@@ -19,10 +19,12 @@ from lightroom_tagger.core.database import (
 from lightroom_tagger.core.matcher import find_candidates_by_date, score_candidates_with_vision
 from lightroom_tagger.core.analyzer import compute_phash
 from lightroom_tagger.core.path_utils import resolve_catalog_path
+from lightroom_tagger.core.config import load_config
+from lightroom_tagger.lightroom.writer import update_lightroom_from_matches
 
 
 def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
-                     month: str = None, year: str = None, last_months: int = None) -> dict:
+                     month: str = None, year: str = None, last_months: int = None) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -34,13 +36,14 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         last_months: Filter Instagram by last N months
 
     Returns:
-        Dict with 'processed', 'matched', 'skipped' counts
+        Tuple of (stats dict, matches list)
     """
     stats = {
         'processed': 0,
         'matched': 0,
         'skipped': 0,
     }
+    matches_found = []
 
     init_instagram_dump_table(db)
     init_catalog_table(db)
@@ -53,7 +56,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         unprocessed = get_unprocessed_dump_media(db, limit=batch_size)
 
     if not unprocessed:
-        return stats
+        return stats, matches_found
 
     for dump_media in unprocessed:
         stats['processed'] += 1
@@ -81,18 +84,18 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             except:
                 pass
 
-    # Prepare candidates for vision comparison
-    vision_candidates = []
-    for catalog_img in candidates:
-        # Resolve catalog path for WSL/Windows compatibility
-        catalog_path = resolve_catalog_path(catalog_img.get('filepath', ''))
-        candidate = {
-            'key': catalog_img.get('key'),
-            'local_path': catalog_path,
-            'image_hash': catalog_img.get('phash'),
-            'description': catalog_img.get('description', ''),
-        }
-        vision_candidates.append(candidate)
+        # Prepare candidates for vision comparison
+        vision_candidates = []
+        for catalog_img in candidates:
+            # Resolve catalog path for WSL/Windows compatibility
+            catalog_path = resolve_catalog_path(catalog_img.get('filepath', ''))
+            candidate = {
+                'key': catalog_img.get('key'),
+                'local_path': catalog_path,
+                'image_hash': catalog_img.get('phash'),
+                'description': catalog_img.get('description', ''),
+            }
+            vision_candidates.append(candidate)
 
         results = score_candidates_with_vision(
             db, dump_image, vision_candidates,
@@ -113,11 +116,12 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             update_instagram_status(db, matched_catalog_key, posted=True)
 
             stats['matched'] += 1
+            matches_found.append(best_match)
         else:
             mark_dump_media_processed(db, dump_media['media_key'])
             stats['skipped'] += 1
 
-    return stats
+    return stats, matches_found
 
 
 def main():
@@ -134,6 +138,8 @@ def main():
     parser.add_argument('--last-months', type=int, help='Filter by last N months')
     parser.add_argument('--reprocess', action='store_true',
                         help='Re-process already processed media')
+    parser.add_argument('--no-lightroom', action='store_true',
+                        help='Skip Lightroom keyword update')
 
     args = parser.parse_args()
 
@@ -144,7 +150,7 @@ def main():
     db = init_database(args.db)
 
     try:
-        stats = match_dump_media(
+        stats, matches = match_dump_media(
             db,
             threshold=args.threshold,
             batch_size=args.batch_size,
@@ -156,6 +162,19 @@ def main():
         print(f"\nProcessed: {stats['processed']}")
         print(f"Matched: {stats['matched']}")
         print(f"Skipped: {stats['skipped']}")
+
+        # Update Lightroom with "Posted" keyword
+        if matches and not args.no_lightroom:
+            config = load_config()
+            catalog_path = config.catalog_path or config.small_catalog_path
+            if catalog_path and os.path.exists(catalog_path):
+                from lightroom_tagger.lightroom.writer import update_lightroom_from_matches
+                lr_stats = update_lightroom_from_matches(catalog_path, matches)
+                print(f"\nLightroom updated: {lr_stats['success']} images tagged with 'Posted'")
+                if lr_stats['failed']:
+                    print(f"Failed to update: {lr_stats['failed']} images")
+            else:
+                print(f"\nWarning: Lightroom catalog not found at {catalog_path}")
 
     finally:
         db.close()
