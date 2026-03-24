@@ -68,29 +68,48 @@ def compress_image(input_path: str, max_size: Optional[Tuple[int, int]] = None, 
 
 def convert_raw_to_jpg(raw_path: str) -> Optional[str]:
     """Convert RAW/DNG file to temporary JPG for vision comparison.
-    
+
+    Uses retry logic for network/NAS intermittent failures.
+
     Returns:
         Path to temporary JPG file, or None if conversion failed.
         Caller is responsible for cleaning up the temporary file.
     """
     import rawpy
-    
-    try:
-        with rawpy.imread(raw_path) as raw:
-            rgb = raw.postprocess(use_camera_wb=True, half_size=True)
-        
-        from PIL import Image
-        img = Image.fromarray(rgb)
-        
-        fd, jpg_path = tempfile.mkstemp(suffix='.jpg')
-        os.close(fd)
-        
-        img.save(jpg_path, 'JPEG', quality=95)
-        
-        return jpg_path
-    except Exception as e:
-        print(f"Warning: Failed to convert {raw_path}: {e}")
+    import time
+
+    if not os.path.exists(raw_path):
         return None
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with rawpy.imread(raw_path) as raw:
+                rgb = raw.postprocess(use_camera_wb=True, half_size=True)
+
+            from PIL import Image
+            img = Image.fromarray(rgb)
+
+            fd, jpg_path = tempfile.mkstemp(suffix='.jpg')
+            os.close(fd)
+
+            img.save(jpg_path, 'JPEG', quality=95)
+
+            return jpg_path
+        except rawpy._rawpy.LibRawIOError as e:
+            # Network/NAS intermittent error - retry
+            if attempt < max_retries - 1:
+                time.sleep(0.5 * (attempt + 1))  # Exponential backoff
+                continue
+            return None
+        except rawpy._rawpy.LibRawTooBigError as e:
+            # Image too large - can't recover
+            return None
+        except Exception as e:
+            # Other errors - don't retry
+            return None
+
+    return None
 
 
 def get_viewable_path(image_path: str) -> str:

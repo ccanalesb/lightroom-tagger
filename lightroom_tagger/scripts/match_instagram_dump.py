@@ -18,6 +18,7 @@ from lightroom_tagger.core.database import (
 )
 from lightroom_tagger.core.matcher import find_candidates_by_date, score_candidates_with_vision
 from lightroom_tagger.core.analyzer import compute_phash
+from lightroom_tagger.core.path_utils import resolve_catalog_path
 
 
 def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
@@ -80,16 +81,18 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             except:
                 pass
 
-        # Prepare candidates for vision comparison
-        vision_candidates = []
-        for catalog_img in candidates:
-            candidate = {
-                'key': catalog_img.get('key'),
-                'local_path': catalog_img.get('filepath'),
-                'image_hash': catalog_img.get('phash'),
-                'description': catalog_img.get('description', ''),
-            }
-            vision_candidates.append(candidate)
+    # Prepare candidates for vision comparison
+    vision_candidates = []
+    for catalog_img in candidates:
+        # Resolve catalog path for WSL/Windows compatibility
+        catalog_path = resolve_catalog_path(catalog_img.get('filepath', ''))
+        candidate = {
+            'key': catalog_img.get('key'),
+            'local_path': catalog_path,
+            'image_hash': catalog_img.get('phash'),
+            'description': catalog_img.get('description', ''),
+        }
+        vision_candidates.append(candidate)
 
         results = score_candidates_with_vision(
             db, dump_image, vision_candidates,
