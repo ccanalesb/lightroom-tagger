@@ -13,7 +13,7 @@ def create_app():
     app = Flask(__name__)
     app.name = 'backend'
     
-    CORS(app, origins=[config.FRONTEND_URL])
+    CORS(app, origins=config.FRONTEND_URL.split(','))
     socketio = SocketIO(app, cors_allowed_origins="*")
     
     db_path = os.path.join(os.path.dirname(__file__), config.DATABASE_PATH)

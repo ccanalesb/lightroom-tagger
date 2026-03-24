@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MatchingAPI, JobsAPI, Match } from '../services/api'
+import { MatchDetailModal } from '../components/MatchDetailModal'
 import {
   MSG_LOADING,
   MSG_ERROR_PREFIX,
@@ -15,6 +16,7 @@ export function MatchingPage() {
   const [error, setError] = useState<string | null>(null)
   const [showTrigger, setShowTrigger] = useState(false)
   const [dateFilter, setDateFilter] = useState<'all' | '3months' | '6months' | '2026'>('all')
+  const [selectedMatch, setSelectedMatch] = useState<Match | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -126,15 +128,27 @@ export function MatchingPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {matches.map((match, idx) => (
-            <MatchCard key={`${match.instagram_key}-${idx}`} match={match} />
+            <MatchCard
+              key={`${match.instagram_key}-${idx}`}
+              match={match}
+              onClick={() => setSelectedMatch(match)}
+            />
           ))}
         </div>
+      )}
+
+      {/* Match detail modal */}
+      {selectedMatch && (
+        <MatchDetailModal
+          match={selectedMatch}
+          onClose={() => setSelectedMatch(null)}
+        />
       )}
     </div>
   )
 }
 
-function MatchCard({ match }: { match: Match }) {
+function MatchCard({ match, onClick }: { match: Match; onClick?: () => void }) {
   const [instaLoaded, setInstaLoaded] = useState(false)
   const [instaError, setInstaError] = useState(false)
   const [catalogLoaded, setCatalogLoaded] = useState(false)
@@ -154,7 +168,10 @@ function MatchCard({ match }: { match: Match }) {
   const visionBadgeColor = visionBadgeColors[visionResult] || visionBadgeColors['UNCERTAIN']
 
   return (
-    <div className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow bg-white">
+    <div
+      className="border rounded-lg overflow-hidden hover:shadow-md transition-shadow bg-white cursor-pointer"
+      onClick={onClick}
+    >
       {/* Thumbnails side by side */}
       <div className="flex h-32">
         {/* Instagram image */}
