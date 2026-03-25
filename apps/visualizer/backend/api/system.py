@@ -9,6 +9,9 @@ import subprocess
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, _PROJECT_ROOT)
 
+# Import lightroom_tagger config for project-specific settings
+from lightroom_tagger.core.config import load_config as load_lt_config
+
 bp = Blueprint('system', __name__)
 
 @bp.route('/status', methods=['GET'])
@@ -102,13 +105,17 @@ def get_cache_status():
 
         cache_stats = get_cache_stats(db)
 
+        # Use lightroom_tagger config for cache_dir
+        lt_config = load_lt_config()
+        cache_dir = lt_config.vision_cache_dir
+
         db.close()
         return jsonify({
             'total_images': cache_stats['total'],
             'cached_images': cache_stats['cached'],
             'missing': cache_stats['missing'],
             'cache_size_mb': round(cache_stats['cache_size_mb'], 2),
-            'cache_dir': config.VISION_CACHE_DIR if hasattr(config, 'VISION_CACHE_DIR') else os.path.expanduser('~/.cache/lightroom_tagger/vision'),
+            'cache_dir': cache_dir,
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

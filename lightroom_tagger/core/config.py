@@ -130,7 +130,7 @@ def _load_from_env(data: dict) -> dict:
             value = os.environ[env_var]
             if config_key == "workers":
                 value = int(value)
-            elif config_key in ("skip_ai", "verbose"):
+            elif config_key in ("skip_ai", "verbose", "vision_cache_enabled"):
                 value = value.lower() in ("true", "1", "yes")
             elif config_key in ("hash_threshold", "match_threshold"):
                 value = int(value)
