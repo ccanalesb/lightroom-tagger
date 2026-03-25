@@ -109,3 +109,22 @@ export const FILTER_CLEAR = 'Clear'
 
 // Config
 export const ITEMS_PER_PAGE = 48
+
+// Job Details Modal
+export const JOB_DETAILS_TITLE = 'Job Details'
+export const JOB_DETAILS_PROGRESS = 'Progress'
+export const JOB_DETAILS_CURRENT_STEP = 'Current Step'
+export const JOB_DETAILS_METADATA = 'Metadata'
+export const JOB_DETAILS_RESULT = 'Result'
+export const JOB_DETAILS_ERROR = 'Error'
+export const JOB_DETAILS_LOGS = 'Logs'
+
+// Job Actions
+export const ACTION_CANCEL = 'Cancel'
+export const ACTION_CANCELLING = 'Cancelling...'
+
+// Job Configuration Display
+export const JOB_CONFIG_METHOD = 'Matching Method'
+export const JOB_CONFIG_DATE_WINDOW = 'Date Window'
+export const JOB_CONFIG_VISION_MODEL = 'Vision Model'
+export const JOB_CONFIG_WEIGHTS = 'Scoring Weights'

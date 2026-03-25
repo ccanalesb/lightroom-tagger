@@ -208,6 +208,11 @@ cd apps/visualizer/backend && pip install -r requirements.txt
 cd ../frontend && npm install --legacy-peer-deps
 cd ../../..
 
+# IMPORTANT: Configure environment variables
+# Copy example file and set your library.db path
+cp apps/visualizer/backend/.env.example apps/visualizer/backend/.env
+# Edit .env and set LIBRARY_DB to absolute path of your library.db
+
 # Start backend + frontend together
 make dev
 # or:
@@ -220,6 +225,12 @@ make dev-down
 # or:
 ./scripts/dev-down.sh
 ```
+
+**Environment Variables:**
+- `LIBRARY_DB` (required) - Absolute path to your library.db file
+- `DATABASE_PATH` - Path to visualizer database (default: ../visualizer.db)
+- `FLASK_HOST` - Backend host (default: localhost)
+- `FLASK_PORT` - Backend port (default: 5000)
 
 ### Available Pages
 

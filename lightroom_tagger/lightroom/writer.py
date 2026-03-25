@@ -137,25 +137,25 @@ def add_keyword_by_key(conn: sqlite3.Connection, image_key: str, keyword_name: s
     return add_keyword_to_image(conn, image_id, keyword_id)
 
 
-def add_keyword_to_images_batch(conn: sqlite3.Connection, image_keys: list[str], 
+def add_keyword_to_images_batch(conn: sqlite3.Connection, image_keys: list[str],
                                 keyword_name: str, dry_run: bool = False) -> dict:
     """Add keyword to multiple images.
-    
+
     Returns:
         dict with 'added', 'skipped', 'errors' counts
     """
     result = {'added': 0, 'skipped': 0, 'errors': 0}
-    
+
     keyword_id = get_or_create_keyword(conn, keyword_name)
-    
+
     for image_key in image_keys:
         try:
             image_id = get_image_local_id(conn, image_key)
             if not image_id:
                 result['errors'] += 1
-                print(f"  Error: Image not found: {image_key}")
+                print(f" Error: Image not found: {image_key}")
                 continue
-            
+
             if dry_run:
                 if image_has_keyword(conn, image_id, keyword_id):
                     result['skipped'] += 1
@@ -168,9 +168,43 @@ def add_keyword_to_images_batch(conn: sqlite3.Connection, image_keys: list[str],
                     result['skipped'] += 1
         except Exception as e:
             result['errors'] += 1
-            print(f"  Error adding keyword to {image_key}: {e}")
-    
+            print(f" Error adding keyword to {image_key}: {e}")
+
     return result
+
+
+def update_lightroom_from_matches(catalog_path: str, matches: list) -> dict:
+    """Add 'Posted' keyword to matched catalog images.
+
+    Args:
+        catalog_path: Path to Lightroom catalog
+        matches: List of match dicts with 'catalog_key' field
+
+    Returns:
+        dict with 'success', 'failed' counts
+    """
+    stats = {'success': 0, 'failed': 0}
+
+    if not matches:
+        return stats
+
+    conn = connect_catalog(catalog_path)
+    keyword_id = get_or_create_keyword(conn, "Posted")
+
+    for match in matches:
+        catalog_key = match.get('catalog_key')
+        if not catalog_key:
+            continue
+
+        image_id = get_image_local_id(conn, catalog_key)
+        if image_id and add_keyword_to_image(conn, image_id, keyword_id):
+            stats['success'] += 1
+        else:
+            stats['failed'] += 1
+
+    conn.commit()
+    conn.close()
+    return stats
 
 
 if __name__ == "__main__":
