@@ -76,3 +76,4 @@ library.json
 validation_report.html
 .run
 vision_matching_results.json
+library.db.worktree-backup

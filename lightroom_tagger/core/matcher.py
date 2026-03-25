@@ -30,7 +30,7 @@ def score_candidates(insta_image: dict, candidates: list, phash_weight: float = 
         
         desc_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
         
-        total = (phash_weight * phash_score) + (desc_weight * desc_sim)
+        total_score_val = (phash_weight * phash_score) + (desc_weight * desc_sim)
         
         results.append({
             'catalog_key': candidate.get('key'),
@@ -38,7 +38,7 @@ def score_candidates(insta_image: dict, candidates: list, phash_weight: float = 
             'phash_distance': phash_dist,
             'phash_score': phash_score,
             'desc_similarity': desc_sim,
-            'total_score': total
+            'total_score': total_score_val
         })
     
     return sorted(results, key=lambda x: x['total_score'], reverse=True)
@@ -62,17 +62,25 @@ def text_similarity(text1: str, text2: str) -> float:
 
 def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                                  phash_weight: float = 0.4, desc_weight: float = 0.3,
-                                 vision_weight: float = 0.3) -> List[dict]:
+                                 vision_weight: float = 0.3,
+                                 log_callback=None) -> List[dict]:
     """Score candidates including vision comparison (one-by-one).
 
     Uses vision comparison cache to avoid re-comparing already processed pairs.
     """
+    import os as _os
     from lightroom_tagger.core.phash import hamming_distance
     from lightroom_tagger.core.analyzer import compare_with_vision, vision_score, get_vision_model
 
     results = []
+    total_candidates = len(candidates)
+    insta_filename = _os.path.basename(insta_image.get('local_path', 'unknown'))
 
-    for candidate in candidates:
+    if log_callback:
+        log_callback('info', f'[{insta_filename}] Starting vision comparison with {total_candidates} candidates')
+
+    for idx, candidate in enumerate(candidates, 1):
+
         phash_dist = hamming_distance(insta_image.get('image_hash', ''), candidate.get('image_hash', ''))
         phash_score_val = max(0, 1 - (phash_dist / 16))
 
@@ -93,7 +101,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         elif insta_path and local_path:
             # Run vision comparison
             try:
-                vision_result = compare_with_vision(local_path, insta_path)
+                vision_result = compare_with_vision(local_path, insta_path, log_callback)
                 vision_score_val = vision_score(vision_result)
 
                 # Cache the result
@@ -109,7 +117,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             vision_result = 'UNCERTAIN'
             vision_score_val = 0.5
 
-        total = (phash_weight * phash_score_val) + \
+        total_score_val = (phash_weight * phash_score_val) + \
                 (desc_weight * desc_sim) + \
                 (vision_weight * vision_score_val)
 
@@ -121,8 +129,17 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             'desc_similarity': desc_sim,
             'vision_result': vision_result,
             'vision_score': vision_score_val,
-            'total_score': total
+            'total_score': total_score_val
         })
+
+    # Log final result
+    if log_callback and results:
+        best = results[0]
+        best_pct = int(best['total_score'] * 100)
+        if best['total_score'] >= 0.7:
+            log_callback('info', f'[{insta_filename}] Comparison complete - Best match: {best["catalog_key"]} ({best_pct}%)')
+        else:
+            log_callback('info', f'[{insta_filename}] No match found above threshold (0.7)')
 
     return sorted(results, key=lambda x: x['total_score'], reverse=True)
 

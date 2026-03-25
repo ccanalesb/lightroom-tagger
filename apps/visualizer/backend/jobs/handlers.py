@@ -1,12 +1,14 @@
 """Job type handlers for vision matching and catalog operations."""
 import sys
 import os
+from pathlib import Path
 
 # Add project root to Python path
 # Project root is where library.db and lightroom_tagger/ package are located
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 sys.path.insert(0, _PROJECT_ROOT)
 
+from tinydb import Query
 from lightroom_tagger.core.database import init_database
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
@@ -23,6 +25,21 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
     runner.update_progress(job_id, 10, 'Initializing...')
 
     try:
+        # Store config in metadata so it shows during job run
+        config = load_config()
+        runner.db.table('jobs').update({
+            'metadata': {
+                **metadata,
+                'method': 'cascade_matching',
+                'date_window_days': 90,
+                'vision_model': config.vision_model or 'gemma3:27b',
+                'weights': {
+                    'phash': config.phash_weight or 0.4,
+                    'description': config.desc_weight or 0.3,
+                    'vision': config.vision_weight or 0.3
+                }
+            }
+        }, Query().id == job_id)
         # Use LIBRARY_DB env var if set, otherwise fall back to config
         import os
         import time
@@ -50,6 +67,11 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             progress = int(30 + (current / total) * 50) # Scale to 30-80%
             runner.update_progress(job_id, progress, message)
 
+        def log_callback(level, message):
+            """Add detailed log entry to job."""
+            from database import add_job_log
+            add_job_log(runner.db, job_id, level, message)
+
         try:
             # Get date filters from metadata
             month = metadata.get('month')
@@ -63,7 +85,8 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 month=month,
                 year=year,
                 last_months=last_months,
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
+                log_callback=log_callback
             )
 
             # Update Lightroom with "Posted" keyword for matched images

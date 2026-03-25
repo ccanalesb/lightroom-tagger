@@ -103,7 +103,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
 
         results = score_candidates_with_vision(
             db, dump_image, vision_candidates,
-            phash_weight=0.4, desc_weight=0.3, vision_weight=0.3
+            phash_weight=0.4, desc_weight=0.3, vision_weight=0.3,
+            log_callback=log_callback
         )
 
         if results and results[0]['total_score'] >= threshold:

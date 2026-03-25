@@ -206,7 +206,7 @@ def run_external_agent(path: str) -> str:
     return ""
 
 
-def compare_with_vision(local_path: str, insta_path: str) -> str:
+def compare_with_vision(local_path: str, insta_path: str, log_callback=None) -> str:
     """Compare two images using vision model via Ollama with compression.
     
     Compresses images to max VISION_MAX_DIMENSION pixels before comparison
@@ -222,6 +222,18 @@ def compare_with_vision(local_path: str, insta_path: str) -> str:
         viewable_local = get_viewable_path(local_path)
         if viewable_local != local_path:
             temp_files.append(viewable_local)
+            # Log what happened
+            if log_callback:
+                ext = os.path.splitext(local_path)[1].lower()
+                if ext in RAW_EXTENSIONS:
+                    if viewable_local.lower().endswith(('.jpg', '.jpeg')):
+                        # Check if it's a sidecar or converted
+                        sidecar_path = local_path.rsplit('.', 1)[0] + '.JPG'
+                        sidecar_path_lower = local_path.rsplit('.', 1)[0] + '.jpg'
+                        if os.path.exists(sidecar_path) or os.path.exists(sidecar_path_lower):
+                            log_callback('info', f'Using JPG sidecar for {os.path.basename(local_path)}')
+                        else:
+                            log_callback('info', f'Converted DNG to JPG: {os.path.basename(viewable_local)}')
         else:
             viewable_local = local_path
         

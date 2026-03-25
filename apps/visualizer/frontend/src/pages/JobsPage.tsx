@@ -156,6 +156,12 @@ export function JobsPage() {
         <JobDetailModal
           job={selectedJob}
           onClose={() => setSelectedJob(null)}
+          onJobUpdate={(updatedJob) => {
+            // Update the jobs list when modal receives updates
+            setJobs(prev => prev.map(job =>
+              job.id === updatedJob.id ? updatedJob : job
+            ))
+          }}
         />
       )}
     </div>
