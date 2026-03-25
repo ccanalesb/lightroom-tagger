@@ -13,43 +13,46 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       ...options?.headers,
     },
   })
-  
+
   if (!response.ok) {
     throw new Error(`${response.status} ${response.statusText}`)
   }
-  
+
   return response.json()
 }
 
 export const JobsAPI = {
-  list: (status?: string) => 
+  list: (status?: string) =>
     request<Job[]>(status? `/jobs/?status=${status}` : '/jobs/'),
-  
-  get: (id: string) => 
+
+  get: (id: string) =>
     request<Job>(`/jobs/${id}`),
-  
+
   create: (type: string, metadata?: Record<string, any>) =>
     request<Job>('/jobs/', {
       method: 'POST',
       body: JSON.stringify({ type, metadata }),
     }),
-  
-  getActive: () => 
+
+  getActive: () =>
     request<Job[]>('/jobs/active'),
-  
-  cancel: (id: string) => 
+
+  cancel: (id: string) =>
     request<void>(`/jobs/${id}`, { method: 'DELETE' }),
 }
 
 export const SystemAPI = {
-  status: () => 
+  status: () =>
     request<{ status: string }>('/status'),
-  
+
   stats: () =>
     request<Stats>('/stats'),
 
- visionModels: () =>
-   request<{ models: { name: string; default: boolean }[]; fallback: boolean }>('/vision-models'),
+  visionModels: () =>
+    request<{ models: { name: string; default: boolean }[]; fallback: boolean }>('/vision-models'),
+
+  cacheStatus: () =>
+    request<CacheStatus>('/cache/status'),
 }
 
 export const ImagesAPI = {
@@ -111,13 +114,21 @@ export interface Stats {
   db_path: string
 }
 
+export interface CacheStatus {
+  total_images: number
+  cached_images: number
+  missing: number
+  cache_size_mb: number
+  cache_dir: string
+}
+
 export interface InstagramImage {
-  post_url?: string  // Optional - not available in dump
+  post_url?: string // Optional - not available in dump
   local_path: string
   filename: string
   instagram_folder: string
-  source_folder: string  // posts, archived_posts, etc.
-  image_hash?: string  // Visual perceptual hash for duplicate detection
+  source_folder: string // posts, archived_posts, etc.
+  image_hash?: string // Visual perceptual hash for duplicate detection
   phash?: string
   description?: string
   key: string
