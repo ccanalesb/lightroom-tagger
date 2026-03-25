@@ -510,6 +510,103 @@ def init_vision_comparisons_table(db: TinyDB):
         db.table('vision_comparisons')
 
 
+def init_vision_cache_table(db: TinyDB):
+    """Ensure vision_cache table exists."""
+    if 'vision_cache' not in db.tables():
+        db.table('vision_cache')
+
+
+def get_vision_cached_image(db: TinyDB, catalog_key: str) -> Optional[dict]:
+    """Get cached compressed image by catalog key.
+
+    Returns dict with 'compressed_path', 'phash', 'compressed_at', 'original_mtime' or None.
+    """
+    Cache = Query()
+    results = db.table('vision_cache').search(Cache.key == catalog_key)
+    return results[0] if results else None
+
+
+def store_vision_cached_image(db: TinyDB, catalog_key: str, compressed_path: str,
+                                phash: str, original_mtime: float) -> bool:
+    """Store compressed image info in vision cache.
+
+    Args:
+        db: TinyDB instance
+        catalog_key: Key of catalog image
+        compressed_path: Path to compressed image file
+        phash: Pre-computed perceptual hash
+        original_mtime: Original file modification time for cache invalidation
+
+    Returns:
+        True if stored successfully
+    """
+    Cache = Query()
+    record = {
+        'key': catalog_key,
+        'compressed_path': compressed_path,
+        'phash': phash,
+        'compressed_at': datetime.now().isoformat(),
+        'original_mtime': original_mtime,
+    }
+
+    existing = db.table('vision_cache').search(Cache.key == catalog_key)
+    if existing:
+        db.table('vision_cache').update(record, Cache.key == catalog_key)
+    else:
+        db.table('vision_cache').insert(record)
+
+    return True
+
+
+def is_vision_cache_valid(db: TinyDB, catalog_key: str, original_path: str) -> bool:
+    """Check if cached image is still valid (mtime unchanged).
+
+    Args:
+        db: TinyDB instance
+        catalog_key: Key of catalog image
+        original_path: Path to original image file
+
+    Returns:
+        True if cache is valid, False otherwise
+    """
+    cached = get_vision_cached_image(db, catalog_key)
+    if not cached or not os.path.exists(cached.get('compressed_path', '')):
+        return False
+
+    try:
+        current_mtime = os.path.getmtime(original_path)
+        return cached.get('original_mtime') == current_mtime
+    except OSError:
+        return False
+
+
+def get_cache_stats(db: TinyDB) -> dict:
+    """Get vision cache statistics.
+
+    Returns dict with total, cached, missing, cache_size_mb.
+    """
+    total = len(db.table('catalog_images').all())
+    cached = len(db.table('vision_cache').all())
+
+    cache_size_bytes = 0
+    for record in db.table('vision_cache').all():
+        path = record.get('compressed_path', '')
+        if os.path.exists(path):
+            cache_size_bytes += os.path.getsize(path)
+
+    return {
+        'total': total,
+        'cached': cached,
+        'missing': total - cached,
+        'cache_size_mb': cache_size_bytes / (1024 * 1024),
+    }
+
+
+def get_all_catalog_images(db: TinyDB) -> list:
+    """Get all catalog images."""
+    return db.table('catalog_images').all()
+
+
 def get_vision_comparison(db, catalog_key: str, insta_key: str) -> Optional[dict]:
     """Get cached vision comparison result.
     

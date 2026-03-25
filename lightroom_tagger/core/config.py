@@ -29,6 +29,8 @@ class Config:
     desc_weight: float = 0.3
     vision_weight: float = 0.3
     match_threshold: float = 0.7
+    vision_cache_dir: str = field(default_factory=lambda: os.path.expanduser("~/.cache/lightroom_tagger/vision"))
+    vision_cache_enabled: bool = True
 
     def __post_init__(self):
         self.catalog_path = self._resolve_path(self.catalog_path)
@@ -88,6 +90,8 @@ def load_config(config_path: str = "config.yaml") -> Config:
         "desc_weight": 0.3,
         "vision_weight": 0.3,
         "match_threshold": 0.7,
+        "vision_cache_dir": os.path.expanduser("~/.cache/lightroom_tagger/vision"),
+        "vision_cache_enabled": True,
     }
 
     for key, value in defaults.items():
@@ -117,6 +121,8 @@ def _load_from_env(data: dict) -> dict:
         "DESC_WEIGHT": "desc_weight",
         "VISION_WEIGHT": "vision_weight",
         "MATCH_THRESHOLD": "match_threshold",
+        "VISION_CACHE_DIR": "vision_cache_dir",
+        "VISION_CACHE_ENABLED": "vision_cache_enabled",
     }
 
     for env_var, config_key in env_mappings.items():

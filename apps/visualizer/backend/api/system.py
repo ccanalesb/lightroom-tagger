@@ -1,8 +1,13 @@
 from flask import Blueprint, jsonify, current_app
 from tinydb import TinyDB
 import os
+import sys
 import config
 import subprocess
+
+# Add project root for lightroom_tagger imports
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, _PROJECT_ROOT)
 
 bp = Blueprint('system', __name__)
 
@@ -79,5 +84,31 @@ def get_stats():
 
         db.close()
         return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/cache/status', methods=['GET'])
+def get_cache_status():
+    """Get vision cache status."""
+    try:
+        db_path = config.LIBRARY_DB
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Library database not found'}), 404
+
+        db = TinyDB(db_path)
+
+        from lightroom_tagger.core.database import get_cache_stats
+
+        cache_stats = get_cache_stats(db)
+
+        db.close()
+        return jsonify({
+            'total_images': cache_stats['total'],
+            'cached_images': cache_stats['cached'],
+            'missing': cache_stats['missing'],
+            'cache_size_mb': round(cache_stats['cache_size_mb'], 2),
+            'cache_dir': config.VISION_CACHE_DIR if hasattr(config, 'VISION_CACHE_DIR') else os.path.expanduser('~/.cache/lightroom_tagger/vision'),
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
