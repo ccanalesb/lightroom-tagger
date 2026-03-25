@@ -1,0 +1,162 @@
+import { RangeSlider } from './RangeSlider';
+import { WeightSlider } from './WeightSlider';
+import {
+  ADVANCED_OPTIONS_TITLE,
+  ADVANCED_MODEL_LABEL,
+  ADVANCED_MODEL_DESCRIPTION,
+  ADVANCED_THRESHOLD_LABEL,
+  ADVANCED_THRESHOLD_MIN,
+  ADVANCED_THRESHOLD_MAX,
+  ADVANCED_THRESHOLD_DESCRIPTION,
+  ADVANCED_WEIGHTS_TITLE,
+  ADVANCED_WEIGHTS_TOTAL,
+  ADVANCED_WEIGHT_PHASH,
+  ADVANCED_WEIGHT_DESC,
+  ADVANCED_WEIGHT_VISION,
+  ADVANCED_RESET_DEFAULTS,
+} from '../constants/strings';
+
+interface AdvancedOptionsProps {
+  isOpen: boolean;
+  onToggle: () => void;
+  availableModels: { name: string; default: boolean }[];
+  selectedModel: string;
+  onModelChange: (model: string) => void;
+  threshold: number;
+  onThresholdChange: (value: number) => void;
+  phashWeight: number;
+  onPhashWeightChange: (value: number) => void;
+  descWeight: number;
+  onDescWeightChange: (value: number) => void;
+  visionWeight: number;
+  onVisionWeightChange: (value: number) => void;
+  weightsError: string | null;
+  onReset: () => void;
+}
+
+export function AdvancedOptions({
+  isOpen,
+  onToggle,
+  availableModels,
+  selectedModel,
+  onModelChange,
+  threshold,
+  onThresholdChange,
+  phashWeight,
+  onPhashWeightChange,
+  descWeight,
+  onDescWeightChange,
+  visionWeight,
+  onVisionWeightChange,
+  weightsError,
+  onReset,
+}: AdvancedOptionsProps) {
+  const totalWeight = phashWeight + descWeight + visionWeight;
+  const weightsValid = Math.abs(totalWeight - 1.0) < 0.001;
+
+  return (
+    <div className="border-t pt-4">
+      <button
+        onClick={onToggle}
+        className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+      >
+        {isOpen ? '▼' : '▶'} {ADVANCED_OPTIONS_TITLE}
+      </button>
+
+      {isOpen && (
+        <div className="mt-4 space-y-4 bg-white p-4 rounded border">
+          {/* Vision Model */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {ADVANCED_MODEL_LABEL}
+            </label>
+            <select
+              value={selectedModel}
+              onChange={(e) => onModelChange(e.target.value)}
+              className="w-full max-w-md px-3 py-2 border rounded text-sm"
+            >
+              {availableModels.length === 0 ? (
+                <option value="gemma3:27b">gemma3:27b (loading...)</option>
+              ) : (
+                availableModels.map((model) => (
+                  <option key={model.name} value={model.name}>
+                    {model.name} {model.default ? '(default)' : ''}
+                  </option>
+                ))
+              )}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">{ADVANCED_MODEL_DESCRIPTION}</p>
+          </div>
+
+          {/* Match Threshold */}
+          <RangeSlider
+            label={ADVANCED_THRESHOLD_LABEL}
+            valueLabel={`: ${threshold.toFixed(2)}`}
+            min={0.5}
+            max={0.95}
+            step={0.05}
+            value={threshold}
+            onChange={onThresholdChange}
+            minLabel={ADVANCED_THRESHOLD_MIN}
+            maxLabel={ADVANCED_THRESHOLD_MAX}
+            description={ADVANCED_THRESHOLD_DESCRIPTION}
+          />
+
+          {/* Weights */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {ADVANCED_WEIGHTS_TITLE}
+            </label>
+
+            {weightsError && (
+              <div className="text-sm text-red-600 mb-2 p-2 bg-red-50 rounded">
+                {weightsError}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <WeightSlider
+                label={ADVANCED_WEIGHT_PHASH}
+                value={phashWeight}
+                onChange={onPhashWeightChange}
+              />
+              <WeightSlider
+                label={ADVANCED_WEIGHT_DESC}
+                value={descWeight}
+                onChange={onDescWeightChange}
+              />
+              <WeightSlider
+                label={ADVANCED_WEIGHT_VISION}
+                value={visionWeight}
+                onChange={onVisionWeightChange}
+              />
+            </div>
+
+            <div className="mt-2 text-sm">
+              <span className="text-gray-600">{ADVANCED_WEIGHTS_TOTAL}: </span>
+              <span
+                className={
+                  weightsValid
+                    ? 'text-green-600 font-medium'
+                    : 'text-red-600 font-medium'
+                }
+              >
+                {(totalWeight * 100).toFixed(0)}%
+              </span>
+            </div>
+          </div>
+
+          {/* Reset button */}
+          <div className="pt-2 border-t">
+            <button
+              onClick={onReset}
+              className="text-sm text-gray-600 hover:text-gray-800"
+            >
+              {ADVANCED_RESET_DEFAULTS}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

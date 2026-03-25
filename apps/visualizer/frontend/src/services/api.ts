@@ -1,6 +1,8 @@
 import { Job } from '../types/job'
 import { API_DEFAULT_URL } from '../constants/strings'
 
+export type { Job }
+
 const API_URL = import.meta.env.VITE_API_URL || API_DEFAULT_URL
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -45,6 +47,9 @@ export const SystemAPI = {
   
   stats: () =>
     request<Stats>('/stats'),
+
+ visionModels: () =>
+   request<{ models: { name: string; default: boolean }[]; fallback: boolean }>('/vision-models'),
 }
 
 export const ImagesAPI = {

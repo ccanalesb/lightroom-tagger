@@ -25,7 +25,8 @@ from lightroom_tagger.lightroom.writer import update_lightroom_from_matches
 
 def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      month: str = None, year: str = None, last_months: int = None,
-                     progress_callback=None, log_callback=None) -> tuple:
+                     progress_callback=None, log_callback=None,
+                     weights: dict = None) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -37,10 +38,14 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         last_months: Filter Instagram by last N months
         progress_callback: Optional callback(current, total, message) for progress updates
         log_callback: Optional callback(level, message) for detailed logging
+        weights: Optional dict with 'phash', 'description', 'vision' keys for scoring weights
 
     Returns:
         Tuple of (stats dict, matches list)
     """
+    # Default weights
+    default_weights = {'phash': 0.4, 'description': 0.3, 'vision': 0.3}
+    weights = weights or default_weights
     stats = {
         'processed': 0,
         'matched': 0,
@@ -103,7 +108,9 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
 
         results = score_candidates_with_vision(
             db, dump_image, vision_candidates,
-            phash_weight=0.4, desc_weight=0.3, vision_weight=0.3,
+            phash_weight=weights.get('phash', 0.4),
+            desc_weight=weights.get('description', 0.3),
+            vision_weight=weights.get('vision', 0.3),
             log_callback=log_callback
         )
 

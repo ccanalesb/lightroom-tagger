@@ -14,6 +14,7 @@ import {
  JOB_CONFIG_METHOD,
  JOB_CONFIG_DATE_WINDOW,
  JOB_CONFIG_VISION_MODEL,
+ JOB_CONFIG_THRESHOLD,
  JOB_CONFIG_WEIGHTS,
 } from '../constants/strings';
 
@@ -187,6 +188,12 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
                    <span className="font-medium font-mono">{displayJob.metadata?.vision_model || displayJob.result?.vision_model}</span>
                  </div>
                )}
+            {(displayJob.metadata?.threshold || displayJob.result?.threshold) && (
+              <div className="flex justify-between">
+                <span className="text-gray-600">{JOB_CONFIG_THRESHOLD}:</span>
+                <span className="font-medium">{displayJob.metadata?.threshold || displayJob.result?.threshold}</span>
+              </div>
+            )}
                {(displayJob.metadata?.weights || displayJob.result?.weights) && (
                  <div>
                    <span className="text-gray-600">{JOB_CONFIG_WEIGHTS}:</span>
@@ -229,7 +236,7 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
                    <span className="text-gray-500">{new Date(log.timestamp).toLocaleTimeString()}</span>
                    <span className={`ml-2 ${
                      log.level === 'error' ? 'text-red-400' :
-                     log.level === 'warn' ? 'text-yellow-400' : 'text-green-400'
+                     log.level === 'warning' ? 'text-yellow-400' : 'text-green-400'
                    }`}>
                      [{log.level}]
                    </span>

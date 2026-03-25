@@ -9,8 +9,6 @@ import {
   MSG_CONNECTED,
   MSG_DISCONNECTED,
   MSG_NO_JOBS,
-  ACTION_CANCEL,
-  ACTION_CANCELLING,
 } from '../constants/strings'
 
 export function JobsPage() {

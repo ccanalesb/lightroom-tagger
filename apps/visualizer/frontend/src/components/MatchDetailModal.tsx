@@ -88,9 +88,9 @@ export function MatchDetailModal({ match, onClose }: MatchDetailModalProps) {
               <p className="text-xs text-gray-500 break-all">
                 {match.instagram_image?.filename || match.instagram_key}
               </p>
-              {match.instagram_image?.caption && (
+              {match.instagram_image?.description && (
                 <p className="text-xs text-gray-600 line-clamp-3">
-                  {match.instagram_image.caption}
+                  {match.instagram_image.description}
                 </p>
               )}
             </div>

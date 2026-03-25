@@ -127,4 +127,51 @@ export const ACTION_CANCELLING = 'Cancelling...'
 export const JOB_CONFIG_METHOD = 'Matching Method'
 export const JOB_CONFIG_DATE_WINDOW = 'Date Window'
 export const JOB_CONFIG_VISION_MODEL = 'Vision Model'
+export const JOB_CONFIG_THRESHOLD = 'Match Threshold'
 export const JOB_CONFIG_WEIGHTS = 'Scoring Weights'
+
+// Matching Page Advanced Options
+export const ADVANCED_OPTIONS_TITLE = 'Advanced Options'
+export const ADVANCED_DATE_FILTER = 'Date filter'
+export const ADVANCED_DATE_ALL = 'All time'
+export const ADVANCED_DATE_3MONTHS = 'Last 3 months'
+export const ADVANCED_DATE_6MONTHS = 'Last 6 months'
+export const ADVANCED_DATE_YEAR_2026 = '2026 only'
+
+export const ADVANCED_MODEL_LABEL = 'Vision Model'
+export const ADVANCED_MODEL_DESCRIPTION = 'Model used for vision comparison'
+
+export const ADVANCED_THRESHOLD_LABEL = 'Match Threshold'
+export const ADVANCED_THRESHOLD_MIN = '0.50 (lenient)'
+export const ADVANCED_THRESHOLD_MAX = '0.95 (strict)'
+export const ADVANCED_THRESHOLD_DESCRIPTION = 'Minimum score required for a match (default: 0.70)'
+
+export const ADVANCED_WEIGHTS_TITLE = 'Matching Weights'
+export const ADVANCED_WEIGHTS_MUST_SUM = 'Weights must sum to 100%'
+export const ADVANCED_WEIGHTS_CURRENT = 'currently'
+export const ADVANCED_WEIGHTS_TOTAL = 'Total'
+
+export const ADVANCED_WEIGHT_PHASH = 'Perceptual Hash (pHash)'
+export const ADVANCED_WEIGHT_DESC = 'Description Similarity'
+export const ADVANCED_WEIGHT_VISION = 'Vision Model'
+
+export const ADVANCED_RESET_DEFAULTS = 'Reset to defaults'
+export const ADVANCED_START = 'Start'
+export const ADVANCED_STARTING = 'Starting...'
+
+// Matching Status
+export const MATCHING_IN_PROGRESS = 'Matching in progress...'
+export const MATCHING_WAITING = 'Waiting to start'
+export const MATCHING_PERCENT_COMPLETE = '% complete'
+export const MATCHING_PROCESSING = 'Processing...'
+export const MATCHING_VIEW_DETAILS = 'View Details'
+export const MATCHING_COMPLETED = 'Matching completed!'
+export const MATCHING_COMPLETED_MATCHES = 'matches found'
+export const MATCHING_FAILED = 'Matching failed'
+export const MATCHING_FAILED_UNKNOWN = 'Unknown error'
+export const MATCHING_DISMISS = 'Dismiss'
+
+// Match Card
+export const MATCH_CARD_IG_LABEL = 'IG'
+export const MATCH_CARD_CATALOG_LABEL = 'Cat'
+export const MATCH_CARD_NO_IMAGE = 'No image'
