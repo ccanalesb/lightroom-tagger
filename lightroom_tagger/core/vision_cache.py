@@ -4,21 +4,19 @@ This module provides caching for compressed images used in vision comparison,
 eliminating redundant compression of the same images across multiple matching runs.
 """
 
+import contextlib
 import os
-import tempfile
-from typing import Optional
-from pathlib import Path
 
-from lightroom_tagger.core.database import (
-    get_vision_cached_image,
-    store_vision_cached_image,
-    is_vision_cache_valid,
-)
 from lightroom_tagger.core.analyzer import compress_image, compute_phash
 from lightroom_tagger.core.config import load_config
+from lightroom_tagger.core.database import (
+    get_vision_cached_image,
+    is_vision_cache_valid,
+    store_vision_cached_image,
+)
 
 
-def get_or_create_cached_image(db, catalog_key: str, original_path: str) -> Optional[str]:
+def get_or_create_cached_image(db, catalog_key: str, original_path: str) -> str | None:
     """Get compressed image path from cache or create it atomically.
 
     Uses file modification time for cache invalidation. Compresses to temp file first,
@@ -68,17 +66,15 @@ def get_or_create_cached_image(db, catalog_key: str, original_path: str) -> Opti
 
         return target_path
 
-    except Exception as e:
+    except Exception:
         # Clean up temp file if exists
         if 'temp_path' in dir() and os.path.exists(temp_path):
-            try:
+            with contextlib.suppress(BaseException):
                 os.unlink(temp_path)
-            except:
-                pass
         raise
 
 
-def get_cached_phash(db, catalog_key: str) -> Optional[str]:
+def get_cached_phash(db, catalog_key: str) -> str | None:
     """Get pre-computed pHash from cache.
 
     Args:
@@ -99,13 +95,13 @@ class InstagramCache:
     all candidate comparisons.
     """
 
-    _compressed_path: Optional[str] = None
-    _original_path: Optional[str] = None
+    _compressed_path: str | None = None
+    _original_path: str | None = None
 
     def __init__(self, db=None):
         self.db = db
 
-    def compress_instagram_image(self, insta_path: str) -> Optional[str]:
+    def compress_instagram_image(self, insta_path: str) -> str | None:
         """Compress Instagram image once and cache for this run.
 
         Args:

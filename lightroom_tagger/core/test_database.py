@@ -1,24 +1,25 @@
-import unittest
-import tempfile
 import os
+import tempfile
+import unittest
+
 from lightroom_tagger.core.database import (
-    init_database,
+    batch_update_hashes,
+    clear_all,
+    delete_image,
     generate_key,
+    get_all_images,
+    get_image,
+    get_image_count,
+    get_images_without_hash,
+    get_instagram_by_date_filter,
+    get_vision_comparison,
+    init_database,
+    init_vision_comparisons_table,
     store_image,
     store_images_batch,
-    get_image,
-    get_all_images,
-    get_image_count,
-    delete_image,
-    clear_all,
-    update_instagram_status,
-    get_images_without_hash,
-    update_image_hash,
-    batch_update_hashes,
-    init_vision_comparisons_table,
-    get_vision_comparison,
     store_vision_comparison,
-    get_instagram_by_date_filter,
+    update_image_hash,
+    update_instagram_status,
 )
 
 
@@ -27,14 +28,14 @@ class TestDatabase(unittest.TestCase):
 
     def setUp(self):
         """Create temporary database for each test."""
-        self.temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.json')
-        self.temp_file.close()
-        self.db = init_database(self.temp_file.name)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.json') as tf:
+            self.temp_db_path = tf.name
+        self.db = init_database(self.temp_db_path)
 
     def tearDown(self):
         """Clean up temporary database."""
         self.db.close()
-        os.unlink(self.temp_file.name)
+        os.unlink(self.temp_db_path)
 
     def test_init_database(self):
         """Test database initialization."""
@@ -66,14 +67,14 @@ class TestDatabase(unittest.TestCase):
             'rating': 5
         }
         store_image(self.db, record1)
-        
+
         record2 = {
             'date_taken': '2024-01-15',
             'filename': 'photo.jpg',
             'rating': 3
         }
         store_image(self.db, record2)
-        
+
         self.assertEqual(get_image_count(self.db), 1)
         img = get_image(self.db, '2024-01-15_photo.jpg')
         self.assertEqual(img['rating'], 3)
@@ -93,7 +94,7 @@ class TestDatabase(unittest.TestCase):
         """Test retrieving an image."""
         record = {'date_taken': '2024-01-15', 'filename': 'photo.jpg'}
         store_image(self.db, record)
-        
+
         img = get_image(self.db, '2024-01-15_photo.jpg')
         self.assertIsNotNone(img)
         self.assertEqual(img['filename'], 'photo.jpg')
@@ -110,7 +111,7 @@ class TestDatabase(unittest.TestCase):
             {'date_taken': '2024-01-16', 'filename': 'photo2.jpg'},
         ]
         store_images_batch(self.db, records)
-        
+
         all_images = get_all_images(self.db)
         self.assertEqual(len(all_images), 2)
 
@@ -118,7 +119,7 @@ class TestDatabase(unittest.TestCase):
         """Test deleting an image."""
         record = {'date_taken': '2024-01-15', 'filename': 'photo.jpg'}
         store_image(self.db, record)
-        
+
         deleted = delete_image(self.db, '2024-01-15_photo.jpg')
         self.assertTrue(deleted)
         self.assertEqual(get_image_count(self.db), 0)
@@ -130,7 +131,7 @@ class TestDatabase(unittest.TestCase):
             {'date_taken': '2024-01-16', 'filename': 'photo2.jpg'},
         ]
         store_images_batch(self.db, records)
-        
+
         count = clear_all(self.db)
         self.assertEqual(count, 2)
         self.assertEqual(get_image_count(self.db), 0)
@@ -141,9 +142,9 @@ class TestInstagramStatus(unittest.TestCase):
 
     def setUp(self):
         """Create temporary database."""
-        self.temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.json')
-        self.temp_file.close()
-        self.db = init_database(self.temp_file.name)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.json') as tf:
+            self.temp_db_path = tf.name
+        self.db = init_database(self.temp_db_path)
         store_image(self.db, {
             'date_taken': '2024-01-15',
             'filename': 'photo.jpg'
@@ -152,7 +153,7 @@ class TestInstagramStatus(unittest.TestCase):
     def tearDown(self):
         """Clean up."""
         self.db.close()
-        os.unlink(self.temp_file.name)
+        os.unlink(self.temp_db_path)
 
     def test_update_instagram_status(self):
         """Test updating Instagram status."""
@@ -165,7 +166,7 @@ class TestInstagramStatus(unittest.TestCase):
             index=0
         )
         self.assertTrue(result)
-        
+
         img = get_image(self.db, '2024-01-15_photo.jpg')
         self.assertTrue(img['instagram_posted'])
         self.assertEqual(img['instagram_post_date'], '2024-02-01')
@@ -178,7 +179,7 @@ class TestInstagramStatus(unittest.TestCase):
             {'date_taken': '2024-01-16', 'filename': 'photo2.jpg', 'image_hash': 'abc123'},
         ]
         store_images_batch(self.db, records)
-        
+
         without_hash = get_images_without_hash(self.db)
         self.assertEqual(len(without_hash), 2)
 
@@ -186,14 +187,14 @@ class TestInstagramStatus(unittest.TestCase):
         """Test updating image hash."""
         result = update_image_hash(self.db, '2024-01-15_photo.jpg', 'abc123def456')
         self.assertTrue(result)
-        
+
         img = get_image(self.db, '2024-01-15_photo.jpg')
         self.assertEqual(img['image_hash'], 'abc123def456')
 
     def test_batch_update_hashes(self):
         """Test batch updating hashes."""
         store_image(self.db, {'date_taken': '2024-01-16', 'filename': 'photo2.jpg'})
-        
+
         updates = [
             {'key': '2024-01-15_photo.jpg', 'image_hash': 'hash1'},
             {'key': '2024-01-16_photo2.jpg', 'image_hash': 'hash2'},
@@ -207,15 +208,15 @@ class TestVisionComparisonCache(unittest.TestCase):
 
     def setUp(self):
         """Create temporary database."""
-        self.temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.json')
-        self.temp_file.close()
-        self.db = init_database(self.temp_file.name)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.json') as tf:
+            self.temp_db_path = tf.name
+        self.db = init_database(self.temp_db_path)
         init_vision_comparisons_table(self.db)
 
     def tearDown(self):
         """Clean up."""
         self.db.close()
-        os.unlink(self.temp_file.name)
+        os.unlink(self.temp_db_path)
 
     def test_store_vision_comparison(self):
         """Test storing a vision comparison result."""
@@ -228,7 +229,7 @@ class TestVisionComparisonCache(unittest.TestCase):
             model_used='gemma3:27b'
         )
         self.assertTrue(result)
-        
+
         # Retrieve cached result
         cached = get_vision_comparison(self.db, 'cat_001', 'insta_001')
         self.assertIsNotNone(cached)
@@ -253,7 +254,7 @@ class TestVisionComparisonCache(unittest.TestCase):
             vision_score=0.5,
             model_used='gemma3:27b'
         )
-        
+
         # Store again with different result
         store_vision_comparison(
             self.db,
@@ -263,7 +264,7 @@ class TestVisionComparisonCache(unittest.TestCase):
             vision_score=1.0,
             model_used='gemma3:27b-cloud'
         )
-        
+
         # Should have updated result
         cached = get_vision_comparison(self.db, 'cat_001', 'insta_001')
         self.assertEqual(cached['result'], 'SAME')
@@ -292,14 +293,14 @@ class TestInstagramDumpMedia(unittest.TestCase):
 
     def setUp(self):
         """Create temporary database."""
-        self.temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.json')
-        self.temp_file.close()
-        self.db = init_database(self.temp_file.name)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.json') as tf:
+            self.temp_db_path = tf.name
+        self.db = init_database(self.temp_db_path)
 
     def tearDown(self):
         """Clean up."""
         self.db.close()
-        os.unlink(self.temp_file.name)
+        os.unlink(self.temp_db_path)
 
     def test_init_instagram_dump_table(self):
         """Test instagram_dump_media table initialization."""
@@ -314,7 +315,9 @@ class TestInstagramDumpMedia(unittest.TestCase):
     def test_store_instagram_dump_media(self):
         """Test storing Instagram dump media record."""
         from lightroom_tagger.core.database import (
-            init_instagram_dump_table, store_instagram_dump_media, get_instagram_dump_media
+            get_instagram_dump_media,
+            init_instagram_dump_table,
+            store_instagram_dump_media,
         )
 
         init_instagram_dump_table(self.db)
@@ -338,7 +341,10 @@ class TestInstagramDumpMedia(unittest.TestCase):
     def test_get_unprocessed_dump_media(self):
         """Test getting unprocessed media."""
         from lightroom_tagger.core.database import (
-            init_instagram_dump_table, store_instagram_dump_media, get_unprocessed_dump_media, mark_dump_media_processed
+            get_unprocessed_dump_media,
+            init_instagram_dump_table,
+            mark_dump_media_processed,
+            store_instagram_dump_media,
         )
 
         init_instagram_dump_table(self.db)
@@ -367,7 +373,10 @@ class TestInstagramDumpMedia(unittest.TestCase):
     def test_mark_dump_media_processed(self):
         """Test marking media as processed."""
         from lightroom_tagger.core.database import (
-            init_instagram_dump_table, store_instagram_dump_media, get_instagram_dump_media, mark_dump_media_processed
+            get_instagram_dump_media,
+            init_instagram_dump_table,
+            mark_dump_media_processed,
+            store_instagram_dump_media,
         )
 
         init_instagram_dump_table(self.db)
@@ -398,7 +407,9 @@ class TestInstagramDumpMedia(unittest.TestCase):
     def test_store_instagram_dump_media_idempotent(self):
         """Test that storing same media_key updates existing record."""
         from lightroom_tagger.core.database import (
-            init_instagram_dump_table, store_instagram_dump_media, get_instagram_dump_media
+            get_instagram_dump_media,
+            init_instagram_dump_table,
+            store_instagram_dump_media,
         )
 
         init_instagram_dump_table(self.db)
@@ -424,8 +435,10 @@ class TestInstagramDumpMedia(unittest.TestCase):
     def test_store_instagram_dump_media_with_hash(self):
         """Test storing media with image_hash."""
         from lightroom_tagger.core.database import (
-            init_instagram_dump_table, store_instagram_dump_media, get_instagram_dump_media,
-            get_dump_media_by_hash
+            get_dump_media_by_hash,
+            get_instagram_dump_media,
+            init_instagram_dump_table,
+            store_instagram_dump_media,
         )
 
         init_instagram_dump_table(self.db)
@@ -454,7 +467,8 @@ class TestInstagramDumpMedia(unittest.TestCase):
     def test_get_instagram_by_month_filter(self):
         """Test filtering Instagram images by month."""
         from lightroom_tagger.core.database import (
-            init_instagram_dump_table, store_instagram_dump_media
+            init_instagram_dump_table,
+            store_instagram_dump_media,
         )
 
         init_instagram_dump_table(self.db)

@@ -1,6 +1,7 @@
 """Tests for visual duplicate detection module."""
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from lightroom_tagger.instagram import deduplicator
 
 
@@ -14,9 +15,9 @@ class TestComputeImageHash(unittest.TestCase):
         mock_img = MagicMock()
         mock_open.return_value = mock_img
         mock_phash.return_value = 'abc123def456'
-        
+
         result = deduplicator.compute_image_hash('/test/image.jpg')
-        
+
         self.assertEqual(result, 'abc123def456')
         mock_open.assert_called_once_with('/test/image.jpg')
         mock_phash.assert_called_once_with(mock_img)
@@ -26,9 +27,9 @@ class TestComputeImageHash(unittest.TestCase):
     def test_compute_hash_file_not_found(self, mock_open):
         """Test hash computation when file doesn't exist."""
         mock_open.side_effect = FileNotFoundError("File not found")
-        
+
         result = deduplicator.compute_image_hash('/nonexistent.jpg')
-        
+
         self.assertIsNone(result)
 
 
@@ -43,14 +44,14 @@ class TestGroupByHash(unittest.TestCase):
             {'file_path': '/posts/202307/c.jpg', 'image_hash': 'hash2'},
             {'file_path': '/posts/202307/d.jpg', 'image_hash': None},  # No hash
         ]
-        
+
         groups = deduplicator.group_by_hash(media)
-        
+
         # Should have 3 groups: hash1, hash2, and one for no_hash
         self.assertEqual(len(groups), 3)
         self.assertEqual(len(groups['hash1']), 2)
         self.assertEqual(len(groups['hash2']), 1)
-        
+
         # Check hash1 group contains both files
         hash1_files = [m['file_path'] for m in groups['hash1']]
         self.assertIn('/posts/202307/a.jpg', hash1_files)
@@ -66,9 +67,9 @@ class TestSelectBestVersion(unittest.TestCase):
             {'file_path': '/archived_posts/202307/a.jpg', 'image_hash': 'hash1'},
             {'file_path': '/posts/202307/b.jpg', 'image_hash': 'hash1'},
         ]
-        
+
         best = deduplicator.select_best_version(group)
-        
+
         self.assertIn('/posts/', best['file_path'])
 
     def test_select_first_when_only_archived(self):
@@ -77,18 +78,18 @@ class TestSelectBestVersion(unittest.TestCase):
             {'file_path': '/archived_posts/202307/a.jpg', 'image_hash': 'hash1'},
             {'file_path': '/archived_posts/202307/b.jpg', 'image_hash': 'hash1'},
         ]
-        
+
         best = deduplicator.select_best_version(group)
-        
+
         # Should pick first one
         self.assertEqual(best['file_path'], '/archived_posts/202307/a.jpg')
 
     def test_single_item_returns_itself(self):
         """Test that single item is returned as-is."""
         group = [{'file_path': '/posts/202307/a.jpg', 'image_hash': 'hash1'}]
-        
+
         best = deduplicator.select_best_version(group)
-        
+
         self.assertEqual(best['file_path'], '/posts/202307/a.jpg')
 
 
@@ -123,9 +124,9 @@ class TestMergeExifData(unittest.TestCase):
                 'exif_latitude': 40.7128,
             }
         ]
-        
+
         merged = deduplicator.merge_exif_data(best, duplicates)
-        
+
         self.assertEqual(merged['exif_data']['date_time_original'], '2023-07-15 10:30:00')
         self.assertEqual(merged['exif_latitude'], 40.7128)
 
@@ -142,9 +143,9 @@ class TestMergeExifData(unittest.TestCase):
                 'exif_data': {'date_time_original': '2023-07-15 10:30:00'},
             }
         ]
-        
+
         merged = deduplicator.merge_exif_data(best, duplicates)
-        
+
         # Should keep posts version
         self.assertEqual(merged['exif_data']['date_time_original'], '2023-07-15 12:00:00')
 
@@ -158,24 +159,24 @@ class TestDeduplicateMedia(unittest.TestCase):
         # Mock the result of compute_image_hashes
         media_files = [
             {'file_path': '/posts/202307/a.jpg', 'media_key': '202307/a'},
-            {'file_path': '/archived_posts/202307/b.jpg', 'media_key': '202307/b', 
+            {'file_path': '/archived_posts/202307/b.jpg', 'media_key': '202307/b',
              'exif_data': {'date': '2023-07-15'}},
             {'file_path': '/posts/202307/c.jpg', 'media_key': '202307/c'},
         ]
-        
+
         # Return files with pre-computed hashes
         mock_compute_hashes.return_value = [
             {'file_path': '/posts/202307/a.jpg', 'media_key': '202307/a', 'image_hash': 'hash1'},
-            {'file_path': '/archived_posts/202307/b.jpg', 'media_key': '202307/b', 
+            {'file_path': '/archived_posts/202307/b.jpg', 'media_key': '202307/b',
              'exif_data': {'date': '2023-07-15'}, 'image_hash': 'hash1'},
             {'file_path': '/posts/202307/c.jpg', 'media_key': '202307/c', 'image_hash': 'hash2'},
         ]
-        
+
         result = deduplicator.deduplicate_media(media_files)
-        
+
         # Should have 2 unique images
         self.assertEqual(len(result), 2)
-        
+
         # Check that posts version of hash1 was kept with EXIF merged
         hash1_results = [r for r in result if r.get('image_hash') == 'hash1']
         self.assertEqual(len(hash1_results), 1)

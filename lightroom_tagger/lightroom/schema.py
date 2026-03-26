@@ -1,10 +1,8 @@
-import sqlite3
 import json
+import sqlite3
 from pathlib import Path
-from typing import Any
 
 from lightroom_tagger.core.config import load_config
-
 
 KEY_TABLES = [
     "Adobe_images",
@@ -77,7 +75,7 @@ def export_schema_json(schema: dict, output_path: str):
 def print_schema_summary(schema: dict):
     """Print a human-readable summary of the schema."""
     print(f"Catalog: {schema.get('catalog_path', 'N/A')}")
-    print(f"\nKey Tables Found:")
+    print("\nKey Tables Found:")
     print("-" * 60)
 
     tables = schema.get("tables", {})

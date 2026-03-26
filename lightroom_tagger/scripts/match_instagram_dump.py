@@ -7,20 +7,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from lightroom_tagger.core.analyzer import compute_phash
+from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import (
+    get_instagram_by_date_filter,
+    get_unprocessed_dump_media,
+    init_catalog_table,
     init_database,
     init_instagram_dump_table,
-    init_catalog_table,
-    get_unprocessed_dump_media,
     mark_dump_media_processed,
     update_instagram_status,
-    get_instagram_by_date_filter,
 )
 from lightroom_tagger.core.matcher import find_candidates_by_date, score_candidates_with_vision
-from lightroom_tagger.core.analyzer import compute_phash
 from lightroom_tagger.core.path_utils import resolve_catalog_path
-from lightroom_tagger.core.config import load_config
-from lightroom_tagger.lightroom.writer import update_lightroom_from_matches
 
 
 def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
@@ -90,7 +89,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             try:
                 phash = compute_phash(dump_image['local_path'])
                 dump_image['image_hash'] = phash
-            except:
+            except Exception:
                 pass
 
         # Prepare candidates for vision comparison

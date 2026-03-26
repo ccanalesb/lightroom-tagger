@@ -1,5 +1,4 @@
 import sqlite3
-from typing import Optional
 from pathlib import Path
 
 
@@ -10,7 +9,7 @@ def connect_catalog(catalog_path: str) -> sqlite3.Connection:
     return conn
 
 
-def get_keyword_id(conn: sqlite3.Connection, keyword_name: str) -> Optional[int]:
+def get_keyword_id(conn: sqlite3.Connection, keyword_name: str) -> int | None:
     """Get keyword ID by name."""
     cursor = conn.cursor()
     cursor.execute(
@@ -28,14 +27,14 @@ def keyword_exists(conn: sqlite3.Connection, keyword_name: str) -> bool:
 
 def create_keyword(conn: sqlite3.Connection, keyword_name: str) -> int:
     """Create a new keyword in the catalog.
-    
+
     Returns:
         Keyword ID
     """
     cursor = conn.cursor()
     cursor.execute(
-        """INSERT INTO AgLibraryKeyword 
-           (id_global, name, lc_name, dateCreated, keywordType) 
+        """INSERT INTO AgLibraryKeyword
+           (id_global, name, lc_name, dateCreated, keywordType)
            VALUES (?, ?, ?, datetime('now'), 0)""",
         (keyword_name.lower(), keyword_name, keyword_name.lower())
     )
@@ -45,7 +44,7 @@ def create_keyword(conn: sqlite3.Connection, keyword_name: str) -> int:
 
 def get_or_create_keyword(conn: sqlite3.Connection, keyword_name: str) -> int:
     """Get existing keyword ID or create new one.
-    
+
     Returns:
         Keyword ID
     """
@@ -55,21 +54,21 @@ def get_or_create_keyword(conn: sqlite3.Connection, keyword_name: str) -> int:
     return create_keyword(conn, keyword_name)
 
 
-def get_image_local_id(conn: sqlite3.Connection, image_key: str) -> Optional[int]:
+def get_image_local_id(conn: sqlite3.Connection, image_key: str) -> int | None:
     """Get Adobe_images.id_local from our key (date_taken_filename format).
-    
+
     NOTE: AgLibraryKeywordImage.image references Adobe_images.id_local,
     NOT AgLibraryFile.id_local. We must join to get the correct ID.
-    
+
     Args:
         conn: Database connection
         image_key: Key in format "YYYY-MM-DD_filename.ext" or just "filename.ext"
-    
+
     Returns:
         Adobe_images.id_local or None if not found
     """
     cursor = conn.cursor()
-    
+
     # Extract filename - handle formats like "2026-01-15_L1007168.JPG" or "L1007168.DNG"
     filename = image_key
     if '_' in image_key:
@@ -77,7 +76,7 @@ def get_image_local_id(conn: sqlite3.Connection, image_key: str) -> Optional[int
     # Remove extension to get baseName
     if '.' in filename:
         filename = filename.rsplit('.', 1)[0]
-    
+
     # CRITICAL FIX: Join AgLibraryFile -> Adobe_images to get correct ID
     # AgLibraryKeywordImage.image references Adobe_images.id_local, not file ID
     cursor.execute("""
@@ -86,7 +85,7 @@ def get_image_local_id(conn: sqlite3.Connection, image_key: str) -> Optional[int
         JOIN Adobe_images ai ON ai.rootFile = f.id_local
         WHERE f.baseName = ?
     """, (filename,))
-    
+
     row = cursor.fetchone()
     return row[0] if row else None
 
@@ -95,7 +94,7 @@ def image_has_keyword(conn: sqlite3.Connection, image_id: int, keyword_id: int) 
     """Check if image already has this keyword."""
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT COUNT(*) FROM AgLibraryKeywordImage 
+        SELECT COUNT(*) FROM AgLibraryKeywordImage
         WHERE image = ? AND tag = ?
     """, (image_id, keyword_id))
     return cursor.fetchone()[0] > 0
@@ -103,13 +102,13 @@ def image_has_keyword(conn: sqlite3.Connection, image_id: int, keyword_id: int) 
 
 def add_keyword_to_image(conn: sqlite3.Connection, image_id: int, keyword_id: int) -> bool:
     """Add a keyword to an image.
-    
+
     Returns:
         True if added, False if already existed
     """
     if image_has_keyword(conn, image_id, keyword_id):
         return False
-    
+
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO AgLibraryKeywordImage (image, tag)
@@ -121,7 +120,7 @@ def add_keyword_to_image(conn: sqlite3.Connection, image_id: int, keyword_id: in
 
 def add_keyword_by_key(conn: sqlite3.Connection, image_key: str, keyword_name: str) -> bool:
     """Add keyword to image by our key format.
-    
+
     Returns:
         True if added, False if already existed or error
     """
@@ -129,22 +128,22 @@ def add_keyword_by_key(conn: sqlite3.Connection, image_key: str, keyword_name: s
     if not image_id:
         print(f"  Warning: Could not find image for key: {image_key}")
         return False
-    
+
     keyword_id = get_or_create_keyword(conn, keyword_name)
     return add_keyword_to_image(conn, image_id, keyword_id)
 
 
-def add_keyword_to_images_batch(conn: sqlite3.Connection, image_keys: list[str], 
+def add_keyword_to_images_batch(conn: sqlite3.Connection, image_keys: list[str],
                                 keyword_name: str, dry_run: bool = False) -> dict:
     """Add keyword to multiple images.
-    
+
     Returns:
         dict with 'added', 'skipped', 'errors' counts
     """
     result = {'added': 0, 'skipped': 0, 'errors': 0}
-    
+
     keyword_id = get_or_create_keyword(conn, keyword_name)
-    
+
     for image_key in image_keys:
         try:
             image_id = get_image_local_id(conn, image_key)
@@ -152,7 +151,7 @@ def add_keyword_to_images_batch(conn: sqlite3.Connection, image_keys: list[str],
                 result['errors'] += 1
                 print(f"  Error: Image not found: {image_key}")
                 continue
-            
+
             if dry_run:
                 if image_has_keyword(conn, image_id, keyword_id):
                     result['skipped'] += 1
@@ -166,36 +165,36 @@ def add_keyword_to_images_batch(conn: sqlite3.Connection, image_keys: list[str],
         except Exception as e:
             result['errors'] += 1
             print(f"  Error adding keyword to {image_key}: {e}")
-    
+
     return result
 
 
 if __name__ == "__main__":
     import sys
-    from lightroom_tagger.config import load_config
-    
+
+
     if len(sys.argv) < 3:
         print("Usage: python lr_writer.py <catalog_path> <keyword> [image_key]")
         sys.exit(1)
-    
+
     catalog_path = sys.argv[1]
     keyword = sys.argv[2]
     image_key = sys.argv[3] if len(sys.argv) > 3 else None
-    
+
     if not Path(catalog_path).exists():
         print(f"Error: Catalog not found: {catalog_path}")
         sys.exit(1)
-    
+
     conn = connect_catalog(catalog_path)
-    
+
     if image_key:
         success = add_keyword_by_key(conn, image_key, keyword)
         print(f"Keyword '{keyword}' {'added' if success else 'already exists'} for {image_key}")
     else:
         keyword_id = get_or_create_keyword(conn, keyword)
         print(f"Keyword '{keyword}' has ID: {keyword_id}")
-        
+
         exists = keyword_exists(conn, keyword)
         print(f"Keyword exists: {exists}")
-    
+
     conn.close()

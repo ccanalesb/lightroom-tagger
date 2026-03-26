@@ -1,5 +1,6 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
+
 from lightroom_tagger.instagram.scraper import (
     InstagramPost,
     get_session_headers,
@@ -27,9 +28,9 @@ class TestInstagramScraper(unittest.TestCase):
         """Test session headers generation."""
         mock_config = MagicMock()
         mock_config.instagram_session_id = 'test_session_123'
-        
+
         headers = get_session_headers(mock_config)
-        
+
         self.assertIn('User-Agent', headers)
         self.assertIn('Cookie', headers)
         self.assertIn('test_session_123', headers['Cookie'])

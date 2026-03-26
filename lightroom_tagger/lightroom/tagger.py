@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Lightroom Tagger - Index Lightroom catalog metadata to TinyDB."""
 
-import sys
 from lightroom_tagger.core.cli import main as cli_main
 
 

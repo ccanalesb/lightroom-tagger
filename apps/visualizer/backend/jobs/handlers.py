@@ -1,17 +1,14 @@
 """Job type handlers for vision matching and catalog operations."""
-import sys
 import os
 from pathlib import Path
 
-# Add project root to Python path
-# Project root is where library.db and lightroom_tagger/ package are located
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
-sys.path.insert(0, _PROJECT_ROOT)
-
 from tinydb import Query
-from lightroom_tagger.core.database import init_database
+
 from lightroom_tagger.core.config import load_config
+from lightroom_tagger.core.database import init_database
 from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
+
+from . import path_setup as _path_setup  # noqa: F401
 
 
 def handle_analyze_instagram(runner, job_id: str, metadata: dict):
@@ -137,11 +134,16 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
 
 def handle_enrich_catalog(runner, job_id: str, metadata: dict):
     """Enrich catalog with metadata."""
-    from lightroom_tagger.core.database import init_database, get_catalog_images_needing_analysis, init_catalog_table
-    from lightroom_tagger.core.vision_cache import get_or_create_cached_image
-    from lightroom_tagger.core.config import load_config
-    from lightroom_tagger.core.analyzer import analyze_image
     import os
+
+    from lightroom_tagger.core.analyzer import analyze_image
+    from lightroom_tagger.core.config import load_config
+    from lightroom_tagger.core.database import (
+        get_catalog_images_needing_analysis,
+        init_catalog_table,
+        init_database,
+    )
+    from lightroom_tagger.core.vision_cache import get_or_create_cached_image
 
     runner.update_progress(job_id, 10, 'Initializing enrichment...')
 
@@ -236,10 +238,15 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
     This job compresses catalog images once and stores them in the vision cache,
     eliminating redundant compression during vision matching runs.
     """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    from lightroom_tagger.core.database import init_database, get_cache_stats, get_all_catalog_images
-    from lightroom_tagger.core.vision_cache import get_or_create_cached_image
     import time
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    from lightroom_tagger.core.database import (
+        get_all_catalog_images,
+        get_cache_stats,
+        init_database,
+    )
+    from lightroom_tagger.core.vision_cache import get_or_create_cached_image
 
     runner.update_progress(job_id, 5, 'Initializing cache preparation...')
 

@@ -82,7 +82,6 @@ export function MatchingPage() {
 
   // Cache status
   const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null);
-  const [cacheLoading, setCacheLoading] = useState(false);
   const [isPreparingCache, setIsPreparingCache] = useState(false);
   const [cacheJob, setCacheJob] = useState<Job | null>(null);
 
@@ -264,7 +263,7 @@ export function MatchingPage() {
 
   // Cache status display
   const renderCacheStatus = () => {
-    if (cacheLoading || !cacheStatus) {
+    if (isPreparingCache || !cacheStatus) {
       return (
         <div className="text-xs text-gray-500">{CACHE_STATUS_LOADING}</div>
       );
@@ -285,7 +284,7 @@ export function MatchingPage() {
         </span>
         <button
           onClick={fetchCacheStatus}
-          disabled={cacheLoading}
+          disabled={isPreparingCache}
           className="text-xs text-blue-600 hover:text-blue-800 underline ml-2"
         >
           {CACHE_REFRESH_BUTTON}

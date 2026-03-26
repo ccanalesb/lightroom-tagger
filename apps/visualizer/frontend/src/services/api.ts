@@ -28,6 +28,7 @@ export const JobsAPI = {
   get: (id: string) =>
     request<Job>(`/jobs/${id}`),
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   create: (type: string, metadata?: Record<string, any>) =>
     request<Job>('/jobs/', {
       method: 'POST',

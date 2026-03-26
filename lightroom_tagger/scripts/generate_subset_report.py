@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Generate HTML report for subset matching validation."""
 
-import json
 import base64
-from pathlib import Path
-from PIL import Image
 import io
+import json
+from pathlib import Path
+
+from PIL import Image
 
 
 def image_to_base64(path: str, max_size: int = 400) -> str:
@@ -18,17 +19,17 @@ def image_to_base64(path: str, max_size: int = 400) -> str:
         else:
             print(f"JPG not found for {path}")
             return ""
-    
+
     try:
         with Image.open(path) as img:
             if img.width > max_size or img.height > max_size:
                 ratio = max_size / max(img.width, img.height)
                 new_size = (int(img.width * ratio), int(img.height * ratio))
                 img = img.resize(new_size, Image.Resampling.LANCZOS)
-            
+
             if img.mode in ('RGBA', 'LA', 'P'):
                 img = img.convert('RGB')
-            
+
             buffer = io.BytesIO()
             img.save(buffer, format='JPEG', quality=85)
             img_str = base64.b64encode(buffer.getvalue()).decode()
@@ -38,13 +39,13 @@ def image_to_base64(path: str, max_size: int = 400) -> str:
         return ""
 
 
-def generate_html_report(results_file: str = 'vision_subset_results.json', 
+def generate_html_report(results_file: str = 'vision_subset_results.json',
                          output_file: str = 'subset_validation_report.html'):
     """Generate HTML report with side-by-side comparisons."""
-    
-    with open(results_file, 'r') as f:
+
+    with open(results_file) as f:
         results = json.load(f)
-    
+
     html_parts = [
         '<!DOCTYPE html>',
         '<html>',
@@ -73,35 +74,35 @@ def generate_html_report(results_file: str = 'vision_subset_results.json',
         '<body>',
         '    <h1>Vision Matching Subset Validation</h1>',
     ]
-    
+
     total = len(results)
     same_count = sum(1 for data in results.values() if data['top_matches'] and data['top_matches'][0]['vision_result'] == 'SAME')
     uncertain_count = sum(1 for data in results.values() if data['top_matches'] and data['top_matches'][0]['vision_result'] == 'UNCERTAIN')
     different_count = sum(1 for data in results.values() if data['top_matches'] and data['top_matches'][0]['vision_result'] == 'DIFFERENT')
-    
+
     html_parts.append(f'    <p>Total: {total} | SAME: {same_count} | UNCERTAIN: {uncertain_count} | DIFFERENT: {different_count}</p>')
-    
-    for insta_key, data in results.items():
+
+    for _insta_key, data in results.items():
         insta_img = data['insta_image']
         top_matches = data['top_matches']
-        
+
         if not top_matches:
             continue
-        
+
         best_match = top_matches[0]
         result = best_match['vision_result']
-        
+
         if result == 'SAME':
             badge_class = 'score-same'
         elif result == 'UNCERTAIN':
             badge_class = 'score-uncertain'
         else:
             badge_class = 'score-different'
-        
+
         html_parts.append('<div class="match-card">')
         html_parts.append(f'    <div class="match-title">{insta_img.get("instagram_folder")}/{insta_img.get("filename")}</div>')
         html_parts.append('    <div class="comparison">')
-        
+
         # Instagram image
         insta_path = insta_img.get('local_path', '')
         insta_b64 = image_to_base64(insta_path)
@@ -109,7 +110,7 @@ def generate_html_report(results_file: str = 'vision_subset_results.json',
         html_parts.append(f'            <img src="{insta_b64}" alt="Instagram">')
         html_parts.append('            <div class="image-label">Instagram</div>')
         html_parts.append('        </div>')
-        
+
         # Best catalog match
         catalog_path = best_match.get('catalog_path', '')
         catalog_b64 = image_to_base64(catalog_path, max_size=400)
@@ -117,15 +118,15 @@ def generate_html_report(results_file: str = 'vision_subset_results.json',
         html_parts.append(f'            <img src="{catalog_b64}" alt="Catalog">')
         html_parts.append(f'            <div class="image-label">{best_match.get("catalog_key", "Unknown")}</div>')
         html_parts.append('        </div>')
-        
+
         html_parts.append('    </div>')
-        
+
         # Match info
         html_parts.append('    <div class="match-info">')
         html_parts.append(f'        <span class="score-badge {badge_class}">{result}</span>')
         html_parts.append(f'        <span style="margin-left: 10px;">Score: {best_match.get("vision_score", 0)}</span>')
         html_parts.append('    </div>')
-        
+
         # All matches
         if len(top_matches) > 1:
             html_parts.append('    <div class="top-matches">')
@@ -140,24 +141,24 @@ def generate_html_report(results_file: str = 'vision_subset_results.json',
                     match_class = 'score-uncertain'
                 else:
                     match_class = 'score-different'
-                
-                html_parts.append(f'        <div class="top-match">')
+
+                html_parts.append('        <div class="top-match">')
                 html_parts.append(f'            <div>#{j} {match.get("catalog_key")}</div>')
                 html_parts.append(f'            <img src="{match_b64}" alt="Match {j}">')
                 html_parts.append(f'            <div><span class="score-badge {match_class}">{match_result}</span></div>')
                 html_parts.append('        </div>')
             html_parts.append('    </div>')
-        
+
         html_parts.append('</div>')
-    
+
     html_parts.extend([
         '</body>',
         '</html>',
     ])
-    
+
     with open(output_file, 'w') as f:
         f.write('\n'.join(html_parts))
-    
+
     print(f"✓ Report generated: {output_file}")
     print(f"  Open in browser: file://{Path(output_file).absolute()}")
 

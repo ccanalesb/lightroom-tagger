@@ -1,14 +1,14 @@
-import pytest
+import importlib
 import os
 import tempfile
-import importlib
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
+
 from lightroom_tagger.core.analyzer import (
-    analyze_image, 
-    describe_image, 
+    analyze_image,
     compare_with_vision,
     compress_image,
-    vision_score
+    describe_image,
+    vision_score,
 )
 
 
@@ -17,9 +17,9 @@ def test_analyze_image_returns_all_signals():
     with patch('lightroom_tagger.core.analyzer.compute_phash', return_value='a1b2c3d4e5f6g7h8'), \
          patch('lightroom_tagger.core.analyzer.extract_exif', return_value={'camera': 'Canon EOS R5'}), \
          patch('lightroom_tagger.core.analyzer.describe_image', return_value='A sunset photo'):
-        
+
         result = analyze_image('/fake/path.jpg')
-    
+
     assert result['phash'] == 'a1b2c3d4e5f6g7h8'
     assert result['exif']['camera'] == 'Canon EOS R5'
     assert result['description'] == 'A sunset photo'
@@ -29,11 +29,11 @@ def test_describe_image_uses_configured_agent():
     """Should use local or external agent based on config."""
     with patch('lightroom_tagger.core.analyzer.run_local_agent', return_value='local desc') as local_mock, \
          patch('lightroom_tagger.core.analyzer.run_external_agent', return_value='external desc') as ext_mock:
-        
+
         # Test local agent
         describe_image('/fake/path.jpg', agent_type='local')
         local_mock.assert_called_once()
-        
+
         # Test external agent
         describe_image('/fake/path.jpg', agent_type='external')
         ext_mock.assert_called_once()
@@ -44,17 +44,16 @@ def test_compare_with_vision_returns_result():
     with patch('lightroom_tagger.core.analyzer.compress_image', side_effect=lambda x: x), \
          patch('lightroom_tagger.core.analyzer.get_viewable_path', side_effect=lambda x: x), \
          patch('lightroom_tagger.core.analyzer.run_vision_ollama', return_value='SAME'):
-        
+
         result = compare_with_vision('/tmp/local.jpg', '/tmp/insta.jpg')
-    
+
     assert result in ['SAME', 'DIFFERENT', 'UNCERTAIN']
     assert result == 'SAME'
 
 
 def test_vision_score_converts_correctly():
     """Vision score should convert result to float."""
-    from lightroom_tagger.core.analyzer import vision_score
-    
+
     assert vision_score('SAME') == 1.0
     assert vision_score('DIFFERENT') == 0.0
     assert vision_score('UNCERTAIN') == 0.5
@@ -66,25 +65,25 @@ def test_compress_image_creates_temp_file():
     from PIL import Image
     fd, test_path = tempfile.mkstemp(suffix='.png')
     os.close(fd)
-    
+
     try:
         # Create a 2000x2000 PNG image
         img = Image.new('RGB', (2000, 2000), color='red')
         img.save(test_path, 'PNG')
-        
+
         # Compress it
         compressed_path = compress_image(test_path, max_size=(500, 500), quality=80)
-        
+
         # Verify it created a temp file
         assert compressed_path != test_path
         assert compressed_path.endswith('.jpg')
         assert os.path.exists(compressed_path)
-        
+
         # Verify it was resized
         with Image.open(compressed_path) as compressed:
             assert compressed.width <= 500
             assert compressed.height <= 500
-        
+
         # Cleanup
         if compressed_path != test_path and os.path.exists(compressed_path):
             os.unlink(compressed_path)
@@ -98,18 +97,18 @@ def test_compress_image_handles_rgba():
     from PIL import Image
     fd, test_path = tempfile.mkstemp(suffix='.png')
     os.close(fd)
-    
+
     try:
         # Create an RGBA image
         img = Image.new('RGBA', (100, 100), color=(255, 0, 0, 128))
         img.save(test_path, 'PNG')
-        
+
         compressed_path = compress_image(test_path)
-        
+
         # Verify it saved as JPEG (RGB)
         with Image.open(compressed_path) as compressed:
             assert compressed.mode == 'RGB'
-        
+
         # Cleanup
         if compressed_path != test_path and os.path.exists(compressed_path):
             os.unlink(compressed_path)
@@ -121,36 +120,36 @@ def test_compress_image_handles_rgba():
 def test_compare_with_vision_uses_compression():
     """Vision comparison should compress images before sending to model."""
     from PIL import Image
-    
+
     # Create test images
     fd1, local_path = tempfile.mkstemp(suffix='.jpg')
     os.close(fd1)
     fd2, insta_path = tempfile.mkstemp(suffix='.jpg')
     os.close(fd2)
-    
+
     try:
         # Create small test images
         img = Image.new('RGB', (100, 100), color='blue')
         img.save(local_path)
         img.save(insta_path)
-        
+
         compressed_paths = []
-        
+
         def track_compress(path):
             result = compress_image(path)
             compressed_paths.append(result)
             return result
-        
+
         with patch('lightroom_tagger.core.analyzer.get_viewable_path', side_effect=lambda x: x), \
              patch('lightroom_tagger.core.analyzer.compress_image', side_effect=track_compress), \
              patch('lightroom_tagger.core.analyzer.run_vision_ollama', return_value='SAME'):
-            
+
             result = compare_with_vision(local_path, insta_path)
-        
+
         # Should have compressed both images
         assert len(compressed_paths) == 2
         assert result == 'SAME'
-        
+
     finally:
         if os.path.exists(local_path):
             os.unlink(local_path)
@@ -163,34 +162,33 @@ def test_compare_with_vision_cleans_up_temp_files():
     with patch('lightroom_tagger.core.analyzer.compress_image', side_effect=lambda x: x), \
          patch('lightroom_tagger.core.analyzer.get_viewable_path', side_effect=lambda x: x), \
          patch('lightroom_tagger.core.analyzer.run_vision_ollama', return_value='SAME'):
-        
+
         # Track temp files in a real scenario
         # This test verifies the cleanup logic runs without error
         result = compare_with_vision('/tmp/local.jpg', '/tmp/insta.jpg')
-        
+
         assert result == 'SAME'
 
 
 def test_vision_config_environment_variables():
     """Vision compression should respect environment variables."""
     import lightroom_tagger.core.analyzer as analyzer_module
-    import importlib
-    
+
     # Test default values
     assert analyzer_module.VISION_MAX_DIMENSION == 1024
     assert analyzer_module.VISION_COMPRESS_QUALITY == 80
-    
+
     # Test custom values via env vars
     original_dim = os.environ.get('VISION_MAX_DIMENSION')
     original_qual = os.environ.get('VISION_COMPRESS_QUALITY')
-    
+
     try:
         os.environ['VISION_MAX_DIMENSION'] = '2048'
         os.environ['VISION_COMPRESS_QUALITY'] = '90'
-        
+
         # Reimport to pick up new values
         importlib.reload(analyzer_module)
-        
+
         assert analyzer_module.VISION_MAX_DIMENSION == 2048
         assert analyzer_module.VISION_COMPRESS_QUALITY == 90
     finally:
@@ -199,11 +197,11 @@ def test_vision_config_environment_variables():
             os.environ['VISION_MAX_DIMENSION'] = original_dim
         else:
             os.environ.pop('VISION_MAX_DIMENSION', None)
-        
+
         if original_qual is not None:
             os.environ['VISION_COMPRESS_QUALITY'] = original_qual
         else:
             os.environ.pop('VISION_COMPRESS_QUALITY', None)
-        
+
         # Reload again to restore
         importlib.reload(analyzer_module)

@@ -1,28 +1,30 @@
 import argparse
-import json
 import csv
-import sys
+import json
 import subprocess
+import sys
 from pathlib import Path
 
 from lightroom_tagger.core.config import load_config
-from lightroom_tagger.lightroom.reader import connect_catalog, get_image_records, get_image_count
 from lightroom_tagger.core.database import (
+    batch_update_hashes,
+    get_all_images,
+    get_images_without_hash,
     init_database,
-    store_images_batch,
-    get_image_count as db_get_image_count,
+    search_by_color_label,
+    search_by_date,
     search_by_keyword,
     search_by_rating,
-    search_by_date,
-    search_by_color_label,
-    get_all_images,
+    store_images_batch,
     update_instagram_status,
-    get_images_without_hash,
-    batch_update_hashes,
 )
-from lightroom_tagger.instagram.scraper import crawl_instagram
+from lightroom_tagger.core.database import (
+    get_image_count as db_get_image_count,
+)
 from lightroom_tagger.core.hasher import compute_phash
 from lightroom_tagger.core.phash import find_matches
+from lightroom_tagger.instagram.scraper import crawl_instagram
+from lightroom_tagger.lightroom.reader import connect_catalog, get_image_count, get_image_records
 from lightroom_tagger.lightroom.writer import add_keyword_to_images_batch
 
 
@@ -336,13 +338,12 @@ def cmd_export(args, config):
         if output_format == "json":
             with open(output_path, "w") as f:
                 json.dump(results, f, indent=2)
-        elif output_format == "csv":
-            if results:
-                fieldnames = list(results[0].keys())
-                with open(output_path, "w", newline="") as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    writer.writerows(results)
+        elif output_format == "csv" and results:
+            fieldnames = list(results[0].keys())
+            with open(output_path, "w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(results)
 
         print(f"Exported {len(results)} images to {output_path}")
         return 0
@@ -410,7 +411,7 @@ def cmd_stats(args, config):
 def cmd_instagram_sync(args, config):
     """Sync Instagram posts with local catalog."""
     db_path = args.db or config.db_path
-    
+
     if not db_path:
         print("Error: No database path provided. Use --db or config.yaml")
         return 1
@@ -439,7 +440,7 @@ def cmd_instagram_sync(args, config):
 
     if use_browser:
         from lightroom_tagger.instagram.browser import BrowserAgent
-        
+
         if do_login:
             print("Opening headed browser for Instagram login...")
             print("(A browser window will appear)")
@@ -448,7 +449,7 @@ def cmd_instagram_sync(args, config):
             print("The system will wait for the browser to close...")
             agent = BrowserAgent(output_dir, headed=True, session_name="instagram")
             agent.login(instagram_url)
-            
+
             # Wait for browser to be closed by user
             import time
             while True:
@@ -460,7 +461,7 @@ def cmd_instagram_sync(args, config):
                 )
                 if result.returncode != 0:
                     break
-            
+
             print("Browser closed. Verifying session...")
             agent2 = BrowserAgent(output_dir, session_name="instagram")
             if agent2.is_logged_in():
@@ -484,7 +485,7 @@ def cmd_instagram_sync(args, config):
 
         username = instagram_url.split('/')[-2] if '/' in instagram_url else instagram_url
         print("Using browser-based scraping...")
-        
+
         try:
             from lightroom_tagger.instagram.browser import crawl_instagram_browser
             posts, url_to_path = crawl_instagram_browser(username, output_dir, limit or 50, session_name="instagram")
@@ -498,13 +499,13 @@ def cmd_instagram_sync(args, config):
 
     try:
         db = init_database(db_path)
-        
+
         print("Step 1: Computing hashes for local images...")
         local_images = get_all_images(db)
-        
+
         images_needing_hash = get_images_without_hash(db)
         print(f"  {len(images_needing_hash)} images need hashes")
-        
+
         hash_updates = []
         for record in images_needing_hash:
             filepath = record.get('filepath')
@@ -512,23 +513,23 @@ def cmd_instagram_sync(args, config):
                 image_hash = compute_phash(filepath)
                 if image_hash:
                     hash_updates.append({'key': record['key'], 'image_hash': image_hash})
-        
+
         if hash_updates:
             batch_update_hashes(db, hash_updates)
             print(f"  Computed {len(hash_updates)} hashes")
-        
+
         local_images = get_all_images(db)
         local_with_hash = [img for img in local_images if img.get('image_hash')]
         print(f"  Total images with hash: {len(local_with_hash)}")
-        
+
         print("\nStep 2: Crawling Instagram...")
-        
+
         if not posts:
             print("No Instagram posts found!")
             return 1
-        
+
         insta_images = []
-        for i, post in enumerate(posts):
+        for _i, post in enumerate(posts):
             local_path = url_to_path.get(post.image_url)
             if local_path:
                 image_hash = compute_phash(local_path)
@@ -538,52 +539,52 @@ def cmd_instagram_sync(args, config):
                     'image_hash': image_hash,
                     'index': post.index,
                 })
-        
+
         print(f"  Found {len(insta_images)} Instagram images with hashes")
-        
+
         print("\nStep 3: Finding matches...")
         matches = find_matches(local_with_hash, insta_images, threshold)
         print(f"  Found {len(matches)} matches")
-        
+
         if not matches:
             print("\nNo matches found!")
             return 0
-        
+
         print("\nMatches found:")
         for match in matches[:10]:
             print(f"  {match['local_key']} <-> {match['insta_url']} (distance: {match['hash_distance']})")
         if len(matches) > 10:
             print(f"  ... and {len(matches) - 10} more")
-        
+
         print(f"\nStep 4: {'Preview' if dry_run else 'Applying'} changes...")
-        
+
         matched_keys = [m['local_key'] for m in matches]
-        
+
         for match in matches:
             if dry_run:
                 print(f"  Would mark as posted: {match['local_key']}")
             else:
                 update_instagram_status(
-                    db, 
+                    db,
                     match['local_key'],
                     posted=True,
                     url=match['insta_url']
                 )
-        
+
         print(f"  Updated {len(matched_keys)} records in database")
-        
+
         if catalog_path and Path(catalog_path).exists():
             print(f"\nStep 5: Adding keyword '{keyword}' to Lightroom...")
             result = add_keyword_to_images_batch(
-                connect_catalog(catalog_path), 
-                matched_keys, 
-                keyword, 
+                connect_catalog(catalog_path),
+                matched_keys,
+                keyword,
                 dry_run=dry_run
             )
             print(f"  Added: {result['added']}, Skipped: {result['skipped']}, Errors: {result['errors']}")
-        
+
         db.close()
-        
+
         print(f"\n{'Done!' if dry_run else 'Complete!'}")
         return 0
 

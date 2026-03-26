@@ -1,16 +1,14 @@
-from flask import Blueprint, jsonify, current_app
-from tinydb import TinyDB
 import os
-import sys
-import config
 import subprocess
+import sys
+
+import config
+from flask import Blueprint, jsonify
+from tinydb import TinyDB
 
 # Add project root for lightroom_tagger imports
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 sys.path.insert(0, _PROJECT_ROOT)
-
-# Import lightroom_tagger config for project-specific settings
-from lightroom_tagger.core.config import load_config as load_lt_config
 
 bp = Blueprint('system', __name__)
 
@@ -54,7 +52,7 @@ def get_vision_models():
             'fallback': False
         })
 
-    except Exception as e:
+    except Exception:
         return jsonify({
             'models': [
                 {'name': 'gemma3:27b', 'default': True},
@@ -95,13 +93,14 @@ def get_stats():
 def get_cache_status():
     """Get vision cache status."""
     try:
+        from lightroom_tagger.core.config import load_config as load_lt_config
+        from lightroom_tagger.core.database import get_cache_stats
+
         db_path = config.LIBRARY_DB
         if not os.path.exists(db_path):
             return jsonify({'error': 'Library database not found'}), 404
 
         db = TinyDB(db_path)
-
-        from lightroom_tagger.core.database import get_cache_stats
 
         cache_stats = get_cache_stats(db)
 

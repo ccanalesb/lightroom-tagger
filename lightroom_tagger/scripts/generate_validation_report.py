@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Generate HTML report for vision matching validation."""
 
-import json
 import base64
-from pathlib import Path
-from PIL import Image
 import io
+import json
+from pathlib import Path
+
+from PIL import Image
 
 
 def image_to_base64(path: str, max_size: int = 400) -> str:
@@ -16,10 +17,10 @@ def image_to_base64(path: str, max_size: int = 400) -> str:
                 ratio = max_size / max(img.width, img.height)
                 new_size = (int(img.width * ratio), int(img.height * ratio))
                 img = img.resize(new_size, Image.Resampling.LANCZOS)
-            
+
             if img.mode in ('RGBA', 'LA', 'P'):
                 img = img.convert('RGB')
-            
+
             buffer = io.BytesIO()
             img.save(buffer, format='JPEG', quality=85)
             img_str = base64.b64encode(buffer.getvalue()).decode()
@@ -29,13 +30,13 @@ def image_to_base64(path: str, max_size: int = 400) -> str:
         return ""
 
 
-def generate_html_report(results_file: str = 'vision_matching_results.json', 
+def generate_html_report(results_file: str = 'vision_matching_results.json',
                          output_file: str = 'validation_report.html'):
     """Generate HTML report with side-by-side comparisons."""
-    
-    with open(results_file, 'r') as f:
+
+    with open(results_file) as f:
         results = json.load(f)
-    
+
     html_parts = [
         '<!DOCTYPE html>',
         '<html>',
@@ -73,12 +74,12 @@ def generate_html_report(results_file: str = 'vision_matching_results.json',
         '        <div class="legend-item"><span class="score-badge score-different">DIFFERENT</span> = Not a match</div>',
         '    </div>',
     ]
-    
+
     total = len(results)
     same_count = sum(1 for data in results.values() if data['top_matches'] and data['top_matches'][0]['vision_result'] == 'SAME')
     uncertain_count = sum(1 for data in results.values() if data['top_matches'] and data['top_matches'][0]['vision_result'] == 'UNCERTAIN')
     different_count = sum(1 for data in results.values() if data['top_matches'] and data['top_matches'][0]['vision_result'] == 'DIFFERENT')
-    
+
     html_parts.append('    <div class="summary">')
     html_parts.append('        <h3>Summary:</h3>')
     html_parts.append(f'        <p>Total Instagram images: {total}</p>')
@@ -86,50 +87,50 @@ def generate_html_report(results_file: str = 'vision_matching_results.json',
     html_parts.append(f'        <p>Matches marked as UNCERTAIN: {uncertain_count}</p>')
     html_parts.append(f'        <p>Matches marked as DIFFERENT: {different_count}</p>')
     html_parts.append('    </div>')
-    
-    for insta_key, data in results.items():
+
+    for _insta_key, data in results.items():
         insta_img = data['insta_image']
         top_matches = data['top_matches']
-        
+
         if not top_matches:
             continue
-        
+
         best_match = top_matches[0]
         result = best_match['vision_result']
-        
+
         if result == 'SAME':
             badge_class = 'score-same'
         elif result == 'UNCERTAIN':
             badge_class = 'score-uncertain'
         else:
             badge_class = 'score-different'
-        
+
         html_parts.append('<div class="match-card">')
         html_parts.append(f'    <div class="match-title">Instagram: {insta_img.get("filename")} ({insta_img.get("instagram_folder")})</div>')
         html_parts.append('    <div class="comparison">')
-        
+
         insta_path = insta_img.get('local_path', '')
         insta_b64 = image_to_base64(insta_path)
         html_parts.append('        <div class="image-box">')
         html_parts.append(f'            <img src="{insta_b64}" alt="Instagram">')
         html_parts.append('            <div class="image-label">Instagram Image</div>')
         html_parts.append('        </div>')
-        
+
         catalog_path = best_match.get('catalog_path', '')
         catalog_b64 = image_to_base64(catalog_path)
         html_parts.append('        <div class="image-box">')
         html_parts.append(f'            <img src="{catalog_b64}" alt="Catalog">')
         html_parts.append(f'            <div class="image-label">Best Match: {best_match.get("catalog_key", "Unknown")}</div>')
         html_parts.append('        </div>')
-        
+
         html_parts.append('    </div>')
-        
+
         html_parts.append('    <div class="match-info">')
         html_parts.append(f'        <span class="score-badge {badge_class}">{result}</span>')
         html_parts.append(f'        <span style="margin-left: 10px;">Score: {best_match.get("vision_score", 0)}</span>')
         html_parts.append(f'        <span style="margin-left: 10px;">Date: {best_match.get("catalog_date", "Unknown")}</span>')
         html_parts.append('    </div>')
-        
+
         if len(top_matches) > 1:
             html_parts.append('    <div class="top-matches">')
             html_parts.append('        <strong>Top 3 Matches:</strong>')
@@ -143,24 +144,24 @@ def generate_html_report(results_file: str = 'vision_matching_results.json',
                     match_class = 'score-uncertain'
                 else:
                     match_class = 'score-different'
-                
-                html_parts.append(f'        <div class="top-match">')
+
+                html_parts.append('        <div class="top-match">')
                 html_parts.append(f'            <div>#{j}</div>')
                 html_parts.append(f'            <img src="{match_b64}" alt="Match {j}">')
                 html_parts.append(f'            <div><span class="score-badge {match_class}">{match_result}</span></div>')
                 html_parts.append('        </div>')
             html_parts.append('    </div>')
-        
+
         html_parts.append('</div>')
-    
+
     html_parts.extend([
         '</body>',
         '</html>',
     ])
-    
+
     with open(output_file, 'w') as f:
         f.write('\n'.join(html_parts))
-    
+
     print(f"✓ Report generated: {output_file}")
     print(f"  Open in browser: file://{Path(output_file).absolute()}")
 

@@ -1,11 +1,11 @@
 """Database utilities for Flask routes."""
-from functools import wraps
-from flask import jsonify, Flask
-from tinydb import TinyDB
 import os
-import json
+from functools import wraps
+
 from config import LIBRARY_DB
 from constants.errors import ERROR_DB_NOT_FOUND
+from flask import jsonify
+from tinydb import TinyDB
 
 
 class DatabaseError(Exception):
