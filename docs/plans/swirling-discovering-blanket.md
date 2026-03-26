@@ -196,6 +196,126 @@ Create a new module `image_description.py` that provides:
 4. What's the budget for cloud processing costs?
 5. Should we add a UI for viewing and filtering by photographer type?
 
+## User Clarifications Received
+
+1. **Cloud Services**: Need to evaluate options (TBC)
+2. **Photographer Types**: Create a set of photographer types (TBC)
+3. **Configuration**: Make photographer type configurable (TBC)
+4. **Budget**: Short budget (TBC)
+5. **Photography Types**: More for analysis type, add under what type of photographer we did the analysis
+
+## Updated Implementation Plan
+
+### Enhanced Description Requirements
+
+**Comprehensive Descriptions with Photographer Perspective:**
+- **Street Photographer**: Focus on urban scenes, candid moments, street life, geometric patterns, decisive moments
+- **Documentary Photographer**: Focus on storytelling, social context, emotional impact, narrative elements
+- **Publisher**: Focus on editorial quality, visual appeal, commercial viability, audience engagement
+
+**Storage Strategy:**
+- Store comprehensive descriptions permanently in database for all images
+- Add dedicated description fields to existing tables
+- Create new `image_descriptions` table for detailed analysis results
+
+**Integration Approach:**
+- Generate descriptions for all images during analysis phase
+- Store descriptions in database immediately
+- Show descriptions in match results when score exceeds threshold
+- Use descriptions for photo selection and filtering
+
+### Modified Implementation Strategy
+
+**Phase 0: Research & Foundation**
+- Research local and cloud models for comprehensive description generation
+- Test different models to determine optimal quality/performance balance
+- Implement OpenCV-based technical quality analysis (sharpness, exposure, noise)
+- Add color analysis (dominant colors, color harmony)
+- Research photographer perspective models and techniques
+
+**Phase 1: Core Description Engine**
+- Build comprehensive image analysis pipeline
+- Implement composition analysis (layers, rule of thirds, leading lines)
+- Create structured description format with photographer perspective
+- Add photographer type detection (street, documentary, publisher)
+
+**Phase 2: Cloud Integration**
+- Integrate cloud services for complex description generation
+- Implement hybrid local/cloud processing for optimal performance
+- Add cloud-based photographer perspective analysis
+- Enhance composition analysis with advanced techniques
+
+**Phase 3: Integration**
+- Enhance vision matching with descriptive context
+- Add description-based filtering options
+- Update database schema for comprehensive descriptions
+- Implement photographer perspective matching
+
+**Phase 4: Optimization**
+- Implement batch processing for efficiency
+- Add caching for repeated analyses
+- Optimize for performance and cost
+- Add quality assessment for photographer types
+
+### Enhanced Database Schema
+
+**New Fields for `catalog_images` and `instagram_images`:**
+- `comprehensive_description` - Detailed description with photographer perspective
+- `photographer_type` - Detected type (street, documentary, publisher, unknown)
+- `composition_analysis` - JSON with layers, composition metrics
+- `artistic_quality` - Artistic assessment score
+- `commercial_viability` - Publisher perspective assessment
+
+**New `image_descriptions` Table:**
+- `key` - Primary key (catalog_key or insta_key)
+- `description_type` - Basic, comprehensive, photographer_perspective
+- `content` - Description text
+- `analysis_data` - JSON with detailed analysis results
+- `generated_at` - Timestamp
+- `model_used` - Model that generated the description
+- `cost_cents` - Cloud processing cost if applicable
+
+### Enhanced Vision Matching Integration
+
+**New Scoring Components:**
+- **Photographer Type Similarity**: Match based on photographer perspective
+- **Composition Similarity**: Compare composition analysis results
+- **Artistic Quality Match**: Assess artistic quality alignment
+- **Commercial Viability**: Publisher perspective matching
+
+**Enhanced Match Display:**
+- Show comprehensive descriptions in match results
+- Display photographer type and perspective
+- Include composition analysis details
+- Show artistic quality assessment
+
+### Configuration and Parameters
+
+**Photographer Type Configuration:**
+- Make photographer type configurable per analysis run
+- Create set of predefined photographer types
+- Add configuration file for photographer type weights
+- Allow custom photographer type definitions
+
+**Budget Configuration:**
+- Set short budget for cloud processing
+- Implement cost tracking and limits
+- Add budget warnings and controls
+- Optimize for cost-effective processing
+
+### Questions for Next Phase
+
+1. What cloud services should we use for comprehensive description generation?
+2. Should we implement photographer type detection automatically or manually?
+3. How should we handle different photographer types in the matching algorithm?
+4. What's the budget for cloud processing costs?
+5. Should we add a UI for viewing and filtering by photographer type?
+6. What specific photographer types should we support?
+7. How should we configure photographer type weights?
+8. What's the optimal budget allocation for cloud processing?
+9. Should we add cost tracking and reporting features?
+10. How should we handle budget limits and warnings?
+
 ## Next Steps
 
 1. Build core description engine
