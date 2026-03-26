@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Stats, JobsAPI, SystemAPI } from '../services/api'
-import { Job } from '../types/job'
+
+import type { Job } from '../types/job'
+
+import { Stats, CacheStatus, JobsAPI, SystemAPI } from '../services/api'
 import { JobsList } from '../components/JobsList'
 import {
   MSG_LOADING,
@@ -11,11 +13,17 @@ import {
   DASHBOARD_MATCHES,
   DASHBOARD_RECENT_JOBS,
   DASHBOARD_NO_JOBS,
+  CACHE_TITLE,
+  CACHE_STATUS_CACHED,
+  CACHE_STATUS_OF,
+  CACHE_STATUS_IMAGES,
+  CACHE_SIZE_LABEL,
 } from '../constants/strings'
 
 export function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [jobs, setJobs] = useState<Job[]>([])
+  const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -44,7 +52,17 @@ export function DashboardPage() {
       }
     }
 
+    async function fetchCacheStatus() {
+      try {
+        const data = await SystemAPI.cacheStatus()
+        if (mounted) setCacheStatus(data)
+      } catch {
+        // Non-critical -- dashboard still works without cache status
+      }
+    }
+
     fetchData()
+    fetchCacheStatus()
     return () => { mounted = false }
   }, [])
 
@@ -93,6 +111,8 @@ export function DashboardPage() {
         </div>
       )}
 
+      {cacheStatus && <CacheStatusCard cacheStatus={cacheStatus} />}
+
       <div>
         <h3 className="text-lg font-semibold text-gray-900 mb-4">
           {DASHBOARD_RECENT_JOBS}
@@ -102,6 +122,47 @@ export function DashboardPage() {
         ) : (
           <JobsList jobs={jobs} />
         )}
+      </div>
+    </div>
+  )
+}
+
+function CacheStatusCard({ cacheStatus }: { cacheStatus: CacheStatus }) {
+  const pct = cacheStatus.total_images > 0
+    ? Math.round((cacheStatus.cached_images / cacheStatus.total_images) * 100)
+    : 0
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+      <h3 className="text-lg font-semibold text-gray-900 mb-3">{CACHE_TITLE}</h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div>
+          <p className="text-sm text-gray-600">Total Catalog Images</p>
+          <p className="text-lg font-bold">{cacheStatus.total_images}</p>
+        </div>
+        <div>
+          <p className="text-sm text-gray-600">{CACHE_STATUS_CACHED}</p>
+          <p className="text-lg font-bold text-green-600">
+            {cacheStatus.cached_images} {CACHE_STATUS_OF} {cacheStatus.total_images} {CACHE_STATUS_IMAGES}
+          </p>
+        </div>
+        <div>
+          <p className="text-sm text-gray-600">Missing</p>
+          <p className="text-lg font-bold text-red-600">{cacheStatus.missing}</p>
+        </div>
+        <div>
+          <p className="text-sm text-gray-600">{CACHE_SIZE_LABEL}</p>
+          <p className="text-lg font-bold">{cacheStatus.cache_size_mb} MB</p>
+        </div>
+      </div>
+      <div className="mt-3">
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          <div
+            className="bg-green-500 h-2 rounded-full transition-all"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <p className="text-xs text-gray-500 mt-1">{pct}% cached</p>
       </div>
     </div>
   )

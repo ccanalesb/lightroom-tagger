@@ -21,10 +21,6 @@ from lightroom_tagger.database import (
 )
 from lightroom_tagger.instagram_scraper import crawl_instagram
 from lightroom_tagger.image_hasher import compute_phash, find_matches
-from lightroom_tagger.core.database import get_all_images, get_catalog_images_needing_analysis, init_catalog_table, store_catalog_image
-from lightroom_tagger.core.vision_cache import get_or_create_cached_image
-from lightroom_tagger.core.config import load_config
-from lightroom_tagger.core.analyzer import analyze_image
 from lightroom_tagger.lr_writer import add_keyword_to_images_batch
 from lightroom_tagger.core.database import (
     get_all_images, get_catalog_images_needing_analysis,
@@ -422,12 +418,13 @@ def cmd_stats(args, config):
         return 1
 
 
-def enrich_catalog_images(db, limit=None):
+def enrich_catalog_images(db, limit=None, verbose=False):
     """Enrich catalog images with metadata and vision cache.
 
     Args:
         db: TinyDB instance
         limit: Maximum number of images to process
+        verbose: Print progress for every image
 
     Returns:
         dict with processed, skipped, errors counts
@@ -453,11 +450,9 @@ def enrich_catalog_images(db, limit=None):
     print("Enriching catalog images...")
 
     try:
-        # Get images that need enrichment
         catalog_images = get_catalog_images_needing_analysis(db)
 
         if not catalog_images:
-            # If catalog table is empty, get from main images table
             print("Catalog table empty, getting from main images table...")
             all_images = get_all_images(db)
             catalog_images = [img for img in all_images if not img.get('analyzed_at')]
@@ -477,17 +472,14 @@ def enrich_catalog_images(db, limit=None):
                     skipped += 1
                     continue
 
-                # Analyze image
                 analysis = analyze_image(filepath)
 
-                # Update record with analysis
                 enriched_record = {
                     'key': key,
                     'filepath': filepath,
                     'analyzed_at': analysis.get('analyzed_at', 'unknown'),
                     'phash': analysis.get('phash'),
                     'exif': analysis.get('exif', {}),
-                    'description': analysis.get('description', ''),
                     'catalog_path': record.get('catalog_path', ''),
                     'date_taken': record.get('date_taken', ''),
                     'filename': record.get('filename', ''),
@@ -495,19 +487,17 @@ def enrich_catalog_images(db, limit=None):
                     'keywords': record.get('keywords', []),
                     'color_label': record.get('color_label', ''),
                     'title': record.get('title', ''),
-                    'description': record.get('description', ''),
+                    'description': analysis.get('description', record.get('description', '')),
                 }
 
-                # Store in catalog table
                 store_catalog_image(db, enriched_record)
 
-                # Create vision cache
                 if config.vision_cache_enabled:
                     get_or_create_cached_image(db, key, filepath)
 
                 processed += 1
 
-                if args.verbose or (i + 1) % 10 == 0:
+                if verbose or (i + 1) % 10 == 0:
                     print(f"Processed {i + 1}/{len(catalog_images)}")
 
             except Exception as e:
@@ -527,13 +517,14 @@ def cmd_enrich_catalog(args, config):
     db_path = args.db or config.db_path
     limit = args.limit
     dry_run = args.dry_run
+    verbose = getattr(args, 'verbose', False)
 
     if dry_run:
         print("Dry run mode - will show what would be processed")
 
     try:
         db = init_database(db_path)
-        result = enrich_catalog_images(db, limit=limit)
+        result = enrich_catalog_images(db, limit=limit, verbose=verbose)
         db.close()
 
         print(f"Processed: {result['processed']} images")
@@ -543,8 +534,12 @@ def cmd_enrich_catalog(args, config):
     except Exception as e:
         print(f"Error: {e}")
         return 1
+
+
+def cmd_instagram_sync(args, config):
+    """Sync Instagram posts with catalog."""
     db_path = args.db or config.db_path
-    
+
     if not db_path:
         print("Error: No database path provided. Use --db or config.yaml")
         return 1
@@ -570,13 +565,13 @@ def cmd_enrich_catalog(args, config):
 
     try:
         db = init_database(db_path)
-        
+
         print("Step 1: Computing hashes for local images...")
         local_images = get_all_images(db)
-        
+
         images_needing_hash = get_images_without_hash(db)
         print(f"  {len(images_needing_hash)} images need hashes")
-        
+
         hash_updates = []
         for record in images_needing_hash:
             filepath = record.get('filepath')
@@ -584,22 +579,22 @@ def cmd_enrich_catalog(args, config):
                 image_hash = compute_phash(filepath)
                 if image_hash:
                     hash_updates.append({'key': record['key'], 'image_hash': image_hash})
-        
+
         if hash_updates:
             batch_update_hashes(db, hash_updates)
             print(f"  Computed {len(hash_updates)} hashes")
-        
+
         local_images = get_all_images(db)
         local_with_hash = [img for img in local_images if img.get('image_hash')]
         print(f"  Total images with hash: {len(local_with_hash)}")
-        
+
         print("\nStep 2: Crawling Instagram...")
         posts, url_to_path = crawl_instagram(config, output_dir, limit=limit or 50)
-        
+
         if not posts:
             print("No Instagram posts found!")
             return 1
-        
+
         insta_images = []
         for i, post in enumerate(posts):
             local_path = url_to_path.get(post.image_url)
@@ -611,52 +606,52 @@ def cmd_enrich_catalog(args, config):
                     'image_hash': image_hash,
                     'index': post.index,
                 })
-        
+
         print(f"  Found {len(insta_images)} Instagram images with hashes")
-        
+
         print("\nStep 3: Finding matches...")
         matches = find_matches(local_with_hash, insta_images, threshold)
         print(f"  Found {len(matches)} matches")
-        
+
         if not matches:
             print("\nNo matches found!")
             return 0
-        
+
         print("\nMatches found:")
         for match in matches[:10]:
             print(f"  {match['local_key']} <-> {match['insta_url']} (distance: {match['hash_distance']})")
         if len(matches) > 10:
             print(f"  ... and {len(matches) - 10} more")
-        
+
         print(f"\nStep 4: {'Preview' if dry_run else 'Applying'} changes...")
-        
+
         matched_keys = [m['local_key'] for m in matches]
-        
+
         for match in matches:
             if dry_run:
                 print(f"  Would mark as posted: {match['local_key']}")
             else:
                 update_instagram_status(
-                    db, 
+                    db,
                     match['local_key'],
                     posted=True,
                     url=match['insta_url']
                 )
-        
+
         print(f"  Updated {len(matched_keys)} records in database")
-        
+
         if catalog_path and Path(catalog_path).exists():
             print(f"\nStep 5: Adding keyword '{keyword}' to Lightroom...")
             result = add_keyword_to_images_batch(
-                connect_catalog(catalog_path), 
-                matched_keys, 
-                keyword, 
+                connect_catalog(catalog_path),
+                matched_keys,
+                keyword,
                 dry_run=dry_run
             )
             print(f"  Added: {result['added']}, Skipped: {result['skipped']}, Errors: {result['errors']}")
-        
+
         db.close()
-        
+
         print(f"\n{'Done!' if dry_run else 'Complete!'}")
         return 0
 
