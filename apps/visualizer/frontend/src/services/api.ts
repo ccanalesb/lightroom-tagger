@@ -167,6 +167,39 @@ export interface CatalogImage {
   image_hash?: string
 }
 
+export interface PerspectiveScore {
+  analysis: string
+  score: number
+}
+
+export interface ImageDescription {
+  image_key: string
+  image_type: string
+  summary: string
+  composition: {
+    layers?: string[]
+    techniques?: string[]
+    problems?: string[]
+    depth?: string
+    balance?: string
+  }
+  perspectives: {
+    street?: PerspectiveScore
+    documentary?: PerspectiveScore
+    publisher?: PerspectiveScore
+  }
+  technical: {
+    dominant_colors?: string[]
+    mood?: string
+    lighting?: string
+    time_of_day?: string
+  }
+  subjects: string[]
+  best_perspective: string
+  model_used: string
+  described_at?: string
+}
+
 export interface Match {
   instagram_key: string
   catalog_key: string
@@ -178,6 +211,8 @@ export interface Match {
   total_score?: number
   instagram_image?: InstagramImage
   catalog_image?: CatalogImage
+  catalog_description?: ImageDescription
+  insta_description?: ImageDescription
 }
 
 export interface DumpMedia {

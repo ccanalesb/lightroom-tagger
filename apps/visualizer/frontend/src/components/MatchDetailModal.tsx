@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { MODAL_CLOSE, MATCHING_RESULTS } from '../constants/strings';
+import { MODAL_CLOSE, MATCHING_RESULTS, DESC_PANEL_TITLE } from '../constants/strings';
 import type { Match } from '../services/api';
+import { DescriptionPanel } from './DescriptionPanel';
 
 interface MatchDetailModalProps {
   match: Match;
@@ -121,6 +122,24 @@ export function MatchDetailModal({ match, onClose }: MatchDetailModalProps) {
               )}
             </div>
           </div>
+
+          {/* Descriptions */}
+          {(match.catalog_description || match.insta_description) && (
+            <div className="grid grid-cols-2 gap-4">
+              {match.insta_description && (
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <h4 className="text-xs font-medium text-gray-500 mb-2">Instagram — {DESC_PANEL_TITLE}</h4>
+                  <DescriptionPanel description={match.insta_description} />
+                </div>
+              )}
+              {match.catalog_description && (
+                <div className={`bg-gray-50 p-3 rounded-lg ${!match.insta_description ? 'col-span-2' : ''}`}>
+                  <h4 className="text-xs font-medium text-gray-500 mb-2">Catalog — {DESC_PANEL_TITLE}</h4>
+                  <DescriptionPanel description={match.catalog_description} />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Metadata */}
           <div className="bg-gray-50 p-4 rounded-lg text-sm space-y-2">
