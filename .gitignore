@@ -81,3 +81,5 @@ node_modules/
 .env.local
 thumbnails/
 *.db-journal
+*.db-wal
+*.db-shm

@@ -60,7 +60,7 @@ def import_dump(db, dump_path: str, skip_existing: bool = True, skip_dedup: bool
     but merge archived metadata (which has better EXIF data).
 
     Args:
-        db: TinyDB instance
+        db: sqlite3 connection
         dump_path: Path to instagram-dump directory
         skip_existing: If True, skip files already in database
         skip_dedup: If True, skip visual duplicate detection

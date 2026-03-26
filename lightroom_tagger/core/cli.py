@@ -32,7 +32,7 @@ def create_parser() -> argparse.ArgumentParser:
     """Create argument parser with subcommands."""
     parser = argparse.ArgumentParser(
         prog="lightroom-tagger",
-        description="Read Lightroom catalog, index metadata, store in TinyDB"
+        description="Read Lightroom catalog, index metadata, store in SQLite"
     )
 
     parser.add_argument(
@@ -41,7 +41,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--db", "-d",
-        help="Path to TinyDB"
+        help="Path to SQLite database"
     )
     parser.add_argument(
         "--config",
@@ -82,7 +82,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     scan_parser.add_argument(
         "--db",
-        help="Path to TinyDB (overrides global)"
+        help="Path to SQLite database (overrides global)"
     )
     scan_parser.add_argument(
         "--workers",
@@ -98,7 +98,7 @@ def create_parser() -> argparse.ArgumentParser:
     search_parser = subparsers.add_parser("search", help="Search indexed images")
     search_parser.add_argument(
         "--db",
-        help="Path to TinyDB (overrides global)"
+        help="Path to SQLite database (overrides global)"
     )
     search_parser.add_argument(
         "--keyword",
@@ -130,7 +130,7 @@ def create_parser() -> argparse.ArgumentParser:
     export_parser = subparsers.add_parser("export", help="Export to JSON/CSV")
     export_parser.add_argument(
         "--db",
-        help="Path to TinyDB (overrides global)"
+        help="Path to SQLite database (overrides global)"
     )
     export_parser.add_argument(
         "--output", "-o",
@@ -161,19 +161,19 @@ def create_parser() -> argparse.ArgumentParser:
     init_parser = subparsers.add_parser("init", help="Initialize database")
     init_parser.add_argument(
         "--db",
-        help="Path to TinyDB (overrides global)"
+        help="Path to SQLite database (overrides global)"
     )
 
     stats_parser = subparsers.add_parser("stats", help="Show database statistics")
     stats_parser.add_argument(
         "--db",
-        help="Path to TinyDB (overrides global)"
+        help="Path to SQLite database (overrides global)"
     )
 
     instagram_parser = subparsers.add_parser("instagram-sync", help="Sync Instagram posts")
     instagram_parser.add_argument(
         "--db",
-        help="Path to TinyDB (overrides global)"
+        help="Path to SQLite database (overrides global)"
     )
     instagram_parser.add_argument(
         "--catalog",
@@ -389,7 +389,7 @@ def cmd_stats(args, config):
         count = db_get_image_count(db)
 
         ratings = {}
-        for record in db.all():
+        for record in db.execute("SELECT * FROM images").fetchall():
             rating = record.get("rating", 0)
             ratings[rating] = ratings.get(rating, 0) + 1
 

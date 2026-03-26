@@ -1,7 +1,7 @@
+import json
 import os
 
 from flask import Blueprint, jsonify, request, send_file
-from tinydb import Query
 from utils.db import with_db
 from utils.responses import error_not_found, error_server_error, success_paginated
 
@@ -15,6 +15,13 @@ def _enrich_instagram_media(media_items):
         file_path = media.get('file_path', '')
         source_folder = _extract_source_folder(file_path)
 
+        exif_data = media.get('exif_data')
+        if isinstance(exif_data, str):
+            try:
+                exif_data = json.loads(exif_data)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         enriched.append({
             'key': media['media_key'],
             'local_path': file_path,
@@ -27,7 +34,7 @@ def _enrich_instagram_media(media_items):
             'image_index': 1,
             'total_in_post': 1,
             'post_url': media.get('post_url'),
-            'exif_data': media.get('exif_data'),
+            'exif_data': exif_data,
         })
     return enriched
 
@@ -61,7 +68,7 @@ def _filter_by_date(images, date_folder, date_from, date_to):
 def list_instagram_images(db):
     """List Instagram images with filtering and pagination."""
     try:
-        media_items = db.table('instagram_dump_media').all()
+        media_items = db.execute("SELECT * FROM instagram_dump_media").fetchall()
         enriched_images = _enrich_instagram_media(media_items)
 
         # Get filter parameters
@@ -106,7 +113,7 @@ def list_instagram_images(db):
 def get_instagram_months(db):
     """Get unique months available in Instagram images."""
     try:
-        media_items = db.table('instagram_dump_media').all()
+        media_items = db.execute("SELECT * FROM instagram_dump_media").fetchall()
         months = set()
         for media in media_items:
             date_folder = media.get('date_folder', '')
@@ -122,8 +129,10 @@ def get_instagram_months(db):
 def get_instagram_thumbnail(db, image_key):
     """Get thumbnail for Instagram image."""
     try:
-        Media = Query()
-        media_items = db.table('instagram_dump_media').search(Media.media_key == image_key)
+        media_items = db.execute(
+            "SELECT * FROM instagram_dump_media WHERE media_key = ?",
+            (image_key,),
+        ).fetchall()
 
         if not media_items:
             return error_not_found('image')
@@ -144,8 +153,10 @@ def get_instagram_thumbnail(db, image_key):
 def get_catalog_thumbnail(db, image_key):
     """Get thumbnail for catalog image."""
     try:
-        Image = Query()
-        images = db.table('images').search(Image.key == image_key)
+        images = db.execute(
+            "SELECT * FROM images WHERE key = ?",
+            (image_key,),
+        ).fetchall()
 
         if not images:
             return error_not_found('image')
@@ -166,7 +177,7 @@ def get_catalog_thumbnail(db, image_key):
 def list_catalog_images(db):
     """List catalog images with optional filtering."""
     try:
-        images = db.table('images').all()
+        images = db.execute("SELECT * FROM images").fetchall()
 
         posted = request.args.get('posted')
         limit = request.args.get('limit', 50, type=int)
@@ -197,19 +208,24 @@ def list_dump_media(db):
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
 
-        table = db.table('instagram_dump_media')
-        Media = Query()
-
         if processed == 'true':
-            media = table.search(Media.processed)
+            media = db.execute(
+                "SELECT * FROM instagram_dump_media WHERE processed = 1"
+            ).fetchall()
         elif processed == 'false':
-            media = table.search(not Media.processed)
+            media = db.execute(
+                "SELECT * FROM instagram_dump_media WHERE processed = 0"
+            ).fetchall()
         elif matched == 'true':
-            media = table.search(Media.matched_catalog_key is not None)
+            media = db.execute(
+                "SELECT * FROM instagram_dump_media WHERE matched_catalog_key IS NOT NULL"
+            ).fetchall()
         elif matched == 'false':
-            media = table.search(Media.matched_catalog_key is None)
+            media = db.execute(
+                "SELECT * FROM instagram_dump_media WHERE matched_catalog_key IS NULL"
+            ).fetchall()
         else:
-            media = table.all()
+            media = db.execute("SELECT * FROM instagram_dump_media").fetchall()
 
         total = len(media)
         paginated = media[offset:offset+limit]
@@ -227,19 +243,15 @@ def list_dump_media(db):
 def list_matches(db):
     """List matches between Instagram and catalog images."""
     try:
-        if 'matches' not in db.tables():
-            return jsonify({'total': 0, 'matches': []})
-
-        matches = db.table('matches').all()
+        matches = db.execute("SELECT * FROM matches").fetchall()
 
         # Build lookup tables for images (avoid N+1 queries)
         instagram_lookup = {}
-        if 'instagram_images' in db.tables():
-            for img in db.table('instagram_images').all():
-                instagram_lookup[img.get('key')] = img
+        for img in db.execute("SELECT * FROM instagram_images").fetchall():
+            instagram_lookup[img.get('key')] = img
 
         catalog_lookup = {}
-        for img in db.table('images').all():
+        for img in db.execute("SELECT * FROM images").fetchall():
             catalog_lookup[img.get('key')] = img
 
         # Enrich matches with image data

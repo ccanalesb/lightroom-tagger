@@ -15,10 +15,10 @@ from lightroom_tagger.core.hasher import (
     batch_compute_hashes,
     compute_multiple_hashes,
     compute_phash,
-    find_matches,
 )
 from lightroom_tagger.core.phash import (
     compare_hashes,
+    find_matches,
     hamming_distance,
 )
 

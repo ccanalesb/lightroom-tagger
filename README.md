@@ -1,11 +1,11 @@
 # Lightroom Tagger
 
-A Python tool to read Lightroom catalog (`.lrcat` SQLite database), index metadata to TinyDB, and export/search your photo library. Includes Instagram matching with vision model support.
+A Python tool to read Lightroom catalog (`.lrcat` SQLite database), index metadata to a local SQLite database, and export/search your photo library. Includes Instagram matching with vision model support.
 
 ## Installation
 
 ```bash
-pip install tinydb pyyaml python-dotenv
+pip install pyyaml python-dotenv
 ```
 
 ## Quick Start - Instagram Matching Flow
@@ -32,7 +32,7 @@ python -m lightroom_tagger instagram-sync --db library.db --from-matches \
 | Command | Parameter | Description |
 |---------|-----------|-------------|
 | `scan` | `--catalog` | Path to your Lightroom .lrcat file |
-| `scan` | `--db` | Path to TinyDB database (will be created) |
+| `scan` | `--db` | Path to SQLite database (will be created) |
 | `crawl-instagram` | `--db` | Database with catalog images |
 | `crawl-instagram` | `--output-dir` | Where to save downloaded Instagram images |
 | `crawl-instagram` | `--limit` | Limit number of posts to download |
@@ -113,15 +113,15 @@ Reads metadata from the Lightroom catalog. Queries the SQLite database and joins
 - `AgLibraryIPTC` - caption, copyright
 
 ### `lightroom_tagger/database.py`
-TinyDB operations for storing and querying indexed images. Provides functions for:
-- `store_image()` / `store_images_batch()` - save records
+SQLite operations for storing and querying indexed images (WAL mode for concurrency). Provides functions for:
+- `store_image()` / `store_images_batch()` - save records (upsert)
 - `get_image()` / `get_all_images()` - retrieve records
 - `search_by_keyword()`, `search_by_rating()`, `search_by_date()` - query filters
 - Unique key format: `{date_taken}_{filename}`
 
 ### `lightroom_tagger/cli.py`
 Command-line interface with subcommands:
-- `scan` - Scan catalog, index all images to TinyDB
+- `scan` - Scan catalog, index all images to SQLite
 - `search` - Search indexed images by keyword, rating, date, color label
 - `export` - Export to JSON or CSV format
 - `init` - Initialize empty database
@@ -188,7 +188,7 @@ frontend/                    # React 19 + TypeScript + Vite + Tailwind
 
 backend/                     # Flask + Flask-SocketIO
 ├── app.py                  # Flask app factory
-├── database.py             # TinyDB operations for jobs
+├── database.py             # SQLite operations for jobs
 ├── api/                    # REST API blueprints
 │   ├── jobs.py             # Job CRUD endpoints
 │   ├── images.py           # Instagram images
@@ -203,34 +203,59 @@ backend/                     # Flask + Flask-SocketIO
 ### Quick Start
 
 ```bash
-# One-time setup
-cd apps/visualizer/backend && pip install -r requirements.txt
-cd ../frontend && npm install --legacy-peer-deps
-cd ../../..
+# 1. Create a virtual environment (required on macOS with system Python)
+python3 -m venv .venv
+source .venv/bin/activate
 
-# IMPORTANT: Configure environment variables
-# Copy example file and set your library.db path
+# 2. Install the project and all dependencies
+pip install -e .
+
+# 3. Scan your Lightroom catalog to create library.db
+python3 -m lightroom_tagger scan \
+  --catalog "/path/to/Lightroom Catalog.lrcat" \
+  --db library.db
+
+# 4. Import your Instagram data dump (Meta data export)
+#    Pass the dump ROOT directory (the one containing media/, your_instagram_activity/, etc.)
+#    NOT the media/ subdirectory itself — the importer appends /media internally
+python3 -m lightroom_tagger.scripts.import_instagram_dump \
+  --db library.db \
+  --dump-path "/path/to/instagram-username-date-hash"
+
+# 5. Configure backend environment
 cp apps/visualizer/backend/.env.example apps/visualizer/backend/.env
-# Edit .env and set LIBRARY_DB to absolute path of your library.db
+# Edit .env and set LIBRARY_DB to the absolute path of your library.db
 
-# Start backend + frontend together
+# 6. Install frontend dependencies
+cd apps/visualizer/frontend && npm install --legacy-peer-deps && cd ../../..
+
+# 7. Start backend + frontend
 make dev
-# or:
-./scripts/dev-up.sh
+# or: ./scripts/dev-up.sh
 
-# Open: http://localhost:5173
+# Open: http://localhost:5173 (or 5174 if 5173 is taken)
 
 # Stop both services
 make dev-down
-# or:
-./scripts/dev-down.sh
+# or: ./scripts/dev-down.sh
+```
+
+**macOS Note:** Port 5000 is used by AirPlay Receiver. Either disable it in
+System Settings > General > AirDrop & Handoff, or set `FLASK_PORT=5001` in
+the backend `.env` and update the frontend `.env` to match:
+```
+# apps/visualizer/frontend/.env
+VITE_API_URL=http://localhost:5001/api
+VITE_WS_URL=http://localhost:5001
 ```
 
 **Environment Variables:**
 - `LIBRARY_DB` (required) - Absolute path to your library.db file
 - `DATABASE_PATH` - Path to visualizer database (default: ../visualizer.db)
 - `FLASK_HOST` - Backend host (default: localhost)
-- `FLASK_PORT` - Backend port (default: 5000)
+- `FLASK_PORT` - Backend port (default: 5000, use 5001 on macOS)
+- `INSTAGRAM_DIR` - Path to Instagram dump root directory
+- `INSTAGRAM_DUMP_PATH` - Alternative env var for import script
 
 ### Available Pages
 
@@ -307,6 +332,7 @@ docs/plans/        # Implementation plan
 3. **Container/Presenter pattern**: Pages fetch data, components receive props
 4. **Minimal Zustand**: Only for WebSocket connection state
 5. **No real paths in git**: Use `.env` files (gitignored)
+6. **SQLite with WAL mode**: All databases use `sqlite3` (stdlib) with WAL for safe concurrent access. No TinyDB.
 
 ### Running Tests
 
@@ -334,6 +360,11 @@ cd frontend && npm test -- --run
 | `Cannot find name 'global'` in tests | Use `(globalThis as any).fetch` instead of `global.fetch` |
 | npm peer dep conflict | Use `npm install --legacy-peer-deps` |
 | `import.meta.env` TypeScript errors | Add `/// <reference types="vite/client" />` to `vite-env.d.ts` |
+| Port 5000 in use on macOS | AirPlay Receiver uses 5000. Set `FLASK_PORT=5001` in backend `.env` |
+| `ModuleNotFoundError: imagehash` | Run `pip install -e .` so `ImageHash` from pyproject.toml is installed |
+| `ImportError: find_matches from core.hasher` | It's in `core/phash.py`, not `core/hasher.py`. Check `core/__init__.py` |
+| Instagram import finds 0 files | Pass the dump root dir, not `media/`. The reader appends `/media` itself |
+| `externally-managed-environment` on pip install | Use a venv: `python3 -m venv .venv && source .venv/bin/activate` |
 
 ### OpenCLI Instagram Adapters
 

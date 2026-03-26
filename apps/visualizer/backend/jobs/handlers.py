@@ -1,8 +1,10 @@
 """Job type handlers for vision matching and catalog operations."""
 import os
+import sqlite3
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from tinydb import Query
+from database import update_job_field
 
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import init_database
@@ -34,16 +36,14 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             'vision': config.vision_weight or 0.3
         })
 
-        runner.db.table('jobs').update({
-            'metadata': {
-                **metadata,
-                'method': 'cascade_matching',
-                'date_window_days': 90,
-                'threshold': custom_threshold,
-                'vision_model': custom_model,
-                'weights': custom_weights
-            }
-        }, Query().id == job_id)
+        update_job_field(runner.db, job_id, 'metadata', {
+            **metadata,
+            'method': 'cascade_matching',
+            'date_window_days': 90,
+            'threshold': custom_threshold,
+            'vision_model': custom_model,
+            'weights': custom_weights
+        })
 
         # Use LIBRARY_DB env var if set, otherwise fall back to config
         import os
@@ -238,9 +238,6 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
     This job compresses catalog images once and stores them in the vision cache,
     eliminating redundant compression during vision matching runs.
     """
-    import time
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-
     from lightroom_tagger.core.database import (
         get_all_catalog_images,
         get_cache_stats,
@@ -268,13 +265,11 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
         config = load_config()
         cache_dir = config.vision_cache_dir
 
-        runner.db.table('jobs').update({
-            'metadata': {
-                **metadata,
-                'cache_dir': cache_dir,
-                'method': 'prepare_catalog_cache',
-            }
-        }, Query().id == job_id)
+        update_job_field(runner.db, job_id, 'metadata', {
+            **metadata,
+            'cache_dir': cache_dir,
+            'method': 'prepare_catalog_cache',
+        })
 
         def log_callback(level, message):
             from database import add_job_log
@@ -303,65 +298,60 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
         # Get all catalog images from library DB
         images = get_all_catalog_images(lib_db)
 
-        # Determine parallelism (I/O bound, so threads are fine)
-        max_workers = min(4, os.cpu_count() or 2)
-        log_callback('info', f"Using {max_workers} parallel threads for compression")
+        def process_single_image(image, db_path):
+            """Each thread gets its own DB connection."""
+            filepath = image.get('filepath')
+            key = image.get('key')
+            if not filepath or not key:
+                return ('failed', key or 'unknown', 'Missing filepath or key')
+            if not os.path.exists(filepath):
+                return ('failed', key, f'File not found: {filepath}')
+
+            thread_db = sqlite3.connect(db_path)
+            thread_db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+            thread_db.execute("PRAGMA journal_mode=WAL")
+            thread_db.execute("PRAGMA busy_timeout=5000")
+            try:
+                from lightroom_tagger.core.database import is_vision_cache_valid
+
+                if is_vision_cache_valid(thread_db, key, filepath):
+                    return ('already_cached', key)
+                compressed_path = get_or_create_cached_image(thread_db, key, filepath)
+                if compressed_path:
+                    size_kb = os.path.getsize(compressed_path) / 1024
+                    return ('newly_cached', key, size_kb)
+                return ('failed', key, 'Compression returned None')
+            except Exception as e:
+                return ('failed', key, str(e))
+            finally:
+                thread_db.close()
 
         newly_cached = 0
         already_cached_count = 0
         failed_count = 0
         total = len(images)
 
-        def process_single_image(image):
-            """Process one image with retry logic."""
-            filepath = image.get('filepath')
-            key = image.get('key')
-            import os as _os
-
-            if not filepath or not key:
-                return ('failed', key or 'unknown', 'Missing filepath or key')
-
-            if not _os.path.exists(filepath):
-                return ('failed', key, f'File not found: {filepath}')
-
-            retries = 2
-            for attempt in range(retries):
-                try:
-                    # Check if already cached and valid
-                    from lightroom_tagger.core.database import is_vision_cache_valid
-                    if is_vision_cache_valid(lib_db, key, filepath):
-                        return ('already_cached', key)
-
-                    # Create cache
-                    compressed_path = get_or_create_cached_image(lib_db, key, filepath)
-                    if compressed_path:
-                        size_kb = _os.path.getsize(compressed_path) / 1024
-                        return ('newly_cached', key, size_kb)
-                    return ('failed', key, 'Compression returned None')
-                except Exception as e:
-                    if attempt < retries - 1:
-                        time.sleep(0.5 * (attempt + 1))
-                        continue
-                    return ('failed', key, str(e))
-
-        # Process images in parallel
+        max_workers = min(4, os.cpu_count() or 2)
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(process_single_image, img): img for img in images}
-
-            for idx, future in enumerate(as_completed(futures), 1):
-                result = future.result()
-                if result[0] == 'already_cached':
+            futures = {executor.submit(process_single_image, img, db_path): img for img in images}
+            completed = 0
+            for _future in as_completed(futures):
+                completed += 1
+                result = _future.result()
+                kind = result[0]
+                if kind == 'already_cached':
                     already_cached_count += 1
-                elif result[0] == 'newly_cached':
+                elif kind == 'newly_cached':
                     newly_cached += 1
-                else:
+                elif kind == 'failed':
                     failed_count += 1
-                    log_callback('error', f"Failed to cache {result[1]}: {result[2]}")
+                    err_key = result[1]
+                    err_msg = result[2] if len(result) > 2 else 'unknown'
+                    log_callback('error', f"Failed to cache {err_key}: {err_msg}")
 
-                # Update progress every 10 images or at end
-                if idx % 10 == 0 or idx == total:
-                    progress = int(10 + (idx / total) * 85) # Scale to 10-95%
-                    runner.update_progress(job_id, progress, f'Processed {idx}/{total} images')
+                if completed % 10 == 0 or completed == total:
+                    progress = int(10 + (completed / total) * 85)
+                    runner.update_progress(job_id, progress, f'Processed {completed}/{total} images')
 
         # Get final cache stats from library DB
         cache_stats_after = get_cache_stats(lib_db)

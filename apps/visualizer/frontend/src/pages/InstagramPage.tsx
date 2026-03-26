@@ -1,133 +1,143 @@
-import { useEffect, useState, useCallback } from 'react'
-import { ImagesAPI, InstagramImage } from '../services/api'
+import { useCallback, useEffect, useState } from "react";
+import { MetadataRow, MetadataSection } from "../components/metadata";
+import { ExifDataSection } from "../components/metadata/ExifDataSection";
+import { Modal, ModalFooter, ModalHeader } from "../components/modal";
 import {
-  MSG_ERROR_PREFIX,
+  FILTER_ALL_DATES,
+  FILTER_CLEAR,
+  HASH_EXPLANATION,
   INSTAGRAM_DOWNLOADED,
-  MODAL_TITLE_IMAGE_DETAILS,
-  MODAL_CLOSE,
-  MODAL_VIEW_ON_INSTAGRAM,
-  MODAL_OPEN_LOCAL_FILE,
-  META_SECTION_BASIC_INFO,
-  META_SECTION_IMAGE_ANALYSIS,
-  META_SECTION_CAPTION,
-  META_SECTION_FILE_LOCATION,
+  ITEMS_PER_PAGE,
+  LABEL_ADDED,
+  LABEL_DATE_FOLDER,
   LABEL_FILENAME,
   LABEL_MEDIA_KEY,
   LABEL_SOURCE_FOLDER,
-  LABEL_DATE_FOLDER,
-  LABEL_ADDED,
   LABEL_VISUAL_HASH,
-  HASH_EXPLANATION,
-  PAGINATION_PREVIOUS,
-  PAGINATION_NEXT,
-  FILTER_ALL_DATES,
-  FILTER_CLEAR,
+  META_SECTION_BASIC_INFO,
+  META_SECTION_CAPTION,
+  META_SECTION_FILE_LOCATION,
+  META_SECTION_IMAGE_ANALYSIS,
+  MODAL_CLOSE,
+  MODAL_OPEN_LOCAL_FILE,
+  MODAL_TITLE_IMAGE_DETAILS,
+  MODAL_VIEW_ON_INSTAGRAM,
   MSG_CLICK_FOR_DETAILS,
+  MSG_ERROR_PREFIX,
   MSG_PAGE_OF,
   MSG_SHOWING_RANGE,
-  ITEMS_PER_PAGE,
-} from '../constants/strings'
-import { useModal } from '../hooks/useModal'
-import { Modal, ModalHeader, ModalFooter } from '../components/modal'
-import { MetadataSection, MetadataRow } from '../components/metadata'
-import { ExifDataSection } from '../components/metadata/ExifDataSection'
+  PAGINATION_NEXT,
+  PAGINATION_PREVIOUS,
+} from "../constants/strings";
+import { useModal } from "../hooks/useModal";
+import { ImagesAPI, InstagramImage } from "../services/api";
 
 export function InstagramPage() {
-  const [images, setImages] = useState<InstagramImage[]>([])
-  const [total, setTotal] = useState(0)
-  const [error, setError] = useState<string | null>(null)
-  const [offset, setOffset] = useState(0)
+  const [images, setImages] = useState<InstagramImage[]>([]);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [offset, setOffset] = useState(0);
   const [pagination, setPagination] = useState({
     current_page: 1,
     total_pages: 1,
     has_more: false,
-  })
-  const [dateFilter, setDateFilter] = useState('')
-  const [availableMonths, setAvailableMonths] = useState<string[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  });
+  const [dateFilter, setDateFilter] = useState("");
+  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const { isOpen: isModalOpen, selectedItem: selectedImage, open: openModal, close: closeModal } = useModal<InstagramImage>()
+  const {
+    isOpen: isModalOpen,
+    selectedItem: selectedImage,
+    open: openModal,
+    close: closeModal,
+  } = useModal<InstagramImage>();
 
   // Fetch images with given offset and filter
-  const fetchImages = useCallback(async (newOffset: number, filter: string = dateFilter) => {
-    setIsLoading(true)
-    try {
-      const params = {
-        limit: ITEMS_PER_PAGE,
-        offset: newOffset,
-        ...(filter && { date_folder: filter }),
+  const fetchImages = useCallback(
+    async (newOffset: number, filter: string = dateFilter) => {
+      setIsLoading(true);
+      try {
+        const params = {
+          limit: ITEMS_PER_PAGE,
+          offset: newOffset,
+          ...(filter && { date_folder: filter }),
+        };
+
+        const data = await ImagesAPI.listInstagram(params);
+
+        setImages(data.images);
+        setTotal(data.total);
+        setPagination(data.pagination);
+        setOffset(newOffset);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unknown error");
+      } finally {
+        setIsLoading(false);
       }
-
-      const data = await ImagesAPI.listInstagram(params)
-
-      setImages(data.images)
-      setTotal(data.total)
-      setPagination(data.pagination)
-      setOffset(newOffset)
-      setError(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [dateFilter])
+    },
+    [dateFilter],
+  );
 
   // Initial load - fetch months and first page
   useEffect(() => {
     const initialize = async () => {
-      setIsLoading(true)
+      setIsLoading(true);
       try {
         const [monthsData, firstPageData] = await Promise.all([
           ImagesAPI.getInstagramMonths(),
-          ImagesAPI.listInstagram({ limit: ITEMS_PER_PAGE, offset: 0 })
-        ])
+          ImagesAPI.listInstagram({ limit: ITEMS_PER_PAGE, offset: 0 }),
+        ]);
 
-        setAvailableMonths(monthsData.months)
-        setImages(firstPageData.images)
-        setTotal(firstPageData.total)
-        setPagination(firstPageData.pagination)
-        setError(null)
+        setAvailableMonths(monthsData.months);
+        setImages(firstPageData.images);
+        setTotal(firstPageData.total);
+        setPagination(firstPageData.pagination);
+        setError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error')
+        setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
+    };
 
-    initialize()
-  }, [])
+    initialize();
+  }, []);
 
   const handlePrevPage = () => {
     if (offset > 0) {
-      fetchImages(Math.max(0, offset - ITEMS_PER_PAGE), dateFilter)
+      fetchImages(Math.max(0, offset - ITEMS_PER_PAGE), dateFilter);
     }
-  }
+  };
 
   const handleNextPage = () => {
     if (pagination.has_more) {
-      fetchImages(offset + ITEMS_PER_PAGE, dateFilter)
+      fetchImages(offset + ITEMS_PER_PAGE, dateFilter);
     }
-  }
+  };
 
   const handleDateFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newFilter = e.target.value
-    setDateFilter(newFilter)
-    setOffset(0)
-    fetchImages(0, newFilter)
-  }
+    const newFilter = e.target.value;
+    setDateFilter(newFilter);
+    setOffset(0);
+    fetchImages(0, newFilter);
+  };
 
   const clearDateFilter = () => {
-    setDateFilter('')
-    setOffset(0)
-    fetchImages(0, '')
-  }
+    setDateFilter("");
+    setOffset(0);
+    fetchImages(0, "");
+  };
 
   if (error) {
     return (
       <div className="text-center py-12">
-        <p className="text-red-600">{MSG_ERROR_PREFIX} {error}</p>
+        <p className="text-red-600">
+          {MSG_ERROR_PREFIX} {error}
+        </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -146,7 +156,7 @@ export function InstagramPage() {
               className="text-sm border border-gray-300 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">{FILTER_ALL_DATES}</option>
-              {availableMonths.map(month => (
+              {availableMonths.map((month) => (
                 <option key={month} value={month}>
                   {formatMonth(month)}
                 </option>
@@ -198,7 +208,7 @@ export function InstagramPage() {
         <ImageDetailsModal image={selectedImage} onClose={closeModal} />
       )}
     </div>
-  )
+  );
 }
 
 // Extracted sub-components...
@@ -210,7 +220,7 @@ function LoadingGrid() {
         <ImageSkeleton key={i} />
       ))}
     </div>
-  )
+  );
 }
 
 function ImageSkeleton() {
@@ -222,16 +232,23 @@ function ImageSkeleton() {
         <div className="h-2 bg-gray-200 rounded w-2/3 animate-pulse" />
       </div>
     </div>
-  )
+  );
 }
 
-function Pagination({ pagination, total, offset, onPrev, onNext, isLoading }: {
-  pagination: { current_page: number; total_pages: number; has_more: boolean }
-  total: number
-  offset: number
-  onPrev: () => void
-  onNext: () => void
-  isLoading: boolean
+function Pagination({
+  pagination,
+  total,
+  offset,
+  onPrev,
+  onNext,
+  isLoading,
+}: {
+  pagination: { current_page: number; total_pages: number; has_more: boolean };
+  total: number;
+  offset: number;
+  onPrev: () => void;
+  onNext: () => void;
+  isLoading: boolean;
 }) {
   return (
     <div className="flex items-center justify-between pt-6 border-t border-gray-200">
@@ -244,12 +261,14 @@ function Pagination({ pagination, total, offset, onPrev, onNext, isLoading }: {
       </button>
 
       <div className="text-sm text-gray-600">
-        {MSG_PAGE_OF.replace('{current}', String(pagination.current_page)).replace('{total}', String(pagination.total_pages))}
+        {MSG_PAGE_OF.replace(
+          "{current}",
+          String(pagination.current_page),
+        ).replace("{total}", String(pagination.total_pages))}
         <span className="text-gray-400 mx-2">|</span>
-        {MSG_SHOWING_RANGE
-          .replace('{start}', String(offset + 1))
-          .replace('{end}', String(Math.min(offset + ITEMS_PER_PAGE, total)))
-          .replace('{total}', String(total))}
+        {MSG_SHOWING_RANGE.replace("{start}", String(offset + 1))
+          .replace("{end}", String(Math.min(offset + ITEMS_PER_PAGE, total)))
+          .replace("{total}", String(total))}
       </div>
 
       <button
@@ -260,13 +279,19 @@ function Pagination({ pagination, total, offset, onPrev, onNext, isLoading }: {
         {PAGINATION_NEXT}
       </button>
     </div>
-  )
+  );
 }
 
-function InstagramImageCard({ image, onClick }: { image: InstagramImage; onClick: () => void }) {
-  const [loaded, setLoaded] = useState(false)
-  const [error, setError] = useState(false)
-  const thumbnailUrl = `/api/images/instagram/${encodeURIComponent(image.key)}/thumbnail`
+function InstagramImageCard({
+  image,
+  onClick,
+}: {
+  image: InstagramImage;
+  onClick: () => void;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+  const thumbnailUrl = `/api/images/instagram/${encodeURIComponent(image.key)}/thumbnail`;
 
   return (
     <div
@@ -285,7 +310,7 @@ function InstagramImageCard({ image, onClick }: { image: InstagramImage; onClick
         <img
           src={thumbnailUrl}
           alt={image.filename}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
           loading="lazy"
           onLoad={() => setLoaded(true)}
           onError={() => setError(true)}
@@ -296,16 +321,24 @@ function InstagramImageCard({ image, onClick }: { image: InstagramImage; onClick
           </div>
         )}
         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <span className="text-white text-sm font-medium">{MSG_CLICK_FOR_DETAILS}</span>
+          <span className="text-white text-sm font-medium">
+            {MSG_CLICK_FOR_DETAILS}
+          </span>
         </div>
       </div>
       <div className="p-2">
         <div className="flex items-start justify-between gap-1">
           <div className="flex flex-col min-w-0">
-            <p className="text-xs font-medium text-gray-900 truncate" title={image.instagram_folder}>
+            <p
+              className="text-xs font-medium text-gray-900 truncate"
+              title={image.instagram_folder}
+            >
               {image.instagram_folder}
             </p>
-            <p className="text-[10px] text-gray-500 uppercase truncate" title={image.source_folder}>
+            <p
+              className="text-[10px] text-gray-500 uppercase truncate"
+              title={image.source_folder}
+            >
               {image.source_folder}
             </p>
           </div>
@@ -315,11 +348,17 @@ function InstagramImageCard({ image, onClick }: { image: InstagramImage; onClick
         </p>
       </div>
     </div>
-  )
+  );
 }
 
-function ImageDetailsModal({ image, onClose }: { image: InstagramImage; onClose: () => void }) {
-  const thumbnailUrl = `/api/images/instagram/${encodeURIComponent(image.key)}/thumbnail`
+function ImageDetailsModal({
+  image,
+  onClose,
+}: {
+  image: InstagramImage;
+  onClose: () => void;
+}) {
+  const thumbnailUrl = `/api/images/instagram/${encodeURIComponent(image.key)}/thumbnail`;
 
   return (
     <Modal onClose={onClose}>
@@ -330,7 +369,11 @@ function ImageDetailsModal({ image, onClose }: { image: InstagramImage; onClose:
           {/* Image Preview */}
           <div className="space-y-4">
             <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-              <img src={thumbnailUrl} alt={image.filename} className="w-full h-full object-contain" />
+              <img
+                src={thumbnailUrl}
+                alt={image.filename}
+                className="w-full h-full object-contain"
+              />
             </div>
 
             <div className="flex gap-2">
@@ -345,7 +388,9 @@ function ImageDetailsModal({ image, onClose }: { image: InstagramImage; onClose:
                 </a>
               ) : (
                 <button
-                  onClick={() => window.open(`file://${image.local_path}`, '_blank')}
+                  onClick={() =>
+                    window.open(`file://${image.local_path}`, "_blank")
+                  }
                   className="flex-1 bg-gray-600 text-white text-center py-2 px-4 rounded-md hover:bg-gray-700 transition-colors text-sm font-medium"
                 >
                   {MODAL_OPEN_LOCAL_FILE}
@@ -360,15 +405,28 @@ function ImageDetailsModal({ image, onClose }: { image: InstagramImage; onClose:
               <div className="space-y-2">
                 <MetadataRow label={LABEL_FILENAME} value={image.filename} />
                 <MetadataRow label={LABEL_MEDIA_KEY} value={image.key} />
-                <MetadataRow label={LABEL_SOURCE_FOLDER} value={image.source_folder} />
-                <MetadataRow label={LABEL_DATE_FOLDER} value={image.instagram_folder} />
-                <MetadataRow label={LABEL_ADDED} value={new Date(image.crawled_at).toLocaleString()} />
+                <MetadataRow
+                  label={LABEL_SOURCE_FOLDER}
+                  value={image.source_folder}
+                />
+                <MetadataRow
+                  label={LABEL_DATE_FOLDER}
+                  value={image.instagram_folder}
+                />
+                <MetadataRow
+                  label={LABEL_ADDED}
+                  value={new Date(image.crawled_at).toLocaleString()}
+                />
               </div>
             </MetadataSection>
 
             {image.image_hash && (
               <MetadataSection title={META_SECTION_IMAGE_ANALYSIS}>
-                <MetadataRow label={LABEL_VISUAL_HASH} value={image.image_hash} monospace />
+                <MetadataRow
+                  label={LABEL_VISUAL_HASH}
+                  value={image.image_hash}
+                  monospace
+                />
                 <p className="text-xs text-gray-500 mt-2">{HASH_EXPLANATION}</p>
               </MetadataSection>
             )}
@@ -377,12 +435,16 @@ function ImageDetailsModal({ image, onClose }: { image: InstagramImage; onClose:
 
             {image.description && (
               <MetadataSection title={META_SECTION_CAPTION}>
-                <p className="text-sm text-gray-800 whitespace-pre-wrap">{image.description}</p>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                  {image.description}
+                </p>
               </MetadataSection>
             )}
 
             <MetadataSection title={META_SECTION_FILE_LOCATION}>
-              <code className="text-xs text-gray-600 break-all">{image.local_path}</code>
+              <code className="text-xs text-gray-600 break-all">
+                {image.local_path}
+              </code>
             </MetadataSection>
           </div>
         </div>
@@ -397,15 +459,15 @@ function ImageDetailsModal({ image, onClose }: { image: InstagramImage; onClose:
         </button>
       </ModalFooter>
     </Modal>
-  )
+  );
 }
 
 function formatMonth(yyyymm: string): string {
-  if (yyyymm.length !== 6) return yyyymm
+  if (yyyymm.length !== 6) return yyyymm;
 
-  const year = yyyymm.substring(0, 4)
-  const month = yyyymm.substring(4, 6)
+  const year = yyyymm.substring(0, 4);
+  const month = yyyymm.substring(4, 6);
 
-  const date = new Date(parseInt(year), parseInt(month) - 1)
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+  const date = new Date(parseInt(year), parseInt(month) - 1);
+  return date.toLocaleDateString("en-US", { year: "numeric", month: "long" });
 }

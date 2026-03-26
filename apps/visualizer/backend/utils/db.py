@@ -1,24 +1,26 @@
 """Database utilities for Flask routes."""
 import os
+import sqlite3
 from functools import wraps
 
 from config import LIBRARY_DB
 from constants.errors import ERROR_DB_NOT_FOUND
 from flask import jsonify
-from tinydb import TinyDB
 
 
 class DatabaseError(Exception):
-    """Custom exception for database errors."""
     pass
 
 
+def _dict_factory(cursor, row):
+    fields = [column[0] for column in cursor.description]
+    return dict(zip(fields, row))
+
+
 def _make_json_response(data, status_code):
-    """Create a JSON response that works with or without Flask app context."""
     try:
         return jsonify(data), status_code
     except RuntimeError:
-        # Outside Flask context, return tuple for testing
         class MockResponse:
             def __init__(self, data_dict):
                 self._json = data_dict
@@ -29,19 +31,7 @@ def _make_json_response(data, status_code):
 
 
 def with_db(handler_func=None, *, require_exists=True):
-    """Decorator that provides database connection to route handlers.
-
-    Usage:
-    @with_db
-    def my_route(db):
-        # db is TinyDB instance, already validated
-        pass
-
-    @with_db(require_exists=False)
-    def optional_route(db):
-        # db may not exist
-        pass
-    """
+    """Decorator that provides SQLite database connection to route handlers."""
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
@@ -52,7 +42,10 @@ def with_db(handler_func=None, *, require_exists=True):
 
             db = None
             try:
-                db = TinyDB(db_path)
+                db = sqlite3.connect(db_path)
+                db.row_factory = _dict_factory
+                db.execute("PRAGMA journal_mode=WAL")
+                db.execute("PRAGMA busy_timeout=5000")
                 return f(db, *args, **kwargs)
             except DatabaseError as e:
                 return _make_json_response({'error': str(e)}, 500)

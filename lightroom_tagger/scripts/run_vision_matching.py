@@ -50,12 +50,12 @@ def resolve_catalog_path(filepath: str) -> str:
 
 def get_all_catalog_images(db) -> list[dict]:
     """Get all catalog images (no filtering)."""
-    return db.table('images').all()
+    return db.execute("SELECT * FROM images").fetchall()
 
 
 def get_all_instagram_images(db) -> list[dict]:
     """Get all Instagram images."""
-    return db.table('instagram_images').all()
+    return db.execute("SELECT * FROM instagram_images").fetchall()
 
 
 def match_with_vision_only(db, insta_image: dict, catalog_images: list) -> list[dict]:

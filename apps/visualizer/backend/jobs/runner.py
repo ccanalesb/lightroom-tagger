@@ -1,5 +1,4 @@
-from database import add_job_log, update_job_status
-from tinydb import Query
+from database import add_job_log, update_job_field, update_job_status
 
 
 class JobRunner:
@@ -24,14 +23,14 @@ class JobRunner:
         update_job_status(self.db, job_id, 'completed', progress=100)
         add_job_log(self.db, job_id, 'info', 'Job completed successfully')
 
-        self.db.table('jobs').update({'result': result}, Query().id == job_id)
+        update_job_field(self.db, job_id, 'result', result)
 
     def fail_job(self, job_id: str, error: str):
         """Mark job as failed."""
         update_job_status(self.db, job_id, 'failed')
         add_job_log(self.db, job_id, 'error', error)
 
-        self.db.table('jobs').update({'error': error}, Query().id == job_id)
+        update_job_field(self.db, job_id, 'error', error)
 
     def cancel_job(self, job_id: str):
         """Cancel a running job."""

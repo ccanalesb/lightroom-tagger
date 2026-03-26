@@ -1,6 +1,5 @@
-from tinydb import Query
-
 from lightroom_tagger.core.database import (
+    _deserialize_row,
     get_vision_comparison,
     store_match,
     store_vision_comparison,
@@ -20,13 +19,21 @@ def query_by_exif(db, insta_exif: dict, date_window_days: int = 7) -> list[dict]
     if not camera and not lens:
         return []
 
-    conditions = []
-    if camera:
-        conditions.append(Query()['exif']['camera'] == camera)
-    if lens:
-        conditions.append(Query()['exif']['lens'] == lens)
+    if camera and lens:
+        sql = (
+            "SELECT * FROM images WHERE "
+            "json_extract(exif, '$.camera') = ? AND json_extract(exif, '$.lens') = ?"
+        )
+        params = (camera, lens)
+    elif camera:
+        sql = "SELECT * FROM images WHERE json_extract(exif, '$.camera') = ?"
+        params = (camera,)
+    else:
+        sql = "SELECT * FROM images WHERE json_extract(exif, '$.lens') = ?"
+        params = (lens,)
 
-    return db.table('catalog_images').search(conditions[0])
+    rows = db.execute(sql, params).fetchall()
+    return [_deserialize_row(r) for r in rows]
 
 def score_candidates(insta_image: dict, candidates: list, phash_weight: float = 0.5, desc_weight: float = 0.5) -> list[dict]:
     """Score candidates by phash distance + description similarity."""
@@ -258,7 +265,8 @@ def find_candidates_by_date(db, insta_image: dict, days_before: int = 90) -> lis
     window_start = post_date - timedelta(days=days_before)
 
     candidates = []
-    for img in db.table('images').all():
+    for row in db.execute("SELECT * FROM images").fetchall():
+        img = _deserialize_row(row)
         date_taken = img.get('date_taken', '')
         if not date_taken:
             continue
