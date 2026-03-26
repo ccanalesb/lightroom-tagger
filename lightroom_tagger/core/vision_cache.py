@@ -56,8 +56,8 @@ def get_or_create_cached_image(db, catalog_key: str, original_path: str) -> Opti
             # Compression failed or not needed, use original
             return original_path
 
-        # Atomic move to final location
-        os.rename(temp_path, target_path)
+        # Atomic move to final location using os.replace to prevent EXDEV errors
+        os.replace(temp_path, target_path)
 
         # Compute pHash and get mtime
         phash = compute_phash(original_path)

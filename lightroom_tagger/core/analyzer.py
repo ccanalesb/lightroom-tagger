@@ -207,7 +207,7 @@ def run_external_agent(path: str) -> str:
 
 
 def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
-                        cached_local_path: str = None, compressed_insta_path: str = None) -> str:
+                        cached_local_path: Optional[str] = None, compressed_insta_path: Optional[str] = None) -> str:
     """Compare two images using vision model via Ollama with compression.
 
     Compresses images to max VISION_MAX_DIMENSION pixels before comparison
