@@ -111,10 +111,18 @@ def add_job_log(db: sqlite3.Connection, job_id: str, level: str, message: str):
     db.commit()
 
 
+_ALLOWED_JOB_UPDATE_FIELDS = frozenset({
+    "metadata", "result", "error", "logs",
+})
+
+
 def update_job_field(db: sqlite3.Connection, job_id: str, field: str, value) -> None:
     """Update a single JSON-serializable field on a job."""
+    if field not in _ALLOWED_JOB_UPDATE_FIELDS:
+        raise ValueError(f"Unsupported job field: {field!r}")
+    column = field  # safe: whitelisted only
     serialized = json.dumps(value) if not isinstance(value, str) else value
-    db.execute(f"UPDATE jobs SET {field} = ? WHERE id = ?", (serialized, job_id))
+    db.execute(f"UPDATE jobs SET {column} = ? WHERE id = ?", (serialized, job_id))
     db.commit()
 
 

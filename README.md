@@ -209,7 +209,6 @@ source .venv/bin/activate
 
 # 2. Install the project and all dependencies
 pip install -e .
-pip install imagehash   # required but not in pyproject.toml yet
 
 # 3. Scan your Lightroom catalog to create library.db
 python3 -m lightroom_tagger scan \
@@ -362,7 +361,7 @@ cd frontend && npm test -- --run
 | npm peer dep conflict | Use `npm install --legacy-peer-deps` |
 | `import.meta.env` TypeScript errors | Add `/// <reference types="vite/client" />` to `vite-env.d.ts` |
 | Port 5000 in use on macOS | AirPlay Receiver uses 5000. Set `FLASK_PORT=5001` in backend `.env` |
-| `ModuleNotFoundError: imagehash` | Run `pip install imagehash` (missing from pyproject.toml) |
+| `ModuleNotFoundError: imagehash` | Run `pip install -e .` so `ImageHash` from pyproject.toml is installed |
 | `ImportError: find_matches from core.hasher` | It's in `core/phash.py`, not `core/hasher.py`. Check `core/__init__.py` |
 | Instagram import finds 0 files | Pass the dump root dir, not `media/`. The reader appends `/media` itself |
 | `externally-managed-environment` on pip install | Use a venv: `python3 -m venv .venv && source .venv/bin/activate` |

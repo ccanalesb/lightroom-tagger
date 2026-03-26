@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import sqlite3
@@ -302,7 +303,10 @@ def search_by_keyword(db: sqlite3.Connection, keyword: str) -> list[dict]:
     pattern = f'%{keyword}%'
     rows = db.execute("""
         SELECT * FROM images
-        WHERE keywords LIKE ? OR filename LIKE ? OR title LIKE ? OR description LIKE ?
+        WHERE keywords LIKE ? COLLATE NOCASE
+           OR filename LIKE ? COLLATE NOCASE
+           OR title LIKE ? COLLATE NOCASE
+           OR description LIKE ? COLLATE NOCASE
     """, (pattern, pattern, pattern, pattern)).fetchall()
     return [_deserialize_row(r) for r in rows]
 
@@ -592,12 +596,27 @@ def init_instagram_table(db: sqlite3.Connection):
     pass
 
 
+def _instagram_row_key(local_path: str | None, post_url: str, filename: str) -> str:
+    """Stable primary key for instagram_images (new rows)."""
+    basis = (local_path or "").strip() or f"{post_url}|{filename}"
+    return "insta_" + hashlib.sha256(basis.encode("utf-8", errors="replace")).hexdigest()
+
+
 def store_instagram_image(db: sqlite3.Connection, record: dict) -> str:
     """Store Instagram image with analysis. Idempotent by local_path."""
     local_path = record.get('local_path')
     post_url = record.get('post_url', '')
     filename = record.get('filename', '')
-    key = f"insta_{datetime.now().strftime('%Y-%m-%d')}_{post_url.split('/')[-2] if post_url else 'unknown'}_{filename}"
+    key = None
+    if local_path:
+        row = db.execute(
+            "SELECT key FROM instagram_images WHERE local_path = ? LIMIT 1",
+            (local_path,),
+        ).fetchone()
+        if row:
+            key = row["key"]
+    if key is None:
+        key = _instagram_row_key(local_path, post_url, filename)
     record['key'] = key
     record['crawled_at'] = datetime.now().isoformat()
 
@@ -610,7 +629,10 @@ def store_instagram_image(db: sqlite3.Connection, record: dict) -> str:
         ON CONFLICT(key) DO UPDATE SET
             local_path=excluded.local_path, post_url=excluded.post_url,
             filename=excluded.filename, description=excluded.description,
-            image_hash=excluded.image_hash, crawled_at=excluded.crawled_at
+            image_hash=excluded.image_hash, instagram_folder=excluded.instagram_folder,
+            crawled_at=excluded.crawled_at,
+            phash=COALESCE(excluded.phash, instagram_images.phash),
+            exif=COALESCE(excluded.exif, instagram_images.exif)
     """, (
         key, local_path, post_url, filename, record.get('description'),
         record.get('image_hash'), record.get('instagram_folder'),

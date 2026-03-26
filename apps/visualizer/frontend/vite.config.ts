@@ -1,27 +1,30 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const backendPort = process.env.VITE_BACKEND_PORT || '5001'
-const backendUrl = `http://localhost:${backendPort}`
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const backendPort = env.VITE_BACKEND_PORT || '5001'
+  const backendUrl = `http://localhost:${backendPort}`
 
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: 5173,
-    proxy: {
-      '/api': {
-        target: backendUrl,
-        changeOrigin: true,
-      },
-      '/socket.io': {
-        target: backendUrl,
-        ws: true,
+  return {
+    plugins: [react()],
+    server: {
+      port: 5173,
+      proxy: {
+        '/api': {
+          target: backendUrl,
+          changeOrigin: true,
+        },
+        '/socket.io': {
+          target: backendUrl,
+          ws: true,
+        },
       },
     },
-  },
-  test: {
-    environment: 'jsdom',
-    globals: true,
-    setupFiles: './src/test/setup.ts',
-  },
+    test: {
+      environment: 'jsdom',
+      globals: true,
+      setupFiles: './src/test/setup.ts',
+    },
+  }
 })
