@@ -23,7 +23,7 @@ def get_or_create_cached_image(db, catalog_key: str, original_path: str) -> str 
     then atomically moves to final location to prevent corruption.
 
     Args:
-        db: TinyDB instance
+        db: sqlite3 connection
         catalog_key: Unique key for the catalog image
         original_path: Path to original image file
 
@@ -50,16 +50,17 @@ def get_or_create_cached_image(db, catalog_key: str, original_path: str) -> str 
     # Compress to temp file first (atomic write pattern)
     try:
         temp_path = compress_image(original_path)
+
+        phash = compute_phash(original_path)
+        original_mtime = os.path.getmtime(original_path)
+
         if temp_path == original_path:
-            # Compression failed or not needed, use original
+            # Compression not possible (e.g. RAW/DNG), cache points to original
+            store_vision_cached_image(db, catalog_key, original_path, phash or '', original_mtime)
             return original_path
 
         # Atomic move to final location using os.replace to prevent EXDEV errors
         os.replace(temp_path, target_path)
-
-        # Compute pHash and get mtime
-        phash = compute_phash(original_path)
-        original_mtime = os.path.getmtime(original_path)
 
         # Store in database
         store_vision_cached_image(db, catalog_key, target_path, phash or '', original_mtime)
@@ -78,7 +79,7 @@ def get_cached_phash(db, catalog_key: str) -> str | None:
     """Get pre-computed pHash from cache.
 
     Args:
-        db: TinyDB instance
+        db: sqlite3 connection
         catalog_key: Key of catalog image
 
     Returns:

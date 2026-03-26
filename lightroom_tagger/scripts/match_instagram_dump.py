@@ -29,7 +29,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
-        db: TinyDB instance
+        db: sqlite3 connection
         threshold: Minimum score threshold for match (default 0.7)
         batch_size: Maximum number of unprocessed media to process (None = all)
         month: Filter Instagram by month (e.g., '202603')

@@ -1,10 +1,10 @@
 import os
+import sqlite3
 import subprocess
 import sys
 
 import config
 from flask import Blueprint, jsonify
-from tinydb import TinyDB
 
 # Add project root for lightroom_tagger imports
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -67,13 +67,14 @@ def get_stats():
         if not os.path.exists(db_path):
             return jsonify({'error': 'Library database not found'}), 404
 
-        db = TinyDB(db_path)
+        db = sqlite3.connect(db_path)
+        db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
 
-        images = db.table('images').all()
-        instagram_images = db.table('instagram_dump_media').all()
+        images = db.execute("SELECT * FROM images").fetchall()
+        instagram_images = db.execute("SELECT * FROM instagram_dump_media").fetchall()
 
         posted_count = sum(1 for img in images if img.get('instagram_posted'))
-        matches = db.table('matches').all() if 'matches' in db.tables() else []
+        matches = db.execute("SELECT * FROM matches").fetchall()
 
         stats = {
             'catalog_images': len(images),
@@ -100,7 +101,8 @@ def get_cache_status():
         if not os.path.exists(db_path):
             return jsonify({'error': 'Library database not found'}), 404
 
-        db = TinyDB(db_path)
+        db = sqlite3.connect(db_path)
+        db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
 
         cache_stats = get_cache_stats(db)
 

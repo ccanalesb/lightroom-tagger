@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lightroom Tagger - Index Lightroom catalog metadata to TinyDB."""
+"""Lightroom Tagger - Index Lightroom catalog metadata to SQLite."""
 
 from lightroom_tagger.cli import main as cli_main
 

@@ -4,8 +4,6 @@
 import json
 import os
 
-from tinydb import Query
-
 from lightroom_tagger.core.analyzer import compare_with_vision, vision_score
 from lightroom_tagger.core.database import init_database
 
@@ -21,11 +19,11 @@ def main():
     catalog_filenames = ['L1007166', 'L1007167', 'L1007168']
     catalog_base_path = "/mnt/tnas/Lightroom Server/Fotos/2026/Street"
 
-    # Get Instagram images
-    Insta = Query()
     insta_images = []
     for folder in insta_folders:
-        images = db.table('instagram_images').search(Insta.instagram_folder == folder)
+        images = db.execute(
+            "SELECT * FROM instagram_images WHERE instagram_folder = ?", (folder,)
+        ).fetchall()
         insta_images.extend(images)
 
     print(f"Instagram images to test: {len(insta_images)}")
