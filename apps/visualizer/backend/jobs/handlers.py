@@ -145,9 +145,9 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
 
     runner.update_progress(job_id, 10, 'Initializing enrichment...')
 
+    config = load_config()
     db_path = os.getenv('LIBRARY_DB')
     if not db_path:
-        config = load_config()
         db_path = config.db_path or 'library.db'
 
     if not os.path.exists(db_path):
@@ -158,11 +158,9 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
         db = init_database(db_path)
         init_catalog_table(db)
 
-        # Get images that need enrichment
         catalog_images = get_catalog_images_needing_analysis(db)
 
         if not catalog_images:
-            # If catalog table is empty, get from main images table
             from lightroom_tagger.core.database import get_all_images
             all_images = get_all_images(db)
             catalog_images = [img for img in all_images if not img.get('analyzed_at')]
@@ -183,17 +181,14 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
                     skipped += 1
                     continue
 
-                # Analyze image
                 analysis = analyze_image(filepath)
 
-                # Update record with analysis
                 enriched_record = {
                     'key': key,
                     'filepath': filepath,
                     'analyzed_at': analysis.get('analyzed_at', 'unknown'),
                     'phash': analysis.get('phash'),
                     'exif': analysis.get('exif', {}),
-                    'description': analysis.get('description', ''),
                     'catalog_path': record.get('catalog_path', ''),
                     'date_taken': record.get('date_taken', ''),
                     'filename': record.get('filename', ''),
@@ -201,21 +196,19 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
                     'keywords': record.get('keywords', []),
                     'color_label': record.get('color_label', ''),
                     'title': record.get('title', ''),
-                    'description': record.get('description', ''),
+                    'description': analysis.get('description', record.get('description', '')),
                 }
 
-                # Store in catalog table
                 from lightroom_tagger.core.database import store_catalog_image
                 store_catalog_image(db, enriched_record)
 
-                # Create vision cache
                 if config.vision_cache_enabled:
                     get_or_create_cached_image(db, key, filepath)
 
                 processed += 1
 
                 if (i + 1) % 10 == 0 or i == total - 1:
-                    progress = int(20 + (processed / total) * 70)  # Scale to 20-90%
+                    progress = int(20 + (processed / total) * 70)
                     runner.update_progress(job_id, progress, f'Processed {processed}/{total} images')
 
             except Exception as e:
