@@ -72,7 +72,7 @@ fi
 echo "Starting backend on http://127.0.0.1:5000 ..."
 (
   cd "$BACKEND_DIR"
-  python3 app.py
+  exec env PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 app.py
 ) &
 BACKEND_PID=$!
 echo "$BACKEND_PID" > "$BACKEND_PID_FILE"
@@ -80,7 +80,7 @@ echo "$BACKEND_PID" > "$BACKEND_PID_FILE"
 echo "Starting frontend on http://localhost:5173 ..."
 (
   cd "$FRONTEND_DIR"
-  npm run dev
+  exec "$FRONTEND_DIR/node_modules/.bin/vite"
 ) &
 FRONTEND_PID=$!
 echo "$FRONTEND_PID" > "$FRONTEND_PID_FILE"

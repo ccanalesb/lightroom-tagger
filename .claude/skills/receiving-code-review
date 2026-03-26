@@ -1,0 +1,76 @@
+# Receiving Code Review
+
+## Description
+
+Use when reviewing code from subagents or receiving review feedback - evaluates code feedback systematically.
+
+## Overview
+
+Not all review feedback is created equal. Categorize, prioritize, and act on feedback systematically.
+
+**Core principle:** Categorize feedback → Prioritize → Act → Re-verify.
+
+## The Process
+
+### Step 1: Categorize Feedback
+
+For each feedback item, categorize:
+
+| Category | Description | Example |
+|----------|-------------|---------|
+| **Must Fix** | Bugs, security, correctness | "Off-by-one error" |
+| **Should Fix** | Style, clarity, maintainability | "Add early return" |
+| **Could Fix** | Nice to have | "Add more comments" |
+| **Disagree** | Intentional choice | "Prefer different approach" |
+| **Ask** | Need clarification | "Why did...?" |
+
+### Step 2: Prioritize
+
+Order of implementation:
+
+1. **Must Fix** - Blockers only
+2. **Should Fix** - Quality improvements
+3. **Ask** - Clarify before acting
+4. **Could Fix** - If time permits
+5. **Disagree** - Discuss or justify
+
+### Step 3: Act
+
+**For each Must Fix:**
+- Revert to before review (fresh context)
+- Use Agent or implement directly
+- Verify with tests
+- Re-request review
+
+**For Should/Could Fixes:**
+- Batch if small
+- Separate if significant
+- Each batch gets re-review
+
+### Step 4: Re-verify
+
+After all changes:
+- Run tests
+- Re-read relevant code
+- Confirm feedback addressed
+
+## Feedback Response Examples
+
+| Feedback | Analysis | Response |
+|----------|----------|----------|
+| "Magic number" | Should Fix | Extract constant |
+| "Missing test for error" | Must Fix | Add test then fix bug |
+| "This is fragile" | Ask | "How would you make it more robust?" |
+
+## Red Flags
+
+- Ignoring "Must Fix" feedback
+- Arguing over "Could Fix" items
+- Making multiple changes without testing between
+- Not re-verifying after changes
+
+## Integration
+
+**Used by:**
+- subagent-driven-development - Spec and code quality reviewers report findings
+- executing-plans - User reviews work between batches

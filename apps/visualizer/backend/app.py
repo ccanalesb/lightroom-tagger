@@ -1,11 +1,18 @@
+import os
+import sys
+import threading
+import time
+
 from flask import Flask
 from flask_cors import CORS
 from flask_socketio import SocketIO
+
 import config
-import os
-import threading
-import time
 from database import init_db, get_pending_jobs, get_job, update_job_status
+
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
 
 db = None
 socketio = None

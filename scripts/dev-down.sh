@@ -28,6 +28,42 @@ stop_pid_file() {
   rm -f "$file"
 }
 
+wait_for_port_to_clear() {
+  local port="$1"
+  local label="$2"
+  local attempt
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    return
+  fi
+
+  for attempt in {1..20}; do
+    if python3 - "$port" <<'PY'
+import socket
+import sys
+
+port = int(sys.argv[1])
+s = socket.socket()
+try:
+    s.bind(("127.0.0.1", port))
+except OSError:
+    raise SystemExit(1)
+finally:
+    s.close()
+PY
+    then
+      if [[ "$attempt" -gt 1 ]]; then
+        echo "$label: port $port is now free"
+      fi
+      return
+    fi
+
+    sleep 0.25
+  done
+
+  echo "$label: port $port still appears busy after waiting"
+}
+
 stop_pid_file "backend" "$BACKEND_PID_FILE"
 stop_pid_file "frontend" "$FRONTEND_PID_FILE"
 
@@ -43,6 +79,7 @@ kill_port_if_busy() {
   if fuser "${port}/tcp" >/dev/null 2>&1; then
     fuser -k "${port}/tcp" >/dev/null 2>&1 || true
     echo "$label: killed process(es) on port $port"
+    wait_for_port_to_clear "$port" "$label"
   else
     echo "$label: port $port already free"
   fi
@@ -50,4 +87,3 @@ kill_port_if_busy() {
 
 kill_port_if_busy 5000 "backend"
 kill_port_if_busy 5173 "frontend"
-

@@ -21,7 +21,18 @@ from lightroom_tagger.database import (
 )
 from lightroom_tagger.instagram_scraper import crawl_instagram
 from lightroom_tagger.image_hasher import compute_phash, find_matches
+from lightroom_tagger.core.database import get_all_images, get_catalog_images_needing_analysis, init_catalog_table, store_catalog_image
+from lightroom_tagger.core.vision_cache import get_or_create_cached_image
+from lightroom_tagger.core.config import load_config
+from lightroom_tagger.core.analyzer import analyze_image
 from lightroom_tagger.lr_writer import add_keyword_to_images_batch
+from lightroom_tagger.core.database import (
+    get_all_images, get_catalog_images_needing_analysis,
+    init_catalog_table, store_catalog_image
+)
+from lightroom_tagger.core.vision_cache import get_or_create_cached_image
+from lightroom_tagger.core.config import load_config
+from lightroom_tagger.core.analyzer import analyze_image
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -203,6 +214,22 @@ def create_parser() -> argparse.ArgumentParser:
         "--output-dir",
         default="/tmp/instagram_images",
         help="Directory to download Instagram images"
+    )
+
+    enrich_parser = subparsers.add_parser("enrich-catalog", help="Enrich catalog with metadata")
+    enrich_parser.add_argument(
+        "--db",
+        help="Path to TinyDB (overrides global)"
+    )
+    enrich_parser.add_argument(
+        "--limit",
+        type=int,
+        help="Limit number of images to process"
+    )
+    enrich_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be processed"
     )
 
     return parser
@@ -395,8 +422,124 @@ def cmd_stats(args, config):
         return 1
 
 
-def cmd_instagram_sync(args, config):
-    """Sync Instagram posts with local catalog."""
+def enrich_catalog_images(db, limit=None):
+    """Enrich catalog images with metadata and vision cache.
+
+    Args:
+        db: TinyDB instance
+        limit: Maximum number of images to process
+
+    Returns:
+        dict with processed, skipped, errors counts
+    """
+    from lightroom_tagger.core.database import (
+        get_all_images, get_catalog_images_needing_analysis,
+        init_catalog_table, store_catalog_image
+    )
+    from lightroom_tagger.core.vision_cache import get_or_create_cached_image
+    from lightroom_tagger.core.config import load_config
+    from lightroom_tagger.core.analyzer import analyze_image
+
+    config = load_config()
+    processed = 0
+    skipped = 0
+    errors = 0
+
+    init_catalog_table(db)
+
+    print("Enriching catalog images...")
+
+    try:
+        # Get images that need enrichment
+        catalog_images = get_catalog_images_needing_analysis(db)
+
+        if not catalog_images:
+            # If catalog table is empty, get from main images table
+            print("Catalog table empty, getting from main images table...")
+            all_images = get_all_images(db)
+            catalog_images = [img for img in all_images if not img.get('analyzed_at')]
+
+        print(f"Found {len(catalog_images)} images to enrich")
+
+        for i, record in enumerate(catalog_images):
+            if limit and i >= limit:
+                break
+
+            try:
+                key = record.get('key')
+                filepath = record.get('filepath')
+
+                if not key or not filepath:
+                    print(f"Skipping record with missing key/filepath: {record}")
+                    skipped += 1
+                    continue
+
+                # Analyze image
+                analysis = analyze_image(filepath)
+
+                # Update record with analysis
+                enriched_record = {
+                    'key': key,
+                    'filepath': filepath,
+                    'analyzed_at': analysis.get('analyzed_at', 'unknown'),
+                    'phash': analysis.get('phash'),
+                    'exif': analysis.get('exif', {}),
+                    'description': analysis.get('description', ''),
+                    'catalog_path': record.get('catalog_path', ''),
+                    'date_taken': record.get('date_taken', ''),
+                    'filename': record.get('filename', ''),
+                    'rating': record.get('rating', 0),
+                    'keywords': record.get('keywords', []),
+                    'color_label': record.get('color_label', ''),
+                    'title': record.get('title', ''),
+                    'description': record.get('description', ''),
+                }
+
+                # Store in catalog table
+                store_catalog_image(db, enriched_record)
+
+                # Create vision cache
+                if config.vision_cache_enabled:
+                    get_or_create_cached_image(db, key, filepath)
+
+                processed += 1
+
+                if args.verbose or (i + 1) % 10 == 0:
+                    print(f"Processed {i + 1}/{len(catalog_images)}")
+
+            except Exception as e:
+                print(f"Error processing image {i + 1}: {e}")
+                errors += 1
+
+        print(f"Enrichment complete: {processed} processed, {skipped} skipped, {errors} errors")
+        return {'processed': processed, 'skipped': skipped, 'errors': errors}
+
+    except Exception as e:
+        print(f"Error during enrichment: {e}")
+        return {'processed': 0, 'skipped': 0, 'errors': 1}
+
+
+def cmd_enrich_catalog(args, config):
+    """Enrich catalog with metadata."""
+    db_path = args.db or config.db_path
+    limit = args.limit
+    dry_run = args.dry_run
+
+    if dry_run:
+        print("Dry run mode - will show what would be processed")
+
+    try:
+        db = init_database(db_path)
+        result = enrich_catalog_images(db, limit=limit)
+        db.close()
+
+        print(f"Processed: {result['processed']} images")
+        print(f"Skipped: {result['skipped']} images")
+        print(f"Errors: {result['errors']} errors")
+        return 0
+    except Exception as e:
+        print(f"Error: {e}")
+        return 1
     db_path = args.db or config.db_path
     
     if not db_path:
@@ -561,6 +704,8 @@ def main():
         return cmd_stats(args, config)
     elif args.command == "instagram-sync":
         return cmd_instagram_sync(args, config)
+    elif args.command == "enrich-catalog":
+        return cmd_enrich_catalog(args, config)
     else:
         parser.print_help()
         return 1
