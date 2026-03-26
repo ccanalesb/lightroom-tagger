@@ -3,12 +3,11 @@ import sys
 import threading
 import time
 
+import config
+from database import get_job, get_pending_jobs, init_db
 from flask import Flask
 from flask_cors import CORS
 from flask_socketio import SocketIO
-
-import config
-from database import init_db, get_pending_jobs, get_job, update_job_status
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 if REPO_ROOT not in sys.path:
@@ -31,7 +30,7 @@ def create_app():
     db = init_db(db_path)
     app.db = db
 
-    from api import jobs, images, system
+    from api import images, jobs, system
     app.register_blueprint(jobs.bp, url_prefix='/api/jobs')
     app.register_blueprint(images.bp, url_prefix='/api/images')
     app.register_blueprint(system.bp, url_prefix='/api')
@@ -51,10 +50,10 @@ def _job_processor():
     """Background thread that processes pending jobs."""
     global db, socketio, job_processor_running
 
-    from jobs.runner import JobRunner
     from jobs.handlers import JOB_HANDLERS
+    from jobs.runner import JobRunner
 
-    runner = JobRunner(db, emit_progress=lambda job_id, progress, step: 
+    runner = JobRunner(db, emit_progress=lambda job_id, progress, step:
         socketio.emit('job_updated', get_job(db, job_id)) if socketio else None)
 
     while job_processor_running:
@@ -65,7 +64,7 @@ def _job_processor():
                 job_id = job.get('id', 'unknown')
                 job_type = job.get('type', 'unknown')
                 metadata = job.get('metadata', {})
-                
+
                 print(f"Processing job {job_id}: type={job_type}, status={job.get('status')}")
 
                 # Mark as running

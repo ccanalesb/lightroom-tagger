@@ -1,12 +1,11 @@
 """Instagram dump reader - discovers and parses Instagram data dump files."""
-import os
+import contextlib
 import json
-from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Optional
+from pathlib import Path
 
 
-def discover_media_files(dump_path: str) -> List[Dict]:
+def discover_media_files(dump_path: str) -> list[dict]:
     """Discover all media files in Instagram dump directory.
 
     Args:
@@ -69,7 +68,7 @@ def discover_media_files(dump_path: str) -> List[Dict]:
                     break
 
             filename_without_ext = file_path.stem
-            
+
             if date_folder:
                 # Standard case: posts/202603/17940060624158613.jpg
                 media_key = f"{date_folder}/{filename_without_ext}"
@@ -90,7 +89,7 @@ def discover_media_files(dump_path: str) -> List[Dict]:
     return sorted(media_files, key=lambda x: x['media_key'])
 
 
-def parse_posts_metadata(dump_path: str) -> Dict[str, Dict]:
+def parse_posts_metadata(dump_path: str) -> dict[str, dict]:
     """Parse posts_1.json to extract metadata for each media file.
 
     Args:
@@ -117,9 +116,9 @@ def parse_posts_metadata(dump_path: str) -> Dict[str, Dict]:
         return metadata
 
     try:
-        with open(posts_json, 'r', encoding='utf-8') as f:
+        with open(posts_json, encoding='utf-8') as f:
             posts = json.load(f)
-    except (json.JSONDecodeError, IOError):
+    except (OSError, json.JSONDecodeError):
         return metadata
 
     for post in posts:
@@ -160,10 +159,8 @@ def parse_posts_metadata(dump_path: str) -> Dict[str, Dict]:
             creation_ts = media.get('creation_timestamp') or post_timestamp
             created_at = None
             if creation_ts:
-                try:
+                with contextlib.suppress(ValueError, OSError):
                     created_at = datetime.fromtimestamp(creation_ts).isoformat()
-                except (ValueError, OSError):
-                    pass
 
             # Use media title if available, otherwise post title
             caption = media.get('title', '') or post_caption
@@ -202,7 +199,7 @@ def parse_posts_metadata(dump_path: str) -> Dict[str, Dict]:
     return metadata
 
 
-def _extract_media_key_from_uri(uri: str) -> Optional[str]:
+def _extract_media_key_from_uri(uri: str) -> str | None:
     """Extract media_key from URI like media/posts/202603/17940060624158613.jpg."""
     parts = uri.replace('\\', '/').split('/')
     if len(parts) >= 2:
@@ -220,7 +217,7 @@ def _extract_media_key_from_uri(uri: str) -> Optional[str]:
     return None
 
 
-def parse_archived_posts_metadata(dump_path: str) -> Dict[str, Dict]:
+def parse_archived_posts_metadata(dump_path: str) -> dict[str, dict]:
     """Parse archived_posts.json to extract EXIF-rich metadata.
 
     Args:
@@ -236,9 +233,9 @@ def parse_archived_posts_metadata(dump_path: str) -> Dict[str, Dict]:
         return metadata
 
     try:
-        with open(json_path, 'r', encoding='utf-8') as f:
+        with open(json_path, encoding='utf-8') as f:
             data = json.load(f)
-    except (json.JSONDecodeError, IOError):
+    except (OSError, json.JSONDecodeError):
         return metadata
 
     archived_posts = data.get('ig_archived_post_media', [])
@@ -266,10 +263,8 @@ def parse_archived_posts_metadata(dump_path: str) -> Dict[str, Dict]:
             creation_ts = media.get('creation_timestamp') or post_timestamp
             created_at = None
             if creation_ts:
-                try:
+                with contextlib.suppress(ValueError, OSError):
                     created_at = datetime.fromtimestamp(creation_ts).isoformat()
-                except (ValueError, OSError):
-                    pass
 
             caption = media.get('title', '') or post_caption
 
@@ -297,7 +292,7 @@ def parse_archived_posts_metadata(dump_path: str) -> Dict[str, Dict]:
     return metadata
 
 
-def parse_other_content_metadata(dump_path: str) -> Dict[str, Dict]:
+def parse_other_content_metadata(dump_path: str) -> dict[str, dict]:
     """Parse other_content.json to extract metadata.
 
     Args:
@@ -313,9 +308,9 @@ def parse_other_content_metadata(dump_path: str) -> Dict[str, Dict]:
         return metadata
 
     try:
-        with open(json_path, 'r', encoding='utf-8') as f:
+        with open(json_path, encoding='utf-8') as f:
             data = json.load(f)
-    except (json.JSONDecodeError, IOError):
+    except (OSError, json.JSONDecodeError):
         return metadata
 
     other_posts = data.get('ig_other_media', [])
@@ -336,10 +331,8 @@ def parse_other_content_metadata(dump_path: str) -> Dict[str, Dict]:
             creation_ts = media.get('creation_timestamp') or post_timestamp
             created_at = None
             if creation_ts:
-                try:
+                with contextlib.suppress(ValueError, OSError):
                     created_at = datetime.fromtimestamp(creation_ts).isoformat()
-                except (ValueError, OSError):
-                    pass
 
             caption = media.get('title', '') or post_caption
 
@@ -353,7 +346,7 @@ def parse_other_content_metadata(dump_path: str) -> Dict[str, Dict]:
     return metadata
 
 
-def parse_saved_and_reposted_urls(dump_path: str) -> Dict[int, str]:
+def parse_saved_and_reposted_urls(dump_path: str) -> dict[int, str]:
     """Parse saved_posts.json and reposts.json to extract Instagram URLs.
 
     Matches by creation_timestamp to link URLs to dump media.
@@ -369,7 +362,7 @@ def parse_saved_and_reposted_urls(dump_path: str) -> Dict[int, str]:
     saved_path = Path(dump_path) / 'your_instagram_activity' / 'saved' / 'saved_posts.json'
     if saved_path.exists():
         try:
-            with open(saved_path, 'r', encoding='utf-8') as f:
+            with open(saved_path, encoding='utf-8') as f:
                 data = json.load(f)
 
             saved_media = data.get('saved_saved_media', [])
@@ -382,13 +375,13 @@ def parse_saved_and_reposted_urls(dump_path: str) -> Dict[int, str]:
 
                 if url and timestamp:
                     url_lookup[timestamp] = url
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             pass
 
     reposts_path = Path(dump_path) / 'your_instagram_activity' / 'media' / 'reposts.json'
     if reposts_path.exists():
         try:
-            with open(reposts_path, 'r', encoding='utf-8') as f:
+            with open(reposts_path, encoding='utf-8') as f:
                 reposts = json.load(f)
 
             for repost in reposts:
@@ -405,7 +398,7 @@ def parse_saved_and_reposted_urls(dump_path: str) -> Dict[int, str]:
 
                             if url and timestamp:
                                 url_lookup[timestamp] = url
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             pass
 
     return url_lookup

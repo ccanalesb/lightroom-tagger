@@ -13,10 +13,12 @@ export interface Job {
   progress: number
   current_step: string | null
   logs: JobLog[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result: any | null
   error: string | null
   created_at: string
   started_at: string | null
   completed_at: string | null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   metadata: Record<string, any>
 }

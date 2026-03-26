@@ -1,5 +1,6 @@
 from flask_socketio import emit, join_room, leave_room
 
+
 def register_socket_events(socketio):
     @socketio.on('connect')
     def handle_connect():

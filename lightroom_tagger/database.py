@@ -1,6 +1,6 @@
-from tinydb import TinyDB, Query
-from typing import Optional
 import os
+
+from tinydb import Query, TinyDB
 
 
 def init_database(db_path: str) -> TinyDB:
@@ -22,7 +22,7 @@ def store_image(db, record: dict) -> str:
     """Store image record, return key. Upsert if exists."""
     key = generate_key(record)
     record['key'] = key
-    
+
     default_instagram_fields = {
         'instagram_posted': False,
         'instagram_post_date': None,
@@ -33,10 +33,10 @@ def store_image(db, record: dict) -> str:
     for field, default_val in default_instagram_fields.items():
         if field not in record:
             record[field] = default_val
-    
+
     Image = Query()
     existing = db.search(Image.key == key)
-    
+
     if existing:
         existing_record = existing[0]
         for field, value in default_instagram_fields.items():
@@ -45,7 +45,7 @@ def store_image(db, record: dict) -> str:
         db.update(record, Image.key == key)
     else:
         db.insert(record)
-    
+
     return key
 
 
@@ -125,10 +125,10 @@ def clear_all(db) -> int:
     return count
 
 
-def update_instagram_status(db, key: str, posted: bool = True, post_date: str = None, 
+def update_instagram_status(db, key: str, posted: bool = True, post_date: str = None,
                            url: str = None, index: int = 0) -> bool:
     """Update Instagram status for an image.
-    
+
     Args:
         db: TinyDB instance
         key: Image key
@@ -136,23 +136,23 @@ def update_instagram_status(db, key: str, posted: bool = True, post_date: str = 
         post_date: Date of Instagram post (ISO format)
         url: Instagram post URL
         index: Index in carousel (0 for single image)
-    
+
     Returns:
         True if updated, False if not found
     """
     Image = Query()
     existing = db.search(Image.key == key)
-    
+
     if not existing:
         return False
-    
+
     updates = {
         'instagram_posted': posted,
         'instagram_post_date': post_date,
         'instagram_url': url,
         'instagram_index': index,
     }
-    
+
     db.update(updates, Image.key == key)
     return True
 
@@ -166,28 +166,28 @@ def search_by_instagram_posted(db, posted: bool = True) -> list[dict]:
 def get_images_without_hash(db) -> list[dict]:
     """Get all images that don't have a computed hash yet."""
     Image = Query()
-    return db.search(Image.image_hash == None)
+    return db.search(Image.image_hash is None)
 
 
 def update_image_hash(db, key: str, image_hash: str) -> bool:
     """Update the image hash for an image."""
     Image = Query()
     existing = db.search(Image.key == key)
-    
+
     if not existing:
         return False
-    
+
     db.update({'image_hash': image_hash}, Image.key == key)
     return True
 
 
 def batch_update_hashes(db, updates: list[dict]) -> int:
     """Batch update image hashes.
-    
+
     Args:
         db: TinyDB instance
         updates: List of dicts with 'key' and 'image_hash'
-    
+
     Returns:
         Number of updates made
     """
@@ -195,21 +195,20 @@ def batch_update_hashes(db, updates: list[dict]) -> int:
     for update in updates:
         key = update.get('key')
         image_hash = update.get('image_hash')
-        if key and image_hash:
-            if update_image_hash(db, key, image_hash):
-                count += 1
+        if key and image_hash and update_image_hash(db, key, image_hash):
+            count += 1
     return count
 
 
 if __name__ == "__main__":
     import tempfile
-    
+
     with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
         db_path = f.name
-    
+
     print(f"Testing database at: {db_path}")
     db = init_database(db_path)
-    
+
     test_records = [
         {
             'date_taken': '2024-01-15',
@@ -239,35 +238,35 @@ if __name__ == "__main__":
             'description': 'Beautiful bloom'
         }
     ]
-    
+
     print("\n--- Testing store_images_batch ---")
     count = store_images_batch(db, test_records)
     print(f"Stored {count} records")
-    
+
     print("\n--- Testing get_image_count ---")
     print(f"Total images: {get_image_count(db)}")
-    
+
     print("\n--- Testing get_image ---")
     key = generate_key(test_records[0])
     img = get_image(db, key)
     print(f"Retrieved: {img['title'] if img else 'Not found'}")
-    
+
     print("\n--- Testing search_by_rating ---")
     results = search_by_rating(db, 5)
     print(f"Images with rating >= 5: {len(results)}")
-    
+
     print("\n--- Testing search_by_date ---")
     results = search_by_date(db, '2024-01-01', '2024-02-28')
     print(f"Images in Jan-Feb 2024: {len(results)}")
-    
+
     print("\n--- Testing search_by_keyword ---")
     results = search_by_keyword(db, 'nature')
     print(f"Images with 'nature' keyword: {len(results)}")
-    
+
     print("\n--- Testing search_by_color_label ---")
     results = search_by_color_label(db, 'Red')
     print(f"Images with Red label: {len(results)}")
-    
+
     print("\n--- Testing upsert ---")
     updated_record = {
         'date_taken': '2024-01-15',
@@ -282,15 +281,15 @@ if __name__ == "__main__":
     img = get_image(db, new_key)
     print(f"Updated title: {img['title']}")
     print(f"Total count after upsert: {get_image_count(db)}")
-    
+
     print("\n--- Testing delete_image ---")
     deleted = delete_image(db, new_key)
     print(f"Deleted: {deleted}, count: {get_image_count(db)}")
-    
+
     print("\n--- Testing clear_all ---")
     count = clear_all(db)
     print(f"Cleared {count} records")
-    
+
     db.close()
     os.unlink(db_path)
     print("\nAll tests passed!")

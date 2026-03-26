@@ -1,34 +1,36 @@
 import argparse
-import json
 import csv
+import json
 import sys
 from pathlib import Path
 
-from lightroom_tagger.config import load_config
-from lightroom_tagger.catalog_reader import connect_catalog, get_image_records, get_image_count
-from lightroom_tagger.database import (
-    init_database,
-    store_images_batch,
-    get_image_count as db_get_image_count,
-    search_by_keyword,
-    search_by_rating,
-    search_by_date,
-    search_by_color_label,
-    get_all_images,
-    update_instagram_status,
-    get_images_without_hash,
-    batch_update_hashes,
-)
-from lightroom_tagger.instagram_scraper import crawl_instagram
-from lightroom_tagger.image_hasher import compute_phash, find_matches
-from lightroom_tagger.lr_writer import add_keyword_to_images_batch
+from lightroom_tagger.catalog_reader import connect_catalog, get_image_count, get_image_records
+from lightroom_tagger.core.analyzer import analyze_image
+from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import (
-    get_all_images, get_catalog_images_needing_analysis,
-    init_catalog_table, store_catalog_image
+    get_catalog_images_needing_analysis,
+    init_catalog_table,
+    store_catalog_image,
 )
 from lightroom_tagger.core.vision_cache import get_or_create_cached_image
-from lightroom_tagger.core.config import load_config
-from lightroom_tagger.core.analyzer import analyze_image
+from lightroom_tagger.database import (
+    batch_update_hashes,
+    get_all_images,
+    get_images_without_hash,
+    init_database,
+    search_by_color_label,
+    search_by_date,
+    search_by_keyword,
+    search_by_rating,
+    store_images_batch,
+    update_instagram_status,
+)
+from lightroom_tagger.database import (
+    get_image_count as db_get_image_count,
+)
+from lightroom_tagger.image_hasher import compute_phash, find_matches
+from lightroom_tagger.instagram_scraper import crawl_instagram
+from lightroom_tagger.lr_writer import add_keyword_to_images_batch
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -347,13 +349,12 @@ def cmd_export(args, config):
         if output_format == "json":
             with open(output_path, "w") as f:
                 json.dump(results, f, indent=2)
-        elif output_format == "csv":
-            if results:
-                fieldnames = list(results[0].keys())
-                with open(output_path, "w", newline="") as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    writer.writerows(results)
+        elif output_format == "csv" and results:
+            fieldnames = list(results[0].keys())
+            with open(output_path, "w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(results)
 
         print(f"Exported {len(results)} images to {output_path}")
         return 0
@@ -429,14 +430,12 @@ def enrich_catalog_images(db, limit=None, verbose=False):
     Returns:
         dict with processed, skipped, errors counts
     """
-    from lightroom_tagger.core.database import (
-        get_all_images, get_catalog_images_needing_analysis,
-        init_catalog_table, store_catalog_image,
-        init_vision_comparisons_table, init_vision_cache_table
-    )
-    from lightroom_tagger.core.vision_cache import get_or_create_cached_image
     from lightroom_tagger.core.config import load_config
-    from lightroom_tagger.core.analyzer import analyze_image
+    from lightroom_tagger.core.database import (
+        get_all_images,
+        init_vision_cache_table,
+        init_vision_comparisons_table,
+    )
 
     config = load_config()
     processed = 0
@@ -537,7 +536,7 @@ def cmd_enrich_catalog(args, config):
 
 
 def cmd_instagram_sync(args, config):
-    """Sync Instagram posts with catalog."""
+    """Match local images to Instagram posts and optionally tag Lightroom."""
     db_path = args.db or config.db_path
 
     if not db_path:
@@ -596,7 +595,7 @@ def cmd_instagram_sync(args, config):
             return 1
 
         insta_images = []
-        for i, post in enumerate(posts):
+        for _i, post in enumerate(posts):
             local_path = url_to_path.get(post.image_url)
             if local_path:
                 image_hash = compute_phash(local_path)

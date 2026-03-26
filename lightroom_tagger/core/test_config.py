@@ -1,5 +1,6 @@
 import unittest
-from unittest.mock import patch, mock_open
+from unittest.mock import mock_open, patch
+
 from lightroom_tagger.core.config import Config, load_config
 
 
@@ -60,8 +61,8 @@ class TestLoadConfig(unittest.TestCase):
     @patch("lightroom_tagger.core.config.open", new_callable=mock_open, read_data="catalog_path: /file/catalog\ndb_path: /file/db\n")
     @patch("lightroom_tagger.core.config.Path.exists", return_value=True)
     @patch("lightroom_tagger.core.config.load_dotenv")
-    def test_load_config_from_file(self, mock_dotenv, mock_exists, mock_file):
-        """Test loading config from YAML file."""
+    def test_load_config_from_file_without_clearing_environ(self, mock_dotenv, mock_exists, mock_file):
+        """Test loading config from YAML when os.environ is not cleared."""
         config = load_config("config.yaml")
         self.assertEqual(config.catalog_path, "/file/catalog")
         self.assertEqual(config.db_path, "/file/db")

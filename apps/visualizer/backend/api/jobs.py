@@ -1,5 +1,5 @@
-from flask import Blueprint, jsonify, request, current_app
-from database import create_job, get_job, list_jobs, get_active_jobs, update_job_status
+from database import create_job, get_active_jobs, get_job, list_jobs, update_job_status
+from flask import Blueprint, current_app, jsonify, request
 
 bp = Blueprint('jobs', __name__)
 
@@ -12,25 +12,25 @@ def list_all_jobs():
 @bp.route('/', methods=['POST'])
 def create_new_job():
     data = request.json
-    
+
     if not data or 'type' not in data:
         return jsonify({'error': 'type is required'}), 400
-    
+
     job_type = data['type']
     metadata = data.get('metadata', {})
-    
+
     job_id = create_job(current_app.db, job_type, metadata)
     job = get_job(current_app.db, job_id)
-    
+
     return jsonify(job), 201
 
 @bp.route('/<job_id>', methods=['GET'])
 def get_job_details(job_id):
     job = get_job(current_app.db, job_id)
-    
+
     if not job:
         return jsonify({'error': 'Job not found'}), 404
-    
+
     return jsonify(job)
 
 @bp.route('/<job_id>', methods=['DELETE'])

@@ -1,13 +1,18 @@
-from typing import List, Dict, Any
 from tinydb import Query
-from lightroom_tagger.core.database import store_match, get_vision_comparison, store_vision_comparison
+
+from lightroom_tagger.core.database import (
+    get_vision_comparison,
+    store_match,
+    store_vision_comparison,
+)
 from lightroom_tagger.core.vision_cache import (
-    get_or_create_cached_image,
-    get_cached_phash,
     InstagramCache,
+    get_cached_phash,
+    get_or_create_cached_image,
 )
 
-def query_by_exif(db, insta_exif: dict, date_window_days: int = 7) -> List[dict]:
+
+def query_by_exif(db, insta_exif: dict, date_window_days: int = 7) -> list[dict]:
     """Query catalog by EXIF (camera, lens, date within window)."""
     camera = insta_exif.get('camera')
     lens = insta_exif.get('lens')
@@ -23,7 +28,7 @@ def query_by_exif(db, insta_exif: dict, date_window_days: int = 7) -> List[dict]
 
     return db.table('catalog_images').search(conditions[0])
 
-def score_candidates(insta_image: dict, candidates: list, phash_weight: float = 0.5, desc_weight: float = 0.5) -> List[dict]:
+def score_candidates(insta_image: dict, candidates: list, phash_weight: float = 0.5, desc_weight: float = 0.5) -> list[dict]:
     """Score candidates by phash distance + description similarity."""
     from lightroom_tagger.core.phash import hamming_distance
 
@@ -68,15 +73,16 @@ def text_similarity(text1: str, text2: str) -> float:
 def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                                  phash_weight: float = 0.4, desc_weight: float = 0.3,
                                  vision_weight: float = 0.3,
-                                 log_callback=None) -> List[dict]:
+                                 log_callback=None) -> list[dict]:
     """Score candidates including vision comparison (one-by-one).
 
     Uses vision comparison cache to avoid re-comparing already processed pairs.
     Also uses image compression cache to avoid redundant compression.
     """
     import os as _os
+
+    from lightroom_tagger.core.analyzer import compare_with_vision, get_vision_model, vision_score
     from lightroom_tagger.core.phash import hamming_distance
-    from lightroom_tagger.core.analyzer import compare_with_vision, vision_score, get_vision_model
 
     results = []
     total_candidates = len(candidates)
@@ -126,7 +132,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         if local_path:
             try:
                 cached_local_path = get_or_create_cached_image(db, catalog_key, local_path)
-            except Exception as e:
+            except Exception:
                 if log_callback and idx <= 5:  # Log first few failures
                     log_callback('warning', f'Cache miss for {catalog_key}, will compress on-demand')
 
@@ -194,7 +200,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
 def match_image(db, insta_image: dict, threshold: float = 0.7,
                 phash_weight: float = 0.4, desc_weight: float = 0.3,
-                vision_weight: float = 0.3) -> List[dict]:
+                vision_weight: float = 0.3) -> list[dict]:
     """Match single Instagram image against catalog with vision comparison."""
     insta_exif = insta_image.get('exif', {})
 
@@ -260,7 +266,7 @@ def find_candidates_by_date(db, insta_image: dict, days_before: int = 90) -> lis
             img_date = datetime.fromisoformat(date_taken.replace('Z', '+00:00'))
             if window_start <= img_date <= post_date:
                 candidates.append(img)
-        except:
+        except Exception:
             continue
 
     return candidates

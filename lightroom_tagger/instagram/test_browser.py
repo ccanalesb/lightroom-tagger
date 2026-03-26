@@ -1,5 +1,6 @@
 import unittest
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import MagicMock, patch
+
 from lightroom_tagger.instagram.browser import BrowserAgent, BrowserPost
 
 
@@ -10,10 +11,10 @@ class TestBrowserAgent(unittest.TestCase):
     def test_open_url(self, mock_run):
         """Test opening a URL in browser."""
         mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
-        
+
         agent = BrowserAgent()
         result = agent.open_url("https://example.com")
-        
+
         self.assertTrue(result)
         mock_run.assert_called_once()
 
@@ -21,10 +22,10 @@ class TestBrowserAgent(unittest.TestCase):
     def test_open_url_failure(self, mock_run):
         """Test URL open failure."""
         mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="Error")
-        
+
         agent = BrowserAgent()
         result = agent.open_url("https://example.com")
-        
+
         self.assertFalse(result)
 
     @patch('subprocess.run')
@@ -35,50 +36,50 @@ class TestBrowserAgent(unittest.TestCase):
             stdout='Page content here',
             stderr=""
         )
-        
+
         agent = BrowserAgent()
         result = agent.snapshot()
-        
+
         self.assertEqual(result, 'Page content here')
 
     @patch('subprocess.run')
     def test_scroll(self, mock_run):
         """Test scrolling the page."""
         mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
-        
+
         agent = BrowserAgent()
         result = agent.scroll("down")
-        
+
         self.assertTrue(result)
 
     @patch('subprocess.run')
     def test_close(self, mock_run):
         """Test closing browser."""
         mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
-        
+
         agent = BrowserAgent()
         result = agent.close()
-        
+
         self.assertTrue(result)
 
     @patch('subprocess.run')
     def test_wait(self, mock_run):
         """Test waiting."""
         mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
-        
+
         agent = BrowserAgent()
         result = agent.wait(2)
-        
+
         self.assertTrue(result)
 
     def test_ensure_output_dir(self):
         """Test output directory creation."""
-        import tempfile
         import os
-        
+        import tempfile
+
         temp_dir = tempfile.mkdtemp()
-        agent = BrowserAgent(temp_dir)
-        
+        BrowserAgent(temp_dir)
+
         self.assertTrue(os.path.exists(temp_dir))
         os.rmdir(temp_dir)
 

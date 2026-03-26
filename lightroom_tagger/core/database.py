@@ -1,7 +1,7 @@
-from tinydb import TinyDB, Query
-from typing import Optional
 import os
 from datetime import datetime, timedelta
+
+from tinydb import Query, TinyDB
 
 
 def init_database(db_path: str) -> TinyDB:
@@ -23,7 +23,7 @@ def store_image(db, record: dict) -> str:
     """Store image record, return key. Upsert if exists."""
     key = generate_key(record)
     record['key'] = key
-    
+
     default_instagram_fields = {
         'instagram_posted': False,
         'instagram_post_date': None,
@@ -34,10 +34,10 @@ def store_image(db, record: dict) -> str:
     for field, default_val in default_instagram_fields.items():
         if field not in record:
             record[field] = default_val
-    
+
     Image = Query()
     existing = db.search(Image.key == key)
-    
+
     if existing:
         existing_record = existing[0]
         for field, value in default_instagram_fields.items():
@@ -46,7 +46,7 @@ def store_image(db, record: dict) -> str:
         db.update(record, Image.key == key)
     else:
         db.insert(record)
-    
+
     return key
 
 
@@ -169,7 +169,7 @@ def store_instagram_dump_media(db, record: dict) -> str:
     return media_key
 
 
-def get_instagram_dump_media(db, media_key: str) -> Optional[dict]:
+def get_instagram_dump_media(db, media_key: str) -> dict | None:
     """Get Instagram dump media by key."""
     Media = Query()
     results = db.table('instagram_dump_media').search(Media.media_key == media_key)
@@ -178,7 +178,7 @@ def get_instagram_dump_media(db, media_key: str) -> Optional[dict]:
 
 def get_dump_media_by_hash(db, image_hash: str) -> list:
     """Get Instagram dump media by image hash.
-    
+
     Returns all media with matching hash (for finding duplicates).
     """
     Media = Query()
@@ -188,7 +188,7 @@ def get_dump_media_by_hash(db, image_hash: str) -> list:
 def get_unprocessed_dump_media(db, limit: int = None) -> list:
     """Get unprocessed Instagram dump media for matching."""
     Media = Query()
-    results = db.table('instagram_dump_media').search(Media.processed == False)
+    results = db.table('instagram_dump_media').search(not Media.processed)
     if limit:
         return results[:limit]
     return results
@@ -248,10 +248,10 @@ def clear_all(db) -> int:
     return count
 
 
-def update_instagram_status(db, key: str, posted: bool = True, post_date: str = None, 
+def update_instagram_status(db, key: str, posted: bool = True, post_date: str = None,
                            url: str = None, index: int = 0) -> bool:
     """Update Instagram status for an image.
-    
+
     Args:
         db: TinyDB instance
         key: Image key
@@ -259,23 +259,23 @@ def update_instagram_status(db, key: str, posted: bool = True, post_date: str = 
         post_date: Date of Instagram post (ISO format)
         url: Instagram post URL
         index: Index in carousel (0 for single image)
-    
+
     Returns:
         True if updated, False if not found
     """
     Image = Query()
     existing = db.search(Image.key == key)
-    
+
     if not existing:
         return False
-    
+
     updates = {
         'instagram_posted': posted,
         'instagram_post_date': post_date,
         'instagram_url': url,
         'instagram_index': index,
     }
-    
+
     db.update(updates, Image.key == key)
     return True
 
@@ -289,28 +289,28 @@ def search_by_instagram_posted(db, posted: bool = True) -> list[dict]:
 def get_images_without_hash(db) -> list[dict]:
     """Get all images that don't have a computed hash yet."""
     Image = Query()
-    return db.search(Image.image_hash == None)
+    return db.search(Image.image_hash is None)
 
 
 def update_image_hash(db, key: str, image_hash: str) -> bool:
     """Update the image hash for an image."""
     Image = Query()
     existing = db.search(Image.key == key)
-    
+
     if not existing:
         return False
-    
+
     db.update({'image_hash': image_hash}, Image.key == key)
     return True
 
 
 def batch_update_hashes(db, updates: list[dict]) -> int:
     """Batch update image hashes.
-    
+
     Args:
         db: TinyDB instance
         updates: List of dicts with 'key' and 'image_hash'
-    
+
     Returns:
         Number of updates made
     """
@@ -318,21 +318,20 @@ def batch_update_hashes(db, updates: list[dict]) -> int:
     for update in updates:
         key = update.get('key')
         image_hash = update.get('image_hash')
-        if key and image_hash:
-            if update_image_hash(db, key, image_hash):
-                count += 1
+        if key and image_hash and update_image_hash(db, key, image_hash):
+            count += 1
     return count
 
 
 if __name__ == "__main__":
     import tempfile
-    
+
     with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as f:
         db_path = f.name
-    
+
     print(f"Testing database at: {db_path}")
     db = init_database(db_path)
-    
+
     test_records = [
         {
             'date_taken': '2024-01-15',
@@ -362,35 +361,35 @@ if __name__ == "__main__":
             'description': 'Beautiful bloom'
         }
     ]
-    
+
     print("\n--- Testing store_images_batch ---")
     count = store_images_batch(db, test_records)
     print(f"Stored {count} records")
-    
+
     print("\n--- Testing get_image_count ---")
     print(f"Total images: {get_image_count(db)}")
-    
+
     print("\n--- Testing get_image ---")
     key = generate_key(test_records[0])
     img = get_image(db, key)
     print(f"Retrieved: {img['title'] if img else 'Not found'}")
-    
+
     print("\n--- Testing search_by_rating ---")
     results = search_by_rating(db, 5)
     print(f"Images with rating >= 5: {len(results)}")
-    
+
     print("\n--- Testing search_by_date ---")
     results = search_by_date(db, '2024-01-01', '2024-02-28')
     print(f"Images in Jan-Feb 2024: {len(results)}")
-    
+
     print("\n--- Testing search_by_keyword ---")
     results = search_by_keyword(db, 'nature')
     print(f"Images with 'nature' keyword: {len(results)}")
-    
+
     print("\n--- Testing search_by_color_label ---")
     results = search_by_color_label(db, 'Red')
     print(f"Images with Red label: {len(results)}")
-    
+
     print("\n--- Testing upsert ---")
     updated_record = {
         'date_taken': '2024-01-15',
@@ -405,15 +404,15 @@ if __name__ == "__main__":
     img = get_image(db, new_key)
     print(f"Updated title: {img['title']}")
     print(f"Total count after upsert: {get_image_count(db)}")
-    
+
     print("\n--- Testing delete_image ---")
     deleted = delete_image(db, new_key)
     print(f"Deleted: {deleted}, count: {get_image_count(db)}")
-    
+
     print("\n--- Testing clear_all ---")
     count = clear_all(db)
     print(f"Cleared {count} records")
-    
+
     db.close()
     os.unlink(db_path)
     print("\nAll tests passed!")
@@ -440,47 +439,47 @@ def init_matches_table(db: TinyDB):
 def store_catalog_image(db, record: dict) -> str:
     """Store catalog image with analysis. Idempotent."""
     Catalog = Query()
-    
+
     key = record.get('key')
     record['analyzed_at'] = datetime.now().isoformat()
-    
+
     existing = db.table('catalog_images').search(Catalog.key == key)
     if existing:
         db.table('catalog_images').update(record, Catalog.key == key)
     else:
         db.table('catalog_images').insert(record)
-    
+
     return key
 
 
 def store_instagram_image(db, record: dict) -> str:
     """Store Instagram image with analysis. Idempotent by local_path."""
     Insta = Query()
-    
+
     local_path = record.get('local_path')
     post_url = record.get('post_url')
     filename = record.get('filename', '')
     key = f"insta_{datetime.now().strftime('%Y-%m-%d')}_{post_url.split('/')[-2]}_{filename}"
     record['key'] = key
     record['crawled_at'] = datetime.now().isoformat()
-    
+
     existing = db.table('instagram_images').search(Insta.local_path == local_path)
     if existing:
         db.table('instagram_images').update(record, Insta.local_path == local_path)
     else:
         db.table('instagram_images').insert(record)
-    
+
     return key
 
 
 def store_match(db, record: dict) -> str:
     """Store match between catalog and Instagram image."""
     Match = Query()
-    
+
     catalog_key = record.get('catalog_key')
     insta_key = record.get('insta_key')
     record['matched_at'] = datetime.now().isoformat()
-    
+
     existing = db.table('matches').search(
         (Match.catalog_key == catalog_key) & (Match.insta_key == insta_key)
     )
@@ -488,20 +487,20 @@ def store_match(db, record: dict) -> str:
         db.table('matches').update(record, (Match.catalog_key == catalog_key) & (Match.insta_key == insta_key))
     else:
         db.table('matches').insert(record)
-    
+
     return f"{catalog_key} <-> {insta_key}"
 
 
 def get_catalog_images_needing_analysis(db) -> list:
     """Get catalog images without phash."""
     Catalog = Query()
-    return db.table('catalog_images').search(Catalog.phash == None)
+    return db.table('catalog_images').search(Catalog.phash is None)
 
 
 def get_instagram_images_needing_analysis(db) -> list:
     """Get Instagram images without phash."""
     Insta = Query()
-    return db.table('instagram_images').search(Insta.phash == None)
+    return db.table('instagram_images').search(Insta.phash is None)
 
 
 def init_vision_comparisons_table(db: TinyDB):
@@ -516,7 +515,7 @@ def init_vision_cache_table(db: TinyDB):
         db.table('vision_cache')
 
 
-def get_vision_cached_image(db: TinyDB, catalog_key: str) -> Optional[dict]:
+def get_vision_cached_image(db: TinyDB, catalog_key: str) -> dict | None:
     """Get cached compressed image by catalog key.
 
     Returns dict with 'compressed_path', 'phash', 'compressed_at', 'original_mtime' or None.
@@ -607,9 +606,9 @@ def get_all_catalog_images(db: TinyDB) -> list:
     return db.table('catalog_images').all()
 
 
-def get_vision_comparison(db, catalog_key: str, insta_key: str) -> Optional[dict]:
+def get_vision_comparison(db, catalog_key: str, insta_key: str) -> dict | None:
     """Get cached vision comparison result.
-    
+
     Returns:
         dict with 'result', 'vision_score', 'compared_at', 'model_used' or None if not cached.
     """
@@ -620,10 +619,10 @@ def get_vision_comparison(db, catalog_key: str, insta_key: str) -> Optional[dict
     return results[0] if results else None
 
 
-def store_vision_comparison(db, catalog_key: str, insta_key: str, 
+def store_vision_comparison(db, catalog_key: str, insta_key: str,
                            result: str, vision_score: float, model_used: str) -> bool:
     """Store vision comparison result in cache. Never expires.
-    
+
     Args:
         db: TinyDB instance
         catalog_key: Key of catalog image
@@ -631,12 +630,12 @@ def store_vision_comparison(db, catalog_key: str, insta_key: str,
         result: 'SAME' | 'DIFFERENT' | 'UNCERTAIN'
         vision_score: float (1.0, 0.5, or 0.0)
         model_used: Vision model identifier
-    
+
     Returns:
         True if stored successfully
     """
     Vision = Query()
-    
+
     record = {
         'catalog_key': catalog_key,
         'insta_key': insta_key,
@@ -645,11 +644,11 @@ def store_vision_comparison(db, catalog_key: str, insta_key: str,
         'compared_at': datetime.now().isoformat(),
         'model_used': model_used
     }
-    
+
     existing = db.table('vision_comparisons').search(
         (Vision.catalog_key == catalog_key) & (Vision.insta_key == insta_key)
     )
-    
+
     if existing:
         db.table('vision_comparisons').update(
             record,
@@ -657,5 +656,5 @@ def store_vision_comparison(db, catalog_key: str, insta_key: str,
         )
     else:
         db.table('vision_comparisons').insert(record)
-    
+
     return True

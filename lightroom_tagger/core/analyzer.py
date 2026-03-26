@@ -1,6 +1,8 @@
+import contextlib
 import os
 import tempfile
-from typing import Dict, Any, Optional, Tuple
+from typing import Any
+
 from lightroom_tagger.core.config import load_config
 
 RAW_EXTENSIONS = {'.dng', '.raw', '.cr2', '.cr3', '.nef', '.arw', '.rw2', '.orf', '.raf', '.srw', '.x3f'}
@@ -19,7 +21,7 @@ def get_vision_model() -> str:
 VISION_MODEL = os.environ.get('VISION_MODEL', 'gemma3:27b')
 
 
-def compress_image(input_path: str, max_size: Optional[Tuple[int, int]] = None, quality: Optional[int] = None) -> str:
+def compress_image(input_path: str, max_size: tuple[int, int] | None = None, quality: int | None = None) -> str:
     """Compress image to reduce file size for vision comparison.
 
     Returns path to temporary compressed file.
@@ -66,7 +68,7 @@ def compress_image(input_path: str, max_size: Optional[Tuple[int, int]] = None, 
         return input_path
 
 
-def convert_raw_to_jpg(raw_path: str) -> Optional[str]:
+def convert_raw_to_jpg(raw_path: str) -> str | None:
     """Convert RAW/DNG file to temporary JPG for vision comparison.
 
     Uses retry logic for network/NAS intermittent failures.
@@ -75,8 +77,9 @@ def convert_raw_to_jpg(raw_path: str) -> Optional[str]:
         Path to temporary JPG file, or None if conversion failed.
         Caller is responsible for cleaning up the temporary file.
     """
-    import rawpy
     import time
+
+    import rawpy
 
     if not os.path.exists(raw_path):
         return None
@@ -96,16 +99,16 @@ def convert_raw_to_jpg(raw_path: str) -> Optional[str]:
             img.save(jpg_path, 'JPEG', quality=95)
 
             return jpg_path
-        except rawpy._rawpy.LibRawIOError as e:
+        except rawpy._rawpy.LibRawIOError:
             # Network/NAS intermittent error - retry
             if attempt < max_retries - 1:
                 time.sleep(0.5 * (attempt + 1)) # Exponential backoff
                 continue
             return None
-        except rawpy._rawpy.LibRawTooBigError as e:
+        except rawpy._rawpy.LibRawTooBigError:
             # Image too large - can't recover
             return None
-        except Exception as e:
+        except Exception:
             # Other errors - don't retry
             return None
 
@@ -139,7 +142,7 @@ def get_viewable_path(image_path: str) -> str:
 
     return image_path
 
-def analyze_image(path: str) -> Dict[str, Any]:
+def analyze_image(path: str) -> dict[str, Any]:
     """Analyze image and return all matching signals.
 
     Returns:
@@ -155,7 +158,7 @@ def analyze_image(path: str) -> Dict[str, Any]:
         'description': description
     }
 
-def compute_phash(path: str) -> Optional[str]:
+def compute_phash(path: str) -> str | None:
     """Placeholder - delegate to existing hasher."""
     from lightroom_tagger.core.hasher import compute_phash as _compute
     try:
@@ -163,7 +166,7 @@ def compute_phash(path: str) -> Optional[str]:
     except Exception:
         return None
 
-def extract_exif(path: str) -> Dict[str, Any]:
+def extract_exif(path: str) -> dict[str, Any]:
     """Extract EXIF metadata from image."""
     from PIL import Image
     from PIL.ExifTags import TAGS
@@ -182,7 +185,7 @@ def extract_exif(path: str) -> Dict[str, Any]:
         pass
     return result
 
-def describe_image(path: str, agent_type: Optional[str] = None) -> str:
+def describe_image(path: str, agent_type: str | None = None) -> str:
     """Generate description using configured agent."""
     if agent_type is None:
         try:
@@ -207,7 +210,7 @@ def run_external_agent(path: str) -> str:
 
 
 def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
-                        cached_local_path: Optional[str] = None, compressed_insta_path: Optional[str] = None) -> str:
+                        cached_local_path: str | None = None, compressed_insta_path: str | None = None) -> str:
     """Compare two images using vision model via Ollama with compression.
 
     Compresses images to max VISION_MAX_DIMENSION pixels before comparison
@@ -243,14 +246,13 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
                 # Log RAW conversion
                 if log_callback:
                     ext = os.path.splitext(local_path)[1].lower()
-                    if ext in RAW_EXTENSIONS:
-                        if viewable_local.lower().endswith(('.jpg', '.jpeg')):
-                            sidecar_path = local_path.rsplit('.', 1)[0] + '.JPG'
-                            sidecar_path_lower = local_path.rsplit('.', 1)[0] + '.jpg'
-                            if os.path.exists(sidecar_path) or os.path.exists(sidecar_path_lower):
-                                log_callback('info', f'Using JPG sidecar for {os.path.basename(local_path)}')
-                            else:
-                                log_callback('info', f'Converted DNG to JPG: {os.path.basename(viewable_local)}')
+                    if ext in RAW_EXTENSIONS and viewable_local.lower().endswith(('.jpg', '.jpeg')):
+                        sidecar_path = local_path.rsplit('.', 1)[0] + '.JPG'
+                        sidecar_path_lower = local_path.rsplit('.', 1)[0] + '.jpg'
+                        if os.path.exists(sidecar_path) or os.path.exists(sidecar_path_lower):
+                            log_callback('info', f'Using JPG sidecar for {os.path.basename(local_path)}')
+                        else:
+                            log_callback('info', f'Converted DNG to JPG: {os.path.basename(viewable_local)}')
             else:
                 viewable_local = local_path
 
@@ -282,10 +284,8 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
         # Clean up temp files we created (but not cached files)
         for temp_file in temp_files:
             if temp_file and os.path.exists(temp_file):
-                try:
+                with contextlib.suppress(Exception):
                     os.unlink(temp_file)
-                except Exception:
-                    pass
 
 
 def run_vision_ollama(local_path: str, insta_path: str) -> str:

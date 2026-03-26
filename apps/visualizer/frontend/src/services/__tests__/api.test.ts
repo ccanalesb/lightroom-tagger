@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { JobsAPI } from '../api'
 
-// @ts-ignore
-;(globalThis as any).fetch = vi.fn()
+const fetchMock = vi.fn()
+globalThis.fetch = fetchMock
 
 describe('JobsAPI', () => {
   beforeEach(() => {
@@ -11,14 +11,14 @@ describe('JobsAPI', () => {
   
   it('should list all jobs', async () => {
     const mockJobs = [{ id: '1', type: 'test', status: 'pending' }]
-    ;(globalThis as any).fetch.mockResolvedValueOnce({
+    fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => mockJobs,
     })
     
     const jobs = await JobsAPI.list()
     
-    expect((globalThis as any).fetch).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/jobs/'),
       expect.objectContaining({ headers: { 'Content-Type': 'application/json' } })
     )
@@ -27,14 +27,14 @@ describe('JobsAPI', () => {
   
   it('should get job by id', async () => {
     const mockJob = { id: '123', type: 'test', status: 'running' }
-    ;(globalThis as any).fetch.mockResolvedValueOnce({
+    fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => mockJob,
     })
     
     const job = await JobsAPI.get('123')
     
-    expect((globalThis as any).fetch).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/jobs/123'),
       expect.any(Object)
     )
@@ -43,14 +43,14 @@ describe('JobsAPI', () => {
   
   it('should create job', async () => {
     const mockJob = { id: '456', type: 'analyze', status: 'pending' }
-    ;(globalThis as any).fetch.mockResolvedValueOnce({
+    fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => mockJob,
     })
     
     const job = await JobsAPI.create('analyze', { test: true })
     
-    expect((globalThis as any).fetch).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/jobs/'),
       expect.objectContaining({
         method: 'POST',
@@ -61,7 +61,7 @@ describe('JobsAPI', () => {
   })
   
   it('should throw on error', async () => {
-    ;(globalThis as any).fetch.mockResolvedValueOnce({
+    fetchMock.mockResolvedValueOnce({
       ok: false,
       status: 404,
       statusText: 'Not Found',

@@ -1,9 +1,8 @@
 """Tests for Instagram dump reader."""
-import pytest
-import tempfile
-import os
 import json
-from unittest.mock import patch, MagicMock
+import os
+import tempfile
+
 from PIL import Image
 
 

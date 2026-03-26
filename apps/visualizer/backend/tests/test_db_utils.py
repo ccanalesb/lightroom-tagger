@@ -1,7 +1,7 @@
 # apps/visualizer/backend/tests/test_db_utils.py
-import pytest
-from unittest.mock import patch, MagicMock
-from utils.db import with_db, DatabaseError
+from unittest.mock import MagicMock, patch
+
+from utils.db import with_db
 
 
 class TestWithDbDecorator:

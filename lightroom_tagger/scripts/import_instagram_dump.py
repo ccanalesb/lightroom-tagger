@@ -8,22 +8,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from lightroom_tagger.core.database import (
+    get_instagram_dump_media,
     init_database,
     init_instagram_dump_table,
     store_instagram_dump_media,
-    get_instagram_dump_media,
-)
-from lightroom_tagger.instagram.dump_reader import (
-    discover_media_files,
-    parse_posts_metadata,
-    parse_archived_posts_metadata,
-    parse_other_content_metadata,
-    parse_saved_and_reposted_urls,
 )
 from lightroom_tagger.instagram.deduplicator import (
     compute_image_hashes,
     group_by_hash,
     select_best_versions,
+)
+from lightroom_tagger.instagram.dump_reader import (
+    discover_media_files,
+    parse_archived_posts_metadata,
+    parse_other_content_metadata,
+    parse_posts_metadata,
+    parse_saved_and_reposted_urls,
 )
 
 
@@ -158,7 +158,7 @@ def import_dump(db, dump_path: str, skip_existing: bool = True, skip_dedup: bool
         if imported % 500 == 0:
             print(f"  Imported {imported}...")
 
-    print(f"\n✓ Import complete!")
+    print("\n✓ Import complete!")
     print(f"  Imported: {imported} new media files")
     print(f"  Skipped: {skipped} existing files")
     print(f"  With EXIF data: {with_exif}")

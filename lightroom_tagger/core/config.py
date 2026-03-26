@@ -1,7 +1,7 @@
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
-import os
-import re
+
 import yaml
 from dotenv import load_dotenv
 
@@ -47,7 +47,6 @@ class Config:
         if not path:
             return path
         # Handle common NAS patterns: //nas/, //tnas/, etc.
-        import re
         # Match //nas/ or //tnas/ or any //<name>/
         # Handle both //tnas/ccanales/... and //tnas/... formats
         # Map //tnas/ccanales -> /mnt/tnas, //nas -> /mnt/nas, etc.
@@ -57,7 +56,7 @@ class Config:
             path = path.replace('//tnas/', '/mnt/tnas/', 1)
         elif path.startswith('//nas/'):
             path = path.replace('//nas/', '/mnt/nas/', 1)
-        
+
         path = path.replace("\\", "/")
         return path
 

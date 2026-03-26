@@ -1,6 +1,10 @@
 # apps/visualizer/backend/tests/test_responses.py
-import pytest
-from utils.responses import error_not_found, error_bad_request, error_server_error, success_paginated
+from utils.responses import (
+    error_bad_request,
+    error_not_found,
+    error_server_error,
+    success_paginated,
+)
 
 
 class TestErrorResponses:
@@ -60,7 +64,7 @@ class TestSuccessResponses:
         assert status == 200
         assert response.json['total'] == 10
         assert response.json['data'] == data
-        assert response.json['pagination']['has_more'] == True
+        assert response.json['pagination']['has_more']
         assert response.json['pagination']['current_page'] == 1
         assert response.json['pagination']['total_pages'] == 2
 
@@ -70,5 +74,5 @@ class TestSuccessResponses:
         response, status = success_paginated(data, 10, 5, 5)
 
         assert status == 200
-        assert response.json['pagination']['has_more'] == False
+        assert not response.json['pagination']['has_more']
         assert response.json['pagination']['current_page'] == 2

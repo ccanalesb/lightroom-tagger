@@ -1,6 +1,7 @@
+import os
+
 from flask import Blueprint, jsonify, request, send_file
 from tinydb import Query
-import os
 from utils.db import with_db
 from utils.responses import error_not_found, error_server_error, success_paginated
 
@@ -82,7 +83,7 @@ def list_instagram_images(db):
         paginated = enriched_images[offset:offset+limit]
 
         # Build custom response with 'images' key for backward compatibility
-        response = success_paginated(paginated, total, offset, limit)
+        success_paginated(paginated, total, offset, limit)
         # success_paginated returns (response, status) tuple, need to modify the response
         # Let's construct manually for compatibility
         return jsonify({
@@ -200,13 +201,13 @@ def list_dump_media(db):
         Media = Query()
 
         if processed == 'true':
-            media = table.search(Media.processed == True)
+            media = table.search(Media.processed)
         elif processed == 'false':
-            media = table.search(Media.processed == False)
+            media = table.search(not Media.processed)
         elif matched == 'true':
-            media = table.search(Media.matched_catalog_key != None)
+            media = table.search(Media.matched_catalog_key is not None)
         elif matched == 'false':
-            media = table.search(Media.matched_catalog_key == None)
+            media = table.search(Media.matched_catalog_key is None)
         else:
             media = table.all()
 

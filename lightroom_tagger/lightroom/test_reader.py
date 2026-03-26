@@ -1,6 +1,7 @@
-import unittest
-from unittest.mock import patch, MagicMock
 import sqlite3
+import unittest
+from unittest.mock import MagicMock, patch
+
 from lightroom_tagger.lightroom.reader import (
     connect_catalog,
     generate_record_key,
@@ -15,9 +16,9 @@ class TestReader(unittest.TestCase):
         """Test connecting to catalog."""
         mock_conn = MagicMock()
         mock_connect.return_value = mock_conn
-        
+
         conn = connect_catalog('/test/catalog.lrcat')
-        
+
         mock_connect.assert_called_once_with('/test/catalog.lrcat')
         self.assertEqual(conn.row_factory, sqlite3.Row)
 
