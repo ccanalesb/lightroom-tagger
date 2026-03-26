@@ -194,6 +194,21 @@ def init_database(db_path: str) -> sqlite3.Connection:
             model_used TEXT,
             PRIMARY KEY (catalog_key, insta_key)
         );
+
+        CREATE TABLE IF NOT EXISTS image_descriptions (
+            image_key TEXT PRIMARY KEY,
+            image_type TEXT NOT NULL,
+            summary TEXT DEFAULT '',
+            composition TEXT DEFAULT '{}',
+            perspectives TEXT DEFAULT '{}',
+            technical TEXT DEFAULT '{}',
+            subjects TEXT DEFAULT '[]',
+            best_perspective TEXT DEFAULT '',
+            model_used TEXT DEFAULT '',
+            described_at TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_desc_image_type ON image_descriptions(image_type);
     """)
 
     # Migrations for existing databases
@@ -834,3 +849,74 @@ def store_vision_comparison(db: sqlite3.Connection, catalog_key: str, insta_key:
           datetime.now().isoformat(), model_used))
     db.commit()
     return True
+
+
+# ---------------------------------------------------------------------------
+# Image descriptions
+# ---------------------------------------------------------------------------
+
+def init_image_descriptions_table(db: sqlite3.Connection):
+    """No-op: table is created in init_database."""
+    pass
+
+
+def store_image_description(db: sqlite3.Connection, record: dict) -> str:
+    """Store image description. Idempotent by image_key."""
+    image_key = record.get('image_key')
+    if not image_key:
+        raise ValueError("image_key is required")
+
+    record['described_at'] = datetime.now().isoformat()
+
+    db.execute("""
+        INSERT INTO image_descriptions
+            (image_key, image_type, summary, composition, perspectives,
+             technical, subjects, best_perspective, model_used, described_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(image_key) DO UPDATE SET
+            image_type=excluded.image_type, summary=excluded.summary,
+            composition=excluded.composition, perspectives=excluded.perspectives,
+            technical=excluded.technical, subjects=excluded.subjects,
+            best_perspective=excluded.best_perspective, model_used=excluded.model_used,
+            described_at=excluded.described_at
+    """, (
+        image_key, record.get('image_type', ''),
+        record.get('summary', ''),
+        _serialize_json(record.get('composition', {})),
+        _serialize_json(record.get('perspectives', {})),
+        _serialize_json(record.get('technical', {})),
+        _serialize_json(record.get('subjects', [])),
+        record.get('best_perspective', ''),
+        record.get('model_used', ''),
+        record['described_at'],
+    ))
+    db.commit()
+    return image_key
+
+
+def get_image_description(db: sqlite3.Connection, image_key: str) -> dict | None:
+    """Get description by image key."""
+    row = db.execute(
+        "SELECT * FROM image_descriptions WHERE image_key = ?", (image_key,)
+    ).fetchone()
+    if not row:
+        return None
+    row = dict(row)
+    for col in ('composition', 'perspectives', 'technical', 'subjects'):
+        val = row.get(col)
+        if isinstance(val, str):
+            try:
+                row[col] = json.loads(val)
+            except (json.JSONDecodeError, TypeError):
+                pass
+    return row
+
+
+def get_undescribed_catalog_images(db: sqlite3.Connection) -> list[dict]:
+    """Get catalog images that don't have descriptions yet."""
+    rows = db.execute("""
+        SELECT i.* FROM images i
+        LEFT JOIN image_descriptions d ON i.key = d.image_key
+        WHERE d.image_key IS NULL
+    """).fetchall()
+    return [_deserialize_row(r) for r in rows]

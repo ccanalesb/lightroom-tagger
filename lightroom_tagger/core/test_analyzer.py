@@ -1,4 +1,5 @@
 import importlib
+import json
 import os
 import tempfile
 from unittest.mock import patch
@@ -14,15 +15,27 @@ from lightroom_tagger.core.analyzer import (
 
 def test_analyze_image_returns_all_signals():
     """Analyzer should return phash, exif, and description."""
+    mock_desc = {
+        'summary': 'A sunset photo',
+        'composition': {},
+        'perspectives': {
+            'street': {'analysis': 'Good light', 'score': 6},
+            'documentary': {'analysis': 'Weak story', 'score': 4},
+            'publisher': {'analysis': 'Stock use', 'score': 5},
+        },
+        'technical': {},
+        'subjects': [],
+        'best_perspective': 'street',
+    }
     with patch('lightroom_tagger.core.analyzer.compute_phash', return_value='a1b2c3d4e5f6g7h8'), \
          patch('lightroom_tagger.core.analyzer.extract_exif', return_value={'camera': 'Canon EOS R5'}), \
-         patch('lightroom_tagger.core.analyzer.describe_image', return_value='A sunset photo'):
+         patch('lightroom_tagger.core.analyzer.describe_image', return_value=mock_desc):
 
         result = analyze_image('/fake/path.jpg')
 
     assert result['phash'] == 'a1b2c3d4e5f6g7h8'
     assert result['exif']['camera'] == 'Canon EOS R5'
-    assert result['description'] == 'A sunset photo'
+    assert result['description'] == mock_desc
 
 
 def test_describe_image_uses_configured_agent():
@@ -205,3 +218,74 @@ def test_vision_config_environment_variables():
 
         # Reload again to restore
         importlib.reload(analyzer_module)
+
+
+def test_build_description_prompt_returns_string():
+    from lightroom_tagger.core.analyzer import build_description_prompt
+    prompt = build_description_prompt()
+    assert isinstance(prompt, str)
+    assert len(prompt) > 100
+    assert 'street photographer' in prompt.lower()
+    assert 'documentary' in prompt.lower()
+    assert 'publisher' in prompt.lower()
+    assert 'composition' in prompt.lower()
+    assert 'JSON' in prompt
+
+
+def test_parse_description_response_valid_json():
+    from lightroom_tagger.core.analyzer import parse_description_response
+    raw = json.dumps({
+        'summary': 'A street photo',
+        'composition': {'layers': ['fg', 'bg'], 'techniques': ['rule_of_thirds']},
+        'perspectives': {
+            'street': {'analysis': 'Strong geometry', 'score': 7},
+            'documentary': {'analysis': 'Fair story', 'score': 5},
+            'publisher': {'analysis': 'Editorial use', 'score': 6},
+        },
+        'technical': {'dominant_colors': ['#000'], 'mood': 'calm', 'lighting': 'natural'},
+        'subjects': ['person'],
+        'best_perspective': 'street',
+    })
+    result = parse_description_response(raw)
+    assert result['summary'] == 'A street photo'
+    assert result['perspectives']['street']['score'] == 7
+    assert 'person' in result['subjects']
+
+
+def test_parse_description_response_extracts_json_from_markdown():
+    from lightroom_tagger.core.analyzer import parse_description_response
+    raw = (
+        'Here is the analysis:\n```json\n'
+        '{"summary": "A sunset", "composition": {}, "perspectives": {}, '
+        '"technical": {}, "subjects": [], "best_perspective": "street"}\n'
+        '```\n'
+    )
+    result = parse_description_response(raw)
+    assert result['summary'] == 'A sunset'
+
+
+def test_parse_description_response_handles_garbage():
+    from lightroom_tagger.core.analyzer import parse_description_response
+    result = parse_description_response('This is not JSON at all')
+    assert result['summary'] == ''
+    assert result['best_perspective'] == ''
+
+
+def test_run_local_agent_calls_ollama():
+    from unittest.mock import MagicMock
+    mock_response = MagicMock()
+    mock_response.message.content = json.dumps({
+        'summary': 'test',
+        'composition': {},
+        'perspectives': {},
+        'technical': {},
+        'subjects': [],
+        'best_perspective': 'street',
+    })
+    with patch('lightroom_tagger.core.analyzer.ollama') as mock_ollama:
+        mock_ollama.chat.return_value = mock_response
+        from lightroom_tagger.core.analyzer import run_local_agent
+        run_local_agent('/fake/image.jpg')
+    mock_ollama.chat.assert_called_once()
+    call_kwargs = mock_ollama.chat.call_args
+    assert call_kwargs[1]['model'] or call_kwargs[0][0]
