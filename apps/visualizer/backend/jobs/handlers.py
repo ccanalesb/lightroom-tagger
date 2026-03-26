@@ -141,8 +141,157 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
     runner.complete_job(job_id, {'enriched': 0})
 
 
+def handle_prepare_catalog(runner, job_id: str, metadata: dict):
+    """Pre-compress and cache all catalog images for vision matching.
+
+    This job compresses catalog images once and stores them in the vision cache,
+    eliminating redundant compression during vision matching runs.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from lightroom_tagger.core.database import init_database, get_cache_stats, get_all_catalog_images
+    from lightroom_tagger.core.vision_cache import get_or_create_cached_image
+    import time
+
+    runner.update_progress(job_id, 5, 'Initializing cache preparation...')
+
+    # Use LIBRARY_DB for cache operations, not runner.db
+    db_path = os.getenv('LIBRARY_DB')
+    if not db_path:
+        config = load_config()
+        db_path = config.db_path or 'library.db'
+
+    if not os.path.exists(db_path):
+        runner.fail_job(job_id, f"Library database not found at: {db_path}")
+        return
+
+    lib_db = None
+    try:
+        lib_db = init_database(db_path)
+
+        # Update metadata with configuration
+        config = load_config()
+        cache_dir = config.vision_cache_dir
+
+        runner.db.table('jobs').update({
+            'metadata': {
+                **metadata,
+                'cache_dir': cache_dir,
+                'method': 'prepare_catalog_cache',
+            }
+        }, Query().id == job_id)
+
+        def log_callback(level, message):
+            from database import add_job_log
+            add_job_log(runner.db, job_id, level, message)
+
+        # Get cache stats from library DB
+        cache_stats_before = get_cache_stats(lib_db)
+        total_images = cache_stats_before['total']
+        already_cached = cache_stats_before['cached']
+
+        log_callback('info', f"Cache directory: {cache_dir}")
+        log_callback('info', f"Using library DB: {db_path}")
+        log_callback('info', f"Cache status: {already_cached}/{total_images} images cached ({cache_stats_before['cache_size_mb']:.1f}MB)")
+
+        if total_images == 0:
+            runner.complete_job(job_id, {
+                'cached': 0,
+                'already_cached': 0,
+                'failed': 0,
+                'total': 0,
+                'cache_size_mb': 0,
+                'message': 'No catalog images found'
+            })
+            return
+
+        # Get all catalog images from library DB
+        images = get_all_catalog_images(lib_db)
+
+        # Determine parallelism (I/O bound, so threads are fine)
+        max_workers = min(4, os.cpu_count() or 2)
+        log_callback('info', f"Using {max_workers} parallel threads for compression")
+
+        newly_cached = 0
+        already_cached_count = 0
+        failed_count = 0
+        total = len(images)
+
+        def process_single_image(image):
+            """Process one image with retry logic."""
+            filepath = image.get('filepath')
+            key = image.get('key')
+            import os as _os
+
+            if not filepath or not key:
+                return ('failed', key or 'unknown', 'Missing filepath or key')
+
+            if not _os.path.exists(filepath):
+                return ('failed', key, f'File not found: {filepath}')
+
+            retries = 2
+            for attempt in range(retries):
+                try:
+                    # Check if already cached and valid
+                    from lightroom_tagger.core.database import is_vision_cache_valid
+                    if is_vision_cache_valid(lib_db, key, filepath):
+                        return ('already_cached', key)
+
+                    # Create cache
+                    compressed_path = get_or_create_cached_image(lib_db, key, filepath)
+                    if compressed_path:
+                        size_kb = _os.path.getsize(compressed_path) / 1024
+                        return ('newly_cached', key, size_kb)
+                    return ('failed', key, 'Compression returned None')
+                except Exception as e:
+                    if attempt < retries - 1:
+                        time.sleep(0.5 * (attempt + 1))
+                        continue
+                    return ('failed', key, str(e))
+
+        # Process images in parallel
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(process_single_image, img): img for img in images}
+
+            for idx, future in enumerate(as_completed(futures), 1):
+                result = future.result()
+                if result[0] == 'already_cached':
+                    already_cached_count += 1
+                elif result[0] == 'newly_cached':
+                    newly_cached += 1
+                else:
+                    failed_count += 1
+                    log_callback('error', f"Failed to cache {result[1]}: {result[2]}")
+
+                # Update progress every 10 images or at end
+                if idx % 10 == 0 or idx == total:
+                    progress = int(10 + (idx / total) * 85) # Scale to 10-95%
+                    runner.update_progress(job_id, progress, f'Processed {idx}/{total} images')
+
+        # Get final cache stats from library DB
+        cache_stats_after = get_cache_stats(lib_db)
+        log_callback('info', f"Complete: {newly_cached} newly cached, {already_cached_count} already cached, {failed_count} failed")
+        log_callback('info', f"Total cache size: {cache_stats_after['cache_size_mb']:.1f}MB")
+
+        runner.complete_job(job_id, {
+            'cached': newly_cached,
+            'already_cached': already_cached_count,
+            'failed': failed_count,
+            'total': total,
+            'cache_size_mb': cache_stats_after['cache_size_mb'],
+            'parallel_workers': max_workers,
+            'cache_dir': cache_dir
+        })
+
+    except Exception as e:
+        runner.fail_job(job_id, str(e))
+    finally:
+        if lib_db:
+            lib_db.close()
+
+
 JOB_HANDLERS = {
     'analyze_instagram': handle_analyze_instagram,
     'vision_match': handle_vision_match,
     'enrich_catalog': handle_enrich_catalog,
+    'prepare_catalog': handle_prepare_catalog,
 }

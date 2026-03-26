@@ -26,7 +26,27 @@ import {
   MATCHING_FAILED,
   MATCHING_FAILED_UNKNOWN,
   MATCHING_DISMISS,
+  CACHE_TITLE,
+  CACHE_PREPARE_BUTTON,
+  CACHE_PREPARING,
+  CACHE_STATUS_LOADING,
+  CACHE_STATUS_CACHED,
+  CACHE_STATUS_OF,
+  CACHE_STATUS_IMAGES,
+  CACHE_SIZE_LABEL,
+  CACHE_REFRESH_BUTTON,
+  CACHE_JOB_RUNNING,
+  CACHE_JOB_COMPLETED,
+  CACHE_WARNING_NOT_READY,
 } from '../constants/strings';
+
+type CacheStatus = {
+  total_images: number;
+  cached_images: number;
+  missing: number;
+  cache_size_mb: number;
+  cache_dir: string;
+};
 
 const DATE_FILTERS = [
   { value: 'all', label: ADVANCED_DATE_ALL },
@@ -60,6 +80,12 @@ export function MatchingPage() {
   const [options, setOptions] = useState({ ...DEFAULT_OPTIONS });
   const [weightsError, setWeightsError] = useState<string | null>(null);
 
+  // Cache status
+  const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null);
+  const [cacheLoading, setCacheLoading] = useState(false);
+  const [isPreparingCache, setIsPreparingCache] = useState(false);
+  const [cacheJob, setCacheJob] = useState<Job | null>(null);
+
   const navigate = useNavigate();
   const { socket, connected } = useSocketStore();
 
@@ -67,6 +93,21 @@ export function MatchingPage() {
     () => !isStarting && activeJob?.status !== 'running' && !weightsError,
     [isStarting, activeJob?.status, weightsError]
   );
+
+  const isCacheReady = useMemo(() => {
+    if (!cacheStatus) return false;
+    return cacheStatus.cached_images === cacheStatus.total_images && cacheStatus.total_images > 0;
+  }, [cacheStatus]);
+
+  // Fetch cache status
+  const fetchCacheStatus = useCallback(async () => {
+    try {
+      const status = await SystemAPI.cacheStatus();
+      setCacheStatus(status);
+    } catch (err) {
+      console.error('Failed to fetch cache status:', err);
+    }
+  }, []);
 
   // Fetch data
   useEffect(() => {
@@ -88,6 +129,15 @@ export function MatchingPage() {
           (job: Job) => job.type === 'vision_match' && ['pending', 'running'].includes(job.status)
         );
         if (runningJob) setActiveJob(runningJob);
+
+        // Check for running prepare_catalog job
+        const runningCacheJob = jobsData.find(
+          (job: Job) => job.type === 'prepare_catalog' && ['pending', 'running'].includes(job.status)
+        );
+        if (runningCacheJob) {
+          setCacheJob(runningCacheJob);
+          setIsPreparingCache(true);
+        }
       } catch (err) {
         if (mounted) setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
@@ -96,6 +146,7 @@ export function MatchingPage() {
     };
 
     fetchData();
+    fetchCacheStatus();
 
     // Fetch models
     SystemAPI.visionModels()
@@ -107,10 +158,8 @@ export function MatchingPage() {
       })
       .catch(console.error);
 
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    return () => { mounted = false; };
+  }, [fetchCacheStatus]);
 
   // Validate weights
   useEffect(() => {
@@ -123,23 +172,35 @@ export function MatchingPage() {
     if (!socket || !connected) return;
 
     const handleJobCreated = (job: Job) => {
-      if (job.type !== 'vision_match') return;
-      setActiveJob(job);
-      setIsStarting(false);
-      setShowTrigger(false);
+      if (job.type === 'vision_match') {
+        setActiveJob(job);
+        setIsStarting(false);
+        setShowTrigger(false);
+      } else if (job.type === 'prepare_catalog') {
+        setCacheJob(job);
+        setIsPreparingCache(true);
+      }
     };
 
     const handleJobUpdated = (job: Job) => {
-      if (job.id !== activeJob?.id) return;
-      setActiveJob(job);
-
-      if (job.status !== 'completed') return;
-      setTimeout(() => {
-        MatchingAPI.list(100).then((data) => {
-          setMatches(data.matches);
-          setTotal(data.total);
-        });
-      }, 1000);
+      if (job.id === activeJob?.id) {
+        setActiveJob(job);
+        if (job.status === 'completed') {
+          setTimeout(() => {
+            MatchingAPI.list(100).then((data) => {
+              setMatches(data.matches);
+              setTotal(data.total);
+            });
+          }, 1000);
+        }
+      }
+      if (job.id === cacheJob?.id) {
+        setCacheJob(job);
+        if (job.status === 'completed') {
+          setIsPreparingCache(false);
+          fetchCacheStatus();
+        }
+      }
     };
 
     socket.on('job_created', handleJobCreated);
@@ -149,7 +210,7 @@ export function MatchingPage() {
       socket.off('job_created', handleJobCreated);
       socket.off('job_updated', handleJobUpdated);
     };
-  }, [socket, connected, activeJob?.id]);
+  }, [socket, connected, activeJob?.id, cacheJob?.id, fetchCacheStatus]);
 
   const startMatching = useCallback(async () => {
     if (weightsError) {
@@ -184,11 +245,54 @@ export function MatchingPage() {
     }
   }, [weightsError, options, dateFilter]);
 
+  const startCachePreparation = useCallback(async () => {
+    setIsPreparingCache(true);
+    try {
+      const job = await JobsAPI.create('prepare_catalog', {});
+      setCacheJob(job);
+    } catch (err) {
+      setIsPreparingCache(false);
+      alert(`Failed to start cache preparation: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
+  }, []);
+
   const resetOptions = useCallback(() => setOptions({ ...DEFAULT_OPTIONS }), []);
 
   const updateOption = useCallback(<K extends keyof typeof options>(key: K, value: (typeof options)[K]) => {
     setOptions((prev) => ({ ...prev, [key]: value }));
   }, []);
+
+  // Cache status display
+  const renderCacheStatus = () => {
+    if (cacheLoading || !cacheStatus) {
+      return (
+        <div className="text-xs text-gray-500">{CACHE_STATUS_LOADING}</div>
+      );
+    }
+
+    const { cached_images, total_images, cache_size_mb } = cacheStatus;
+    const percentage = total_images > 0 ? Math.round((cached_images / total_images) * 100) : 0;
+
+    return (
+      <div className="flex items-center gap-2">
+        <div className={`w-2 h-2 rounded-full ${isCacheReady ? 'bg-green-500' : 'bg-yellow-500'}`} />
+        <span className="text-xs text-gray-600">
+          {cached_images} {CACHE_STATUS_CACHED} {CACHE_STATUS_OF} {total_images} {CACHE_STATUS_IMAGES} ({percentage}%)
+        </span>
+        <span className="text-xs text-gray-400">|</span>
+        <span className="text-xs text-gray-600">
+          {CACHE_SIZE_LABEL}: {cache_size_mb.toFixed(1)}MB
+        </span>
+        <button
+          onClick={fetchCacheStatus}
+          disabled={cacheLoading}
+          className="text-xs text-blue-600 hover:text-blue-800 underline ml-2"
+        >
+          {CACHE_REFRESH_BUTTON}
+        </button>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -210,6 +314,38 @@ export function MatchingPage() {
 
   return (
     <div className="space-y-6">
+      {/* Cache Status Panel */}
+      <div className="bg-gray-50 p-3 rounded-lg border">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-700">{CACHE_TITLE}</span>
+            {renderCacheStatus()}
+          </div>
+          <button
+            onClick={startCachePreparation}
+            disabled={isPreparingCache || cacheJob?.status === 'running'}
+            className="px-3 py-1.5 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isPreparingCache ? CACHE_PREPARING : CACHE_PREPARE_BUTTON}
+          </button>
+        </div>
+        {cacheJob?.status === 'running' && (
+          <div className="mt-2 text-xs text-purple-700">
+            {CACHE_JOB_RUNNING} {cacheJob.progress ? `${cacheJob.progress}%` : ''}
+          </div>
+        )}
+        {cacheJob?.status === 'completed' && (
+          <div className="mt-2 text-xs text-green-700">
+            {CACHE_JOB_COMPLETED} {cacheJob.result?.cached || 0} images cached
+          </div>
+        )}
+        {!isCacheReady && cacheStatus && cacheStatus.total_images > 0 && (
+          <div className="mt-2 text-xs text-yellow-700">
+            {CACHE_WARNING_NOT_READY}
+          </div>
+        )}
+      </div>
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">{MATCHING_RESULTS}</h2>
@@ -308,8 +444,8 @@ function JobStatusPanel({ job, onView }: { job: Job; onView: () => void }) {
               {job.status === 'pending'
                 ? MATCHING_WAITING
                 : job.progress
-                  ? `${job.progress}${MATCHING_PERCENT_COMPLETE}`
-                  : MATCHING_PROCESSING}
+                ? `${job.progress}${MATCHING_PERCENT_COMPLETE}`
+                : MATCHING_PROCESSING}
             </p>
           </div>
         </div>
