@@ -434,7 +434,8 @@ def enrich_catalog_images(db, limit=None):
     """
     from lightroom_tagger.core.database import (
         get_all_images, get_catalog_images_needing_analysis,
-        init_catalog_table, store_catalog_image
+        init_catalog_table, store_catalog_image,
+        init_vision_comparisons_table, init_vision_cache_table
     )
     from lightroom_tagger.core.vision_cache import get_or_create_cached_image
     from lightroom_tagger.core.config import load_config
@@ -446,6 +447,8 @@ def enrich_catalog_images(db, limit=None):
     errors = 0
 
     init_catalog_table(db)
+    init_vision_comparisons_table(db)
+    init_vision_cache_table(db)
 
     print("Enriching catalog images...")
 

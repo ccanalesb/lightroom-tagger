@@ -137,8 +137,104 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
 
 def handle_enrich_catalog(runner, job_id: str, metadata: dict):
     """Enrich catalog with metadata."""
-    runner.update_progress(job_id, 50, 'Enriching catalog...')
-    runner.complete_job(job_id, {'enriched': 0})
+    from lightroom_tagger.core.database import init_database, get_catalog_images_needing_analysis, init_catalog_table
+    from lightroom_tagger.core.vision_cache import get_or_create_cached_image
+    from lightroom_tagger.core.config import load_config
+    from lightroom_tagger.core.analyzer import analyze_image
+    import os
+
+    runner.update_progress(job_id, 10, 'Initializing enrichment...')
+
+    db_path = os.getenv('LIBRARY_DB')
+    if not db_path:
+        config = load_config()
+        db_path = config.db_path or 'library.db'
+
+    if not os.path.exists(db_path):
+        runner.fail_job(job_id, f"Library database not found at: {db_path}")
+        return
+
+    try:
+        db = init_database(db_path)
+        init_catalog_table(db)
+
+        # Get images that need enrichment
+        catalog_images = get_catalog_images_needing_analysis(db)
+
+        if not catalog_images:
+            # If catalog table is empty, get from main images table
+            from lightroom_tagger.core.database import get_all_images
+            all_images = get_all_images(db)
+            catalog_images = [img for img in all_images if not img.get('analyzed_at')]
+
+        total = len(catalog_images)
+        processed = 0
+        skipped = 0
+        errors = 0
+
+        runner.update_progress(job_id, 20, f'Found {total} images to enrich')
+
+        for i, record in enumerate(catalog_images):
+            try:
+                key = record.get('key')
+                filepath = record.get('filepath')
+
+                if not key or not filepath:
+                    skipped += 1
+                    continue
+
+                # Analyze image
+                analysis = analyze_image(filepath)
+
+                # Update record with analysis
+                enriched_record = {
+                    'key': key,
+                    'filepath': filepath,
+                    'analyzed_at': analysis.get('analyzed_at', 'unknown'),
+                    'phash': analysis.get('phash'),
+                    'exif': analysis.get('exif', {}),
+                    'description': analysis.get('description', ''),
+                    'catalog_path': record.get('catalog_path', ''),
+                    'date_taken': record.get('date_taken', ''),
+                    'filename': record.get('filename', ''),
+                    'rating': record.get('rating', 0),
+                    'keywords': record.get('keywords', []),
+                    'color_label': record.get('color_label', ''),
+                    'title': record.get('title', ''),
+                    'description': record.get('description', ''),
+                }
+
+                # Store in catalog table
+                from lightroom_tagger.core.database import store_catalog_image
+                store_catalog_image(db, enriched_record)
+
+                # Create vision cache
+                if config.vision_cache_enabled:
+                    get_or_create_cached_image(db, key, filepath)
+
+                processed += 1
+
+                if (i + 1) % 10 == 0 or i == total - 1:
+                    progress = int(20 + (processed / total) * 70)  # Scale to 20-90%
+                    runner.update_progress(job_id, progress, f'Processed {processed}/{total} images')
+
+            except Exception as e:
+                errors += 1
+                print(f"Error processing image {i + 1}: {e}")
+
+        runner.complete_job(job_id, {
+            'processed': processed,
+            'skipped': skipped,
+            'errors': errors,
+            'method': 'enrich_catalog',
+            'limit': metadata.get('limit')
+        })
+
+    except Exception as e:
+        runner.fail_job(job_id, str(e))
+    finally:
+        if db:
+            db.close()
 
 
 def handle_prepare_catalog(runner, job_id: str, metadata: dict):
