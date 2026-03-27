@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AdvancedOptions } from "../components";
 import { MetadataRow, MetadataSection } from "../components/metadata";
 import { ExifDataSection } from "../components/metadata/ExifDataSection";
 import { Modal, ModalFooter, ModalHeader } from "../components/modal";
@@ -19,7 +20,12 @@ import {
   META_SECTION_FILE_LOCATION,
   META_SECTION_IMAGE_ANALYSIS,
   MODAL_CLOSE,
-  MODAL_OPEN_LOCAL_FILE,
+  MODAL_MATCH_RESULT_FOUND,
+  MODAL_MATCH_RESULT_NONE,
+  MODAL_MATCH_RETRY,
+  MODAL_MATCH_RUNNING,
+  MODAL_MATCH_THIS_PHOTO,
+  MODAL_MATCH_VIEW_RESULTS,
   MODAL_TITLE_IMAGE_DETAILS,
   MODAL_VIEW_ON_INSTAGRAM,
   MSG_CLICK_FOR_DETAILS,
@@ -30,7 +36,9 @@ import {
   PAGINATION_PREVIOUS,
 } from "../constants/strings";
 import { useModal } from "../hooks/useModal";
-import { ImagesAPI, InstagramImage } from "../services/api";
+import type { InstagramImage, Job } from "../services/api";
+import { ImagesAPI, JobsAPI } from "../services/api";
+import { useMatchOptions } from "../stores/matchOptionsContext";
 
 export function InstagramPage() {
   const [images, setImages] = useState<InstagramImage[]>([]);
@@ -359,6 +367,74 @@ function ImageDetailsModal({
   onClose: () => void;
 }) {
   const thumbnailUrl = `/api/images/instagram/${encodeURIComponent(image.key)}/thumbnail`;
+  const { options: matchOptions, updateOption, resetOptions, availableModels, weightsError } =
+    useMatchOptions();
+  const [matchState, setMatchState] = useState<"idle" | "running" | "done">("idle");
+  const [matchJob, setMatchJob] = useState<Job | null>(null);
+  const [matchResult, setMatchResult] = useState<{ matched: number; score?: number } | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearPoll = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    setMatchState("idle");
+    setMatchJob(null);
+    setMatchResult(null);
+    setAdvancedOpen(false);
+    clearPoll();
+    return clearPoll;
+  }, [image.key]);
+
+  const pollJob = (jobId: string) => {
+    clearPoll();
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const job = await JobsAPI.get(jobId);
+        setMatchJob(job);
+        if (job.status === "completed" || job.status === "failed") {
+          clearPoll();
+          setMatchState("done");
+          if (job.result) {
+            setMatchResult({
+              matched: job.result.matched ?? 0,
+              score: job.result.best_score,
+            });
+          }
+        }
+      } catch {
+        clearPoll();
+        setMatchState("done");
+      }
+    }, 2000);
+  };
+
+  const startSingleMatch = async () => {
+    setMatchState("running");
+    setMatchResult(null);
+    try {
+      const job = await JobsAPI.create("vision_match", {
+        media_key: image.key,
+        vision_model: matchOptions.selectedModel,
+        threshold: matchOptions.threshold,
+        weights: {
+          phash: matchOptions.phashWeight,
+          description: matchOptions.descWeight,
+          vision: matchOptions.visionWeight,
+        },
+      });
+      setMatchJob(job);
+      pollJob(job.id);
+    } catch (err) {
+      setMatchState("idle");
+      console.error("Failed to start match:", err);
+    }
+  };
 
   return (
     <Modal onClose={onClose}>
@@ -376,26 +452,108 @@ function ImageDetailsModal({
               />
             </div>
 
-            <div className="flex gap-2">
-              {image.post_url ? (
+            <div className="space-y-3">
+              {image.post_url && (
                 <a
                   href={image.post_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 bg-blue-600 text-white text-center py-2 px-4 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                  className="block w-full bg-blue-600 text-white text-center py-2 px-4 rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
                 >
                   {MODAL_VIEW_ON_INSTAGRAM}
                 </a>
-              ) : (
+              )}
+
+              {matchState === "idle" && (
                 <button
-                  onClick={() =>
-                    window.open(`file://${image.local_path}`, "_blank")
-                  }
-                  className="flex-1 bg-gray-600 text-white text-center py-2 px-4 rounded-md hover:bg-gray-700 transition-colors text-sm font-medium"
+                  type="button"
+                  onClick={startSingleMatch}
+                  className="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition-colors text-sm font-medium"
                 >
-                  {MODAL_OPEN_LOCAL_FILE}
+                  {MODAL_MATCH_THIS_PHOTO}
                 </button>
               )}
+
+              {matchState === "running" && (
+                <div className="flex items-center gap-2 py-2 px-4 bg-purple-50 rounded-md text-sm text-purple-700">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  {MODAL_MATCH_RUNNING}
+                  {matchJob && ` ${matchJob.progress}%`}
+                </div>
+              )}
+
+              {matchState === "done" && matchResult && (
+                <div
+                  className={`py-2 px-4 rounded-md text-sm ${matchResult.matched > 0 ? "bg-green-50 text-green-700" : "bg-gray-50 text-gray-600"}`}
+                >
+                  <p className="font-medium">
+                    {matchResult.matched > 0 ? MODAL_MATCH_RESULT_FOUND : MODAL_MATCH_RESULT_NONE}
+                    {matchResult.score != null && ` (score: ${matchResult.score.toFixed(2)})`}
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    {matchResult.matched > 0 && (
+                      <a href="/matching" className="text-xs text-blue-600 hover:underline">
+                        {MODAL_MATCH_VIEW_RESULTS}
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setMatchState("idle")}
+                      className="text-xs text-purple-600 hover:underline"
+                    >
+                      {MODAL_MATCH_RETRY}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {matchState === "done" && matchJob?.status === "failed" && (
+                <div className="py-2 px-4 rounded-md text-sm bg-red-50 text-red-700">
+                  <p className="font-medium">
+                    Match failed: {matchJob.error || "Unknown error"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setMatchState("idle")}
+                    className="text-xs text-purple-600 hover:underline mt-1"
+                  >
+                    {MODAL_MATCH_RETRY}
+                  </button>
+                </div>
+              )}
+
+              <AdvancedOptions
+                isOpen={advancedOpen}
+                onToggle={() => setAdvancedOpen(!advancedOpen)}
+                availableModels={availableModels}
+                selectedModel={matchOptions.selectedModel}
+                onModelChange={(model) => updateOption("selectedModel", model)}
+                threshold={matchOptions.threshold}
+                onThresholdChange={(v) => updateOption("threshold", v)}
+                phashWeight={matchOptions.phashWeight}
+                onPhashWeightChange={(v) => updateOption("phashWeight", v)}
+                descWeight={matchOptions.descWeight}
+                onDescWeightChange={(v) => updateOption("descWeight", v)}
+                visionWeight={matchOptions.visionWeight}
+                onVisionWeightChange={(v) => updateOption("visionWeight", v)}
+                weightsError={weightsError}
+                onReset={resetOptions}
+              />
             </div>
           </div>
 
