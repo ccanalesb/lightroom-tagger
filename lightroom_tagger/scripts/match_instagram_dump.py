@@ -21,6 +21,7 @@ from lightroom_tagger.core.database import (
     init_instagram_dump_table,
     mark_dump_media_attempted,
     mark_dump_media_processed,
+    store_match,
     update_instagram_status,
 )
 from lightroom_tagger.core.matcher import find_candidates_by_date, score_candidates_with_vision
@@ -130,6 +131,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         if results and results[0]['total_score'] >= threshold:
             best_match = results[0]
             matched_catalog_key = best_match['catalog_key']
+
+            store_match(db, best_match)
 
             mark_dump_media_processed(
                 db, dump_media['media_key'],
