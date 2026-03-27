@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MatchingAPI, JobsAPI, SystemAPI, Match, Job } from '../services/api';
 import { MatchDetailModal, AdvancedOptions, MatchCard } from '../components';
 import { useSocketStore } from '../stores/socketStore';
+import { useMatchOptions } from '../stores/matchOptionsContext';
 import {
   MSG_LOADING,
   MSG_ERROR_PREFIX,
@@ -56,14 +57,6 @@ const DATE_FILTERS = [
   { value: '2026', label: ADVANCED_DATE_YEAR_2026 },
 ] as const;
 
-const DEFAULT_OPTIONS = {
-  selectedModel: '',
-  threshold: 0.7,
-  phashWeight: 0,
-  descWeight: 0,
-  visionWeight: 1,
-};
-
 export function MatchingPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [total, setTotal] = useState(0);
@@ -77,9 +70,7 @@ export function MatchingPage() {
 
   // Advanced options
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [availableModels, setAvailableModels] = useState<{ name: string; default: boolean }[]>([]);
-  const [options, setOptions] = useState({ ...DEFAULT_OPTIONS });
-  const [weightsError, setWeightsError] = useState<string | null>(null);
+  const { options, updateOption, resetOptions, availableModels, weightsError } = useMatchOptions();
 
   // Cache status
   const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null);
@@ -149,24 +140,8 @@ export function MatchingPage() {
     fetchData();
     fetchCacheStatus();
 
-    // Fetch models
-    SystemAPI.visionModels()
-      .then((data) => {
-        if (!mounted) return;
-        setAvailableModels(data.models);
-        const defaultModel = data.models.find((m) => m.default) ?? data.models[0];
-        if (defaultModel) setOptions((prev) => ({ ...prev, selectedModel: defaultModel.name }));
-      })
-      .catch(console.error);
-
     return () => { mounted = false; };
   }, [fetchCacheStatus]);
-
-  // Validate weights
-  useEffect(() => {
-    const total = options.phashWeight + options.descWeight + options.visionWeight;
-    setWeightsError(Math.abs(total - 1.0) > 0.001 ? `Weights must sum to 100% (currently ${(total * 100).toFixed(0)}%)` : null);
-  }, [options.phashWeight, options.descWeight, options.visionWeight]);
 
   // WebSocket updates
   useEffect(() => {
@@ -257,12 +232,6 @@ export function MatchingPage() {
       setIsPreparingCache(false);
       alert(`Failed to start cache preparation: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
-  }, []);
-
-  const resetOptions = useCallback(() => setOptions({ ...DEFAULT_OPTIONS }), []);
-
-  const updateOption = useCallback(<K extends keyof typeof options>(key: K, value: (typeof options)[K]) => {
-    setOptions((prev) => ({ ...prev, [key]: value }));
   }, []);
 
   // Cache status display

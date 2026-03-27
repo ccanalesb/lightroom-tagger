@@ -83,6 +83,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             month = metadata.get('month')
             year = metadata.get('year')
             last_months = metadata.get('last_months')
+            media_key = metadata.get('media_key')
 
             # Set environment variable for vision model if custom
             if custom_model and custom_model != config.vision_model:
@@ -104,6 +105,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 last_months=last_months,
                 progress_callback=progress_callback,
                 log_callback=log_callback,
+                media_key=media_key,
                 force_descriptions=force_descriptions,
             )
 
