@@ -1,0 +1,1 @@
+export { DescriptionPanel } from './DescriptionPanel'

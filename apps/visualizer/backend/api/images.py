@@ -7,6 +7,21 @@ from utils.responses import error_not_found, error_server_error, success_paginat
 
 bp = Blueprint('images', __name__)
 
+_DESC_JSON_COLS = ('composition', 'perspectives', 'technical', 'subjects')
+
+
+def _deserialize_description(row: dict) -> dict:
+    """Deserialize JSON columns in an image_descriptions row."""
+    out = dict(row)
+    for col in _DESC_JSON_COLS:
+        val = out.get(col)
+        if isinstance(val, str):
+            try:
+                out[col] = json.loads(val)
+            except (json.JSONDecodeError, TypeError):
+                pass
+    return out
+
 
 def _enrich_instagram_media(media_items):
     """Transform database media items to API response format."""
@@ -254,20 +269,26 @@ def list_matches(db):
         for img in db.execute("SELECT * FROM images").fetchall():
             catalog_lookup[img.get('key')] = img
 
+        desc_lookup = {}
+        for desc in db.execute("SELECT * FROM image_descriptions").fetchall():
+            key = (desc.get('image_key'), desc.get('image_type'))
+            desc_lookup[key] = _deserialize_description(desc)
+
         # Enrich matches with image data
         enriched_matches = []
         for match in matches:
             enriched = {**match}
 
-            # Add Instagram image details
             insta_key = match.get('insta_key')
             if insta_key and insta_key in instagram_lookup:
                 enriched['instagram_image'] = instagram_lookup[insta_key]
 
-            # Add Catalog image details
             catalog_key = match.get('catalog_key')
             if catalog_key and catalog_key in catalog_lookup:
                 enriched['catalog_image'] = catalog_lookup[catalog_key]
+
+            enriched['catalog_description'] = desc_lookup.get((catalog_key, 'catalog')) if catalog_key else None
+            enriched['insta_description'] = desc_lookup.get((insta_key, 'instagram')) if insta_key else None
 
             enriched_matches.append(enriched)
 

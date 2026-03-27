@@ -61,7 +61,8 @@ vision_model: "gemma3:27b"  # Best for accuracy, requires 17GB RAM
 ```
 
 Environment variables:
-- `VISION_MODEL` - Override vision model
+- `VISION_MODEL` - Override vision model (pair matching and default for descriptions)
+- `DESCRIPTION_VISION_MODEL` - Override Ollama model used only for structured image descriptions (falls back to `VISION_MODEL` / config)
 - `PHASH_WEIGHT`, `DESC_WEIGHT`, `VISION_WEIGHT` - Override weights
 - `MATCH_THRESHOLD` - Override threshold
 

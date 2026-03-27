@@ -1,7 +1,11 @@
 import contextlib
+import json as _json
 import os
+import re
 import tempfile
 from typing import Any
+
+import ollama
 
 from lightroom_tagger.core.config import load_config
 
@@ -18,7 +22,128 @@ def get_vision_model() -> str:
         return os.environ['VISION_MODEL']
     return load_config().vision_model
 
-VISION_MODEL = os.environ.get('VISION_MODEL', 'gemma3:27b')  # fallback; get_vision_model() preferred
+VISION_MODEL = os.environ.get('VISION_MODEL', 'gemma3:27b')
+
+
+def get_description_model() -> str:
+    """Ollama model for structured image descriptions.
+
+    ``DESCRIPTION_VISION_MODEL`` overrides when set; otherwise uses the same
+    resolution as :func:`get_vision_model` (env ``VISION_MODEL`` or config).
+    """
+    if 'DESCRIPTION_VISION_MODEL' in os.environ:
+        return os.environ['DESCRIPTION_VISION_MODEL']
+    return get_vision_model()
+
+DESCRIPTION_PROMPT = """You are an experienced photo editor reviewing images for a photography portfolio. Be direct and constructive. State clearly what works and what doesn't — no flattery, no sugarcoating, but also no performative negativity. Every image has strengths and weaknesses; identify both with specifics.
+
+Analyze this photograph from three expert perspectives and return a structured JSON response.
+
+## Perspectives (each gets its own score — an image can be a 7 for street but a 3 for publishing)
+1. **Street Photographer**: Is there a decisive moment or is the timing off? Evaluate geometry, light, and candid quality. What would make this frame stronger? Score how well it works AS street photography.
+2. **Documentary Photographer**: Does this tell a story? Is there emotional weight? What narrative is present or missing? How could the storytelling improve? Score how well it works AS documentary work.
+3. **Publisher**: What's the realistic use case? (magazine cover, editorial feature, blog post, social media, stock, none). What audience would this serve? What limits its usability? Score its commercial value.
+
+Also choose which single perspective fits this image best (best_perspective).
+
+## Composition Analysis
+Identify:
+- **Layers**: List distinct depth layers (foreground, midground, background) and what occupies each. Note if layers are weak or missing.
+- **Techniques**: Which composition techniques are present (rule_of_thirds, leading_lines, symmetry, framing, diagonal, golden_ratio, negative_space, repetition).
+- **Problems**: Specific composition weaknesses (cluttered, no clear subject, awkward crop, distracting elements, missed focus). Empty list if none.
+- **Depth**: shallow, moderate, or deep
+- **Balance**: symmetric, asymmetric, or radial
+
+## Technical Analysis
+- **Dominant colors**: Up to 5 hex codes
+- **Mood**: One word (contemplative, energetic, melancholic, joyful, tense, serene, dramatic, mysterious, flat, dull, chaotic, intimate, raw, quiet)
+- **Lighting**: (natural_front, natural_side, natural_back, golden_hour, blue_hour, overcast, artificial, mixed, low_light, high_key, low_key)
+- **Time of day** if discernible: (dawn, morning, midday, afternoon, golden_hour, blue_hour, night, unknown)
+
+## Scoring Rubric (use the FULL range honestly — most photos land between 4-6)
+- **1-2**: Technically broken or no photographic intent. Accidental shot.
+- **3-4**: Snapshot with some intent but weak execution or no clear subject.
+- **5**: Competent but forgettable. Technically fine, nothing memorable.
+- **6**: Above average. One strong element (light, moment, composition) but doesn't fully come together.
+- **7**: Good. Clear intent, solid execution. Minor issues hold it back.
+- **8**: Strong. Portfolio-worthy. Would make someone pause and look twice.
+- **9**: Excellent. Gallery-level. Distinctive voice, memorable image.
+- **10**: Masterwork. Iconic potential. Rare.
+
+## Required JSON format (respond with ONLY this JSON, no other text):
+{
+  "summary": "1-2 sentence objective description of the image content",
+  "composition": {
+    "layers": ["foreground: <description>", "midground: <description>", "background: <description>"],
+    "techniques": ["technique1", "technique2"],
+    "problems": ["specific issue 1", "specific issue 2"],
+    "depth": "shallow|moderate|deep",
+    "balance": "symmetric|asymmetric|radial"
+  },
+  "perspectives": {
+    "street": {
+      "analysis": "2-3 sentences — what works, what doesn't, what would improve it",
+      "score": 1-10
+    },
+    "documentary": {
+      "analysis": "2-3 sentences — what works, what doesn't, what would improve it",
+      "score": 1-10
+    },
+    "publisher": {
+      "analysis": "2-3 sentences — realistic use case and what limits usability",
+      "score": 1-10
+    }
+  },
+  "technical": {
+    "dominant_colors": ["#hex1", "#hex2"],
+    "mood": "one_word",
+    "lighting": "lighting_type",
+    "time_of_day": "time_period"
+  },
+  "subjects": ["subject1", "subject2"],
+  "best_perspective": "street|documentary|publisher"
+}"""
+
+_DESCRIPTION_FALLBACK: dict[str, Any] = {
+    'summary': '',
+    'composition': {},
+    'perspectives': {},
+    'technical': {},
+    'subjects': [],
+    'best_perspective': '',
+}
+
+
+def build_description_prompt() -> str:
+    """Return the image description prompt."""
+    return DESCRIPTION_PROMPT
+
+
+def parse_description_response(raw: str) -> dict:
+    """Parse model response into structured description dict."""
+    text = raw.strip()
+
+    fence_match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', text, re.DOTALL)
+    if fence_match:
+        text = fence_match.group(1).strip()
+
+    try:
+        parsed = _json.loads(text)
+        if isinstance(parsed, dict):
+            return parsed
+    except (_json.JSONDecodeError, ValueError):
+        pass
+
+    brace_match = re.search(r'\{.*\}', text, re.DOTALL)
+    if brace_match:
+        try:
+            parsed = _json.loads(brace_match.group(0))
+            if isinstance(parsed, dict):
+                return parsed
+        except (_json.JSONDecodeError, ValueError):
+            pass
+
+    return dict(_DESCRIPTION_FALLBACK)
 
 
 def compress_image(input_path: str, max_size: tuple[int, int] | None = None, quality: int | None = None) -> str:
@@ -146,16 +271,17 @@ def analyze_image(path: str) -> dict[str, Any]:
     """Analyze image and return all matching signals.
 
     Returns:
-        {phash, exif: {camera, lens, date_taken, gps, ...}, description}
+        {phash, exif, description (str summary), structured_description (full dict)}
     """
     phash = compute_phash(path)
     exif = extract_exif(path)
-    description = describe_image(path)
+    structured = describe_image(path)
 
     return {
         'phash': phash,
         'exif': exif,
-        'description': description
+        'description': structured.get('summary', ''),
+        'structured_description': structured,
     }
 
 def compute_phash(path: str) -> str | None:
@@ -185,8 +311,8 @@ def extract_exif(path: str) -> dict[str, Any]:
         pass
     return result
 
-def describe_image(path: str, agent_type: str | None = None) -> str:
-    """Generate description using configured agent."""
+def describe_image(path: str, agent_type: str | None = None) -> dict:
+    """Generate structured description using configured agent."""
     if agent_type is None:
         try:
             config = load_config()
@@ -195,14 +321,47 @@ def describe_image(path: str, agent_type: str | None = None) -> str:
             agent_type = 'local'
 
     if agent_type == 'local':
-        return run_local_agent(path)
+        raw = run_local_agent(path)
     elif agent_type == 'external':
-        return run_external_agent(path)
-    return ""
+        raw = run_external_agent(path)
+    else:
+        raw = ''
+
+    return parse_description_response(raw)
+
 
 def run_local_agent(path: str) -> str:
-    """Run local vision model (e.g., LLaVA)."""
-    return ""
+    """Run local vision model (e.g., LLaVA) via Ollama Python client."""
+    temp_files: list[str] = []
+    viewable = get_viewable_path(path)
+    if viewable != path:
+        temp_files.append(viewable)
+
+    compressed = compress_image(viewable)
+    if compressed != viewable:
+        temp_files.append(compressed)
+
+    try:
+        response = ollama.chat(
+            model=get_description_model(),
+            messages=[
+                {
+                    'role': 'user',
+                    'content': build_description_prompt(),
+                    'images': [compressed],
+                }
+            ],
+        )
+        content = getattr(response.message, 'content', None) if response and response.message else None
+        return content or ''
+    except Exception as e:
+        print(f"  Ollama description failed: {e}", flush=True)
+        return ''
+    finally:
+        for f in temp_files:
+            if os.path.exists(f):
+                with contextlib.suppress(Exception):
+                    os.unlink(f)
 
 def run_external_agent(path: str) -> str:
     """Run external API (e.g., Claude, GPT-4V)."""

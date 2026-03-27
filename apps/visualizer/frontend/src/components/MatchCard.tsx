@@ -5,6 +5,7 @@ import {
   MATCH_CARD_CATALOG_LABEL,
   MATCH_CARD_NO_IMAGE,
 } from '../constants/strings';
+import { PerspectiveBadge } from './PerspectiveBadge';
 
 interface MatchCardProps {
   match: Match;
@@ -83,6 +84,7 @@ export function MatchCard({ match, onClick }: MatchCardProps) {
           <p className="text-gray-600 truncate" title={match.catalog_image?.filename || match.catalog_key}>
             {MATCH_CARD_CATALOG_LABEL}: {match.catalog_image?.filename || getFilename(match.catalog_key)}
           </p>
+          <PerspectiveBadge match={match} />
         </div>
       </div>
     </div>

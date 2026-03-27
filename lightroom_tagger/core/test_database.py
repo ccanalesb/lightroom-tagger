@@ -10,12 +10,16 @@ from lightroom_tagger.core.database import (
     get_all_images,
     get_image,
     get_image_count,
+    get_image_description,
     get_images_without_hash,
     get_instagram_by_date_filter,
+    get_undescribed_catalog_images,
     get_vision_comparison,
     init_database,
+    init_image_descriptions_table,
     init_vision_comparisons_table,
     store_image,
+    store_image_description,
     store_images_batch,
     store_vision_comparison,
     update_image_hash,
@@ -39,7 +43,10 @@ class TestDatabase(unittest.TestCase):
 
     def test_init_database(self):
         """Test database initialization."""
-        self.assertEqual(self.db.default_table_name, 'images')
+        row = self.db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='images'"
+        ).fetchone()
+        self.assertIsNotNone(row)
         self.assertEqual(get_image_count(self.db), 0)
 
     def test_generate_key(self):
@@ -307,10 +314,10 @@ class TestInstagramDumpMedia(unittest.TestCase):
         from lightroom_tagger.core.database import init_instagram_dump_table
 
         init_instagram_dump_table(self.db)
-        # Table is created lazily in TinyDB - verify by inserting and retrieving
-        table = self.db.table('instagram_dump_media')
-        table.insert({'test': True})
-        self.assertIn('instagram_dump_media', self.db.tables())
+        row = self.db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='instagram_dump_media'"
+        ).fetchone()
+        self.assertIsNotNone(row)
 
     def test_store_instagram_dump_media(self):
         """Test storing Instagram dump media record."""
@@ -562,6 +569,76 @@ class TestInstagramDumpMedia(unittest.TestCase):
         keys_date = [r['media_key'] for r in result_date]
         self.assertIn('202603/fresh', keys_date)
         self.assertNotIn('202603/attempted', keys_date)
+
+
+class TestImageDescriptions(unittest.TestCase):
+    """Tests for image_descriptions table functions."""
+
+    def setUp(self):
+        fd, self.temp_db_path = tempfile.mkstemp(suffix='.db')
+        os.close(fd)
+        self.db = init_database(self.temp_db_path)
+
+    def tearDown(self):
+        self.db.close()
+        os.unlink(self.temp_db_path)
+
+    def test_init_descriptions_table(self):
+        init_image_descriptions_table(self.db)
+        # Should not raise - table already exists from init_database
+        self.db.execute("SELECT COUNT(*) FROM image_descriptions")
+
+    def test_store_image_description(self):
+        record = {
+            'image_key': '2024-01-15_photo.jpg',
+            'image_type': 'catalog',
+            'summary': 'A street scene at golden hour',
+            'composition': {'layers': ['foreground', 'background'], 'techniques': ['rule_of_thirds']},
+            'perspectives': {
+                'street': {'analysis': 'Strong geometry', 'score': 7},
+                'documentary': {'analysis': 'Fair story', 'score': 5},
+                'publisher': {'analysis': 'Editorial use', 'score': 6},
+            },
+            'technical': {'dominant_colors': ['#2b3a4c'], 'mood': 'contemplative'},
+            'subjects': ['person', 'architecture'],
+            'best_perspective': 'street',
+            'model_used': 'gemma3:27b',
+        }
+        key = store_image_description(self.db, record)
+        self.assertEqual(key, '2024-01-15_photo.jpg')
+
+        stored = get_image_description(self.db, '2024-01-15_photo.jpg')
+        self.assertIsNotNone(stored)
+        self.assertEqual(stored['summary'], 'A street scene at golden hour')
+        self.assertEqual(stored['perspectives']['street']['score'], 7)
+        self.assertIn('described_at', stored)
+
+    def test_get_image_description_not_found(self):
+        self.assertIsNone(get_image_description(self.db, 'nonexistent'))
+
+    def test_store_description_is_idempotent(self):
+        store_image_description(self.db, {
+            'image_key': 'key1', 'image_type': 'catalog',
+            'summary': 'First', 'model_used': 'gemma3:27b',
+        })
+        store_image_description(self.db, {
+            'image_key': 'key1', 'image_type': 'catalog',
+            'summary': 'Updated', 'model_used': 'gemma3:27b',
+        })
+        stored = get_image_description(self.db, 'key1')
+        self.assertEqual(stored['summary'], 'Updated')
+
+    def test_get_undescribed_images(self):
+        store_image(self.db, {'date_taken': '2024-01-15', 'filename': 'a.jpg'})
+        store_image(self.db, {'date_taken': '2024-01-16', 'filename': 'b.jpg'})
+        store_image_description(self.db, {
+            'image_key': '2024-01-15_a.jpg', 'image_type': 'catalog',
+            'summary': 'Described', 'model_used': 'gemma3:27b',
+        })
+        undescribed = get_undescribed_catalog_images(self.db)
+        keys = [img['key'] for img in undescribed]
+        self.assertIn('2024-01-16_b.jpg', keys)
+        self.assertNotIn('2024-01-15_a.jpg', keys)
 
 
 if __name__ == "__main__":
