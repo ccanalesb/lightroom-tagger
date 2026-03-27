@@ -5,15 +5,44 @@ eliminating redundant compression of the same images across multiple matching ru
 """
 
 import contextlib
+import errno
 import os
+import shutil
+import tempfile
 
-from lightroom_tagger.core.analyzer import compress_image, compute_phash
+from lightroom_tagger.core.analyzer import compress_image, compute_phash, get_viewable_path
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import (
     get_vision_cached_image,
     is_vision_cache_valid,
     store_vision_cached_image,
 )
+
+
+def _is_path_in_temp_dir(path: str) -> bool:
+    """True if path is under the system temp directory (a file this process may delete)."""
+    if not path:
+        return False
+    tmp = os.path.abspath(tempfile.gettempdir())
+    ap = os.path.abspath(path)
+    return ap == tmp or ap.startswith(tmp + os.sep)
+
+
+def _place_into_cache(source: str, target_path: str, temp_files: list[str]) -> None:
+    """Move or copy source into the cache path without clobbering user-owned files."""
+    if _is_path_in_temp_dir(source):
+        try:
+            os.replace(source, target_path)
+        except OSError as e:
+            if e.errno != errno.EXDEV:
+                raise
+            shutil.copy2(source, target_path)
+            with contextlib.suppress(OSError):
+                os.unlink(source)
+        if source in temp_files:
+            temp_files.remove(source)
+    else:
+        shutil.copy2(source, target_path)
 
 
 def get_or_create_cached_image(db, catalog_key: str, original_path: str) -> str | None:
@@ -47,32 +76,39 @@ def get_or_create_cached_image(db, catalog_key: str, original_path: str) -> str 
     # Need to create cache
     target_path = os.path.join(cache_dir, f"{catalog_key.replace('/', '_')}.jpg")
 
-    # Compress to temp file first (atomic write pattern)
+    temp_files: list[str] = []
     try:
-        temp_path = compress_image(original_path)
+        # Convert RAW/DNG to viewable JPG first
+        viewable_path = get_viewable_path(original_path)
+        if viewable_path != original_path and _is_path_in_temp_dir(viewable_path):
+            temp_files.append(viewable_path)
 
-        phash = compute_phash(original_path)
+        temp_path = compress_image(viewable_path)
+        if temp_path != viewable_path:
+            temp_files.append(temp_path)
+
+        phash = compute_phash(viewable_path)
         original_mtime = os.path.getmtime(original_path)
 
-        if temp_path == original_path:
-            # Compression not possible (e.g. RAW/DNG), cache points to original
-            store_vision_cached_image(db, catalog_key, original_path, phash or '', original_mtime)
+        if temp_path == viewable_path and viewable_path == original_path:
+            # Neither conversion nor compression worked; cache original path
+            store_vision_cached_image(db, catalog_key, original_path, phash, original_mtime)
             return original_path
 
-        # Atomic move to final location using os.replace to prevent EXDEV errors
-        os.replace(temp_path, target_path)
+        # Use the compressed file (or converted file if compression was no-op)
+        source = temp_path if temp_path != viewable_path else viewable_path
+        _place_into_cache(source, target_path, temp_files)
 
-        # Store in database
-        store_vision_cached_image(db, catalog_key, target_path, phash or '', original_mtime)
-
+        store_vision_cached_image(db, catalog_key, target_path, phash, original_mtime)
         return target_path
 
     except Exception:
-        # Clean up temp file if exists
-        if 'temp_path' in dir() and os.path.exists(temp_path):
-            with contextlib.suppress(BaseException):
-                os.unlink(temp_path)
         raise
+    finally:
+        for tf in temp_files:
+            if tf and os.path.exists(tf):
+                with contextlib.suppress(BaseException):
+                    os.unlink(tf)
 
 
 def get_cached_phash(db, catalog_key: str) -> str | None:
@@ -83,10 +119,13 @@ def get_cached_phash(db, catalog_key: str) -> str | None:
         catalog_key: Key of catalog image
 
     Returns:
-        Pre-computed pHash string, or None if not cached
+        Pre-computed pHash string, or None if not cached or unavailable
     """
     cached = get_vision_cached_image(db, catalog_key)
-    return cached.get('phash') if cached else None
+    if not cached:
+        return None
+    ph = cached.get('phash')
+    return ph if ph else None
 
 
 class InstagramCache:

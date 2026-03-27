@@ -490,6 +490,79 @@ class TestInstagramDumpMedia(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]['media_key'], '202603/123')
 
+    def test_mark_dump_media_attempted_keeps_unprocessed(self):
+        """Attempted images stay unprocessed and are retryable in future runs."""
+        from lightroom_tagger.core.database import (
+            get_instagram_dump_media,
+            get_unprocessed_dump_media,
+            init_instagram_dump_table,
+            mark_dump_media_attempted,
+            store_instagram_dump_media,
+        )
+
+        init_instagram_dump_table(self.db)
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/attempt_test',
+            'file_path': '/path/to/file.jpg',
+            'filename': 'file.jpg',
+        })
+
+        mark_dump_media_attempted(self.db, '202603/attempt_test',
+                                   vision_result='DIFFERENT', vision_score=0.3)
+
+        stored = get_instagram_dump_media(self.db, '202603/attempt_test')
+        self.assertFalse(stored['processed'])
+        self.assertIsNotNone(stored['last_attempted_at'])
+        self.assertEqual(stored['vision_result'], 'DIFFERENT')
+
+        # Still returned by get_unprocessed (no run_start filter)
+        unprocessed = get_unprocessed_dump_media(self.db)
+        self.assertEqual(len(unprocessed), 1)
+
+    def test_run_start_skips_recently_attempted(self):
+        """Images attempted in the current run are skipped via run_start."""
+        from datetime import datetime, timedelta
+
+        from lightroom_tagger.core.database import (
+            get_instagram_by_date_filter,
+            get_unprocessed_dump_media,
+            init_instagram_dump_table,
+            mark_dump_media_attempted,
+            store_instagram_dump_media,
+        )
+
+        init_instagram_dump_table(self.db)
+
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/fresh',
+            'date_folder': '202603',
+            'file_path': '/path/fresh.jpg',
+        })
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/attempted',
+            'date_folder': '202603',
+            'file_path': '/path/attempted.jpg',
+        })
+
+        run_start = datetime.now().isoformat()
+        mark_dump_media_attempted(self.db, '202603/attempted')
+
+        # With run_start, the attempted one is skipped
+        result = get_unprocessed_dump_media(self.db, run_start=run_start)
+        keys = [r['media_key'] for r in result]
+        self.assertIn('202603/fresh', keys)
+        self.assertNotIn('202603/attempted', keys)
+
+        # Without run_start (new run), both are returned
+        result_all = get_unprocessed_dump_media(self.db)
+        self.assertEqual(len(result_all), 2)
+
+        # Same behavior via date filter
+        result_date = get_instagram_by_date_filter(self.db, month='202603', run_start=run_start)
+        keys_date = [r['media_key'] for r in result_date]
+        self.assertIn('202603/fresh', keys_date)
+        self.assertNotIn('202603/attempted', keys_date)
+
 
 if __name__ == "__main__":
     unittest.main()

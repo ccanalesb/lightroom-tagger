@@ -18,7 +18,7 @@ def get_vision_model() -> str:
         return os.environ['VISION_MODEL']
     return load_config().vision_model
 
-VISION_MODEL = os.environ.get('VISION_MODEL', 'gemma3:27b')
+VISION_MODEL = os.environ.get('VISION_MODEL', 'gemma3:27b')  # fallback; get_vision_model() preferred
 
 
 def compress_image(input_path: str, max_size: tuple[int, int] | None = None, quality: int | None = None) -> str:
@@ -289,31 +289,50 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
 
 
 def run_vision_ollama(local_path: str, insta_path: str) -> str:
-    """Run vision model via Ollama to compare images."""
-    import subprocess
+    """Compare two images using Ollama HTTP API with base64-encoded images."""
+    import base64
+    import json
+    import urllib.request
 
-    prompt = """You are given two images. Determine if they depict the same subject or scene.
-Image 1 may be lower quality, compressed, or degraded.
-Focus on semantic content, not pixel-level accuracy.
-
-Reply with ONLY: SAME / DIFFERENT / UNCERTAIN"""
+    prompt = (
+        "You are given two images. Determine if they depict the same subject or scene. "
+        "Image 1 may be lower quality, compressed, or degraded. "
+        "Focus on semantic content, not pixel-level accuracy.\n\n"
+        "Reply with ONLY one word: SAME or DIFFERENT or UNCERTAIN"
+    )
 
     try:
-        result = subprocess.run([
-            'ollama', 'run', get_vision_model(),
-            f'Image 1: {local_path}',
-            f'Image 2: {insta_path}',
-            prompt
-        ], capture_output=True, text=True, timeout=120)
+        images_b64 = []
+        for path in (local_path, insta_path):
+            with open(path, 'rb') as f:
+                images_b64.append(base64.b64encode(f.read()).decode('utf-8'))
 
-        output = result.stdout.strip().upper()
+        payload = json.dumps({
+            'model': get_vision_model(),
+            'prompt': prompt,
+            'images': images_b64,
+            'stream': False,
+        }).encode('utf-8')
+
+        ollama_host = load_config().ollama_host
+        req = urllib.request.Request(
+            f'{ollama_host}/api/generate',
+            data=payload,
+            headers={'Content-Type': 'application/json'},
+        )
+
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+
+        output = data.get('response', '').strip().upper()
 
         if output.startswith('SAME') and 'DIFFERENT' not in output[:20]:
             return 'SAME'
         elif 'DIFFERENT' in output[:50]:
             return 'DIFFERENT'
         return 'UNCERTAIN'
-    except Exception:
+    except Exception as e:
+        print(f"Vision comparison error: {e}", flush=True)
         return 'UNCERTAIN'
 
 

@@ -31,6 +31,7 @@ class Config:
     match_threshold: float = 0.7
     vision_cache_dir: str = field(default_factory=lambda: os.path.expanduser("~/.cache/lightroom_tagger/vision"))
     vision_cache_enabled: bool = True
+    ollama_host: str = "http://localhost:11434"
 
     def __post_init__(self):
         self.catalog_path = self._resolve_path(self.catalog_path)
@@ -91,6 +92,7 @@ def load_config(config_path: str = "config.yaml") -> Config:
         "match_threshold": 0.7,
         "vision_cache_dir": os.path.expanduser("~/.cache/lightroom_tagger/vision"),
         "vision_cache_enabled": True,
+        "ollama_host": "http://localhost:11434",
     }
 
     for key, value in defaults.items():
@@ -122,6 +124,7 @@ def _load_from_env(data: dict) -> dict:
         "MATCH_THRESHOLD": "match_threshold",
         "VISION_CACHE_DIR": "vision_cache_dir",
         "VISION_CACHE_ENABLED": "vision_cache_enabled",
+        "OLLAMA_HOST": "ollama_host",
     }
 
     for env_var, config_key in env_mappings.items():
