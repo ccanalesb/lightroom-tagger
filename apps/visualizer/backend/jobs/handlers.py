@@ -116,6 +116,8 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 catalog_path = config.catalog_path or config.small_catalog_path
                 if catalog_path and Path(catalog_path).exists():
                     lr_stats = update_lightroom_from_matches(catalog_path, matches)
+                else:
+                    log_callback('warning', f'Lightroom catalog path not configured — {len(matches)} match(es) found but NOT written to catalog. Set CATALOG_PATH in .env to enable.')
 
             runner.update_progress(job_id, 100, 'Complete')
             runner.complete_job(job_id, {
