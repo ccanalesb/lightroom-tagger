@@ -176,9 +176,29 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             vision_result = 'UNCERTAIN'
             vision_score_val = 0.5
 
-        total_score_val = (phash_weight * phash_score_val) + \
-                          (desc_weight * desc_sim) + \
-                          (vision_weight * vision_score_val)
+        # Redistribute weight from unavailable signals to available ones.
+        # A signal is unavailable when its inputs are missing (None/empty hashes,
+        # empty descriptions), distinct from a genuine low-similarity score.
+        insta_hash = insta_image.get('image_hash')
+        cand_hash = cached_phash if cached_phash is not None else candidate.get('image_hash')
+        phash_available = bool(insta_hash) and bool(cand_hash)
+        desc_available = bool((insta_image.get('description') or '').strip()) and bool((candidate.get('description') or '').strip())
+
+        active_weights = {}
+        if phash_available:
+            active_weights['phash'] = phash_weight
+        if desc_available:
+            active_weights['desc'] = desc_weight
+        active_weights['vision'] = vision_weight
+
+        weight_sum = sum(active_weights.values()) or 1.0
+        w_phash = active_weights.get('phash', 0) / weight_sum
+        w_desc = active_weights.get('desc', 0) / weight_sum
+        w_vision = active_weights['vision'] / weight_sum
+
+        total_score_val = (w_phash * phash_score_val) + \
+                          (w_desc * desc_sim) + \
+                          (w_vision * vision_score_val)
 
         if log_callback and vision_result != 'UNCERTAIN':
             log_callback('debug', f'[{insta_filename}] {catalog_key} → {vision_result} (vision={vision_score_val:.2f}, phash={phash_score_val:.2f}, total={total_score_val:.2f})')
