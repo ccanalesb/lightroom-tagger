@@ -278,16 +278,20 @@ def list_matches(db):
         except sqlite3.OperationalError:
             pass
 
-        # Enrich matches with image data
         enriched_matches = []
         for match in matches:
-            enriched = {**match}
-
             insta_key = match.get('insta_key')
+            catalog_key = match.get('catalog_key')
+
+            enriched = {
+                **match,
+                'instagram_key': insta_key,
+                'score': match.get('total_score', 0),
+            }
+
             if insta_key and insta_key in instagram_lookup:
                 enriched['instagram_image'] = instagram_lookup[insta_key]
 
-            catalog_key = match.get('catalog_key')
             if catalog_key and catalog_key in catalog_lookup:
                 enriched['catalog_image'] = catalog_lookup[catalog_key]
 
