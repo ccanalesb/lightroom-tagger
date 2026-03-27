@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { MatchingPage } from '../MatchingPage';
+import { MatchOptionsProvider } from '../../stores/matchOptionsContext';
 
 const fetchMock = vi.fn();
 
@@ -60,7 +61,9 @@ describe('MatchingPage model selection', () => {
 
     render(
       <MemoryRouter>
-        <MatchingPage />
+        <MatchOptionsProvider>
+          <MatchingPage />
+        </MatchOptionsProvider>
       </MemoryRouter>
     );
 
@@ -93,7 +96,9 @@ describe('MatchingPage model selection', () => {
 
     render(
       <MemoryRouter>
-        <MatchingPage />
+        <MatchOptionsProvider>
+          <MatchingPage />
+        </MatchOptionsProvider>
       </MemoryRouter>
     );
 

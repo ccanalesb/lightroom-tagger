@@ -4,9 +4,11 @@ import { DashboardPage } from './pages/DashboardPage'
 import { InstagramPage } from './pages/InstagramPage'
 import { MatchingPage } from './pages/MatchingPage'
 import { JobsPage } from './pages/JobsPage'
+import { MatchOptionsProvider } from './stores/matchOptionsContext'
 
 function App() {
   return (
+    <MatchOptionsProvider>
     <Router>
       <Routes>
         <Route path="/" element={<Layout />}>
@@ -17,6 +19,7 @@ function App() {
         </Route>
       </Routes>
     </Router>
+    </MatchOptionsProvider>
   )
 }
 
