@@ -26,7 +26,7 @@ from lightroom_tagger.core.path_utils import resolve_catalog_path
 def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      month: str = None, year: str = None, last_months: int = None,
                      progress_callback=None, log_callback=None,
-                     weights: dict = None) -> tuple:
+                     weights: dict = None, media_key: str = None) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -36,6 +36,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         month: Filter Instagram by month (e.g., '202603')
         year: Filter Instagram by year (e.g., '2026')
         last_months: Filter Instagram by last N months
+        media_key: If set, process only this Instagram dump row (ignores batch/date filters)
         progress_callback: Optional callback(current, total, message) for progress updates
         log_callback: Optional callback(level, message) for detailed logging
         weights: Optional dict with 'phash', 'description', 'vision' keys for scoring weights
@@ -58,7 +59,15 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
     init_instagram_dump_table(db)
     init_catalog_table(db)
 
-    if month or year or last_months:
+    if media_key:
+        row = db.execute(
+            "SELECT * FROM instagram_dump_media WHERE media_key = ?",
+            (media_key,),
+        ).fetchone()
+        if not row:
+            return stats, matches_found
+        unprocessed = [dict(row) if not isinstance(row, dict) else row]
+    elif month or year or last_months:
         unprocessed = get_instagram_by_date_filter(
             db, month=month, year=year, last_months=last_months, run_start=run_start)
     else:
