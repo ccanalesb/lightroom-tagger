@@ -90,6 +90,47 @@ class TestDescribeMatchedImage:
         result = describe_matched_image(db, catalog_key)
         assert result is False
 
+    def test_does_not_store_empty_summary(self, tmp_path):
+        from lightroom_tagger.core.description_service import describe_matched_image
+
+        db = _make_db(tmp_path)
+        filepath = str(tmp_path / 'photo.jpg')
+        open(filepath, 'w').close()
+        catalog_key = store_image(db, {'filepath': filepath, 'filename': 'photo.jpg'})
+
+        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc:
+            mock_desc.return_value = {
+                'summary': '', 'composition': {}, 'perspectives': {},
+                'technical': {}, 'subjects': [], 'best_perspective': '',
+            }
+            result = describe_matched_image(db, catalog_key)
+
+        assert result is False
+        assert get_image_description(db, catalog_key) is None
+
+    def test_force_does_not_overwrite_with_empty_summary(self, tmp_path):
+        from lightroom_tagger.core.description_service import describe_matched_image
+
+        db = _make_db(tmp_path)
+        filepath = str(tmp_path / 'photo.jpg')
+        open(filepath, 'w').close()
+        catalog_key = store_image(db, {'filepath': filepath, 'filename': 'photo.jpg'})
+        store_image_description(db, {
+            'image_key': catalog_key, 'image_type': 'catalog', 'summary': 'keep me',
+            'composition': {}, 'perspectives': {}, 'technical': {},
+            'subjects': [], 'best_perspective': 'street', 'model_used': 'old',
+        })
+
+        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc:
+            mock_desc.return_value = {
+                'summary': '   ', 'composition': {}, 'perspectives': {},
+                'technical': {}, 'subjects': [], 'best_perspective': '',
+            }
+            result = describe_matched_image(db, catalog_key, force=True)
+
+        assert result is False
+        assert get_image_description(db, catalog_key)['summary'] == 'keep me'
+
 
 class TestMatchDumpMediaDescriptions:
     """Verify match_dump_media triggers description generation for matches."""
@@ -142,3 +183,30 @@ class TestMatchDumpMediaDescriptions:
             stats, matches = match_dump_media(db, force_descriptions=True)
 
         mock_describe.assert_called_once_with(db, 'CAT2', force=True)
+
+    @patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image')
+    @patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
+    @patch('lightroom_tagger.scripts.match_instagram_dump.find_candidates_by_date')
+    @patch('lightroom_tagger.scripts.match_instagram_dump.get_unprocessed_dump_media')
+    def test_description_exception_logs_without_callback(self, mock_unprocessed, mock_candidates,
+                                                           mock_score, mock_describe, tmp_path):
+        from lightroom_tagger.scripts import match_instagram_dump
+        from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
+
+        db = _make_db(tmp_path)
+        store_image(db, {'key': 'CAT3', 'filepath': '/p/c.jpg', 'filename': 'c.jpg'})
+
+        mock_unprocessed.return_value = [{'media_key': 'IG3', 'file_path': '/ig/3.jpg', 'caption': ''}]
+        mock_candidates.return_value = [{'key': 'CAT3', 'filepath': '/p/c.jpg', 'phash': 'ghi', 'description': ''}]
+        mock_score.return_value = [{'catalog_key': 'CAT3', 'total_score': 0.9, 'vision_result': 'same', 'vision_score': 0.9}]
+        mock_describe.side_effect = RuntimeError('model down')
+
+        with patch('lightroom_tagger.scripts.match_instagram_dump.mark_dump_media_processed'), \
+             patch('lightroom_tagger.scripts.match_instagram_dump.update_instagram_status'), \
+             patch('lightroom_tagger.scripts.match_instagram_dump.init_instagram_dump_table'), \
+             patch('lightroom_tagger.scripts.match_instagram_dump.init_catalog_table'), \
+             patch.object(match_instagram_dump.logger, 'warning') as mock_warn:
+            match_dump_media(db, log_callback=None)
+
+        mock_warn.assert_called_once()
+        assert 'CAT3' in mock_warn.call_args[0][0]

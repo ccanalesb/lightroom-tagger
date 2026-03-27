@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Match Instagram dump media against catalog images using cascade filtering."""
 
+import logging
 import os
 import sys
+
+logger = logging.getLogger(__name__)
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -133,8 +136,11 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                 if describe_matched_image(db, matched_catalog_key, force=force_descriptions):
                     stats['descriptions_generated'] += 1
             except Exception as e:
+                msg = f'Description failed for {matched_catalog_key}: {e}'
                 if log_callback:
-                    log_callback('warning', f'Description failed for {matched_catalog_key}: {e}')
+                    log_callback('warning', msg)
+                else:
+                    logger.warning(msg)
         else:
             best = results[0] if results else None
             mark_dump_media_attempted(
