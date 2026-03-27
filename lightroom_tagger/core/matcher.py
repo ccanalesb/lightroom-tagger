@@ -167,9 +167,11 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                     vision_result, vision_score_val,
                     get_vision_model()
                 )
-            except Exception:
-                vision_result = 'UNCERTAIN'
-                vision_score_val = 0.5
+            except Exception as e:
+                if log_callback:
+                    log_callback('error', f'[{insta_filename}] Vision error for {catalog_key}: {e}')
+                vision_result = 'ERROR'
+                vision_score_val = 0.0
         else:
             vision_result = 'UNCERTAIN'
             vision_score_val = 0.5
@@ -177,6 +179,9 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         total_score_val = (phash_weight * phash_score_val) + \
                           (desc_weight * desc_sim) + \
                           (vision_weight * vision_score_val)
+
+        if log_callback and vision_result != 'UNCERTAIN':
+            log_callback('debug', f'[{insta_filename}] {catalog_key} → {vision_result} (vision={vision_score_val:.2f}, phash={phash_score_val:.2f}, total={total_score_val:.2f})')
 
         results.append({
             'catalog_key': catalog_key,

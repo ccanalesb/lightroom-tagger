@@ -4,7 +4,7 @@ import threading
 import time
 
 import config
-from database import get_job, get_pending_jobs, init_db
+from database import add_job_log, get_active_jobs, get_job, get_pending_jobs, init_db, update_job_status
 from flask import Flask
 from flask_cors import CORS
 from flask_socketio import SocketIO
@@ -38,12 +38,22 @@ def create_app():
     from websocket.events import register_socket_events
     register_socket_events(socketio)
 
-    # Start job processor thread
+    _recover_orphaned_jobs(db)
+
     job_processor_running = True
     job_processor_thread = threading.Thread(target=_job_processor, daemon=True)
     job_processor_thread.start()
 
     return app
+
+
+def _recover_orphaned_jobs(db):
+    """Mark any 'running' jobs as failed — they were interrupted by a server restart."""
+    for job in get_active_jobs(db):
+        if job['status'] == 'running':
+            update_job_status(db, job['id'], 'failed')
+            add_job_log(db, job['id'], 'error', 'Job interrupted by server restart')
+            print(f"Recovered orphaned job {job['id']}: marked as failed")
 
 
 def _job_processor():

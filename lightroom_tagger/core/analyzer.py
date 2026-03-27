@@ -435,7 +435,7 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
                 temp_files.append(compressed_insta)
 
         # Step 3: Run vision comparison
-        result = run_vision_ollama(compressed_local, compressed_insta)
+        result = run_vision_ollama(compressed_local, compressed_insta, log_callback=log_callback)
 
         return result
 
@@ -447,7 +447,7 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
                     os.unlink(temp_file)
 
 
-def run_vision_ollama(local_path: str, insta_path: str) -> str:
+def run_vision_ollama(local_path: str, insta_path: str, log_callback=None) -> str:
     """Compare two images using Ollama HTTP API with base64-encoded images."""
     import base64
     import json
@@ -460,39 +460,49 @@ def run_vision_ollama(local_path: str, insta_path: str) -> str:
         "Reply with ONLY one word: SAME or DIFFERENT or UNCERTAIN"
     )
 
-    try:
-        images_b64 = []
-        for path in (local_path, insta_path):
-            with open(path, 'rb') as f:
-                images_b64.append(base64.b64encode(f.read()).decode('utf-8'))
+    model = get_vision_model()
 
-        payload = json.dumps({
-            'model': get_vision_model(),
-            'prompt': prompt,
-            'images': images_b64,
-            'stream': False,
-        }).encode('utf-8')
+    images_b64 = []
+    for path in (local_path, insta_path):
+        with open(path, 'rb') as f:
+            images_b64.append(base64.b64encode(f.read()).decode('utf-8'))
 
-        ollama_host = load_config().ollama_host
-        req = urllib.request.Request(
-            f'{ollama_host}/api/generate',
-            data=payload,
-            headers={'Content-Type': 'application/json'},
-        )
+    payload = json.dumps({
+        'model': model,
+        'prompt': prompt,
+        'images': images_b64,
+        'stream': False,
+    }).encode('utf-8')
 
-        with urllib.request.urlopen(req, timeout=180) as resp:
-            data = json.loads(resp.read().decode('utf-8'))
+    ollama_host = load_config().ollama_host
+    req = urllib.request.Request(
+        f'{ollama_host}/api/generate',
+        data=payload,
+        headers={'Content-Type': 'application/json'},
+    )
 
-        output = data.get('response', '').strip().upper()
+    with urllib.request.urlopen(req, timeout=180) as resp:
+        data = json.loads(resp.read().decode('utf-8'))
 
-        if output.startswith('SAME') and 'DIFFERENT' not in output[:20]:
-            return 'SAME'
-        elif 'DIFFERENT' in output[:50]:
-            return 'DIFFERENT'
-        return 'UNCERTAIN'
-    except Exception as e:
-        print(f"Vision comparison error: {e}", flush=True)
-        return 'UNCERTAIN'
+    if 'error' in data:
+        raise RuntimeError(f"Ollama error: {data['error']}")
+
+    raw_response = data.get('response', '').strip()
+    output = raw_response.upper()
+
+    if output.startswith('SAME') and 'DIFFERENT' not in output[:20]:
+        result = 'SAME'
+    elif 'DIFFERENT' in output[:50]:
+        result = 'DIFFERENT'
+    else:
+        result = 'UNCERTAIN'
+
+    if log_callback:
+        local_name = os.path.basename(local_path)
+        insta_name = os.path.basename(insta_path)
+        log_callback('debug', f'[vision] {local_name} vs {insta_name} → {result} (model={model}, raw="{raw_response[:80]}")')
+
+    return result
 
 
 def vision_score(result: str) -> float:

@@ -1,11 +1,11 @@
 """Database utilities for Flask routes."""
 import os
-import sqlite3
 from functools import wraps
 
 from config import LIBRARY_DB
 from constants.errors import ERROR_DB_NOT_FOUND
 from flask import jsonify
+from lightroom_tagger.core.database import init_database
 
 
 class DatabaseError(Exception):
@@ -42,10 +42,7 @@ def with_db(handler_func=None, *, require_exists=True):
 
             db = None
             try:
-                db = sqlite3.connect(db_path)
-                db.row_factory = _dict_factory
-                db.execute("PRAGMA journal_mode=WAL")
-                db.execute("PRAGMA busy_timeout=5000")
+                db = init_database(db_path)
                 return f(db, *args, **kwargs)
             except DatabaseError as e:
                 return _make_json_response({'error': str(e)}, 500)

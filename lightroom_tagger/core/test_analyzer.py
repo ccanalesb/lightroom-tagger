@@ -304,3 +304,45 @@ def test_get_description_model_falls_back_to_vision_model_env():
     with patch.dict(os.environ, {'VISION_MODEL': 'gemma3:27b'}):
         os.environ.pop('DESCRIPTION_VISION_MODEL', None)
         assert get_description_model() == 'gemma3:27b'
+
+
+def test_run_vision_ollama_raises_on_model_not_found():
+    """should raise RuntimeError when Ollama returns model not found."""
+    import json
+    import urllib.request
+    from io import BytesIO
+    from unittest.mock import MagicMock
+
+    from lightroom_tagger.core.analyzer import run_vision_ollama
+
+    mock_response = MagicMock()
+    mock_response.read.return_value = json.dumps(
+        {'error': "model 'gemma3:27b' not found"}
+    ).encode()
+    mock_response.__enter__ = lambda s: s
+    mock_response.__exit__ = MagicMock(return_value=False)
+
+    with patch('urllib.request.urlopen', return_value=mock_response), \
+         patch('builtins.open', side_effect=lambda p, m: BytesIO(b'\x00' * 10)):
+        try:
+            run_vision_ollama('/tmp/a.jpg', '/tmp/b.jpg')
+            assert False, "Expected RuntimeError"
+        except RuntimeError as e:
+            assert 'not found' in str(e)
+
+
+def test_run_vision_ollama_raises_on_connection_error():
+    """should raise URLError when Ollama is unreachable."""
+    from io import BytesIO
+    from unittest.mock import MagicMock
+    from urllib.error import URLError
+
+    from lightroom_tagger.core.analyzer import run_vision_ollama
+
+    with patch('urllib.request.urlopen', side_effect=URLError('Connection refused')), \
+         patch('builtins.open', side_effect=lambda p, m: BytesIO(b'\x00' * 10)):
+        try:
+            run_vision_ollama('/tmp/a.jpg', '/tmp/b.jpg')
+            assert False, "Expected URLError"
+        except URLError:
+            pass

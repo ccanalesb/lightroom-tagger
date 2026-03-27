@@ -1,5 +1,6 @@
 import json
 import os
+import sqlite3
 
 from flask import Blueprint, jsonify, request, send_file
 from utils.db import with_db
@@ -270,9 +271,12 @@ def list_matches(db):
             catalog_lookup[img.get('key')] = img
 
         desc_lookup = {}
-        for desc in db.execute("SELECT * FROM image_descriptions").fetchall():
-            key = (desc.get('image_key'), desc.get('image_type'))
-            desc_lookup[key] = _deserialize_description(desc)
+        try:
+            for desc in db.execute("SELECT * FROM image_descriptions").fetchall():
+                key = (desc.get('image_key'), desc.get('image_type'))
+                desc_lookup[key] = _deserialize_description(desc)
+        except sqlite3.OperationalError:
+            pass
 
         # Enrich matches with image data
         enriched_matches = []

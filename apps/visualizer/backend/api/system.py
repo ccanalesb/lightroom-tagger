@@ -1,10 +1,10 @@
 import os
-import sqlite3
 import subprocess
 import sys
 
 import config
 from flask import Blueprint, jsonify
+from lightroom_tagger.core.database import init_database
 
 # Add project root for lightroom_tagger imports
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -67,8 +67,7 @@ def get_stats():
         if not os.path.exists(db_path):
             return jsonify({'error': 'Library database not found'}), 404
 
-        db = sqlite3.connect(db_path)
-        db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+        db = init_database(db_path)
 
         images = db.execute("SELECT * FROM images").fetchall()
         instagram_images = db.execute("SELECT * FROM instagram_dump_media").fetchall()
@@ -101,8 +100,7 @@ def get_cache_status():
         if not os.path.exists(db_path):
             return jsonify({'error': 'Library database not found'}), 404
 
-        db = sqlite3.connect(db_path)
-        db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+        db = init_database(db_path)
 
         cache_stats = get_cache_stats(db)
 

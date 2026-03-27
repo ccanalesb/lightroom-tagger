@@ -1,4 +1,4 @@
-from database import create_job, get_active_jobs, get_job, list_jobs, update_job_status
+from database import add_job_log, create_job, get_active_jobs, get_job, list_jobs, update_job_field, update_job_status
 from flask import Blueprint, current_app, jsonify, request
 
 bp = Blueprint('jobs', __name__)
@@ -45,6 +45,24 @@ def cancel_job(job_id):
         return jsonify({'status': 'cancelled'})
 
     return jsonify({'error': 'Can only cancel running or pending jobs'}), 400
+
+@bp.route('/<job_id>/retry', methods=['POST'])
+def retry_job(job_id):
+    job = get_job(current_app.db, job_id)
+
+    if not job:
+        return jsonify({'error': 'Job not found'}), 404
+
+    if job['status'] not in ('failed', 'cancelled'):
+        return jsonify({'error': 'Can only retry failed or cancelled jobs'}), 400
+
+    update_job_status(current_app.db, job_id, 'pending', progress=0, current_step=None)
+    update_job_field(current_app.db, job_id, 'error', None)
+    update_job_field(current_app.db, job_id, 'result', None)
+    add_job_log(current_app.db, job_id, 'info', 'Job queued for retry')
+
+    return jsonify(get_job(current_app.db, job_id))
+
 
 @bp.route('/active', methods=['GET'])
 def list_active_jobs():

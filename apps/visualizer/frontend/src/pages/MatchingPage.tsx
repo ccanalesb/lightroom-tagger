@@ -56,11 +56,11 @@ const DATE_FILTERS = [
 ] as const;
 
 const DEFAULT_OPTIONS = {
-  selectedModel: 'gemma3:27b',
+  selectedModel: '',
   threshold: 0.7,
-  phashWeight: 0.4,
-  descWeight: 0.3,
-  visionWeight: 0.3,
+  phashWeight: 0,
+  descWeight: 0,
+  visionWeight: 1,
 };
 
 export function MatchingPage() {
@@ -152,7 +152,7 @@ export function MatchingPage() {
       .then((data) => {
         if (!mounted) return;
         setAvailableModels(data.models);
-        const defaultModel = data.models.find((m) => m.default);
+        const defaultModel = data.models.find((m) => m.default) ?? data.models[0];
         if (defaultModel) setOptions((prev) => ({ ...prev, selectedModel: defaultModel.name }));
       })
       .catch(console.error);

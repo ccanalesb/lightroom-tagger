@@ -5,6 +5,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_DIR="$ROOT_DIR/.run"
 BACKEND_PID_FILE="$RUN_DIR/backend.pid"
 FRONTEND_PID_FILE="$RUN_DIR/frontend.pid"
+BACKEND_DIR="$ROOT_DIR/apps/visualizer/backend"
+
+BACKEND_PORT=5001
+if [[ -f "$BACKEND_DIR/.env" ]]; then
+  _port="$(grep -E '^FLASK_PORT=' "$BACKEND_DIR/.env" | cut -d= -f2 | tr -d '[:space:]')"
+  [[ -n "$_port" ]] && BACKEND_PORT="$_port"
+fi
 
 stop_pid_file() {
   local name="$1"
@@ -85,5 +92,5 @@ kill_port_if_busy() {
   fi
 }
 
-kill_port_if_busy 5000 "backend"
+kill_port_if_busy "$BACKEND_PORT" "backend"
 kill_port_if_busy 5173 "frontend"

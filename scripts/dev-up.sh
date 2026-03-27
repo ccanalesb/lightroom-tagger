@@ -8,6 +8,12 @@ RUN_DIR="$ROOT_DIR/.run"
 BACKEND_PID_FILE="$RUN_DIR/backend.pid"
 FRONTEND_PID_FILE="$RUN_DIR/frontend.pid"
 
+BACKEND_PORT=5001
+if [[ -f "$BACKEND_DIR/.env" ]]; then
+  _port="$(grep -E '^FLASK_PORT=' "$BACKEND_DIR/.env" | cut -d= -f2 | tr -d '[:space:]')"
+  [[ -n "$_port" ]] && BACKEND_PORT="$_port"
+fi
+
 if [[ ! -d "$BACKEND_DIR" || ! -d "$FRONTEND_DIR" ]]; then
   echo "Expected apps/visualizer/backend/ and apps/visualizer/frontend/ under: $ROOT_DIR"
   exit 1
@@ -35,20 +41,20 @@ if [[ ! -x "$FRONTEND_DIR/node_modules/.bin/vite" ]]; then
   )
 fi
 
-if ! python3 - <<'PY'
-import socket
+if ! python3 - "$BACKEND_PORT" <<'PY'
+import socket, sys
 s = socket.socket()
 try:
-    s.bind(("127.0.0.1", 5000))
+    s.bind(("127.0.0.1", int(sys.argv[1])))
 except OSError:
     raise SystemExit(1)
 finally:
     s.close()
 PY
 then
-  echo "Port 5000 is already in use."
+  echo "Port $BACKEND_PORT is already in use."
   echo "Run 'make dev-down' first, or stop the process using that port."
-  echo "Tip: 'fuser -k 5000/tcp' (Linux/WSL) can free it quickly."
+  echo "Tip: 'fuser -k ${BACKEND_PORT}/tcp' (Linux/WSL) can free it quickly."
   exit 1
 fi
 
@@ -69,7 +75,7 @@ then
   exit 1
 fi
 
-echo "Starting backend on http://127.0.0.1:5000 ..."
+echo "Starting backend on http://127.0.0.1:$BACKEND_PORT ..."
 (
   cd "$BACKEND_DIR"
   exec env PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 app.py
@@ -89,4 +95,4 @@ echo
 echo "Both services started. Press Ctrl+C to stop both."
 echo
 
-wait -n "$BACKEND_PID" "$FRONTEND_PID"
+wait "$BACKEND_PID" "$FRONTEND_PID"
