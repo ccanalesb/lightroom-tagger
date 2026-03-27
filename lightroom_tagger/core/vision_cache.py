@@ -7,7 +7,7 @@ eliminating redundant compression of the same images across multiple matching ru
 import contextlib
 import os
 
-from lightroom_tagger.core.analyzer import compress_image, compute_phash
+from lightroom_tagger.core.analyzer import compress_image, compute_phash, get_viewable_path
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import (
     get_vision_cached_image,
@@ -47,32 +47,42 @@ def get_or_create_cached_image(db, catalog_key: str, original_path: str) -> str 
     # Need to create cache
     target_path = os.path.join(cache_dir, f"{catalog_key.replace('/', '_')}.jpg")
 
-    # Compress to temp file first (atomic write pattern)
+    temp_files = []
     try:
-        temp_path = compress_image(original_path)
+        # Convert RAW/DNG to viewable JPG first
+        viewable_path = get_viewable_path(original_path)
+        if viewable_path != original_path:
+            temp_files.append(viewable_path)
+
+        temp_path = compress_image(viewable_path)
+        if temp_path != viewable_path:
+            temp_files.append(temp_path)
 
         phash = compute_phash(original_path)
         original_mtime = os.path.getmtime(original_path)
 
-        if temp_path == original_path:
-            # Compression not possible (e.g. RAW/DNG), cache points to original
+        if temp_path == viewable_path and viewable_path == original_path:
+            # Neither conversion nor compression worked; cache original path
             store_vision_cached_image(db, catalog_key, original_path, phash or '', original_mtime)
             return original_path
 
-        # Atomic move to final location using os.replace to prevent EXDEV errors
-        os.replace(temp_path, target_path)
+        # Use the compressed file (or converted file if compression was no-op)
+        source = temp_path if temp_path != viewable_path else viewable_path
+        os.replace(source, target_path)
+        # Don't clean up the file we just moved
+        if source in temp_files:
+            temp_files.remove(source)
 
-        # Store in database
         store_vision_cached_image(db, catalog_key, target_path, phash or '', original_mtime)
-
         return target_path
 
     except Exception:
-        # Clean up temp file if exists
-        if 'temp_path' in dir() and os.path.exists(temp_path):
-            with contextlib.suppress(BaseException):
-                os.unlink(temp_path)
         raise
+    finally:
+        for tf in temp_files:
+            if tf and os.path.exists(tf):
+                with contextlib.suppress(BaseException):
+                    os.unlink(tf)
 
 
 def get_cached_phash(db, catalog_key: str) -> str | None:

@@ -140,6 +140,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
             vision_result TEXT,
             vision_score REAL,
             processed_at TEXT,
+            last_attempted_at TEXT,
             added_at TEXT
         );
 
@@ -193,8 +194,19 @@ def init_database(db_path: str) -> sqlite3.Connection:
             PRIMARY KEY (catalog_key, insta_key)
         );
     """)
+
+    # Migrations for existing databases
+    _migrate_add_column(conn, 'instagram_dump_media', 'last_attempted_at', 'TEXT')
+
     conn.commit()
     return conn
+
+
+def _migrate_add_column(conn: sqlite3.Connection, table: str, column: str, col_type: str):
+    """Add a column if it doesn't already exist. Safe to call repeatedly."""
+    cols = {row['name'] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
 
 
 # ---------------------------------------------------------------------------
@@ -537,37 +549,53 @@ def get_dump_media_by_hash(db: sqlite3.Connection, image_hash: str) -> list:
     return [_deserialize_row(r) for r in rows]
 
 
-def get_unprocessed_dump_media(db: sqlite3.Connection, limit: int = None) -> list:
-    """Get unprocessed Instagram dump media for matching."""
+def get_unprocessed_dump_media(db: sqlite3.Connection, limit: int = None,
+                                run_start: str = None) -> list:
+    """Get unprocessed Instagram dump media for matching.
+
+    Args:
+        run_start: ISO timestamp; skip images already attempted in this run
+                   (last_attempted_at >= run_start).
+    """
+    where = "processed = 0"
+    params: list = []
+    if run_start:
+        where += " AND (last_attempted_at IS NULL OR last_attempted_at < ?)"
+        params.append(run_start)
+    sql = f"SELECT * FROM instagram_dump_media WHERE {where}"
     if limit:
-        rows = db.execute(
-            "SELECT * FROM instagram_dump_media WHERE processed = 0 LIMIT ?", (limit,)
-        ).fetchall()
-    else:
-        rows = db.execute(
-            "SELECT * FROM instagram_dump_media WHERE processed = 0"
-        ).fetchall()
+        sql += " LIMIT ?"
+        params.append(limit)
+    rows = db.execute(sql, params).fetchall()
     return [_deserialize_row(r) for r in rows]
 
 
 def get_instagram_by_date_filter(db: sqlite3.Connection, month: str = None,
-                                  year: str = None, last_months: int = None) -> list:
-    """Get Instagram dump media filtered by date."""
+                                  year: str = None, last_months: int = None,
+                                  run_start: str = None) -> list:
+    """Get unprocessed Instagram dump media filtered by date.
+
+    Args:
+        run_start: ISO timestamp; skip images already attempted in this run.
+    """
+    where = "processed = 0"
+    params: list = []
+    if run_start:
+        where += " AND (last_attempted_at IS NULL OR last_attempted_at < ?)"
+        params.append(run_start)
+
     if month:
-        rows = db.execute(
-            "SELECT * FROM instagram_dump_media WHERE date_folder = ?", (month,)
-        ).fetchall()
+        where += " AND date_folder = ?"
+        params.append(month)
     elif year:
-        rows = db.execute(
-            "SELECT * FROM instagram_dump_media WHERE date_folder LIKE ?", (f'{year}%',)
-        ).fetchall()
+        where += " AND date_folder LIKE ?"
+        params.append(f'{year}%')
     elif last_months:
         from_date = (datetime.now() - timedelta(days=last_months * 30)).strftime('%Y%m')
-        rows = db.execute(
-            "SELECT * FROM instagram_dump_media WHERE date_folder >= ?", (from_date,)
-        ).fetchall()
-    else:
-        rows = db.execute("SELECT * FROM instagram_dump_media").fetchall()
+        where += " AND date_folder >= ?"
+        params.append(from_date)
+
+    rows = db.execute(f"SELECT * FROM instagram_dump_media WHERE {where}", params).fetchall()
     return [_deserialize_row(r) for r in rows]
 
 
@@ -583,6 +611,25 @@ def mark_dump_media_processed(db: sqlite3.Connection, media_key: str,
         WHERE media_key = ?
     """, (matched_catalog_key, vision_result, vision_score,
           datetime.now().isoformat(), media_key))
+    db.commit()
+    return cursor.rowcount > 0
+
+
+def mark_dump_media_attempted(db: sqlite3.Connection, media_key: str,
+                               vision_result: str = None,
+                               vision_score: float = None) -> bool:
+    """Record an attempt without marking as permanently processed.
+
+    Stores the best vision result for debugging and sets last_attempted_at
+    so the current run can skip it. Does NOT set processed=1.
+    """
+    cursor = db.execute("""
+        UPDATE instagram_dump_media SET
+            last_attempted_at = ?,
+            vision_result = COALESCE(?, vision_result),
+            vision_score = COALESCE(?, vision_score)
+        WHERE media_key = ?
+    """, (datetime.now().isoformat(), vision_result, vision_score, media_key))
     db.commit()
     return cursor.rowcount > 0
 

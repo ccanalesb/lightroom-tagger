@@ -15,6 +15,7 @@ from lightroom_tagger.core.database import (
     init_catalog_table,
     init_database,
     init_instagram_dump_table,
+    mark_dump_media_attempted,
     mark_dump_media_processed,
     update_instagram_status,
 )
@@ -42,9 +43,11 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
     Returns:
         Tuple of (stats dict, matches list)
     """
-    # Default weights
+    from datetime import datetime
+
     default_weights = {'phash': 0.4, 'description': 0.3, 'vision': 0.3}
     weights = weights or default_weights
+    run_start = datetime.now().isoformat()
     stats = {
         'processed': 0,
         'matched': 0,
@@ -55,12 +58,11 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
     init_instagram_dump_table(db)
     init_catalog_table(db)
 
-    # Use date filtering if specified
     if month or year or last_months:
-        unprocessed = get_instagram_by_date_filter(db, month=month, year=year, last_months=last_months)
-        unprocessed = [u for u in unprocessed if not u.get('processed')]
+        unprocessed = get_instagram_by_date_filter(
+            db, month=month, year=year, last_months=last_months, run_start=run_start)
     else:
-        unprocessed = get_unprocessed_dump_media(db, limit=batch_size)
+        unprocessed = get_unprocessed_dump_media(db, limit=batch_size, run_start=run_start)
 
     total = len(unprocessed)
     if not unprocessed:
@@ -69,11 +71,10 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
     for idx, dump_media in enumerate(unprocessed, 1):
         stats['processed'] += 1
 
-        # Find candidates within 90-day window before posting
         candidates = find_candidates_by_date(db, dump_media, days_before=90)
 
         if not candidates:
-            mark_dump_media_processed(db, dump_media['media_key'])
+            mark_dump_media_attempted(db, dump_media['media_key'])
             stats['skipped'] += 1
             continue
 
@@ -84,7 +85,6 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             'description': dump_media.get('caption', ''),
         }
 
-        # Compute phash if possible
         if dump_image['local_path'] and os.path.exists(dump_image['local_path']):
             try:
                 phash = compute_phash(dump_image['local_path'])
@@ -92,10 +92,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             except Exception:
                 pass
 
-        # Prepare candidates for vision comparison
         vision_candidates = []
         for catalog_img in candidates:
-            # Resolve catalog path for WSL/Windows compatibility
             catalog_path = resolve_catalog_path(catalog_img.get('filepath', ''))
             candidate = {
                 'key': catalog_img.get('key'),
@@ -129,10 +127,14 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             stats['matched'] += 1
             matches_found.append(best_match)
         else:
-            mark_dump_media_processed(db, dump_media['media_key'])
+            best = results[0] if results else None
+            mark_dump_media_attempted(
+                db, dump_media['media_key'],
+                vision_result=best.get('vision_result') if best else None,
+                vision_score=best.get('vision_score') if best else None,
+            )
             stats['skipped'] += 1
 
-        # Report progress
         if progress_callback:
             progress_callback(idx, total, f'Processing {dump_media["media_key"]} ({idx}/{total})')
 
