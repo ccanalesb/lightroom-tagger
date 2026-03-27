@@ -89,3 +89,56 @@ class TestDescribeMatchedImage:
         catalog_key = store_image(db, {'filepath': '/no/such/file.jpg', 'filename': 'file.jpg'})
         result = describe_matched_image(db, catalog_key)
         assert result is False
+
+
+class TestMatchDumpMediaDescriptions:
+    """Verify match_dump_media triggers description generation for matches."""
+
+    @patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image')
+    @patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
+    @patch('lightroom_tagger.scripts.match_instagram_dump.find_candidates_by_date')
+    @patch('lightroom_tagger.scripts.match_instagram_dump.get_unprocessed_dump_media')
+    def test_generates_description_on_match(self, mock_unprocessed, mock_candidates,
+                                             mock_score, mock_describe, tmp_path):
+        from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
+
+        db = _make_db(tmp_path)
+        store_image(db, {'key': 'CAT1', 'filepath': '/p/a.jpg', 'filename': 'a.jpg'})
+
+        mock_unprocessed.return_value = [{'media_key': 'IG1', 'file_path': '/ig/1.jpg', 'caption': ''}]
+        mock_candidates.return_value = [{'key': 'CAT1', 'filepath': '/p/a.jpg', 'phash': 'abc', 'description': ''}]
+        mock_score.return_value = [{'catalog_key': 'CAT1', 'total_score': 0.9, 'vision_result': 'same', 'vision_score': 0.9}]
+        mock_describe.return_value = True
+
+        with patch('lightroom_tagger.scripts.match_instagram_dump.mark_dump_media_processed'), \
+             patch('lightroom_tagger.scripts.match_instagram_dump.update_instagram_status'), \
+             patch('lightroom_tagger.scripts.match_instagram_dump.init_instagram_dump_table'), \
+             patch('lightroom_tagger.scripts.match_instagram_dump.init_catalog_table'):
+            stats, matches = match_dump_media(db)
+
+        mock_describe.assert_called_once_with(db, 'CAT1', force=False)
+        assert stats['descriptions_generated'] == 1
+
+    @patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image')
+    @patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
+    @patch('lightroom_tagger.scripts.match_instagram_dump.find_candidates_by_date')
+    @patch('lightroom_tagger.scripts.match_instagram_dump.get_unprocessed_dump_media')
+    def test_passes_force_flag(self, mock_unprocessed, mock_candidates,
+                                mock_score, mock_describe, tmp_path):
+        from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
+
+        db = _make_db(tmp_path)
+        store_image(db, {'key': 'CAT2', 'filepath': '/p/b.jpg', 'filename': 'b.jpg'})
+
+        mock_unprocessed.return_value = [{'media_key': 'IG2', 'file_path': '/ig/2.jpg', 'caption': ''}]
+        mock_candidates.return_value = [{'key': 'CAT2', 'filepath': '/p/b.jpg', 'phash': 'def', 'description': ''}]
+        mock_score.return_value = [{'catalog_key': 'CAT2', 'total_score': 0.85, 'vision_result': 'same', 'vision_score': 0.85}]
+        mock_describe.return_value = True
+
+        with patch('lightroom_tagger.scripts.match_instagram_dump.mark_dump_media_processed'), \
+             patch('lightroom_tagger.scripts.match_instagram_dump.update_instagram_status'), \
+             patch('lightroom_tagger.scripts.match_instagram_dump.init_instagram_dump_table'), \
+             patch('lightroom_tagger.scripts.match_instagram_dump.init_catalog_table'):
+            stats, matches = match_dump_media(db, force_descriptions=True)
+
+        mock_describe.assert_called_once_with(db, 'CAT2', force=True)
