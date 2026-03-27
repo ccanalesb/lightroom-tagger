@@ -1,0 +1,11 @@
+import {
+  DESC_PERSPECTIVE_STREET,
+  DESC_PERSPECTIVE_DOCUMENTARY,
+  DESC_PERSPECTIVE_PUBLISHER,
+} from '../../constants/strings'
+
+export const DESCRIPTION_PERSPECTIVE_LABELS: Record<string, string> = {
+  street: DESC_PERSPECTIVE_STREET,
+  documentary: DESC_PERSPECTIVE_DOCUMENTARY,
+  publisher: DESC_PERSPECTIVE_PUBLISHER,
+}
