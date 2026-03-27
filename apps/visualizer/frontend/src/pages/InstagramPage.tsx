@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AdvancedOptions } from "../components";
 import { MetadataRow, MetadataSection } from "../components/metadata";
 import { ExifDataSection } from "../components/metadata/ExifDataSection";
@@ -36,8 +36,9 @@ import {
   PAGINATION_PREVIOUS,
 } from "../constants/strings";
 import { useModal } from "../hooks/useModal";
-import type { InstagramImage, Job } from "../services/api";
-import { ImagesAPI, JobsAPI } from "../services/api";
+import { useSingleMatch } from "../hooks/useSingleMatch";
+import type { InstagramImage } from "../services/api";
+import { ImagesAPI } from "../services/api";
 import { useMatchOptions } from "../stores/matchOptionsContext";
 
 export function InstagramPage() {
@@ -369,72 +370,19 @@ function ImageDetailsModal({
   const thumbnailUrl = `/api/images/instagram/${encodeURIComponent(image.key)}/thumbnail`;
   const { options: matchOptions, updateOption, resetOptions, availableModels, weightsError } =
     useMatchOptions();
-  const [matchState, setMatchState] = useState<"idle" | "running" | "done">("idle");
-  const [matchJob, setMatchJob] = useState<Job | null>(null);
-  const [matchResult, setMatchResult] = useState<{ matched: number; score?: number } | null>(null);
+  const {
+    matchState,
+    matchJob,
+    matchResult,
+    matchError,
+    startSingleMatch,
+    resetMatch,
+  } = useSingleMatch(image.key);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const clearPoll = () => {
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-  };
 
   useEffect(() => {
-    setMatchState("idle");
-    setMatchJob(null);
-    setMatchResult(null);
     setAdvancedOpen(false);
-    clearPoll();
-    return clearPoll;
   }, [image.key]);
-
-  const pollJob = (jobId: string) => {
-    clearPoll();
-    pollIntervalRef.current = setInterval(async () => {
-      try {
-        const job = await JobsAPI.get(jobId);
-        setMatchJob(job);
-        if (job.status === "completed" || job.status === "failed") {
-          clearPoll();
-          setMatchState("done");
-          if (job.result) {
-            setMatchResult({
-              matched: job.result.matched ?? 0,
-              score: job.result.best_score,
-            });
-          }
-        }
-      } catch {
-        clearPoll();
-        setMatchState("done");
-      }
-    }, 2000);
-  };
-
-  const startSingleMatch = async () => {
-    setMatchState("running");
-    setMatchResult(null);
-    try {
-      const job = await JobsAPI.create("vision_match", {
-        media_key: image.key,
-        vision_model: matchOptions.selectedModel,
-        threshold: matchOptions.threshold,
-        weights: {
-          phash: matchOptions.phashWeight,
-          description: matchOptions.descWeight,
-          vision: matchOptions.visionWeight,
-        },
-      });
-      setMatchJob(job);
-      pollJob(job.id);
-    } catch (err) {
-      setMatchState("idle");
-      console.error("Failed to start match:", err);
-    }
-  };
 
   return (
     <Modal onClose={onClose}>
@@ -464,14 +412,27 @@ function ImageDetailsModal({
                 </a>
               )}
 
-              {matchState === "idle" && (
+              {matchState === "idle" && !matchError && (
                 <button
                   type="button"
-                  onClick={startSingleMatch}
+                  onClick={() => startSingleMatch(image.key)}
                   className="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition-colors text-sm font-medium"
                 >
                   {MODAL_MATCH_THIS_PHOTO}
                 </button>
+              )}
+
+              {matchError && (
+                <div className="py-2 px-4 rounded-md text-sm bg-red-50 text-red-700">
+                  <p className="font-medium">{matchError}</p>
+                  <button
+                    type="button"
+                    onClick={resetMatch}
+                    className="text-xs text-purple-600 hover:underline mt-1"
+                  >
+                    {MODAL_MATCH_RETRY}
+                  </button>
+                </div>
               )}
 
               {matchState === "running" && (
@@ -497,7 +458,7 @@ function ImageDetailsModal({
                 </div>
               )}
 
-              {matchState === "done" && matchResult && (
+              {matchState === "done" && matchResult && !matchError && (
                 <div
                   className={`py-2 px-4 rounded-md text-sm ${matchResult.matched > 0 ? "bg-green-50 text-green-700" : "bg-gray-50 text-gray-600"}`}
                 >
@@ -513,7 +474,7 @@ function ImageDetailsModal({
                     )}
                     <button
                       type="button"
-                      onClick={() => setMatchState("idle")}
+                      onClick={resetMatch}
                       className="text-xs text-purple-600 hover:underline"
                     >
                       {MODAL_MATCH_RETRY}
@@ -529,7 +490,7 @@ function ImageDetailsModal({
                   </p>
                   <button
                     type="button"
-                    onClick={() => setMatchState("idle")}
+                    onClick={resetMatch}
                     className="text-xs text-purple-600 hover:underline mt-1"
                   >
                     {MODAL_MATCH_RETRY}
