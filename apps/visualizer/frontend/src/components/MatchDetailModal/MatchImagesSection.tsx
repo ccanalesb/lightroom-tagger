@@ -10,8 +10,8 @@ export function MatchImagesSection({ match }: MatchImagesSectionProps) {
   const [instaLoaded, setInstaLoaded] = useState(false);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
 
-  const instaUrl = `/api/images/instagram/${encodeURIComponent(match.instagram_key)}`;
-  const catalogUrl = `/api/images/catalog/${encodeURIComponent(match.catalog_key)}`;
+  const instaUrl = `/api/images/instagram/${encodeURIComponent(match.instagram_key)}/thumbnail`;
+  const catalogUrl = `/api/images/catalog/${encodeURIComponent(match.catalog_key)}/thumbnail`;
 
   return (
     <div className="grid grid-cols-2 gap-4">

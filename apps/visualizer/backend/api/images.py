@@ -167,7 +167,7 @@ def get_instagram_thumbnail(db, image_key):
 @bp.route('/catalog/<path:image_key>/thumbnail', methods=['GET'])
 @with_db
 def get_catalog_thumbnail(db, image_key):
-    """Get thumbnail for catalog image."""
+    """Get thumbnail for catalog image, preferring cached compressed JPG."""
     try:
         images = db.execute(
             "SELECT * FROM images WHERE key = ?",
@@ -178,7 +178,18 @@ def get_catalog_thumbnail(db, image_key):
             return error_not_found('image')
 
         image = images[0]
-        filepath = image.get('filepath')
+
+        # Prefer vision cache (compressed JPG) over raw file
+        cached = db.execute(
+            "SELECT compressed_path FROM vision_cache WHERE key = ?",
+            (image_key,),
+        ).fetchone()
+        if cached and cached.get('compressed_path') and os.path.exists(cached['compressed_path']):
+            return send_file(cached['compressed_path'], mimetype='image/jpeg')
+
+        # Fall back to resolved original path
+        from lightroom_tagger.core.path_utils import resolve_catalog_path
+        filepath = resolve_catalog_path(image.get('filepath', ''))
 
         if not filepath or not os.path.exists(filepath):
             return error_not_found('file')
