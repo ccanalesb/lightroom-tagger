@@ -32,7 +32,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      month: str = None, year: str = None, last_months: int = None,
                      progress_callback=None, log_callback=None,
                      weights: dict = None, media_key: str = None,
-                     force_descriptions: bool = False) -> tuple:
+                     force_descriptions: bool = False,
+                     force_reprocess: bool = False) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -43,6 +44,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         year: Filter Instagram by year (e.g., '2026')
         last_months: Filter Instagram by last N months
         media_key: If set, process only this Instagram dump row (ignores batch/date filters)
+        force_reprocess: If True, include already-processed images in the batch
         progress_callback: Optional callback(current, total, message) for progress updates
         log_callback: Optional callback(level, message) for detailed logging
         weights: Optional dict with 'phash', 'description', 'vision' keys for scoring weights
@@ -77,9 +79,12 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         unprocessed = [dict(row) if not isinstance(row, dict) else row]
     elif month or year or last_months:
         unprocessed = get_instagram_by_date_filter(
-            db, month=month, year=year, last_months=last_months, run_start=run_start)
+            db, month=month, year=year, last_months=last_months,
+            run_start=run_start, include_processed=force_reprocess)
     else:
-        unprocessed = get_unprocessed_dump_media(db, limit=batch_size, run_start=run_start)
+        unprocessed = get_unprocessed_dump_media(
+            db, limit=batch_size, run_start=run_start,
+            include_processed=force_reprocess)
 
     total = len(unprocessed)
     if not unprocessed:
@@ -201,7 +206,8 @@ def main():
             batch_size=args.batch_size,
             month=args.month,
             year=args.year,
-            last_months=args.last_months
+            last_months=args.last_months,
+            force_reprocess=args.reprocess,
         )
 
         print(f"\nProcessed: {stats['processed']}")

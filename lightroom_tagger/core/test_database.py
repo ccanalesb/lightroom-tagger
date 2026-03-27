@@ -571,6 +571,68 @@ class TestInstagramDumpMedia(unittest.TestCase):
         self.assertNotIn('202603/attempted', keys_date)
 
 
+    def test_include_processed_returns_all_media(self):
+        """include_processed=True returns both processed and unprocessed rows."""
+        from lightroom_tagger.core.database import (
+            get_unprocessed_dump_media,
+            init_instagram_dump_table,
+            mark_dump_media_processed,
+            store_instagram_dump_media,
+        )
+
+        init_instagram_dump_table(self.db)
+
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/processed_one',
+            'file_path': '/path/processed.jpg',
+        })
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/unprocessed_one',
+            'file_path': '/path/unprocessed.jpg',
+        })
+
+        mark_dump_media_processed(self.db, '202603/processed_one',
+                                   matched_catalog_key='cat_1')
+
+        without = get_unprocessed_dump_media(self.db, include_processed=False)
+        self.assertEqual(len(without), 1)
+
+        with_all = get_unprocessed_dump_media(self.db, include_processed=True)
+        self.assertEqual(len(with_all), 2)
+
+    def test_include_processed_with_date_filter(self):
+        """include_processed works with get_instagram_by_date_filter too."""
+        from lightroom_tagger.core.database import (
+            init_instagram_dump_table,
+            mark_dump_media_processed,
+            store_instagram_dump_media,
+        )
+
+        init_instagram_dump_table(self.db)
+
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/processed_date',
+            'date_folder': '202603',
+            'file_path': '/path/processed.jpg',
+        })
+        store_instagram_dump_media(self.db, {
+            'media_key': '202603/unprocessed_date',
+            'date_folder': '202603',
+            'file_path': '/path/unprocessed.jpg',
+        })
+
+        mark_dump_media_processed(self.db, '202603/processed_date',
+                                   matched_catalog_key='cat_1')
+
+        without = get_instagram_by_date_filter(self.db, month='202603',
+                                                include_processed=False)
+        self.assertEqual(len(without), 1)
+
+        with_all = get_instagram_by_date_filter(self.db, month='202603',
+                                                 include_processed=True)
+        self.assertEqual(len(with_all), 2)
+
+
 class TestImageDescriptions(unittest.TestCase):
     """Tests for image_descriptions table functions."""
 

@@ -157,6 +157,8 @@ export const ADVANCED_WEIGHT_VISION = 'Vision Model'
 
 export const ADVANCED_RESET_DEFAULTS = 'Reset to defaults'
 export const ADVANCED_FORCE_DESCRIPTIONS = 'Force regenerate AI descriptions'
+export const ADVANCED_FORCE_REPROCESS = 'Include already matched images'
+export const MODAL_ALREADY_MATCHED = 'Previously matched to:'
 export const ADVANCED_START = 'Start'
 export const ADVANCED_STARTING = 'Starting...'
 

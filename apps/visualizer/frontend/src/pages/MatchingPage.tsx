@@ -15,6 +15,7 @@ import {
   ADVANCED_DATE_6MONTHS,
   ADVANCED_DATE_YEAR_2026,
   ADVANCED_FORCE_DESCRIPTIONS,
+  ADVANCED_FORCE_REPROCESS,
   ADVANCED_START,
   ADVANCED_STARTING,
   ADVANCED_DATE_FILTER,
@@ -77,6 +78,7 @@ export function MatchingPage() {
   const [isPreparingCache, setIsPreparingCache] = useState(false);
   const [cacheJob, setCacheJob] = useState<Job | null>(null);
   const [forceDescriptions, setForceDescriptions] = useState(false);
+  const [forceReprocess, setForceReprocess] = useState(false);
 
   const navigate = useNavigate();
   const { socket, connected } = useSocketStore();
@@ -207,6 +209,7 @@ export function MatchingPage() {
     };
 
     if (forceDescriptions) metadata.force_descriptions = true;
+    if (forceReprocess) metadata.force_reprocess = true;
 
     if (dateFilter === '3months') metadata.last_months = 3;
     else if (dateFilter === '6months') metadata.last_months = 6;
@@ -221,7 +224,7 @@ export function MatchingPage() {
       setIsStarting(false);
       alert(`Failed to start matching: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
-  }, [weightsError, options, dateFilter, forceDescriptions]);
+  }, [weightsError, options, dateFilter, forceDescriptions, forceReprocess]);
 
   const startCachePreparation = useCallback(async () => {
     setIsPreparingCache(true);
@@ -367,15 +370,26 @@ export function MatchingPage() {
             </button>
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={forceDescriptions}
-              onChange={(e) => setForceDescriptions(e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            {ADVANCED_FORCE_DESCRIPTIONS}
-          </label>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={forceReprocess}
+                onChange={(e) => setForceReprocess(e.target.checked)}
+                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+              />
+              {ADVANCED_FORCE_REPROCESS}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={forceDescriptions}
+                onChange={(e) => setForceDescriptions(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              {ADVANCED_FORCE_DESCRIPTIONS}
+            </label>
+          </div>
 
           <AdvancedOptions
             isOpen={showAdvanced}

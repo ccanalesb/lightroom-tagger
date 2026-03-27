@@ -85,6 +85,11 @@ export function MatchCard({ match, onClick }: MatchCardProps) {
             {MATCH_CARD_CATALOG_LABEL}: {match.catalog_image?.filename || getFilename(match.catalog_key)}
           </p>
           <PerspectiveBadge match={match} />
+          {match.model_used && (
+            <p className="text-gray-400 truncate" title={match.model_used}>
+              model: {match.model_used}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -154,6 +159,9 @@ function ScoreTooltip({ match, show, children }: ScoreTooltipProps) {
             <span className="text-gray-600">Total:</span>
             <span>{(match.score * 100).toFixed(0)}%</span>
           </div>
+          {match.model_used && (
+            <div className="border-t pt-1 mt-1 text-gray-400">{match.model_used}</div>
+          )}
         </div>
       </div>
     </div>

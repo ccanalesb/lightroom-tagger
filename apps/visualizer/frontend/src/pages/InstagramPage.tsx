@@ -26,6 +26,8 @@ import {
   MODAL_MATCH_RUNNING,
   MODAL_MATCH_THIS_PHOTO,
   MODAL_MATCH_VIEW_RESULTS,
+  MODAL_ALREADY_MATCHED,
+  ADVANCED_FORCE_REPROCESS,
   MODAL_TITLE_IMAGE_DETAILS,
   MODAL_VIEW_ON_INSTAGRAM,
   MSG_CLICK_FOR_DETAILS,
@@ -329,6 +331,9 @@ function InstagramImageCard({
             {image.image_index}/{image.total_in_post}
           </div>
         )}
+        {image.matched_catalog_key && (
+          <div className="absolute top-1 left-1 w-3 h-3 rounded-full bg-green-500 border border-white" title={`Matched: ${image.matched_catalog_key}`} />
+        )}
         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
           <span className="text-white text-sm font-medium">
             {MSG_CLICK_FOR_DETAILS}
@@ -379,9 +384,11 @@ function ImageDetailsModal({
     resetMatch,
   } = useSingleMatch(image.key);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [forceReprocess, setForceReprocess] = useState(false);
 
   useEffect(() => {
     setAdvancedOpen(false);
+    setForceReprocess(false);
   }, [image.key]);
 
   return (
@@ -401,6 +408,21 @@ function ImageDetailsModal({
             </div>
 
             <div className="space-y-3">
+              {image.matched_catalog_key && (
+                <div className="py-2 px-3 bg-green-50 border border-green-200 rounded-md text-sm space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                    <span className="text-green-800">
+                      {MODAL_ALREADY_MATCHED}{' '}
+                      <code className="text-xs bg-green-100 px-1 py-0.5 rounded">{image.matched_catalog_key}</code>
+                    </span>
+                  </div>
+                  {image.matched_model && (
+                    <p className="text-xs text-green-600 ml-4">via {image.matched_model}</p>
+                  )}
+                </div>
+              )}
+
               {image.post_url && (
                 <a
                   href={image.post_url}
@@ -413,13 +435,26 @@ function ImageDetailsModal({
               )}
 
               {matchState === "idle" && !matchError && (
-                <button
-                  type="button"
-                  onClick={() => startSingleMatch(image.key)}
-                  className="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition-colors text-sm font-medium"
-                >
-                  {MODAL_MATCH_THIS_PHOTO}
-                </button>
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => startSingleMatch(image.key, { forceReprocess })}
+                    className="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition-colors text-sm font-medium"
+                  >
+                    {MODAL_MATCH_THIS_PHOTO}
+                  </button>
+                  {image.matched_catalog_key && (
+                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={forceReprocess}
+                        onChange={(e) => setForceReprocess(e.target.checked)}
+                        className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      />
+                      {ADVANCED_FORCE_REPROCESS}
+                    </label>
+                  )}
+                </div>
               )}
 
               {matchError && (

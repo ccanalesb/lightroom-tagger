@@ -136,6 +136,9 @@ export interface InstagramImage {
   crawled_at: string
   image_index: number
   total_in_post: number
+  processed?: boolean
+  matched_catalog_key?: string
+  matched_model?: string
   exif_data?: {
     latitude?: number
     longitude?: number
@@ -209,6 +212,7 @@ export interface Match {
   phash_score?: number
   desc_similarity?: number
   total_score?: number
+  model_used?: string
   instagram_image?: InstagramImage
   catalog_image?: CatalogImage
   catalog_description?: ImageDescription

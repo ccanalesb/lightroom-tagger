@@ -24,8 +24,9 @@ def _deserialize_description(row: dict) -> dict:
     return out
 
 
-def _enrich_instagram_media(media_items):
+def _enrich_instagram_media(media_items, model_lookup=None):
     """Transform database media items to API response format."""
+    model_lookup = model_lookup or {}
     enriched = []
     for media in media_items:
         file_path = media.get('file_path', '')
@@ -51,6 +52,9 @@ def _enrich_instagram_media(media_items):
             'total_in_post': 1,
             'post_url': media.get('post_url'),
             'exif_data': exif_data,
+            'processed': bool(media.get('processed')),
+            'matched_catalog_key': media.get('matched_catalog_key'),
+            'matched_model': model_lookup.get(media['media_key']),
         })
     return enriched
 
@@ -85,7 +89,15 @@ def list_instagram_images(db):
     """List Instagram images with filtering and pagination."""
     try:
         media_items = db.execute("SELECT * FROM instagram_dump_media").fetchall()
-        enriched_images = _enrich_instagram_media(media_items)
+
+        model_lookup = {}
+        try:
+            for row in db.execute("SELECT insta_key, model_used FROM matches").fetchall():
+                model_lookup[row['insta_key']] = row['model_used']
+        except sqlite3.OperationalError:
+            pass
+
+        enriched_images = _enrich_instagram_media(media_items, model_lookup)
 
         # Get filter parameters
         date_from = request.args.get('date_from', '')

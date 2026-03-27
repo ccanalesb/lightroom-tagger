@@ -174,6 +174,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
             vision_score REAL,
             total_score REAL,
             matched_at TEXT,
+            model_used TEXT,
             PRIMARY KEY (catalog_key, insta_key)
         );
 
@@ -213,6 +214,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
 
     # Migrations for existing databases
     _migrate_add_column(conn, 'instagram_dump_media', 'last_attempted_at', 'TEXT')
+    _migrate_add_column(conn, 'matches', 'model_used', 'TEXT')
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_dump_media_processed_attempted "
         "ON instagram_dump_media(processed, last_attempted_at)"
@@ -570,18 +572,23 @@ def get_dump_media_by_hash(db: sqlite3.Connection, image_hash: str) -> list:
 
 
 def get_unprocessed_dump_media(db: sqlite3.Connection, limit: int = None,
-                                run_start: str = None) -> list:
-    """Get unprocessed Instagram dump media for matching.
+                                run_start: str = None,
+                                include_processed: bool = False) -> list:
+    """Get Instagram dump media for matching.
 
     Args:
         run_start: ISO timestamp; skip images already attempted in this run
                    (last_attempted_at >= run_start).
+        include_processed: If True, also return already-processed rows.
     """
-    where = "processed = 0"
+    clauses: list[str] = []
     params: list = []
+    if not include_processed:
+        clauses.append("processed = 0")
     if run_start:
-        where += " AND (last_attempted_at IS NULL OR last_attempted_at < ?)"
+        clauses.append("(last_attempted_at IS NULL OR last_attempted_at < ?)")
         params.append(run_start)
+    where = " AND ".join(clauses) if clauses else "1=1"
     sql = f"SELECT * FROM instagram_dump_media WHERE {where}"
     if limit:
         sql += " LIMIT ?"
@@ -592,29 +599,34 @@ def get_unprocessed_dump_media(db: sqlite3.Connection, limit: int = None,
 
 def get_instagram_by_date_filter(db: sqlite3.Connection, month: str = None,
                                   year: str = None, last_months: int = None,
-                                  run_start: str = None) -> list:
-    """Get unprocessed Instagram dump media filtered by date.
+                                  run_start: str = None,
+                                  include_processed: bool = False) -> list:
+    """Get Instagram dump media filtered by date.
 
     Args:
         run_start: ISO timestamp; skip images already attempted in this run.
+        include_processed: If True, also return already-processed rows.
     """
-    where = "processed = 0"
+    clauses: list[str] = []
     params: list = []
+    if not include_processed:
+        clauses.append("processed = 0")
     if run_start:
-        where += " AND (last_attempted_at IS NULL OR last_attempted_at < ?)"
+        clauses.append("(last_attempted_at IS NULL OR last_attempted_at < ?)")
         params.append(run_start)
 
     if month:
-        where += " AND date_folder = ?"
+        clauses.append("date_folder = ?")
         params.append(month)
     elif year:
-        where += " AND date_folder LIKE ?"
+        clauses.append("date_folder LIKE ?")
         params.append(f'{year}%')
     elif last_months:
         from_date = (datetime.now() - timedelta(days=last_months * 30)).strftime('%Y%m')
-        where += " AND date_folder >= ?"
+        clauses.append("date_folder >= ?")
         params.append(from_date)
 
+    where = " AND ".join(clauses) if clauses else "1=1"
     rows = db.execute(f"SELECT * FROM instagram_dump_media WHERE {where}", params).fetchall()
     return [_deserialize_row(r) for r in rows]
 
@@ -734,18 +746,18 @@ def store_match(db: sqlite3.Connection, record: dict) -> str:
 
     db.execute("""
         INSERT INTO matches (catalog_key, insta_key, phash_distance, phash_score,
-            desc_similarity, vision_result, vision_score, total_score, matched_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            desc_similarity, vision_result, vision_score, total_score, matched_at, model_used)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(catalog_key, insta_key) DO UPDATE SET
             phash_distance=excluded.phash_distance, phash_score=excluded.phash_score,
             desc_similarity=excluded.desc_similarity, vision_result=excluded.vision_result,
             vision_score=excluded.vision_score, total_score=excluded.total_score,
-            matched_at=excluded.matched_at
+            matched_at=excluded.matched_at, model_used=excluded.model_used
     """, (
         catalog_key, insta_key, record.get('phash_distance'),
         record.get('phash_score'), record.get('desc_similarity'),
         record.get('vision_result'), record.get('vision_score'),
-        record.get('total_score'), record['matched_at'],
+        record.get('total_score'), record['matched_at'], record.get('model_used'),
     ))
     db.commit()
     return f"{catalog_key} <-> {insta_key}"

@@ -84,6 +84,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             year = metadata.get('year')
             last_months = metadata.get('last_months')
             media_key = metadata.get('media_key')
+            force_reprocess = metadata.get('force_reprocess', False)
 
             # Set environment variable for vision model if custom
             if custom_model and custom_model != config.vision_model:
@@ -107,6 +108,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 log_callback=log_callback,
                 media_key=media_key,
                 force_descriptions=force_descriptions,
+                force_reprocess=force_reprocess,
             )
 
             # Update Lightroom with "Posted" keyword for matched images
