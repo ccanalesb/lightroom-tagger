@@ -22,7 +22,18 @@ def get_vision_model() -> str:
         return os.environ['VISION_MODEL']
     return load_config().vision_model
 
-VISION_MODEL = os.environ.get('VISION_MODEL', 'gemma3:27b')  # fallback; get_vision_model() preferred
+VISION_MODEL = os.environ.get('VISION_MODEL', 'gemma3:27b')
+
+
+def get_description_model() -> str:
+    """Ollama model for structured image descriptions.
+
+    ``DESCRIPTION_VISION_MODEL`` overrides when set; otherwise uses the same
+    resolution as :func:`get_vision_model` (env ``VISION_MODEL`` or config).
+    """
+    if 'DESCRIPTION_VISION_MODEL' in os.environ:
+        return os.environ['DESCRIPTION_VISION_MODEL']
+    return get_vision_model()
 
 DESCRIPTION_PROMPT = """You are an experienced photo editor reviewing images for a photography portfolio. Be direct and constructive. State clearly what works and what doesn't — no flattery, no sugarcoating, but also no performative negativity. Every image has strengths and weaknesses; identify both with specifics.
 
@@ -332,7 +343,7 @@ def run_local_agent(path: str) -> str:
 
     try:
         response = ollama.chat(
-            model=get_vision_model(),
+            model=get_description_model(),
             messages=[
                 {
                     'role': 'user',

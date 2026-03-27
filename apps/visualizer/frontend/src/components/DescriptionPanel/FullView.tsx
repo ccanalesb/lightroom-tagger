@@ -14,9 +14,9 @@ import {
   DESC_TECHNICAL_TIME,
   DESC_TECHNICAL_COLORS,
 } from '../../constants/strings'
+import { Section } from '../shared/Section'
 import { underscoreToSpaces } from '../../utils/underscoreToSpaces'
-import { descriptionScoreColor } from '../../utils/descriptionScoreColor'
-import { Section } from './Section'
+import { descriptionScoreColor } from '../../utils/scoreColorClasses'
 import { DESCRIPTION_PERSPECTIVE_LABELS } from './perspectiveLabels'
 
 interface FullViewProps {

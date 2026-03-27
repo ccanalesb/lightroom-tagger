@@ -283,10 +283,24 @@ def test_run_local_agent_calls_ollama():
         'subjects': [],
         'best_perspective': 'street',
     })
-    with patch('lightroom_tagger.core.analyzer.ollama') as mock_ollama:
+    with patch('lightroom_tagger.core.analyzer.ollama') as mock_ollama, \
+         patch('lightroom_tagger.core.analyzer.get_description_model', return_value='desc-model-test'):
         mock_ollama.chat.return_value = mock_response
         from lightroom_tagger.core.analyzer import run_local_agent
         run_local_agent('/fake/image.jpg')
     mock_ollama.chat.assert_called_once()
     call_kwargs = mock_ollama.chat.call_args
-    assert call_kwargs[1]['model'] or call_kwargs[0][0]
+    assert call_kwargs[1]['model'] == 'desc-model-test'
+
+
+def test_get_description_model_prefers_env_override():
+    from lightroom_tagger.core.analyzer import get_description_model
+    with patch.dict(os.environ, {'DESCRIPTION_VISION_MODEL': 'llava:13b', 'VISION_MODEL': 'gemma3:27b'}):
+        assert get_description_model() == 'llava:13b'
+
+
+def test_get_description_model_falls_back_to_vision_model_env():
+    from lightroom_tagger.core.analyzer import get_description_model
+    with patch.dict(os.environ, {'VISION_MODEL': 'gemma3:27b'}):
+        os.environ.pop('DESCRIPTION_VISION_MODEL', None)
+        assert get_description_model() == 'gemma3:27b'

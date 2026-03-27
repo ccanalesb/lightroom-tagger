@@ -1,6 +1,6 @@
 import type { ImageDescription } from '../../services/api'
 import { DESC_BEST_FIT } from '../../constants/strings'
-import { descriptionScoreColor } from '../../utils/descriptionScoreColor'
+import { descriptionScoreColor } from '../../utils/scoreColorClasses'
 import { DESCRIPTION_PERSPECTIVE_LABELS } from './perspectiveLabels'
 
 interface CompactViewProps {
