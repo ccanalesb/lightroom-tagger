@@ -314,7 +314,7 @@ def run_vision_ollama(local_path: str, insta_path: str) -> str:
             'stream': False,
         }).encode('utf-8')
 
-        ollama_host = os.environ.get('OLLAMA_HOST', 'http://localhost:11434')
+        ollama_host = load_config().ollama_host
         req = urllib.request.Request(
             f'{ollama_host}/api/generate',
             data=payload,

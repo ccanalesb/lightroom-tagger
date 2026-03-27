@@ -147,6 +147,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
         CREATE INDEX IF NOT EXISTS idx_dump_media_hash ON instagram_dump_media(image_hash);
         CREATE INDEX IF NOT EXISTS idx_dump_media_date ON instagram_dump_media(date_folder);
         CREATE INDEX IF NOT EXISTS idx_dump_media_processed ON instagram_dump_media(processed);
+        CREATE INDEX IF NOT EXISTS idx_dump_media_processed_attempted ON instagram_dump_media(processed, last_attempted_at);
 
         CREATE TABLE IF NOT EXISTS instagram_images (
             key TEXT PRIMARY KEY,
@@ -197,6 +198,10 @@ def init_database(db_path: str) -> sqlite3.Connection:
 
     # Migrations for existing databases
     _migrate_add_column(conn, 'instagram_dump_media', 'last_attempted_at', 'TEXT')
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_dump_media_processed_attempted "
+        "ON instagram_dump_media(processed, last_attempted_at)"
+    )
 
     conn.commit()
     return conn
@@ -754,7 +759,7 @@ def get_vision_cached_image(db: sqlite3.Connection, catalog_key: str) -> dict | 
 
 
 def store_vision_cached_image(db: sqlite3.Connection, catalog_key: str,
-                               compressed_path: str, phash: str,
+                               compressed_path: str, phash: str | None,
                                original_mtime: float) -> bool:
     """Store compressed image info in vision cache."""
     db.execute("""
