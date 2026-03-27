@@ -422,7 +422,28 @@ export function MatchingPage() {
       )}
 
       {/* Modal */}
-      {selectedMatch && <MatchDetailModal match={selectedMatch} onClose={() => setSelectedMatch(null)} />}
+      {selectedMatch && (
+        <MatchDetailModal
+          match={selectedMatch}
+          onClose={() => setSelectedMatch(null)}
+          onValidationChange={(m, validated) => {
+            setMatches(prev => prev.map(p =>
+              p.catalog_key === m.catalog_key && p.instagram_key === m.instagram_key
+                ? { ...p, validated_at: validated ? new Date().toISOString() : undefined }
+                : p
+            ));
+            setSelectedMatch(prev =>
+              prev ? { ...prev, validated_at: validated ? new Date().toISOString() : undefined } : null
+            );
+          }}
+          onRejected={(m) => {
+            setMatches(prev => prev.filter(p =>
+              !(p.catalog_key === m.catalog_key && p.instagram_key === m.instagram_key)
+            ));
+            setTotal(prev => prev - 1);
+          }}
+        />
+      )}
     </div>
   );
 }

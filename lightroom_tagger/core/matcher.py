@@ -80,6 +80,7 @@ def text_similarity(text1: str, text2: str) -> float:
 def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                                  phash_weight: float = 0.4, desc_weight: float = 0.3,
                                  vision_weight: float = 0.3,
+                                 threshold: float = 0.7,
                                  log_callback=None) -> list[dict]:
     """Score candidates including vision comparison (one-by-one).
 
@@ -229,10 +230,10 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         if results:
             best = results[0]
             best_pct = int(best['total_score'] * 100)
-            if best['total_score'] >= 0.7:
+            if best['total_score'] >= threshold:
                 log_callback('info', f'[{insta_filename}] Comparison complete - Best match: {best["catalog_key"]} ({best_pct}%)')
             else:
-                log_callback('info', f'[{insta_filename}] No match found above threshold (0.7)')
+                log_callback('info', f'[{insta_filename}] No match found above threshold ({threshold})')
 
     return results
 

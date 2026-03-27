@@ -175,6 +175,14 @@ def init_database(db_path: str) -> sqlite3.Connection:
             total_score REAL,
             matched_at TEXT,
             model_used TEXT,
+            validated_at TEXT,
+            PRIMARY KEY (catalog_key, insta_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS rejected_matches (
+            catalog_key TEXT,
+            insta_key TEXT,
+            rejected_at TEXT,
             PRIMARY KEY (catalog_key, insta_key)
         );
 
@@ -215,6 +223,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
     # Migrations for existing databases
     _migrate_add_column(conn, 'instagram_dump_media', 'last_attempted_at', 'TEXT')
     _migrate_add_column(conn, 'matches', 'model_used', 'TEXT')
+    _migrate_add_column(conn, 'matches', 'validated_at', 'TEXT')
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_dump_media_processed_attempted "
         "ON instagram_dump_media(processed, last_attempted_at)"
@@ -585,6 +594,10 @@ def get_unprocessed_dump_media(db: sqlite3.Connection, limit: int = None,
     params: list = []
     if not include_processed:
         clauses.append("processed = 0")
+        clauses.append(
+            "media_key NOT IN "
+            "(SELECT insta_key FROM matches WHERE validated_at IS NOT NULL)"
+        )
     if run_start:
         clauses.append("(last_attempted_at IS NULL OR last_attempted_at < ?)")
         params.append(run_start)
@@ -761,6 +774,65 @@ def store_match(db: sqlite3.Connection, record: dict) -> str:
     ))
     db.commit()
     return f"{catalog_key} <-> {insta_key}"
+
+
+def validate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bool:
+    """Stamp a match as human-validated."""
+    db.execute(
+        "UPDATE matches SET validated_at = ? WHERE catalog_key = ? AND insta_key = ?",
+        (datetime.now().isoformat(), catalog_key, insta_key),
+    )
+    db.commit()
+    return db.total_changes > 0
+
+
+def unvalidate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bool:
+    """Remove human validation (undo validate, not reject)."""
+    db.execute(
+        "UPDATE matches SET validated_at = NULL WHERE catalog_key = ? AND insta_key = ?",
+        (catalog_key, insta_key),
+    )
+    db.commit()
+    return db.total_changes > 0
+
+
+def reject_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bool:
+    """Delete match row and add pair to rejected blocklist.
+
+    Also resets the instagram image's processed flag so it can match other
+    catalog candidates in future runs.
+    """
+    db.execute(
+        "DELETE FROM matches WHERE catalog_key = ? AND insta_key = ?",
+        (catalog_key, insta_key),
+    )
+    db.execute(
+        "INSERT OR REPLACE INTO rejected_matches (catalog_key, insta_key, rejected_at) "
+        "VALUES (?, ?, ?)",
+        (catalog_key, insta_key, datetime.now().isoformat()),
+    )
+    db.execute(
+        "UPDATE instagram_dump_media SET processed = 0, matched_catalog_key = NULL "
+        "WHERE media_key = ?",
+        (insta_key,),
+    )
+    # Reset instagram_posted on the catalog image if no other matches reference it
+    remaining = db.execute(
+        "SELECT 1 FROM matches WHERE catalog_key = ? LIMIT 1", (catalog_key,)
+    ).fetchone()
+    if not remaining:
+        db.execute(
+            "UPDATE images SET instagram_posted = 0 WHERE key = ?",
+            (catalog_key,),
+        )
+    db.commit()
+    return True
+
+
+def get_rejected_pairs(db: sqlite3.Connection) -> set[tuple[str, str]]:
+    """Return set of (catalog_key, insta_key) pairs in the blocklist."""
+    rows = db.execute("SELECT catalog_key, insta_key FROM rejected_matches").fetchall()
+    return {(r['catalog_key'], r['insta_key']) for r in rows}
 
 
 # ---------------------------------------------------------------------------

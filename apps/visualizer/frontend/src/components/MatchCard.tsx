@@ -4,6 +4,7 @@ import {
   MATCH_CARD_IG_LABEL,
   MATCH_CARD_CATALOG_LABEL,
   MATCH_CARD_NO_IMAGE,
+  MATCH_VALIDATED,
 } from '../constants/strings';
 import { PerspectiveBadge } from './PerspectiveBadge';
 
@@ -62,9 +63,16 @@ export function MatchCard({ match, onClick }: MatchCardProps) {
       {/* Details */}
       <div className="p-3">
         <div className="flex justify-between items-start mb-2">
-          <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${visionBadgeColor}`}>
-            {visionResult}
-          </span>
+          <div className="flex gap-1">
+            <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${visionBadgeColor}`}>
+              {visionResult}
+            </span>
+            {match.validated_at && (
+              <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-600 text-white">
+                &#x2713; {MATCH_VALIDATED}
+              </span>
+            )}
+          </div>
 
           <ScoreTooltip match={match} show={showTooltip}>
             <span

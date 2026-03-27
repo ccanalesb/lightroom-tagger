@@ -94,6 +94,16 @@ export const MatchingAPI = {
     request<{ total: number; matches: Match[] }>(
       `/images/matches?limit=${limit || 50}&offset=${offset || 0}`
     ),
+  validate: (catalogKey: string, instaKey: string) =>
+    request<{ validated: boolean }>(
+      `/images/matches/${encodeURIComponent(catalogKey)}/${encodeURIComponent(instaKey)}/validate`,
+      { method: 'PATCH' },
+    ),
+  reject: (catalogKey: string, instaKey: string) =>
+    request<{ rejected: boolean }>(
+      `/images/matches/${encodeURIComponent(catalogKey)}/${encodeURIComponent(instaKey)}/reject`,
+      { method: 'PATCH' },
+    ),
 }
 
 export const DumpMediaAPI = {
@@ -213,6 +223,7 @@ export interface Match {
   desc_similarity?: number
   total_score?: number
   model_used?: string
+  validated_at?: string
   instagram_image?: InstagramImage
   catalog_image?: CatalogImage
   catalog_description?: ImageDescription

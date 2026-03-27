@@ -198,9 +198,9 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
                  <div>
                    <span className="text-gray-600">{JOB_CONFIG_WEIGHTS}:</span>
                    <div className="mt-1 pl-4 text-xs space-y-0.5">
-                     <div>pHash: {((displayJob.metadata?.weights?.phash || displayJob.result?.weights?.phash) * 100).toFixed(0)}%</div>
-                     <div>Description: {((displayJob.metadata?.weights?.description || displayJob.result?.weights?.description) * 100).toFixed(0)}%</div>
-                     <div>Vision: {((displayJob.metadata?.weights?.vision || displayJob.result?.weights?.vision) * 100).toFixed(0)}%</div>
+                     <div>pHash: {(((displayJob.metadata?.weights?.phash ?? displayJob.result?.weights?.phash) ?? 0) * 100).toFixed(0)}%</div>
+                     <div>Description: {(((displayJob.metadata?.weights?.description ?? displayJob.result?.weights?.description) ?? 0) * 100).toFixed(0)}%</div>
+                     <div>Vision: {(((displayJob.metadata?.weights?.vision ?? displayJob.result?.weights?.vision) ?? 0) * 100).toFixed(0)}%</div>
                    </div>
                  </div>
                )}

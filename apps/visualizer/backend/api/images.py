@@ -3,6 +3,11 @@ import os
 import sqlite3
 
 from flask import Blueprint, jsonify, request, send_file
+from lightroom_tagger.core.database import (
+    reject_match,
+    unvalidate_match,
+    validate_match,
+)
 from utils.db import with_db
 from utils.responses import error_not_found, error_server_error, success_paginated
 
@@ -332,5 +337,45 @@ def list_matches(db):
             'total': len(enriched_matches),
             'matches': paginated,
         })
+    except Exception as e:
+        return error_server_error(str(e))
+
+
+@bp.route('/matches/<path:catalog_key>/<path:insta_key>/validate', methods=['PATCH'])
+@with_db
+def toggle_match_validation(db, catalog_key, insta_key):
+    """Toggle human validation on a match."""
+    try:
+        match_row = db.execute(
+            "SELECT validated_at FROM matches WHERE catalog_key = ? AND insta_key = ?",
+            (catalog_key, insta_key),
+        ).fetchone()
+        if not match_row:
+            return error_not_found('match')
+
+        if match_row['validated_at']:
+            unvalidate_match(db, catalog_key, insta_key)
+            return jsonify({'validated': False})
+        else:
+            validate_match(db, catalog_key, insta_key)
+            return jsonify({'validated': True})
+    except Exception as e:
+        return error_server_error(str(e))
+
+
+@bp.route('/matches/<path:catalog_key>/<path:insta_key>/reject', methods=['PATCH'])
+@with_db
+def reject_match_endpoint(db, catalog_key, insta_key):
+    """Reject a match: delete it and blocklist the pair."""
+    try:
+        match_row = db.execute(
+            "SELECT 1 FROM matches WHERE catalog_key = ? AND insta_key = ?",
+            (catalog_key, insta_key),
+        ).fetchone()
+        if not match_row:
+            return error_not_found('match')
+
+        reject_match(db, catalog_key, insta_key)
+        return jsonify({'rejected': True})
     except Exception as e:
         return error_server_error(str(e))

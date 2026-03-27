@@ -14,7 +14,7 @@ const PERSPECTIVE_BADGE_LABELS: Record<string, string> = {
 };
 
 export function PerspectiveBadge({ match }: { match: Match }) {
-  const desc = match.catalog_description;
+  const desc = match.insta_description ?? match.catalog_description;
   if (!desc?.best_perspective) return null;
 
   const key = desc.best_perspective;
