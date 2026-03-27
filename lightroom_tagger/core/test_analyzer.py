@@ -35,7 +35,8 @@ def test_analyze_image_returns_all_signals():
 
     assert result['phash'] == 'a1b2c3d4e5f6g7h8'
     assert result['exif']['camera'] == 'Canon EOS R5'
-    assert result['description'] == mock_desc
+    assert result['description'] == 'A sunset photo'
+    assert result['structured_description'] == mock_desc
 
 
 def test_describe_image_uses_configured_agent():

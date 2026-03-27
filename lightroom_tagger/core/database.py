@@ -916,7 +916,8 @@ def get_undescribed_catalog_images(db: sqlite3.Connection) -> list[dict]:
     """Get catalog images that don't have descriptions yet."""
     rows = db.execute("""
         SELECT i.* FROM images i
-        LEFT JOIN image_descriptions d ON i.key = d.image_key
+        LEFT JOIN image_descriptions d
+            ON i.key = d.image_key AND d.image_type = 'catalog'
         WHERE d.image_key IS NULL
     """).fetchall()
     return [_deserialize_row(r) for r in rows]

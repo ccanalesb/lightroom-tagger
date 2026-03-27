@@ -271,7 +271,8 @@ def list_matches(db):
 
         desc_lookup = {}
         for desc in db.execute("SELECT * FROM image_descriptions").fetchall():
-            desc_lookup[desc.get('image_key')] = _deserialize_description(desc)
+            key = (desc.get('image_key'), desc.get('image_type'))
+            desc_lookup[key] = _deserialize_description(desc)
 
         # Enrich matches with image data
         enriched_matches = []
@@ -286,8 +287,8 @@ def list_matches(db):
             if catalog_key and catalog_key in catalog_lookup:
                 enriched['catalog_image'] = catalog_lookup[catalog_key]
 
-            enriched['catalog_description'] = desc_lookup.get(catalog_key) if catalog_key else None
-            enriched['insta_description'] = desc_lookup.get(insta_key) if insta_key else None
+            enriched['catalog_description'] = desc_lookup.get((catalog_key, 'catalog')) if catalog_key else None
+            enriched['insta_description'] = desc_lookup.get((insta_key, 'instagram')) if insta_key else None
 
             enriched_matches.append(enriched)
 

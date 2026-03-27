@@ -260,16 +260,17 @@ def analyze_image(path: str) -> dict[str, Any]:
     """Analyze image and return all matching signals.
 
     Returns:
-        {phash, exif: {camera, lens, date_taken, gps, ...}, description}
+        {phash, exif, description (str summary), structured_description (full dict)}
     """
     phash = compute_phash(path)
     exif = extract_exif(path)
-    description = describe_image(path)
+    structured = describe_image(path)
 
     return {
         'phash': phash,
         'exif': exif,
-        'description': description
+        'description': structured.get('summary', ''),
+        'structured_description': structured,
     }
 
 def compute_phash(path: str) -> str | None:
