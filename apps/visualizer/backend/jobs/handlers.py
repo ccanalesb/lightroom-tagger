@@ -35,6 +35,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             'description': config.desc_weight or 0.3,
             'vision': config.vision_weight or 0.3
         })
+        force_descriptions = metadata.get('force_descriptions', False)
 
         update_job_field(runner.db, job_id, 'metadata', {
             **metadata,
@@ -91,6 +92,8 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             # Log custom configuration
             log_callback('info', f"Configuration: threshold={custom_threshold}, model={custom_model}")
             log_callback('info', f"Weights: phash={custom_weights['phash']:.2f}, desc={custom_weights['description']:.2f}, vision={custom_weights['vision']:.2f}")
+            if force_descriptions:
+                log_callback('info', 'Force regenerate descriptions: ON')
 
             # Run cascade matching with progress callback
             stats, matches = match_dump_media(
@@ -100,7 +103,8 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 year=year,
                 last_months=last_months,
                 progress_callback=progress_callback,
-                log_callback=log_callback
+                log_callback=log_callback,
+                force_descriptions=force_descriptions,
             )
 
             # Update Lightroom with "Posted" keyword for matched images
@@ -116,6 +120,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 'processed': stats['processed'],
                 'matched': stats['matched'],
                 'skipped': stats['skipped'],
+                'descriptions_generated': stats.get('descriptions_generated', 0),
                 'lightroom_updated': lr_stats['success'],
                 'lightroom_failed': lr_stats['failed'],
                 'method': 'cascade_matching',

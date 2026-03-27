@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Match Instagram dump media against catalog images using cascade filtering."""
 
+import logging
 import os
 import sys
+
+logger = logging.getLogger(__name__)
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from lightroom_tagger.core.analyzer import compute_phash
 from lightroom_tagger.core.config import load_config
+from lightroom_tagger.core.description_service import describe_matched_image
 from lightroom_tagger.core.database import (
     get_instagram_by_date_filter,
     get_unprocessed_dump_media,
@@ -26,7 +30,7 @@ from lightroom_tagger.core.path_utils import resolve_catalog_path
 def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      month: str = None, year: str = None, last_months: int = None,
                      progress_callback=None, log_callback=None,
-                     weights: dict = None) -> tuple:
+                     weights: dict = None, force_descriptions: bool = False) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -39,6 +43,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         progress_callback: Optional callback(current, total, message) for progress updates
         log_callback: Optional callback(level, message) for detailed logging
         weights: Optional dict with 'phash', 'description', 'vision' keys for scoring weights
+        force_descriptions: If True, regenerate descriptions even when one exists
 
     Returns:
         Tuple of (stats dict, matches list)
@@ -52,6 +57,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         'processed': 0,
         'matched': 0,
         'skipped': 0,
+        'descriptions_generated': 0,
     }
     matches_found = []
 
@@ -126,6 +132,15 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
 
             stats['matched'] += 1
             matches_found.append(best_match)
+            try:
+                if describe_matched_image(db, matched_catalog_key, force=force_descriptions):
+                    stats['descriptions_generated'] += 1
+            except Exception as e:
+                msg = f'Description failed for {matched_catalog_key}: {e}'
+                if log_callback:
+                    log_callback('warning', msg)
+                else:
+                    logger.warning(msg)
         else:
             best = results[0] if results else None
             mark_dump_media_attempted(
