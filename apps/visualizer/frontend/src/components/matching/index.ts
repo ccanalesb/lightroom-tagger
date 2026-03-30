@@ -1,5 +1,6 @@
 export { AdvancedOptions } from './AdvancedOptions'
 export { CacheStatusCard } from './CacheStatusCard'
+export { CandidateCarousel } from './CandidateCarousel'
 export { MatchCard } from './MatchCard'
 export { MatchDetailModal } from './match-detail-modal'
 export { PerspectiveBadge } from './PerspectiveBadge'
