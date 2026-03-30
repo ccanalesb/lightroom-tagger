@@ -176,6 +176,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
             matched_at TEXT,
             model_used TEXT,
             validated_at TEXT,
+            rank INTEGER DEFAULT 1,
             PRIMARY KEY (catalog_key, insta_key)
         );
 
@@ -224,6 +225,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
     _migrate_add_column(conn, 'instagram_dump_media', 'last_attempted_at', 'TEXT')
     _migrate_add_column(conn, 'matches', 'model_used', 'TEXT')
     _migrate_add_column(conn, 'matches', 'validated_at', 'TEXT')
+    _migrate_add_column(conn, 'matches', 'rank', 'INTEGER DEFAULT 1')
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_dump_media_processed_attempted "
         "ON instagram_dump_media(processed, last_attempted_at)"
@@ -763,18 +765,21 @@ def store_match(db: sqlite3.Connection, record: dict) -> str:
 
     db.execute("""
         INSERT INTO matches (catalog_key, insta_key, phash_distance, phash_score,
-            desc_similarity, vision_result, vision_score, total_score, matched_at, model_used)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            desc_similarity, vision_result, vision_score, total_score, matched_at,
+            model_used, rank)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(catalog_key, insta_key) DO UPDATE SET
             phash_distance=excluded.phash_distance, phash_score=excluded.phash_score,
             desc_similarity=excluded.desc_similarity, vision_result=excluded.vision_result,
             vision_score=excluded.vision_score, total_score=excluded.total_score,
-            matched_at=excluded.matched_at, model_used=excluded.model_used
+            matched_at=excluded.matched_at, model_used=excluded.model_used,
+            rank=excluded.rank
     """, (
         catalog_key, insta_key, record.get('phash_distance'),
         record.get('phash_score'), record.get('desc_similarity'),
         record.get('vision_result'), record.get('vision_score'),
-        record.get('total_score'), record['matched_at'], record.get('model_used'),
+        record.get('total_score'), record['matched_at'],
+        record.get('model_used'), record.get('rank', 1),
     ))
     db.commit()
     return f"{catalog_key} <-> {insta_key}"
