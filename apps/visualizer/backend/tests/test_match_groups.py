@@ -44,7 +44,8 @@ def test_matches_grouped_by_insta_key():
         assert groups[0]['candidates'][0]['rank'] == 1
         assert groups[0]['candidates'][1]['rank'] == 2
         assert groups[0]['candidate_count'] == 2
-        # Backward compat flat list still present
+        assert data['total_groups'] == 1
+        assert data['total_matches'] == 2
         assert len(data['matches']) == 2
 
 
@@ -65,3 +66,5 @@ def test_single_match_still_grouped():
         data = resp.get_json()
         assert len(data['match_groups']) == 1
         assert data['match_groups'][0]['candidate_count'] == 1
+        assert data['total_matches'] == 1
+        assert len(data['matches']) == 1

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Match, MatchGroup } from '../../services/api';
 import {
   MATCH_CARD_IG_LABEL,
@@ -28,6 +28,13 @@ export function MatchCard({ group, onClick }: MatchCardProps) {
   const candidate = group.candidates[candidateIdx];
   const instaSrc = thumbnailUrl('instagram', group.instagram_key);
   const getFilename = (key: string) => key.split('_').pop() || key;
+
+  useEffect(() => {
+    setCandidateIdx((idx) => {
+      const last = Math.max(0, group.candidates.length - 1);
+      return Math.min(idx, last);
+    });
+  }, [group.candidates.length, group.instagram_key]);
 
   if (!candidate) {
     return null;

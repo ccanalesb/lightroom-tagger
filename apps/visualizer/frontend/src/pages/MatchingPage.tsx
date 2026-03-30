@@ -381,8 +381,8 @@ export function MatchingPage() {
       {selectedMatch && (
         <MatchDetailModal
           match={selectedMatch}
-          group={
-            matchGroups.find((g) => g.instagram_key === selectedMatch.instagram_key) ??
+          group={() =>
+            matchGroups.find((group) => group.instagram_key === selectedMatch.instagram_key) ??
             selectedGroup ??
             undefined
           }

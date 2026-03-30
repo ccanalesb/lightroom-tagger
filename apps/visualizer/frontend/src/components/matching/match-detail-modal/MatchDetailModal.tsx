@@ -3,6 +3,7 @@ import {
   MODAL_CLOSE,
   MATCHING_RESULTS,
   MATCH_DETAIL_VISION_LABEL,
+  MATCH_DETAIL_VISION_REASONING,
   MATCH_DETAIL_SCORE_LABEL,
   MATCH_DETAIL_PHASH_LABEL,
   MATCH_VALIDATE,
@@ -21,7 +22,7 @@ import { visionBadgeClasses } from '../../../utils/visionBadge';
 
 interface MatchDetailModalProps {
   match: Match;
-  group?: MatchGroup;
+  group?: MatchGroup | (() => MatchGroup | undefined);
   onClose: () => void;
   onValidationChange?: (match: Match, validated: boolean) => void;
   onRejected?: (match: Match) => void;
@@ -36,6 +37,7 @@ export function MatchDetailModal({
   onRejected,
   onCandidateChange,
 }: MatchDetailModalProps) {
+  const resolvedGroup = typeof group === 'function' ? group() : group;
   const visionResult = match.vision_result || 'UNCERTAIN';
   const [validated, setValidated] = useState(!!match.validated_at);
   const [busy, setBusy] = useState(false);
@@ -119,9 +121,9 @@ export function MatchDetailModal({
             </div>
           </div>
 
-          {group && group.candidates.length > 1 && (
+          {resolvedGroup && resolvedGroup.candidates.length > 1 && (
             <CandidateTabBar
-              candidates={group.candidates}
+              candidates={resolvedGroup.candidates}
               activeKey={match.catalog_key}
               onSelect={(c) => onCandidateChange?.(c)}
             />
@@ -148,6 +150,13 @@ export function MatchDetailModal({
                 </span>
               )}
             </div>
+
+            {match.vision_reasoning ? (
+              <p className="text-sm text-gray-700 border-l-4 border-purple-200 pl-3 py-1 bg-gray-50 rounded-r">
+                <span className="font-medium text-gray-800">{MATCH_DETAIL_VISION_REASONING}: </span>
+                {match.vision_reasoning}
+              </p>
+            ) : null}
 
             <MatchImagesSection match={match} />
             <MatchDescriptionsSection match={match} />

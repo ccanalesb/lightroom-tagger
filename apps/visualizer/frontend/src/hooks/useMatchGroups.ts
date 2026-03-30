@@ -9,47 +9,58 @@ export function useMatchGroups() {
   const fetchGroups = useCallback(async (limit = 100) => {
     const data = await MatchingAPI.list(limit);
     setMatchGroups(data.match_groups ?? []);
-    setTotal(data.total);
+    setTotal(data.total_groups ?? data.total);
   }, []);
 
   const handleValidationChange = useCallback((match: Match, validated: boolean) => {
     setMatchGroups((prev) =>
-      prev.map((g) => {
-        if (g.instagram_key !== match.instagram_key) return g;
-        const candidates = g.candidates.map((c) =>
-          c.catalog_key === match.catalog_key && c.instagram_key === match.instagram_key
-            ? { ...c, validated_at: validated ? new Date().toISOString() : undefined }
-            : c
+      prev.map((group) => {
+        if (group.instagram_key !== match.instagram_key) return group;
+        const candidates = group.candidates.map((candidate) =>
+          candidate.catalog_key === match.catalog_key && candidate.instagram_key === match.instagram_key
+            ? { ...candidate, validated_at: validated ? new Date().toISOString() : undefined }
+            : candidate
         );
         return {
-          ...g,
+          ...group,
           candidates,
-          has_validated: candidates.some((c) => c.validated_at),
+          has_validated: candidates.some((candidate) => candidate.validated_at),
         };
       })
     );
   }, []);
 
   const handleRejected = useCallback((match: Match) => {
-    setMatchGroups((prev) =>
-      prev.flatMap((g) => {
-        if (g.instagram_key !== match.instagram_key) return [g];
-        const remaining = g.candidates.filter(
-          (c) => !(c.catalog_key === match.catalog_key && c.instagram_key === match.instagram_key)
+    setMatchGroups((prev) => {
+      let removedEntireGroup = false;
+      const next = prev.flatMap((group) => {
+        if (group.instagram_key !== match.instagram_key) return [group];
+        const remaining = group.candidates.filter(
+          (candidate) =>
+            !(
+              candidate.catalog_key === match.catalog_key &&
+              candidate.instagram_key === match.instagram_key
+            )
         );
-        if (remaining.length === 0) return [];
+        if (remaining.length === 0) {
+          removedEntireGroup = true;
+          return [];
+        }
         return [
           {
-            ...g,
+            ...group,
             candidates: remaining,
             candidate_count: remaining.length,
-            best_score: Math.max(...remaining.map((c) => c.score)),
-            has_validated: remaining.some((c) => c.validated_at),
+            best_score: Math.max(...remaining.map((candidate) => candidate.score)),
+            has_validated: remaining.some((candidate) => candidate.validated_at),
           },
         ];
-      })
-    );
-    setTotal((t) => t - 1);
+      });
+      if (removedEntireGroup) {
+        setTotal((groupCount) => groupCount - 1);
+      }
+      return next;
+    });
   }, []);
 
   return { matchGroups, total, fetchGroups, handleValidationChange, handleRejected };

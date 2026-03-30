@@ -288,7 +288,9 @@ def list_dump_media(db):
 def list_matches(db):
     """List matches grouped by Instagram image."""
     try:
-        matches = db.execute("SELECT * FROM matches ORDER BY insta_key, rank").fetchall()
+        matches = db.execute(
+            "SELECT * FROM matches ORDER BY insta_key, rank, total_score DESC"
+        ).fetchall()
 
         # Build lookup tables for images (avoid N+1 queries)
         instagram_lookup = {}
@@ -333,23 +335,32 @@ def list_matches(db):
 
         match_groups = []
         for insta_key, candidates in groups.items():
+            best = max((c.get('score') or 0) for c in candidates) if candidates else 0
             match_groups.append({
                 'instagram_key': insta_key,
                 'instagram_image': instagram_lookup.get(insta_key),
                 'candidates': candidates,
-                'best_score': candidates[0]['score'] if candidates else 0,
+                'best_score': best,
                 'candidate_count': len(candidates),
                 'has_validated': any(c.get('validated_at') for c in candidates),
             })
 
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
-        paginated = match_groups[offset:offset+limit]
+        paginated_groups = match_groups[offset:offset+limit]
+        paginated_matches = []
+        for grp in paginated_groups:
+            paginated_matches.extend(grp['candidates'])
+
+        total_groups = len(match_groups)
+        total_matches = len(all_enriched)
 
         return jsonify({
-            'total': len(match_groups),
-            'match_groups': paginated,
-            'matches': all_enriched,
+            'total': total_groups,
+            'total_groups': total_groups,
+            'total_matches': total_matches,
+            'match_groups': paginated_groups,
+            'matches': paginated_matches,
         })
     except Exception as e:
         return error_server_error(str(e))
