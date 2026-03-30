@@ -5,14 +5,8 @@ export const APP_TITLE = 'Lightroom Tagger'
 export const NAV_DASHBOARD = 'Dashboard'
 export const NAV_INSTAGRAM = 'Instagram'
 export const NAV_MATCHING = 'Matching'
+export const NAV_DESCRIPTIONS = 'Descriptions'
 export const NAV_JOBS = 'Jobs'
-
-// Status
-export const STATUS_PENDING = 'pending'
-export const STATUS_RUNNING = 'running'
-export const STATUS_COMPLETED = 'completed'
-export const STATUS_FAILED = 'failed'
-export const STATUS_CANCELLED = 'cancelled'
 
 // Status Display
 export const STATUS_LABELS: Record<string, string> = {
@@ -23,14 +17,28 @@ export const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
-// Messages
+// Generic Messages
 export const MSG_LOADING = 'Loading...'
+export const MSG_UNKNOWN_ERROR = 'Unknown error'
 export const MSG_NO_JOBS = 'No jobs found. Start a job to see it here.'
-export const MSG_NO_IMAGES = 'No images found.'
 export const MSG_NO_MATCHES = 'No matches found. Run vision matching first.'
 export const MSG_CONNECTED = 'Connected'
 export const MSG_DISCONNECTED = 'Disconnected'
 export const MSG_ERROR_PREFIX = 'Error:'
+
+// Generic Labels
+export const LABEL_ID = 'ID:'
+export const LABEL_TYPE = 'Type:'
+export const LABEL_STATUS = 'Status:'
+export const LABEL_CREATED = 'Created:'
+export const LABEL_CONFIGURATION = 'Configuration'
+export const LABEL_IMAGES = 'images'
+export const LABEL_MATCHES = 'matches'
+export const LABEL_DAYS = 'days'
+export const LABEL_MB = 'MB'
+export const LABEL_CACHED = 'cached'
+export const LABEL_MODEL = 'model:'
+export const LABEL_SCORE = 'score:'
 
 // Dashboard
 export const DASHBOARD_CATALOG_IMAGES = 'Catalog Images'
@@ -39,24 +47,25 @@ export const DASHBOARD_POSTED = 'Posted to Instagram'
 export const DASHBOARD_MATCHES = 'Matches Found'
 export const DASHBOARD_RECENT_JOBS = 'Recent Jobs'
 export const DASHBOARD_NO_JOBS = 'No recent jobs'
-export const DASHBOARD_START_JOB = 'Start a Job'
+export const DASHBOARD_TOTAL_CATALOG = 'Total Catalog Images'
+export const DASHBOARD_MISSING = 'Missing'
 
 // Instagram Page
 export const INSTAGRAM_DOWNLOADED = 'Downloaded Instagram Images'
-export const INSTAGRAM_POST_URL = 'Post URL'
-export const INSTAGRAM_FILE = 'File'
-export const INSTAGRAM_CRAWLED = 'Crawled'
+export const INSTAGRAM_ERROR_PLACEHOLDER = 'Error'
+export const INSTAGRAM_MATCHED_PREFIX = 'Matched:'
+export const INSTAGRAM_VIA = 'via'
 
 // Matching Page
 export const MATCHING_RESULTS = 'Matching Results'
-export const MATCHING_RUN = 'Run Vision Matching'
-export const MATCHING_RUNNING = 'Running matching...'
-export const MATCHING_SUCCESS = 'Matching completed successfully'
+export const MATCHING_RUN_PROMPT = 'Click "Run Matching" above to start the matching process.'
 
 // Actions
-export const ACTION_REFRESH = 'Refresh'
-export const ACTION_VIEW = 'View'
 export const ACTION_RUN_MATCHING = 'Run Matching'
+export const ACTION_CANCEL = 'Cancel'
+export const ACTION_CANCELLING = 'Cancelling...'
+
+export const MSG_FAILED_START_JOB = 'Failed to start job'
 
 // API
 export const API_DEFAULT_URL = '/api'
@@ -72,7 +81,6 @@ export const MSG_SHOWING_RANGE = 'Showing {start}-{end} of {total}'
 export const MODAL_TITLE_IMAGE_DETAILS = 'Image Details'
 export const MODAL_CLOSE = 'Close'
 export const MODAL_VIEW_ON_INSTAGRAM = 'View on Instagram'
-export const MODAL_OPEN_LOCAL_FILE = 'Open Local File'
 
 // Metadata Sections
 export const META_SECTION_BASIC_INFO = 'Basic Information'
@@ -119,16 +127,17 @@ export const JOB_DETAILS_RESULT = 'Result'
 export const JOB_DETAILS_ERROR = 'Error'
 export const JOB_DETAILS_LOGS = 'Logs'
 
-// Job Actions
-export const ACTION_CANCEL = 'Cancel'
-export const ACTION_CANCELLING = 'Cancelling...'
-
 // Job Configuration Display
 export const JOB_CONFIG_METHOD = 'Matching Method'
 export const JOB_CONFIG_DATE_WINDOW = 'Date Window'
 export const JOB_CONFIG_VISION_MODEL = 'Vision Model'
 export const JOB_CONFIG_THRESHOLD = 'Match Threshold'
 export const JOB_CONFIG_WEIGHTS = 'Scoring Weights'
+
+// Job Config Labels
+export const JOB_WEIGHT_PHASH = 'pHash:'
+export const JOB_WEIGHT_DESC = 'Description:'
+export const JOB_WEIGHT_VISION = 'Vision:'
 
 // Matching Page Advanced Options
 export const ADVANCED_OPTIONS_TITLE = 'Advanced Options'
@@ -148,7 +157,6 @@ export const ADVANCED_THRESHOLD_DESCRIPTION = 'Minimum score required for a matc
 
 export const ADVANCED_WEIGHTS_TITLE = 'Matching Weights'
 export const ADVANCED_WEIGHTS_MUST_SUM = 'Weights must sum to 100%'
-export const ADVANCED_WEIGHTS_CURRENT = 'currently'
 export const ADVANCED_WEIGHTS_TOTAL = 'Total'
 
 export const ADVANCED_WEIGHT_PHASH = 'Perceptual Hash (pHash)'
@@ -158,6 +166,7 @@ export const ADVANCED_WEIGHT_VISION = 'Vision Model'
 export const ADVANCED_RESET_DEFAULTS = 'Reset to defaults'
 export const ADVANCED_FORCE_DESCRIPTIONS = 'Force regenerate AI descriptions'
 export const ADVANCED_FORCE_REPROCESS = 'Include already matched images'
+export const ADVANCED_FIX_WEIGHTS = 'Please fix weight configuration before starting'
 export const MODAL_ALREADY_MATCHED = 'Previously matched to:'
 export const ADVANCED_START = 'Start'
 export const ADVANCED_STARTING = 'Starting...'
@@ -178,6 +187,10 @@ export const MATCHING_DISMISS = 'Dismiss'
 export const MATCH_CARD_IG_LABEL = 'IG'
 export const MATCH_CARD_CATALOG_LABEL = 'Cat'
 export const MATCH_CARD_NO_IMAGE = 'No image'
+export const MATCH_CARD_SCORE_PHASH = 'PHash'
+export const MATCH_CARD_SCORE_DESC = 'Desc'
+export const MATCH_CARD_SCORE_VISION = 'Vision'
+export const MATCH_CARD_SCORE_TOTAL = 'Total:'
 
 // Cache Status
 export const CACHE_TITLE = 'Vision Cache'
@@ -188,10 +201,35 @@ export const CACHE_STATUS_CACHED = 'cached'
 export const CACHE_STATUS_OF = 'of'
 export const CACHE_STATUS_IMAGES = 'images'
 export const CACHE_SIZE_LABEL = 'Cache size'
+export const CACHE_TOTAL_CATALOG_IMAGES = 'Total Catalog Images'
+export const CACHE_MISSING = 'Missing'
+export const CACHE_PERCENT_CACHED = (pct: number) => `${pct}% cached`
 export const CACHE_REFRESH_BUTTON = 'Refresh'
 export const CACHE_JOB_RUNNING = 'Cache preparation in progress...'
 export const CACHE_JOB_COMPLETED = 'Cache preparation completed!'
 export const CACHE_WARNING_NOT_READY = 'Catalog not fully cached. Matching may be slower.'
+
+// Descriptions Page
+export const DESC_PAGE_TITLE = 'AI Descriptions'
+export const DESC_PAGE_TAB_ALL = 'All'
+export const DESC_PAGE_TAB_CATALOG = 'Catalog'
+export const DESC_PAGE_TAB_INSTAGRAM = 'Instagram'
+export const DESC_PAGE_BATCH_CATALOG = 'Generate Catalog Descriptions'
+export const DESC_PAGE_BATCH_INSTAGRAM = 'Generate Instagram Descriptions'
+export const DESC_PAGE_BATCH_ALL = 'Generate All Descriptions'
+export const DESC_PAGE_BATCH_RUNNING = 'Generating...'
+export const DESC_PAGE_MODEL_LABEL = 'Vision Model'
+export const DESC_PAGE_SOURCE_CATALOG = 'Source: catalog file'
+export const DESC_PAGE_SOURCE_INSTAGRAM = 'Source: Instagram post'
+export const DESC_PAGE_FILTER_ALL = 'All time'
+export const DESC_PAGE_FILTER_3M = 'Last 3 months'
+export const DESC_PAGE_FILTER_6M = 'Last 6 months'
+export const DESC_PAGE_FORCE = 'Force regenerate'
+export const DESC_PAGE_GENERATE = 'Generate'
+export const DESC_PAGE_REGENERATE = 'Regenerate'
+export const DESC_PAGE_GENERATING = 'Generating...'
+export const DESC_PAGE_NO_DESCRIPTION = 'No description yet'
+export const DESC_PAGE_EMPTY = 'No images found.'
 
 // Description Panel
 export const DESC_PANEL_TITLE = 'AI Description'
@@ -224,6 +262,7 @@ export const MATCH_DETAIL_MATCH_DETAILS = 'Match Details'
 export const MATCH_DETAIL_INSTAGRAM_KEY = 'Instagram Key:'
 export const MATCH_DETAIL_CATALOG_KEY = 'Catalog Key:'
 export const MATCH_DETAIL_MODEL = 'Model:'
+export const MATCH_DETAIL_UNVALIDATE_FIRST = 'Un-validate first to reject'
 
 export const MATCH_VALIDATE = 'Validate'
 export const MATCH_VALIDATED = 'Validated'

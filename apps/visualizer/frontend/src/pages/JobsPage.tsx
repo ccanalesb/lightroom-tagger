@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react'
-import { Job } from '../types/job'
+import { useCallback, useEffect, useState } from 'react'
+import type { Job } from '../types/job'
 import { JobsAPI } from '../services/api'
-import { useSocketStore } from '../stores/socketStore'
-import { JobDetailModal } from '../components/JobDetailModal'
+import { useJobSocket } from '../hooks/useJobSocket'
+import { JobDetailModal } from '../components/jobs/JobDetailModal'
+import { PageLoading, PageError, EmptyState } from '../components/ui/page-states'
+import { StatusBadge } from '../components/ui/badges'
+import { formatDateTime } from '../utils/date'
 import {
-  MSG_LOADING,
-  MSG_ERROR_PREFIX,
   MSG_CONNECTED,
   MSG_DISCONNECTED,
   MSG_NO_JOBS,
+  ACTION_CANCEL,
+  ACTION_CANCELLING,
 } from '../constants/strings'
 
 export function JobsPage() {
@@ -17,14 +20,12 @@ export function JobsPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
-  const { socket, connected, connect, disconnect } = useSocketStore()
 
   const cancelJob = async (jobId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     setCancellingId(jobId)
     try {
       await JobsAPI.cancel(jobId)
-      // Update local state to show cancelled status immediately
       setJobs(prev => prev.map(job =>
         job.id === jobId ? { ...job, status: 'cancelled' as const } : job
       ))
@@ -34,15 +35,10 @@ export function JobsPage() {
       setCancellingId(null)
     }
   }
-  
-  useEffect(() => {
-    connect()
-    return () => disconnect()
-  }, [connect, disconnect])
-  
+
   useEffect(() => {
     let mounted = true
-    
+
     async function fetchJobs() {
       try {
         const fetchedJobs = await JobsAPI.list()
@@ -60,34 +56,29 @@ export function JobsPage() {
         }
       }
     }
-    
+
     fetchJobs()
     return () => { mounted = false }
   }, [])
-  
-  useEffect(() => {
-    if (!socket || !connected) return
-    
-    socket.on('job_created', (job: Job) => {
-      setJobs(prev => [job, ...prev])
-    })
-    
-    socket.on('job_updated', (updatedJob: Job) => {
-      setJobs(prev => prev.map(job => 
-        job.id === updatedJob.id ? updatedJob : job
-      ))
-    })
-    
-    return () => {
-      socket.off('job_created')
-      socket.off('job_updated')
-    }
-  }, [socket, connected])
-  
-  if (loading) {
-    return <div className="text-center py-8">{MSG_LOADING}</div>
-  }
-  
+
+  const handleJobCreated = useCallback((job: Job) => {
+    setJobs(prev => [job, ...prev])
+  }, [])
+
+  const handleJobUpdated = useCallback((updatedJob: Job) => {
+    setJobs(prev => prev.map(job =>
+      job.id === updatedJob.id ? updatedJob : job
+    ))
+  }, [])
+
+  const { connected } = useJobSocket({
+    onJobCreated: handleJobCreated,
+    onJobUpdated: handleJobUpdated,
+  })
+
+  if (loading) return <PageLoading />
+  if (error) return <PageError message={error} />
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -99,15 +90,9 @@ export function JobsPage() {
           </span>
         </div>
       </div>
-      
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 text-red-800 rounded">
-          {MSG_ERROR_PREFIX} {error}
-        </div>
-      )}
-      
+
       {jobs.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">{MSG_NO_JOBS}</div>
+        <EmptyState message={MSG_NO_JOBS} />
       ) : (
         <div className="space-y-4">
           {jobs.map(job => (
@@ -121,41 +106,32 @@ export function JobsPage() {
                   <h3 className="font-semibold">{job.type}</h3>
                   <p className="text-sm text-gray-500">{job.id.slice(0, 8)}</p>
                 </div>
-            <div className="flex items-center gap-2">
-              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                job.status === 'completed' ? 'bg-green-100 text-green-800' :
-                job.status === 'failed' ? 'bg-red-100 text-red-800' :
-                job.status === 'running' ? 'bg-blue-100 text-blue-800' :
-                'bg-yellow-100 text-yellow-800'
-              }`}>
-                {job.status}
-              </span>
-              {(job.status === 'pending' || job.status === 'running') && (
-                <button
-                  onClick={(e) => cancelJob(job.id, e)}
-                  disabled={cancellingId === job.id}
-                  className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                >
-                  {cancellingId === job.id ? 'Cancelling...' : 'Cancel'}
-                </button>
-              )}
-            </div>
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={job.status} />
+                  {(job.status === 'pending' || job.status === 'running') && (
+                    <button
+                      onClick={(e) => cancelJob(job.id, e)}
+                      disabled={cancellingId === job.id}
+                      className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                    >
+                      {cancellingId === job.id ? ACTION_CANCELLING : ACTION_CANCEL}
+                    </button>
+                  )}
+                </div>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                {new Date(job.created_at).toLocaleString()}
+                {formatDateTime(job.created_at)}
               </p>
             </div>
           ))}
         </div>
       )}
 
-      {/* Job Detail Modal */}
       {selectedJob && (
         <JobDetailModal
           job={selectedJob}
           onClose={() => setSelectedJob(null)}
           onJobUpdate={(updatedJob) => {
-            // Update the jobs list when modal receives updates
             setJobs(prev => prev.map(job =>
               job.id === updatedJob.id ? updatedJob : job
             ))

@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useSocketStore } from '../stores/socketStore';
-import { JobsAPI } from '../services/api';
-import type { Job } from '../types/job';
+import { useSocketStore } from '../../stores/socketStore';
+import { JobsAPI } from '../../services/api';
+import type { Job } from '../../types/job';
+import { statusBadgeClasses } from '../../utils/jobStatus';
+import { progressBarColor } from '../../utils/jobStatus';
+import { formatDateTime } from '../../utils/date';
 import {
  MODAL_CLOSE,
  JOB_DETAILS_TITLE,
@@ -16,7 +19,7 @@ import {
  JOB_CONFIG_VISION_MODEL,
  JOB_CONFIG_THRESHOLD,
  JOB_CONFIG_WEIGHTS,
-} from '../constants/strings';
+} from '../../constants/strings';
 
 interface JobDetailModalProps {
  job: Job;
@@ -28,7 +31,6 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
  const [localJob, setLocalJob] = useState<Job>(job);
  const socket = useSocketStore(state => state.socket);
 
- // Fetch fresh job data when modal opens to ensure logs are loaded
  useEffect(() => {
    JobsAPI.get(job.id)
      .then(freshJob => {
@@ -39,14 +41,11 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
      });
  }, [job.id]);
 
- // Subscribe to job updates via WebSocket
  useEffect(() => {
    if (!socket) return;
 
-   // Subscribe to this specific job
    socket.emit('subscribe_job', { job_id: job.id });
 
-   // Listen for job updates
    const handleJobUpdate = (updatedJob: Job) => {
      if (updatedJob.id === job.id) {
        setLocalJob(updatedJob);
@@ -62,21 +61,8 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
    };
  }, [socket, job.id, onJobUpdate]);
 
- // Use localJob if available, otherwise fall back to prop
  const displayJob = localJob.id === job.id ? localJob : job;
 
- // Status badge color
- const getStatusColor = (status?: string) => {
-   switch (status) {
-     case 'completed': return 'bg-green-100 text-green-800 border-green-200';
-     case 'failed': return 'bg-red-100 text-red-800 border-red-200';
-     case 'running': return 'bg-blue-100 text-blue-800 border-blue-200';
-     case 'cancelled': return 'bg-gray-100 text-gray-800 border-gray-200';
-     default: return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-   }
- };
-
- // Progress bar
  const renderProgress = () => {
    if (displayJob.progress === undefined) return null;
 
@@ -88,11 +74,7 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
        </div>
        <div className="w-full bg-gray-200 rounded-full h-2">
          <div
-           className={`h-2 rounded-full transition-all duration-300 ${
-             displayJob.status === 'completed' ? 'bg-green-500' :
-             displayJob.status === 'failed' ? 'bg-red-500' :
-             displayJob.status === 'running' ? 'bg-blue-500' : 'bg-gray-400'
-           }`}
+           className={`h-2 rounded-full transition-all duration-300 ${progressBarColor(displayJob.status)}`}
            style={{ width: `${displayJob.progress}%` }}
          />
        </div>
@@ -109,7 +91,6 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
        className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto"
        onClick={(e) => e.stopPropagation()}
      >
-       {/* Header */}
        <div className="flex justify-between items-center p-4 border-b">
          <h3 className="text-lg font-bold">{JOB_DETAILS_TITLE}</h3>
          <button
@@ -120,9 +101,7 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
          </button>
        </div>
 
-       {/* Content */}
        <div className="p-4 space-y-4">
-         {/* Job Info */}
          <div className="grid grid-cols-2 gap-4 text-sm">
            <div>
              <span className="text-gray-500">ID:</span>
@@ -134,20 +113,18 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
            </div>
            <div>
              <span className="text-gray-500">Status:</span>
-             <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusColor(displayJob.status)}`}>
+             <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium border ${statusBadgeClasses(displayJob.status, { withBorder: true })}`}>
                {displayJob.status}
              </span>
            </div>
            <div>
              <span className="text-gray-500">Created:</span>
-             <p>{new Date(displayJob.created_at).toLocaleString()}</p>
+             <p>{formatDateTime(displayJob.created_at)}</p>
            </div>
          </div>
 
-         {/* Progress */}
          {renderProgress()}
 
-         {/* Current Step */}
          {displayJob.current_step && (
            <div className="bg-blue-50 p-3 rounded">
              <span className="text-sm text-blue-600 font-medium">{JOB_DETAILS_CURRENT_STEP}:</span>
@@ -155,7 +132,6 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
            </div>
          )}
 
-         {/* Metadata */}
          {displayJob.metadata && Object.keys(displayJob.metadata).length > 0 && (
            <div className="border rounded p-3">
              <h4 className="font-medium text-sm mb-2">{JOB_DETAILS_METADATA}</h4>
@@ -165,7 +141,6 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
            </div>
          )}
 
-         {/* Job Configuration - show from metadata during run, from result when complete */}
          {(displayJob.metadata?.method || displayJob.result?.method) && (
            <div className="border border-purple-200 rounded p-3 bg-purple-50">
              <h4 className="font-medium text-sm mb-2 text-purple-800">Configuration</h4>
@@ -208,7 +183,6 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
            </div>
          )}
 
-         {/* Result */}
          {displayJob.result && (
            <div className="border border-green-200 rounded p-3 bg-green-50">
              <h4 className="font-medium text-sm mb-2 text-green-800">{JOB_DETAILS_RESULT}</h4>
@@ -218,7 +192,6 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
            </div>
          )}
 
-         {/* Error */}
          {displayJob.error && (
            <div className="border border-red-200 rounded p-3 bg-red-50">
              <h4 className="font-medium text-sm mb-2 text-red-800">{JOB_DETAILS_ERROR}</h4>
@@ -226,7 +199,6 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
            </div>
          )}
 
-         {/* Logs */}
          {displayJob.logs && displayJob.logs.length > 0 && (
            <div className="border rounded p-3">
              <h4 className="font-medium text-sm mb-2">{JOB_DETAILS_LOGS}</h4>

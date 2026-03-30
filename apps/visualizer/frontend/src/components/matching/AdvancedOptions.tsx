@@ -14,7 +14,7 @@ import {
   ADVANCED_WEIGHT_DESC,
   ADVANCED_WEIGHT_VISION,
   ADVANCED_RESET_DEFAULTS,
-} from '../constants/strings';
+} from '../../constants/strings';
 
 interface AdvancedOptionsProps {
   isOpen: boolean;
@@ -65,7 +65,6 @@ export function AdvancedOptions({
 
       {isOpen && (
         <div className="mt-4 space-y-4 bg-white p-4 rounded border">
-          {/* Vision Model */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               {ADVANCED_MODEL_LABEL}
@@ -88,7 +87,6 @@ export function AdvancedOptions({
             <p className="text-xs text-gray-500 mt-1">{ADVANCED_MODEL_DESCRIPTION}</p>
           </div>
 
-          {/* Match Threshold */}
           <RangeSlider
             label={ADVANCED_THRESHOLD_LABEL}
             valueLabel={`: ${threshold.toFixed(2)}`}
@@ -102,7 +100,6 @@ export function AdvancedOptions({
             description={ADVANCED_THRESHOLD_DESCRIPTION}
           />
 
-          {/* Weights */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               {ADVANCED_WEIGHTS_TITLE}
@@ -146,7 +143,6 @@ export function AdvancedOptions({
             </div>
           </div>
 
-          {/* Reset button */}
           <div className="pt-2 border-t">
             <button
               onClick={onReset}

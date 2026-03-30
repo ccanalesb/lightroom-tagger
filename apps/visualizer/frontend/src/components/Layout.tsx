@@ -1,11 +1,12 @@
 import { Outlet, NavLink } from 'react-router-dom'
-import { APP_TITLE, NAV_DASHBOARD, NAV_INSTAGRAM, NAV_MATCHING, NAV_JOBS } from '../constants/strings'
+import { APP_TITLE, NAV_DASHBOARD, NAV_INSTAGRAM, NAV_MATCHING, NAV_DESCRIPTIONS, NAV_JOBS } from '../constants/strings'
 
 export function Layout() {
   const navItems = [
     { to: '/', label: NAV_DASHBOARD },
     { to: '/instagram', label: NAV_INSTAGRAM },
     { to: '/matching', label: NAV_MATCHING },
+    { to: '/descriptions', label: NAV_DESCRIPTIONS },
     { to: '/jobs', label: NAV_JOBS },
   ]
   

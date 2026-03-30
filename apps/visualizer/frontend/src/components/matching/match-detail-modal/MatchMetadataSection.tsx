@@ -1,10 +1,10 @@
-import type { Match } from '../../services/api';
+import type { Match } from '../../../services/api';
 import {
   MATCH_DETAIL_MATCH_DETAILS,
   MATCH_DETAIL_INSTAGRAM_KEY,
   MATCH_DETAIL_CATALOG_KEY,
   MATCH_DETAIL_MODEL,
-} from '../../constants/strings';
+} from '../../../constants/strings';
 
 interface MatchMetadataSectionProps {
   match: Match;

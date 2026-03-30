@@ -65,13 +65,7 @@ export const ImagesAPI = {
     return request<{
       total: number;
       images: InstagramImage[];
-      pagination: {
-        offset: number;
-        limit: number;
-        current_page: number;
-        total_pages: number;
-        has_more: boolean;
-      }
+      pagination: PaginationMeta;
     }>(`/images/instagram?${searchParams.toString()}`)
   },
 
@@ -105,6 +99,50 @@ export const MatchingAPI = {
       { method: 'PATCH' },
     ),
 }
+
+export interface DescriptionItem {
+  image_key: string
+  image_type: 'catalog' | 'instagram'
+  filename?: string
+  date_ref?: string
+  summary?: string
+  best_perspective?: string
+  desc_model?: string
+  described_at?: string
+  has_description: number
+}
+
+export interface PaginationMeta {
+  offset: number
+  limit: number
+  current_page: number
+  total_pages: number
+  has_more: boolean
+}
+
+export const DescriptionsAPI = {
+  get: (imageKey: string) =>
+    request<{ description: ImageDescription | null }>(
+      `/descriptions/${encodeURIComponent(imageKey)}`
+    ),
+  list: (params?: { image_type?: string; described_only?: boolean; limit?: number; offset?: number }) => {
+    const sp = new URLSearchParams()
+    if (params?.image_type) sp.set('image_type', params.image_type)
+    if (params?.described_only) sp.set('described_only', 'true')
+    if (params?.limit) sp.set('limit', String(params.limit))
+    if (params?.offset) sp.set('offset', String(params.offset))
+    return request<{ total: number; items: DescriptionItem[]; pagination: PaginationMeta }>(
+      `/descriptions/?${sp.toString()}`
+    )
+  },
+  generate: (imageKey: string, imageType: string, force = false, model?: string) =>
+    request<{ generated: boolean; description: ImageDescription | null }>(
+      `/descriptions/${encodeURIComponent(imageKey)}/generate`,
+      { method: 'POST', body: JSON.stringify({ image_type: imageType, force, ...(model && { model }) }) },
+    ),
+}
+
+export type DescriptionListResult = Awaited<ReturnType<typeof DescriptionsAPI.list>>
 
 export const DumpMediaAPI = {
   list: (filters?: { processed?: boolean; matched?: boolean; limit?: number; offset?: number }) => {
