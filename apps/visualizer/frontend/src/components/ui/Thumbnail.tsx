@@ -1,3 +1,5 @@
+import { MATCH_CARD_NO_IMAGE } from '../../constants/strings';
+
 interface ThumbnailProps {
   url: string;
   label: string;
@@ -9,7 +11,7 @@ interface ThumbnailProps {
   errorText?: string;
 }
 
-export function Thumbnail({ url, label, loaded, error, onLoad, onError, alignRight, errorText = 'No image' }: ThumbnailProps) {
+export function Thumbnail({ url, label, loaded, error, onLoad, onError, alignRight, errorText = MATCH_CARD_NO_IMAGE }: ThumbnailProps) {
   return (
     <div className="w-1/2 bg-gray-100 relative">
       {!loaded && !error && <div className="absolute inset-0 bg-gray-200 animate-pulse" />}

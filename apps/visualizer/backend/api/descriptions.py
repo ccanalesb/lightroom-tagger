@@ -11,7 +11,7 @@ from lightroom_tagger.core.description_service import (
     describe_matched_image,
 )
 from utils.db import with_db
-from utils.responses import error_not_found, error_server_error
+from utils.responses import error_server_error
 
 bp = Blueprint('descriptions', __name__)
 

@@ -8,6 +8,9 @@ import {
   DESC_PAGE_FILTER_ALL,
   DESC_PAGE_FILTER_3M,
   DESC_PAGE_FILTER_6M,
+  DESC_BATCH_JOB_STARTED,
+  DESC_BATCH_VIEW_IN_JOBS,
+  DESC_BATCH_FAILED_PREFIX,
 } from '../../constants/strings';
 
 type DateFilter = 'all' | '3months' | '6months';
@@ -114,14 +117,14 @@ export function BatchActionPanel({
 
       {batchJob && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
-          <span>Job started (ID: {batchJob.id.slice(0, 8)})</span>
-          <Link to="/jobs" className="underline font-medium hover:text-green-900">View in Jobs</Link>
+          <span>{DESC_BATCH_JOB_STARTED(batchJob.id.slice(0, 8))}</span>
+          <Link to="/jobs" className="underline font-medium hover:text-green-900">{DESC_BATCH_VIEW_IN_JOBS}</Link>
           <button type="button" onClick={onDismissJob} className="ml-auto text-green-600 hover:text-green-800">&times;</button>
         </div>
       )}
       {batchError && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
-          <span>Failed: {batchError}</span>
+          <span>{DESC_BATCH_FAILED_PREFIX} {batchError}</span>
           <button type="button" onClick={onDismissError} className="ml-auto text-red-600 hover:text-red-800">&times;</button>
         </div>
       )}

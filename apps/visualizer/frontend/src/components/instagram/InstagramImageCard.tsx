@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import type { InstagramImage } from '../../services/api';
-import { INSTAGRAM_ERROR_PLACEHOLDER, MSG_CLICK_FOR_DETAILS } from '../../constants/strings';
+import {
+  INSTAGRAM_ERROR_PLACEHOLDER,
+  INSTAGRAM_MATCHED_PREFIX,
+  MSG_CLICK_FOR_DETAILS,
+} from '../../constants/strings';
 import { thumbnailUrl as buildThumbUrl } from '../../utils/imageUrl';
 
 interface InstagramImageCardProps {
@@ -41,7 +45,10 @@ export function InstagramImageCard({ image, onClick }: InstagramImageCardProps) 
           </div>
         )}
         {image.matched_catalog_key && (
-          <div className="absolute top-1 left-1 w-3 h-3 rounded-full bg-green-500 border border-white" title={`Matched: ${image.matched_catalog_key}`} />
+          <div
+            className="absolute top-1 left-1 w-3 h-3 rounded-full bg-green-500 border border-white"
+            title={`${INSTAGRAM_MATCHED_PREFIX} ${image.matched_catalog_key}`}
+          />
         )}
         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
           <span className="text-white text-sm font-medium">

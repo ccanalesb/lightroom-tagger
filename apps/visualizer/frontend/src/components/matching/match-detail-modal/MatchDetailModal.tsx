@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   MODAL_CLOSE,
   MATCHING_RESULTS,
@@ -16,12 +16,7 @@ import { MatchImagesSection } from './MatchImagesSection';
 import { MatchDescriptionsSection } from './MatchDescriptionsSection';
 import { MatchMetadataSection } from './MatchMetadataSection';
 import { RejectConfirmModal } from './RejectConfirmModal';
-
-const VISION_BADGE_COLORS: Record<string, string> = {
-  SAME: 'bg-green-100 text-green-800',
-  DIFFERENT: 'bg-red-100 text-red-800',
-  UNCERTAIN: 'bg-yellow-100 text-yellow-800',
-};
+import { visionBadgeClasses } from '../../../utils/visionBadge';
 
 interface MatchDetailModalProps {
   match: Match;
@@ -35,6 +30,10 @@ export function MatchDetailModal({ match, onClose, onValidationChange, onRejecte
   const [validated, setValidated] = useState(!!match.validated_at);
   const [busy, setBusy] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+
+  useEffect(() => {
+    setValidated(!!match.validated_at);
+  }, [match.validated_at]);
 
   async function handleValidate() {
     setBusy(true);
@@ -113,9 +112,7 @@ export function MatchDetailModal({ match, onClose, onValidationChange, onRejecte
           <div className="p-4 space-y-4">
             <div className="flex gap-2 flex-wrap">
               <span
-                className={`inline-flex items-center px-3 py-1 rounded text-sm font-medium ${
-                  VISION_BADGE_COLORS[visionResult] || VISION_BADGE_COLORS.UNCERTAIN
-                }`}
+                className={`inline-flex items-center px-3 py-1 rounded text-sm font-medium ${visionBadgeClasses(match.vision_result)}`}
               >
                 {MATCH_DETAIL_VISION_LABEL} {visionResult}
               </span>

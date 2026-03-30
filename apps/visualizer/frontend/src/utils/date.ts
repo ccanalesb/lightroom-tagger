@@ -17,7 +17,7 @@ export function formatTime(value: DateInput): string {
 
 export function formatMonth(yyyymm: string): string {
   if (yyyymm.length !== 6) return yyyymm
-  const year = parseInt(yyyymm.substring(0, 4))
-  const month = parseInt(yyyymm.substring(4, 6)) - 1
+  const year = parseInt(yyyymm.substring(0, 4), 10)
+  const month = parseInt(yyyymm.substring(4, 6), 10) - 1
   return new Date(year, month).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
 }

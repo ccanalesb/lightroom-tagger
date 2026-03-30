@@ -10,6 +10,9 @@ import {
   MODAL_ALREADY_MATCHED,
   ADVANCED_FORCE_REPROCESS,
   MODAL_VIEW_ON_INSTAGRAM,
+  INSTAGRAM_VIA,
+  MSG_UNKNOWN_ERROR,
+  MODAL_MATCH_JOB_FAILED_PREFIX,
 } from '../../constants/strings';
 import { useSingleMatch } from '../../hooks/useSingleMatch';
 import type { InstagramImage } from '../../services/api';
@@ -45,7 +48,9 @@ export function SingleMatchSection({ image }: SingleMatchSectionProps) {
             </span>
           </div>
           {image.matched_model && (
-            <p className="text-xs text-green-600 ml-4">via {image.matched_model}</p>
+            <p className="text-xs text-green-600 ml-4">
+              {INSTAGRAM_VIA} {image.matched_model}
+            </p>
           )}
         </div>
       )}
@@ -148,7 +153,7 @@ export function SingleMatchSection({ image }: SingleMatchSectionProps) {
       {matchState === "done" && matchJob?.status === "failed" && (
         <div className="py-2 px-4 rounded-md text-sm bg-red-50 text-red-700">
           <p className="font-medium">
-            Match failed: {matchJob.error || "Unknown error"}
+            {MODAL_MATCH_JOB_FAILED_PREFIX} {matchJob.error || MSG_UNKNOWN_ERROR}
           </p>
           <button
             type="button"

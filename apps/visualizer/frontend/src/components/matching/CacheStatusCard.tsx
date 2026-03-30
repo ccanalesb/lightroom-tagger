@@ -8,6 +8,7 @@ import {
   CACHE_TOTAL_CATALOG_IMAGES,
   CACHE_MISSING,
   CACHE_PERCENT_CACHED,
+  LABEL_MB,
 } from '../../constants/strings';
 
 export function CacheStatusCard({ cacheStatus }: { cacheStatus: CacheStatus }) {
@@ -35,7 +36,7 @@ export function CacheStatusCard({ cacheStatus }: { cacheStatus: CacheStatus }) {
         </div>
         <div>
           <p className="text-sm text-gray-600">{CACHE_SIZE_LABEL}</p>
-          <p className="text-lg font-bold">{cacheStatus.cache_size_mb} MB</p>
+          <p className="text-lg font-bold">{cacheStatus.cache_size_mb} {LABEL_MB}</p>
         </div>
       </div>
       <div className="mt-3">

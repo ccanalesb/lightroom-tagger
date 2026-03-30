@@ -231,6 +231,10 @@ export const DESC_PAGE_GENERATING = 'Generating...'
 export const DESC_PAGE_NO_DESCRIPTION = 'No description yet'
 export const DESC_PAGE_EMPTY = 'No images found.'
 
+export const DESC_BATCH_JOB_STARTED = (idPrefix: string) => `Job started (ID: ${idPrefix})`
+export const DESC_BATCH_VIEW_IN_JOBS = 'View in Jobs'
+export const DESC_BATCH_FAILED_PREFIX = 'Failed:'
+
 // Description Panel
 export const DESC_PANEL_TITLE = 'AI Description'
 export const DESC_PANEL_SUMMARY = 'Summary'
@@ -278,3 +282,4 @@ export const MODAL_MATCH_RESULT_FOUND = 'Match found!'
 export const MODAL_MATCH_RESULT_NONE = 'No match found'
 export const MODAL_MATCH_VIEW_RESULTS = 'View on Matching page'
 export const MODAL_MATCH_RETRY = 'Run Again'
+export const MODAL_MATCH_JOB_FAILED_PREFIX = 'Match failed:'

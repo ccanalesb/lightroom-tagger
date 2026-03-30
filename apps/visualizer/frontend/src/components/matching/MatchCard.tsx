@@ -5,6 +5,7 @@ import {
   MATCH_CARD_CATALOG_LABEL,
   MATCH_CARD_NO_IMAGE,
   MATCH_VALIDATED,
+  LABEL_MODEL,
 } from '../../constants/strings';
 import { PerspectiveBadge } from './PerspectiveBadge';
 import { VisionBadge } from '../ui/badges';
@@ -88,7 +89,7 @@ export function MatchCard({ match, onClick }: MatchCardProps) {
           <PerspectiveBadge match={match} />
           {match.model_used && (
             <p className="text-gray-400 truncate" title={match.model_used}>
-              model: {match.model_used}
+              {LABEL_MODEL} {match.model_used}
             </p>
           )}
         </div>

@@ -1078,7 +1078,10 @@ def get_all_images_with_descriptions(db: sqlite3.Connection,
     count_sql = f"SELECT COUNT(*) AS cnt FROM ({wrapper})"
     total = db.execute(count_sql, params * len(parts)).fetchone()['cnt']
 
-    page_sql = f"{wrapper} ORDER BY t.described_at DESC NULLS LAST, t.date_ref DESC LIMIT ? OFFSET ?"
+    page_sql = (
+        f"{wrapper} ORDER BY CASE WHEN t.described_at IS NULL THEN 1 ELSE 0 END, "
+        f"t.described_at DESC, t.date_ref DESC LIMIT ? OFFSET ?"
+    )
     all_params = params * len(parts) + [limit, offset]
     rows = db.execute(page_sql, all_params).fetchall()
 
