@@ -1,11 +1,13 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import type { DescriptionItem, ImageDescription, Job } from '../services/api';
 import { DescriptionsAPI, JobsAPI } from '../services/api';
+import { Alert } from '../components/ui/Alert';
 import { BatchActionPanel } from '../components/descriptions/BatchActionPanel';
 import { DescriptionDetailModal } from '../components/descriptions/DescriptionDetailModal';
 import { DescriptionGrid } from '../components/descriptions/DescriptionGrid';
 import { TotalCount } from '../components/descriptions/TotalCount';
 import { useMatchOptions } from '../stores/matchOptionsContext';
+import { classifyApiError } from '../utils/classifyApiError';
 import { createResource, type Resource } from '../utils/createResource';
 import { thumbnailUrl as buildThumbUrl, fullImageUrl as buildFullUrl } from '../utils/imageUrl';
 import {
@@ -47,6 +49,7 @@ export function DescriptionsPage() {
   const [batchJob, setBatchJob] = useState<Job | null>(null);
   const [batchError, setBatchError] = useState<string | null>(null);
   const [generatingKeys, setGeneratingKeys] = useState<Set<string>>(new Set());
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const [modalItem, setModalItem] = useState<DescriptionItem | null>(null);
   const [modalDescResource, setModalDescResource] = useState<Resource<{ description: ImageDescription | null }> | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -95,6 +98,7 @@ export function DescriptionsPage() {
   async function handleGenerate(item: DescriptionItem, e?: React.MouseEvent) {
     e?.stopPropagation();
     setGeneratingKeys(prev => new Set(prev).add(item.image_key));
+    setGenerateError(null);
     try {
       const res = await DescriptionsAPI.generate(
         item.image_key,
@@ -108,6 +112,8 @@ export function DescriptionsPage() {
           setModalDescResource(createResource(Promise.resolve({ description: res.description as ImageDescription })));
         }
       }
+    } catch (err) {
+      setGenerateError(classifyApiError(err));
     } finally {
       setGeneratingKeys(prev => { const next = new Set(prev); next.delete(item.image_key); return next; });
     }
@@ -174,6 +180,10 @@ export function DescriptionsPage() {
         batchError={batchError}
         onDismissError={() => setBatchError(null)}
       />
+
+      {generateError && (
+        <Alert tone="danger" message={generateError} onDismiss={() => setGenerateError(null)} />
+      )}
 
       <Suspense fallback={<p className="text-gray-500 text-center py-12">{MSG_LOADING}</p>}>
         <DescriptionGrid

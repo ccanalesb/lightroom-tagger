@@ -311,8 +311,18 @@ def extract_exif(path: str) -> dict[str, Any]:
         pass
     return result
 
-def describe_image(path: str, agent_type: str | None = None) -> dict:
-    """Generate structured description using configured agent."""
+def describe_image(path: str, agent_type: str | None = None,
+                    provider_id: str | None = None, model: str | None = None,
+                    log_callback=None) -> dict:
+    """Generate structured description using configured agent.
+
+    When *provider_id* is given the new multi-provider pipeline is used
+    (FallbackDispatcher + retry).  Otherwise falls back to the legacy
+    Ollama path for backward compatibility.
+    """
+    if provider_id is not None:
+        return _describe_image_via_provider(path, provider_id, model, log_callback)
+
     if agent_type is None:
         try:
             config = load_config()
@@ -328,6 +338,51 @@ def describe_image(path: str, agent_type: str | None = None) -> dict:
         raw = ''
 
     return parse_description_response(raw)
+
+
+def _describe_image_via_provider(path: str, provider_id: str,
+                                  model: str | None, log_callback=None) -> dict:
+    """Generate description via the unified provider pipeline."""
+    from lightroom_tagger.core.fallback import FallbackDispatcher
+    from lightroom_tagger.core.provider_registry import ProviderRegistry
+    from lightroom_tagger.core.vision_client import generate_description as _gen
+
+    registry = ProviderRegistry()
+    dispatcher = FallbackDispatcher(registry)
+
+    if model is None:
+        models = registry.list_models(provider_id)
+        model = models[0]["id"] if models else "gemma3:27b"
+
+    temp_files: list[str] = []
+    viewable = get_viewable_path(path)
+    if viewable != path:
+        temp_files.append(viewable)
+
+    compressed = compress_image(viewable)
+    if compressed != viewable:
+        temp_files.append(compressed)
+
+    try:
+        def fn_factory(client, mdl):
+            return lambda: _gen(client, mdl, compressed, log_callback=log_callback)
+
+        raw, actual_provider, actual_model = dispatcher.call_with_fallback(
+            operation="describe",
+            fn_factory=fn_factory,
+            provider_id=provider_id,
+            model=model,
+            log_callback=log_callback,
+        )
+        result = parse_description_response(raw)
+        result["_provider"] = actual_provider
+        result["_model"] = actual_model
+        return result
+    finally:
+        for f in temp_files:
+            if os.path.exists(f):
+                with contextlib.suppress(Exception):
+                    os.unlink(f)
 
 
 def run_local_agent(path: str) -> str:
@@ -369,7 +424,8 @@ def run_external_agent(path: str) -> str:
 
 
 def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
-                        cached_local_path: str | None = None, compressed_insta_path: str | None = None) -> dict:
+                        cached_local_path: str | None = None, compressed_insta_path: str | None = None,
+                        provider_id: str | None = None, model: str | None = None) -> dict:
     """Compare two images using vision model via Ollama with compression.
 
     Compresses images to max VISION_MAX_DIMENSION pixels before comparison
@@ -437,7 +493,13 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
                 temp_files.append(compressed_insta)
 
         # Step 3: Run vision comparison
-        result = run_vision_ollama(compressed_local, compressed_insta, log_callback=log_callback)
+        if provider_id is not None:
+            result = _compare_via_provider(
+                compressed_local, compressed_insta,
+                provider_id, model, log_callback,
+            )
+        else:
+            result = run_vision_ollama(compressed_local, compressed_insta, log_callback=log_callback)
 
         return result
 
@@ -447,6 +509,36 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
             if temp_file and os.path.exists(temp_file):
                 with contextlib.suppress(Exception):
                     os.unlink(temp_file)
+
+
+def _compare_via_provider(local_path: str, insta_path: str,
+                          provider_id: str, model: str | None,
+                          log_callback=None) -> dict:
+    """Run vision comparison via the unified provider pipeline."""
+    from lightroom_tagger.core.fallback import FallbackDispatcher
+    from lightroom_tagger.core.provider_registry import ProviderRegistry
+    from lightroom_tagger.core.vision_client import compare_images as _cmp
+
+    registry = ProviderRegistry()
+    dispatcher = FallbackDispatcher(registry)
+
+    if model is None:
+        models = registry.list_models(provider_id)
+        model = models[0]["id"] if models else "gemma3:27b"
+
+    def fn_factory(client, mdl):
+        return lambda: _cmp(client, mdl, local_path, insta_path, log_callback=log_callback)
+
+    result, actual_provider, actual_model = dispatcher.call_with_fallback(
+        operation="compare",
+        fn_factory=fn_factory,
+        provider_id=provider_id,
+        model=model,
+        log_callback=log_callback,
+    )
+    result["_provider"] = actual_provider
+    result["_model"] = actual_model
+    return result
 
 
 def parse_vision_response(raw: str) -> dict:

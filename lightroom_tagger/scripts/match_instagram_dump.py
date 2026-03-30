@@ -38,7 +38,9 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      progress_callback=None, log_callback=None,
                      weights: dict = None, media_key: str = None,
                      force_descriptions: bool = False,
-                     force_reprocess: bool = False) -> tuple:
+                     force_reprocess: bool = False,
+                     provider_id: str = None,
+                     provider_model: str = None) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -145,7 +147,9 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             desc_weight=weights.get('description', 0.3),
             vision_weight=weights.get('vision', 0.3),
             threshold=threshold,
-            log_callback=log_callback
+            log_callback=log_callback,
+            provider_id=provider_id,
+            model=provider_model,
         )
 
         above_threshold = [r for r in results if r['total_score'] >= threshold]

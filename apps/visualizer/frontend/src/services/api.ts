@@ -139,10 +139,26 @@ export const DescriptionsAPI = {
       `/descriptions/?${sp.toString()}`
     )
   },
-  generate: (imageKey: string, imageType: string, force = false, model?: string) =>
+  generate: (
+    imageKey: string,
+    imageType: string,
+    force = false,
+    model?: string,
+    providerId?: string,
+    providerModel?: string,
+  ) =>
     request<{ generated: boolean; description: ImageDescription | null }>(
       `/descriptions/${encodeURIComponent(imageKey)}/generate`,
-      { method: 'POST', body: JSON.stringify({ image_type: imageType, force, ...(model && { model }) }) },
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          image_type: imageType,
+          force,
+          ...(model && { model }),
+          ...(providerId && { provider_id: providerId }),
+          ...(providerModel && { provider_model: providerModel }),
+        }),
+      },
     ),
 }
 
@@ -294,4 +310,32 @@ export interface DumpMedia {
   matched_catalog_key?: string
   vision_result?: 'SAME' | 'DIFFERENT' | 'UNCERTAIN' | 'NO_MATCH' | 'ERROR'
   vision_score?: number
+}
+
+export interface Provider {
+  id: string
+  name: string
+  available: boolean
+}
+
+export interface ProviderModel {
+  id: string
+  name: string
+  vision: boolean
+  source: 'config' | 'discovered' | 'user'
+}
+
+export interface ProviderDefaults {
+  vision_comparison: { provider: string; model: string | null }
+  description: { provider: string; model: string | null }
+}
+
+export const ProvidersAPI = {
+  list: () => request<Provider[]>('/providers/'),
+  listModels: (providerId: string) =>
+    request<ProviderModel[]>(`/providers/${providerId}/models`),
+  getFallbackOrder: () =>
+    request<{ order: string[] }>('/providers/fallback-order'),
+  getDefaults: () =>
+    request<ProviderDefaults>('/providers/defaults'),
 }

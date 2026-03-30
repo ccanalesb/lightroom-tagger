@@ -27,7 +27,6 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
         # Store config in metadata so it shows during job run
         config = load_config()
 
-        # Use custom values from metadata if provided, otherwise config defaults
         custom_model = metadata.get('vision_model', config.vision_model or 'gemma3:27b')
         custom_threshold = metadata.get('threshold', config.match_threshold or 0.7)
         custom_weights = metadata.get('weights', {
@@ -36,6 +35,8 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             'vision': config.vision_weight or 0.3
         })
         force_descriptions = metadata.get('force_descriptions', False)
+        provider_id = metadata.get('provider_id')
+        provider_model = metadata.get('provider_model')
 
         update_job_field(runner.db, job_id, 'metadata', {
             **metadata,
@@ -97,7 +98,6 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             if force_descriptions:
                 log_callback('info', 'Force regenerate descriptions: ON')
 
-            # Run cascade matching with progress callback
             stats, matches = match_dump_media(
                 db,
                 threshold=custom_threshold,
@@ -109,6 +109,8 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 media_key=media_key,
                 force_descriptions=force_descriptions,
                 force_reprocess=force_reprocess,
+                provider_id=provider_id,
+                provider_model=provider_model,
             )
 
             # Update Lightroom with "Posted" keyword for matched images
@@ -401,6 +403,8 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
         date_filter = metadata.get('date_filter', 'all')  # all, 3months, 6months
         force = metadata.get('force', False)
         vision_model = metadata.get('vision_model')
+        desc_provider_id = metadata.get('provider_id')
+        desc_provider_model = metadata.get('provider_model')
 
         if vision_model:
             os.environ['DESCRIPTION_VISION_MODEL'] = vision_model
@@ -470,9 +474,15 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
 
             try:
                 if itype == 'catalog':
-                    result = describe_matched_image(lib_db, key, force=force)
+                    result = describe_matched_image(
+                        lib_db, key, force=force,
+                        provider_id=desc_provider_id, model=desc_provider_model,
+                    )
                 else:
-                    result = describe_instagram_image(lib_db, key, force=force)
+                    result = describe_instagram_image(
+                        lib_db, key, force=force,
+                        provider_id=desc_provider_id, model=desc_provider_model,
+                    )
 
                 if result:
                     described += 1
