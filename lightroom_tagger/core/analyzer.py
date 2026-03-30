@@ -426,7 +426,11 @@ def run_external_agent(path: str) -> str:
 def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
                         cached_local_path: str | None = None, compressed_insta_path: str | None = None,
                         provider_id: str | None = None, model: str | None = None) -> dict:
-    """Compare two images using vision model via Ollama with compression.
+    """Compare two images using a vision model with compression.
+
+    When *provider_id* is supplied, routes through the multi-provider pipeline
+    (retry + fallback via ``FallbackDispatcher``).  Otherwise falls back to the
+    legacy Ollama-only path.
 
     Compresses images to max VISION_MAX_DIMENSION pixels before comparison
     to reduce bandwidth and processing time. Supports pre-compressed paths
@@ -438,10 +442,12 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
         log_callback: Optional callback for logging
         cached_local_path: Pre-compressed catalog image path (optional, uses cache if available)
         compressed_insta_path: Pre-compressed Instagram image path (optional)
+        provider_id: Provider to use (``None`` → legacy Ollama path)
+        model: Model to use with the selected provider (``None`` → provider default)
 
     Returns:
         dict with keys ``confidence`` (0-100), ``verdict`` (``SAME`` | ``DIFFERENT`` | ``UNCERTAIN``),
-        and ``reasoning`` (str).
+        ``reasoning`` (str), and when using the multi-provider path, ``_provider`` and ``_model``.
     """
     # Track all temp files for cleanup
     temp_files = []

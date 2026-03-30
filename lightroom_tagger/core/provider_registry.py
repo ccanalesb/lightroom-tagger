@@ -62,11 +62,13 @@ class ProviderRegistry:
         base_url = self._resolve_base_url(pconfig)
         api_key = self._resolve_api_key(pconfig)
         extra_headers = pconfig.get("extra_headers", {})
-        return openai.OpenAI(
+        client = openai.OpenAI(
             base_url=base_url,
             api_key=api_key,
             default_headers=extra_headers or None,
         )
+        client._provider_id = provider_id  # type: ignore[attr-defined]
+        return client
 
     def get_retry_config(self, provider_id: str) -> dict:
         pconfig = self._providers[provider_id]

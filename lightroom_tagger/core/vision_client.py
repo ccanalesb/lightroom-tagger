@@ -50,8 +50,22 @@ def _image_url_part(b64: str) -> dict[str, Any]:
     return {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
 
 
-def _map_openai_error(exc: Exception) -> ProviderError:
-    """Map openai SDK exceptions to our ProviderError hierarchy."""
+def _map_openai_error(
+    exc: Exception,
+    provider: str | None = None,
+    model: str | None = None,
+) -> ProviderError:
+    """Map openai SDK exceptions to our ProviderError hierarchy.
+
+    Parameters
+    ----------
+    exc:
+        The original SDK exception.
+    provider:
+        Provider id to attach as context on the mapped error.
+    model:
+        Model name to attach as context on the mapped error.
+    """
     retry_after = None
     if hasattr(exc, "response") and exc.response is not None:
         raw = exc.response.headers.get("retry-after")
@@ -62,25 +76,25 @@ def _map_openai_error(exc: Exception) -> ProviderError:
                 pass
 
     if isinstance(exc, openai_sdk.RateLimitError):
-        return RateLimitError(str(exc), retry_after=retry_after)
+        return RateLimitError(str(exc), provider=provider, model=model, retry_after=retry_after)
     if isinstance(exc, openai_sdk.AuthenticationError):
-        return AuthenticationError(str(exc))
+        return AuthenticationError(str(exc), provider=provider, model=model)
     if isinstance(exc, openai_sdk.BadRequestError):
         msg = str(exc).lower()
         if "context length" in msg or "too many tokens" in msg or "maximum" in msg:
-            return ContextLengthError(str(exc))
-        return InvalidRequestError(str(exc))
+            return ContextLengthError(str(exc), provider=provider, model=model)
+        return InvalidRequestError(str(exc), provider=provider, model=model)
     if isinstance(exc, openai_sdk.APITimeoutError):
-        return TimeoutError(str(exc))
+        return TimeoutError(str(exc), provider=provider, model=model)
     if isinstance(exc, openai_sdk.APIConnectionError):
-        return ConnectionError(str(exc))
+        return ConnectionError(str(exc), provider=provider, model=model)
     if isinstance(exc, openai_sdk.APIStatusError):
         status = getattr(exc.response, "status_code", 0) if exc.response else 0
         if status == 503:
-            return ModelUnavailableError(str(exc))
-        return ProviderError(str(exc))
+            return ModelUnavailableError(str(exc), provider=provider, model=model)
+        return ProviderError(str(exc), provider=provider, model=model)
 
-    return ProviderError(str(exc))
+    return ProviderError(str(exc), provider=provider, model=model)
 
 
 def compare_images(
@@ -108,7 +122,7 @@ def compare_images(
             max_tokens=256,
         )
     except Exception as exc:
-        raise _map_openai_error(exc) from exc
+        raise _map_openai_error(exc, provider=getattr(client, '_provider_id', None), model=model) from exc
 
     raw = response.choices[0].message.content or ""
     result = parse_vision_response(raw)
@@ -147,7 +161,7 @@ def generate_description(
             max_tokens=2048,
         )
     except Exception as exc:
-        raise _map_openai_error(exc) from exc
+        raise _map_openai_error(exc, provider=getattr(client, '_provider_id', None), model=model) from exc
 
     raw = response.choices[0].message.content or ""
 
