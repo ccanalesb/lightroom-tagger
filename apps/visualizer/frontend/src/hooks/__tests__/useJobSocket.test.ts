@@ -27,14 +27,14 @@ describe('useJobSocket', () => {
     vi.clearAllMocks()
   })
 
-  it('connects on mount and disconnects on unmount', () => {
+  it('should connect on mount and disconnect on unmount', () => {
     const { unmount } = renderHook(() => useJobSocket({}))
     expect(mockConnect).toHaveBeenCalledOnce()
     unmount()
     expect(mockDisconnect).toHaveBeenCalledOnce()
   })
 
-  it('registers job_created and job_updated listeners', () => {
+  it('should register job_created and job_updated listeners', () => {
     const onCreated = vi.fn()
     const onUpdated = vi.fn()
     renderHook(() => useJobSocket({ onJobCreated: onCreated, onJobUpdated: onUpdated }))
@@ -65,7 +65,7 @@ describe('useJobSocket', () => {
     expect(eventNames).toContain('job_updated')
   })
 
-  it('returns connected state', () => {
+  it('should return connected state', () => {
     const { result } = renderHook(() => useJobSocket({}))
     expect(result.current.connected).toBe(true)
   })

@@ -3,41 +3,41 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { Alert } from '../Alert'
 
 describe('Alert', () => {
-  it('renders message for success tone', () => {
+  it('should render message for success tone', () => {
     render(<Alert tone="success" message="Job completed!" />)
     expect(screen.getByText('Job completed!')).toBeTruthy()
   })
 
-  it('renders message for danger tone', () => {
+  it('should render message for danger tone', () => {
     render(<Alert tone="danger" message="Something failed" />)
     expect(screen.getByText('Something failed')).toBeTruthy()
   })
 
-  it('renders message for info tone', () => {
+  it('should render message for info tone', () => {
     render(<Alert tone="info" message="Processing..." />)
     expect(screen.getByText('Processing...')).toBeTruthy()
   })
 
-  it('renders message for warning tone', () => {
+  it('should render message for warning tone', () => {
     render(<Alert tone="warning" message="Check config" />)
     expect(screen.getByText('Check config')).toBeTruthy()
   })
 
-  it('applies green classes for success', () => {
+  it('should apply green classes for success', () => {
     const { container } = render(<Alert tone="success" message="Done" />)
     const alert = container.firstElementChild!
     expect(alert.className).toContain('bg-green')
     expect(alert.className).toContain('border-green')
   })
 
-  it('applies red classes for danger', () => {
+  it('should apply red classes for danger', () => {
     const { container } = render(<Alert tone="danger" message="Fail" />)
     const alert = container.firstElementChild!
     expect(alert.className).toContain('bg-red')
     expect(alert.className).toContain('border-red')
   })
 
-  it('renders dismiss button when onDismiss provided', () => {
+  it('should render dismiss button when onDismiss provided', () => {
     const onDismiss = vi.fn()
     render(<Alert tone="success" message="Done" onDismiss={onDismiss} />)
     const btn = screen.getByRole('button')
@@ -45,12 +45,12 @@ describe('Alert', () => {
     expect(onDismiss).toHaveBeenCalledOnce()
   })
 
-  it('does not render dismiss button when onDismiss not provided', () => {
+  it('should not render dismiss button when onDismiss not provided', () => {
     render(<Alert tone="info" message="Info" />)
     expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('renders children as secondary content', () => {
+  it('should render children as secondary content', () => {
     render(
       <Alert tone="info" message="Primary">
         <span>Secondary detail</span>

@@ -99,7 +99,7 @@ export function DescriptionsPage() {
       const res = await DescriptionsAPI.generate(
         item.image_key,
         item.image_type,
-        !!item.has_description,
+        force,
         selectedModel || undefined,
       );
       if (res.description) {

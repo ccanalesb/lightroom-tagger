@@ -3,20 +3,20 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { AsyncThumbnail } from '../AsyncThumbnail'
 
 describe('AsyncThumbnail', () => {
-  it('renders an img element with the given src', () => {
+  it('should render an img element with the given src', () => {
     render(<AsyncThumbnail src="/img.jpg" alt="test" />)
     const img = screen.getByRole('img')
     expect(img.getAttribute('src')).toBe('/img.jpg')
     expect(img.getAttribute('alt')).toBe('test')
   })
 
-  it('starts with pulse placeholder visible', () => {
+  it('should start with pulse placeholder visible', () => {
     const { container } = render(<AsyncThumbnail src="/img.jpg" alt="test" />)
     const pulse = container.querySelector('.animate-pulse')
     expect(pulse).toBeTruthy()
   })
 
-  it('hides pulse and shows image after load', () => {
+  it('should hide pulse and show image after load', () => {
     const { container } = render(<AsyncThumbnail src="/img.jpg" alt="test" />)
     const img = screen.getByRole('img')
     fireEvent.load(img)
@@ -24,14 +24,14 @@ describe('AsyncThumbnail', () => {
     expect(pulse).toBeNull()
   })
 
-  it('shows fallback text on error', () => {
+  it('should show fallback text on error', () => {
     render(<AsyncThumbnail src="/bad.jpg" alt="test" fallback="--" />)
     const img = screen.getByRole('img')
     fireEvent.error(img)
     expect(screen.getByText('--')).toBeTruthy()
   })
 
-  it('hides img element on error', () => {
+  it('should hide img element on error', () => {
     render(<AsyncThumbnail src="/bad.jpg" alt="test" />)
     const img = screen.getByRole('img')
     fireEvent.error(img)

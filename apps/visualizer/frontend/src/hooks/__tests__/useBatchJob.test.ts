@@ -15,14 +15,14 @@ describe('useBatchJob', () => {
     vi.clearAllMocks()
   })
 
-  it('starts in idle state', () => {
+  it('should start in idle state', () => {
     const { result } = renderHook(() => useBatchJob())
     expect(result.current.job).toBeNull()
     expect(result.current.error).toBeNull()
     expect(result.current.isRunning).toBe(false)
   })
 
-  it('transitions to running on start', async () => {
+  it('should transition to running on start', async () => {
     mockCreate.mockResolvedValueOnce({ id: 'j1', status: 'pending', type: 'test' })
     const { result } = renderHook(() => useBatchJob())
 
@@ -35,7 +35,7 @@ describe('useBatchJob', () => {
     expect(result.current.error).toBeNull()
   })
 
-  it('captures error on failed start', async () => {
+  it('should capture error on failed start', async () => {
     mockCreate.mockRejectedValueOnce(new Error('Server error'))
     const { result } = renderHook(() => useBatchJob())
 
@@ -47,7 +47,7 @@ describe('useBatchJob', () => {
     expect(result.current.isRunning).toBe(false)
   })
 
-  it('updates job via onJobUpdate', async () => {
+  it('should update job via onJobUpdate', async () => {
     mockCreate.mockResolvedValueOnce({ id: 'j1', status: 'pending', type: 'test' })
     const { result } = renderHook(() => useBatchJob())
 
@@ -63,7 +63,7 @@ describe('useBatchJob', () => {
     expect(result.current.isRunning).toBe(false)
   })
 
-  it('ignores updates for other job ids', async () => {
+  it('should ignore updates for other job ids', async () => {
     mockCreate.mockResolvedValueOnce({ id: 'j1', status: 'pending', type: 'test' })
     const { result } = renderHook(() => useBatchJob())
 
@@ -79,7 +79,7 @@ describe('useBatchJob', () => {
     expect(result.current.isRunning).toBe(true)
   })
 
-  it('dismiss clears job and error', async () => {
+  it('should clear job and error on dismiss', async () => {
     mockCreate.mockResolvedValueOnce({ id: 'j1', status: 'completed', type: 'test' })
     const { result } = renderHook(() => useBatchJob())
 
