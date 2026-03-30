@@ -10,8 +10,9 @@ import {
   MATCH_REJECT,
   MATCH_DETAIL_UNVALIDATE_FIRST,
 } from '../../../constants/strings';
-import type { Match } from '../../../services/api';
+import type { Match, MatchGroup } from '../../../services/api';
 import { MatchingAPI } from '../../../services/api';
+import { CandidateTabBar } from './CandidateTabBar';
 import { MatchImagesSection } from './MatchImagesSection';
 import { MatchDescriptionsSection } from './MatchDescriptionsSection';
 import { MatchMetadataSection } from './MatchMetadataSection';
@@ -20,12 +21,21 @@ import { visionBadgeClasses } from '../../../utils/visionBadge';
 
 interface MatchDetailModalProps {
   match: Match;
+  group?: MatchGroup;
   onClose: () => void;
   onValidationChange?: (match: Match, validated: boolean) => void;
   onRejected?: (match: Match) => void;
+  onCandidateChange?: (candidate: Match) => void;
 }
 
-export function MatchDetailModal({ match, onClose, onValidationChange, onRejected }: MatchDetailModalProps) {
+export function MatchDetailModal({
+  match,
+  group,
+  onClose,
+  onValidationChange,
+  onRejected,
+  onCandidateChange,
+}: MatchDetailModalProps) {
   const visionResult = match.vision_result || 'UNCERTAIN';
   const [validated, setValidated] = useState(!!match.validated_at);
   const [busy, setBusy] = useState(false);
@@ -108,6 +118,14 @@ export function MatchDetailModal({ match, onClose, onValidationChange, onRejecte
               </button>
             </div>
           </div>
+
+          {group && group.candidates.length > 1 && (
+            <CandidateTabBar
+              candidates={group.candidates}
+              activeKey={match.catalog_key}
+              onSelect={(c) => onCandidateChange?.(c)}
+            />
+          )}
 
           <div className="p-4 space-y-4">
             <div className="flex gap-2 flex-wrap">

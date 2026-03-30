@@ -192,6 +192,7 @@ export const MATCH_CARD_SCORE_DESC = 'Desc'
 export const MATCH_CARD_SCORE_VISION = 'Vision'
 export const MATCH_CARD_SCORE_TOTAL = 'Total:'
 export const MATCH_CANDIDATES_OF = 'of'
+export const MATCH_CANDIDATE_LABEL = 'Candidate'
 
 // Cache Status
 export const CACHE_TITLE = 'Vision Cache'
