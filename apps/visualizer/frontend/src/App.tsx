@@ -1,6 +1,8 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { DashboardPage } from './pages/DashboardPage'
+import { DescriptionsPage } from './pages/DescriptionsPage'
 import { InstagramPage } from './pages/InstagramPage'
 import { MatchingPage } from './pages/MatchingPage'
 import { JobsPage } from './pages/JobsPage'
@@ -12,10 +14,11 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="instagram" element={<InstagramPage />} />
-          <Route path="matching" element={<MatchingPage />} />
-          <Route path="jobs" element={<JobsPage />} />
+          <Route index element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
+          <Route path="instagram" element={<ErrorBoundary><InstagramPage /></ErrorBoundary>} />
+          <Route path="matching" element={<ErrorBoundary><MatchingPage /></ErrorBoundary>} />
+          <Route path="descriptions" element={<ErrorBoundary><DescriptionsPage /></ErrorBoundary>} />
+          <Route path="jobs" element={<ErrorBoundary><JobsPage /></ErrorBoundary>} />
         </Route>
       </Routes>
     </Router>

@@ -80,6 +80,7 @@ def text_similarity(text1: str, text2: str) -> float:
 def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                                  phash_weight: float = 0.4, desc_weight: float = 0.3,
                                  vision_weight: float = 0.3,
+                                 threshold: float = 0.7,
                                  log_callback=None) -> list[dict]:
     """Score candidates including vision comparison (one-by-one).
 
@@ -143,11 +144,15 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 if log_callback and idx <= 5:  # Log first few failures
                     log_callback('warning', f'Cache miss for {catalog_key}, will compress on-demand')
 
-        # Check vision comparison cache
+        # Check vision comparison cache (invalidate if model changed)
         vision_cached = get_vision_comparison(db, catalog_key, insta_key)
+        current_model = get_vision_model()
+        cache_valid = (
+            vision_cached
+            and vision_cached.get('model_used') == current_model
+        )
 
-        if vision_cached:
-            # Use cached vision comparison result
+        if cache_valid:
             vision_result = vision_cached['result']
             vision_score_val = vision_cached['vision_score']
         elif insta_path and local_path:
@@ -211,24 +216,26 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             'desc_similarity': desc_sim,
             'vision_result': vision_result,
             'vision_score': vision_score_val,
-            'total_score': total_score_val
+            'total_score': total_score_val,
+            'model_used': get_vision_model(),
         })
 
     # Cleanup Instagram temp file
     insta_cache.cleanup()
 
-    # Log summary
+    results.sort(key=lambda x: x['total_score'], reverse=True)
+
     if log_callback:
         log_callback('info', f'[{insta_filename}] Cache summary: {cache_hits} pHash hits, {cache_misses} pHash misses')
         if results:
             best = results[0]
             best_pct = int(best['total_score'] * 100)
-            if best['total_score'] >= 0.7:
+            if best['total_score'] >= threshold:
                 log_callback('info', f'[{insta_filename}] Comparison complete - Best match: {best["catalog_key"]} ({best_pct}%)')
             else:
-                log_callback('info', f'[{insta_filename}] No match found above threshold (0.7)')
+                log_callback('info', f'[{insta_filename}] No match found above threshold ({threshold})')
 
-    return sorted(results, key=lambda x: x['total_score'], reverse=True)
+    return results
 
 def match_image(db, insta_image: dict, threshold: float = 0.7,
                 phash_weight: float = 0.4, desc_weight: float = 0.3,
@@ -243,7 +250,8 @@ def match_image(db, insta_image: dict, threshold: float = 0.7,
 
     scored = score_candidates_with_vision(
         db, insta_image, candidates,
-        phash_weight, desc_weight, vision_weight
+        phash_weight, desc_weight, vision_weight,
+        threshold=threshold,
     )
 
     # Get best match (highest score) if above threshold

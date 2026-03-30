@@ -1,11 +1,11 @@
-import type { Match } from '../services/api';
+import type { Match } from '../../services/api';
 import {
   DESC_BEST_FIT,
   DESC_PERSPECTIVE_STREET,
   DESC_PERSPECTIVE_DOCUMENTARY,
   DESC_PERSPECTIVE_PUBLISHER,
-} from '../constants/strings';
-import { perspectiveBadgeColor } from '../utils/scoreColorClasses';
+} from '../../constants/strings';
+import { perspectiveBadgeColor } from '../../utils/scoreColorClasses';
 
 const PERSPECTIVE_BADGE_LABELS: Record<string, string> = {
   street: DESC_PERSPECTIVE_STREET,
@@ -14,7 +14,7 @@ const PERSPECTIVE_BADGE_LABELS: Record<string, string> = {
 };
 
 export function PerspectiveBadge({ match }: { match: Match }) {
-  const desc = match.catalog_description;
+  const desc = match.insta_description ?? match.catalog_description;
   if (!desc?.best_perspective) return null;
 
   const key = desc.best_perspective;

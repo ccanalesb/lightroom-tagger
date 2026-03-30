@@ -3,6 +3,11 @@ import os
 import sqlite3
 
 from flask import Blueprint, jsonify, request, send_file
+from lightroom_tagger.core.database import (
+    reject_match,
+    unvalidate_match,
+    validate_match,
+)
 from utils.db import with_db
 from utils.responses import error_not_found, error_server_error, success_paginated
 
@@ -24,8 +29,9 @@ def _deserialize_description(row: dict) -> dict:
     return out
 
 
-def _enrich_instagram_media(media_items):
+def _enrich_instagram_media(media_items, model_lookup=None):
     """Transform database media items to API response format."""
+    model_lookup = model_lookup or {}
     enriched = []
     for media in media_items:
         file_path = media.get('file_path', '')
@@ -51,6 +57,9 @@ def _enrich_instagram_media(media_items):
             'total_in_post': 1,
             'post_url': media.get('post_url'),
             'exif_data': exif_data,
+            'processed': bool(media.get('processed')),
+            'matched_catalog_key': media.get('matched_catalog_key'),
+            'matched_model': model_lookup.get(media['media_key']),
         })
     return enriched
 
@@ -85,7 +94,15 @@ def list_instagram_images(db):
     """List Instagram images with filtering and pagination."""
     try:
         media_items = db.execute("SELECT * FROM instagram_dump_media").fetchall()
-        enriched_images = _enrich_instagram_media(media_items)
+
+        model_lookup = {}
+        try:
+            for row in db.execute("SELECT insta_key, model_used FROM matches").fetchall():
+                model_lookup[row['insta_key']] = row['model_used']
+        except sqlite3.OperationalError:
+            pass
+
+        enriched_images = _enrich_instagram_media(media_items, model_lookup)
 
         # Get filter parameters
         date_from = request.args.get('date_from', '')
@@ -320,5 +337,50 @@ def list_matches(db):
             'total': len(enriched_matches),
             'matches': paginated,
         })
+    except Exception as e:
+        return error_server_error(str(e))
+
+
+@bp.route('/matches/<path:catalog_key>/<path:insta_key>/validate', methods=['PATCH'])
+@with_db
+def toggle_match_validation(db, catalog_key, insta_key):
+    """Toggle human validation on a match."""
+    try:
+        match_row = db.execute(
+            "SELECT validated_at FROM matches WHERE catalog_key = ? AND insta_key = ?",
+            (catalog_key, insta_key),
+        ).fetchone()
+        if not match_row:
+            return error_not_found('match')
+
+        if match_row['validated_at']:
+            unvalidate_match(db, catalog_key, insta_key)
+            return jsonify({'validated': False})
+        else:
+            validate_match(db, catalog_key, insta_key)
+            return jsonify({'validated': True})
+    except Exception as e:
+        return error_server_error(str(e))
+
+
+@bp.route('/matches/<path:catalog_key>/<path:insta_key>/reject', methods=['PATCH'])
+@with_db
+def reject_match_endpoint(db, catalog_key, insta_key):
+    """Reject a match: delete it and blocklist the pair."""
+    try:
+        match_row = db.execute(
+            "SELECT validated_at FROM matches WHERE catalog_key = ? AND insta_key = ?",
+            (catalog_key, insta_key),
+        ).fetchone()
+        if not match_row:
+            return error_not_found('match')
+        if match_row['validated_at']:
+            return jsonify({
+                'error': 'Match has been validated; un-validate it before rejecting.',
+                'rejected': False,
+            }), 409
+
+        reject_match(db, catalog_key, insta_key)
+        return jsonify({'rejected': True})
     except Exception as e:
         return error_server_error(str(e))

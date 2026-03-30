@@ -1,33 +1,27 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MatchingAPI, JobsAPI, SystemAPI, Match, Job } from '../services/api';
-import { MatchDetailModal, AdvancedOptions, MatchCard } from '../components';
-import { useSocketStore } from '../stores/socketStore';
+import { MatchDetailModal } from '../components/matching/match-detail-modal';
+import { AdvancedOptions } from '../components/matching/AdvancedOptions';
+import { MatchCard } from '../components/matching/MatchCard';
+import { JobStatusPanel, CompletedPanel, FailedPanel } from '../components/matching/job-status-panels';
+import { useJobSocket } from '../hooks/useJobSocket';
 import { useMatchOptions } from '../stores/matchOptionsContext';
+import { PageLoading, PageError } from '../components/ui/page-states';
 import {
-  MSG_LOADING,
-  MSG_ERROR_PREFIX,
   MSG_NO_MATCHES,
   MATCHING_RESULTS,
+  MATCHING_RUN_PROMPT,
   ACTION_RUN_MATCHING,
   ADVANCED_DATE_ALL,
   ADVANCED_DATE_3MONTHS,
   ADVANCED_DATE_6MONTHS,
   ADVANCED_DATE_YEAR_2026,
   ADVANCED_FORCE_DESCRIPTIONS,
+  ADVANCED_FORCE_REPROCESS,
   ADVANCED_START,
   ADVANCED_STARTING,
   ADVANCED_DATE_FILTER,
-  MATCHING_IN_PROGRESS,
-  MATCHING_WAITING,
-  MATCHING_PERCENT_COMPLETE,
-  MATCHING_PROCESSING,
-  MATCHING_VIEW_DETAILS,
-  MATCHING_COMPLETED,
-  MATCHING_COMPLETED_MATCHES,
-  MATCHING_FAILED,
-  MATCHING_FAILED_UNKNOWN,
-  MATCHING_DISMISS,
   CACHE_TITLE,
   CACHE_PREPARE_BUTTON,
   CACHE_PREPARING,
@@ -68,18 +62,16 @@ export function MatchingPage() {
   const [activeJob, setActiveJob] = useState<Job | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 
-  // Advanced options
   const [showAdvanced, setShowAdvanced] = useState(false);
   const { options, updateOption, resetOptions, availableModels, weightsError } = useMatchOptions();
 
-  // Cache status
   const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null);
   const [isPreparingCache, setIsPreparingCache] = useState(false);
   const [cacheJob, setCacheJob] = useState<Job | null>(null);
   const [forceDescriptions, setForceDescriptions] = useState(false);
+  const [forceReprocess, setForceReprocess] = useState(false);
 
   const navigate = useNavigate();
-  const { socket, connected } = useSocketStore();
 
   const canStart = useMemo(
     () => !isStarting && activeJob?.status !== 'running' && !weightsError,
@@ -91,7 +83,6 @@ export function MatchingPage() {
     return cacheStatus.cached_images === cacheStatus.total_images && cacheStatus.total_images > 0;
   }, [cacheStatus]);
 
-  // Fetch cache status
   const fetchCacheStatus = useCallback(async () => {
     try {
       const status = await SystemAPI.cacheStatus();
@@ -101,7 +92,6 @@ export function MatchingPage() {
     }
   }, []);
 
-  // Fetch data
   useEffect(() => {
     let mounted = true;
 
@@ -122,7 +112,6 @@ export function MatchingPage() {
         );
         if (runningJob) setActiveJob(runningJob);
 
-        // Check for running prepare_catalog job
         const runningCacheJob = jobsData.find(
           (job: Job) => job.type === 'prepare_catalog' && ['pending', 'running'].includes(job.status)
         );
@@ -143,50 +132,42 @@ export function MatchingPage() {
     return () => { mounted = false; };
   }, [fetchCacheStatus]);
 
-  // WebSocket updates
-  useEffect(() => {
-    if (!socket || !connected) return;
+  const handleJobCreated = useCallback((job: Job) => {
+    if (job.type === 'vision_match') {
+      setActiveJob(job);
+      setIsStarting(false);
+      setShowTrigger(false);
+    } else if (job.type === 'prepare_catalog') {
+      setCacheJob(job);
+      setIsPreparingCache(true);
+    }
+  }, []);
 
-    const handleJobCreated = (job: Job) => {
-      if (job.type === 'vision_match') {
-        setActiveJob(job);
-        setIsStarting(false);
-        setShowTrigger(false);
-      } else if (job.type === 'prepare_catalog') {
-        setCacheJob(job);
-        setIsPreparingCache(true);
+  const handleJobUpdated = useCallback((job: Job) => {
+    if (job.id === activeJob?.id) {
+      setActiveJob(job);
+      if (job.status === 'completed') {
+        setTimeout(() => {
+          MatchingAPI.list(100).then((data) => {
+            setMatches(data.matches);
+            setTotal(data.total);
+          });
+        }, 1000);
       }
-    };
-
-    const handleJobUpdated = (job: Job) => {
-      if (job.id === activeJob?.id) {
-        setActiveJob(job);
-        if (job.status === 'completed') {
-          setTimeout(() => {
-            MatchingAPI.list(100).then((data) => {
-              setMatches(data.matches);
-              setTotal(data.total);
-            });
-          }, 1000);
-        }
+    }
+    if (job.id === cacheJob?.id) {
+      setCacheJob(job);
+      if (job.status === 'completed') {
+        setIsPreparingCache(false);
+        fetchCacheStatus();
       }
-      if (job.id === cacheJob?.id) {
-        setCacheJob(job);
-        if (job.status === 'completed') {
-          setIsPreparingCache(false);
-          fetchCacheStatus();
-        }
-      }
-    };
+    }
+  }, [activeJob?.id, cacheJob?.id, fetchCacheStatus]);
 
-    socket.on('job_created', handleJobCreated);
-    socket.on('job_updated', handleJobUpdated);
-
-    return () => {
-      socket.off('job_created', handleJobCreated);
-      socket.off('job_updated', handleJobUpdated);
-    };
-  }, [socket, connected, activeJob?.id, cacheJob?.id, fetchCacheStatus]);
+  useJobSocket({
+    onJobCreated: handleJobCreated,
+    onJobUpdated: handleJobUpdated,
+  });
 
   const startMatching = useCallback(async () => {
     if (weightsError) {
@@ -207,6 +188,7 @@ export function MatchingPage() {
     };
 
     if (forceDescriptions) metadata.force_descriptions = true;
+    if (forceReprocess) metadata.force_reprocess = true;
 
     if (dateFilter === '3months') metadata.last_months = 3;
     else if (dateFilter === '6months') metadata.last_months = 6;
@@ -221,7 +203,7 @@ export function MatchingPage() {
       setIsStarting(false);
       alert(`Failed to start matching: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
-  }, [weightsError, options, dateFilter, forceDescriptions]);
+  }, [weightsError, options, dateFilter, forceDescriptions, forceReprocess]);
 
   const startCachePreparation = useCallback(async () => {
     setIsPreparingCache(true);
@@ -234,7 +216,6 @@ export function MatchingPage() {
     }
   }, []);
 
-  // Cache status display
   const renderCacheStatus = () => {
     if (isPreparingCache || !cacheStatus) {
       return (
@@ -266,27 +247,11 @@ export function MatchingPage() {
     );
   };
 
-  if (loading) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">{MSG_LOADING}</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-red-600">
-          {MSG_ERROR_PREFIX} {error}
-        </p>
-      </div>
-    );
-  }
+  if (loading) return <PageLoading />;
+  if (error) return <PageError message={error} />;
 
   return (
     <div className="space-y-6">
-      {/* Cache Status Panel */}
       <div className="bg-gray-50 p-3 rounded-lg border">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -318,7 +283,6 @@ export function MatchingPage() {
         )}
       </div>
 
-      {/* Header */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900">{MATCHING_RESULTS}</h2>
         <div className="flex items-center gap-4">
@@ -333,7 +297,6 @@ export function MatchingPage() {
         </div>
       </div>
 
-      {/* Job Status Panels */}
       {activeJob && activeJob.status !== 'completed' && <JobStatusPanel job={activeJob} onView={() => navigate('/jobs')} />}
       {activeJob?.status === 'completed' && (
         <CompletedPanel matches={activeJob.result?.matched || 0} onDismiss={() => setActiveJob(null)} />
@@ -342,7 +305,6 @@ export function MatchingPage() {
         <FailedPanel error={activeJob.error} onDismiss={() => setActiveJob(null)} />
       )}
 
-      {/* Trigger Panel */}
       {showTrigger && !activeJob && (
         <div className="bg-gray-50 p-4 rounded-lg border space-y-4">
           <div className="flex items-center gap-4 flex-wrap">
@@ -367,15 +329,26 @@ export function MatchingPage() {
             </button>
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={forceDescriptions}
-              onChange={(e) => setForceDescriptions(e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            {ADVANCED_FORCE_DESCRIPTIONS}
-          </label>
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={forceReprocess}
+                onChange={(e) => setForceReprocess(e.target.checked)}
+                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+              />
+              {ADVANCED_FORCE_REPROCESS}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={forceDescriptions}
+                onChange={(e) => setForceDescriptions(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              {ADVANCED_FORCE_DESCRIPTIONS}
+            </label>
+          </div>
 
           <AdvancedOptions
             isOpen={showAdvanced}
@@ -393,11 +366,10 @@ export function MatchingPage() {
         </div>
       )}
 
-      {/* Matches Grid */}
       {matches.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-gray-500">{MSG_NO_MATCHES}</p>
-          <p className="text-sm text-gray-400 mt-2">Click "Run Matching" above to start the matching process.</p>
+          <p className="text-sm text-gray-400 mt-2">{MATCHING_RUN_PROMPT}</p>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -407,78 +379,28 @@ export function MatchingPage() {
         </div>
       )}
 
-      {/* Modal */}
-      {selectedMatch && <MatchDetailModal match={selectedMatch} onClose={() => setSelectedMatch(null)} />}
-    </div>
-  );
-}
-
-// Status Panel Components
-function JobStatusPanel({ job, onView }: { job: Job; onView: () => void }) {
-  return (
-    <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full" />
-          <div>
-            <p className="font-medium text-blue-900">{MATCHING_IN_PROGRESS}</p>
-            <p className="text-sm text-blue-700">
-              {job.status === 'pending'
-                ? MATCHING_WAITING
-                : job.progress
-                ? `${job.progress}${MATCHING_PERCENT_COMPLETE}`
-                : MATCHING_PROCESSING}
-            </p>
-          </div>
-        </div>
-        <button onClick={onView} className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
-          {MATCHING_VIEW_DETAILS}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function CompletedPanel({ matches, onDismiss }: { matches: number; onDismiss: () => void }) {
-  return (
-    <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <svg className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          <div>
-            <p className="font-medium text-green-900">{MATCHING_COMPLETED}</p>
-            <p className="text-sm text-green-700">
-              {matches} {MATCHING_COMPLETED_MATCHES}
-            </p>
-          </div>
-        </div>
-        <button onClick={onDismiss} className="text-green-700 hover:text-green-900">
-          {MATCHING_DISMISS}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function FailedPanel({ error, onDismiss }: { error?: string | null; onDismiss: () => void }) {
-  return (
-    <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <svg className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-          <div>
-            <p className="font-medium text-red-900">{MATCHING_FAILED}</p>
-            <p className="text-sm text-red-700">{error || MATCHING_FAILED_UNKNOWN}</p>
-          </div>
-        </div>
-        <button onClick={onDismiss} className="text-red-700 hover:text-red-900">
-          {MATCHING_DISMISS}
-        </button>
-      </div>
+      {selectedMatch && (
+        <MatchDetailModal
+          match={selectedMatch}
+          onClose={() => setSelectedMatch(null)}
+          onValidationChange={(m, validated) => {
+            setMatches(prev => prev.map(p =>
+              p.catalog_key === m.catalog_key && p.instagram_key === m.instagram_key
+                ? { ...p, validated_at: validated ? new Date().toISOString() : undefined }
+                : p
+            ));
+            setSelectedMatch(prev =>
+              prev ? { ...prev, validated_at: validated ? new Date().toISOString() : undefined } : null
+            );
+          }}
+          onRejected={(m) => {
+            setMatches(prev => prev.filter(p =>
+              !(p.catalog_key === m.catalog_key && p.instagram_key === m.instagram_key)
+            ));
+            setTotal(prev => prev - 1);
+          }}
+        />
+      )}
     </div>
   );
 }

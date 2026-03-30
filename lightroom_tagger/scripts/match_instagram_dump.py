@@ -12,9 +12,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from lightroom_tagger.core.analyzer import compute_phash
 from lightroom_tagger.core.config import load_config
-from lightroom_tagger.core.description_service import describe_matched_image
+from lightroom_tagger.core.description_service import (
+    describe_instagram_image,
+    describe_matched_image,
+)
 from lightroom_tagger.core.database import (
     get_instagram_by_date_filter,
+    get_rejected_pairs,
     get_unprocessed_dump_media,
     init_catalog_table,
     init_database,
@@ -32,7 +36,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      month: str = None, year: str = None, last_months: int = None,
                      progress_callback=None, log_callback=None,
                      weights: dict = None, media_key: str = None,
-                     force_descriptions: bool = False) -> tuple:
+                     force_descriptions: bool = False,
+                     force_reprocess: bool = False) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -43,6 +48,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         year: Filter Instagram by year (e.g., '2026')
         last_months: Filter Instagram by last N months
         media_key: If set, process only this Instagram dump row (ignores batch/date filters)
+        force_reprocess: If True, include already-processed images in the batch
         progress_callback: Optional callback(current, total, message) for progress updates
         log_callback: Optional callback(level, message) for detailed logging
         weights: Optional dict with 'phash', 'description', 'vision' keys for scoring weights
@@ -77,18 +83,30 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         unprocessed = [dict(row) if not isinstance(row, dict) else row]
     elif month or year or last_months:
         unprocessed = get_instagram_by_date_filter(
-            db, month=month, year=year, last_months=last_months, run_start=run_start)
+            db, month=month, year=year, last_months=last_months,
+            run_start=run_start, include_processed=force_reprocess)
     else:
-        unprocessed = get_unprocessed_dump_media(db, limit=batch_size, run_start=run_start)
+        unprocessed = get_unprocessed_dump_media(
+            db, limit=batch_size, run_start=run_start,
+            include_processed=force_reprocess)
 
     total = len(unprocessed)
     if not unprocessed:
         return stats, matches_found
 
+    rejected = get_rejected_pairs(db)
+
     for idx, dump_media in enumerate(unprocessed, 1):
         stats['processed'] += 1
 
         candidates = find_candidates_by_date(db, dump_media, days_before=90)
+
+        if rejected:
+            media_key = dump_media['media_key']
+            candidates = [
+                c for c in candidates
+                if (c.get('key'), media_key) not in rejected
+            ]
 
         if not candidates:
             mark_dump_media_attempted(db, dump_media['media_key'])
@@ -125,6 +143,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             phash_weight=weights.get('phash', 0.4),
             desc_weight=weights.get('description', 0.3),
             vision_weight=weights.get('vision', 0.3),
+            threshold=threshold,
             log_callback=log_callback
         )
 
@@ -147,6 +166,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             matches_found.append(best_match)
             try:
                 if describe_matched_image(db, matched_catalog_key, force=force_descriptions):
+                    stats['descriptions_generated'] += 1
+                if describe_instagram_image(db, dump_media['media_key'], force=force_descriptions):
                     stats['descriptions_generated'] += 1
             except Exception as e:
                 msg = f'Description failed for {matched_catalog_key}: {e}'
@@ -201,7 +222,8 @@ def main():
             batch_size=args.batch_size,
             month=args.month,
             year=args.year,
-            last_months=args.last_months
+            last_months=args.last_months,
+            force_reprocess=args.reprocess,
         )
 
         print(f"\nProcessed: {stats['processed']}")

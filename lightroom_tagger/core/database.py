@@ -174,6 +174,15 @@ def init_database(db_path: str) -> sqlite3.Connection:
             vision_score REAL,
             total_score REAL,
             matched_at TEXT,
+            model_used TEXT,
+            validated_at TEXT,
+            PRIMARY KEY (catalog_key, insta_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS rejected_matches (
+            catalog_key TEXT,
+            insta_key TEXT,
+            rejected_at TEXT,
             PRIMARY KEY (catalog_key, insta_key)
         );
 
@@ -213,6 +222,8 @@ def init_database(db_path: str) -> sqlite3.Connection:
 
     # Migrations for existing databases
     _migrate_add_column(conn, 'instagram_dump_media', 'last_attempted_at', 'TEXT')
+    _migrate_add_column(conn, 'matches', 'model_used', 'TEXT')
+    _migrate_add_column(conn, 'matches', 'validated_at', 'TEXT')
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_dump_media_processed_attempted "
         "ON instagram_dump_media(processed, last_attempted_at)"
@@ -570,18 +581,27 @@ def get_dump_media_by_hash(db: sqlite3.Connection, image_hash: str) -> list:
 
 
 def get_unprocessed_dump_media(db: sqlite3.Connection, limit: int = None,
-                                run_start: str = None) -> list:
-    """Get unprocessed Instagram dump media for matching.
+                                run_start: str = None,
+                                include_processed: bool = False) -> list:
+    """Get Instagram dump media for matching.
 
     Args:
         run_start: ISO timestamp; skip images already attempted in this run
                    (last_attempted_at >= run_start).
+        include_processed: If True, also return already-processed rows.
     """
-    where = "processed = 0"
+    clauses: list[str] = []
     params: list = []
+    if not include_processed:
+        clauses.append("processed = 0")
+        clauses.append(
+            "media_key NOT IN "
+            "(SELECT insta_key FROM matches WHERE validated_at IS NOT NULL)"
+        )
     if run_start:
-        where += " AND (last_attempted_at IS NULL OR last_attempted_at < ?)"
+        clauses.append("(last_attempted_at IS NULL OR last_attempted_at < ?)")
         params.append(run_start)
+    where = " AND ".join(clauses) if clauses else "1=1"
     sql = f"SELECT * FROM instagram_dump_media WHERE {where}"
     if limit:
         sql += " LIMIT ?"
@@ -592,29 +612,38 @@ def get_unprocessed_dump_media(db: sqlite3.Connection, limit: int = None,
 
 def get_instagram_by_date_filter(db: sqlite3.Connection, month: str = None,
                                   year: str = None, last_months: int = None,
-                                  run_start: str = None) -> list:
-    """Get unprocessed Instagram dump media filtered by date.
+                                  run_start: str = None,
+                                  include_processed: bool = False) -> list:
+    """Get Instagram dump media filtered by date.
 
     Args:
         run_start: ISO timestamp; skip images already attempted in this run.
+        include_processed: If True, also return already-processed rows.
     """
-    where = "processed = 0"
+    clauses: list[str] = []
     params: list = []
+    if not include_processed:
+        clauses.append("processed = 0")
+        clauses.append(
+            "media_key NOT IN "
+            "(SELECT insta_key FROM matches WHERE validated_at IS NOT NULL)"
+        )
     if run_start:
-        where += " AND (last_attempted_at IS NULL OR last_attempted_at < ?)"
+        clauses.append("(last_attempted_at IS NULL OR last_attempted_at < ?)")
         params.append(run_start)
 
     if month:
-        where += " AND date_folder = ?"
+        clauses.append("date_folder = ?")
         params.append(month)
     elif year:
-        where += " AND date_folder LIKE ?"
+        clauses.append("date_folder LIKE ?")
         params.append(f'{year}%')
     elif last_months:
         from_date = (datetime.now() - timedelta(days=last_months * 30)).strftime('%Y%m')
-        where += " AND date_folder >= ?"
+        clauses.append("date_folder >= ?")
         params.append(from_date)
 
+    where = " AND ".join(clauses) if clauses else "1=1"
     rows = db.execute(f"SELECT * FROM instagram_dump_media WHERE {where}", params).fetchall()
     return [_deserialize_row(r) for r in rows]
 
@@ -734,21 +763,80 @@ def store_match(db: sqlite3.Connection, record: dict) -> str:
 
     db.execute("""
         INSERT INTO matches (catalog_key, insta_key, phash_distance, phash_score,
-            desc_similarity, vision_result, vision_score, total_score, matched_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            desc_similarity, vision_result, vision_score, total_score, matched_at, model_used)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(catalog_key, insta_key) DO UPDATE SET
             phash_distance=excluded.phash_distance, phash_score=excluded.phash_score,
             desc_similarity=excluded.desc_similarity, vision_result=excluded.vision_result,
             vision_score=excluded.vision_score, total_score=excluded.total_score,
-            matched_at=excluded.matched_at
+            matched_at=excluded.matched_at, model_used=excluded.model_used
     """, (
         catalog_key, insta_key, record.get('phash_distance'),
         record.get('phash_score'), record.get('desc_similarity'),
         record.get('vision_result'), record.get('vision_score'),
-        record.get('total_score'), record['matched_at'],
+        record.get('total_score'), record['matched_at'], record.get('model_used'),
     ))
     db.commit()
     return f"{catalog_key} <-> {insta_key}"
+
+
+def validate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bool:
+    """Stamp a match as human-validated."""
+    cursor = db.execute(
+        "UPDATE matches SET validated_at = ? WHERE catalog_key = ? AND insta_key = ?",
+        (datetime.now().isoformat(), catalog_key, insta_key),
+    )
+    db.commit()
+    return cursor.rowcount > 0
+
+
+def unvalidate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bool:
+    """Remove human validation (undo validate, not reject)."""
+    cursor = db.execute(
+        "UPDATE matches SET validated_at = NULL WHERE catalog_key = ? AND insta_key = ?",
+        (catalog_key, insta_key),
+    )
+    db.commit()
+    return cursor.rowcount > 0
+
+
+def reject_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bool:
+    """Delete match row and add pair to rejected blocklist.
+
+    Also resets the instagram image's processed flag so it can match other
+    catalog candidates in future runs.
+    """
+    db.execute(
+        "DELETE FROM matches WHERE catalog_key = ? AND insta_key = ?",
+        (catalog_key, insta_key),
+    )
+    db.execute(
+        "INSERT OR REPLACE INTO rejected_matches (catalog_key, insta_key, rejected_at) "
+        "VALUES (?, ?, ?)",
+        (catalog_key, insta_key, datetime.now().isoformat()),
+    )
+    db.execute(
+        "UPDATE instagram_dump_media SET processed = 0, matched_catalog_key = NULL "
+        "WHERE media_key = ?",
+        (insta_key,),
+    )
+    # Reset instagram_posted on the catalog image if no other matches reference it
+    remaining = db.execute(
+        "SELECT 1 FROM matches WHERE catalog_key = ? LIMIT 1", (catalog_key,)
+    ).fetchone()
+    if not remaining:
+        db.execute(
+            "UPDATE images SET instagram_posted = 0 WHERE key = ?",
+            (catalog_key,),
+        )
+    db.commit()
+    return True
+
+
+def get_rejected_pairs(db: sqlite3.Connection) -> set[tuple[str, str]]:
+    """Return set of (catalog_key, insta_key) pairs in the blocklist."""
+    rows = db.execute("SELECT catalog_key, insta_key FROM rejected_matches").fetchall()
+    return {(r['catalog_key'], r['insta_key']) for r in rows}
 
 
 # ---------------------------------------------------------------------------
@@ -912,12 +1000,89 @@ def get_image_description(db: sqlite3.Connection, image_key: str) -> dict | None
     return row
 
 
-def get_undescribed_catalog_images(db: sqlite3.Connection) -> list[dict]:
+def get_undescribed_catalog_images(db: sqlite3.Connection, months: int = None) -> list[dict]:
     """Get catalog images that don't have descriptions yet."""
-    rows = db.execute("""
+    sql = """
         SELECT i.* FROM images i
         LEFT JOIN image_descriptions d
             ON i.key = d.image_key AND d.image_type = 'catalog'
         WHERE d.image_key IS NULL
-    """).fetchall()
+    """
+    params: list = []
+    if months:
+        sql += " AND i.date_taken >= date('now', ?)"
+        params.append(f'-{months} months')
+    rows = db.execute(sql, params).fetchall()
     return [_deserialize_row(r) for r in rows]
+
+
+def get_undescribed_instagram_images(db: sqlite3.Connection, months: int = None) -> list[dict]:
+    """Get Instagram dump media that don't have descriptions yet."""
+    sql = """
+        SELECT m.* FROM instagram_dump_media m
+        LEFT JOIN image_descriptions d
+            ON m.media_key = d.image_key AND d.image_type = 'instagram'
+        WHERE d.image_key IS NULL
+    """
+    params: list = []
+    if months:
+        sql += " AND m.created_at >= date('now', ?)"
+        params.append(f'-{months} months')
+    rows = db.execute(sql, params).fetchall()
+    return [_deserialize_row(r) for r in rows]
+
+
+def get_all_images_with_descriptions(db: sqlite3.Connection,
+                                     image_type: str = None,
+                                     described_only: bool = False,
+                                     limit: int = 50,
+                                     offset: int = 0) -> tuple[list[dict], int]:
+    """Get images joined with their descriptions for the descriptions page.
+
+    Returns (items, total_count).
+    """
+    parts = []
+    params: list = []
+
+    if image_type != 'instagram':
+        parts.append("""
+            SELECT i.key AS image_key, 'catalog' AS image_type,
+                   i.filename, i.date_taken AS date_ref,
+                   d.summary, d.best_perspective, d.model_used AS desc_model,
+                   d.described_at,
+                   CASE WHEN d.image_key IS NOT NULL THEN 1 ELSE 0 END AS has_description
+            FROM images i
+            LEFT JOIN image_descriptions d
+                ON i.key = d.image_key AND d.image_type = 'catalog'
+        """)
+
+    if image_type != 'catalog':
+        parts.append("""
+            SELECT m.media_key AS image_key, 'instagram' AS image_type,
+                   m.filename, m.created_at AS date_ref,
+                   d.summary, d.best_perspective, d.model_used AS desc_model,
+                   d.described_at,
+                   CASE WHEN d.image_key IS NOT NULL THEN 1 ELSE 0 END AS has_description
+            FROM instagram_dump_media m
+            LEFT JOIN image_descriptions d
+                ON m.media_key = d.image_key AND d.image_type = 'instagram'
+        """)
+
+    union_sql = " UNION ALL ".join(parts)
+
+    if described_only:
+        wrapper = f"SELECT * FROM ({union_sql}) t WHERE t.has_description = 1"
+    else:
+        wrapper = f"SELECT * FROM ({union_sql}) t"
+
+    count_sql = f"SELECT COUNT(*) AS cnt FROM ({wrapper})"
+    total = db.execute(count_sql, params * len(parts)).fetchone()['cnt']
+
+    page_sql = (
+        f"{wrapper} ORDER BY CASE WHEN t.described_at IS NULL THEN 1 ELSE 0 END, "
+        f"t.described_at DESC, t.date_ref DESC LIMIT ? OFFSET ?"
+    )
+    all_params = params * len(parts) + [limit, offset]
+    rows = db.execute(page_sql, all_params).fetchall()
+
+    return [_deserialize_row(r) for r in rows], total

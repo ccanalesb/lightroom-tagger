@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { Match } from '../../services/api';
-import { MATCH_DETAIL_INSTAGRAM, MATCH_DETAIL_CATALOG } from '../../constants/strings';
+import type { Match } from '../../../services/api';
+import { MATCH_DETAIL_INSTAGRAM, MATCH_DETAIL_CATALOG } from '../../../constants/strings';
 
 interface MatchImagesSectionProps {
   match: Match;

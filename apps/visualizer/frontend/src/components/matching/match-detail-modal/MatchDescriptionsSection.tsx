@@ -1,10 +1,10 @@
-import type { Match } from '../../services/api';
-import { DescriptionPanel } from '../DescriptionPanel';
+import type { Match } from '../../../services/api';
+import { DescriptionPanel } from '../../DescriptionPanel';
 import {
   DESC_PANEL_TITLE,
   MATCH_DETAIL_INSTAGRAM,
   MATCH_DETAIL_CATALOG,
-} from '../../constants/strings';
+} from '../../../constants/strings';
 
 interface MatchDescriptionsSectionProps {
   match: Match;
