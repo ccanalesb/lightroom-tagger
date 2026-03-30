@@ -250,7 +250,8 @@ def match_image(db, insta_image: dict, threshold: float = 0.7,
 
     scored = score_candidates_with_vision(
         db, insta_image, candidates,
-        phash_weight, desc_weight, vision_weight
+        phash_weight, desc_weight, vision_weight,
+        threshold=threshold,
     )
 
     # Get best match (highest score) if above threshold
