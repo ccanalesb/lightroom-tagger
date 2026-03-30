@@ -1,6 +1,6 @@
 """Providers API — list providers, models, manage fallback order."""
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 

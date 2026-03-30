@@ -153,16 +153,23 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
         # Check vision comparison cache (invalidate if model changed)
         vision_cached = get_vision_comparison(db, catalog_key, insta_key)
-        current_model = get_vision_model()
+        base_vision_model = get_vision_model()
+        current_model_label = (
+            f"{provider_id}:{model or base_vision_model}"
+            if provider_id
+            else base_vision_model
+        )
         cache_valid = (
             vision_cached
-            and vision_cached.get('model_used') == current_model
+            and vision_cached.get('model_used') == current_model_label
         )
 
+        model_label = base_vision_model
         vision_reasoning = ''
         if cache_valid:
             vision_result = vision_cached['result']
             vision_score_val = vision_cached['vision_score']
+            model_label = vision_cached.get('model_used', model_label)
             consecutive_rate_limits = 0
         elif consecutive_rate_limits >= RATE_LIMIT_ABORT_THRESHOLD:
             vision_result = 'RATE_LIMITED'
@@ -183,14 +190,13 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 vision_reasoning = (vision_data.get('reasoning') or '').strip()
                 consecutive_rate_limits = 0
 
-                model_label = get_vision_model()
                 if vision_data.get('_provider'):
                     model_label = f"{vision_data['_provider']}:{vision_data.get('_model', model_label)}"
 
                 store_vision_comparison(
                     db, catalog_key, insta_key,
                     vision_result, vision_score_val,
-                    model_label,
+                    current_model_label,
                 )
             except RateLimitError as e:
                 consecutive_rate_limits += 1
@@ -246,7 +252,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             'vision_score': vision_score_val,
             'vision_reasoning': vision_reasoning,
             'total_score': total_score_val,
-            'model_used': get_vision_model(),
+            'model_used': model_label,
             'rate_limited': vision_result == 'RATE_LIMITED',
         })
 

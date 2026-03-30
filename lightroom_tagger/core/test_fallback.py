@@ -17,6 +17,9 @@ def _mock_registry(available_providers=None):
 
     registry = MagicMock()
     registry.fallback_order = available_providers
+    registry.list_providers.return_value = [
+        {"id": pid, "name": pid, "available": True} for pid in available_providers
+    ]
     registry.get_client.return_value = MagicMock()
     registry.get_retry_config.return_value = {
         "max_retries": 0,
