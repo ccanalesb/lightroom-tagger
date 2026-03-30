@@ -78,14 +78,15 @@ def match_with_vision_only(db, insta_image: dict, catalog_images: list) -> list[
             continue
 
         try:
-            vision_result = compare_with_vision(catalog_path, insta_path)
-            score = vision_score(vision_result)
+            vision_data = compare_with_vision(catalog_path, insta_path)
+            score = vision_score(vision_data['confidence'])
+            verdict = vision_data['verdict']
 
             results.append({
                 'catalog_key': catalog_img.get('key'),
                 'catalog_path': catalog_path,
                 'catalog_date': catalog_img.get('date_taken'),
-                'vision_result': vision_result,
+                'vision_result': verdict,
                 'vision_score': score,
                 'insta_path': insta_path,
                 'insta_key': insta_image.get('key')

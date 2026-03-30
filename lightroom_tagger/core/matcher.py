@@ -158,13 +158,14 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         elif insta_path and local_path:
             # Run vision comparison with cached/prepared paths
             try:
-                vision_result = compare_with_vision(
+                vision_data = compare_with_vision(
                     local_path, insta_path,
                     log_callback=log_callback,
                     cached_local_path=cached_local_path,
                     compressed_insta_path=compressed_insta
                 )
-                vision_score_val = vision_score(vision_result)
+                vision_result = vision_data['verdict']
+                vision_score_val = vision_score(vision_data['confidence'])
 
                 # Cache the result
                 store_vision_comparison(
