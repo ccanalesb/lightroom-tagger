@@ -3,7 +3,6 @@ import {
   MODAL_CLOSE,
   MATCHING_RESULTS,
   MATCH_DETAIL_VISION_LABEL,
-  MATCH_DETAIL_VISION_REASONING,
   MATCH_DETAIL_SCORE_LABEL,
   MATCH_DETAIL_PHASH_LABEL,
   MATCH_VALIDATE,
@@ -18,6 +17,7 @@ import { MatchImagesSection } from './MatchImagesSection';
 import { MatchDescriptionsSection } from './MatchDescriptionsSection';
 import { MatchMetadataSection } from './MatchMetadataSection';
 import { RejectConfirmModal } from './RejectConfirmModal';
+import { VisionReasoningNote } from './VisionReasoningNote';
 import { visionBadgeClasses } from '../../../utils/visionBadge';
 
 interface MatchDetailModalProps {
@@ -152,10 +152,7 @@ export function MatchDetailModal({
             </div>
 
             {match.vision_reasoning ? (
-              <p className="text-sm text-gray-700 border-l-4 border-purple-200 pl-3 py-1 bg-gray-50 rounded-r">
-                <span className="font-medium text-gray-800">{MATCH_DETAIL_VISION_REASONING}: </span>
-                {match.vision_reasoning}
-              </p>
+              <VisionReasoningNote visionReasoning={match.vision_reasoning} />
             ) : null}
 
             <MatchImagesSection match={match} />

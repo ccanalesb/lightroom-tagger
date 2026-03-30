@@ -758,13 +758,15 @@ def init_matches_table(db: sqlite3.Connection):
     pass
 
 
-def delete_matches_for_insta_key(db: sqlite3.Connection, insta_key: str) -> None:
+def delete_matches_for_insta_key(db: sqlite3.Connection, insta_key: str,
+                                  commit: bool = True) -> None:
     """Remove all match rows for an Instagram key (e.g. before replacing candidate set)."""
     db.execute("DELETE FROM matches WHERE insta_key = ?", (insta_key,))
-    db.commit()
+    if commit:
+        db.commit()
 
 
-def store_match(db: sqlite3.Connection, record: dict) -> str:
+def store_match(db: sqlite3.Connection, record: dict, commit: bool = True) -> str:
     """Store match between catalog and Instagram image."""
     catalog_key = record.get('catalog_key')
     insta_key = record.get('insta_key')
@@ -789,7 +791,8 @@ def store_match(db: sqlite3.Connection, record: dict) -> str:
         record.get('model_used'), record.get('rank', 1),
         record.get('vision_reasoning'),
     ))
-    db.commit()
+    if commit:
+        db.commit()
     return f"{catalog_key} <-> {insta_key}"
 
 

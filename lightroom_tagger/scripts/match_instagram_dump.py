@@ -151,13 +151,14 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         above_threshold = [r for r in results if r['total_score'] >= threshold]
 
         if above_threshold:
-            delete_matches_for_insta_key(db, dump_media['media_key'])
             best_match = above_threshold[0]
             matched_catalog_key = best_match['catalog_key']
 
-            for rank, candidate in enumerate(above_threshold, 1):
-                candidate['rank'] = rank
-                store_match(db, candidate)
+            with db:
+                delete_matches_for_insta_key(db, dump_media['media_key'], commit=False)
+                for rank, candidate in enumerate(above_threshold, 1):
+                    candidate['rank'] = rank
+                    store_match(db, candidate, commit=False)
 
             mark_dump_media_processed(
                 db, dump_media['media_key'],

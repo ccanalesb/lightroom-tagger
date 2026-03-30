@@ -30,20 +30,6 @@ export function CandidateCarousel({
     setError(false);
   }, []);
 
-  const prev = (e: MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    const next = activeIndex > 0 ? activeIndex - 1 : catalogKeys.length - 1;
-    onIndexChange(next);
-    resetImage();
-  };
-
-  const goNext = (e: MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    const nextIdx = activeIndex < catalogKeys.length - 1 ? activeIndex + 1 : 0;
-    onIndexChange(nextIdx);
-    resetImage();
-  };
-
   if (catalogKeys.length === 0) {
     return (
       <div className="w-1/2 relative flex items-center justify-center bg-gray-100 text-xs text-gray-500">
@@ -53,6 +39,20 @@ export function CandidateCarousel({
   }
 
   const safeIndex = Math.min(Math.max(0, activeIndex), catalogKeys.length - 1);
+
+  const prev = (e: MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    const next = safeIndex > 0 ? safeIndex - 1 : catalogKeys.length - 1;
+    onIndexChange(next);
+    resetImage();
+  };
+
+  const goNext = (e: MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    const nextIdx = safeIndex < catalogKeys.length - 1 ? safeIndex + 1 : 0;
+    onIndexChange(nextIdx);
+    resetImage();
+  };
   const src = thumbnailUrl('catalog', catalogKeys[safeIndex]);
 
   return (
