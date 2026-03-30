@@ -27,7 +27,13 @@ export function mockApiResponses(models: { name: string; default: boolean }[]) {
     if (url.includes("/matches")) {
       return Promise.resolve({
         ok: true,
-        json: async () => ({ matches: [], total: 0 }),
+        json: async () => ({
+          matches: [],
+          match_groups: [],
+          total: 0,
+          total_groups: 0,
+          total_matches: 0,
+        }),
       });
     }
     if (url.includes("/cache/status")) {

@@ -85,9 +85,13 @@ export const ImagesAPI = {
 
 export const MatchingAPI = {
   list: (limit?: number, offset?: number) =>
-    request<{ total: number; matches: Match[] }>(
-      `/images/matches?limit=${limit || 50}&offset=${offset || 0}`
-    ),
+    request<{
+      total: number
+      total_groups?: number
+      total_matches?: number
+      match_groups: MatchGroup[]
+      matches: Match[]
+    }>(`/images/matches?limit=${limit || 50}&offset=${offset || 0}`),
   validate: (catalogKey: string, instaKey: string) =>
     request<{ validated: boolean }>(
       `/images/matches/${encodeURIComponent(catalogKey)}/${encodeURIComponent(instaKey)}/validate`,
@@ -256,16 +260,28 @@ export interface Match {
   catalog_key: string
   score: number
   vision_result?: 'SAME' | 'DIFFERENT' | 'UNCERTAIN'
+  /** Model explanation when available (from JSON vision response). */
+  vision_reasoning?: string
   vision_score?: number
   phash_score?: number
   desc_similarity?: number
   total_score?: number
   model_used?: string
   validated_at?: string
+  rank?: number
   instagram_image?: InstagramImage
   catalog_image?: CatalogImage
   catalog_description?: ImageDescription
   insta_description?: ImageDescription
+}
+
+export interface MatchGroup {
+  instagram_key: string
+  instagram_image?: InstagramImage
+  candidates: Match[]
+  best_score: number
+  candidate_count: number
+  has_validated: boolean
 }
 
 export interface DumpMedia {

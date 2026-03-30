@@ -68,14 +68,15 @@ def main():
             print(f"  [{j}/{len(catalog_images)}] Comparing with {catalog_key}...", end=" ", flush=True)
 
             try:
-                vision_result = compare_with_vision(catalog_path, insta_path)
-                score = vision_score(vision_result)
-                print(f"{vision_result} (score: {score})")
+                vision_data = compare_with_vision(catalog_path, insta_path)
+                score = vision_score(vision_data['confidence'])
+                verdict = vision_data['verdict']
+                print(f"{verdict} (score: {score})")
 
                 matches.append({
                     'catalog_key': catalog_key,
                     'catalog_path': catalog_path,
-                    'vision_result': vision_result,
+                    'vision_result': verdict,
                     'vision_score': score
                 })
             except Exception as e:

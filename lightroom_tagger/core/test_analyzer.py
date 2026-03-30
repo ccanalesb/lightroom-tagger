@@ -54,15 +54,16 @@ def test_describe_image_uses_configured_agent():
 
 
 def test_compare_with_vision_returns_result():
-    """Vision comparison should return SAME, DIFFERENT, or UNCERTAIN."""
+    """Vision comparison should return dict with verdict and confidence."""
     with patch('lightroom_tagger.core.analyzer.compress_image', side_effect=lambda x: x), \
          patch('lightroom_tagger.core.analyzer.get_viewable_path', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer.run_vision_ollama', return_value='SAME'):
+         patch('lightroom_tagger.core.analyzer.run_vision_ollama',
+               return_value={'confidence': 90, 'verdict': 'SAME', 'reasoning': 'test'}):
 
         result = compare_with_vision('/tmp/local.jpg', '/tmp/insta.jpg')
 
-    assert result in ['SAME', 'DIFFERENT', 'UNCERTAIN']
-    assert result == 'SAME'
+    assert result['verdict'] in ['SAME', 'DIFFERENT', 'UNCERTAIN']
+    assert 0 <= result['confidence'] <= 100
 
 
 def test_vision_score_converts_correctly():
@@ -71,6 +72,74 @@ def test_vision_score_converts_correctly():
     assert vision_score('SAME') == 1.0
     assert vision_score('DIFFERENT') == 0.0
     assert vision_score('UNCERTAIN') == 0.5
+
+
+def test_vision_score_converts_confidence():
+    """vision_score should return confidence as 0.0-1.0 float."""
+    assert vision_score(85) == 0.85
+    assert vision_score(0) == 0.0
+    assert vision_score(100) == 1.0
+
+
+def test_vision_score_clamps():
+    """vision_score clamps out-of-range values."""
+    assert vision_score(150) == 1.0
+    assert vision_score(-10) == 0.0
+
+
+def test_vision_score_legacy_strings():
+    """vision_score still handles legacy string results for cached comparisons."""
+    assert vision_score('SAME') == 1.0
+    assert vision_score('DIFFERENT') == 0.0
+    assert vision_score('UNCERTAIN') == 0.5
+
+
+def test_parse_vision_response_json():
+    """parse_vision_response extracts confidence and verdict from JSON."""
+    from lightroom_tagger.core.analyzer import parse_vision_response
+
+    result = parse_vision_response('{"confidence": 85, "reasoning": "Same building"}')
+    assert result['confidence'] == 85
+    assert result['verdict'] == 'SAME'
+
+    result = parse_vision_response('{"confidence": 30, "reasoning": "Different scene"}')
+    assert result['confidence'] == 30
+    assert result['verdict'] == 'DIFFERENT'
+
+    result = parse_vision_response('{"confidence": 55, "reasoning": "Unclear"}')
+    assert result['confidence'] == 55
+    assert result['verdict'] == 'UNCERTAIN'
+
+
+def test_parse_vision_response_fallback():
+    """parse_vision_response falls back for non-JSON responses."""
+    from lightroom_tagger.core.analyzer import parse_vision_response
+
+    result = parse_vision_response('SAME')
+    assert result['confidence'] == 100
+    assert result['verdict'] == 'SAME'
+
+    result = parse_vision_response('DIFFERENT')
+    assert result['confidence'] == 0
+    assert result['verdict'] == 'DIFFERENT'
+
+    result = parse_vision_response('UNCERTAIN')
+    assert result['confidence'] == 50
+    assert result['verdict'] == 'UNCERTAIN'
+
+
+def test_compare_with_vision_returns_dict():
+    """Vision comparison returns dict with confidence and verdict."""
+    with patch('lightroom_tagger.core.analyzer.compress_image', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer.get_viewable_path', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer.run_vision_ollama',
+               return_value={'confidence': 85, 'verdict': 'SAME'}):
+
+        result = compare_with_vision('/tmp/local.jpg', '/tmp/insta.jpg')
+
+    assert isinstance(result, dict)
+    assert result['confidence'] == 85
+    assert result['verdict'] == 'SAME'
 
 
 def test_compress_image_creates_temp_file():
@@ -156,13 +225,14 @@ def test_compare_with_vision_uses_compression():
 
         with patch('lightroom_tagger.core.analyzer.get_viewable_path', side_effect=lambda x: x), \
              patch('lightroom_tagger.core.analyzer.compress_image', side_effect=track_compress), \
-             patch('lightroom_tagger.core.analyzer.run_vision_ollama', return_value='SAME'):
+             patch('lightroom_tagger.core.analyzer.run_vision_ollama',
+                   return_value={'confidence': 90, 'verdict': 'SAME', 'reasoning': ''}):
 
             result = compare_with_vision(local_path, insta_path)
 
         # Should have compressed both images
         assert len(compressed_paths) == 2
-        assert result == 'SAME'
+        assert result['verdict'] == 'SAME'
 
     finally:
         if os.path.exists(local_path):
@@ -175,13 +245,14 @@ def test_compare_with_vision_cleans_up_temp_files():
     """Vision comparison should clean up all temporary files."""
     with patch('lightroom_tagger.core.analyzer.compress_image', side_effect=lambda x: x), \
          patch('lightroom_tagger.core.analyzer.get_viewable_path', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer.run_vision_ollama', return_value='SAME'):
+         patch('lightroom_tagger.core.analyzer.run_vision_ollama',
+               return_value={'confidence': 90, 'verdict': 'SAME', 'reasoning': ''}):
 
         # Track temp files in a real scenario
         # This test verifies the cleanup logic runs without error
         result = compare_with_vision('/tmp/local.jpg', '/tmp/insta.jpg')
 
-        assert result == 'SAME'
+        assert result['verdict'] == 'SAME'
 
 
 def test_vision_config_environment_variables():

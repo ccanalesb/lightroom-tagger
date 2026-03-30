@@ -58,11 +58,17 @@ def test_score_candidates_includes_vision():
     ]
 
     with patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=None), \
-         patch('lightroom_tagger.core.analyzer.compare_with_vision', return_value='SAME'), \
+         patch('lightroom_tagger.core.analyzer.compare_with_vision',
+               return_value={'confidence': 100, 'verdict': 'SAME', 'reasoning': ''}), \
          patch('lightroom_tagger.core.analyzer.vision_score', return_value=1.0), \
          patch('lightroom_tagger.core.matcher.store_vision_comparison') as store_mock, \
          patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
+         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
+         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
          patch('lightroom_tagger.core.phash.hamming_distance', return_value=0):
+        mock_insta_cache.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
+        mock_insta_cache.return_value.cleanup.return_value = None
 
         results = score_candidates_with_vision(
             mock_db, insta_image, candidates,
@@ -100,7 +106,12 @@ def test_score_candidates_uses_cache():
 
     with patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=cached_result), \
          patch('lightroom_tagger.core.analyzer.compare_with_vision') as vision_mock, \
+         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
+         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
+         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
          patch('lightroom_tagger.core.phash.hamming_distance', return_value=0):
+        mock_insta_cache.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
+        mock_insta_cache.return_value.cleanup.return_value = None
 
         results = score_candidates_with_vision(
             mock_db, insta_image, candidates,

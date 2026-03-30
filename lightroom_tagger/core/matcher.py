@@ -152,19 +152,22 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             and vision_cached.get('model_used') == current_model
         )
 
+        vision_reasoning = ''
         if cache_valid:
             vision_result = vision_cached['result']
             vision_score_val = vision_cached['vision_score']
         elif insta_path and local_path:
             # Run vision comparison with cached/prepared paths
             try:
-                vision_result = compare_with_vision(
+                vision_data = compare_with_vision(
                     local_path, insta_path,
                     log_callback=log_callback,
                     cached_local_path=cached_local_path,
                     compressed_insta_path=compressed_insta
                 )
-                vision_score_val = vision_score(vision_result)
+                vision_result = vision_data['verdict']
+                vision_score_val = vision_score(vision_data['confidence'])
+                vision_reasoning = (vision_data.get('reasoning') or '').strip()
 
                 # Cache the result
                 store_vision_comparison(
@@ -216,6 +219,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             'desc_similarity': desc_sim,
             'vision_result': vision_result,
             'vision_score': vision_score_val,
+            'vision_reasoning': vision_reasoning,
             'total_score': total_score_val,
             'model_used': get_vision_model(),
         })

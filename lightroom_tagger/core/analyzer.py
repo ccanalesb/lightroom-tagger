@@ -369,7 +369,7 @@ def run_external_agent(path: str) -> str:
 
 
 def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
-                        cached_local_path: str | None = None, compressed_insta_path: str | None = None) -> str:
+                        cached_local_path: str | None = None, compressed_insta_path: str | None = None) -> dict:
     """Compare two images using vision model via Ollama with compression.
 
     Compresses images to max VISION_MAX_DIMENSION pixels before comparison
@@ -383,7 +383,9 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
         cached_local_path: Pre-compressed catalog image path (optional, uses cache if available)
         compressed_insta_path: Pre-compressed Instagram image path (optional)
 
-    Returns: 'SAME' | 'DIFFERENT' | 'UNCERTAIN'
+    Returns:
+        dict with keys ``confidence`` (0-100), ``verdict`` (``SAME`` | ``DIFFERENT`` | ``UNCERTAIN``),
+        and ``reasoning`` (str).
     """
     # Track all temp files for cleanup
     temp_files = []
@@ -447,17 +449,51 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
                     os.unlink(temp_file)
 
 
-def run_vision_ollama(local_path: str, insta_path: str, log_callback=None) -> str:
+def parse_vision_response(raw: str) -> dict:
+    """Parse vision model response into structured result.
+
+    Expects JSON: {"confidence": 0-100, "reasoning": "..."}
+    Falls back to legacy SAME/DIFFERENT/UNCERTAIN parsing.
+    """
+    raw = raw.strip()
+
+    try:
+        if raw.startswith('```'):
+            raw = raw.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
+        data = _json.loads(raw)
+        confidence = int(data.get('confidence', 50))
+        confidence = max(0, min(100, confidence))
+        if confidence >= 70:
+            verdict = 'SAME'
+        elif confidence <= 30:
+            verdict = 'DIFFERENT'
+        else:
+            verdict = 'UNCERTAIN'
+        return {'confidence': confidence, 'verdict': verdict, 'reasoning': data.get('reasoning', '')}
+    except (TypeError, ValueError, KeyError, _json.JSONDecodeError):
+        pass
+
+    upper = raw.upper()
+    if upper.startswith('SAME') and 'DIFFERENT' not in upper[:20]:
+        return {'confidence': 100, 'verdict': 'SAME', 'reasoning': ''}
+    elif 'DIFFERENT' in upper[:50]:
+        return {'confidence': 0, 'verdict': 'DIFFERENT', 'reasoning': ''}
+    return {'confidence': 50, 'verdict': 'UNCERTAIN', 'reasoning': ''}
+
+
+def run_vision_ollama(local_path: str, insta_path: str, log_callback=None) -> dict:
     """Compare two images using Ollama HTTP API with base64-encoded images."""
     import base64
     import json
     import urllib.request
 
     prompt = (
-        "You are given two images. Determine if they depict the same subject or scene. "
-        "Image 1 may be lower quality, compressed, or degraded. "
-        "Focus on semantic content, not pixel-level accuracy.\n\n"
-        "Reply with ONLY one word: SAME or DIFFERENT or UNCERTAIN"
+        "You are comparing two images to determine if they depict the same photograph "
+        "(possibly with different crops, compression, or processing).\n\n"
+        "Respond with ONLY valid JSON, no other text:\n"
+        '{"confidence": <0-100>, "reasoning": "<one sentence>"}\n\n'
+        "confidence: 0 = definitely different photos, 100 = definitely the same photo.\n"
+        "Focus on semantic content (subject, scene, composition), not pixel-level differences."
     )
 
     model = get_vision_model()
@@ -488,27 +524,31 @@ def run_vision_ollama(local_path: str, insta_path: str, log_callback=None) -> st
         raise RuntimeError(f"Ollama error: {data['error']}")
 
     raw_response = data.get('response', '').strip()
-    output = raw_response.upper()
-
-    if output.startswith('SAME') and 'DIFFERENT' not in output[:20]:
-        result = 'SAME'
-    elif 'DIFFERENT' in output[:50]:
-        result = 'DIFFERENT'
-    else:
-        result = 'UNCERTAIN'
+    result = parse_vision_response(raw_response)
 
     if log_callback:
         local_name = os.path.basename(local_path)
         insta_name = os.path.basename(insta_path)
-        log_callback('debug', f'[vision] {local_name} vs {insta_name} → {result} (model={model}, raw="{raw_response[:80]}")')
+        log_callback(
+            'debug',
+            f'[vision] {local_name} vs {insta_name} → {result["verdict"]} '
+            f'({result["confidence"]}%) (model={model}, raw="{raw_response[:80]}")',
+        )
 
     return result
 
 
-def vision_score(result: str) -> float:
-    """Convert vision result to score."""
-    if result == 'SAME':
-        return 1.0
-    elif result == 'DIFFERENT':
-        return 0.0
-    return 0.5 # UNCERTAIN
+def vision_score(result) -> float:
+    """Convert vision result to 0.0-1.0 score.
+
+    Accepts int confidence (0-100) or legacy string ('SAME'/'DIFFERENT'/'UNCERTAIN').
+    """
+    if isinstance(result, (int, float)):
+        return max(0.0, min(1.0, result / 100))
+    if isinstance(result, str):
+        if result == 'SAME':
+            return 1.0
+        elif result == 'DIFFERENT':
+            return 0.0
+        return 0.5
+    return 0.5

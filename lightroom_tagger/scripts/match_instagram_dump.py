@@ -17,6 +17,7 @@ from lightroom_tagger.core.description_service import (
     describe_matched_image,
 )
 from lightroom_tagger.core.database import (
+    delete_matches_for_insta_key,
     get_instagram_by_date_filter,
     get_rejected_pairs,
     get_unprocessed_dump_media,
@@ -147,11 +148,17 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             log_callback=log_callback
         )
 
-        if results and results[0]['total_score'] >= threshold:
-            best_match = results[0]
+        above_threshold = [r for r in results if r['total_score'] >= threshold]
+
+        if above_threshold:
+            best_match = above_threshold[0]
             matched_catalog_key = best_match['catalog_key']
 
-            store_match(db, best_match)
+            with db:
+                delete_matches_for_insta_key(db, dump_media['media_key'], commit=False)
+                for rank, candidate in enumerate(above_threshold, 1):
+                    candidate['rank'] = rank
+                    store_match(db, candidate, commit=False)
 
             mark_dump_media_processed(
                 db, dump_media['media_key'],
