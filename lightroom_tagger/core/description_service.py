@@ -17,7 +17,10 @@ def _description_structured_is_valid(structured: dict) -> bool:
     return isinstance(summary, str) and bool(summary.strip())
 
 
-def describe_matched_image(db, catalog_key: str, force: bool = False) -> bool:
+def describe_matched_image(db, catalog_key: str, force: bool = False,
+                           provider_id: str | None = None,
+                           model: str | None = None,
+                           log_callback=None) -> bool:
     """Generate and store a description for a catalog image if needed.
 
     Returns True if a non-empty description was stored. Returns False if
@@ -35,15 +38,25 @@ def describe_matched_image(db, catalog_key: str, force: bool = False) -> bool:
     if not os.path.exists(filepath):
         return False
 
-    structured = describe_image(filepath)
+    structured = describe_image(
+        filepath, provider_id=provider_id, model=model,
+        log_callback=log_callback,
+    )
     if not _description_structured_is_valid(structured):
         return False
 
-    _store_structured(db, catalog_key, 'catalog', structured)
+    model_used = structured.pop("_model", None) or get_description_model()
+    provider_used = structured.pop("_provider", None)
+    model_label = f"{provider_used}:{model_used}" if provider_used else model_used
+
+    _store_structured(db, catalog_key, 'catalog', structured, model_label)
     return True
 
 
-def describe_instagram_image(db, media_key: str, force: bool = False) -> bool:
+def describe_instagram_image(db, media_key: str, force: bool = False,
+                             provider_id: str | None = None,
+                             model: str | None = None,
+                             log_callback=None) -> bool:
     """Generate and store a description for an Instagram image if needed.
 
     Uses the local file from instagram_dump_media. Returns True if a
@@ -60,15 +73,23 @@ def describe_instagram_image(db, media_key: str, force: bool = False) -> bool:
     if not os.path.exists(filepath):
         return False
 
-    structured = describe_image(filepath)
+    structured = describe_image(
+        filepath, provider_id=provider_id, model=model,
+        log_callback=log_callback,
+    )
     if not _description_structured_is_valid(structured):
         return False
 
-    _store_structured(db, media_key, 'instagram', structured)
+    model_used = structured.pop("_model", None) or get_description_model()
+    provider_used = structured.pop("_provider", None)
+    model_label = f"{provider_used}:{model_used}" if provider_used else model_used
+
+    _store_structured(db, media_key, 'instagram', structured, model_label)
     return True
 
 
-def _store_structured(db, image_key: str, image_type: str, structured: dict):
+def _store_structured(db, image_key: str, image_type: str, structured: dict,
+                      model_used: str | None = None):
     store_image_description(db, {
         'image_key': image_key,
         'image_type': image_type,
@@ -78,5 +99,5 @@ def _store_structured(db, image_key: str, image_type: str, structured: dict):
         'technical': structured.get('technical', {}),
         'subjects': structured.get('subjects', []),
         'best_perspective': structured.get('best_perspective', ''),
-        'model_used': get_description_model(),
+        'model_used': model_used or get_description_model(),
     })

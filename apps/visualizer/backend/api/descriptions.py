@@ -65,22 +65,46 @@ def get_description(db, image_key):
 @with_db
 def generate_description(db, image_key):
     """Generate AI description for a single image."""
+    from lightroom_tagger.core.provider_errors import (
+        AuthenticationError,
+        ConnectionError,
+        ModelUnavailableError,
+        RateLimitError,
+    )
+
     old_model_env = os.environ.get('DESCRIPTION_VISION_MODEL')
+    provider_id = None
     try:
         data = request.json or {}
         image_type = data.get('image_type', 'catalog')
         force = data.get('force', False)
         model = data.get('model')
+        provider_id = data.get('provider_id')
+        provider_model = data.get('provider_model')
 
-        if model:
+        if model and not provider_id:
             os.environ['DESCRIPTION_VISION_MODEL'] = model
 
-        if image_type == 'catalog':
-            generated = describe_matched_image(db, image_key, force=force)
-        elif image_type == 'instagram':
-            generated = describe_instagram_image(db, image_key, force=force)
-        else:
-            return jsonify({'error': f'Invalid image_type: {image_type}'}), 400
+        try:
+            if image_type == 'catalog':
+                generated = describe_matched_image(
+                    db, image_key, force=force,
+                    provider_id=provider_id, model=provider_model,
+                )
+            elif image_type == 'instagram':
+                generated = describe_instagram_image(
+                    db, image_key, force=force,
+                    provider_id=provider_id, model=provider_model,
+                )
+            else:
+                return jsonify({'error': f'Invalid image_type: {image_type}'}), 400
+        except KeyError:
+            if not provider_id:
+                raise
+            return jsonify({
+                'error': 'invalid_provider',
+                'message': f'Unknown provider: {provider_id}',
+            }), 400
 
         if not generated:
             existing = get_image_description(db, image_key)
@@ -90,6 +114,24 @@ def generate_description(db, image_key):
 
         desc = get_image_description(db, image_key)
         return jsonify({'generated': True, 'description': _deserialize(desc) if desc else None})
+    except RateLimitError as e:
+        return jsonify({
+            'error': 'rate_limit',
+            'message': str(e),
+            'provider': getattr(e, 'provider', None) or provider_id,
+        }), 429
+    except AuthenticationError as e:
+        return jsonify({
+            'error': 'auth_error',
+            'message': str(e),
+            'provider': getattr(e, 'provider', None) or provider_id,
+        }), 401
+    except (ModelUnavailableError, ConnectionError) as e:
+        return jsonify({
+            'error': 'provider_unavailable',
+            'message': str(e),
+            'provider': getattr(e, 'provider', None) or provider_id,
+        }), 503
     except Exception as e:
         return error_server_error(str(e))
     finally:

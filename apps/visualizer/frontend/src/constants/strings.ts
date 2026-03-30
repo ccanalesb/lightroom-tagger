@@ -288,3 +288,36 @@ export const MODAL_MATCH_RESULT_NONE = 'No match found'
 export const MODAL_MATCH_VIEW_RESULTS = 'View on Matching page'
 export const MODAL_MATCH_RETRY = 'Run Again'
 export const MODAL_MATCH_JOB_FAILED_PREFIX = 'Match failed:'
+
+// Providers Page
+export const NAV_PROVIDERS = 'Providers'
+export const PROVIDER_TITLE = 'Provider Configuration'
+export const PROVIDER_STATUS_AVAILABLE = 'Available'
+export const PROVIDER_STATUS_UNAVAILABLE = 'Unavailable'
+export const PROVIDER_MODELS_HEADING = 'Models'
+export const PROVIDER_FALLBACK_HEADING = 'Fallback Order'
+export const PROVIDER_FALLBACK_DESCRIPTION = 'When a provider fails, requests cascade in this order.'
+export const PROVIDER_SOURCE_CONFIG = 'built-in'
+export const PROVIDER_SOURCE_DISCOVERED = 'auto-discovered'
+export const PROVIDER_SOURCE_USER = 'user-added'
+export const PROVIDER_NO_MODELS = 'No models available'
+export const PROVIDER_COL_MODEL = 'Model'
+export const PROVIDER_COL_VISION = 'Vision'
+export const PROVIDER_COL_SOURCE = 'Source'
+export const PROVIDER_SELECT_LABEL = 'Provider'
+export const PROVIDER_MODEL_SELECT_LABEL = 'Model'
+export const PROVIDER_AUTO_DEFAULT = 'Auto (default)'
+export const PROVIDER_MODEL_AUTO_FIRST = 'Auto (first available)'
+
+// Generic Buttons
+export const BTN_DISMISS = 'Dismiss'
+export const BTN_RETRY = 'Retry'
+
+// Provider Inline Labels
+export const PROVIDER_STATUS_SUFFIX_UNAVAILABLE = '(unavailable)'
+
+// Description Generation Errors
+export const DESC_ERROR_RATE_LIMIT = 'Rate limited — try a different provider or wait.'
+export const DESC_ERROR_AUTH = 'Authentication failed — check your API key.'
+export const DESC_ERROR_UNAVAILABLE = 'Provider unavailable — try a different provider.'
+export const DESC_ERROR_GENERIC = 'Description generation failed.'

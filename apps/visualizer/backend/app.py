@@ -30,10 +30,11 @@ def create_app():
     db = init_db(db_path)
     app.db = db
 
-    from api import descriptions, images, jobs, system
+    from api import descriptions, images, jobs, providers, system
     app.register_blueprint(jobs.bp, url_prefix='/api/jobs')
     app.register_blueprint(images.bp, url_prefix='/api/images')
     app.register_blueprint(descriptions.bp, url_prefix='/api/descriptions')
+    app.register_blueprint(providers.bp, url_prefix='/api/providers')
     app.register_blueprint(system.bp, url_prefix='/api')
 
     from websocket.events import register_socket_events

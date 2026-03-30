@@ -38,7 +38,9 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      progress_callback=None, log_callback=None,
                      weights: dict = None, media_key: str = None,
                      force_descriptions: bool = False,
-                     force_reprocess: bool = False) -> tuple:
+                     force_reprocess: bool = False,
+                     provider_id: str | None = None,
+                     provider_model: str | None = None) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -50,6 +52,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         last_months: Filter Instagram by last N months
         media_key: If set, process only this Instagram dump row (ignores batch/date filters)
         force_reprocess: If True, include already-processed images in the batch
+        provider_id: Optional vision provider id (registry key); None uses defaults
+        provider_model: Optional model id for that provider; None uses provider default
         progress_callback: Optional callback(current, total, message) for progress updates
         log_callback: Optional callback(level, message) for detailed logging
         weights: Optional dict with 'phash', 'description', 'vision' keys for scoring weights
@@ -145,7 +149,9 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             desc_weight=weights.get('description', 0.3),
             vision_weight=weights.get('vision', 0.3),
             threshold=threshold,
-            log_callback=log_callback
+            log_callback=log_callback,
+            provider_id=provider_id,
+            model=provider_model,
         )
 
         above_threshold = [r for r in results if r['total_score'] >= threshold]

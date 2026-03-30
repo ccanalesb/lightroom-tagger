@@ -81,7 +81,9 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                                  phash_weight: float = 0.4, desc_weight: float = 0.3,
                                  vision_weight: float = 0.3,
                                  threshold: float = 0.7,
-                                 log_callback=None) -> list[dict]:
+                                 log_callback=None,
+                                 provider_id: str | None = None,
+                                 model: str | None = None) -> list[dict]:
     """Score candidates including vision comparison (one-by-one).
 
     Uses vision comparison cache to avoid re-comparing already processed pairs.
@@ -91,9 +93,14 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
     from lightroom_tagger.core.analyzer import compare_with_vision, get_vision_model, vision_score
     from lightroom_tagger.core.phash import hamming_distance
+    from lightroom_tagger.core.provider_errors import RateLimitError
+
+    RATE_LIMIT_ABORT_THRESHOLD = 3
 
     results = []
     total_candidates = len(candidates)
+    consecutive_rate_limits = 0
+    rate_limited_count = 0
     insta_filename = _os.path.basename(insta_image.get('local_path', 'unknown'))
 
     # Compress Instagram image ONCE before candidate loop
@@ -146,36 +153,63 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
         # Check vision comparison cache (invalidate if model changed)
         vision_cached = get_vision_comparison(db, catalog_key, insta_key)
-        current_model = get_vision_model()
+        base_vision_model = get_vision_model()
+        # Requested label for cache lookup only; pipeline may pick a different default model.
+        requested_model_label = (
+            f"{provider_id}:{model or base_vision_model}"
+            if provider_id
+            else base_vision_model
+        )
         cache_valid = (
             vision_cached
-            and vision_cached.get('model_used') == current_model
+            and vision_cached.get('model_used') == requested_model_label
         )
 
+        model_label = base_vision_model
         vision_reasoning = ''
         if cache_valid:
             vision_result = vision_cached['result']
             vision_score_val = vision_cached['vision_score']
+            model_label = vision_cached.get('model_used', model_label)
+            consecutive_rate_limits = 0
+        elif consecutive_rate_limits >= RATE_LIMIT_ABORT_THRESHOLD:
+            vision_result = 'RATE_LIMITED'
+            vision_score_val = 0.0
+            rate_limited_count += 1
         elif insta_path and local_path:
-            # Run vision comparison with cached/prepared paths
             try:
                 vision_data = compare_with_vision(
                     local_path, insta_path,
                     log_callback=log_callback,
                     cached_local_path=cached_local_path,
-                    compressed_insta_path=compressed_insta
+                    compressed_insta_path=compressed_insta,
+                    provider_id=provider_id,
+                    model=model,
                 )
                 vision_result = vision_data['verdict']
                 vision_score_val = vision_score(vision_data['confidence'])
                 vision_reasoning = (vision_data.get('reasoning') or '').strip()
+                consecutive_rate_limits = 0
 
-                # Cache the result
+                if vision_data.get('_provider'):
+                    ap = vision_data['_provider']
+                    am = vision_data.get('_model')
+                    model_label = f"{ap}:{am}" if am is not None else f"{ap}:"
+
                 store_vision_comparison(
                     db, catalog_key, insta_key,
                     vision_result, vision_score_val,
-                    get_vision_model()
+                    model_label,
                 )
+            except RateLimitError as e:
+                consecutive_rate_limits += 1
+                rate_limited_count += 1
+                if log_callback:
+                    log_callback('warning', f'[{insta_filename}] Rate limited for {catalog_key} ({consecutive_rate_limits} consecutive)')
+                vision_result = 'RATE_LIMITED'
+                vision_score_val = 0.0
             except Exception as e:
+                consecutive_rate_limits = 0
                 if log_callback:
                     log_callback('error', f'[{insta_filename}] Vision error for {catalog_key}: {e}')
                 vision_result = 'ERROR'
@@ -221,7 +255,8 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             'vision_score': vision_score_val,
             'vision_reasoning': vision_reasoning,
             'total_score': total_score_val,
-            'model_used': get_vision_model(),
+            'model_used': model_label,
+            'rate_limited': vision_result == 'RATE_LIMITED',
         })
 
     # Cleanup Instagram temp file
@@ -243,7 +278,9 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
 def match_image(db, insta_image: dict, threshold: float = 0.7,
                 phash_weight: float = 0.4, desc_weight: float = 0.3,
-                vision_weight: float = 0.3) -> list[dict]:
+                vision_weight: float = 0.3,
+                provider_id: str | None = None,
+                model: str | None = None) -> list[dict]:
     """Match single Instagram image against catalog with vision comparison."""
     insta_exif = insta_image.get('exif', {})
 
@@ -256,6 +293,8 @@ def match_image(db, insta_image: dict, threshold: float = 0.7,
         db, insta_image, candidates,
         phash_weight, desc_weight, vision_weight,
         threshold=threshold,
+        provider_id=provider_id,
+        model=model,
     )
 
     # Get best match (highest score) if above threshold
