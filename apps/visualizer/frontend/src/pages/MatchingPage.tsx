@@ -1,11 +1,12 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MatchingAPI, JobsAPI, SystemAPI, Match, MatchGroup, Job } from '../services/api';
+import { JobsAPI, SystemAPI, Match, MatchGroup, Job } from '../services/api';
 import { MatchDetailModal } from '../components/matching/match-detail-modal';
 import { AdvancedOptions } from '../components/matching/AdvancedOptions';
 import { MatchCard } from '../components/matching/MatchCard';
 import { JobStatusPanel, CompletedPanel, FailedPanel } from '../components/matching/job-status-panels';
 import { useJobSocket } from '../hooks/useJobSocket';
+import { useMatchGroups } from '../hooks/useMatchGroups';
 import { useMatchOptions } from '../stores/matchOptionsContext';
 import { PageLoading, PageError } from '../components/ui/page-states';
 import {
@@ -52,8 +53,8 @@ const DATE_FILTERS = [
 ] as const;
 
 export function MatchingPage() {
-  const [matchGroups, setMatchGroups] = useState<MatchGroup[]>([]);
-  const [total, setTotal] = useState(0);
+  const { matchGroups, total, fetchGroups, handleValidationChange, handleRejected } = useMatchGroups();
+  const [selectedGroup, setSelectedGroup] = useState<MatchGroup | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showTrigger, setShowTrigger] = useState(false);
@@ -97,15 +98,9 @@ export function MatchingPage() {
 
     const fetchData = async () => {
       try {
-        const [matchesData, jobsData] = await Promise.all([
-          MatchingAPI.list(100),
-          JobsAPI.getActive(),
-        ]);
+        const [, jobsData] = await Promise.all([fetchGroups(100), JobsAPI.getActive()]);
 
         if (!mounted) return;
-
-        setMatchGroups(matchesData.match_groups ?? []);
-        setTotal(matchesData.total);
 
         const runningJob = jobsData.find(
           (job: Job) => job.type === 'vision_match' && ['pending', 'running'].includes(job.status)
@@ -130,7 +125,7 @@ export function MatchingPage() {
     fetchCacheStatus();
 
     return () => { mounted = false; };
-  }, [fetchCacheStatus]);
+  }, [fetchCacheStatus, fetchGroups]);
 
   const handleJobCreated = useCallback((job: Job) => {
     if (job.type === 'vision_match') {
@@ -148,10 +143,7 @@ export function MatchingPage() {
       setActiveJob(job);
       if (job.status === 'completed') {
         setTimeout(() => {
-          MatchingAPI.list(100).then((data) => {
-            setMatchGroups(data.match_groups ?? []);
-            setTotal(data.total);
-          });
+          fetchGroups(100);
         }, 1000);
       }
     }
@@ -162,7 +154,7 @@ export function MatchingPage() {
         fetchCacheStatus();
       }
     }
-  }, [activeJob?.id, cacheJob?.id, fetchCacheStatus]);
+  }, [activeJob?.id, cacheJob?.id, fetchCacheStatus, fetchGroups]);
 
   useJobSocket({
     onJobCreated: handleJobCreated,
@@ -377,7 +369,10 @@ export function MatchingPage() {
             <MatchCard
               key={group.instagram_key}
               group={group}
-              onClick={(candidate) => setSelectedMatch(candidate)}
+              onClick={(candidate) => {
+                setSelectedMatch(candidate);
+                setSelectedGroup(group);
+              }}
             />
           ))}
         </div>
@@ -386,49 +381,27 @@ export function MatchingPage() {
       {selectedMatch && (
         <MatchDetailModal
           match={selectedMatch}
-          onClose={() => setSelectedMatch(null)}
+          group={
+            matchGroups.find((g) => g.instagram_key === selectedMatch.instagram_key) ??
+            selectedGroup ??
+            undefined
+          }
+          onClose={() => {
+            setSelectedMatch(null);
+            setSelectedGroup(null);
+          }}
           onValidationChange={(m, validated) => {
-            setMatchGroups((prev) =>
-              prev.map((g) => {
-                if (g.instagram_key !== m.instagram_key) return g;
-                const candidates = g.candidates.map((c) =>
-                  c.catalog_key === m.catalog_key && c.instagram_key === m.instagram_key
-                    ? { ...c, validated_at: validated ? new Date().toISOString() : undefined }
-                    : c
-                );
-                return {
-                  ...g,
-                  candidates,
-                  has_validated: candidates.some((c) => c.validated_at),
-                };
-              })
-            );
+            handleValidationChange(m, validated);
             setSelectedMatch((prev) =>
               prev ? { ...prev, validated_at: validated ? new Date().toISOString() : undefined } : null
             );
           }}
           onRejected={(m) => {
-            setMatchGroups((prev) =>
-              prev.flatMap((g) => {
-                if (g.instagram_key !== m.instagram_key) return [g];
-                const candidates = g.candidates.filter(
-                  (c) => !(c.catalog_key === m.catalog_key && c.instagram_key === m.instagram_key)
-                );
-                if (candidates.length === 0) return [];
-                const bestScore = Math.max(...candidates.map((c) => c.score));
-                return [
-                  {
-                    ...g,
-                    candidates,
-                    candidate_count: candidates.length,
-                    best_score: bestScore,
-                    has_validated: candidates.some((c) => c.validated_at),
-                  },
-                ];
-              })
-            );
-            setTotal((prev) => prev - 1);
+            handleRejected(m);
+            setSelectedMatch(null);
+            setSelectedGroup(null);
           }}
+          onCandidateChange={(c) => setSelectedMatch(c)}
         />
       )}
     </div>
