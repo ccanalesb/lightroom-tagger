@@ -85,7 +85,7 @@ export const ImagesAPI = {
 
 export const MatchingAPI = {
   list: (limit?: number, offset?: number) =>
-    request<{ total: number; matches: Match[] }>(
+    request<{ total: number; match_groups: MatchGroup[]; matches: Match[] }>(
       `/images/matches?limit=${limit || 50}&offset=${offset || 0}`
     ),
   validate: (catalogKey: string, instaKey: string) =>
@@ -262,10 +262,20 @@ export interface Match {
   total_score?: number
   model_used?: string
   validated_at?: string
+  rank?: number
   instagram_image?: InstagramImage
   catalog_image?: CatalogImage
   catalog_description?: ImageDescription
   insta_description?: ImageDescription
+}
+
+export interface MatchGroup {
+  instagram_key: string
+  instagram_image?: InstagramImage
+  candidates: Match[]
+  best_score: number
+  candidate_count: number
+  has_validated: boolean
 }
 
 export interface DumpMedia {

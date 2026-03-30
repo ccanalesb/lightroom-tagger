@@ -1,6 +1,7 @@
 import json
 import os
 import sqlite3
+from collections import OrderedDict
 
 from flask import Blueprint, jsonify, request, send_file
 from lightroom_tagger.core.database import (
@@ -285,9 +286,9 @@ def list_dump_media(db):
 @bp.route('/matches', methods=['GET'])
 @with_db
 def list_matches(db):
-    """List matches between Instagram and catalog images."""
+    """List matches grouped by Instagram image."""
     try:
-        matches = db.execute("SELECT * FROM matches").fetchall()
+        matches = db.execute("SELECT * FROM matches ORDER BY insta_key, rank").fetchall()
 
         # Build lookup tables for images (avoid N+1 queries)
         instagram_lookup = {}
@@ -306,7 +307,9 @@ def list_matches(db):
         except sqlite3.OperationalError:
             pass
 
-        enriched_matches = []
+        groups = OrderedDict()
+        all_enriched = []
+
         for match in matches:
             insta_key = match.get('insta_key')
             catalog_key = match.get('catalog_key')
@@ -319,23 +322,34 @@ def list_matches(db):
 
             if insta_key and insta_key in instagram_lookup:
                 enriched['instagram_image'] = instagram_lookup[insta_key]
-
             if catalog_key and catalog_key in catalog_lookup:
                 enriched['catalog_image'] = catalog_lookup[catalog_key]
 
             enriched['catalog_description'] = desc_lookup.get((catalog_key, 'catalog')) if catalog_key else None
             enriched['insta_description'] = desc_lookup.get((insta_key, 'instagram')) if insta_key else None
 
-            enriched_matches.append(enriched)
+            groups.setdefault(insta_key, []).append(enriched)
+            all_enriched.append(enriched)
+
+        match_groups = []
+        for insta_key, candidates in groups.items():
+            match_groups.append({
+                'instagram_key': insta_key,
+                'instagram_image': instagram_lookup.get(insta_key),
+                'candidates': candidates,
+                'best_score': candidates[0]['score'] if candidates else 0,
+                'candidate_count': len(candidates),
+                'has_validated': any(c.get('validated_at') for c in candidates),
+            })
 
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
-
-        paginated = enriched_matches[offset:offset+limit]
+        paginated = match_groups[offset:offset+limit]
 
         return jsonify({
-            'total': len(enriched_matches),
-            'matches': paginated,
+            'total': len(match_groups),
+            'match_groups': paginated,
+            'matches': all_enriched,
         })
     except Exception as e:
         return error_server_error(str(e))
