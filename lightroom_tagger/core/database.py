@@ -624,6 +624,10 @@ def get_instagram_by_date_filter(db: sqlite3.Connection, month: str = None,
     params: list = []
     if not include_processed:
         clauses.append("processed = 0")
+        clauses.append(
+            "media_key NOT IN "
+            "(SELECT insta_key FROM matches WHERE validated_at IS NOT NULL)"
+        )
     if run_start:
         clauses.append("(last_attempted_at IS NULL OR last_attempted_at < ?)")
         params.append(run_start)
@@ -778,22 +782,22 @@ def store_match(db: sqlite3.Connection, record: dict) -> str:
 
 def validate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bool:
     """Stamp a match as human-validated."""
-    db.execute(
+    cursor = db.execute(
         "UPDATE matches SET validated_at = ? WHERE catalog_key = ? AND insta_key = ?",
         (datetime.now().isoformat(), catalog_key, insta_key),
     )
     db.commit()
-    return db.total_changes > 0
+    return cursor.rowcount > 0
 
 
 def unvalidate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bool:
     """Remove human validation (undo validate, not reject)."""
-    db.execute(
+    cursor = db.execute(
         "UPDATE matches SET validated_at = NULL WHERE catalog_key = ? AND insta_key = ?",
         (catalog_key, insta_key),
     )
     db.commit()
-    return db.total_changes > 0
+    return cursor.rowcount > 0
 
 
 def reject_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bool:
@@ -996,12 +1000,86 @@ def get_image_description(db: sqlite3.Connection, image_key: str) -> dict | None
     return row
 
 
-def get_undescribed_catalog_images(db: sqlite3.Connection) -> list[dict]:
+def get_undescribed_catalog_images(db: sqlite3.Connection, months: int = None) -> list[dict]:
     """Get catalog images that don't have descriptions yet."""
-    rows = db.execute("""
+    sql = """
         SELECT i.* FROM images i
         LEFT JOIN image_descriptions d
             ON i.key = d.image_key AND d.image_type = 'catalog'
         WHERE d.image_key IS NULL
-    """).fetchall()
+    """
+    params: list = []
+    if months:
+        sql += " AND i.date_taken >= date('now', ?)"
+        params.append(f'-{months} months')
+    rows = db.execute(sql, params).fetchall()
     return [_deserialize_row(r) for r in rows]
+
+
+def get_undescribed_instagram_images(db: sqlite3.Connection, months: int = None) -> list[dict]:
+    """Get Instagram dump media that don't have descriptions yet."""
+    sql = """
+        SELECT m.* FROM instagram_dump_media m
+        LEFT JOIN image_descriptions d
+            ON m.media_key = d.image_key AND d.image_type = 'instagram'
+        WHERE d.image_key IS NULL
+    """
+    params: list = []
+    if months:
+        sql += " AND m.created_at >= date('now', ?)"
+        params.append(f'-{months} months')
+    rows = db.execute(sql, params).fetchall()
+    return [_deserialize_row(r) for r in rows]
+
+
+def get_all_images_with_descriptions(db: sqlite3.Connection,
+                                     image_type: str = None,
+                                     described_only: bool = False,
+                                     limit: int = 50,
+                                     offset: int = 0) -> tuple[list[dict], int]:
+    """Get images joined with their descriptions for the descriptions page.
+
+    Returns (items, total_count).
+    """
+    parts = []
+    params: list = []
+
+    if image_type != 'instagram':
+        parts.append("""
+            SELECT i.key AS image_key, 'catalog' AS image_type,
+                   i.filename, i.date_taken AS date_ref,
+                   d.summary, d.best_perspective, d.model_used AS desc_model,
+                   d.described_at,
+                   CASE WHEN d.image_key IS NOT NULL THEN 1 ELSE 0 END AS has_description
+            FROM images i
+            LEFT JOIN image_descriptions d
+                ON i.key = d.image_key AND d.image_type = 'catalog'
+        """)
+
+    if image_type != 'catalog':
+        parts.append("""
+            SELECT m.media_key AS image_key, 'instagram' AS image_type,
+                   m.filename, m.created_at AS date_ref,
+                   d.summary, d.best_perspective, d.model_used AS desc_model,
+                   d.described_at,
+                   CASE WHEN d.image_key IS NOT NULL THEN 1 ELSE 0 END AS has_description
+            FROM instagram_dump_media m
+            LEFT JOIN image_descriptions d
+                ON m.media_key = d.image_key AND d.image_type = 'instagram'
+        """)
+
+    union_sql = " UNION ALL ".join(parts)
+
+    if described_only:
+        wrapper = f"SELECT * FROM ({union_sql}) t WHERE t.has_description = 1"
+    else:
+        wrapper = f"SELECT * FROM ({union_sql}) t"
+
+    count_sql = f"SELECT COUNT(*) AS cnt FROM ({wrapper})"
+    total = db.execute(count_sql, params * len(parts)).fetchone()['cnt']
+
+    page_sql = f"{wrapper} ORDER BY t.described_at DESC NULLS LAST, t.date_ref DESC LIMIT ? OFFSET ?"
+    all_params = params * len(parts) + [limit, offset]
+    rows = db.execute(page_sql, all_params).fetchall()
+
+    return [_deserialize_row(r) for r in rows], total

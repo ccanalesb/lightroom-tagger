@@ -369,11 +369,16 @@ def reject_match_endpoint(db, catalog_key, insta_key):
     """Reject a match: delete it and blocklist the pair."""
     try:
         match_row = db.execute(
-            "SELECT 1 FROM matches WHERE catalog_key = ? AND insta_key = ?",
+            "SELECT validated_at FROM matches WHERE catalog_key = ? AND insta_key = ?",
             (catalog_key, insta_key),
         ).fetchone()
         if not match_row:
             return error_not_found('match')
+        if match_row['validated_at']:
+            return jsonify({
+                'error': 'Match has been validated; un-validate it before rejecting.',
+                'rejected': False,
+            }), 409
 
         reject_match(db, catalog_key, insta_key)
         return jsonify({'rejected': True})

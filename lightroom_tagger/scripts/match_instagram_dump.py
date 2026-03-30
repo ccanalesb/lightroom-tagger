@@ -94,7 +94,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
     if not unprocessed:
         return stats, matches_found
 
-    rejected = get_rejected_pairs(db) if not force_reprocess else set()
+    rejected = get_rejected_pairs(db)
 
     for idx, dump_media in enumerate(unprocessed, 1):
         stats['processed'] += 1
