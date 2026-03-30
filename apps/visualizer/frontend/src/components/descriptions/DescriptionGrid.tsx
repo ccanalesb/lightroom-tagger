@@ -1,11 +1,8 @@
 import type { DescriptionItem, DescriptionListResult } from '../../services/api';
 import type { Resource } from '../../utils/createResource';
 import { DescriptionCard } from './DescriptionCard';
-import {
-  DESC_PAGE_EMPTY,
-  PAGINATION_PREVIOUS,
-  PAGINATION_NEXT,
-} from '../../constants/strings';
+import { Pagination } from '../ui/Pagination';
+import { DESC_PAGE_EMPTY } from '../../constants/strings';
 
 export interface DescriptionGridProps {
   resource: Resource<DescriptionListResult>;
@@ -43,29 +40,7 @@ export function DescriptionGrid({
         ))}
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-4 pt-4">
-          <button
-            type="button"
-            onClick={() => onPageChange(Math.max(1, page - 1))}
-            disabled={page <= 1}
-            className="px-3 py-1 rounded text-sm border disabled:opacity-30"
-          >
-            {PAGINATION_PREVIOUS}
-          </button>
-          <span className="text-sm text-gray-600">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-            disabled={page >= totalPages}
-            className="px-3 py-1 rounded text-sm border disabled:opacity-30"
-          >
-            {PAGINATION_NEXT}
-          </button>
-        </div>
-      )}
+      <Pagination currentPage={page} totalPages={totalPages} onPageChange={onPageChange} />
     </>
   );
 }

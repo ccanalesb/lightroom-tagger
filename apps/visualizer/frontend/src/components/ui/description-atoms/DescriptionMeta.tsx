@@ -1,6 +1,7 @@
 import {
   DESC_PAGE_SOURCE_CATALOG,
   DESC_PAGE_SOURCE_INSTAGRAM,
+  LABEL_MODEL,
 } from '../../../constants/strings'
 import { formatDate } from '../../../utils/date'
 
@@ -33,7 +34,11 @@ export function DescriptionMeta({ model, describedAt, imageType, hasDescription,
   }
 
   if (model) {
-    parts.push(<span key="model">model: {model}</span>)
+    parts.push(
+      <span key="model">
+        {LABEL_MODEL} {model}
+      </span>
+    )
   }
 
   if (describedAt) {

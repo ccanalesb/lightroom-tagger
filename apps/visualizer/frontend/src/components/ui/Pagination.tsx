@@ -1,4 +1,8 @@
-import { PAGINATION_PREVIOUS, PAGINATION_NEXT } from '../../constants/strings'
+import { MSG_PAGE_OF, PAGINATION_NEXT, PAGINATION_PREVIOUS } from '../../constants/strings'
+
+function formatPageOf(currentPage: number, totalPages: number): string {
+  return MSG_PAGE_OF.replace('{current}', String(currentPage)).replace('{total}', String(totalPages))
+}
 
 interface PaginationProps {
   currentPage: number
@@ -20,9 +24,7 @@ export function Pagination({ currentPage, totalPages, onPageChange, disabled }: 
       >
         {PAGINATION_PREVIOUS}
       </button>
-      <span className="text-sm text-gray-600">
-        Page {currentPage} of {totalPages}
-      </span>
+      <span className="text-sm text-gray-600">{formatPageOf(currentPage, totalPages)}</span>
       <button
         type="button"
         onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}

@@ -8,6 +8,7 @@ import {
   MATCH_VALIDATE,
   MATCH_VALIDATED,
   MATCH_REJECT,
+  MATCH_DETAIL_UNVALIDATE_FIRST,
 } from '../../../constants/strings';
 import type { Match } from '../../../services/api';
 import { MatchingAPI } from '../../../services/api';
@@ -95,7 +96,7 @@ export function MatchDetailModal({ match, onClose, onValidationChange, onRejecte
                     ? 'border-gray-300 text-gray-300 cursor-not-allowed'
                     : 'border-red-500 text-red-500 hover:bg-red-50'
                 }`}
-                title={validated ? 'Un-validate first to reject' : undefined}
+                title={validated ? MATCH_DETAIL_UNVALIDATE_FIRST : undefined}
               >
                 {MATCH_REJECT}
               </button>

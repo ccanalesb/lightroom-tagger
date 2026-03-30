@@ -25,8 +25,8 @@ export function useJobSocket({ onJobCreated, onJobUpdated }: UseJobSocketOptions
     if (onJobUpdated) socket.on('job_updated', onJobUpdated)
 
     return () => {
-      socket.off('job_created', onJobCreated)
-      socket.off('job_updated', onJobUpdated)
+      if (onJobCreated) socket.off('job_created', onJobCreated)
+      if (onJobUpdated) socket.off('job_updated', onJobUpdated)
     }
   }, [socket, connected, onJobCreated, onJobUpdated])
 

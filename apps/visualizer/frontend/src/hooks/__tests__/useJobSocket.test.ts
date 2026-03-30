@@ -45,8 +45,19 @@ describe('useJobSocket', () => {
     expect(eventNames).toContain('job_updated')
   })
 
-  it('cleans up listeners on unmount', () => {
+  it('should only unregister handlers that were registered', () => {
     const { unmount } = renderHook(() => useJobSocket({ onJobCreated: vi.fn() }))
+    unmount()
+    const offCalls = mockSocket.off.mock.calls
+    const eventNames = offCalls.map(([name]: [string]) => name)
+    expect(eventNames).toContain('job_created')
+    expect(eventNames).not.toContain('job_updated')
+  })
+
+  it('should clean up both listeners on unmount when both handlers are provided', () => {
+    const { unmount } = renderHook(() =>
+      useJobSocket({ onJobCreated: vi.fn(), onJobUpdated: vi.fn() })
+    )
     unmount()
     const offCalls = mockSocket.off.mock.calls
     const eventNames = offCalls.map(([name]: [string]) => name)

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { InstagramImage } from '../../services/api';
-import { MSG_CLICK_FOR_DETAILS } from '../../constants/strings';
+import { INSTAGRAM_ERROR_PLACEHOLDER, MSG_CLICK_FOR_DETAILS } from '../../constants/strings';
 import { thumbnailUrl as buildThumbUrl } from '../../utils/imageUrl';
 
 interface InstagramImageCardProps {
@@ -24,7 +24,7 @@ export function InstagramImageCard({ image, onClick }: InstagramImageCardProps) 
         )}
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-            <span className="text-xs text-gray-400">Error</span>
+            <span className="text-xs text-gray-400">{INSTAGRAM_ERROR_PLACEHOLDER}</span>
           </div>
         )}
         <img
