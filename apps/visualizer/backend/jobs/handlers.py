@@ -386,9 +386,138 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
             lib_db.close()
 
 
+def handle_batch_describe(runner, job_id: str, metadata: dict):
+    """Generate AI descriptions for catalog and/or Instagram images in bulk."""
+    lib_db = None
+    old_model_env = os.environ.get('DESCRIPTION_VISION_MODEL')
+    try:
+        config = load_config()
+        db_path = os.getenv('LIBRARY_DB')
+        if not db_path:
+            db_path = config.db_path or 'library.db'
+        lib_db = init_database(db_path)
+
+        image_type = metadata.get('image_type', 'both')  # catalog, instagram, both
+        date_filter = metadata.get('date_filter', 'all')  # all, 3months, 6months
+        force = metadata.get('force', False)
+        vision_model = metadata.get('vision_model')
+
+        if vision_model:
+            os.environ['DESCRIPTION_VISION_MODEL'] = vision_model
+
+        months = {'3months': 3, '6months': 6}.get(date_filter)
+
+        from lightroom_tagger.core.database import (
+            get_undescribed_catalog_images,
+            get_undescribed_instagram_images,
+        )
+        from lightroom_tagger.core.description_service import (
+            describe_instagram_image,
+            describe_matched_image,
+        )
+
+        images_to_describe: list[tuple[str, str]] = []  # (key, type)
+
+        if image_type in ('catalog', 'both'):
+            if force:
+                rows = lib_db.execute("SELECT key FROM images").fetchall()
+                if months:
+                    rows = lib_db.execute(
+                        "SELECT key FROM images WHERE date_taken >= date('now', ?)",
+                        (f'-{months} months',),
+                    ).fetchall()
+                images_to_describe += [(r['key'], 'catalog') for r in rows]
+            else:
+                images_to_describe += [
+                    (img['key'], 'catalog')
+                    for img in get_undescribed_catalog_images(lib_db, months=months)
+                ]
+
+        if image_type in ('instagram', 'both'):
+            if force:
+                rows = lib_db.execute("SELECT media_key FROM instagram_dump_media").fetchall()
+                if months:
+                    rows = lib_db.execute(
+                        "SELECT media_key FROM instagram_dump_media WHERE created_at >= date('now', ?)",
+                        (f'-{months} months',),
+                    ).fetchall()
+                images_to_describe += [(r['media_key'], 'instagram') for r in rows]
+            else:
+                images_to_describe += [
+                    (img['media_key'], 'instagram')
+                    for img in get_undescribed_instagram_images(lib_db, months=months)
+                ]
+
+        total = len(images_to_describe)
+        runner.update_progress(job_id, 5, f'Found {total} images to describe')
+
+        if total == 0:
+            runner.complete_job(job_id, {
+                'described': 0, 'skipped': 0, 'failed': 0, 'total': 0,
+            })
+            return
+
+        described = 0
+        skipped = 0
+        failed = 0
+        consecutive_failures = 0
+
+        from database import add_job_log
+
+        for idx, (key, itype) in enumerate(images_to_describe, 1):
+            progress = int(5 + (idx / total) * 90)
+            runner.update_progress(job_id, progress, f'Describing {idx}/{total}: {key}')
+
+            try:
+                if itype == 'catalog':
+                    result = describe_matched_image(lib_db, key, force=force)
+                else:
+                    result = describe_instagram_image(lib_db, key, force=force)
+
+                if result:
+                    described += 1
+                    consecutive_failures = 0
+                else:
+                    skipped += 1
+                    consecutive_failures += 1
+                    if consecutive_failures <= 3:
+                        add_job_log(runner.db, job_id, 'warning',
+                                    f'No description generated for {key} (file missing or model error)')
+            except Exception as e:
+                failed += 1
+                consecutive_failures += 1
+                add_job_log(runner.db, job_id, 'warning', f'Failed {key}: {e}')
+
+            if consecutive_failures >= 10:
+                add_job_log(runner.db, job_id, 'error',
+                            f'Stopping: {consecutive_failures} consecutive failures — possible rate limit or model issue')
+                break
+
+        runner.complete_job(job_id, {
+            'described': described,
+            'skipped': skipped,
+            'failed': failed,
+            'total': total,
+            'image_type': image_type,
+            'date_filter': date_filter,
+            'force': force,
+        })
+
+    except Exception as e:
+        runner.fail_job(job_id, str(e))
+    finally:
+        if old_model_env is not None:
+            os.environ['DESCRIPTION_VISION_MODEL'] = old_model_env
+        else:
+            os.environ.pop('DESCRIPTION_VISION_MODEL', None)
+        if lib_db:
+            lib_db.close()
+
+
 JOB_HANDLERS = {
     'analyze_instagram': handle_analyze_instagram,
     'vision_match': handle_vision_match,
     'enrich_catalog': handle_enrich_catalog,
     'prepare_catalog': handle_prepare_catalog,
+    'batch_describe': handle_batch_describe,
 }
