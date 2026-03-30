@@ -289,7 +289,7 @@ def list_matches(db):
     """List matches grouped by Instagram image."""
     try:
         matches = db.execute(
-            "SELECT * FROM matches ORDER BY insta_key, rank, total_score DESC"
+            "SELECT * FROM matches ORDER BY insta_key, COALESCE(rank, 1), total_score DESC"
         ).fetchall()
 
         # Build lookup tables for images (avoid N+1 queries)
