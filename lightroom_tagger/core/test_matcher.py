@@ -82,6 +82,55 @@ def test_score_candidates_includes_vision():
     store_mock.assert_called_once()
 
 
+def test_score_candidates_stores_actual_provider_model_in_cache():
+    """After vision success, cache row uses _provider/_model from response, not requested default."""
+    mock_db = Mock()
+
+    insta_image = {
+        'key': 'insta_test',
+        'image_hash': 'a1b2c3d4e5f6g7h8',
+        'description': 'sunset over bay',
+        'local_path': '/tmp/insta.jpg',
+    }
+
+    candidates = [
+        {'key': 'cat1', 'image_hash': 'a1b2c3d4e5f6g7h8', 'description': 'sunset', 'local_path': '/tmp/local1.jpg'},
+    ]
+
+    vision_payload = {
+        'confidence': 100,
+        'verdict': 'SAME',
+        'reasoning': '',
+        '_provider': 'nvidia_nim',
+        '_model': 'google/paligemma',
+    }
+
+    with patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=None), \
+         patch('lightroom_tagger.core.analyzer.compare_with_vision', return_value=vision_payload), \
+         patch('lightroom_tagger.core.analyzer.vision_score', return_value=1.0), \
+         patch('lightroom_tagger.core.matcher.store_vision_comparison') as store_mock, \
+         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
+         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
+         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
+         patch('lightroom_tagger.core.phash.hamming_distance', return_value=0):
+        mock_insta_cache.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
+        mock_insta_cache.return_value.cleanup.return_value = None
+
+        results = score_candidates_with_vision(
+            mock_db, insta_image, candidates,
+            phash_weight=0.4, desc_weight=0.3, vision_weight=0.3,
+            provider_id='ollama',
+            model=None,
+        )
+
+    assert len(results) == 1
+    assert results[0]['model_used'] == 'nvidia_nim:google/paligemma'
+    store_mock.assert_called_once()
+    _db, cat, insta, _result, _score, model_used = store_mock.call_args[0]
+    assert model_used == 'nvidia_nim:google/paligemma'
+
+
 def test_score_candidates_uses_cache():
     """Should use cached vision comparison when available."""
     mock_db = Mock()

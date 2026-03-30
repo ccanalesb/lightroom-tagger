@@ -154,14 +154,15 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         # Check vision comparison cache (invalidate if model changed)
         vision_cached = get_vision_comparison(db, catalog_key, insta_key)
         base_vision_model = get_vision_model()
-        current_model_label = (
+        # Requested label for cache lookup only; pipeline may pick a different default model.
+        requested_model_label = (
             f"{provider_id}:{model or base_vision_model}"
             if provider_id
             else base_vision_model
         )
         cache_valid = (
             vision_cached
-            and vision_cached.get('model_used') == current_model_label
+            and vision_cached.get('model_used') == requested_model_label
         )
 
         model_label = base_vision_model
@@ -191,12 +192,14 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 consecutive_rate_limits = 0
 
                 if vision_data.get('_provider'):
-                    model_label = f"{vision_data['_provider']}:{vision_data.get('_model', model_label)}"
+                    ap = vision_data['_provider']
+                    am = vision_data.get('_model')
+                    model_label = f"{ap}:{am}" if am is not None else f"{ap}:"
 
                 store_vision_comparison(
                     db, catalog_key, insta_key,
                     vision_result, vision_score_val,
-                    current_model_label,
+                    model_label,
                 )
             except RateLimitError as e:
                 consecutive_rate_limits += 1

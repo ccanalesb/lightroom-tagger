@@ -1,8 +1,10 @@
 import json
 import os
 import tempfile
+from unittest.mock import patch
 
 from lightroom_tagger.core.database import init_database
+from lightroom_tagger.core.provider_errors import RateLimitError
 
 
 def _make_client(db_path):
@@ -130,6 +132,56 @@ def test_generate_should_reject_invalid_image_type():
         )
         assert resp.status_code == 400
         assert 'error' in resp.get_json()
+
+
+def test_generate_should_return_400_when_provider_id_unknown():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, 'test.db')
+        db = init_database(db_path)
+        db.execute(
+            "INSERT OR IGNORE INTO images (key, filename, filepath, date_taken) VALUES (?, ?, ?, ?)",
+            ('cat_001', 'photo.jpg', '/fake/photo.jpg', '2024-01-15'),
+        )
+        db.commit()
+        db.close()
+
+        client = _make_client(db_path)
+        with patch(
+            'api.descriptions.describe_matched_image',
+            side_effect=KeyError("Unknown provider: not_a_real_provider"),
+        ):
+            resp = client.post(
+                '/api/descriptions/cat_001/generate',
+                json={'image_type': 'catalog', 'provider_id': 'not_a_real_provider'},
+            )
+        assert resp.status_code == 400
+        body = resp.get_json()
+        assert body['error'] == 'invalid_provider'
+        assert 'not_a_real_provider' in body['message']
+
+
+def test_generate_should_include_request_provider_on_rate_limit_when_exception_has_no_provider():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, 'test.db')
+        db = init_database(db_path)
+        db.execute(
+            "INSERT OR IGNORE INTO images (key, filename, filepath, date_taken) VALUES (?, ?, ?, ?)",
+            ('cat_001', 'photo.jpg', '/fake/photo.jpg', '2024-01-15'),
+        )
+        db.commit()
+        db.close()
+
+        client = _make_client(db_path)
+        with patch(
+            'api.descriptions.describe_matched_image',
+            side_effect=RateLimitError('too many requests'),
+        ):
+            resp = client.post(
+                '/api/descriptions/cat_001/generate',
+                json={'image_type': 'catalog', 'provider_id': 'ollama'},
+            )
+        assert resp.status_code == 429
+        assert resp.get_json()['provider'] == 'ollama'
 
 
 def test_list_descriptions_should_paginate():

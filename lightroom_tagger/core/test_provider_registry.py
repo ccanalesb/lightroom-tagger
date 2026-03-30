@@ -123,6 +123,22 @@ class TestGetClient:
             client = registry.get_client("ollama")
             assert "myhost" in str(client.base_url)
 
+    def test_should_not_append_v1_twice_when_ollama_host_already_has_v1(self):
+        with patch.dict(os.environ, {"OLLAMA_HOST": "http://localhost:11434/v1"}):
+            registry = ProviderRegistry()
+            client = registry.get_client("ollama")
+            url = str(client.base_url).rstrip("/")
+            assert url.endswith("/v1")
+            assert "/v1/v1" not in url
+
+    def test_should_not_append_v1_twice_when_ollama_host_has_trailing_slash_and_v1(self):
+        with patch.dict(os.environ, {"OLLAMA_HOST": "http://localhost:11434/v1/"}):
+            registry = ProviderRegistry()
+            client = registry.get_client("ollama")
+            url = str(client.base_url).rstrip("/")
+            assert url.endswith("/v1")
+            assert "/v1/v1" not in url
+
     def test_should_use_default_ollama_url_when_env_unset(self):
         with patch.dict(os.environ, {}, clear=True):
             registry = ProviderRegistry()

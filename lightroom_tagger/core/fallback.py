@@ -5,7 +5,12 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from lightroom_tagger.core.provider_errors import NOT_RETRYABLE_ERRORS, RETRYABLE_ERRORS, ProviderError
+from lightroom_tagger.core.provider_errors import (
+    NOT_RETRYABLE_ERRORS,
+    RETRYABLE_ERRORS,
+    ModelUnavailableError,
+    ProviderError,
+)
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.retry import retry_with_backoff
 
@@ -48,6 +53,8 @@ class FallbackDispatcher:
         """
         primary_id = provider_id
         order = self._build_order(primary_id)
+        if not order:
+            raise ProviderError("No available providers for operation")
         last_error: ProviderError | None = None
 
         for index, provider_id in enumerate(order):
@@ -96,5 +103,10 @@ class FallbackDispatcher:
     def _pick_fallback_model(self, provider_id: str) -> str:
         """Pick the first vision model for a fallback provider."""
         models = self._registry.list_models(provider_id)
+        if not models:
+            raise ModelUnavailableError(
+                f"No models available for fallback provider '{provider_id}'.",
+                provider=provider_id,
+            )
         vision_models = [m for m in models if m.get("vision")]
         return vision_models[0]["id"] if vision_models else models[0]["id"]

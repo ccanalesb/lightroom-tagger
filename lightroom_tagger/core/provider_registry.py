@@ -89,7 +89,10 @@ class ProviderRegistry:
         host = os.environ.get(env_var, "") if env_var else ""
         default = pconfig.get("base_url_default", "")
         if host:
-            return host.rstrip("/") + "/v1"
+            base = host.rstrip("/")
+            if not base.endswith("/v1"):
+                base = base + "/v1"
+            return base
         return default
 
     def _resolve_api_key(self, pconfig: dict) -> str:

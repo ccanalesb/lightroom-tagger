@@ -5,6 +5,8 @@ import pytest
 from lightroom_tagger.core.provider_errors import (
     AuthenticationError,
     ConnectionError,
+    ModelUnavailableError,
+    ProviderError,
     RateLimitError,
 )
 from lightroom_tagger.core.fallback import FallbackDispatcher
@@ -141,6 +143,57 @@ class TestNonRetryableSkipsFallback:
                 model="gemma3:27b",
             )
         registry.get_client.assert_called_once()
+
+
+class TestEmptyOrder:
+    def test_should_raise_provider_error_when_no_providers_available(self):
+        registry = MagicMock()
+        registry.fallback_order = ["ollama", "nvidia_nim"]
+        registry.list_providers.return_value = [
+            {"id": "ollama", "name": "Ollama", "available": False},
+            {"id": "nvidia_nim", "name": "NIM", "available": False},
+        ]
+        dispatcher = FallbackDispatcher(registry)
+
+        with pytest.raises(ProviderError, match="No available providers"):
+            dispatcher.call_with_fallback(
+                operation="compare",
+                fn_factory=lambda c, m: lambda: "never",
+                provider_id="ollama",
+                model="gemma3:27b",
+            )
+
+
+class TestEmptyFallbackModels:
+    @patch("time.sleep")
+    def test_should_raise_model_unavailable_when_fallback_has_no_models(self, mock_sleep):
+        registry = MagicMock()
+        registry.fallback_order = ["ollama", "nvidia_nim"]
+        registry.list_providers.return_value = [
+            {"id": "ollama", "name": "ollama", "available": True},
+            {"id": "nvidia_nim", "name": "nvidia_nim", "available": True},
+        ]
+        registry.get_client.return_value = MagicMock()
+        registry.get_retry_config.return_value = {
+            "max_retries": 0,
+            "backoff_seconds": [],
+            "respect_retry_after": False,
+        }
+        registry.list_models.side_effect = lambda pid: (
+            [] if pid == "nvidia_nim" else [{"id": "test-model", "vision": True, "source": "config"}]
+        )
+        dispatcher = FallbackDispatcher(registry)
+
+        def fn_factory(client, model):
+            return lambda: (_ for _ in ()).throw(RateLimitError("429"))
+
+        with pytest.raises(ModelUnavailableError, match="No models available for fallback provider"):
+            dispatcher.call_with_fallback(
+                operation="compare",
+                fn_factory=fn_factory,
+                provider_id="ollama",
+                model="gemma3:27b",
+            )
 
 
 class TestLogCallback:
