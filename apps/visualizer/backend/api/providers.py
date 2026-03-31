@@ -1,6 +1,9 @@
 """Providers API — list providers, models, manage fallback order."""
 
-from flask import Blueprint, jsonify
+import sqlite3
+
+from database import add_user_model, delete_user_model, get_user_models
+from flask import Blueprint, current_app, jsonify, request
 
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 
@@ -17,23 +20,83 @@ def list_providers():
     return jsonify(registry.list_providers())
 
 
-@bp.route("/<provider_id>/models", methods=["GET"])
-def list_models(provider_id: str):
+@bp.route("/fallback-order", methods=["GET", "PUT"])
+def fallback_order():
     registry = _get_registry()
+    if request.method == "GET":
+        return jsonify({"order": registry.fallback_order})
+    data = request.json
+    if not data or "order" not in data:
+        return jsonify({"error": "order is required"}), 400
     try:
-        models = registry.list_models(provider_id)
-    except KeyError:
-        return jsonify({"error": f"Unknown provider: {provider_id}"}), 404
-    return jsonify(models)
-
-
-@bp.route("/fallback-order", methods=["GET"])
-def get_fallback_order():
-    registry = _get_registry()
+        registry.update_fallback_order(data["order"])
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     return jsonify({"order": registry.fallback_order})
 
 
-@bp.route("/defaults", methods=["GET"])
-def get_defaults():
+@bp.route("/defaults", methods=["GET", "PUT"])
+def defaults():
     registry = _get_registry()
+    if request.method == "GET":
+        return jsonify(registry.defaults)
+    data = request.json
+    if not data:
+        return jsonify({"error": "body is required"}), 400
+    try:
+        registry.update_defaults(data)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     return jsonify(registry.defaults)
+
+
+@bp.route("/<provider_id>/models/<path:model_id>", methods=["DELETE"])
+def delete_model(provider_id: str, model_id: str):
+    deleted = delete_user_model(current_app.db, provider_id, model_id)
+    if not deleted:
+        return jsonify({"error": "Model not found or not user-added"}), 404
+    return jsonify({"deleted": True})
+
+
+@bp.route("/<provider_id>/models", methods=["GET", "POST"])
+def models(provider_id: str):
+    registry = _get_registry()
+    if provider_id not in [provider["id"] for provider in registry.list_providers()]:
+        return jsonify({"error": f"Unknown provider: {provider_id}"}), 404
+
+    if request.method == "GET":
+        models_list = registry.list_models(provider_id)
+        user_models = get_user_models(current_app.db, provider_id)
+        for user_model in user_models:
+            models_list.append({
+                "id": user_model["model_id"],
+                "name": user_model["model_name"],
+                "vision": bool(user_model["vision"]),
+                "source": "user",
+            })
+        return jsonify(models_list)
+
+    data = request.json
+    if not data or "id" not in data or "name" not in data:
+        return jsonify({"error": "id and name are required"}), 400
+    try:
+        add_user_model(
+            current_app.db,
+            provider_id,
+            data["id"],
+            data["name"],
+            data.get("vision", True),
+        )
+    except sqlite3.IntegrityError:
+        return jsonify(
+            {"error": f"Model {data['id']} already exists for {provider_id}"}
+        ), 409
+    return (
+        jsonify({
+            "id": data["id"],
+            "name": data["name"],
+            "vision": data.get("vision", True),
+            "source": "user",
+        }),
+        201,
+    )

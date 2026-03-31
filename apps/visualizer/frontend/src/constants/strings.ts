@@ -149,6 +149,8 @@ export const ADVANCED_DATE_YEAR_2026 = '2026 only'
 
 export const ADVANCED_MODEL_LABEL = 'Vision Model'
 export const ADVANCED_MODEL_DESCRIPTION = 'Model used for vision comparison'
+export const ADVANCED_PROVIDER_OVERRIDES_LEGACY_MODEL =
+  'Provider-specific model selection overrides the legacy Ollama model below when set.'
 
 export const ADVANCED_THRESHOLD_LABEL = 'Match Threshold'
 export const ADVANCED_THRESHOLD_MIN = '0.50 (lenient)'
@@ -304,10 +306,18 @@ export const PROVIDER_NO_MODELS = 'No models available'
 export const PROVIDER_COL_MODEL = 'Model'
 export const PROVIDER_COL_VISION = 'Vision'
 export const PROVIDER_COL_SOURCE = 'Source'
+export const PROVIDER_COL_ACTIONS = 'Actions'
 export const PROVIDER_SELECT_LABEL = 'Provider'
 export const PROVIDER_MODEL_SELECT_LABEL = 'Model'
 export const PROVIDER_AUTO_DEFAULT = 'Auto (default)'
 export const PROVIDER_MODEL_AUTO_FIRST = 'Auto (first available)'
+export const PROVIDER_MOVE_UP = 'Move provider up in fallback order'
+export const PROVIDER_MOVE_DOWN = 'Move provider down in fallback order'
+export const PROVIDER_REMOVE_MODEL = 'Remove user-added model'
+export const PROVIDER_ADD_MODEL_ID_LABEL = 'Model ID'
+export const PROVIDER_ADD_MODEL_NAME_LABEL = 'Display name'
+export const PROVIDER_ADD_MODEL_VISION_LABEL = 'Supports vision'
+export const PROVIDER_ADD_MODEL_SUBMIT = 'Add model'
 
 // Generic Buttons
 export const BTN_DISMISS = 'Dismiss'

@@ -1,10 +1,12 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { SystemAPI } from '../services/api';
+import { ProvidersAPI, SystemAPI } from '../services/api';
 import { ADVANCED_WEIGHTS_MUST_SUM } from '../constants/strings';
 
 interface MatchOptions {
   selectedModel: string;
+  providerId: string | null;
+  providerModel: string | null;
   threshold: number;
   phashWeight: number;
   descWeight: number;
@@ -13,6 +15,8 @@ interface MatchOptions {
 
 const DEFAULT_OPTIONS: MatchOptions = {
   selectedModel: '',
+  providerId: null,
+  providerModel: null,
   threshold: 0.7,
   phashWeight: 0,
   descWeight: 0,
@@ -43,12 +47,31 @@ export function MatchOptionsProvider({ children }: { children: ReactNode }) {
       .catch(console.error);
   }, []);
 
+  useEffect(() => {
+    ProvidersAPI.getDefaults()
+      .then((defaults) => {
+        const visionComparison = defaults.vision_comparison;
+        if (!visionComparison?.provider) return;
+        setOptions((prev) => ({
+          ...prev,
+          providerId: visionComparison.provider,
+          providerModel: visionComparison.model ?? null,
+        }));
+      })
+      .catch(console.error);
+  }, []);
+
   const updateOption = useCallback(<K extends keyof MatchOptions>(key: K, value: MatchOptions[K]) => {
     setOptions((prev) => ({ ...prev, [key]: value }));
   }, []);
 
   const resetOptions = useCallback(() => {
-    setOptions((prev) => ({ ...DEFAULT_OPTIONS, selectedModel: prev.selectedModel }));
+    setOptions((prev) => ({
+      ...DEFAULT_OPTIONS,
+      selectedModel: prev.selectedModel,
+      providerId: prev.providerId,
+      providerModel: prev.providerModel,
+    }));
   }, []);
 
   const weightsError = useMemo(() => {
@@ -72,7 +95,7 @@ export function MatchOptionsProvider({ children }: { children: ReactNode }) {
 }
 
 export function useMatchOptions() {
-  const ctx = useContext(MatchOptionsContext);
-  if (!ctx) throw new Error('useMatchOptions must be used within MatchOptionsProvider');
-  return ctx;
+  const context = useContext(MatchOptionsContext);
+  if (!context) throw new Error('useMatchOptions must be used within MatchOptionsProvider');
+  return context;
 }

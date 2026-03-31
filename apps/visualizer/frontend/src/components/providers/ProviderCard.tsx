@@ -4,28 +4,27 @@ import {
   PROVIDER_STATUS_UNAVAILABLE,
   PROVIDER_MODELS_HEADING,
   PROVIDER_NO_MODELS,
-  PROVIDER_COL_MODEL,
-  PROVIDER_COL_VISION,
-  PROVIDER_COL_SOURCE,
-  PROVIDER_SOURCE_CONFIG,
-  PROVIDER_SOURCE_DISCOVERED,
-  PROVIDER_SOURCE_USER,
 } from '../../constants/strings'
+import { ModelList } from './ModelList'
+import { AddModelForm } from './AddModelForm'
 
-const SOURCE_LABELS: Record<string, string> = {
-  config: PROVIDER_SOURCE_CONFIG,
-  discovered: PROVIDER_SOURCE_DISCOVERED,
-  user: PROVIDER_SOURCE_USER,
-}
-
-interface Props {
+interface ProviderCardProps {
   provider: Provider
   models: ProviderModel[]
   expanded: boolean
   onToggle: () => void
+  onAddModel: (model: { id: string; name: string; vision: boolean }) => void
+  onRemoveModel: (modelId: string) => void
 }
 
-export function ProviderCard({ provider, models, expanded, onToggle }: Props) {
+export function ProviderCard({
+  provider,
+  models,
+  expanded,
+  onToggle,
+  onAddModel,
+  onRemoveModel,
+}: ProviderCardProps) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
       <button
@@ -54,33 +53,9 @@ export function ProviderCard({ provider, models, expanded, onToggle }: Props) {
           {models.length === 0 ? (
             <p className="text-sm text-gray-400">{PROVIDER_NO_MODELS}</p>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-500 text-xs uppercase tracking-wider">
-                  <th className="pb-1">{PROVIDER_COL_MODEL}</th>
-                  <th className="pb-1">{PROVIDER_COL_VISION}</th>
-                  <th className="pb-1">{PROVIDER_COL_SOURCE}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {models.map(model => (
-                  <tr key={model.id}>
-                    <td className="py-1.5 font-mono text-xs text-gray-800">{model.name}</td>
-                    <td className="py-1.5">
-                      {model.vision ? (
-                        <span className="text-green-600">✓</span>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
-                    <td className="py-1.5 text-xs text-gray-500">
-                      {SOURCE_LABELS[model.source] ?? model.source}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <ModelList models={models} onRemove={onRemoveModel} />
           )}
+          <AddModelForm onAdd={onAddModel} />
         </div>
       )}
     </div>

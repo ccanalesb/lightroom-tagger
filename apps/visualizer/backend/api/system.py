@@ -1,9 +1,8 @@
 import os
-import subprocess
 import sys
 
 import config
-from flask import Blueprint, jsonify
+from flask import Blueprint, current_app, has_app_context, jsonify
 from lightroom_tagger.core.database import init_database
 
 # Add project root for lightroom_tagger imports
@@ -18,46 +17,72 @@ def get_status():
 
 @bp.route('/vision-models', methods=['GET'])
 def get_vision_models():
-    """Get available vision models from Ollama."""
+    """Get available vision models from all providers (registry + optional user DB rows)."""
     try:
-        # Get list of vision-capable models from Ollama
-        result = subprocess.run(
-            ['ollama', 'list'],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        if result.returncode != 0:
-            # Fallback to common vision models
-            return jsonify({
-                'models': [
-                    {'name': 'gemma3:27b', 'default': True},
-                    {'name': 'gemma3:4b', 'default': False},
-                ],
-                'fallback': True
-            })
+        from lightroom_tagger.core.provider_registry import ProviderRegistry
 
-        models = []
-        default_model = config.vision_model if hasattr(config, 'vision_model') else 'gemma3:27b'
-        for line in result.stdout.strip().split('\n'):
-            if line and not line.startswith('NAME'):
-                model_name = line.split()[0]
-                models.append({
-                    'name': model_name,
-                    'default': model_name == default_model
+        registry = ProviderRegistry()
+        defaults = registry.defaults
+        default_comparison = defaults.get("vision_comparison", {})
+        default_provider = default_comparison.get("provider", "ollama")
+        default_model = default_comparison.get("model")
+
+        all_models = []
+        for provider in registry.list_providers():
+            if not provider["available"]:
+                continue
+            try:
+                models = registry.list_models(provider["id"])
+            except Exception:
+                continue
+            for model in models:
+                if not model.get("vision"):
+                    continue
+                model_name = model["id"]
+                is_default = (
+                    provider["id"] == default_provider
+                    and (default_model is None or default_model == model_name)
+                    and not any(m.get("default") for m in all_models)
+                )
+                all_models.append({
+                    "name": model_name,
+                    "provider_id": provider["id"],
+                    "default": is_default,
                 })
 
-        return jsonify({
-            'models': models,
-            'fallback': False
-        })
+        if has_app_context():
+            db = getattr(current_app, "db", None)
+            if db is not None:
+                from database import get_user_models
 
+                seen = {(entry["provider_id"], entry["name"]) for entry in all_models}
+                for user_model in get_user_models(db):
+                    if not user_model.get("vision"):
+                        continue
+                    key = (user_model["provider_id"], user_model["model_id"])
+                    if key in seen:
+                        continue
+                    all_models.append({
+                        "name": user_model["model_id"],
+                        "provider_id": user_model["provider_id"],
+                        "default": False,
+                    })
+                    seen.add(key)
+
+        if not all_models:
+            return jsonify({
+                "models": [{"name": "gemma3:27b", "default": True}],
+                "fallback": True,
+            })
+
+        if not any(m["default"] for m in all_models):
+            all_models[0]["default"] = True
+
+        return jsonify({"models": all_models, "fallback": False})
     except Exception:
         return jsonify({
-            'models': [
-                {'name': 'gemma3:27b', 'default': True},
-            ],
-            'fallback': True
+            "models": [{"name": "gemma3:27b", "default": True}],
+            "fallback": True,
         })
 
 @bp.route('/stats', methods=['GET'])

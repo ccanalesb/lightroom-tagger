@@ -338,4 +338,27 @@ export const ProvidersAPI = {
     request<{ order: string[] }>('/providers/fallback-order'),
   getDefaults: () =>
     request<ProviderDefaults>('/providers/defaults'),
+  updateFallbackOrder: (order: string[]) =>
+    request<{ order: string[] }>('/providers/fallback-order', {
+      method: 'PUT',
+      body: JSON.stringify({ order }),
+    }),
+  updateDefaults: (defaults: Record<string, unknown>) =>
+    request<Record<string, unknown>>('/providers/defaults', {
+      method: 'PUT',
+      body: JSON.stringify(defaults),
+    }),
+  addModel: (
+    providerId: string,
+    model: { id: string; name: string; vision: boolean },
+  ) =>
+    request<ProviderModel>(`/providers/${providerId}/models`, {
+      method: 'POST',
+      body: JSON.stringify(model),
+    }),
+  removeModel: (providerId: string, modelId: string) =>
+    request<{ deleted: boolean }>(
+      `/providers/${providerId}/models/${encodeURIComponent(modelId)}`,
+      { method: 'DELETE' },
+    ),
 }

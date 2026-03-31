@@ -26,7 +26,12 @@ export function useProviders() {
 
   useEffect(() => { refresh() }, [refresh])
 
-  return { providers, fallbackOrder, loading, error, refresh }
+  const updateFallbackOrder = useCallback(async (order: string[]) => {
+    await ProvidersAPI.updateFallbackOrder(order)
+    await refresh()
+  }, [refresh])
+
+  return { providers, fallbackOrder, loading, error, refresh, updateFallbackOrder }
 }
 
 export function useProviderModels(providerId: string | null) {

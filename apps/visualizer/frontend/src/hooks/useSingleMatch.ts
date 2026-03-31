@@ -67,7 +67,7 @@ export function useSingleMatch(imageKey: string) {
   );
 
   const startSingleMatch = useCallback(
-    async (key: string, opts?: { forceReprocess?: boolean }) => {
+    async (key: string, options?: { forceReprocess?: boolean }) => {
       setMatchState("running");
       setMatchResult(null);
       setMatchError(null);
@@ -82,7 +82,13 @@ export function useSingleMatch(imageKey: string) {
             vision: matchOptions.visionWeight,
           },
         };
-        if (opts?.forceReprocess) metadata.force_reprocess = true;
+        if (matchOptions.providerId) {
+          metadata.provider_id = matchOptions.providerId;
+          if (matchOptions.providerModel) {
+            metadata.provider_model = matchOptions.providerModel;
+          }
+        }
+        if (options?.forceReprocess) metadata.force_reprocess = true;
         const job = await JobsAPI.create("vision_match", metadata);
         setMatchJob(job);
         pollJob(job.id);

@@ -169,6 +169,12 @@ export function SingleMatchSection({ image }: SingleMatchSectionProps) {
         isOpen={advancedOpen}
         onToggle={() => setAdvancedOpen(!advancedOpen)}
         availableModels={availableModels}
+        providerId={matchOptions.providerId}
+        providerModel={matchOptions.providerModel}
+        onProviderChange={(pid, mid) => {
+          updateOption("providerId", pid);
+          updateOption("providerModel", mid);
+        }}
         selectedModel={matchOptions.selectedModel}
         onModelChange={(model) => updateOption("selectedModel", model)}
         threshold={matchOptions.threshold}
