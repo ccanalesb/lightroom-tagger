@@ -86,7 +86,9 @@ export function DescriptionsPage() {
         image_type: tab === 'all' ? 'both' : tab,
         date_filter: dateFilter,
         force,
-        vision_model: selectedModel || undefined,
+        ...(options.providerId || options.providerModel
+          ? {}
+          : { vision_model: selectedModel || undefined }),
         ...(options.providerId ? { provider_id: options.providerId } : {}),
         ...(options.providerModel ? { provider_model: options.providerModel } : {}),
       });

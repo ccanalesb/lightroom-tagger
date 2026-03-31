@@ -170,13 +170,15 @@ export function MatchingPage() {
     setIsStarting(true);
 
     const metadata: Record<string, unknown> = {
-      vision_model: options.selectedModel,
       threshold: options.threshold,
       weights: {
         phash: options.phashWeight,
         description: options.descWeight,
         vision: options.visionWeight,
       },
+      ...(options.providerId
+        ? {}
+        : { vision_model: options.selectedModel || undefined }),
     };
 
     if (options.providerId) {

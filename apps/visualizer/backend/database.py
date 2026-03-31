@@ -186,7 +186,9 @@ def get_user_models(
             """
         ).fetchall()
     return [
-        user_model_row if isinstance(user_model_row, dict) else dict(user_model_row)
+        user_model_row
+        if isinstance(user_model_row, dict)
+        else {key: user_model_row[key] for key in user_model_row.keys()}
         for user_model_row in rows
     ]
 

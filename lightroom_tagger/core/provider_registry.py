@@ -19,7 +19,7 @@ class ProviderRegistry:
 
     def __init__(self, config_path: Path = _CONFIG_PATH):
         self._config_path = config_path
-        with open(config_path) as f:
+        with open(self._config_path, encoding="utf-8") as f:
             self._config: dict[str, Any] = json.load(f)
         self._providers: dict[str, dict] = self._config["providers"]
         self._retry_defaults: dict = self._config.get("retry_defaults", {})

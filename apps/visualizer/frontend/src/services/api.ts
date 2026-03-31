@@ -50,7 +50,10 @@ export const SystemAPI = {
     request<Stats>('/stats'),
 
   visionModels: () =>
-    request<{ models: { name: string; default: boolean }[]; fallback: boolean }>('/vision-models'),
+    request<{
+      models: { name: string; default: boolean; provider_id?: string }[]
+      fallback: boolean
+    }>('/vision-models'),
 
   cacheStatus: () =>
     request<CacheStatus>('/cache/status'),
@@ -343,7 +346,7 @@ export const ProvidersAPI = {
       method: 'PUT',
       body: JSON.stringify({ order }),
     }),
-  updateDefaults: (defaults: ProviderDefaults) =>
+  updateDefaults: (defaults: Partial<ProviderDefaults>) =>
     request<ProviderDefaults>('/providers/defaults', {
       method: 'PUT',
       body: JSON.stringify(defaults),

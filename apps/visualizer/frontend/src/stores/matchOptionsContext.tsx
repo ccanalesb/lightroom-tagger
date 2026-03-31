@@ -23,11 +23,17 @@ const DEFAULT_OPTIONS: MatchOptions = {
   visionWeight: 1,
 };
 
+type VisionModelOption = {
+  name: string;
+  default: boolean;
+  provider_id?: string;
+};
+
 interface MatchOptionsContextValue {
   options: MatchOptions;
   updateOption: <K extends keyof MatchOptions>(key: K, value: MatchOptions[K]) => void;
   resetOptions: () => void;
-  availableModels: { name: string; default: boolean }[];
+  availableModels: VisionModelOption[];
   weightsError: string | null;
 }
 
@@ -35,13 +41,13 @@ const MatchOptionsContext = createContext<MatchOptionsContextValue | null>(null)
 
 export function MatchOptionsProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<MatchOptions>({ ...DEFAULT_OPTIONS });
-  const [availableModels, setAvailableModels] = useState<{ name: string; default: boolean }[]>([]);
+  const [availableModels, setAvailableModels] = useState<VisionModelOption[]>([]);
 
   useEffect(() => {
     SystemAPI.visionModels()
       .then((data) => {
         setAvailableModels(data.models);
-        const defaultModel = data.models.find((m) => m.default) ?? data.models[0];
+        const defaultModel = data.models.find((model) => model.default) ?? data.models[0];
         if (defaultModel) setOptions((prev) => ({ ...prev, selectedModel: defaultModel.name }));
       })
       .catch(console.error);

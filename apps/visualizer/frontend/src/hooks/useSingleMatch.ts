@@ -74,13 +74,15 @@ export function useSingleMatch(imageKey: string) {
       try {
         const metadata: Record<string, unknown> = {
           media_key: key,
-          vision_model: matchOptions.selectedModel,
           threshold: matchOptions.threshold,
           weights: {
             phash: matchOptions.phashWeight,
             description: matchOptions.descWeight,
             vision: matchOptions.visionWeight,
           },
+          ...(matchOptions.providerId
+            ? {}
+            : { vision_model: matchOptions.selectedModel || undefined }),
         };
         if (matchOptions.providerId) {
           metadata.provider_id = matchOptions.providerId;
