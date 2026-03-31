@@ -1,10 +1,12 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { SystemAPI } from '../services/api';
+import { ProvidersAPI, SystemAPI } from '../services/api';
 import { ADVANCED_WEIGHTS_MUST_SUM } from '../constants/strings';
 
 interface MatchOptions {
   selectedModel: string;
+  providerId: string | null;
+  providerModel: string | null;
   threshold: number;
   phashWeight: number;
   descWeight: number;
@@ -13,17 +15,25 @@ interface MatchOptions {
 
 const DEFAULT_OPTIONS: MatchOptions = {
   selectedModel: '',
+  providerId: null,
+  providerModel: null,
   threshold: 0.7,
   phashWeight: 0,
   descWeight: 0,
   visionWeight: 1,
 };
 
+type VisionModelOption = {
+  name: string;
+  default: boolean;
+  provider_id?: string;
+};
+
 interface MatchOptionsContextValue {
   options: MatchOptions;
   updateOption: <K extends keyof MatchOptions>(key: K, value: MatchOptions[K]) => void;
   resetOptions: () => void;
-  availableModels: { name: string; default: boolean }[];
+  availableModels: VisionModelOption[];
   weightsError: string | null;
 }
 
@@ -31,14 +41,31 @@ const MatchOptionsContext = createContext<MatchOptionsContextValue | null>(null)
 
 export function MatchOptionsProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<MatchOptions>({ ...DEFAULT_OPTIONS });
-  const [availableModels, setAvailableModels] = useState<{ name: string; default: boolean }[]>([]);
+  const [availableModels, setAvailableModels] = useState<VisionModelOption[]>([]);
 
   useEffect(() => {
-    SystemAPI.visionModels()
-      .then((data) => {
-        setAvailableModels(data.models);
-        const defaultModel = data.models.find((m) => m.default) ?? data.models[0];
-        if (defaultModel) setOptions((prev) => ({ ...prev, selectedModel: defaultModel.name }));
+    Promise.all([SystemAPI.visionModels(), ProvidersAPI.getDefaults()])
+      .then(([modelsData, defaults]) => {
+        setAvailableModels(modelsData.models);
+
+        const legacyModels = modelsData.models.filter(
+          (model) => !model.provider_id || model.provider_id === 'ollama',
+        );
+        const defaultLegacyModel =
+          legacyModels.find((model) => model.default) ?? legacyModels[0];
+
+        const visionComparison = defaults.vision_comparison;
+
+        setOptions((prev) => ({
+          ...prev,
+          ...(defaultLegacyModel ? { selectedModel: defaultLegacyModel.name } : {}),
+          ...(visionComparison?.provider
+            ? {
+                providerId: visionComparison.provider,
+                providerModel: visionComparison.model ?? null,
+              }
+            : {}),
+        }));
       })
       .catch(console.error);
   }, []);
@@ -48,7 +75,12 @@ export function MatchOptionsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const resetOptions = useCallback(() => {
-    setOptions((prev) => ({ ...DEFAULT_OPTIONS, selectedModel: prev.selectedModel }));
+    setOptions((prev) => ({
+      ...DEFAULT_OPTIONS,
+      selectedModel: prev.selectedModel,
+      providerId: prev.providerId,
+      providerModel: prev.providerModel,
+    }));
   }, []);
 
   const weightsError = useMemo(() => {
@@ -72,7 +104,7 @@ export function MatchOptionsProvider({ children }: { children: ReactNode }) {
 }
 
 export function useMatchOptions() {
-  const ctx = useContext(MatchOptionsContext);
-  if (!ctx) throw new Error('useMatchOptions must be used within MatchOptionsProvider');
-  return ctx;
+  const context = useContext(MatchOptionsContext);
+  if (!context) throw new Error('useMatchOptions must be used within MatchOptionsProvider');
+  return context;
 }

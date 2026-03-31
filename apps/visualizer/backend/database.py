@@ -50,6 +50,15 @@ def init_db(db_path: str) -> sqlite3.Connection:
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_type ON jobs(type)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS provider_models (
+            provider_id TEXT NOT NULL,
+            model_id TEXT NOT NULL,
+            model_name TEXT NOT NULL,
+            vision INTEGER DEFAULT 1,
+            PRIMARY KEY (provider_id, model_id)
+        )
+    """)
     conn.commit()
     return conn
 
@@ -152,3 +161,63 @@ def get_pending_jobs(db: sqlite3.Connection) -> list:
     """Get all pending jobs."""
     rows = db.execute("SELECT * FROM jobs WHERE status = 'pending'").fetchall()
     return [_deserialize_job(r) for r in rows]
+
+
+def get_user_models(
+    db: sqlite3.Connection, provider_id: str | None = None
+) -> list[dict]:
+    """List user-added provider models, optionally filtered by provider."""
+    if provider_id is not None:
+        rows = db.execute(
+            """
+            SELECT provider_id, model_id, model_name, vision
+            FROM provider_models
+            WHERE provider_id = ?
+            ORDER BY model_id
+            """,
+            (provider_id,),
+        ).fetchall()
+    else:
+        rows = db.execute(
+            """
+            SELECT provider_id, model_id, model_name, vision
+            FROM provider_models
+            ORDER BY provider_id, model_id
+            """
+        ).fetchall()
+    return [
+        user_model_row
+        if isinstance(user_model_row, dict)
+        else {key: user_model_row[key] for key in user_model_row.keys()}
+        for user_model_row in rows
+    ]
+
+
+def add_user_model(
+    db: sqlite3.Connection,
+    provider_id: str,
+    model_id: str,
+    model_name: str,
+    vision: bool = True,
+) -> None:
+    """Insert a user-defined model row. Raises sqlite3.IntegrityError on duplicate."""
+    db.execute(
+        """
+        INSERT INTO provider_models (provider_id, model_id, model_name, vision)
+        VALUES (?, ?, ?, ?)
+        """,
+        (provider_id, model_id, model_name, 1 if vision else 0),
+    )
+    db.commit()
+
+
+def delete_user_model(
+    db: sqlite3.Connection, provider_id: str, model_id: str
+) -> bool:
+    """Delete a user-defined model. Returns True if a row was removed."""
+    cur = db.execute(
+        "DELETE FROM provider_models WHERE provider_id = ? AND model_id = ?",
+        (provider_id, model_id),
+    )
+    db.commit()
+    return cur.rowcount > 0

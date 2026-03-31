@@ -2,6 +2,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import type { DescriptionItem, ImageDescription, Job } from '../services/api';
 import { DescriptionsAPI, JobsAPI } from '../services/api';
 import { Alert } from '../components/ui/Alert';
+import { ProviderModelSelect } from '../components/ui/ProviderModelSelect';
 import { BatchActionPanel } from '../components/descriptions/BatchActionPanel';
 import { DescriptionDetailModal } from '../components/descriptions/DescriptionDetailModal';
 import { DescriptionGrid } from '../components/descriptions/DescriptionGrid';
@@ -38,7 +39,7 @@ const BATCH_LABELS: Record<TabValue, string> = {
 };
 
 export function DescriptionsPage() {
-  const { availableModels } = useMatchOptions();
+  const { options, updateOption, availableModels } = useMatchOptions();
 
   const [page, setPage] = useState(1);
   const [tab, setTab] = useState<TabValue>('all');
@@ -85,7 +86,11 @@ export function DescriptionsPage() {
         image_type: tab === 'all' ? 'both' : tab,
         date_filter: dateFilter,
         force,
-        vision_model: selectedModel || undefined,
+        ...(options.providerId
+          ? {}
+          : { vision_model: selectedModel || undefined }),
+        ...(options.providerId ? { provider_id: options.providerId } : {}),
+        ...(options.providerModel ? { provider_model: options.providerModel } : {}),
       });
       setBatchJob(job);
     } catch (err) {
@@ -105,6 +110,8 @@ export function DescriptionsPage() {
         item.image_type,
         force,
         selectedModel || undefined,
+        options.providerId ?? undefined,
+        options.providerModel ?? undefined,
       );
       if (res.description) {
         setRefreshKey(prev => prev + 1);
@@ -164,22 +171,32 @@ export function DescriptionsPage() {
         </Suspense>
       </div>
 
-      <BatchActionPanel
-        availableModels={availableModels}
-        selectedModel={selectedModel}
-        onModelChange={setSelectedModel}
-        dateFilter={dateFilter}
-        onDateFilterChange={setDateFilter}
-        force={force}
-        onForceChange={setForce}
-        batchRunning={batchRunning}
-        batchLabel={BATCH_LABELS[tab]}
-        onBatchDescribe={handleBatchDescribe}
-        batchJob={batchJob}
-        onDismissJob={() => setBatchJob(null)}
-        batchError={batchError}
-        onDismissError={() => setBatchError(null)}
-      />
+      <div className="space-y-3">
+        <ProviderModelSelect
+          providerId={options.providerId}
+          modelId={options.providerModel}
+          onChange={(nextProviderId, nextModelId) => {
+            updateOption('providerId', nextProviderId);
+            updateOption('providerModel', nextModelId);
+          }}
+        />
+        <BatchActionPanel
+          availableModels={availableModels}
+          selectedModel={selectedModel}
+          onModelChange={setSelectedModel}
+          dateFilter={dateFilter}
+          onDateFilterChange={setDateFilter}
+          force={force}
+          onForceChange={setForce}
+          batchRunning={batchRunning}
+          batchLabel={BATCH_LABELS[tab]}
+          onBatchDescribe={handleBatchDescribe}
+          batchJob={batchJob}
+          onDismissJob={() => setBatchJob(null)}
+          batchError={batchError}
+          onDismissError={() => setBatchError(null)}
+        />
+      </div>
 
       {generateError && (
         <Alert tone="danger" message={generateError} onDismiss={() => setGenerateError(null)} />

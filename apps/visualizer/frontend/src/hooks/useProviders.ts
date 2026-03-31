@@ -26,24 +26,35 @@ export function useProviders() {
 
   useEffect(() => { refresh() }, [refresh])
 
-  return { providers, fallbackOrder, loading, error, refresh }
+  const updateFallbackOrder = useCallback(async (order: string[]) => {
+    await ProvidersAPI.updateFallbackOrder(order)
+    await refresh()
+  }, [refresh])
+
+  return { providers, fallbackOrder, loading, error, refresh, updateFallbackOrder }
 }
 
 export function useProviderModels(providerId: string | null) {
   const [models, setModels] = useState<ProviderModel[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!providerId) {
       setModels([])
+      setError(null)
       return
     }
     setLoading(true)
+    setError(null)
     ProvidersAPI.listModels(providerId)
       .then(setModels)
-      .catch(() => setModels([]))
+      .catch((err) => {
+        setModels([])
+        setError(err instanceof Error ? err.message : 'Failed to load models')
+      })
       .finally(() => setLoading(false))
   }, [providerId])
 
-  return { models, loading }
+  return { models, loading, error }
 }

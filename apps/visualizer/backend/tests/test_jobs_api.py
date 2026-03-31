@@ -43,10 +43,14 @@ def test_get_job(client):
     assert response.json['type'] == 'vision_match'
 
 def test_get_active_jobs(client):
+    response = client.get('/api/jobs/active')
+    assert response.status_code == 200
+    assert len(response.json) == 0
+
     client.post('/api/jobs/',
         json={'type': 'vision_match', 'metadata': {}}
     )
 
     response = client.get('/api/jobs/active')
     assert response.status_code == 200
-    assert len(response.json) == 0  # No running jobs yet
+    assert len(response.json) == 1

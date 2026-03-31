@@ -170,14 +170,21 @@ export function MatchingPage() {
     setIsStarting(true);
 
     const metadata: Record<string, unknown> = {
-      vision_model: options.selectedModel,
       threshold: options.threshold,
       weights: {
         phash: options.phashWeight,
         description: options.descWeight,
         vision: options.visionWeight,
       },
+      ...(options.providerId
+        ? {}
+        : { vision_model: options.selectedModel || undefined }),
     };
+
+    if (options.providerId) {
+      metadata.provider_id = options.providerId;
+      if (options.providerModel) metadata.provider_model = options.providerModel;
+    }
 
     if (forceDescriptions) metadata.force_descriptions = true;
     if (forceReprocess) metadata.force_reprocess = true;
@@ -347,6 +354,10 @@ export function MatchingPage() {
             onToggle={() => setShowAdvanced(!showAdvanced)}
             availableModels={availableModels}
             {...options}
+            onProviderChange={(providerId, modelId) => {
+              updateOption('providerId', providerId);
+              updateOption('providerModel', modelId);
+            }}
             onModelChange={(v) => updateOption('selectedModel', v)}
             onThresholdChange={(v) => updateOption('threshold', v)}
             onPhashWeightChange={(v) => updateOption('phashWeight', v)}
@@ -390,18 +401,18 @@ export function MatchingPage() {
             setSelectedMatch(null);
             setSelectedGroup(null);
           }}
-          onValidationChange={(m, validated) => {
-            handleValidationChange(m, validated);
+          onValidationChange={(match, validated) => {
+            handleValidationChange(match, validated);
             setSelectedMatch((prev) =>
               prev ? { ...prev, validated_at: validated ? new Date().toISOString() : undefined } : null
             );
           }}
-          onRejected={(m) => {
-            handleRejected(m);
+          onRejected={(match) => {
+            handleRejected(match);
             setSelectedMatch(null);
             setSelectedGroup(null);
           }}
-          onCandidateChange={(c) => setSelectedMatch(c)}
+          onCandidateChange={(candidate) => setSelectedMatch(candidate)}
         />
       )}
     </div>

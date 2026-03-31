@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ProvidersAPI, type ProviderModel } from '../services/api'
 import { useProviders } from '../hooks/useProviders'
 import { ProviderCard, FallbackOrderPanel } from '../components/providers'
@@ -6,16 +6,35 @@ import { PageLoading, PageError } from '../components/ui/page-states'
 import { PROVIDER_TITLE } from '../constants/strings'
 
 export function ProvidersPage() {
-  const { providers, fallbackOrder, loading, error } = useProviders()
+  const { providers, fallbackOrder, loading, error, updateFallbackOrder } = useProviders()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [modelCache, setModelCache] = useState<Record<string, ProviderModel[]>>({})
 
+  const refreshModelsForProvider = useCallback(async (providerId: string) => {
+    const models = await ProvidersAPI.listModels(providerId)
+    setModelCache(previous => ({ ...previous, [providerId]: models }))
+  }, [])
+
   useEffect(() => {
     if (!expandedId || modelCache[expandedId]) return
-    ProvidersAPI.listModels(expandedId).then(models => {
-      setModelCache(prev => ({ ...prev, [expandedId]: models }))
-    })
-  }, [expandedId, modelCache])
+    refreshModelsForProvider(expandedId).catch(console.error)
+  }, [expandedId, modelCache, refreshModelsForProvider])
+
+  const handleAddModel = useCallback(
+    async (providerId: string, model: { id: string; name: string; vision: boolean }) => {
+      await ProvidersAPI.addModel(providerId, model)
+      await refreshModelsForProvider(providerId)
+    },
+    [refreshModelsForProvider],
+  )
+
+  const handleRemoveModel = useCallback(
+    async (providerId: string, modelId: string) => {
+      await ProvidersAPI.removeModel(providerId, modelId)
+      await refreshModelsForProvider(providerId)
+    },
+    [refreshModelsForProvider],
+  )
 
   if (loading) return <PageLoading />
   if (error) return <PageError message={error} />
@@ -31,12 +50,22 @@ export function ProvidersPage() {
             provider={provider}
             models={modelCache[provider.id] ?? []}
             expanded={expandedId === provider.id}
-            onToggle={() => setExpandedId(prev => (prev === provider.id ? null : provider.id))}
+            onToggle={() => setExpandedId(previous => (previous === provider.id ? null : provider.id))}
+            onAddModel={model => handleAddModel(provider.id, model)}
+            onRemoveModel={modelId => {
+              handleRemoveModel(provider.id, modelId).catch(console.error)
+            }}
           />
         ))}
       </div>
 
-      <FallbackOrderPanel providers={providers} order={fallbackOrder} />
+      <FallbackOrderPanel
+        providers={providers}
+        order={fallbackOrder}
+        onReorder={order => {
+          updateFallbackOrder(order).catch(console.error)
+        }}
+      />
     </div>
   )
 }

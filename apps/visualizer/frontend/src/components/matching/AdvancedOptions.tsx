@@ -1,9 +1,11 @@
 import { RangeSlider } from './RangeSlider';
 import { WeightSlider } from './WeightSlider';
+import { ProviderModelSelect } from '../ui/ProviderModelSelect';
 import {
   ADVANCED_OPTIONS_TITLE,
   ADVANCED_MODEL_LABEL,
   ADVANCED_MODEL_DESCRIPTION,
+  ADVANCED_PROVIDER_OVERRIDES_LEGACY_MODEL,
   ADVANCED_THRESHOLD_LABEL,
   ADVANCED_THRESHOLD_MIN,
   ADVANCED_THRESHOLD_MAX,
@@ -20,6 +22,9 @@ interface AdvancedOptionsProps {
   isOpen: boolean;
   onToggle: () => void;
   availableModels: { name: string; default: boolean }[];
+  providerId: string | null;
+  providerModel: string | null;
+  onProviderChange: (providerId: string | null, modelId: string | null) => void;
   selectedModel: string;
   onModelChange: (model: string) => void;
   threshold: number;
@@ -38,6 +43,9 @@ export function AdvancedOptions({
   isOpen,
   onToggle,
   availableModels,
+  providerId,
+  providerModel,
+  onProviderChange,
   selectedModel,
   onModelChange,
   threshold,
@@ -53,6 +61,7 @@ export function AdvancedOptions({
 }: AdvancedOptionsProps) {
   const totalWeight = phashWeight + descWeight + visionWeight;
   const weightsValid = Math.abs(totalWeight - 1.0) < 0.001;
+  const legacyModelDisabled = providerId !== null;
 
   return (
     <div className="border-t pt-4">
@@ -65,14 +74,24 @@ export function AdvancedOptions({
 
       {isOpen && (
         <div className="mt-4 space-y-4 bg-white p-4 rounded border">
-          <div>
+          <div className="space-y-2">
+            <ProviderModelSelect
+              providerId={providerId}
+              modelId={providerModel}
+              onChange={onProviderChange}
+            />
+            <p className="text-xs text-gray-500">{ADVANCED_PROVIDER_OVERRIDES_LEGACY_MODEL}</p>
+          </div>
+
+          <div className={legacyModelDisabled ? 'opacity-50' : ''}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               {ADVANCED_MODEL_LABEL}
             </label>
             <select
               value={selectedModel}
               onChange={(e) => onModelChange(e.target.value)}
-              className="w-full max-w-md px-3 py-2 border rounded text-sm"
+              disabled={legacyModelDisabled}
+              className="w-full max-w-md px-3 py-2 border rounded text-sm disabled:cursor-not-allowed"
             >
               {availableModels.length === 0 ? (
                 <option value="gemma3:27b">gemma3:27b (loading...)</option>
