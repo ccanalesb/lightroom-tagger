@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,7 @@ from typing import Any
 import openai
 
 _CONFIG_PATH = Path(__file__).parent / "providers.json"
+_EXAMPLE_PATH = Path(__file__).parent / "providers.example.json"
 
 
 class ProviderRegistry:
@@ -19,6 +21,8 @@ class ProviderRegistry:
 
     def __init__(self, config_path: Path = _CONFIG_PATH):
         self._config_path = config_path
+        if not self._config_path.exists() and _EXAMPLE_PATH.exists():
+            shutil.copy2(_EXAMPLE_PATH, self._config_path)
         with open(self._config_path, encoding="utf-8") as f:
             self._config: dict[str, Any] = json.load(f)
         self._providers: dict[str, dict] = self._config["providers"]
@@ -111,6 +115,20 @@ class ProviderRegistry:
         merged = {**self._config.get("defaults", {}), **defaults}
         self._config["defaults"] = merged
         self._save_config()
+
+    def remove_model(self, provider_id: str, model_id: str) -> bool:
+        """Remove a config model from providers.json. Returns True if removed."""
+        if provider_id not in self._providers:
+            raise KeyError(f"Unknown provider: {provider_id}")
+        models = self._providers[provider_id].get("models", [])
+        original_count = len(models)
+        self._providers[provider_id]["models"] = [
+            model for model in models if model["id"] != model_id
+        ]
+        if len(self._providers[provider_id]["models"]) == original_count:
+            return False
+        self._save_config()
+        return True
 
     def _save_config(self) -> None:
         with open(self._config_path, "w", encoding="utf-8") as f:

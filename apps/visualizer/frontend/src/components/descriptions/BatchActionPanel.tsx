@@ -3,8 +3,6 @@ import type { Job } from '../../services/api';
 import {
   DESC_PAGE_BATCH_RUNNING,
   DESC_PAGE_FORCE,
-  DESC_PAGE_MODEL_LABEL,
-  MSG_LOADING,
   DESC_PAGE_FILTER_ALL,
   DESC_PAGE_FILTER_3M,
   DESC_PAGE_FILTER_6M,
@@ -21,15 +19,7 @@ const DATE_FILTERS: { value: DateFilter; label: string }[] = [
   { value: '6months', label: DESC_PAGE_FILTER_6M },
 ];
 
-interface ModelOption {
-  name: string;
-  default?: boolean;
-}
-
 export interface BatchActionPanelProps {
-  availableModels: ModelOption[];
-  selectedModel: string;
-  onModelChange: (model: string) => void;
   dateFilter: DateFilter;
   onDateFilterChange: (filter: DateFilter) => void;
   force: boolean;
@@ -44,9 +34,6 @@ export interface BatchActionPanelProps {
 }
 
 export function BatchActionPanel({
-  availableModels,
-  selectedModel,
-  onModelChange,
   dateFilter,
   onDateFilterChange,
   force,
@@ -62,26 +49,6 @@ export function BatchActionPanel({
   return (
     <>
       <div className="bg-white border rounded-lg p-4 flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700">{DESC_PAGE_MODEL_LABEL}</label>
-          <select
-            value={selectedModel}
-            onChange={e => onModelChange(e.target.value)}
-            className="border rounded px-2 py-1 text-sm"
-            aria-label="Vision model selector"
-          >
-            {availableModels.length === 0 ? (
-              <option value="">{MSG_LOADING}</option>
-            ) : (
-              availableModels.map(m => (
-                <option key={m.name} value={m.name}>
-                  {m.name}{m.default ? ' (default)' : ''}
-                </option>
-              ))
-            )}
-          </select>
-        </div>
-
         <div className="flex items-center gap-2">
           <select
             value={dateFilter}

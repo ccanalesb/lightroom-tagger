@@ -53,9 +53,16 @@ def defaults():
 @bp.route("/<provider_id>/models/<path:model_id>", methods=["DELETE"])
 def delete_model(provider_id: str, model_id: str):
     deleted = delete_user_model(current_app.db, provider_id, model_id)
-    if not deleted:
-        return jsonify({"error": "Model not found or not user-added"}), 404
-    return jsonify({"deleted": True})
+    if deleted:
+        return jsonify({"deleted": True})
+    registry = _get_registry()
+    try:
+        removed = registry.remove_model(provider_id, model_id)
+    except KeyError:
+        return jsonify({"error": f"Unknown provider: {provider_id}"}), 404
+    if removed:
+        return jsonify({"deleted": True})
+    return jsonify({"error": "Model not found"}), 404
 
 
 @bp.route("/<provider_id>/models", methods=["GET", "POST"])

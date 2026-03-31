@@ -23,7 +23,7 @@ interface SingleMatchSectionProps {
 }
 
 export function SingleMatchSection({ image }: SingleMatchSectionProps) {
-  const { options: matchOptions, updateOption, resetOptions, availableModels, weightsError } =
+  const { options: matchOptions, updateOption, resetOptions, weightsError } =
     useMatchOptions();
   const {
     matchState,
@@ -168,15 +168,12 @@ export function SingleMatchSection({ image }: SingleMatchSectionProps) {
       <AdvancedOptions
         isOpen={advancedOpen}
         onToggle={() => setAdvancedOpen(!advancedOpen)}
-        availableModels={availableModels}
         providerId={matchOptions.providerId}
         providerModel={matchOptions.providerModel}
         onProviderChange={(providerId, modelId) => {
           updateOption("providerId", providerId);
           updateOption("providerModel", modelId);
         }}
-        selectedModel={matchOptions.selectedModel}
-        onModelChange={(model) => updateOption("selectedModel", model)}
         threshold={matchOptions.threshold}
         onThresholdChange={(v) => updateOption("threshold", v)}
         phashWeight={matchOptions.phashWeight}

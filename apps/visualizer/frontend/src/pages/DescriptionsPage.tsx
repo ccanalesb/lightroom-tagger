@@ -39,13 +39,12 @@ const BATCH_LABELS: Record<TabValue, string> = {
 };
 
 export function DescriptionsPage() {
-  const { options, updateOption, availableModels } = useMatchOptions();
+  const { options, updateOption } = useMatchOptions();
 
   const [page, setPage] = useState(1);
   const [tab, setTab] = useState<TabValue>('all');
   const [dateFilter, setDateFilter] = useState<'all' | '3months' | '6months'>('all');
   const [force, setForce] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('');
   const [batchRunning, setBatchRunning] = useState(false);
   const [batchJob, setBatchJob] = useState<Job | null>(null);
   const [batchError, setBatchError] = useState<string | null>(null);
@@ -54,13 +53,6 @@ export function DescriptionsPage() {
   const [modalItem, setModalItem] = useState<DescriptionItem | null>(null);
   const [modalDescResource, setModalDescResource] = useState<Resource<{ description: ImageDescription | null }> | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-
-  useEffect(() => {
-    if (!selectedModel && availableModels.length > 0) {
-      const def = availableModels.find(m => m.default) ?? availableModels[0];
-      if (def) setSelectedModel(def.name);
-    }
-  }, [availableModels, selectedModel]);
 
   const limit = ITEMS_PER_PAGE;
 
@@ -86,9 +78,6 @@ export function DescriptionsPage() {
         image_type: tab === 'all' ? 'both' : tab,
         date_filter: dateFilter,
         force,
-        ...(options.providerId
-          ? {}
-          : { vision_model: selectedModel || undefined }),
         ...(options.providerId ? { provider_id: options.providerId } : {}),
         ...(options.providerModel ? { provider_model: options.providerModel } : {}),
       });
@@ -109,7 +98,7 @@ export function DescriptionsPage() {
         item.image_key,
         item.image_type,
         force,
-        selectedModel || undefined,
+        undefined,
         options.providerId ?? undefined,
         options.providerModel ?? undefined,
       );
@@ -181,9 +170,6 @@ export function DescriptionsPage() {
           }}
         />
         <BatchActionPanel
-          availableModels={availableModels}
-          selectedModel={selectedModel}
-          onModelChange={setSelectedModel}
           dateFilter={dateFilter}
           onDateFilterChange={setDateFilter}
           force={force}

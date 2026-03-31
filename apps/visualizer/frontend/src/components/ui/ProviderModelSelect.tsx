@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useProviders, useProviderModels } from '../../hooks/useProviders'
 import {
   PROVIDER_SELECT_LABEL,
@@ -21,6 +22,14 @@ export function ProviderModelSelect({ providerId, modelId, onChange, className =
   const { models, loading: modelsLoading } = useProviderModels(providerId)
 
   const visionModels = models.filter(model => model.vision)
+
+  useEffect(() => {
+    if (modelsLoading || !modelId || !providerId) return
+    const modelExists = visionModels.some(model => model.id === modelId)
+    if (!modelExists) {
+      onChange(providerId, null)
+    }
+  }, [modelsLoading, modelId, providerId, visionModels, onChange])
 
   return (
     <div className={`flex gap-3 ${className}`}>

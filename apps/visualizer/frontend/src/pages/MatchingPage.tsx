@@ -64,7 +64,7 @@ export function MatchingPage() {
   const [isStarting, setIsStarting] = useState(false);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const { options, updateOption, resetOptions, availableModels, weightsError } = useMatchOptions();
+  const { options, updateOption, resetOptions, weightsError } = useMatchOptions();
 
   const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null);
   const [isPreparingCache, setIsPreparingCache] = useState(false);
@@ -176,15 +176,9 @@ export function MatchingPage() {
         description: options.descWeight,
         vision: options.visionWeight,
       },
-      ...(options.providerId
-        ? {}
-        : { vision_model: options.selectedModel || undefined }),
+      ...(options.providerId ? { provider_id: options.providerId } : {}),
+      ...(options.providerModel ? { provider_model: options.providerModel } : {}),
     };
-
-    if (options.providerId) {
-      metadata.provider_id = options.providerId;
-      if (options.providerModel) metadata.provider_model = options.providerModel;
-    }
 
     if (forceDescriptions) metadata.force_descriptions = true;
     if (forceReprocess) metadata.force_reprocess = true;
@@ -352,13 +346,11 @@ export function MatchingPage() {
           <AdvancedOptions
             isOpen={showAdvanced}
             onToggle={() => setShowAdvanced(!showAdvanced)}
-            availableModels={availableModels}
             {...options}
             onProviderChange={(providerId, modelId) => {
               updateOption('providerId', providerId);
               updateOption('providerModel', modelId);
             }}
-            onModelChange={(v) => updateOption('selectedModel', v)}
             onThresholdChange={(v) => updateOption('threshold', v)}
             onPhashWeightChange={(v) => updateOption('phashWeight', v)}
             onDescWeightChange={(v) => updateOption('descWeight', v)}

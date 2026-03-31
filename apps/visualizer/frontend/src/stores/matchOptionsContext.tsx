@@ -1,10 +1,9 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { ProvidersAPI, SystemAPI } from '../services/api';
+import { ProvidersAPI } from '../services/api';
 import { ADVANCED_WEIGHTS_MUST_SUM } from '../constants/strings';
 
 interface MatchOptions {
-  selectedModel: string;
   providerId: string | null;
   providerModel: string | null;
   threshold: number;
@@ -14,7 +13,6 @@ interface MatchOptions {
 }
 
 const DEFAULT_OPTIONS: MatchOptions = {
-  selectedModel: '',
   providerId: null,
   providerModel: null,
   threshold: 0.7,
@@ -23,17 +21,10 @@ const DEFAULT_OPTIONS: MatchOptions = {
   visionWeight: 1,
 };
 
-type VisionModelOption = {
-  name: string;
-  default: boolean;
-  provider_id?: string;
-};
-
 interface MatchOptionsContextValue {
   options: MatchOptions;
   updateOption: <K extends keyof MatchOptions>(key: K, value: MatchOptions[K]) => void;
   resetOptions: () => void;
-  availableModels: VisionModelOption[];
   weightsError: string | null;
 }
 
@@ -41,31 +32,18 @@ const MatchOptionsContext = createContext<MatchOptionsContextValue | null>(null)
 
 export function MatchOptionsProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<MatchOptions>({ ...DEFAULT_OPTIONS });
-  const [availableModels, setAvailableModels] = useState<VisionModelOption[]>([]);
 
   useEffect(() => {
-    Promise.all([SystemAPI.visionModels(), ProvidersAPI.getDefaults()])
-      .then(([modelsData, defaults]) => {
-        setAvailableModels(modelsData.models);
-
-        const legacyModels = modelsData.models.filter(
-          (model) => !model.provider_id || model.provider_id === 'ollama',
-        );
-        const defaultLegacyModel =
-          legacyModels.find((model) => model.default) ?? legacyModels[0];
-
+    ProvidersAPI.getDefaults()
+      .then((defaults) => {
         const visionComparison = defaults.vision_comparison;
-
-        setOptions((prev) => ({
-          ...prev,
-          ...(defaultLegacyModel ? { selectedModel: defaultLegacyModel.name } : {}),
-          ...(visionComparison?.provider
-            ? {
-                providerId: visionComparison.provider,
-                providerModel: visionComparison.model ?? null,
-              }
-            : {}),
-        }));
+        if (visionComparison?.provider) {
+          setOptions((prev) => ({
+            ...prev,
+            providerId: visionComparison.provider,
+            providerModel: visionComparison.model ?? null,
+          }));
+        }
       })
       .catch(console.error);
   }, []);
@@ -77,7 +55,6 @@ export function MatchOptionsProvider({ children }: { children: ReactNode }) {
   const resetOptions = useCallback(() => {
     setOptions((prev) => ({
       ...DEFAULT_OPTIONS,
-      selectedModel: prev.selectedModel,
       providerId: prev.providerId,
       providerModel: prev.providerModel,
     }));
@@ -92,9 +69,8 @@ export function MatchOptionsProvider({ children }: { children: ReactNode }) {
     options,
     updateOption,
     resetOptions,
-    availableModels,
     weightsError,
-  }), [options, updateOption, resetOptions, availableModels, weightsError]);
+  }), [options, updateOption, resetOptions, weightsError]);
 
   return (
     <MatchOptionsContext.Provider value={value}>

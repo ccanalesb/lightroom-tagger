@@ -90,6 +90,9 @@ def _map_openai_error(
         return ConnectionError(str(exc), provider=provider, model=model)
     if isinstance(exc, openai_sdk.APIStatusError):
         status = getattr(exc.response, "status_code", 0) if exc.response else 0
+        msg = str(exc).lower()
+        if "multimodal" in msg or "image_url" in msg or "modality" in msg:
+            return InvalidRequestError(str(exc), provider=provider, model=model)
         if status == 503:
             return ModelUnavailableError(str(exc), provider=provider, model=model)
         return ProviderError(str(exc), provider=provider, model=model)

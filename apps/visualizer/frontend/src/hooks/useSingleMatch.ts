@@ -80,16 +80,9 @@ export function useSingleMatch(imageKey: string) {
             description: matchOptions.descWeight,
             vision: matchOptions.visionWeight,
           },
-          ...(matchOptions.providerId
-            ? {}
-            : { vision_model: matchOptions.selectedModel || undefined }),
+          ...(matchOptions.providerId ? { provider_id: matchOptions.providerId } : {}),
+          ...(matchOptions.providerModel ? { provider_model: matchOptions.providerModel } : {}),
         };
-        if (matchOptions.providerId) {
-          metadata.provider_id = matchOptions.providerId;
-          if (matchOptions.providerModel) {
-            metadata.provider_model = matchOptions.providerModel;
-          }
-        }
         if (options?.forceReprocess) metadata.force_reprocess = true;
         const job = await JobsAPI.create("vision_match", metadata);
         setMatchJob(job);

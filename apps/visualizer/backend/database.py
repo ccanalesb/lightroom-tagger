@@ -221,3 +221,5 @@ def delete_user_model(
     )
     db.commit()
     return cur.rowcount > 0
+
+

@@ -24,10 +24,8 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
     runner.update_progress(job_id, 10, 'Initializing...')
 
     try:
-        # Store config in metadata so it shows during job run
         config = load_config()
 
-        custom_model = metadata.get('vision_model', config.vision_model or 'gemma3:27b')
         custom_threshold = metadata.get('threshold', config.match_threshold or 0.7)
         custom_weights = metadata.get('weights', {
             'phash': config.phash_weight or 0.4,
@@ -43,8 +41,9 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             'method': 'cascade_matching',
             'date_window_days': 90,
             'threshold': custom_threshold,
-            'vision_model': custom_model,
-            'weights': custom_weights
+            'weights': custom_weights,
+            **({"provider_id": provider_id} if provider_id else {}),
+            **({"provider_model": provider_model} if provider_model else {}),
         })
 
         # Use LIBRARY_DB env var if set, otherwise fall back to config
@@ -87,13 +86,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             media_key = metadata.get('media_key')
             force_reprocess = metadata.get('force_reprocess', False)
 
-            # Set environment variable for vision model if custom
-            if custom_model and custom_model != config.vision_model:
-                os.environ['VISION_MODEL'] = custom_model
-                print(f"[Job {job_id[:8]}] Using custom vision model: {custom_model}")
-
-            # Log custom configuration
-            log_callback('info', f"Configuration: threshold={custom_threshold}, model={custom_model}")
+            log_callback('info', f"Configuration: threshold={custom_threshold}, provider={provider_id or 'default'}, model={provider_model or 'auto'}")
             log_callback('info', f"Weights: phash={custom_weights['phash']:.2f}, desc={custom_weights['description']:.2f}, vision={custom_weights['vision']:.2f}")
             if force_descriptions:
                 log_callback('info', 'Force regenerate descriptions: ON')
@@ -133,9 +126,10 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 'lightroom_failed': lr_stats['failed'],
                 'method': 'cascade_matching',
                 'date_window_days': 90,
-                'vision_model': custom_model,
                 'threshold': custom_threshold,
-                'weights': custom_weights
+                'weights': custom_weights,
+                **({"provider_id": provider_id} if provider_id else {}),
+                **({"provider_model": provider_model} if provider_model else {}),
             })
 
         finally:
@@ -402,12 +396,8 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
         image_type = metadata.get('image_type', 'both')  # catalog, instagram, both
         date_filter = metadata.get('date_filter', 'all')  # all, 3months, 6months
         force = metadata.get('force', False)
-        vision_model = metadata.get('vision_model')
         desc_provider_id = metadata.get('provider_id')
         desc_provider_model = metadata.get('provider_model')
-
-        if vision_model:
-            os.environ['DESCRIPTION_VISION_MODEL'] = vision_model
 
         months = {'3months': 3, '6months': 6}.get(date_filter)
 

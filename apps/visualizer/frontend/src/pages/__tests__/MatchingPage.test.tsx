@@ -5,14 +5,14 @@ import { MatchingPage } from "../MatchingPage";
 import { MatchOptionsProvider } from "../../stores/matchOptionsContext";
 import { fetchMock, mockApiResponses } from "../../__test-utils__/mockApiResponses";
 
-describe("MatchingPage model selection", () => {
+describe("MatchingPage provider selection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     globalThis.fetch = fetchMock;
   });
 
-  it("should send the first available model when no default exists", async () => {
-    mockApiResponses([{ name: "gemma3:27b-cloud", default: false }]);
+  it("should send the default provider from provider defaults", async () => {
+    mockApiResponses([], { defaultProvider: "ollama" });
 
     render(
       <MemoryRouter>
@@ -40,17 +40,17 @@ describe("MatchingPage model selection", () => {
         );
         expect(postCall).toBeTruthy();
         const body = JSON.parse(postCall![1].body as string);
-        expect(body.metadata.vision_model).toBe("gemma3:27b-cloud");
+        expect(body.metadata.provider_id).toBe("ollama");
       },
       { timeout: 3000 },
     );
   });
 
-  it("should send the default model when one exists", async () => {
-    mockApiResponses([
-      { name: "gemma3:4b", default: false },
-      { name: "gemma3:27b", default: true },
-    ]);
+  it("should include provider_model when a specific model is set", async () => {
+    mockApiResponses([], {
+      defaultProvider: "openrouter",
+      defaultModel: "google/gemini-2.5-flash-lite",
+    });
 
     render(
       <MemoryRouter>
@@ -78,7 +78,8 @@ describe("MatchingPage model selection", () => {
         );
         expect(postCall).toBeTruthy();
         const body = JSON.parse(postCall![1].body as string);
-        expect(body.metadata.vision_model).toBe("gemma3:27b");
+        expect(body.metadata.provider_id).toBe("openrouter");
+        expect(body.metadata.provider_model).toBe("google/gemini-2.5-flash-lite");
       },
       { timeout: 3000 },
     );

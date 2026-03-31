@@ -80,6 +80,7 @@ library.db.worktree-backup
 node_modules/
 .env.local
 thumbnails/
+lightroom_tagger/core/providers.json
 *.db-journal
 *.db-wal
 *.db-shm

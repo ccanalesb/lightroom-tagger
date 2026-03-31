@@ -86,7 +86,8 @@ class FallbackDispatcher:
     def _build_order(self, primary: str) -> list[str]:
         """Return [primary] + remaining fallback order (excluding primary).
 
-        Only includes providers that are available (e.g. API key present).
+        Only includes providers that are available (API key present) and have
+        at least one model configured or discoverable.
         """
         available_ids = {
             entry["id"]
@@ -98,7 +99,15 @@ class FallbackDispatcher:
             for provider_id in self._registry.fallback_order
             if provider_id != primary
         ]
-        return [provider_id for provider_id in full_order if provider_id in available_ids]
+        result = []
+        for provider_id in full_order:
+            if provider_id not in available_ids:
+                continue
+            if provider_id == primary:
+                result.append(provider_id)
+            elif self._registry.list_models(provider_id):
+                result.append(provider_id)
+        return result
 
     def _pick_fallback_model(self, provider_id: str) -> str:
         """Pick the first vision model for a fallback provider."""
