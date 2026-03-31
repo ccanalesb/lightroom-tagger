@@ -47,8 +47,14 @@ export function MatchOptionsProvider({ children }: { children: ReactNode }) {
     SystemAPI.visionModels()
       .then((data) => {
         setAvailableModels(data.models);
-        const defaultModel = data.models.find((model) => model.default) ?? data.models[0];
-        if (defaultModel) setOptions((prev) => ({ ...prev, selectedModel: defaultModel.name }));
+        const legacyModels = data.models.filter(
+          (model) => !model.provider_id || model.provider_id === 'ollama',
+        );
+        const defaultLegacyModel =
+          legacyModels.find((model) => model.default) ?? legacyModels[0];
+        if (defaultLegacyModel) {
+          setOptions((prev) => ({ ...prev, selectedModel: defaultLegacyModel.name }));
+        }
       })
       .catch(console.error);
   }, []);

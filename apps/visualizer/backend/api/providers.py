@@ -82,25 +82,37 @@ def models(provider_id: str):
         return jsonify(models_list)
 
     data = request.json
-    if not data or "id" not in data or "name" not in data:
+    if not data:
         return jsonify({"error": "id and name are required"}), 400
+
+    model_id = data.get("id")
+    model_name = data.get("name")
+    if not isinstance(model_id, str) or not model_id.strip():
+        return jsonify({"error": "id must be a non-empty string"}), 400
+    if not isinstance(model_name, str) or not model_name.strip():
+        return jsonify({"error": "name must be a non-empty string"}), 400
+
+    vision = data.get("vision", True)
+    if "vision" in data and not isinstance(vision, bool):
+        return jsonify({"error": "vision must be a boolean"}), 400
+
     try:
         add_user_model(
             current_app.db,
             provider_id,
-            data["id"],
-            data["name"],
-            data.get("vision", True),
+            model_id,
+            model_name,
+            vision,
         )
     except sqlite3.IntegrityError:
         return jsonify(
-            {"error": f"Model {data['id']} already exists for {provider_id}"}
+            {"error": f"Model {model_id} already exists for {provider_id}"}
         ), 409
     return (
         jsonify({
-            "id": data["id"],
-            "name": data["name"],
-            "vision": data.get("vision", True),
+            "id": model_id,
+            "name": model_name,
+            "vision": vision,
             "source": "user",
         }),
         201,

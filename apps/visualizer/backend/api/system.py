@@ -1,9 +1,12 @@
+import logging
 import os
 import sys
 
 import config
 from flask import Blueprint, current_app, has_app_context, jsonify
 from lightroom_tagger.core.database import init_database
+
+logger = logging.getLogger(__name__)
 
 # Add project root for lightroom_tagger imports
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -34,6 +37,7 @@ def get_vision_models():
             try:
                 models = registry.list_models(provider["id"])
             except Exception:
+                logger.exception("Failed to list models for provider %s", provider["id"])
                 continue
             for model in models:
                 if not model.get("vision"):
@@ -42,7 +46,7 @@ def get_vision_models():
                 is_default = (
                     provider["id"] == default_provider
                     and (default_model is None or default_model == model_name)
-                    and not any(m.get("default") for m in all_models)
+                    and not any(entry.get("default") for entry in all_models)
                 )
                 all_models.append({
                     "name": model_name,
@@ -75,7 +79,7 @@ def get_vision_models():
                 "fallback": True,
             })
 
-        if not any(m["default"] for m in all_models):
+        if not any(entry["default"] for entry in all_models):
             all_models[0]["default"] = True
 
         return jsonify({"models": all_models, "fallback": False})
