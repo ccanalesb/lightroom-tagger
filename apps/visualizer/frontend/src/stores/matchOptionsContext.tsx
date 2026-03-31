@@ -44,30 +44,27 @@ export function MatchOptionsProvider({ children }: { children: ReactNode }) {
   const [availableModels, setAvailableModels] = useState<VisionModelOption[]>([]);
 
   useEffect(() => {
-    SystemAPI.visionModels()
-      .then((data) => {
-        setAvailableModels(data.models);
-        const legacyModels = data.models.filter(
+    Promise.all([SystemAPI.visionModels(), ProvidersAPI.getDefaults()])
+      .then(([modelsData, defaults]) => {
+        setAvailableModels(modelsData.models);
+
+        const legacyModels = modelsData.models.filter(
           (model) => !model.provider_id || model.provider_id === 'ollama',
         );
         const defaultLegacyModel =
           legacyModels.find((model) => model.default) ?? legacyModels[0];
-        if (defaultLegacyModel) {
-          setOptions((prev) => ({ ...prev, selectedModel: defaultLegacyModel.name }));
-        }
-      })
-      .catch(console.error);
-  }, []);
 
-  useEffect(() => {
-    ProvidersAPI.getDefaults()
-      .then((defaults) => {
         const visionComparison = defaults.vision_comparison;
-        if (!visionComparison?.provider) return;
+
         setOptions((prev) => ({
           ...prev,
-          providerId: visionComparison.provider,
-          providerModel: visionComparison.model ?? null,
+          ...(defaultLegacyModel ? { selectedModel: defaultLegacyModel.name } : {}),
+          ...(visionComparison?.provider
+            ? {
+                providerId: visionComparison.provider,
+                providerModel: visionComparison.model ?? null,
+              }
+            : {}),
         }));
       })
       .catch(console.error);

@@ -9,14 +9,14 @@ import {
   MSG_LOADING,
 } from '../../constants/strings'
 
-interface Props {
+interface ProviderModelSelectProps {
   providerId: string | null
   modelId: string | null
   onChange: (providerId: string | null, modelId: string | null) => void
   className?: string
 }
 
-export function ProviderModelSelect({ providerId, modelId, onChange, className = '' }: Props) {
+export function ProviderModelSelect({ providerId, modelId, onChange, className = '' }: ProviderModelSelectProps) {
   const { providers } = useProviders()
   const { models, loading: modelsLoading } = useProviderModels(providerId)
 

@@ -171,9 +171,9 @@ export function SingleMatchSection({ image }: SingleMatchSectionProps) {
         availableModels={availableModels}
         providerId={matchOptions.providerId}
         providerModel={matchOptions.providerModel}
-        onProviderChange={(pid, mid) => {
-          updateOption("providerId", pid);
-          updateOption("providerModel", mid);
+        onProviderChange={(providerId, modelId) => {
+          updateOption("providerId", providerId);
+          updateOption("providerModel", modelId);
         }}
         selectedModel={matchOptions.selectedModel}
         onModelChange={(model) => updateOption("selectedModel", model)}

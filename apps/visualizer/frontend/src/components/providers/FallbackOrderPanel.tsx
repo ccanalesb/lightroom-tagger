@@ -7,7 +7,7 @@ import {
   PROVIDER_MOVE_DOWN,
 } from '../../constants/strings'
 
-interface Props {
+interface FallbackOrderPanelProps {
   providers: Provider[]
   order: string[]
   onReorder: (order: string[]) => void
@@ -29,7 +29,7 @@ function reorderBySwappingNeighbors(
   return nextOrder
 }
 
-export function FallbackOrderPanel({ providers, order, onReorder }: Props) {
+export function FallbackOrderPanel({ providers, order, onReorder }: FallbackOrderPanelProps) {
   const providerMap = Object.fromEntries(providers.map(provider => [provider.id, provider]))
 
   return (

@@ -125,12 +125,12 @@ class ProviderRegistry:
             return bool(os.environ.get(api_key_env))
         return False
 
-    def _resolve_base_url(self, pconfig: dict) -> str:
-        if "base_url" in pconfig:
-            return pconfig["base_url"]
-        env_var = pconfig.get("base_url_env")
+    def _resolve_base_url(self, provider_config: dict) -> str:
+        if "base_url" in provider_config:
+            return provider_config["base_url"]
+        env_var = provider_config.get("base_url_env")
         host = os.environ.get(env_var, "") if env_var else ""
-        default = pconfig.get("base_url_default", "")
+        default = provider_config.get("base_url_default", "")
         if host:
             base = host.rstrip("/")
             if not base.endswith("/v1"):

@@ -31,8 +31,9 @@ export function AddModelForm({ onAdd }: AddModelFormProps) {
       setModelId('')
       setDisplayName('')
       setSupportsVision(true)
-    } catch {
-      setSubmitError(PROVIDER_ADD_MODEL_ERROR)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : PROVIDER_ADD_MODEL_ERROR
+      setSubmitError(message)
     } finally {
       setSubmitting(false)
     }

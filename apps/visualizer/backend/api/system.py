@@ -84,6 +84,7 @@ def get_vision_models():
 
         return jsonify({"models": all_models, "fallback": False})
     except Exception:
+        logger.exception("Failed to load vision models from registry")
         return jsonify({
             "models": [{"name": "gemma3:27b", "default": True}],
             "fallback": True,
