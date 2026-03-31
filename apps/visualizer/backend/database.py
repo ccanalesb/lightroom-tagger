@@ -185,7 +185,10 @@ def get_user_models(
             ORDER BY provider_id, model_id
             """
         ).fetchall()
-    return list(rows)
+    return [
+        user_model_row if isinstance(user_model_row, dict) else dict(user_model_row)
+        for user_model_row in rows
+    ]
 
 
 def add_user_model(

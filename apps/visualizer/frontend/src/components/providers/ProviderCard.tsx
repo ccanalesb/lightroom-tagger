@@ -13,7 +13,7 @@ interface ProviderCardProps {
   models: ProviderModel[]
   expanded: boolean
   onToggle: () => void
-  onAddModel: (model: { id: string; name: string; vision: boolean }) => void
+  onAddModel: (model: { id: string; name: string; vision: boolean }) => Promise<void>
   onRemoveModel: (modelId: string) => void
 }
 

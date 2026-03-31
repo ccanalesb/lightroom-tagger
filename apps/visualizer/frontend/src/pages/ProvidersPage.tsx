@@ -51,9 +51,7 @@ export function ProvidersPage() {
             models={modelCache[provider.id] ?? []}
             expanded={expandedId === provider.id}
             onToggle={() => setExpandedId(previous => (previous === provider.id ? null : provider.id))}
-            onAddModel={model => {
-              handleAddModel(provider.id, model).catch(console.error)
-            }}
+            onAddModel={model => handleAddModel(provider.id, model)}
             onRemoveModel={modelId => {
               handleRemoveModel(provider.id, modelId).catch(console.error)
             }}

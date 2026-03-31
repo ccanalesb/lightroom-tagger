@@ -318,6 +318,8 @@ export const PROVIDER_ADD_MODEL_ID_LABEL = 'Model ID'
 export const PROVIDER_ADD_MODEL_NAME_LABEL = 'Display name'
 export const PROVIDER_ADD_MODEL_VISION_LABEL = 'Supports vision'
 export const PROVIDER_ADD_MODEL_SUBMIT = 'Add model'
+export const PROVIDER_ADD_MODEL_SUBMITTING = 'Adding…'
+export const PROVIDER_ADD_MODEL_ERROR = 'Could not add model. Please try again.'
 
 // Generic Buttons
 export const BTN_DISMISS = 'Dismiss'

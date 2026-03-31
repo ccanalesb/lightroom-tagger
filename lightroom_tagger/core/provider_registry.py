@@ -83,7 +83,13 @@ class ProviderRegistry:
         unknown = [provider_id for provider_id in order if provider_id not in self._providers]
         if unknown:
             raise ValueError(f"Unknown provider id(s): {unknown!r}")
-        self._config["fallback_order"] = list(order)
+        seen_provider_ids: set[str] = set()
+        deduplicated_order: list[str] = []
+        for provider_id in order:
+            if provider_id not in seen_provider_ids:
+                seen_provider_ids.add(provider_id)
+                deduplicated_order.append(provider_id)
+        self._config["fallback_order"] = deduplicated_order
         self._save_config()
 
     def update_defaults(self, defaults: dict) -> None:

@@ -343,8 +343,8 @@ export const ProvidersAPI = {
       method: 'PUT',
       body: JSON.stringify({ order }),
     }),
-  updateDefaults: (defaults: Record<string, unknown>) =>
-    request<Record<string, unknown>>('/providers/defaults', {
+  updateDefaults: (defaults: ProviderDefaults) =>
+    request<ProviderDefaults>('/providers/defaults', {
       method: 'PUT',
       body: JSON.stringify(defaults),
     }),

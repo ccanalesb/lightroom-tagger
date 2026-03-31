@@ -66,10 +66,15 @@ def models(provider_id: str):
 
     if request.method == "GET":
         models_list = registry.list_models(provider_id)
+        existing_model_ids = {model_entry["id"] for model_entry in models_list}
         user_models = get_user_models(current_app.db, provider_id)
         for user_model in user_models:
+            user_model_id = user_model["model_id"]
+            if user_model_id in existing_model_ids:
+                continue
+            existing_model_ids.add(user_model_id)
             models_list.append({
-                "id": user_model["model_id"],
+                "id": user_model_id,
                 "name": user_model["model_name"],
                 "vision": bool(user_model["vision"]),
                 "source": "user",
