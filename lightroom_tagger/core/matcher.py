@@ -83,7 +83,9 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                                  threshold: float = 0.7,
                                  log_callback=None,
                                  provider_id: str | None = None,
-                                 model: str | None = None) -> list[dict]:
+                                 model: str | None = None,
+                                 batch_size: int = 20,
+                                 batch_threshold: int = 5) -> list[dict]:
     """Score candidates including vision comparison (one-by-one).
 
     Uses vision comparison cache to avoid re-comparing already processed pairs.
@@ -94,6 +96,8 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     from lightroom_tagger.core.analyzer import compare_with_vision, get_vision_model, vision_score
     from lightroom_tagger.core.phash import hamming_distance
     from lightroom_tagger.core.provider_errors import RateLimitError
+    from lightroom_tagger.core.vision_client import compare_images_batch
+    from lightroom_tagger.core.provider_management import create_client
 
     RATE_LIMIT_ABORT_THRESHOLD = 3
 
@@ -124,140 +128,244 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     if log_callback:
         log_callback('info', f'[{insta_filename}] Starting vision comparison with {total_candidates} candidates')
 
-    for idx, candidate in enumerate(candidates, 1):
-        catalog_key = candidate.get('key')
-        insta_key = insta_image.get('key')
-        local_path = candidate.get('local_path')
-
-        # Use cached pHash if available, otherwise compute or fallback
-        cached_phash = get_cached_phash(db, catalog_key)
-        if cached_phash is not None:
-            phash_dist = hamming_distance(insta_image.get('image_hash', ''), cached_phash)
-            cache_hits += 1
-        else:
-            phash_dist = hamming_distance(insta_image.get('image_hash', ''), candidate.get('image_hash', ''))
-            cache_misses += 1
-
-        phash_score_val = max(0, 1 - (phash_dist / 16))
-
-        desc_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
-
-        # Get or create cached compressed image for catalog
-        cached_local_path = None
-        if local_path:
+    # Use batch API if we have enough candidates and batch processing is enabled
+    use_batch = (total_candidates >= batch_threshold and batch_size > 1)
+    
+    if use_batch:
+        if log_callback:
+            log_callback('info', f'[{insta_filename}] Using batch API (batch_size={batch_size}, candidates={total_candidates})')
+        
+        # Prepare batch candidates with numeric IDs
+        batch_candidates = []
+        for idx, candidate in enumerate(candidates):
+            local_path = candidate.get('local_path')
+            if not local_path:
+                continue
             try:
-                cached_local_path = get_or_create_cached_image(db, catalog_key, local_path)
+                cached_local_path = get_or_create_cached_image(db, candidate.get('key'), local_path)
+                batch_candidates.append((idx, cached_local_path or local_path))
             except Exception:
-                if log_callback and idx <= 5:  # Log first few failures
-                    log_callback('warning', f'Cache miss for {catalog_key}, will compress on-demand')
-
-        # Check vision comparison cache (invalidate if model changed)
-        vision_cached = get_vision_comparison(db, catalog_key, insta_key)
-        base_vision_model = get_vision_model()
-        # Requested label for cache lookup only; pipeline may pick a different default model.
-        requested_model_label = (
-            f"{provider_id}:{model or base_vision_model}"
-            if provider_id
-            else base_vision_model
-        )
-        cache_valid = (
-            vision_cached
-            and vision_cached.get('model_used') == requested_model_label
-        )
-
-        model_label = base_vision_model
-        vision_reasoning = ''
-        if cache_valid:
-            vision_result = vision_cached['result']
-            vision_score_val = vision_cached['vision_score']
-            model_label = vision_cached.get('model_used', model_label)
-            consecutive_rate_limits = 0
-        elif consecutive_rate_limits >= RATE_LIMIT_ABORT_THRESHOLD:
-            vision_result = 'RATE_LIMITED'
-            vision_score_val = 0.0
-            rate_limited_count += 1
-        elif insta_path and local_path:
+                pass
+        
+        # Call batch API
+        batch_results = {}
+        if batch_candidates and compressed_insta:
             try:
-                vision_data = compare_with_vision(
-                    local_path, insta_path,
+                client = create_client(provider_id)
+                requested_model = model or get_vision_model()
+                batch_results = compare_images_batch(
+                    client,
+                    requested_model,
+                    compressed_insta,
+                    batch_candidates,
                     log_callback=log_callback,
-                    cached_local_path=cached_local_path,
-                    compressed_insta_path=compressed_insta,
-                    provider_id=provider_id,
-                    model=model,
-                )
-                vision_result = vision_data['verdict']
-                vision_score_val = vision_score(vision_data['confidence'])
-                vision_reasoning = (vision_data.get('reasoning') or '').strip()
-                consecutive_rate_limits = 0
-
-                if vision_data.get('_provider'):
-                    ap = vision_data['_provider']
-                    am = vision_data.get('_model')
-                    model_label = f"{ap}:{am}" if am is not None else f"{ap}:"
-
-                store_vision_comparison(
-                    db, catalog_key, insta_key,
-                    vision_result, vision_score_val,
-                    model_label,
                 )
             except RateLimitError as e:
-                consecutive_rate_limits += 1
-                rate_limited_count += 1
                 if log_callback:
-                    log_callback('warning', f'[{insta_filename}] Rate limited for {catalog_key} ({consecutive_rate_limits} consecutive)')
+                    log_callback('warning', f'[{insta_filename}] Batch API rate limited, falling back to sequential')
+                use_batch = False
+            except Exception as e:
+                if log_callback:
+                    log_callback('warning', f'[{insta_filename}] Batch API error: {e}, falling back to sequential')
+                use_batch = False
+    
+    if use_batch and batch_results:
+        # Process batch results
+        for idx, candidate in enumerate(candidates):
+            catalog_key = candidate.get('key')
+            insta_key = insta_image.get('key')
+            
+            # Get vision score from batch results
+            vision_confidence = batch_results.get(idx, 0.0)
+            vision_score_val = vision_score(vision_confidence)
+            vision_result = 'SAME' if vision_confidence >= 80 else 'DIFFERENT' if vision_confidence <= 20 else 'UNCERTAIN'
+            
+            # Compute phash and desc scores
+            cached_phash = get_cached_phash(db, catalog_key)
+            if cached_phash is not None:
+                phash_dist = hamming_distance(insta_image.get('image_hash', ''), cached_phash)
+                cache_hits += 1
+            else:
+                phash_dist = hamming_distance(insta_image.get('image_hash', ''), candidate.get('image_hash', ''))
+                cache_misses += 1
+            
+            phash_score_val = max(0, 1 - (phash_dist / 16))
+            desc_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
+            
+            # Weight redistribution logic
+            insta_hash = insta_image.get('image_hash')
+            cand_hash = cached_phash if cached_phash is not None else candidate.get('image_hash')
+            phash_available = bool(insta_hash) and bool(cand_hash)
+            desc_available = bool((insta_image.get('description') or '').strip()) and bool((candidate.get('description') or '').strip())
+            
+            active_weights = {}
+            if phash_available:
+                active_weights['phash'] = phash_weight
+            if desc_available:
+                active_weights['desc'] = desc_weight
+            active_weights['vision'] = vision_weight
+            
+            weight_sum = sum(active_weights.values()) or 1.0
+            w_phash = active_weights.get('phash', 0) / weight_sum
+            w_desc = active_weights.get('desc', 0) / weight_sum
+            w_vision = active_weights['vision'] / weight_sum
+            
+            total_score_val = (w_phash * phash_score_val) + (w_desc * desc_sim) + (w_vision * vision_score_val)
+            
+            model_label = f"{provider_id}:{model}" if provider_id and model else get_vision_model()
+            
+            # Store result
+            store_vision_comparison(db, catalog_key, insta_key, vision_result, vision_score_val, model_label)
+            
+            results.append({
+                'catalog_key': catalog_key,
+                'insta_key': insta_key,
+                'phash_distance': int(phash_dist),
+                'phash_score': phash_score_val,
+                'desc_similarity': desc_sim,
+                'vision_result': vision_result,
+                'vision_score': vision_score_val,
+                'vision_reasoning': '',
+                'total_score': total_score_val,
+                'model_used': model_label,
+                'rate_limited': False,
+            })
+    else:
+        # Sequential fallback
+        for idx, candidate in enumerate(candidates, 1):
+            catalog_key = candidate.get('key')
+            insta_key = insta_image.get('key')
+            local_path = candidate.get('local_path')
+
+            # Use cached pHash if available, otherwise compute or fallback
+            cached_phash = get_cached_phash(db, catalog_key)
+            if cached_phash is not None:
+                phash_dist = hamming_distance(insta_image.get('image_hash', ''), cached_phash)
+                cache_hits += 1
+            else:
+                phash_dist = hamming_distance(insta_image.get('image_hash', ''), candidate.get('image_hash', ''))
+                cache_misses += 1
+
+            phash_score_val = max(0, 1 - (phash_dist / 16))
+
+            desc_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
+
+            # Get or create cached compressed image for catalog
+            cached_local_path = None
+            if local_path:
+                try:
+                    cached_local_path = get_or_create_cached_image(db, catalog_key, local_path)
+                except Exception:
+                    if log_callback and idx <= 5:  # Log first few failures
+                        log_callback('warning', f'Cache miss for {catalog_key}, will compress on-demand')
+
+            # Check vision comparison cache (invalidate if model changed)
+            vision_cached = get_vision_comparison(db, catalog_key, insta_key)
+            base_vision_model = get_vision_model()
+            # Requested label for cache lookup only; pipeline may pick a different default model.
+            requested_model_label = (
+                f"{provider_id}:{model or base_vision_model}"
+                if provider_id
+                else base_vision_model
+            )
+            cache_valid = (
+                vision_cached
+                and vision_cached.get('model_used') == requested_model_label
+            )
+
+            model_label = base_vision_model
+            vision_reasoning = ''
+            if cache_valid:
+                vision_result = vision_cached['result']
+                vision_score_val = vision_cached['vision_score']
+                model_label = vision_cached.get('model_used', model_label)
+                consecutive_rate_limits = 0
+            elif consecutive_rate_limits >= RATE_LIMIT_ABORT_THRESHOLD:
                 vision_result = 'RATE_LIMITED'
                 vision_score_val = 0.0
-            except Exception as e:
-                consecutive_rate_limits = 0
-                if log_callback:
-                    log_callback('error', f'[{insta_filename}] Vision error for {catalog_key}: {e}')
-                vision_result = 'ERROR'
-                vision_score_val = 0.0
-        else:
-            vision_result = 'UNCERTAIN'
-            vision_score_val = 0.5
+                rate_limited_count += 1
+            elif insta_path and local_path:
+                try:
+                    vision_data = compare_with_vision(
+                        local_path, insta_path,
+                        log_callback=log_callback,
+                        cached_local_path=cached_local_path,
+                        compressed_insta_path=compressed_insta,
+                        provider_id=provider_id,
+                        model=model,
+                    )
+                    vision_result = vision_data['verdict']
+                    vision_score_val = vision_score(vision_data['confidence'])
+                    vision_reasoning = (vision_data.get('reasoning') or '').strip()
+                    consecutive_rate_limits = 0
 
-        # Redistribute weight from unavailable signals to available ones.
-        # A signal is unavailable when its inputs are missing (None/empty hashes,
-        # empty descriptions), distinct from a genuine low-similarity score.
-        insta_hash = insta_image.get('image_hash')
-        cand_hash = cached_phash if cached_phash is not None else candidate.get('image_hash')
-        phash_available = bool(insta_hash) and bool(cand_hash)
-        desc_available = bool((insta_image.get('description') or '').strip()) and bool((candidate.get('description') or '').strip())
+                    if vision_data.get('_provider'):
+                        ap = vision_data['_provider']
+                        am = vision_data.get('_model')
+                        model_label = f"{ap}:{am}" if am is not None else f"{ap}:"
 
-        active_weights = {}
-        if phash_available:
-            active_weights['phash'] = phash_weight
-        if desc_available:
-            active_weights['desc'] = desc_weight
-        active_weights['vision'] = vision_weight
+                    store_vision_comparison(
+                        db, catalog_key, insta_key,
+                        vision_result, vision_score_val,
+                        model_label,
+                    )
+                except RateLimitError as e:
+                    consecutive_rate_limits += 1
+                    rate_limited_count += 1
+                    if log_callback:
+                        log_callback('warning', f'[{insta_filename}] Rate limited for {catalog_key} ({consecutive_rate_limits} consecutive)')
+                    vision_result = 'RATE_LIMITED'
+                    vision_score_val = 0.0
+                except Exception as e:
+                    consecutive_rate_limits = 0
+                    if log_callback:
+                        log_callback('error', f'[{insta_filename}] Vision error for {catalog_key}: {e}')
+                    vision_result = 'ERROR'
+                    vision_score_val = 0.0
+            else:
+                vision_result = 'UNCERTAIN'
+                vision_score_val = 0.5
 
-        weight_sum = sum(active_weights.values()) or 1.0
-        w_phash = active_weights.get('phash', 0) / weight_sum
-        w_desc = active_weights.get('desc', 0) / weight_sum
-        w_vision = active_weights['vision'] / weight_sum
+            # Redistribute weight from unavailable signals to available ones.
+            # A signal is unavailable when its inputs are missing (None/empty hashes,
+            # empty descriptions), distinct from a genuine low-similarity score.
+            insta_hash = insta_image.get('image_hash')
+            cand_hash = cached_phash if cached_phash is not None else candidate.get('image_hash')
+            phash_available = bool(insta_hash) and bool(cand_hash)
+            desc_available = bool((insta_image.get('description') or '').strip()) and bool((candidate.get('description') or '').strip())
 
-        total_score_val = (w_phash * phash_score_val) + \
-                          (w_desc * desc_sim) + \
-                          (w_vision * vision_score_val)
+            active_weights = {}
+            if phash_available:
+                active_weights['phash'] = phash_weight
+            if desc_available:
+                active_weights['desc'] = desc_weight
+            active_weights['vision'] = vision_weight
 
-        if log_callback and vision_result != 'UNCERTAIN':
-            log_callback('debug', f'[{insta_filename}] {catalog_key} → {vision_result} (vision={vision_score_val:.2f}, phash={phash_score_val:.2f}, total={total_score_val:.2f})')
+            weight_sum = sum(active_weights.values()) or 1.0
+            w_phash = active_weights.get('phash', 0) / weight_sum
+            w_desc = active_weights.get('desc', 0) / weight_sum
+            w_vision = active_weights['vision'] / weight_sum
 
-        results.append({
-            'catalog_key': catalog_key,
-            'insta_key': insta_key,
-            'phash_distance': int(phash_dist),
-            'phash_score': phash_score_val,
-            'desc_similarity': desc_sim,
-            'vision_result': vision_result,
-            'vision_score': vision_score_val,
-            'vision_reasoning': vision_reasoning,
-            'total_score': total_score_val,
-            'model_used': model_label,
-            'rate_limited': vision_result == 'RATE_LIMITED',
-        })
+            total_score_val = (w_phash * phash_score_val) + \
+                              (w_desc * desc_sim) + \
+                              (w_vision * vision_score_val)
+
+            if log_callback and vision_result != 'UNCERTAIN':
+                log_callback('debug', f'[{insta_filename}] {catalog_key} → {vision_result} (vision={vision_score_val:.2f}, phash={phash_score_val:.2f}, total={total_score_val:.2f})')
+
+            results.append({
+                'catalog_key': catalog_key,
+                'insta_key': insta_key,
+                'phash_distance': int(phash_dist),
+                'phash_score': phash_score_val,
+                'desc_similarity': desc_sim,
+                'vision_result': vision_result,
+                'vision_score': vision_score_val,
+                'vision_reasoning': vision_reasoning,
+                'total_score': total_score_val,
+                'model_used': model_label,
+                'rate_limited': vision_result == 'RATE_LIMITED',
+            })
 
     # Cleanup Instagram temp file
     insta_cache.cleanup()
