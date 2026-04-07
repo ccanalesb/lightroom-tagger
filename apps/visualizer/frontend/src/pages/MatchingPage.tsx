@@ -176,6 +176,7 @@ export function MatchingPage() {
         description: options.descWeight,
         vision: options.visionWeight,
       },
+      max_workers: options.maxWorkers,
       ...(options.providerId ? { provider_id: options.providerId } : {}),
       ...(options.providerModel ? { provider_model: options.providerModel } : {}),
     };
@@ -355,6 +356,8 @@ export function MatchingPage() {
             onPhashWeightChange={(v) => updateOption('phashWeight', v)}
             onDescWeightChange={(v) => updateOption('descWeight', v)}
             onVisionWeightChange={(v) => updateOption('visionWeight', v)}
+            maxWorkers={options.maxWorkers}
+            onMaxWorkersChange={(v) => updateOption('maxWorkers', v)}
             weightsError={weightsError}
             onReset={resetOptions}
           />

@@ -182,6 +182,8 @@ export function SingleMatchSection({ image }: SingleMatchSectionProps) {
         onDescWeightChange={(v) => updateOption("descWeight", v)}
         visionWeight={matchOptions.visionWeight}
         onVisionWeightChange={(v) => updateOption("visionWeight", v)}
+        maxWorkers={matchOptions.maxWorkers}
+        onMaxWorkersChange={(v) => updateOption("maxWorkers", v)}
         weightsError={weightsError}
         onReset={resetOptions}
       />
