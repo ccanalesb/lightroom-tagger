@@ -35,6 +35,8 @@ class Config:
     
     # Parallel processing configuration
     matching_workers: int = 4
+    vision_batch_size: int = 20
+    vision_batch_threshold: int = 5
 
     def __post_init__(self):
         self.catalog_path = self._resolve_path(self.catalog_path)
@@ -97,6 +99,8 @@ def load_config(config_path: str = "config.yaml") -> Config:
         "vision_cache_enabled": True,
         "ollama_host": "http://localhost:11434",
         "matching_workers": 4,
+        "vision_batch_size": 20,
+        "vision_batch_threshold": 5,
     }
 
     for key, value in defaults.items():
@@ -130,12 +134,14 @@ def _load_from_env(data: dict) -> dict:
         "VISION_CACHE_ENABLED": "vision_cache_enabled",
         "OLLAMA_HOST": "ollama_host",
         "MATCHING_WORKERS": "matching_workers",
+        "VISION_BATCH_SIZE": "vision_batch_size",
+        "VISION_BATCH_THRESHOLD": "vision_batch_threshold",
     }
 
     for env_var, config_key in env_mappings.items():
         if env_var in os.environ:
             value = os.environ[env_var]
-            if config_key in ("workers", "hash_threshold", "matching_workers"):
+            if config_key in ("workers", "hash_threshold", "matching_workers", "vision_batch_size", "vision_batch_threshold"):
                 value = int(value)
             elif config_key in ("skip_ai", "verbose", "vision_cache_enabled"):
                 value = value.lower() in ("true", "1", "yes")
