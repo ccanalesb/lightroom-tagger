@@ -35,6 +35,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
         force_descriptions = metadata.get('force_descriptions', False)
         provider_id = metadata.get('provider_id')
         provider_model = metadata.get('provider_model')
+        max_workers = int(metadata.get('max_workers', config.matching_workers or 4))
 
         update_job_field(runner.db, job_id, 'metadata', {
             **metadata,
@@ -104,6 +105,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 force_reprocess=force_reprocess,
                 provider_id=provider_id,
                 provider_model=provider_model,
+                max_workers=max_workers,
             )
 
             # Update Lightroom with "Posted" keyword for matched images
@@ -382,6 +384,38 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
             lib_db.close()
 
 
+def _describe_single_image(lib_db, key: str, itype: str, force: bool, desc_provider_id, desc_provider_model) -> tuple[str, bool, str | None]:
+    """
+    Describe a single image (DRY helper).
+    
+    Returns:
+        (status, success, error_message) where status is 'described'|'skipped'|'failed'
+    """
+    from lightroom_tagger.core.description_service import (
+        describe_instagram_image,
+        describe_matched_image,
+    )
+    
+    try:
+        if itype == 'catalog':
+            result = describe_matched_image(
+                lib_db, key, force=force,
+                provider_id=desc_provider_id, model=desc_provider_model,
+            )
+        else:
+            result = describe_instagram_image(
+                lib_db, key, force=force,
+                provider_id=desc_provider_id, model=desc_provider_model,
+            )
+        
+        if result:
+            return ('described', True, None)
+        else:
+            return ('skipped', False, 'No description generated (file missing or model error)')
+    except Exception as e:
+        return ('failed', False, str(e))
+
+
 def handle_batch_describe(runner, job_id: str, metadata: dict):
     """Generate AI descriptions for catalog and/or Instagram images in bulk."""
     lib_db = None
@@ -400,14 +434,11 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
         desc_provider_model = metadata.get('provider_model')
 
         months = {'3months': 3, '6months': 6}.get(date_filter)
+        max_workers = int(metadata.get('max_workers', 4))
 
         from lightroom_tagger.core.database import (
             get_undescribed_catalog_images,
             get_undescribed_instagram_images,
-        )
-        from lightroom_tagger.core.description_service import (
-            describe_instagram_image,
-            describe_matched_image,
         )
 
         images_to_describe: list[tuple[str, str]] = []  # (key, type)
@@ -458,40 +489,80 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
 
         from database import add_job_log
 
-        for idx, (key, itype) in enumerate(images_to_describe, 1):
-            progress = int(5 + (idx / total) * 90)
-            runner.update_progress(job_id, progress, f'Describing {idx}/{total}: {key}')
-
-            try:
-                if itype == 'catalog':
-                    result = describe_matched_image(
-                        lib_db, key, force=force,
-                        provider_id=desc_provider_id, model=desc_provider_model,
+        # Use parallel processing if max_workers > 1 and batch is large enough
+        if max_workers > 1 and total > 3:
+            def process_image_worker(key: str, itype: str):
+                """Worker function with its own DB connection."""
+                worker_db = init_database(db_path)
+                try:
+                    status, success, error_msg = _describe_single_image(
+                        worker_db, key, itype, force, desc_provider_id, desc_provider_model
                     )
-                else:
-                    result = describe_instagram_image(
-                        lib_db, key, force=force,
-                        provider_id=desc_provider_id, model=desc_provider_model,
-                    )
+                    return (key, status, error_msg)
+                finally:
+                    worker_db.close()
 
-                if result:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {
+                    executor.submit(process_image_worker, key, itype): (idx, key)
+                    for idx, (key, itype) in enumerate(images_to_describe, 1)
+                }
+                
+                for future in as_completed(futures):
+                    idx, key = futures[future]
+                    progress = int(5 + (idx / total) * 90)
+                    runner.update_progress(job_id, progress, f'Describing {idx}/{total}')
+                    
+                    try:
+                        result_key, status, error_msg = future.result()
+                        if status == 'described':
+                            described += 1
+                            consecutive_failures = 0
+                        elif status == 'skipped':
+                            skipped += 1
+                            consecutive_failures += 1
+                            if consecutive_failures <= 3:
+                                add_job_log(runner.db, job_id, 'warning', f'{result_key}: {error_msg}')
+                        else:  # failed
+                            failed += 1
+                            consecutive_failures += 1
+                            add_job_log(runner.db, job_id, 'warning', f'{result_key}: {error_msg}')
+                    except Exception as e:
+                        failed += 1
+                        consecutive_failures += 1
+                        add_job_log(runner.db, job_id, 'warning', f'{key}: {e}')
+                    
+                    if consecutive_failures >= 10:
+                        add_job_log(runner.db, job_id, 'error',
+                                    f'Stopping: {consecutive_failures} consecutive failures')
+                        break
+        else:
+            # Sequential fallback for single worker or small batches
+            for idx, (key, itype) in enumerate(images_to_describe, 1):
+                progress = int(5 + (idx / total) * 90)
+                runner.update_progress(job_id, progress, f'Describing {idx}/{total}: {key}')
+                
+                status, success, error_msg = _describe_single_image(
+                    lib_db, key, itype, force, desc_provider_id, desc_provider_model
+                )
+                
+                if status == 'described':
                     described += 1
                     consecutive_failures = 0
-                else:
+                elif status == 'skipped':
                     skipped += 1
                     consecutive_failures += 1
                     if consecutive_failures <= 3:
-                        add_job_log(runner.db, job_id, 'warning',
-                                    f'No description generated for {key} (file missing or model error)')
-            except Exception as e:
-                failed += 1
-                consecutive_failures += 1
-                add_job_log(runner.db, job_id, 'warning', f'Failed {key}: {e}')
-
-            if consecutive_failures >= 10:
-                add_job_log(runner.db, job_id, 'error',
-                            f'Stopping: {consecutive_failures} consecutive failures — possible rate limit or model issue')
-                break
+                        add_job_log(runner.db, job_id, 'warning', f'{key}: {error_msg}')
+                else:  # failed
+                    failed += 1
+                    consecutive_failures += 1
+                    add_job_log(runner.db, job_id, 'warning', f'{key}: {error_msg}')
+                
+                if consecutive_failures >= 10:
+                    add_job_log(runner.db, job_id, 'error',
+                                f'Stopping: {consecutive_failures} consecutive failures')
+                    break
 
         runner.complete_job(job_id, {
             'described': described,
