@@ -1,5 +1,6 @@
 import { RangeSlider } from './RangeSlider';
 import { WeightSlider } from './WeightSlider';
+import { WorkerSlider } from './WorkerSlider';
 import { ProviderModelSelect } from '../ui/ProviderModelSelect';
 import {
   ADVANCED_OPTIONS_TITLE,
@@ -29,6 +30,8 @@ interface AdvancedOptionsProps {
   onDescWeightChange: (value: number) => void;
   visionWeight: number;
   onVisionWeightChange: (value: number) => void;
+  maxWorkers: number;
+  onMaxWorkersChange: (value: number) => void;
   weightsError: string | null;
   onReset: () => void;
 }
@@ -47,6 +50,8 @@ export function AdvancedOptions({
   onDescWeightChange,
   visionWeight,
   onVisionWeightChange,
+  maxWorkers,
+  onMaxWorkersChange,
   weightsError,
   onReset,
 }: AdvancedOptionsProps) {
@@ -81,6 +86,11 @@ export function AdvancedOptions({
             minLabel={ADVANCED_THRESHOLD_MIN}
             maxLabel={ADVANCED_THRESHOLD_MAX}
             description={ADVANCED_THRESHOLD_DESCRIPTION}
+          />
+
+          <WorkerSlider
+            value={maxWorkers}
+            onChange={onMaxWorkersChange}
           />
 
           <div>
