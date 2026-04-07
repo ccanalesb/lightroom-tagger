@@ -142,6 +142,123 @@ def compare_images(
     return result
 
 
+def compare_images_batch(
+    client: openai_sdk.OpenAI,
+    model: str,
+    reference_path: str,
+    candidates: list[tuple[int, str]],
+    log_callback: LogCallback = None,
+) -> dict[int, float]:
+    """
+    Compare one reference image against N candidates in a single API call.
+    
+    Parameters
+    ----------
+    client:
+        OpenAI-compatible client
+    model:
+        Model identifier
+    reference_path:
+        Path to the reference (Instagram) image
+    candidates:
+        List of (candidate_id, candidate_path) tuples
+    log_callback:
+        Optional logging callback
+    
+    Returns
+    -------
+    dict[int, float]:
+        Mapping of candidate_id -> confidence (0-100)
+    
+    Raises
+    ------
+    ProviderError:
+        On API/model errors (mapped from openai SDK)
+    """
+    import json
+    
+    if not candidates:
+        return {}
+    
+    # Encode reference image once
+    ref_b64 = _encode_image(reference_path)
+    
+    # Build prompt for batch comparison with explicit JSON structure
+    candidate_info = "\n".join([
+        f"Candidate {cid}: (image attached)"
+        for cid, _ in candidates
+    ])
+    
+    batch_prompt = (
+        "You are comparing ONE reference image against MULTIPLE candidate images.\n"
+        "Determine if each candidate depicts the same photograph as the reference "
+        "(possibly with different crops, compression, or processing).\n\n"
+        f"Reference: (image attached)\n\n{candidate_info}\n\n"
+        "Respond with ONLY valid JSON, no other text:\n"
+        '{"results": [{"id": <int>, "confidence": <0-100>}, ...]}\n\n'
+        "confidence: 0 = definitely different, 100 = definitely same.\n"
+        "Focus on semantic content (subject, scene, composition), not pixel-level differences."
+    )
+    
+    # Build message content: [prompt, ref_image, candidate1, candidate2, ...]
+    content_parts: list[dict[str, Any]] = [
+        {"type": "text", "text": batch_prompt},
+        _image_url_part(ref_b64),
+    ]
+    
+    for cid, cand_path in candidates:
+        cand_b64 = _encode_image(cand_path)
+        content_parts.append(_image_url_part(cand_b64))
+    
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{
+                "role": "user",
+                "content": content_parts,
+            }],
+            max_tokens=1024,
+        )
+    except Exception as exc:
+        raise _map_openai_error(exc, provider=getattr(client, '_provider_id', None), model=model) from exc
+    
+    raw = response.choices[0].message.content or "{}"
+    
+    # Parse structured JSON response
+    try:
+        # Extract JSON from markdown code blocks if present
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+        
+        parsed = json.loads(raw)
+        results_list = parsed.get("results", [])
+        
+        # Map results back to candidate IDs
+        result_map: dict[int, float] = {}
+        for item in results_list:
+            cid = item.get("id")
+            conf = item.get("confidence", 0)
+            if cid is not None:
+                result_map[cid] = float(conf)
+        
+        if log_callback:
+            ref_name = os.path.basename(reference_path)
+            log_callback(
+                "debug",
+                f"[vision_batch] {ref_name} vs {len(candidates)} candidates -> {len(result_map)} results"
+            )
+        
+        return result_map
+    
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        # Fallback: Return 0 confidence for all if parsing fails
+        if log_callback:
+            log_callback("warning", f"[vision_batch] JSON parse error: {e}, raw={raw[:100]}")
+        return {cid: 0.0 for cid, _ in candidates}
+
+
 def generate_description(
     client: openai_sdk.OpenAI,
     model: str,
