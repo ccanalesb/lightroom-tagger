@@ -40,7 +40,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      force_descriptions: bool = False,
                      force_reprocess: bool = False,
                      provider_id: str | None = None,
-                     provider_model: str | None = None) -> tuple:
+                     provider_model: str | None = None,
+                     max_workers: int = 1) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -63,7 +64,9 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         Tuple of (stats dict, matches list)
     """
     from datetime import datetime
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
+    config = load_config()
     default_weights = {'phash': 0.4, 'description': 0.3, 'vision': 0.3}
     weights = weights or default_weights
     run_start = datetime.now().isoformat()
@@ -152,6 +155,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             log_callback=log_callback,
             provider_id=provider_id,
             model=provider_model,
+            batch_size=config.vision_batch_size,
+            batch_threshold=config.vision_batch_threshold,
         )
 
         above_threshold = [r for r in results if r['total_score'] >= threshold]
