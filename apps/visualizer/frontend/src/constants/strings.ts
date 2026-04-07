@@ -165,6 +165,11 @@ export const ADVANCED_WEIGHT_PHASH = 'Perceptual Hash (pHash)'
 export const ADVANCED_WEIGHT_DESC = 'Description Similarity'
 export const ADVANCED_WEIGHT_VISION = 'Vision Model'
 
+export const ADVANCED_WORKERS_LABEL = 'Parallel Workers'
+export const ADVANCED_WORKERS_DESCRIPTION = 'Process multiple images in parallel (higher = faster, more load)'
+export const ADVANCED_WORKERS_MIN = '1 (sequential)'
+export const ADVANCED_WORKERS_MAX = '4 (parallel)'
+
 export const ADVANCED_RESET_DEFAULTS = 'Reset to defaults'
 export const ADVANCED_FORCE_DESCRIPTIONS = 'Force regenerate AI descriptions'
 export const ADVANCED_FORCE_REPROCESS = 'Include already matched images'
