@@ -7,6 +7,7 @@ import { BatchActionPanel } from '../components/descriptions/BatchActionPanel';
 import { DescriptionDetailModal } from '../components/descriptions/DescriptionDetailModal';
 import { DescriptionGrid } from '../components/descriptions/DescriptionGrid';
 import { TotalCount } from '../components/descriptions/TotalCount';
+import { WorkerSlider } from '../components/matching/WorkerSlider';
 import { useMatchOptions } from '../stores/matchOptionsContext';
 import { classifyApiError } from '../utils/classifyApiError';
 import { createResource, type Resource } from '../utils/createResource';
@@ -22,6 +23,7 @@ import {
   MSG_LOADING,
   ITEMS_PER_PAGE,
   MSG_FAILED_START_JOB,
+  ADVANCED_OPTIONS_TITLE,
 } from '../constants/strings';
 
 type TabValue = 'all' | 'catalog' | 'instagram';
@@ -53,6 +55,7 @@ export function DescriptionsPage() {
   const [modalItem, setModalItem] = useState<DescriptionItem | null>(null);
   const [modalDescResource, setModalDescResource] = useState<Resource<{ description: ImageDescription | null }> | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const limit = ITEMS_PER_PAGE;
 
@@ -78,6 +81,7 @@ export function DescriptionsPage() {
         image_type: tab === 'all' ? 'both' : tab,
         date_filter: dateFilter,
         force,
+        max_workers: options.maxWorkers,
         ...(options.providerId ? { provider_id: options.providerId } : {}),
         ...(options.providerModel ? { provider_model: options.providerModel } : {}),
       });
@@ -182,6 +186,24 @@ export function DescriptionsPage() {
           batchError={batchError}
           onDismissError={() => setBatchError(null)}
         />
+
+        <div className="border-t pt-4">
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+          >
+            {showAdvanced ? '▼' : '▶'} {ADVANCED_OPTIONS_TITLE}
+          </button>
+
+          {showAdvanced && (
+            <div className="mt-4 space-y-4 bg-white p-4 rounded border">
+              <WorkerSlider
+                value={options.maxWorkers}
+                onChange={(v) => updateOption('maxWorkers', v)}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {generateError && (
