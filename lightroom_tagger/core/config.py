@@ -32,6 +32,9 @@ class Config:
     vision_cache_dir: str = field(default_factory=lambda: os.path.expanduser("~/.cache/lightroom_tagger/vision"))
     vision_cache_enabled: bool = True
     ollama_host: str = "http://localhost:11434"
+    
+    # Parallel processing configuration
+    matching_workers: int = 4
 
     def __post_init__(self):
         self.catalog_path = self._resolve_path(self.catalog_path)
@@ -93,6 +96,7 @@ def load_config(config_path: str = "config.yaml") -> Config:
         "vision_cache_dir": os.path.expanduser("~/.cache/lightroom_tagger/vision"),
         "vision_cache_enabled": True,
         "ollama_host": "http://localhost:11434",
+        "matching_workers": 4,
     }
 
     for key, value in defaults.items():
@@ -125,16 +129,17 @@ def _load_from_env(data: dict) -> dict:
         "VISION_CACHE_DIR": "vision_cache_dir",
         "VISION_CACHE_ENABLED": "vision_cache_enabled",
         "OLLAMA_HOST": "ollama_host",
+        "MATCHING_WORKERS": "matching_workers",
     }
 
     for env_var, config_key in env_mappings.items():
         if env_var in os.environ:
             value = os.environ[env_var]
-            if config_key == "workers":
+            if config_key in ("workers", "hash_threshold", "matching_workers"):
                 value = int(value)
             elif config_key in ("skip_ai", "verbose", "vision_cache_enabled"):
                 value = value.lower() in ("true", "1", "yes")
-            elif config_key in ("hash_threshold", "match_threshold"):
+            elif config_key == "match_threshold":
                 value = int(value)
             elif config_key in ("phash_weight", "desc_weight", "vision_weight"):
                 value = float(value)
