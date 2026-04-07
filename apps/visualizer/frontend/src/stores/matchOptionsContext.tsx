@@ -10,6 +10,7 @@ interface MatchOptions {
   phashWeight: number;
   descWeight: number;
   visionWeight: number;
+  maxWorkers: number;
 }
 
 const DEFAULT_OPTIONS: MatchOptions = {
@@ -19,6 +20,7 @@ const DEFAULT_OPTIONS: MatchOptions = {
   phashWeight: 0,
   descWeight: 0,
   visionWeight: 1,
+  maxWorkers: 4,
 };
 
 interface MatchOptionsContextValue {
@@ -57,6 +59,7 @@ export function MatchOptionsProvider({ children }: { children: ReactNode }) {
       ...DEFAULT_OPTIONS,
       providerId: prev.providerId,
       providerModel: prev.providerModel,
+      maxWorkers: prev.maxWorkers,
     }));
   }, []);
 
