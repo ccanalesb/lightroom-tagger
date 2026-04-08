@@ -97,7 +97,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     from lightroom_tagger.core.phash import hamming_distance
     from lightroom_tagger.core.provider_errors import RateLimitError
     from lightroom_tagger.core.vision_client import compare_images_batch
-    from lightroom_tagger.core.provider_management import create_client
+    from lightroom_tagger.core.provider_registry import ProviderRegistry
 
     RATE_LIMIT_ABORT_THRESHOLD = 3
 
@@ -151,7 +151,10 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         batch_results = {}
         if batch_candidates and compressed_insta:
             try:
-                client = create_client(provider_id)
+                registry = ProviderRegistry()
+                # Use provided provider_id or fall back to first provider in fallback order
+                actual_provider_id = provider_id or registry.fallback_order[0]
+                client = registry.get_client(actual_provider_id)
                 requested_model = model or get_vision_model()
                 batch_results = compare_images_batch(
                     client,
