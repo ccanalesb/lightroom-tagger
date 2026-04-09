@@ -1,12 +1,9 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { DashboardPage } from './pages/DashboardPage'
-import { DescriptionsPage } from './pages/DescriptionsPage'
-import { InstagramPage } from './pages/InstagramPage'
-import { MatchingPage } from './pages/MatchingPage'
-import { JobsPage } from './pages/JobsPage'
-import { ProvidersPage } from './pages/ProvidersPage'
+import { ImagesPage } from './pages/ImagesPage'
+import { ProcessingPage } from './pages/ProcessingPage'
 import { MatchOptionsProvider } from './stores/matchOptionsContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 
@@ -18,11 +15,19 @@ function App() {
           <Routes>
             <Route path="/" element={<Layout />}>
               <Route index element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
-              <Route path="instagram" element={<ErrorBoundary><InstagramPage /></ErrorBoundary>} />
-              <Route path="matching" element={<ErrorBoundary><MatchingPage /></ErrorBoundary>} />
-              <Route path="descriptions" element={<ErrorBoundary><DescriptionsPage /></ErrorBoundary>} />
-              <Route path="jobs" element={<ErrorBoundary><JobsPage /></ErrorBoundary>} />
-              <Route path="providers" element={<ErrorBoundary><ProvidersPage /></ErrorBoundary>} />
+              <Route path="images" element={<ErrorBoundary><ImagesPage /></ErrorBoundary>} />
+              <Route path="processing" element={<ErrorBoundary><ProcessingPage /></ErrorBoundary>} />
+              <Route path="instagram" element={<Navigate to="/images" replace />} />
+              <Route path="matching" element={<Navigate to="/processing" replace />} />
+              <Route
+                path="descriptions"
+                element={<Navigate to={{ pathname: '/processing', search: '?tab=descriptions' }} replace />}
+              />
+              <Route path="jobs" element={<Navigate to={{ pathname: '/processing', search: '?tab=jobs' }} replace />} />
+              <Route
+                path="providers"
+                element={<Navigate to={{ pathname: '/processing', search: '?tab=providers' }} replace />}
+              />
             </Route>
           </Routes>
         </Router>

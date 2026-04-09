@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { MatchingPage } from "../MatchingPage";
+import { MatchingTab } from "../../components/processing/MatchingTab";
 import { MatchOptionsProvider } from "../../stores/matchOptionsContext";
 import { fetchMock, mockApiResponses } from "../../__test-utils__/mockApiResponses";
 
-describe("MatchingPage provider selection", () => {
+describe("MatchingTab provider selection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     globalThis.fetch = fetchMock;
@@ -17,19 +17,12 @@ describe("MatchingPage provider selection", () => {
     render(
       <MemoryRouter>
         <MatchOptionsProvider>
-          <MatchingPage />
+          <MatchingTab />
         </MatchOptionsProvider>
       </MemoryRouter>,
     );
 
-    const runBtn = await screen.findByText("Run Matching");
-    fireEvent.click(runBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText("Start")).toBeTruthy();
-    });
-
-    const startBtn = screen.getByText("Start");
+    const startBtn = await screen.findByText("Start Vision Matching");
     fireEvent.click(startBtn);
 
     await waitFor(
@@ -55,19 +48,12 @@ describe("MatchingPage provider selection", () => {
     render(
       <MemoryRouter>
         <MatchOptionsProvider>
-          <MatchingPage />
+          <MatchingTab />
         </MatchOptionsProvider>
       </MemoryRouter>,
     );
 
-    const runBtn = await screen.findByText("Run Matching");
-    fireEvent.click(runBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText("Start")).toBeTruthy();
-    });
-
-    const startBtn = screen.getByText("Start");
+    const startBtn = await screen.findByText("Start Vision Matching");
     fireEvent.click(startBtn);
 
     await waitFor(

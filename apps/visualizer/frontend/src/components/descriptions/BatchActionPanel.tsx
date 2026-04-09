@@ -85,7 +85,7 @@ export function BatchActionPanel({
       {batchJob && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
           <span>{DESC_BATCH_JOB_STARTED(batchJob.id.slice(0, 8))}</span>
-          <Link to="/jobs" className="underline font-medium hover:text-green-900">{DESC_BATCH_VIEW_IN_JOBS}</Link>
+          <Link to="/processing?tab=jobs" className="underline font-medium hover:text-green-900">{DESC_BATCH_VIEW_IN_JOBS}</Link>
           <button type="button" onClick={onDismissJob} className="ml-auto text-green-600 hover:text-green-800">&times;</button>
         </div>
       )}

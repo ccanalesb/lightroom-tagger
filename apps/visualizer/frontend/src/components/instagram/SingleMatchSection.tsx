@@ -135,7 +135,7 @@ export function SingleMatchSection({ image }: SingleMatchSectionProps) {
           </p>
           <div className="flex gap-2 mt-2">
             {matchResult.matched > 0 && (
-              <a href="/matching" className="text-xs text-blue-600 hover:underline">
+              <a href="/processing" className="text-xs text-blue-600 hover:underline">
                 {MODAL_MATCH_VIEW_RESULTS}
               </a>
             )}

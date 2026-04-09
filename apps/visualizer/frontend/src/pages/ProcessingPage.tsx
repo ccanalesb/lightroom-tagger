@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, Tab } from '../components/ui/Tabs';
 import { MatchingTab } from '../components/processing/MatchingTab';
 import { DescriptionsTab } from '../components/processing/DescriptionsTab';
@@ -12,8 +13,30 @@ import {
   NAV_PROCESSING,
 } from '../constants/strings';
 
+const PROCESSING_TAB_IDS = ['matching', 'descriptions', 'jobs', 'providers'] as const;
+type ProcessingTabId = (typeof PROCESSING_TAB_IDS)[number];
+
+function tabIdFromSearch(search: string): ProcessingTabId {
+  const tab = new URLSearchParams(search).get('tab');
+  if (tab && PROCESSING_TAB_IDS.includes(tab as ProcessingTabId)) {
+    return tab as ProcessingTabId;
+  }
+  return 'matching';
+}
+
 export function ProcessingPage() {
-  const [activeTab, setActiveTab] = useState('matching');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeTab = useMemo(() => tabIdFromSearch(location.search), [location.search]);
+
+  const handleTabChange = (id: string) => {
+    if (!PROCESSING_TAB_IDS.includes(id as ProcessingTabId)) return;
+    const next = id as ProcessingTabId;
+    navigate(
+      { pathname: '/processing', search: next === 'matching' ? '' : `?tab=${next}` },
+      { replace: true },
+    );
+  };
 
   const tabs: Tab[] = [
     { id: 'matching', label: TAB_VISION_MATCHING, content: <MatchingTab /> },
@@ -31,7 +54,7 @@ export function ProcessingPage() {
         </p>
       </div>
 
-      <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+      <Tabs tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
     </div>
   );
 }
