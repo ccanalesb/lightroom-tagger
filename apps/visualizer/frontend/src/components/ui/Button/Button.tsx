@@ -11,10 +11,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-accent text-white hover:bg-accent-hover border border-accent font-semibold',
+  primary: 'bg-accent !bg-accent text-white hover:bg-accent-hover border-2 border-accent shadow-sm font-semibold',
   secondary: 'bg-surface text-text hover:bg-surface-hover border border-border font-medium',
   ghost: 'bg-transparent text-text hover:bg-surface border border-transparent',
-  danger: 'bg-error text-white hover:opacity-90 border border-error font-semibold',
+  danger: 'bg-error text-white hover:opacity-90 border-2 border-error shadow-sm font-semibold',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -32,6 +32,16 @@ export function Button({
   children,
   ...props
 }: ButtonProps) {
+  const getInlineStyle = () => {
+    if (variant === 'primary') {
+      return { backgroundColor: 'var(--color-accent)', color: 'white' };
+    }
+    if (variant === 'danger') {
+      return { backgroundColor: 'var(--color-error)', color: 'white' };
+    }
+    return undefined;
+  };
+
   return (
     <button
       className={`
@@ -43,6 +53,7 @@ export function Button({
         disabled:opacity-50 disabled:cursor-not-allowed
         ${className}
       `.trim()}
+      style={getInlineStyle()}
       disabled={disabled}
       {...props}
     >

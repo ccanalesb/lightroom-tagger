@@ -24,12 +24,12 @@ export function Tabs({ tabs, activeTab, onTabChange, className = '' }: TabsProps
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={`
-                px-4 py-2.5 text-sm font-medium whitespace-nowrap
-                border-b-2 transition-all duration-150
+                px-4 py-2.5 text-sm font-semibold whitespace-nowrap
+                border-b-[3px] transition-all duration-150
                 ${
                   activeTab === tab.id
                     ? 'border-accent text-accent'
-                    : 'border-transparent text-text-secondary hover:text-text hover:border-border'
+                    : 'border-transparent text-text opacity-60 hover:text-text hover:opacity-100 hover:border-border-strong'
                 }
               `.trim()}
             >
