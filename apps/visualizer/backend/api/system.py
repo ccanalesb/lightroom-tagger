@@ -119,6 +119,26 @@ def get_stats():
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/catalog/status', methods=['GET'])
+def get_catalog_status():
+    """Return whether the catalog vision cache has any prepared entries."""
+    try:
+        from lightroom_tagger.core.database import get_cache_stats
+
+        db_path = config.LIBRARY_DB
+        if not os.path.exists(db_path):
+            return jsonify({'cached': False})
+
+        db = init_database(db_path)
+        try:
+            stats = get_cache_stats(db)
+        finally:
+            db.close()
+        return jsonify({'cached': stats['cached'] > 0})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/cache/status', methods=['GET'])
 def get_cache_status():
     """Get vision cache status."""

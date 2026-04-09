@@ -12,3 +12,9 @@ def test_app_has_required_endpoints():
 
     response = client.get('/api/status')
     assert response.status_code == 200
+
+    catalog_status = client.get('/api/catalog/status')
+    assert catalog_status.status_code == 200
+    payload = catalog_status.get_json()
+    assert 'cached' in payload
+    assert isinstance(payload['cached'], bool)
