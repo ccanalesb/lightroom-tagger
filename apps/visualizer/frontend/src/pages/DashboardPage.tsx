@@ -1,111 +1,125 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import { Badge } from '../components/ui/Badge';
+import { ImagesAPI, JobsAPI } from '../services/api';
 
-import type { Job } from '../types/job'
-
-import { Stats, CacheStatus, JobsAPI, SystemAPI } from '../services/api'
-import { JobsList } from '../components/jobs/JobsList'
-import { CacheStatusCard } from '../components/matching/CacheStatusCard'
-import { StatCard } from '../components/ui/StatCard'
-import { PageLoading, PageError, EmptyState } from '../components/ui/page-states'
-import {
-  DASHBOARD_CATALOG_IMAGES,
-  DASHBOARD_INSTAGRAM_IMAGES,
-  DASHBOARD_POSTED,
-  DASHBOARD_MATCHES,
-  DASHBOARD_RECENT_JOBS,
-  DASHBOARD_NO_JOBS,
-} from '../constants/strings'
+type StatBadge = 'default' | 'success' | 'accent';
 
 export function DashboardPage() {
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [jobs, setJobs] = useState<Job[]>([])
-  const [cacheStatus, setCacheStatus] = useState<CacheStatus | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [stats, setStats] = useState({
+    instagramImages: 0,
+    matches: 0,
+    pendingJobs: 0,
+  });
 
   useEffect(() => {
-    let mounted = true
-
-    async function fetchData() {
+    async function loadStats() {
       try {
-        const [statsData, jobsData] = await Promise.all([
-          SystemAPI.stats(),
+        const [instagramData, jobsData] = await Promise.all([
+          ImagesAPI.listInstagram({ limit: 1, offset: 0 }),
           JobsAPI.list(),
-        ])
-        if (mounted) {
-          setStats(statsData)
-          setJobs(jobsData.slice(0, 5))
-          setError(null)
-        }
-      } catch (err) {
-        if (mounted) {
-          setError(err instanceof Error ? err.message : 'Unknown error')
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false)
-        }
+        ]);
+
+        const pendingCount = jobsData.filter(
+          (job) => job.status === 'pending' || job.status === 'running',
+        ).length;
+
+        setStats({
+          instagramImages: instagramData.total,
+          matches: 0,
+          pendingJobs: pendingCount,
+        });
+      } catch (error) {
+        console.error('Failed to load stats:', error);
       }
     }
+    loadStats();
+  }, []);
 
-    async function fetchCacheStatus() {
-      try {
-        const data = await SystemAPI.cacheStatus()
-        if (mounted) setCacheStatus(data)
-      } catch {
-        // Non-critical -- dashboard still works without cache status
-      }
-    }
-
-    fetchData()
-    fetchCacheStatus()
-    return () => { mounted = false }
-  }, [])
-
-  if (loading) return <PageLoading />
-  if (error) return <PageError message={error} />
+  const statCards: Array<{
+    title: string;
+    value: string;
+    description: string;
+    link: string;
+    badge: StatBadge;
+  }> = [
+    {
+      title: 'Instagram Images',
+      value: stats.instagramImages.toLocaleString(),
+      description: 'Downloaded from Instagram dump',
+      link: '/images',
+      badge: stats.instagramImages > 0 ? 'success' : 'default',
+    },
+    {
+      title: 'Matched Pairs',
+      value: stats.matches.toLocaleString(),
+      description: 'Successfully matched images',
+      link: '/images',
+      badge: stats.matches > 0 ? 'success' : 'default',
+    },
+    {
+      title: 'Active Jobs',
+      value: stats.pendingJobs.toLocaleString(),
+      description: 'Running or queued',
+      link: '/processing',
+      badge: stats.pendingJobs > 0 ? 'accent' : 'default',
+    },
+  ];
 
   return (
     <div className="space-y-8">
-      <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-      
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            label={DASHBOARD_CATALOG_IMAGES}
-            value={stats.catalog_images}
-            color="blue"
-          />
-          <StatCard
-            label={DASHBOARD_INSTAGRAM_IMAGES}
-            value={stats.instagram_images}
-            color="purple"
-          />
-          <StatCard
-            label={DASHBOARD_POSTED}
-            value={stats.posted_to_instagram}
-            color="green"
-          />
-          <StatCard
-            label={DASHBOARD_MATCHES}
-            value={stats.matches_found}
-            color="yellow"
-          />
-        </div>
-      )}
+      <div>
+        <h1 className="text-section text-text mb-2">Dashboard</h1>
+        <p className="text-text-secondary">
+          Match Instagram photos with your Lightroom catalog using AI vision models
+        </p>
+      </div>
 
-      {cacheStatus && <CacheStatusCard cacheStatus={cacheStatus} />}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {statCards.map((stat) => (
+          <Link key={stat.title} to={stat.link}>
+            <Card hoverable padding="md">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <CardTitle>{stat.title}</CardTitle>
+                  <Badge variant={stat.badge}>{stat.value}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm">{stat.description}</p>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
 
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          {DASHBOARD_RECENT_JOBS}
-        </h3>
-        {jobs.length === 0 ? (
-          <EmptyState message={DASHBOARD_NO_JOBS} />
-        ) : (
-          <JobsList jobs={jobs} />
-        )}
+        <h2 className="text-card-title text-text mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Link to="/images">
+            <Card hoverable padding="md">
+              <CardHeader>
+                <CardTitle>Browse Images</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm">View Instagram photos, catalog images, and matched pairs</p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/processing">
+            <Card hoverable padding="md">
+              <CardHeader>
+                <CardTitle>Start Processing</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm">Run vision matching or generate descriptions</p>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
       </div>
     </div>
-  )
+  );
 }
