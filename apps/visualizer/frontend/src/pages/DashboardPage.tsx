@@ -55,14 +55,14 @@ export function DashboardPage() {
       title: 'Matched Pairs',
       value: stats.matches.toLocaleString(),
       description: 'Successfully matched images',
-      link: '/images',
+      link: '/images?tab=matches',
       badge: stats.matches > 0 ? 'success' : 'default',
     },
     {
       title: 'Active Jobs',
       value: stats.pendingJobs.toLocaleString(),
       description: 'Running or queued',
-      link: '/processing',
+      link: '/processing?tab=jobs',
       badge: stats.pendingJobs > 0 ? 'accent' : 'default',
     },
   ];
