@@ -7,6 +7,43 @@ export const NAV_INSTAGRAM = 'Instagram'
 export const NAV_MATCHING = 'Matching'
 export const NAV_DESCRIPTIONS = 'Descriptions'
 export const NAV_JOBS = 'Jobs'
+export const NAV_IMAGES = 'Images'
+export const NAV_CATALOG = 'Catalog'
+export const NAV_MATCHES = 'Matches'
+export const NAV_PROCESSING = 'Processing'
+export const NAV_JOB_QUEUE = 'Job Queue'
+
+// Tab labels
+export const TAB_INSTAGRAM = 'Instagram'
+export const TAB_CATALOG = 'Catalog'
+export const TAB_MATCHES = 'Matches'
+export const TAB_VISION_MATCHING = 'Vision Matching'
+export const TAB_DESCRIPTIONS = 'Descriptions'
+export const TAB_JOB_QUEUE = 'Job Queue'
+export const TAB_PROVIDERS = 'Providers'
+
+// Placeholders
+export const PLACEHOLDER_COMING_SOON = 'Coming soon...'
+export const PLACEHOLDER_CATALOG_VIEW = 'Catalog image view coming soon'
+export const PLACEHOLDER_MATCHES_VIEW = 'Matches view coming soon'
+
+// Badge labels (for variant prop values, not display strings)
+export const BADGE_MATCHED = 'Matched'
+export const BADGE_DESCRIBED = 'Described'
+export const BADGE_PROCESSED = 'Processed'
+
+// Date display
+export const DATE_NO_DATE = 'No date'
+export const DATE_ESTIMATED_SUFFIX = '(est.)'
+
+// Image details
+export const IMAGE_DETAILS_TITLE = 'Image Details'
+export const IMAGE_DETAILS_AI_DESCRIPTION = 'AI Description'
+export const LABEL_FOLDER = 'Folder'
+export const LABEL_SOURCE = 'Source'
+export const LABEL_DATE = 'Date'
+export const LABEL_IMAGE_HASH_DISPLAY = 'Image Hash'
+export const LABEL_CATALOG_MATCH = 'Catalog Match'
 
 // Status Display
 export const STATUS_LABELS: Record<string, string> = {
@@ -145,7 +182,11 @@ export const ADVANCED_DATE_FILTER = 'Date filter'
 export const ADVANCED_DATE_ALL = 'All time'
 export const ADVANCED_DATE_3MONTHS = 'Last 3 months'
 export const ADVANCED_DATE_6MONTHS = 'Last 6 months'
+export const ADVANCED_DATE_12MONTHS = 'Last 12 months'
 export const ADVANCED_DATE_YEAR_2026 = '2026 only'
+export const ADVANCED_DATE_YEAR_2025 = '2025 only'
+export const ADVANCED_DATE_YEAR_2024 = '2024 only'
+export const ADVANCED_DATE_YEAR_2023 = '2023 only'
 
 export const ADVANCED_MODEL_LABEL = 'Vision Model'
 export const ADVANCED_MODEL_DESCRIPTION = 'Model used for vision comparison'
