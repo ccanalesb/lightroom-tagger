@@ -30,9 +30,9 @@
   --color-text-tertiary: #6f6e69;
   --color-border: rgba(255,255,255,0.1);
   --color-border-strong: rgba(255,255,255,0.15);
-  --color-accent: #62aef0;
-  --color-accent-hover: #97c9ff;
-  --color-accent-light: rgba(98,174,240,0.1);
+  --color-accent: #4A9EFF;
+  --color-accent-hover: #7AB8FF;
+  --color-accent-light: rgba(74, 158, 255, 0.15);
   --color-success: #2a9d99;
   --color-warning: #ff8c42;
   --color-error: #ff6b6b;

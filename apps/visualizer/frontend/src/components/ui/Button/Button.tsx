@@ -11,10 +11,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-accent text-white hover:bg-accent-hover border border-accent',
-  secondary: 'bg-surface text-text hover:bg-surface-hover border border-border',
-  ghost: 'bg-transparent text-text-secondary hover:bg-surface border border-transparent',
-  danger: 'bg-error text-white hover:opacity-90 border border-error',
+  primary: 'bg-accent text-white hover:bg-accent-hover border border-accent font-semibold',
+  secondary: 'bg-surface text-text hover:bg-surface-hover border border-border font-medium',
+  ghost: 'bg-transparent text-text hover:bg-surface border border-transparent',
+  danger: 'bg-error text-white hover:opacity-90 border border-error font-semibold',
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -38,8 +38,8 @@ export function Button({
         ${variantClasses[variant]}
         ${sizeClasses[size]}
         ${fullWidth ? 'w-full' : ''}
-        font-medium rounded-base transition-all duration-150
-        focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2
+        rounded-base transition-all duration-150
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2
         disabled:opacity-50 disabled:cursor-not-allowed
         ${className}
       `.trim()}
