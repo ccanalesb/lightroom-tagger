@@ -32,6 +32,7 @@ export function Card({
         ${className}
       `.trim()}
       onClick={onClick}
+      style={{ backgroundColor: 'var(--color-background)' }}
     >
       {children}
     </div>

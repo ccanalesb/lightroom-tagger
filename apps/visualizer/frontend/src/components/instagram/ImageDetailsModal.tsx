@@ -39,11 +39,13 @@ export function ImageDetailsModal({ image, onClose }: ImageDetailsModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.75)' }}
       onClick={onClose}
     >
       <div
         className="relative w-full max-w-4xl max-h-[90vh] bg-bg rounded-card shadow-deep overflow-hidden"
+        style={{ backgroundColor: 'var(--color-background)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <button
