@@ -1,12 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-background: #ffffff;
+  --color-surface: #f6f5f4;
+  --color-surface-hover: #f1f0ed;
+  --color-text-primary: rgba(0,0,0,0.95);
+  --color-text-secondary: #615d59;
+  --color-text-tertiary: #a39e98;
+  --color-border: rgba(0,0,0,0.1);
+  --color-border-strong: rgba(0,0,0,0.15);
+  --color-accent: #0075de;
+  --color-accent-hover: #005bab;
+  --color-accent-light: #f2f9ff;
+  --color-success: #1aae39;
+  --color-warning: #dd5b00;
+  --color-error: #e03e3e;
+}
+
+.dark {
+  --color-background: #191919;
+  --color-surface: #31302e;
+  --color-surface-hover: #3d3b38;
+  --color-text-primary: #f7f6f5;
+  --color-text-secondary: #9b9a97;
+  --color-text-tertiary: #6f6e69;
+  --color-border: rgba(255,255,255,0.1);
+  --color-border-strong: rgba(255,255,255,0.15);
+  --color-accent: #62aef0;
+  --color-accent-hover: #97c9ff;
+  --color-accent-light: rgba(98,174,240,0.1);
+  --color-success: #2a9d99;
+  --color-warning: #ff8c42;
+  --color-error: #ff6b6b;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
