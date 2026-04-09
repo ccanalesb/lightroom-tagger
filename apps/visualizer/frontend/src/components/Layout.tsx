@@ -30,7 +30,9 @@ export function Layout() {
                     end={item.exact}
                     className={({ isActive }) =>
                       `px-3 py-1.5 rounded-base text-sm font-medium transition-all duration-150
-                      ${isActive ? 'bg-accent-light text-accent' : 'text-text-secondary hover:bg-surface hover:text-text'}`
+                      ${isActive
+                        ? 'bg-accent text-white shadow-sm'
+                        : 'text-text-secondary hover:bg-surface hover:text-text'}`
                     }
                   >
                     {item.label}
@@ -52,7 +54,9 @@ export function Layout() {
                 end={item.exact}
                 className={({ isActive }) =>
                   `px-3 py-1.5 rounded-base text-sm font-medium whitespace-nowrap transition-all
-                  ${isActive ? 'bg-accent-light text-accent' : 'text-text-secondary hover:bg-surface'}`
+                  ${isActive
+                    ? 'bg-accent text-white shadow-sm'
+                    : 'text-text-secondary hover:bg-surface hover:text-text'}`
                 }
               >
                 {item.label}
