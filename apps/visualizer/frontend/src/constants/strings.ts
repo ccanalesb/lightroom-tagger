@@ -19,6 +19,7 @@ export const TAB_CATALOG = 'Catalog'
 export const TAB_MATCHES = 'Matches'
 export const TAB_VISION_MATCHING = 'Vision Matching'
 export const TAB_DESCRIPTIONS = 'Descriptions'
+export const TAB_CATALOG_CACHE = 'Catalog Cache'
 export const TAB_JOB_QUEUE = 'Job Queue'
 export const TAB_PROVIDERS = 'Providers'
 

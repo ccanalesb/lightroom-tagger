@@ -3,17 +3,19 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, Tab } from '../components/ui/Tabs';
 import { MatchingTab } from '../components/processing/MatchingTab';
 import { DescriptionsTab } from '../components/processing/DescriptionsTab';
+import { CatalogCacheTab } from '../components/processing/CatalogCacheTab';
 import { JobQueueTab } from '../components/processing/JobQueueTab';
 import { ProvidersTab } from '../components/processing/ProvidersTab';
 import {
   TAB_VISION_MATCHING,
   TAB_DESCRIPTIONS,
+  TAB_CATALOG_CACHE,
   TAB_JOB_QUEUE,
   TAB_PROVIDERS,
   NAV_PROCESSING,
 } from '../constants/strings';
 
-const PROCESSING_TAB_IDS = ['matching', 'descriptions', 'jobs', 'providers'] as const;
+const PROCESSING_TAB_IDS = ['matching', 'descriptions', 'cache', 'jobs', 'providers'] as const;
 type ProcessingTabId = (typeof PROCESSING_TAB_IDS)[number];
 
 function tabIdFromSearch(search: string): ProcessingTabId {
@@ -41,6 +43,7 @@ export function ProcessingPage() {
   const tabs: Tab[] = [
     { id: 'matching', label: TAB_VISION_MATCHING, content: <MatchingTab /> },
     { id: 'descriptions', label: TAB_DESCRIPTIONS, content: <DescriptionsTab /> },
+    { id: 'cache', label: TAB_CATALOG_CACHE, content: <CatalogCacheTab /> },
     { id: 'jobs', label: TAB_JOB_QUEUE, content: <JobQueueTab /> },
     { id: 'providers', label: TAB_PROVIDERS, content: <ProvidersTab /> },
   ];
@@ -50,7 +53,7 @@ export function ProcessingPage() {
       <div className="mb-6">
         <h1 className="text-section text-text mb-2">{NAV_PROCESSING}</h1>
         <p className="text-text-secondary">
-          AI-powered vision matching, description generation, and job monitoring
+          Vision matching, descriptions, catalog cache management, and job monitoring
         </p>
       </div>
 
