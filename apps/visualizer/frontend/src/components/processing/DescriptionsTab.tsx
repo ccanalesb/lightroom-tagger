@@ -2,25 +2,56 @@ import { useState, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { WorkerSlider } from '../matching/WorkerSlider';
+import { ProviderModelSelect } from '../ui/ProviderModelSelect';
+import { useMatchOptions } from '../../stores/matchOptionsContext';
 import { JobsAPI } from '../../services/api';
 import { ADVANCED_OPTIONS_TITLE } from '../../constants/strings';
 
+type ImageType = 'both' | 'instagram' | 'catalog';
+type DateFilter = 'all' | '3months' | '6months' | '12months';
+
+const IMAGE_TYPE_OPTIONS: { value: ImageType; label: string }[] = [
+  { value: 'both', label: 'Instagram + Catalog' },
+  { value: 'instagram', label: 'Instagram Only' },
+  { value: 'catalog', label: 'Catalog Only' },
+];
+
+const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
+  { value: 'all', label: 'All time' },
+  { value: '3months', label: 'Last 3 months' },
+  { value: '6months', label: 'Last 6 months' },
+  { value: '12months', label: 'Last 12 months' },
+];
+
 export function DescriptionsTab() {
-  const [maxWorkers, setMaxWorkers] = useState(2);
+  const { options, updateOption } = useMatchOptions();
+  const [imageType, setImageType] = useState<ImageType>('both');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [force, setForce] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
 
   const startDescriptions = useCallback(async () => {
     setIsStarting(true);
     try {
-      await JobsAPI.create('batch_describe', { max_workers: maxWorkers });
+      const metadata: Record<string, unknown> = {
+        image_type: imageType,
+        date_filter: dateFilter,
+        force,
+        max_workers: options.maxWorkers,
+      };
+
+      if (options.providerId) metadata.provider_id = options.providerId;
+      if (options.providerModel) metadata.provider_model = options.providerModel;
+
+      await JobsAPI.create('batch_describe', metadata);
       alert('Description generation job started! Check Job Queue tab to monitor progress.');
     } catch (error) {
       alert(`Failed to start job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsStarting(false);
     }
-  }, [maxWorkers]);
+  }, [imageType, dateFilter, force, options]);
 
   return (
     <div className="max-w-2xl">
@@ -34,6 +65,53 @@ export function DescriptionsTab() {
             <p className="text-sm text-text-secondary">
               AI-generated descriptions improve matching accuracy by providing semantic context.
             </p>
+
+            <div>
+              <label className="block text-sm font-medium text-text mb-2">
+                Image Source
+              </label>
+              <select
+                value={imageType}
+                onChange={(e) => setImageType(e.target.value as ImageType)}
+                className="w-full px-3 py-2 rounded-base border border-border bg-bg text-text focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all"
+              >
+                {IMAGE_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text mb-2">
+                Date Range
+              </label>
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value as DateFilter)}
+                className="w-full px-3 py-2 rounded-base border border-border bg-bg text-text focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all"
+              >
+                {DATE_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="force-regenerate"
+                checked={force}
+                onChange={(e) => setForce(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
+              />
+              <label htmlFor="force-regenerate" className="text-sm text-text cursor-pointer">
+                Force regenerate existing descriptions
+              </label>
+            </div>
 
             <div>
               <button
@@ -54,8 +132,16 @@ export function DescriptionsTab() {
             </div>
 
             {showAdvanced && (
-              <div className="pt-4 border-t border-border">
-                <WorkerSlider value={maxWorkers} onChange={setMaxWorkers} />
+              <div className="pt-4 border-t border-border space-y-4">
+                <ProviderModelSelect
+                  providerId={options.providerId}
+                  modelId={options.providerModel}
+                  onChange={(providerId, modelId) => {
+                    updateOption('providerId', providerId);
+                    updateOption('providerModel', modelId);
+                  }}
+                />
+                <WorkerSlider value={options.maxWorkers} onChange={(v) => updateOption('maxWorkers', v)} />
               </div>
             )}
 
