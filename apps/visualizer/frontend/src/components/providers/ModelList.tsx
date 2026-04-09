@@ -1,4 +1,4 @@
-import type { ProviderModel } from '../../services/api'
+import type { ProviderModel } from '../../services/api';
 import {
   PROVIDER_COL_ACTIONS,
   PROVIDER_COL_MODEL,
@@ -8,57 +8,60 @@ import {
   PROVIDER_SOURCE_CONFIG,
   PROVIDER_SOURCE_DISCOVERED,
   PROVIDER_SOURCE_USER,
-} from '../../constants/strings'
+} from '../../constants/strings';
+import { Button } from '../ui/Button';
 
 const SOURCE_LABELS: Record<string, string> = {
   config: PROVIDER_SOURCE_CONFIG,
   discovered: PROVIDER_SOURCE_DISCOVERED,
   user: PROVIDER_SOURCE_USER,
-}
+};
 
 interface ModelListProps {
-  models: ProviderModel[]
-  onRemove: (modelId: string) => void
+  models: ProviderModel[];
+  onRemove: (modelId: string) => void;
 }
 
 export function ModelList({ models, onRemove }: ModelListProps) {
   return (
     <table className="w-full text-sm">
       <thead>
-        <tr className="text-left text-gray-500 text-xs uppercase tracking-wider">
+        <tr className="text-left text-text-secondary text-xs uppercase tracking-wider">
           <th className="pb-1">{PROVIDER_COL_MODEL}</th>
           <th className="pb-1">{PROVIDER_COL_VISION}</th>
           <th className="pb-1">{PROVIDER_COL_SOURCE}</th>
           <th className="pb-1 w-10 text-right font-normal">{PROVIDER_COL_ACTIONS}</th>
         </tr>
       </thead>
-      <tbody className="divide-y divide-gray-50">
+      <tbody className="divide-y divide-border">
         {models.map(model => (
           <tr key={model.id}>
-            <td className="py-1.5 font-mono text-xs text-gray-800">{model.name}</td>
+            <td className="py-1.5 font-mono text-xs text-text">{model.name}</td>
             <td className="py-1.5">
               {model.vision ? (
-                <span className="text-green-600">✓</span>
+                <span className="text-success">✓</span>
               ) : (
-                <span className="text-gray-300">—</span>
+                <span className="text-text-tertiary">—</span>
               )}
             </td>
-            <td className="py-1.5 text-xs text-gray-500">
+            <td className="py-1.5 text-xs text-text-secondary">
               {SOURCE_LABELS[model.source] ?? model.source}
             </td>
             <td className="py-1.5 text-right">
-              <button
+              <Button
                 type="button"
-                onClick={() => onRemove(model.id)}
+                variant="ghost"
+                size="sm"
                 aria-label={PROVIDER_REMOVE_MODEL}
-                className="text-gray-400 hover:text-red-600 text-base leading-none px-1"
+                className="!px-1 !py-0 min-w-0 text-text-tertiary hover:text-error"
+                onClick={() => onRemove(model.id)}
               >
                 ×
-              </button>
+              </Button>
             </td>
           </tr>
         ))}
       </tbody>
     </table>
-  )
+  );
 }
