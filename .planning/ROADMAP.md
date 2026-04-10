@@ -82,7 +82,7 @@
 | Plan | Title | Status |
 |------|--------|--------|
 | 03-01 | Matches API dump-media thumbnails and vision_match single-image result score | **Done** (2026-04-10) |
-| 03-02 | Lightroom keyword from config.instagram_keyword (auto-tag unchanged) | Pending |
+| 03-02 | Lightroom keyword from config.instagram_keyword (auto-tag unchanged) | **Done** (2026-04-10) |
 | 03-03 | Instagram dump path in config + instagram_import job handler | Pending |
 | 03-04 | Frontend: configure dump path and Run Import job | Pending |
 | 03-05 | Ship Matches tab with MatchDetailModal and useMatchGroups | Pending |
@@ -131,4 +131,4 @@ flowchart LR
 Deferred items remain as documented in [REQUIREMENTS.md](./REQUIREMENTS.md) (v2 and Out of Scope tables).
 
 ---
-*Roadmap created: 2026-04-10 · Last plan progress edit: 2026-04-10 (plan 03-01 complete; Phase 3 execution table added).*
+*Roadmap created: 2026-04-10 · Last plan progress edit: 2026-04-10 (plan 03-02 complete).*

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: "03-02"
+current_plan: "03-03"
 status: executing
-last_updated: "2026-04-10T22:00:00.000Z"
+last_updated: "2026-04-10T23:30:00.000Z"
 last_activity: 2026-04-10
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 15
-  completed_plans: 10
-  percent: 67
+  completed_plans: 11
+  percent: 73
 ---
 
 # Planning state
@@ -26,11 +26,11 @@ progress:
 | Active milestone | v1 |
 | Active phase | 3 — Instagram sync |
 | Phase status | In progress |
-| Last completed plan | 03-01 — Matches API dump-media thumbnails and vision_match single-image result score |
+| Last completed plan | 03-02 — Lightroom keyword from config.instagram_keyword (auto-tag unchanged) |
 
 ## GSD progression
 
-**Next plan:** 03-02
+**Next plan:** 03-03
 **Total Plans in Phase:** 6 (03-01 … 03-06)
 **Status:** Executing Phase 03 — Instagram sync
 **Last Activity:** 2026-04-10
@@ -39,7 +39,7 @@ progress:
 
 - [x] Phase 1 — Catalog management (CAT-01 … CAT-05) ✓
 - [ ] Phase 2 — Jobs & system reliability (SYS-01 … SYS-05)
-- [ ] Phase 3 — Instagram sync (IG-01 … IG-06) — plan 03-01 done
+- [ ] Phase 3 — Instagram sync (IG-01 … IG-06) — plans 03-01 … 03-02 done
 - [ ] Phase 4 — AI analysis (AI-01 … AI-06)
 
 ## Traceability
@@ -54,10 +54,12 @@ Full requirement ↔ phase mapping: [REQUIREMENTS.md § Traceability](./REQUIREM
 - **2026-04-10:** Plan **02-03** executed — `jobs.error_severity` column and migration; `fail_job`/`retry`/`complete_job` persistence; handler exception classification; frontend `Job` type, `ERROR_SEVERITY_LABELS`, severity badges in job detail modal and job cards.
 - **2026-04-10:** Plan **02-04** executed — `STATUS_LABELS.pending` → Queued; job detail status uses `STATUS_LABELS`; orphan recovery log copy in `app.py`; cooperative cancel in `handle_enrich_catalog`, `handle_batch_describe` (sequential + parallel), and `handle_prepare_catalog`.
 - **2026-04-10:** Plan **03-01** executed — `list_matches` joins `instagram_dump_media` via `_enrich_instagram_media` (`dump_instagram_by_key`); regression test `ig_dump_only`; `handle_vision_match` sets `result.best_score` when `matches` non-empty. See [SUMMARY.md](./phases/03-instagram-sync/SUMMARY.md).
+- **2026-04-10:** Plan **03-02** executed — `update_lightroom_from_matches` uses `Config.instagram_keyword` (default `Posted`); CLI success message uses the same; unit test covers configured keyword. See [03-02-SUMMARY.md](./phases/03-instagram-sync/03-02-SUMMARY.md).
 
 ## Decisions (phase 3)
 
 - **D-03-01:** Match list `instagram_image` resolves **legacy `instagram_images` first**, then **enriched `instagram_dump_media`** by `insta_key`, so dump-only keys still get thumbnails/metadata in the API without duplicating legacy rows.
+- **D-03-02:** Lightroom writeback from matches applies **`Config.instagram_keyword`** (YAML / `LIGHTRoom_INSTAGRAM_KEYWORD`), with **empty-after-strip falling back to `Posted`**, so the posted token stays configurable without changing auto-match/writeback triggers.
 
 ## Decisions (phase 2)
 
