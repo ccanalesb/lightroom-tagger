@@ -15,6 +15,11 @@ Know which catalog images are posted on Instagram and get artistic critique that
 - [x] Register and browse Lightroom catalog safely with read-only enforcement (Validated in Phase 1: Catalog Management)
 - [x] Paginate and filter catalog photos by keyword, rating, date range, color label (Validated in Phase 1: Catalog Management)
 - [x] Stable photo identity across sessions via unified composite keys (Validated in Phase 1: Catalog Management)
+- [x] Observable job lifecycle with status visible as queued/running/complete/failed (Validated in Phase 2: Jobs & System Reliability)
+- [x] Job cancellation with cooperative threading.Event propagation (Validated in Phase 2: Jobs & System Reliability)
+- [x] Backup-before-write with timestamped rotation capped at two files (Validated in Phase 2: Jobs & System Reliability)
+- [x] Actionable error severity classification with UI badges (Validated in Phase 2: Jobs & System Reliability)
+- [x] Lightroom-open guardrail via lock file detection before catalog writes (Validated in Phase 2: Jobs & System Reliability)
 
 ### Active
 
@@ -44,6 +49,7 @@ The user is a photographer managing work across multiple Lightroom catalogs (per
 
 ### Current State
 - Phase 1 complete — catalog browsing, filtering, and registration working via visualizer UI
+- Phase 2 complete — job lifecycle, cooperative cancellation, catalog backup/lock guard, error severity
 - Read-only catalog enforcement via SQLite URI `mode=ro` prevents accidental writes
 - Library DB keys unified with `YYYY-MM-DD_filename` format, migration with backup
 - Instagram presence with analytics data available via export dumps
@@ -93,4 +99,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-10 after Phase 1 completion*
+*Last updated: 2026-04-10 after Phase 2 completion*
