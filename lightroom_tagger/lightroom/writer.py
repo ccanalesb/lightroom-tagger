@@ -224,6 +224,9 @@ def update_lightroom_from_matches(catalog_path: str, matches: list) -> dict:
     if not matches:
         return stats
 
+    raise_if_catalog_locked(catalog_path)
+    _backup_path = backup_catalog_if_needed(catalog_path, max_backups=2)
+
     conn = connect_catalog(catalog_path)
     keyword_id = get_or_create_keyword(conn, "Posted")
 
