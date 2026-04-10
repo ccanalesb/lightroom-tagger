@@ -8,9 +8,20 @@ from database import update_job_field
 
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import init_database
+from lightroom_tagger.core.provider_errors import AuthenticationError, InvalidRequestError
 from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
 
 from . import path_setup as _path_setup  # noqa: F401
+
+
+def _failure_severity_from_exception(exc: BaseException) -> str:
+    if isinstance(exc, (AuthenticationError, InvalidRequestError)):
+        return 'warning'
+    if isinstance(exc, (PermissionError, OSError)):
+        return 'critical'
+    if isinstance(exc, RuntimeError) and str(exc) == 'Close Lightroom before writing to catalog.':
+        return 'critical'
+    return 'error'
 
 
 def handle_analyze_instagram(runner, job_id: str, metadata: dict):
@@ -127,7 +138,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                     except RuntimeError as e:
                         if str(e) == "Close Lightroom before writing to catalog.":
                             log_callback('error', str(e))
-                            runner.fail_job(job_id, str(e))
+                            runner.fail_job(job_id, str(e), severity='critical')
                             return
                         raise
                 else:
@@ -156,7 +167,8 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
         if runner.is_cancelled(job_id):
             runner.finalize_cancelled(job_id)
             return
-        runner.fail_job(job_id, str(e))
+        severity = _failure_severity_from_exception(e)
+        runner.fail_job(job_id, str(e), severity=severity)
 
 
 def handle_enrich_catalog(runner, job_id: str, metadata: dict):
@@ -253,7 +265,8 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
         })
 
     except Exception as e:
-        runner.fail_job(job_id, str(e))
+        severity = _failure_severity_from_exception(e)
+        runner.fail_job(job_id, str(e), severity=severity)
     finally:
         if db:
             db.close()
@@ -396,7 +409,8 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
         })
 
     except Exception as e:
-        runner.fail_job(job_id, str(e))
+        severity = _failure_severity_from_exception(e)
+        runner.fail_job(job_id, str(e), severity=severity)
     finally:
         if lib_db:
             lib_db.close()
@@ -593,7 +607,8 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
         })
 
     except Exception as e:
-        runner.fail_job(job_id, str(e))
+        severity = _failure_severity_from_exception(e)
+        runner.fail_job(job_id, str(e), severity=severity)
     finally:
         if old_model_env is not None:
             os.environ['DESCRIPTION_VISION_MODEL'] = old_model_env
