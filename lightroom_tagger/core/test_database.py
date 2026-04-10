@@ -19,6 +19,7 @@ from lightroom_tagger.core.database import (
     init_image_descriptions_table,
     init_vision_comparisons_table,
     migrate_unified_image_keys,
+    query_catalog_images,
     store_image,
     store_image_description,
     store_images_batch,
@@ -189,6 +190,66 @@ class TestDatabase(unittest.TestCase):
         self.db.commit()
         row = self.db.execute("SELECT key FROM images").fetchone()
         self.assertEqual(row["key"], "2024-01-15_photo.jpg")
+
+
+class TestQueryCatalogImages(unittest.TestCase):
+    """Tests for query_catalog_images."""
+
+    def setUp(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as tf:
+            self.temp_db_path = tf.name
+        self.db = init_database(self.temp_db_path)
+        store_image(self.db, {
+            'date_taken': '2024-03-10',
+            'filename': 'low_rating.jpg',
+            'rating': 2,
+            'color_label': 'Red',
+            'keywords': ['foo'],
+            'instagram_posted': False,
+        })
+        store_image(self.db, {
+            'date_taken': '2024-04-20T12:00:00',
+            'filename': 'beta_unique.jpg',
+            'rating': 4,
+            'color_label': 'Blue',
+            'keywords': ['bar'],
+            'instagram_posted': True,
+        })
+        store_image(self.db, {
+            'date_taken': '2025-01-10',
+            'filename': 'high.jpg',
+            'rating': 5,
+            'color_label': 'Green',
+            'keywords': ['baz'],
+            'instagram_posted': False,
+        })
+
+    def tearDown(self):
+        self.db.close()
+        bak = self.temp_db_path + ".pre-key-migration.bak"
+        if os.path.exists(bak):
+            os.unlink(bak)
+        os.unlink(self.temp_db_path)
+
+    def test_min_rating_filter(self):
+        rows, total = query_catalog_images(self.db, min_rating=3)
+        self.assertEqual(total, 2)
+        keys = {r['key'] for r in rows}
+        self.assertEqual(
+            keys,
+            {'2024-04-20_beta_unique.jpg', '2025-01-10_high.jpg'},
+        )
+
+    def test_keyword_matches_filename(self):
+        rows, total = query_catalog_images(self.db, keyword='beta_unique')
+        self.assertEqual(total, 1)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['filename'], 'beta_unique.jpg')
+
+    def test_month_filter(self):
+        rows, total = query_catalog_images(self.db, month='202404')
+        self.assertEqual(total, 1)
+        self.assertEqual(rows[0]['filename'], 'beta_unique.jpg')
 
 
 class TestInstagramStatus(unittest.TestCase):
