@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: null
-status: ready
-last_updated: "2026-04-10T22:00:00.000Z"
+status: planning
+last_updated: "2026-04-10T20:16:37.620Z"
 last_activity: 2026-04-10
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 15
   completed_plans: 15
-  percent: 100
+  percent: 75
 ---
 
 # Planning state
@@ -24,22 +23,22 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v1 |
-| Active phase | 3 — Instagram sync |
-| Phase status | In progress |
+| Active phase | 4 — AI analysis |
+| Phase status | Not started |
 | Last completed plan | 03-06 — Posted visibility end-to-end and catalog API regression |
 
 ## GSD progression
 
-**Next plan:** Phase 4 — AI analysis (no numbered v1 plans in ROADMAP yet)
-**Total Plans in Phase:** 6 (03-01 … 03-06) — complete
-**Status:** Phase 03 — Instagram sync complete (IG-01 … IG-06 covered by plans 03-01 … 03-06)
+**Current Plan:** Not started
+**Total Plans in Phase:** 0 (Phase 4 not yet planned)
+**Status:** Ready to plan Phase 4
 **Last Activity:** 2026-04-10
 
 ## v1 phase checklist
 
 - [x] Phase 1 — Catalog management (CAT-01 … CAT-05) ✓
 - [x] Phase 2 — Jobs & system reliability (SYS-01 … SYS-05) ✓
-- [x] Phase 3 — Instagram sync (IG-01 … IG-06) — plans 03-01 … 03-06 done
+- [x] Phase 3 — Instagram sync (IG-01 … IG-06) ✓
 - [ ] Phase 4 — AI analysis (AI-01 … AI-06)
 
 ## Traceability
