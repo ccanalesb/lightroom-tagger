@@ -1,0 +1,73 @@
+import os
+import sys
+import tempfile
+
+import pytest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+import api.lt_config as lt_config_mod
+from app import create_app
+from database import init_db
+
+
+@pytest.fixture
+def client():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        app = create_app()
+        app.db = init_db(db_path)
+        yield app.test_client()
+
+
+def test_get_catalog_when_file_exists(monkeypatch, client, tmp_path):
+    lrcat = tmp_path / "fake.lrcat"
+    lrcat.touch()
+    yaml_path = tmp_path / "config.yaml"
+    yaml_path.write_text(f"catalog_path: {lrcat.resolve()}\n", encoding="utf-8")
+    monkeypatch.setattr(lt_config_mod, "LT_CONFIG_YAML", str(yaml_path.resolve()))
+
+    response = client.get("/api/config/catalog")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["exists"] is True
+    assert data["catalog_path"] == str(lrcat.resolve())
+
+
+def test_put_catalog_updates_yaml_and_get(monkeypatch, client, tmp_path):
+    old = tmp_path / "old.lrcat"
+    old.touch()
+    yaml_path = tmp_path / "config.yaml"
+    yaml_path.write_text(f"catalog_path: {old.resolve()}\n", encoding="utf-8")
+    monkeypatch.setattr(lt_config_mod, "LT_CONFIG_YAML", str(yaml_path.resolve()))
+
+    newcat = tmp_path / "newcat.lrcat"
+    newcat.touch()
+
+    put = client.put(
+        "/api/config/catalog",
+        json={"catalog_path": str(newcat.resolve())},
+    )
+    assert put.status_code == 200
+    body = put.get_json()
+    assert body["ok"] is True
+    assert body["catalog_path"] == str(newcat.resolve())
+
+    get = client.get("/api/config/catalog")
+    assert get.status_code == 200
+    assert get.get_json()["catalog_path"] == str(newcat.resolve())
+
+
+def test_put_rejects_non_lrcat(monkeypatch, client, tmp_path):
+    yaml_path = tmp_path / "config.yaml"
+    yaml_path.write_text("catalog_path: /tmp/placeholder.lrcat\n", encoding="utf-8")
+    monkeypatch.setattr(lt_config_mod, "LT_CONFIG_YAML", str(yaml_path.resolve()))
+
+    bad = tmp_path / "not_a_catalog.txt"
+    bad.touch()
+    resp = client.put(
+        "/api/config/catalog",
+        json={"catalog_path": str(bad.resolve())},
+    )
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
