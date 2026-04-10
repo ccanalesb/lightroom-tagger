@@ -4,7 +4,7 @@ import sqlite3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from database import update_job_field
+from database import add_job_log, update_job_field
 
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import init_database
@@ -379,6 +379,14 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
             futures = {executor.submit(process_single_image, img, db_path): img for img in images}
             completed = 0
             for _future in as_completed(futures):
+                if runner.is_cancelled(job_id):
+                    add_job_log(
+                        runner.db,
+                        job_id,
+                        'info',
+                        'Prepare catalog cache stopped: cancel requested',
+                    )
+                    break
                 completed += 1
                 result = _future.result()
                 kind = result[0]
@@ -395,6 +403,10 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
                 if completed % 10 == 0 or completed == total:
                     progress = int(10 + (completed / total) * 85)
                     runner.update_progress(job_id, progress, f'Processed {completed}/{total} images')
+
+        if runner.is_cancelled(job_id):
+            runner.finalize_cancelled(job_id)
+            return
 
         # Get final cache stats from library DB
         cache_stats_after = get_cache_stats(lib_db)
@@ -521,8 +533,6 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
         skipped = 0
         failed = 0
         consecutive_failures = 0
-
-        from database import add_job_log
 
         # Use parallel processing if max_workers > 1 and batch is large enough
         if max_workers > 1 and total > 3:
