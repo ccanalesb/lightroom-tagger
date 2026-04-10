@@ -102,7 +102,10 @@ def get_stats():
         images = db.execute("SELECT * FROM images").fetchall()
         instagram_images = db.execute("SELECT * FROM instagram_dump_media").fetchall()
 
-        posted_count = sum(1 for img in images if img.get('instagram_posted'))
+        posted_row = db.execute(
+            "SELECT COUNT(*) AS cnt FROM images WHERE instagram_posted = 1"
+        ).fetchone()
+        posted_count = int(posted_row["cnt"])
         matches = db.execute("SELECT * FROM matches").fetchall()
 
         stats = {
