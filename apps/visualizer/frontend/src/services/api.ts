@@ -42,6 +42,17 @@ export const JobsAPI = {
     request<void>(`/jobs/${id}`, { method: 'DELETE' }),
 }
 
+export const ConfigAPI = {
+  getCatalog: () =>
+    request<{ catalog_path: string; resolved_path: string; exists: boolean }>('/config/catalog'),
+
+  putCatalog: (catalogPath: string) =>
+    request<{ catalog_path: string; ok: boolean }>('/config/catalog', {
+      method: 'PUT',
+      body: JSON.stringify({ catalog_path: catalogPath }),
+    }),
+}
+
 export const SystemAPI = {
   status: () =>
     request<{ status: string }>('/status'),
