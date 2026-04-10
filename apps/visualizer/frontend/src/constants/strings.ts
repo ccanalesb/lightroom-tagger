@@ -163,6 +163,11 @@ export const FILTER_CLEAR = 'Clear'
 // Config
 export const ITEMS_PER_PAGE = 48
 
+// Settings — Instagram dump (server path; IG-01)
+export const SETTINGS_INSTAGRAM_DUMP_TITLE = 'Instagram export dump'
+export const SETTINGS_INSTAGRAM_DUMP_HELP =
+  'Path must be reachable by the visualizer server (large folder — not uploaded from the browser).'
+
 // Job Details Modal
 export const JOB_DETAILS_TITLE = 'Job Details'
 export const JOB_DETAILS_PROGRESS = 'Progress'
