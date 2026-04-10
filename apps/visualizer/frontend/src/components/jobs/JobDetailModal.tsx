@@ -7,6 +7,7 @@ import {
   JOB_CONFIG_WEIGHTS,
   JOB_DETAILS_CURRENT_STEP,
   JOB_DETAILS_ERROR,
+  ERROR_SEVERITY_LABELS,
   JOB_DETAILS_LOGS,
   JOB_DETAILS_METADATA,
   JOB_DETAILS_PROGRESS,
@@ -37,6 +38,19 @@ function statusToBadgeVariant(status: Job['status']): BadgeVariant {
     case 'pending':
       return 'default';
   }
+}
+
+function errorSeverityBadgeProps(severity: 'warning' | 'error' | 'critical'): {
+  variant: BadgeVariant;
+  className: string;
+} {
+  if (severity === 'warning') {
+    return { variant: 'warning', className: '' };
+  }
+  if (severity === 'critical') {
+    return { variant: 'error', className: 'ring-2 ring-error' };
+  }
+  return { variant: 'error', className: '' };
 }
 
 function progressFillClass(status: Job['status']): string {
@@ -269,7 +283,18 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
 
             {displayJob.error && (
               <div className="rounded-base border border-error/50 bg-red-50 dark:bg-red-950/30 p-3">
-                <h4 className="font-medium text-sm mb-2 text-error">{JOB_DETAILS_ERROR}</h4>
+                <div className="flex flex-row items-center justify-between gap-2 mb-2">
+                  <h4 className="font-medium text-sm text-error">{JOB_DETAILS_ERROR}</h4>
+                  {(displayJob.error_severity === 'warning' ||
+                    displayJob.error_severity === 'error' ||
+                    displayJob.error_severity === 'critical') && (
+                    <Badge
+                      {...errorSeverityBadgeProps(displayJob.error_severity)}
+                    >
+                      {ERROR_SEVERITY_LABELS[displayJob.error_severity]}
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-sm text-error font-mono">{displayJob.error}</p>
               </div>
             )}
