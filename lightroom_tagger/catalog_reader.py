@@ -4,13 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from lightroom_tagger.config import load_config
-
-
-def connect_catalog(catalog_path: str) -> sqlite3.Connection:
-    """Connect to Lightroom catalog."""
-    conn = sqlite3.connect(catalog_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+from lightroom_tagger.lightroom.reader import connect_catalog
 
 
 def _parse_date(date_str: str | None) -> str | None:

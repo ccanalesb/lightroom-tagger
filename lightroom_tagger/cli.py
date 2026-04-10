@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 
-from lightroom_tagger.catalog_reader import connect_catalog, get_image_count, get_image_records
+from lightroom_tagger.lightroom.reader import connect_catalog, get_image_count, get_image_records
 from lightroom_tagger.core.analyzer import analyze_image
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import (
