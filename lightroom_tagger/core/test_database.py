@@ -56,6 +56,11 @@ class TestDatabase(unittest.TestCase):
         key = generate_key(record)
         self.assertEqual(key, '2024-01-15_photo.jpg')
 
+    def test_generate_key_truncates_iso_datetime(self):
+        """ISO datetime date_taken yields YYYY-MM-DD portion only in key."""
+        key = generate_key({'date_taken': '2024-01-15T14:30:00', 'filename': 'x.jpg'})
+        self.assertEqual(key, '2024-01-15_x.jpg')
+
     def test_store_image(self):
         """Test storing a single image."""
         record = {
