@@ -3,6 +3,7 @@ import sqlite3
 from pathlib import Path
 
 from lightroom_tagger.core.config import load_config
+from lightroom_tagger.lightroom.reader import connect_catalog
 
 KEY_TABLES = [
     "Adobe_images",
@@ -20,7 +21,7 @@ def explore_catalog(catalog_path: str) -> dict:
     schema = {"catalog_path": catalog_path, "tables": {}}
 
     try:
-        conn = sqlite3.connect(catalog_path)
+        conn = connect_catalog(catalog_path)
         schema["tables"] = get_key_tables(conn)
         conn.close()
     except sqlite3.Error as e:
@@ -131,7 +132,7 @@ def main():
     print(f"Exploring catalog: {catalog_path}")
 
     try:
-        conn = sqlite3.connect(catalog_path)
+        conn = connect_catalog(catalog_path)
 
         if args.all_tables:
             tables = list_tables(conn)
