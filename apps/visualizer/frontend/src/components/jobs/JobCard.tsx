@@ -1,6 +1,8 @@
 import type { Job } from '../../types/job'
-import { StatusBadge } from '../ui/badges'
+import { ERROR_SEVERITY_LABELS } from '../../constants/strings'
 import { formatDateTime } from '../../utils/date'
+import { Badge } from '../ui/Badge'
+import { StatusBadge } from '../ui/badges'
 
 interface JobCardProps {
   job: Job
@@ -18,7 +20,20 @@ export function JobCard({ job, onClick }: JobCardProps) {
           <h3 className="font-semibold">{job.type}</h3>
           <p className="text-sm text-gray-500">{job.id.slice(0, 8)}</p>
         </div>
-        <StatusBadge status={job.status} />
+        <div className="flex flex-row items-center gap-2 shrink-0">
+          <StatusBadge status={job.status} />
+          {job.status === 'failed' &&
+            (job.error_severity === 'warning' ||
+              job.error_severity === 'error' ||
+              job.error_severity === 'critical') && (
+              <Badge
+                variant={job.error_severity === 'warning' ? 'warning' : 'error'}
+                className={job.error_severity === 'critical' ? 'ring-2 ring-error' : ''}
+              >
+                {ERROR_SEVERITY_LABELS[job.error_severity]}
+              </Badge>
+            )}
+        </div>
       </div>
 
       {job.status === 'running' && (
