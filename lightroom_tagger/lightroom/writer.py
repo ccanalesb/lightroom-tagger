@@ -23,6 +23,23 @@ def raise_if_catalog_locked(catalog_path: str) -> None:
     return None
 
 
+# Backups run once per write call (update_lightroom_from_matches runs once per job invocation).
+def backup_catalog_if_needed(catalog_path: str, *, max_backups: int = 2) -> str:
+    cat = Path(catalog_path)
+    parent = cat.parent
+    pattern = f"{cat.name}.backup-*"
+    while True:
+        existing = sorted(parent.glob(pattern), key=lambda x: x.stat().st_mtime)
+        if len(existing) < max_backups:
+            break
+        existing[0].unlink(missing_ok=True)
+    ts = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    dest = parent / f"{cat.name}.backup-{ts}"
+    shutil.copy2(catalog_path, dest)
+    logger.info("Catalog backup created: %s", dest)
+    return str(dest)
+
+
 def connect_catalog(catalog_path: str) -> sqlite3.Connection:
     """Connect to Lightroom catalog."""
     conn = sqlite3.connect(catalog_path)
