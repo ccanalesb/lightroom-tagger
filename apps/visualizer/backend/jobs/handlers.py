@@ -574,6 +574,10 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
         else:
             # Sequential fallback for single worker or small batches
             for idx, (key, itype) in enumerate(images_to_describe, 1):
+                if runner.is_cancelled(job_id):
+                    add_job_log(runner.db, job_id, 'info', 'Batch describe stopped: cancel requested')
+                    runner.finalize_cancelled(job_id)
+                    return
                 progress = int(5 + (idx / total) * 90)
                 runner.update_progress(job_id, progress, f'Describing {idx}/{total}: {key}')
                 
