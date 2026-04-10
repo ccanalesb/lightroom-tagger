@@ -1,53 +1,79 @@
 ---
 status: issues_found
 phase: 01
-depth: quick
-findings_count: 9
-severity_summary:
+depth: standard
+files_reviewed: 6
+findings:
   critical: 0
   warning: 5
-  info: 4
+  info: 5
+  total: 10
 ---
 
-# Phase 01 Code Review
+# Code Review: Phase 01 (catalog-management)
 
 ## Summary
-Production code is generally sound (parameterized SQL, path checks on catalog updates), but there are a few correctness and security-footgun issues: split config modules, a wrong type coercion for `match_threshold` from the environment, duplicate DB connections in schema CLIs, and thumbnail endpoints that trust filesystem paths stored in SQLite.
+
+Catalog querying and API wiring are solid: SQL uses bound parameters, legacy `images` columns are migrated safely, and tests cover pagination and legacy DB behavior. Remaining gaps are mainly operational and security hardening—unbounded request limits, full-table reads for Instagram listing, and thumbnail endpoints that trust paths stored in SQLite.
 
 ## Findings
 
-### 1. warning — `lightroom_tagger/core/config.py` (lines 174–176)
-**Description:** `MATCH_THRESHOLD` is applied with `int(value)`, while `match_threshold` is a float everywhere else (default `0.7`). Non-integer env values raise `ValueError`; integers silently change semantics.
-**Suggestion:** Use `float(value)` for `match_threshold`, or parse explicitly and validate range.
+### CR-01: Unbounded `limit` / `offset` on catalog list (warning)
+- **File:** lightroom_tagger/core/database.py
+- **Line:** 606
+- **Issue:** `query_catalog_images` passes `limit` and `offset` straight into `LIMIT`/`OFFSET` with no validation. The Flask handler forwards query params without clamping. Very large `limit` values can cause high memory use; negative values can yield errors or surprising SQLite behavior.
+- **Suggestion:** Enforce sane bounds in one place (e.g. `limit = max(1, min(limit, 200))`, `offset = max(0, offset)`) in `query_catalog_images` or in `list_catalog_images` before calling it.
 
-### 2. warning — `lightroom_tagger/lightroom/schema.py` and `lightroom_tagger/schema_explorer.py` (`main`, ~134–148 / ~134–148)
-**Description:** After `conn = connect_catalog(catalog_path)`, the non-`--all-tables` branch calls `explore_catalog(catalog_path)`, which opens a second connection. That wastes resources and can interact badly with `locking_mode=EXCLUSIVE` on the catalog.
-**Suggestion:** Pass the existing `conn` into exploration (e.g. `get_key_tables(conn)` + wrap in the same try/finally), or drop the outer `connect_catalog` in that branch.
+### CR-02: Key migration continues if backup fails (warning)
+- **File:** lightroom_tagger/core/database.py
+- **Line:** 349
+- **Issue:** If copying the DB to `.pre-key-migration.bak` fails, the migration still runs and rewrites primary keys and related tables, increasing exposure if something goes wrong mid-migration.
+- **Suggestion:** Fail closed (abort migration and surface a clear error) when backup is required but cannot be created, or document that operators must take an external backup first.
 
-### 3. warning — `apps/visualizer/backend/api/images.py` (lines 191–196, 224–242)
-**Description:** `send_file` uses `file_path` / resolved catalog paths from the library DB. Anyone who can alter the database (or a bug that writes attacker-controlled paths) could attempt arbitrary file reads via path traversal or absolute paths.
-**Suggestion:** Resolve with `Path.resolve()`, enforce a prefix allowlist (e.g. under known photo roots or cache dir), or stat+reject paths outside expected roots.
+### CR-03: Instagram list loads entire dump table into memory (warning)
+- **File:** apps/visualizer/backend/api/images.py
+- **Line:** 105
+- **Issue:** `list_instagram_images` runs `SELECT * FROM instagram_dump_media` with no server-side filter or pagination, then filters and paginates in Python. Large libraries will scale poorly and spike memory.
+- **Suggestion:** Push filters and `LIMIT`/`OFFSET` into SQL (mirroring `query_catalog_images`), or at least select only needed columns.
 
-### 4. warning — `apps/visualizer/backend/api/lt_config.py` (lines 31–45)
-**Description:** `PUT /api/config/catalog` rewrites repo `config.yaml` with no authentication in this layer. Fine for trusted local use; risky if the backend is reachable on a network without other controls.
-**Suggestion:** Gate behind auth, bind to localhost only, or document as a trusted-admin-only endpoint.
+### CR-04: Thumbnail endpoints trust filesystem paths from the database (warning)
+- **File:** apps/visualizer/backend/api/images.py
+- **Line:** 191
+- **Issue:** `get_instagram_thumbnail` and `get_catalog_thumbnail` resolve paths from DB rows and call `send_file` when the path exists. A poisoned or tampered library DB (or bug writing paths) could expose arbitrary readable files to anything that can call the API.
+- **Suggestion:** Restrict paths to expected roots (catalog root, Instagram media dir), reject `..` and absolute paths outside allowlists, or resolve to a canonical path under a trusted base.
 
-### 5. warning — `lightroom_tagger/catalog_reader.py` (line 6) vs `lightroom_tagger/cli.py` / `lightroom_tagger/core/config.py`
-**Description:** `catalog_reader` and `schema_explorer` import `lightroom_tagger.config.load_config`, while the main CLI uses `lightroom_tagger.core.config`. The legacy `config` module is a different `Config` (fewer fields, different NAS rules, required `catalog_path`/`db_path` in the dataclass). Behavior and env coverage diverge; minimal YAML can fail `Config(**data)` on the legacy class.
-**Suggestion:** Standardize on `core.config` for all entry points or make `lightroom_tagger.config` a thin re-export of `core.config`.
+### CR-05: `store_catalog_image` does not ensure a non-null `key` (warning)
+- **File:** lightroom_tagger/core/database.py
+- **Line:** 707
+- **Issue:** `key = record.get('key')` can be `None`, unlike `store_image` which always derives a key via `generate_key`. That can cause failed inserts or ambiguous rows depending on SQLite constraints and callers.
+- **Suggestion:** Require `key` or compute it the same way as `store_image` / callers’ contract; raise `ValueError` early if missing.
 
-### 6. info — `lightroom_tagger/lightroom/reader.py` (lines 194–235)
-**Description:** `get_image_records(..., workers=4)` documents parallel workers, but both branches perform the same sequential per-image fetches. The parameter is misleading dead API surface.
-**Suggestion:** Remove `workers` until real parallelism exists, or implement safe batching (single connection or pooled read-only connections).
+### CR-06: Dead / misleading `success_paginated` call (info)
+- **File:** apps/visualizer/backend/api/images.py
+- **Line:** 143
+- **Issue:** `success_paginated(...)` is invoked and its return value ignored; the handler then builds a manual `jsonify(...)` response. This confuses readers and suggests incomplete refactoring.
+- **Suggestion:** Remove the call or use its return value as the actual response.
 
-### 7. info — `apps/visualizer/backend/api/images.py` (lines 105–106, 143–144)
-**Description:** Instagram listing loads all `instagram_dump_media` rows into memory before filtering/pagination. Large libraries risk high memory and slow responses. `success_paginated` is called and its return value is ignored—dead code.
-**Suggestion:** Push filters/pagination to SQL; remove or use the `success_paginated` helper consistently.
+### CR-07: Keyword search treats `%` and `_` as SQL `LIKE` wildcards (info)
+- **File:** lightroom_tagger/core/database.py
+- **Line:** 624
+- **Issue:** User-supplied keywords are wrapped in `%...%` for `LIKE` without escaping, so literal `%` or `_` in a search string change match semantics.
+- **Suggestion:** Escape `LIKE` specials (e.g. escape `\` and use `ESCAPE '\'` in SQLite) or document the behavior.
 
-### 8. info — `lightroom_tagger/lightroom/reader.py` (`main`, ~292–326)
-**Description:** Only `sqlite3.Error` is caught. If `json.dump` or file I/O fails after `connect_catalog`, `conn.close()` may not run.
-**Suggestion:** Use `try`/`finally` or context manager for the connection.
+### CR-08: Thumbnail responses always use `image/jpeg` (info)
+- **File:** apps/visualizer/backend/api/images.py
+- **Line:** 196
+- **Issue:** `send_file(..., mimetype='image/jpeg')` is used even when the underlying file may be PNG, HEIC, or other formats (including the “last resort” original file path).
+- **Suggestion:** Sniff extension or use `mimetypes.guess_type`, or omit forcing mimetype and let Flask infer when appropriate.
 
-### 9. info — `apps/visualizer/backend/app.py` (lines 31–34, 58)
-**Description:** Unconditional `DEBUG` prints may leak paths/config in logs. `SocketIO(..., cors_allowed_origins="*")` is permissive relative to the narrower Flask CORS list.
-**Suggestion:** Use logging at DEBUG level behind a flag; align SocketIO CORS with `config.FRONTEND_URL`.
+### CR-09: Broad exceptions return raw `str(e)` to clients (info)
+- **File:** apps/visualizer/backend/api/images.py
+- **Line:** 157
+- **Issue:** `except Exception as e: return error_server_error(str(e))` can leak internal paths, SQL fragments, or implementation details to API consumers.
+- **Suggestion:** Log the full exception server-side and return a generic message (or a stable error code) in production.
+
+### CR-10: Duplicate `CREATE INDEX` for the same index (info)
+- **File:** lightroom_tagger/core/database.py
+- **Line:** 163
+- **Issue:** `idx_dump_media_processed_attempted` is created in the initial `executescript` and again after migrations (lines 243–246). Harmless with `IF NOT EXISTS` but redundant noise in schema init.
+- **Suggestion:** Keep a single `CREATE INDEX` in one location after all migrations that affect indexed columns.
