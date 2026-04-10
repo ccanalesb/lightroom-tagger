@@ -14,6 +14,13 @@
 | 6 | `f74e330` | fix(02-04): cooperative cancel for parallel batch describe |
 | 7 | `eb8fcbe` | fix(02-04): cooperative cancel for prepare catalog cache executor loop |
 
+### Planning artifacts
+
+| Commit | Message |
+|--------|---------|
+| `52b938a` | docs(02-04): add plan execution summary |
+| `97b4924` | chore(02-04): sync ROADMAP, STATE, and summary after plan completion |
+
 ## Implementation notes
 
 - **Frontend:** `STATUS_LABELS.pending` is `Queued`; `JobDetailModal` renders `STATUS_LABELS[displayJob.status] ?? displayJob.status` so detail matches `StatusBadge` (API values unchanged).
