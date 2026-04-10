@@ -35,14 +35,31 @@ def get_job_details(job_id):
 
 @bp.route('/<job_id>', methods=['DELETE'])
 def cancel_job(job_id):
+    from app import get_job_runner, socketio
+
     job = get_job(current_app.db, job_id)
 
     if not job:
         return jsonify({'error': 'Job not found'}), 404
 
-    if job['status'] in ['running', 'pending']:
+    if job['status'] == 'running':
         update_job_status(current_app.db, job_id, 'cancelled')
-        return jsonify({'status': 'cancelled'})
+        r = get_job_runner()
+        if r:
+            r.signal_cancel(job_id)
+        add_job_log(current_app.db, job_id, 'info', 'Cancel requested via API')
+        updated = get_job(current_app.db, job_id)
+        if socketio:
+            socketio.emit('job_updated', updated)
+        return jsonify(updated)
+
+    if job['status'] == 'pending':
+        update_job_status(current_app.db, job_id, 'cancelled')
+        add_job_log(current_app.db, job_id, 'info', 'Cancel requested via API')
+        updated = get_job(current_app.db, job_id)
+        if socketio:
+            socketio.emit('job_updated', updated)
+        return jsonify(updated)
 
     return jsonify({'error': 'Can only cancel running or pending jobs'}), 400
 
