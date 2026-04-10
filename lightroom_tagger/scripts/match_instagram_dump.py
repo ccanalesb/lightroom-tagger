@@ -278,14 +278,14 @@ def main():
         print(f"Matched: {stats['matched']}")
         print(f"Skipped: {stats['skipped']}")
 
-        # Update Lightroom with "Posted" keyword
+        # Update Lightroom with configured Instagram keyword
         if matches and not args.no_lightroom:
             config = load_config()
             catalog_path = config.catalog_path or config.small_catalog_path
             if catalog_path and os.path.exists(catalog_path):
                 from lightroom_tagger.lightroom.writer import update_lightroom_from_matches
                 lr_stats = update_lightroom_from_matches(catalog_path, matches)
-                print(f"\nLightroom updated: {lr_stats['success']} images tagged with 'Posted'")
+                print(f"\nLightroom updated: {lr_stats['success']} images tagged with {config.instagram_keyword!r}")
                 if lr_stats['failed']:
                     print(f"Failed to update: {lr_stats['failed']} images")
             else:
