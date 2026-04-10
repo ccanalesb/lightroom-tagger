@@ -10,6 +10,9 @@ def resolve_filepath(path: str) -> str:
 
     Set NAS_PATH_PREFIX and NAS_MOUNT_POINT env vars to configure.
     Falls back to auto-detecting SMB mounts under /Volumes/.
+    Handles case-insensitive server names (NAS vs tnas vs TNAS).
+    
+    Example: //tnas/ccanales/Foo/bar.jpg -> /Volumes/ccanales/Foo/bar.jpg
     """
     if not path or not path.startswith('//'):
         return path
@@ -17,25 +20,39 @@ def resolve_filepath(path: str) -> str:
     prefix = os.getenv('NAS_PATH_PREFIX', '')
     mount = os.getenv('NAS_MOUNT_POINT', '')
 
-    if not prefix:
-        parts = path.lstrip('/').split('/')
-        if len(parts) >= 2:
-            prefix = f'//{parts[0]}/{parts[1]}'
+    # Parse path: //server/share/rest/of/path
+    path_parts = path.lstrip('/').split('/', 2)  # ['server', 'share', 'rest/of/path']
+    if len(path_parts) < 2:
+        return path
+    
+    server_name = path_parts[0]  # e.g., "tnas", "NAS", "TNAS"
+    share_name = path_parts[1]   # e.g., "ccanales"
+    rest_of_path = path_parts[2] if len(path_parts) > 2 else ""
+    
+    # If we have a configured prefix and mount, check if share names match
+    if prefix and mount:
+        prefix_parts = prefix.lstrip('/').split('/')
+        if len(prefix_parts) >= 2 and prefix_parts[1] == share_name:
+            # Match found - construct path: /mount/rest
+            if rest_of_path:
+                return os.path.join(mount, rest_of_path)
+            else:
+                return mount
 
-    if not mount and prefix:
-        share_name = prefix.rstrip('/').split('/')[-1]
+    # Auto-detect mount if not configured
+    if not mount:
         try:
             for name in sorted(os.listdir('/Volumes/'), reverse=True):
                 if name.startswith(share_name):
                     candidate = os.path.join('/Volumes', name)
                     if os.path.ismount(candidate):
                         mount = candidate
-                        break
+                        if rest_of_path:
+                            return os.path.join(mount, rest_of_path)
+                        else:
+                            return mount
         except OSError:
             pass
-
-    if mount and prefix and path.startswith(prefix):
-        return path.replace(prefix, mount, 1)
 
     return path
 
@@ -248,10 +265,14 @@ def _migrate_add_column(conn: sqlite3.Connection, table: str, column: str, col_t
 # ---------------------------------------------------------------------------
 
 def generate_key(record: dict) -> str:
-    """Generate unique key from record: {date_taken}_{filename}"""
+    """Generate unique key from record: {date_taken}_{filename}
+
+    Date portion matches ``lightroom.reader.generate_record_key`` (YYYY-MM-DD only).
+    """
     date_taken = record.get('date_taken', 'unknown')
+    date_part = date_taken[:10] if date_taken else 'unknown'
     filename = record.get('filename', 'unknown')
-    return f"{date_taken}_{filename}"
+    return f"{date_part}_{filename}"
 
 
 def store_image(db: sqlite3.Connection, record: dict) -> str:
