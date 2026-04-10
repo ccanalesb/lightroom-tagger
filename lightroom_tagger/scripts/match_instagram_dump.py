@@ -181,7 +181,13 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             model=provider_model,
             batch_size=config.vision_batch_size,
             batch_threshold=config.vision_batch_threshold,
+            should_cancel=should_cancel,
         )
+
+        if should_cancel is not None and should_cancel():
+            if log_callback:
+                log_callback('info', 'Matching stopped: cancel requested')
+            return stats, matches_found
 
         above_threshold = [r for r in results if r['total_score'] >= threshold]
 

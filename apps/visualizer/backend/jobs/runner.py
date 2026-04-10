@@ -21,7 +21,9 @@ class JobRunner:
         return True
 
     def update_progress(self, job_id: str, progress: int, current_step: str):
-        """Update job progress."""
+        """Update job progress. No-op if the job has been cancelled."""
+        if self.is_cancelled(job_id):
+            return
         update_job_status(self.db, job_id, 'running', progress=progress, current_step=current_step)
         add_job_log(self.db, job_id, 'info', current_step)
         self.emit_progress(job_id, progress, current_step)
@@ -63,7 +65,14 @@ class JobRunner:
 
     def is_cancelled(self, job_id: str) -> bool:
         ev = self.active_jobs.get(job_id)
-        return bool(ev and ev.is_set())
+        if ev and ev.is_set():
+            return True
+        row = get_job(self.db, job_id)
+        if row and row.get('status') == 'cancelled':
+            if ev:
+                ev.set()
+            return True
+        return False
 
     def clear_cancel_registration(self, job_id: str) -> None:
         self.active_jobs.pop(job_id, None)

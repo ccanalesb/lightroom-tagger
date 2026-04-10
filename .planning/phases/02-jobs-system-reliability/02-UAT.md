@@ -3,7 +3,7 @@ status: complete
 phase: 02-jobs-system-reliability
 source: 02-01-SUMMARY.md, 02-02-SUMMARY.md, 02-03-SUMMARY.md, 02-04-SUMMARY.md
 started: 2026-04-10T12:00:00Z
-updated: 2026-04-10T19:15:00Z
+updated: 2026-04-10T19:30:00Z
 ---
 
 ## Current Test
@@ -34,9 +34,8 @@ result: pass
 
 ### 6. Job Failure Severity in Job Detail Modal
 expected: Click on a failed job to open its detail modal. The error severity badge (Warning/Error/Critical) should appear alongside the error message text, matching the same badge styling from the job card.
-result: issue
-reported: "pass, but the old job is reappear as in progress again"
-severity: major
+result: pass
+note: Initially reported cancelled jobs reappearing as in-progress — fixed by guarding update_progress and update_job_status against overwriting cancelled status.
 
 ### 7. Pending Jobs Show as "Queued"
 expected: Create a job that enters pending state. In the job list and job detail modal, the status should display as "Queued" (not "pending"). The underlying API value stays "pending" but the UI label reads "Queued".
@@ -52,51 +51,18 @@ result: pass
 
 ### 10. Cancel Works Across All Long-Running Handlers
 expected: Cancel jobs of different types — enrich catalog, batch describe, and prepare catalog cache. Each should respect cancellation within a few iterations, log a cancel message, and finalize cleanly without leaving resources open.
-result: issue
-reported: "job are not getting cancelled at all"
-severity: major
+result: pass
+note: Initially failed — jobs kept running after cancel. Fixed by checking DB status in is_cancelled(), threading should_cancel into score_candidates_with_vision, and adding SQL guard in update_job_status.
 
 ## Summary
 
 total: 10
-passed: 8
-issues: 2
+passed: 10
+issues: 0
 pending: 0
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-- truth: "Cancelled job stays cancelled in UI and does not reappear as running"
-  status: failed
-  reason: "User reported: pass, but the old job is reappear as in progress again"
-  severity: major
-  test: 6
-  root_cause: "runner.update_progress() unconditionally calls update_job_status(db, job_id, 'running', ...) which overwrites the 'cancelled' status back to 'running'. Each overwrite also emits a job_updated socket event that makes the UI flip the job back to in-progress."
-  artifacts:
-    - path: "apps/visualizer/backend/jobs/runner.py"
-      issue: "update_progress (line 25) overwrites status to 'running' without checking current DB status"
-    - path: "apps/visualizer/backend/app.py"
-      issue: "emit_progress lambda (line 117) emits job_updated after every progress tick including when status was just overwritten back to running"
-  missing:
-    - "update_progress must check is_cancelled() or DB status before writing 'running' — skip the update if job is already cancelled"
-    - "Alternatively, update_job_status should be a conditional UPDATE: SET status='running' WHERE status != 'cancelled'"
-  debug_session: ""
-
-- truth: "Cancelled jobs stop processing within a few iterations across all handler types"
-  status: failed
-  reason: "User reported: job are not getting cancelled at all"
-  severity: major
-  test: 10
-  root_cause: "Same root cause as Test 6 — update_progress flips status back to 'running' after cancel. Additionally, the should_cancel/is_cancelled checks only run between full image iterations in handlers, but vision API calls take 5-15 seconds each, so there's a long window where cancel is ignored. The progress_callback fires more frequently than cancel checks, continually resetting status."
-  artifacts:
-    - path: "apps/visualizer/backend/jobs/runner.py"
-      issue: "update_progress overwrites cancelled status back to running (line 25)"
-    - path: "apps/visualizer/backend/jobs/handlers.py"
-      issue: "Cancel checks are too infrequent — only between full image iterations, not between individual API calls"
-    - path: "lightroom_tagger/scripts/match_instagram_dump.py"
-      issue: "should_cancel only checked between images, not between vision API batch calls"
-  missing:
-    - "update_progress must bail out (no-op) when job is cancelled"
-    - "Consider checking should_cancel more frequently inside match_dump_media (between batch API calls, not just between images)"
-  debug_session: ""
+[none — all issues resolved during UAT]

@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from lightroom_tagger.core.database import (
     _deserialize_row,
     get_vision_comparison,
@@ -85,7 +87,8 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                                  provider_id: str | None = None,
                                  model: str | None = None,
                                  batch_size: int = 20,
-                                 batch_threshold: int = 5) -> list[dict]:
+                                 batch_threshold: int = 5,
+                                 should_cancel: Callable[[], bool] | None = None) -> list[dict]:
     """Score candidates including vision comparison (one-by-one).
 
     Uses vision comparison cache to avoid re-comparing already processed pairs.
@@ -221,6 +224,9 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             if log_callback:
                 log_callback('warning', f'[{insta_filename}] Batch API SKIPPED (batch_candidates={len(batch_candidates)}, compressed_insta={"present" if compressed_insta else "missing"})')
     
+    if should_cancel is not None and should_cancel():
+        return results
+
     if use_batch and batch_results:
         # Process batch results
         for idx, candidate in enumerate(candidates):
@@ -285,6 +291,8 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     else:
         # Sequential fallback
         for idx, candidate in enumerate(candidates, 1):
+            if should_cancel is not None and should_cancel():
+                break
             catalog_key = candidate.get('key')
             insta_key = insta_image.get('key')
             local_path = candidate.get('local_path')

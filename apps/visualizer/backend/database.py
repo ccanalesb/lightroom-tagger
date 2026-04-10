@@ -114,7 +114,10 @@ def update_job_status(db: sqlite3.Connection, job_id: str, status: str,
         params.append(datetime.now().isoformat())
 
     params.append(job_id)
-    db.execute(f"UPDATE jobs SET {', '.join(sets)} WHERE id = ?", params)
+    where = "id = ?"
+    if status == 'running':
+        where += " AND status != 'cancelled'"
+    db.execute(f"UPDATE jobs SET {', '.join(sets)} WHERE {where}", params)
     db.commit()
 
 
