@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: "03-05"
-status: executing
-last_updated: "2026-04-10T23:59:59.000Z"
+current_plan: "03-06"
+status: ready
+last_updated: "2026-04-10T20:00:00.000Z"
 last_activity: 2026-04-10
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 15
-  completed_plans: 13
-  percent: 87
+  completed_plans: 14
+  percent: 93
 ---
 
 # Planning state
@@ -26,11 +26,11 @@ progress:
 | Active milestone | v1 |
 | Active phase | 3 — Instagram sync |
 | Phase status | In progress |
-| Last completed plan | 03-04 — Dump path UI and import trigger on Processing Settings |
+| Last completed plan | 03-05 — Matches tab with MatchDetailModal and useMatchGroups |
 
 ## GSD progression
 
-**Next plan:** 03-05
+**Next plan:** 03-06
 **Total Plans in Phase:** 6 (03-01 … 03-06)
 **Status:** Executing Phase 03 — Instagram sync
 **Last Activity:** 2026-04-10
@@ -39,7 +39,7 @@ progress:
 
 - [x] Phase 1 — Catalog management (CAT-01 … CAT-05) ✓
 - [x] Phase 2 — Jobs & system reliability (SYS-01 … SYS-05) ✓
-- [ ] Phase 3 — Instagram sync (IG-01 … IG-06) — plans 03-01 … 03-04 done
+- [ ] Phase 3 — Instagram sync (IG-01 … IG-06) — plans 03-01 … 03-05 done
 - [ ] Phase 4 — AI analysis (AI-01 … AI-06)
 
 ## Traceability
@@ -57,6 +57,7 @@ Full requirement ↔ phase mapping: [REQUIREMENTS.md § Traceability](./REQUIREM
 - **2026-04-10:** Plan **03-02** executed — `update_lightroom_from_matches` uses `Config.instagram_keyword` (default `Posted`); CLI success message uses the same; unit test covers configured keyword. See [03-02-SUMMARY.md](./phases/03-instagram-sync/03-02-SUMMARY.md).
 - **2026-04-10:** Plan **03-03** executed — `instagram_dump_path` in core `Config` + `INSTAGRAM_DUMP_PATH`; YAML helper; `/api/config/instagram-dump` GET/PUT; `instagram_import` job handler calling `import_dump`. See [03-03-SUMMARY.md](./phases/03-instagram-sync/03-03-SUMMARY.md).
 - **2026-04-10:** Plan **03-04** executed — `ConfigAPI` instagram-dump methods; `InstagramDumpSettingsPanel` on Processing **Settings** with server-path copy, save, optional `reimport` / `skip_dedup`, and **Run Import** (`JobsAPI.create('instagram_import', …)`). See [03-04-SUMMARY.md](./phases/03-instagram-sync/03-04-SUMMARY.md).
+- **2026-04-10:** Plan **03-05** executed — `MatchesTab` lists `GET /api/images/matches` via `useMatchGroups` and `MatchingAPI.list`, opens `MatchDetailModal` for validate/reject, empty copy `MATCHES_TAB_EMPTY`, pagination with **Load more** (`fetchGroups(50, matchGroups.length)`). See [03-05-SUMMARY.md](./phases/03-instagram-sync/03-05-SUMMARY.md).
 
 ## Decisions (phase 3)
 
@@ -64,6 +65,7 @@ Full requirement ↔ phase mapping: [REQUIREMENTS.md § Traceability](./REQUIREM
 - **D-03-02:** Lightroom writeback from matches applies **`Config.instagram_keyword`** (YAML / `LIGHTRoom_INSTAGRAM_KEYWORD`), with **empty-after-strip falling back to `Posted`**, so the posted token stays configurable without changing auto-match/writeback triggers.
 - **D-03-03:** **Server-side** Instagram dump root is stored as **`instagram_dump_path`** in repo `config.yaml` (via PUT) and optionally overridden by **`INSTAGRAM_DUMP_PATH`**; the visualizer exposes it at **`GET`/`PUT` `/api/config/instagram-dump`**. **Ingest** is triggered by job type **`instagram_import`**, which runs **`import_dump`** against the configured path and library DB (`metadata.dump_path` overrides config/env for one-off runs).
 - **D-03-04:** Processing **Settings** UI treats the Instagram dump as a **server filesystem path** (text field + help text), not a browser file picker; operators enqueue ingest with **`instagram_import`** and optional **`reimport`** / **`skip_dedup`** metadata aligned with the 03-03 handler.
+- **D-03-05:** **Matches** tab loads match groups with an initial **`fetchGroups(100, 0)`** and **Load more** uses **`fetchGroups(50, matchGroups.length)`**; **`useMatchGroups`** merges paginated responses by **`instagram_key`** so offsets do not duplicate rows when the API overlaps windows.
 
 ## Decisions (phase 2)
 
