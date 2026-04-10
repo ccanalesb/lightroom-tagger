@@ -92,6 +92,21 @@ class TestDatabase(unittest.TestCase):
         img = get_image(self.db, '2024-01-15_photo.jpg')
         self.assertEqual(img['rating'], 3)
 
+    def test_store_image_upsert_refreshes_id_column(self):
+        """Upsert on same composite key updates Lightroom id_local column."""
+        store_image(self.db, {
+            'date_taken': '2024-01-15',
+            'filename': 'photo.jpg',
+            'id': '1',
+        })
+        store_image(self.db, {
+            'date_taken': '2024-01-15',
+            'filename': 'photo.jpg',
+            'id': '2',
+        })
+        img = get_image(self.db, '2024-01-15_photo.jpg')
+        self.assertEqual(img['id'], '2')
+
     def test_store_images_batch(self):
         """Test batch storing images."""
         records = [

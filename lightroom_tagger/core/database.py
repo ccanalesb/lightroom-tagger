@@ -331,6 +331,7 @@ def store_image(db: sqlite3.Connection, record: dict) -> str:
             :file_size, :instagram_posted, :instagram_post_date, :instagram_url,
             :instagram_index, :image_hash, :analyzed_at, :phash, :exif, :catalog_path)
         ON CONFLICT(key) DO UPDATE SET
+            id=excluded.id,
             filename=excluded.filename, filepath=excluded.filepath,
             date_taken=excluded.date_taken, rating=excluded.rating,
             pick=excluded.pick, color_label=excluded.color_label,
