@@ -75,9 +75,13 @@ export const ImagesAPI = {
   getInstagramMonths: () =>
     request<{ months: string[] }>('/images/instagram/months'),
 
-  listCatalog: (posted?: boolean, limit?: number, offset?: number) => {
+  getCatalogMonths: () =>
+    request<{ months: string[] }>('/images/catalog/months'),
+
+  listCatalog: (posted?: boolean, month?: string, limit?: number, offset?: number) => {
     const params = new URLSearchParams()
     if (posted !== undefined) params.set('posted', String(posted))
+    if (month) params.set('month', month)
     if (limit) params.set('limit', String(limit))
     if (offset) params.set('offset', String(offset))
     return request<{ total: number; images: CatalogImage[] }>(
@@ -200,9 +204,12 @@ export interface InstagramImage {
   filename: string
   instagram_folder: string
   source_folder: string // posts, archived_posts, etc.
+  date_folder: string // YYYYMM format (e.g., '202404' for April 2024)
+  created_at?: string // ISO timestamp when posted to Instagram (may be empty)
   image_hash?: string // Visual perceptual hash for duplicate detection
   phash?: string
-  description?: string
+  description?: string // AI-generated description
+  caption?: string // Original Instagram caption
   key: string
   crawled_at: string
   image_index: number
@@ -224,6 +231,7 @@ export interface InstagramImage {
 
 export interface CatalogImage {
   id: number
+  key: string
   filename: string
   filepath: string
   date_taken: string
@@ -364,4 +372,9 @@ export const ProvidersAPI = {
       `/providers/${providerId}/models/${encodeURIComponent(modelId)}`,
       { method: 'DELETE' },
     ),
+  reorderModels: (providerId: string, order: string[]) =>
+    request<{ success: boolean }>(`/providers/${providerId}/models/order`, {
+      method: 'PUT',
+      body: JSON.stringify({ order }),
+    }),
 }

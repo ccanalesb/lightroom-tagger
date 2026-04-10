@@ -41,7 +41,12 @@ if [[ ! -x "$FRONTEND_DIR/node_modules/.bin/vite" ]]; then
   )
 fi
 
-if ! python3 - "$BACKEND_PORT" <<'PY'
+PYTHON_BIN="python3"
+if [[ -x "$ROOT_DIR/.venv/bin/python" ]]; then
+  PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
+fi
+
+if ! "$PYTHON_BIN" - "$BACKEND_PORT" <<'PY'
 import socket, sys
 s = socket.socket()
 try:
@@ -58,7 +63,7 @@ then
   exit 1
 fi
 
-if ! python3 - <<'PY'
+if ! "$PYTHON_BIN" - <<'PY'
 import socket
 s = socket.socket()
 try:
@@ -78,7 +83,7 @@ fi
 echo "Starting backend on http://127.0.0.1:$BACKEND_PORT ..."
 (
   cd "$BACKEND_DIR"
-  exec env PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" python3 app.py
+  exec env PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" app.py
 ) &
 BACKEND_PID=$!
 echo "$BACKEND_PID" > "$BACKEND_PID_FILE"

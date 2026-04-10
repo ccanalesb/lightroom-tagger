@@ -35,6 +35,30 @@ export function ProvidersTab() {
     [refreshModelsForProvider],
   );
 
+  const handleReorderModel = useCallback(
+    async (providerId: string, modelId: string, direction: 'up' | 'down') => {
+      const models = modelCache[providerId] ?? [];
+      const index = models.findIndex(m => m.id === modelId);
+      if (index === -1) return;
+
+      const newModels = [...models];
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= newModels.length) return;
+
+      [newModels[index], newModels[targetIndex]] = [newModels[targetIndex], newModels[index]];
+      const newOrder = newModels.map(m => m.id);
+
+      setModelCache(previous => ({ ...previous, [providerId]: newModels }));
+      
+      try {
+        await ProvidersAPI.reorderModels(providerId, newOrder);
+      } catch (error) {
+        await refreshModelsForProvider(providerId);
+      }
+    },
+    [modelCache, refreshModelsForProvider],
+  );
+
   if (loading) {
     return (
       <Card padding="lg">
@@ -52,7 +76,7 @@ export function ProvidersTab() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6">
       <div>
         <h3 className="text-card-title text-text mb-2">AI Model Providers</h3>
         <p className="text-sm text-text-secondary">
@@ -71,6 +95,9 @@ export function ProvidersTab() {
             onAddModel={model => handleAddModel(provider.id, model)}
             onRemoveModel={modelId => {
               handleRemoveModel(provider.id, modelId).catch(console.error);
+            }}
+            onReorderModel={(modelId, direction) => {
+              handleReorderModel(provider.id, modelId, direction).catch(console.error);
             }}
           />
         ))}

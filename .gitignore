@@ -84,3 +84,5 @@ lightroom_tagger/core/providers.json
 *.db-journal
 *.db-wal
 *.db-shm
+.agent-browser-shots/*
+config.yaml

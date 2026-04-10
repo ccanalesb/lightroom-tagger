@@ -65,6 +65,22 @@ def delete_model(provider_id: str, model_id: str):
     return jsonify({"error": "Model not found"}), 404
 
 
+@bp.route("/<provider_id>/models/order", methods=["PUT"])
+def reorder_models_endpoint(provider_id: str):
+    """Reorder models for a provider."""
+    registry = _get_registry()
+    data = request.json
+    if not data or "order" not in data:
+        return jsonify({"error": "order is required"}), 400
+    try:
+        registry.reorder_models(provider_id, data["order"])
+        return jsonify({"success": True})
+    except KeyError:
+        return jsonify({"error": f"Unknown provider: {provider_id}"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 @bp.route("/<provider_id>/models", methods=["GET", "POST"])
 def models(provider_id: str):
     registry = _get_registry()
@@ -86,6 +102,22 @@ def models(provider_id: str):
                 "vision": bool(user_model["vision"]),
                 "source": "user",
             })
+        
+        # Apply custom order if it exists
+        provider_config = registry._providers.get(provider_id, {})
+        model_order = provider_config.get("model_order", [])
+        if model_order:
+            models_by_id = {m["id"]: m for m in models_list}
+            ordered = []
+            for model_id in model_order:
+                if model_id in models_by_id:
+                    ordered.append(models_by_id[model_id])
+            # Add any models not in the order (new discoveries)
+            for model in models_list:
+                if model["id"] not in model_order:
+                    ordered.append(model)
+            models_list = ordered
+        
         return jsonify(models_list)
 
     data = request.json

@@ -54,7 +54,7 @@ export function DescriptionsTab() {
   }, [imageType, dateFilter, force, options]);
 
   return (
-    <div className="max-w-2xl">
+    <div>
       <Card padding="lg">
         <CardHeader>
           <CardTitle>Generate Image Descriptions</CardTitle>

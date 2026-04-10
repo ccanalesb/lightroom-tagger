@@ -23,6 +23,22 @@ def create_app():
     app = Flask(__name__)
     app.name = 'backend'
 
+    # Set up NAS path resolution environment variables from lightroom-tagger config
+    try:
+        from lightroom_tagger.core.config import load_config as load_lt_config
+        lt_config = load_lt_config()
+        if lt_config.mount_point:
+            os.environ['NAS_MOUNT_POINT'] = lt_config.mount_point
+        # Auto-detect NAS prefix from catalog path if available
+        if hasattr(lt_config, 'catalog_path') and lt_config.catalog_path:
+            catalog_path = lt_config.catalog_path
+            if catalog_path.startswith('//'):
+                parts = catalog_path.lstrip('/').split('/')
+                if len(parts) >= 2:
+                    os.environ['NAS_PATH_PREFIX'] = f'//{parts[0]}/{parts[1]}'
+    except Exception as e:
+        print(f"Warning: Could not load NAS config from lightroom-tagger: {e}")
+
     CORS(app, origins=config.FRONTEND_URL.split(','))
     socketio = SocketIO(app, cors_allowed_origins="*")
 

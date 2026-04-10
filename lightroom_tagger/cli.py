@@ -229,6 +229,11 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Show what would be processed"
     )
+    enrich_parser.add_argument(
+        "--cache-only",
+        action="store_true",
+        help="Only update vision cache (incremental, preserves existing cache)"
+    )
 
     return parser
 
@@ -419,13 +424,14 @@ def cmd_stats(args, config):
         return 1
 
 
-def enrich_catalog_images(db, limit=None, verbose=False):
+def enrich_catalog_images(db, limit=None, verbose=False, cache_only=False):
     """Enrich catalog images with metadata and vision cache.
 
     Args:
         db: sqlite3 connection
         limit: Maximum number of images to process
         verbose: Print progress for every image
+        cache_only: Only process images missing from vision cache (incremental update)
 
     Returns:
         dict with processed, skipped, errors counts
@@ -433,6 +439,7 @@ def enrich_catalog_images(db, limit=None, verbose=False):
     from lightroom_tagger.core.config import load_config
     from lightroom_tagger.core.database import (
         get_all_images,
+        get_catalog_images_missing_cache,
         init_vision_cache_table,
         init_vision_comparisons_table,
     )
@@ -446,17 +453,25 @@ def enrich_catalog_images(db, limit=None, verbose=False):
     init_vision_comparisons_table(db)
     init_vision_cache_table(db)
 
-    print("Enriching catalog images...")
+    if cache_only:
+        print("Running incremental cache update (cache-only mode)...")
+    else:
+        print("Enriching catalog images...")
 
     try:
-        catalog_images = get_catalog_images_needing_analysis(db)
+        if cache_only:
+            # Only get images missing from vision cache
+            catalog_images = get_catalog_images_missing_cache(db)
+        else:
+            # Get images needing full analysis
+            catalog_images = get_catalog_images_needing_analysis(db)
 
-        if not catalog_images:
-            print("Catalog table empty, getting from main images table...")
-            all_images = get_all_images(db)
-            catalog_images = [img for img in all_images if not img.get('analyzed_at')]
+            if not catalog_images:
+                print("Catalog table empty, getting from main images table...")
+                all_images = get_all_images(db)
+                catalog_images = [img for img in all_images if not img.get('analyzed_at')]
 
-        print(f"Found {len(catalog_images)} images to enrich")
+        print(f"Found {len(catalog_images)} images to {'cache' if cache_only else 'enrich'}")
 
         for i, record in enumerate(catalog_images):
             if limit and i >= limit:
@@ -471,30 +486,46 @@ def enrich_catalog_images(db, limit=None, verbose=False):
                     skipped += 1
                     continue
 
-                analysis = analyze_image(filepath)
+                if cache_only:
+                    # Cache-only mode: just create compressed image cache
+                    if config.vision_cache_enabled:
+                        from lightroom_tagger.core.path_utils import resolve_catalog_path
+                        resolved_path = resolve_catalog_path(filepath)
+                        if resolved_path:
+                            get_or_create_cached_image(db, key, resolved_path)
+                            processed += 1
+                        else:
+                            print(f"Skipping {key}: file not found at {filepath}")
+                            skipped += 1
+                    else:
+                        print("Vision cache is disabled in config, nothing to do")
+                        break
+                else:
+                    # Full enrichment mode: analyze and cache
+                    analysis = analyze_image(filepath)
 
-                enriched_record = {
-                    'key': key,
-                    'filepath': filepath,
-                    'analyzed_at': analysis.get('analyzed_at', 'unknown'),
-                    'phash': analysis.get('phash'),
-                    'exif': analysis.get('exif', {}),
-                    'catalog_path': record.get('catalog_path', ''),
-                    'date_taken': record.get('date_taken', ''),
-                    'filename': record.get('filename', ''),
-                    'rating': record.get('rating', 0),
-                    'keywords': record.get('keywords', []),
-                    'color_label': record.get('color_label', ''),
-                    'title': record.get('title', ''),
-                    'description': analysis.get('description', record.get('description', '')),
-                }
+                    enriched_record = {
+                        'key': key,
+                        'filepath': filepath,
+                        'analyzed_at': analysis.get('analyzed_at', 'unknown'),
+                        'phash': analysis.get('phash'),
+                        'exif': analysis.get('exif', {}),
+                        'catalog_path': record.get('catalog_path', ''),
+                        'date_taken': record.get('date_taken', ''),
+                        'filename': record.get('filename', ''),
+                        'rating': record.get('rating', 0),
+                        'keywords': record.get('keywords', []),
+                        'color_label': record.get('color_label', ''),
+                        'title': record.get('title', ''),
+                        'description': analysis.get('description', record.get('description', '')),
+                    }
 
-                store_catalog_image(db, enriched_record)
+                    store_catalog_image(db, enriched_record)
 
-                if config.vision_cache_enabled:
-                    get_or_create_cached_image(db, key, filepath)
+                    if config.vision_cache_enabled:
+                        get_or_create_cached_image(db, key, filepath)
 
-                processed += 1
+                    processed += 1
 
                 if verbose or (i + 1) % 10 == 0:
                     print(f"Processed {i + 1}/{len(catalog_images)}")
@@ -503,7 +534,8 @@ def enrich_catalog_images(db, limit=None, verbose=False):
                 print(f"Error processing image {i + 1}: {e}")
                 errors += 1
 
-        print(f"Enrichment complete: {processed} processed, {skipped} skipped, {errors} errors")
+        action = "Cache update" if cache_only else "Enrichment"
+        print(f"{action} complete: {processed} processed, {skipped} skipped, {errors} errors")
         return {'processed': processed, 'skipped': skipped, 'errors': errors}
 
     except Exception as e:
@@ -513,17 +545,30 @@ def enrich_catalog_images(db, limit=None, verbose=False):
 
 def cmd_enrich_catalog(args, config):
     """Enrich catalog with metadata."""
+    import os
+    
     db_path = args.db or config.db_path
     limit = args.limit
     dry_run = args.dry_run
+    cache_only = getattr(args, 'cache_only', False)
     verbose = getattr(args, 'verbose', False)
+
+    # Set up NAS path resolution environment variables
+    if config.mount_point:
+        os.environ['NAS_MOUNT_POINT'] = config.mount_point
+    if hasattr(config, 'catalog_path') and config.catalog_path:
+        catalog_path = config.catalog_path
+        if catalog_path.startswith('//'):
+            parts = catalog_path.lstrip('/').split('/')
+            if len(parts) >= 2:
+                os.environ['NAS_PATH_PREFIX'] = f'//{parts[0]}/{parts[1]}'
 
     if dry_run:
         print("Dry run mode - will show what would be processed")
 
     try:
         db = init_database(db_path)
-        result = enrich_catalog_images(db, limit=limit, verbose=verbose)
+        result = enrich_catalog_images(db, limit=limit, verbose=verbose, cache_only=cache_only)
         db.close()
 
         print(f"Processed: {result['processed']} images")
@@ -532,6 +577,8 @@ def cmd_enrich_catalog(args, config):
         return 0
     except Exception as e:
         print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
         return 1
 
 

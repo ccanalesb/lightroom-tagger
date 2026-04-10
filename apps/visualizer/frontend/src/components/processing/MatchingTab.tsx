@@ -71,7 +71,7 @@ export function MatchingTab() {
   }, [dateFilter, options, weightsError]);
 
   return (
-    <div className="max-w-2xl">
+    <div>
       <Card padding="lg">
         <CardHeader>
           <CardTitle>Start Vision Matching Job</CardTitle>

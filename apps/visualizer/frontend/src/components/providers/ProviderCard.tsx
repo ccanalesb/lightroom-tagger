@@ -16,6 +16,7 @@ interface ProviderCardProps {
   onToggle: () => void;
   onAddModel: (model: { id: string; name: string; vision: boolean }) => Promise<void>;
   onRemoveModel: (modelId: string) => void;
+  onReorderModel: (modelId: string, direction: 'up' | 'down') => void;
 }
 
 export function ProviderCard({
@@ -25,6 +26,7 @@ export function ProviderCard({
   onToggle,
   onAddModel,
   onRemoveModel,
+  onReorderModel,
 }: ProviderCardProps) {
   return (
     <div className="rounded-card border border-border bg-bg shadow-card">
@@ -48,7 +50,7 @@ export function ProviderCard({
           {models.length === 0 ? (
             <p className="text-sm text-text-tertiary">{PROVIDER_NO_MODELS}</p>
           ) : (
-            <ModelList models={models} onRemove={onRemoveModel} />
+            <ModelList models={models} onRemove={onRemoveModel} onReorder={onReorderModel} />
           )}
           <AddModelForm onAdd={onAddModel} />
         </div>

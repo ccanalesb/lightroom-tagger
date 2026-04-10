@@ -190,14 +190,19 @@ def compare_images_batch(
     ])
     
     batch_prompt = (
-        "You are comparing ONE reference image against MULTIPLE candidate images.\n"
-        "Determine if each candidate depicts the same photograph as the reference "
-        "(possibly with different crops, compression, or processing).\n\n"
-        f"Reference: (image attached)\n\n{candidate_info}\n\n"
-        "Respond with ONLY valid JSON, no other text:\n"
-        '{"results": [{"id": <int>, "confidence": <0-100>}, ...]}\n\n'
-        "confidence: 0 = definitely different, 100 = definitely same.\n"
-        "Focus on semantic content (subject, scene, composition), not pixel-level differences."
+        "CRITICAL: You MUST respond with ONLY valid JSON. No explanations, no prose, ONLY JSON.\n\n"
+        "Task: Compare the FIRST image (reference) against the remaining candidate images.\n"
+        "For each candidate, determine if it depicts the SAME photograph as the reference.\n\n"
+        f"Reference image: First image\n"
+        f"Candidates to compare:\n{candidate_info}\n\n"
+        "REQUIRED OUTPUT FORMAT (copy this structure exactly):\n"
+        '{"results": [{"id": 1, "confidence": 85}, {"id": 2, "confidence": 10}, ...]}\n\n'
+        "Rules:\n"
+        "- confidence: 0-100, where 0=completely different, 100=definitely same photo\n"
+        "- Compare semantic content: subject, scene, composition, angle\n"
+        "- Ignore: crops, quality, filters, color vs B&W\n"
+        "- Include ALL candidate IDs in results\n\n"
+        "RESPOND WITH ONLY THE JSON OBJECT. DO NOT ADD ANY OTHER TEXT."
     )
     
     # Build message content: [prompt, ref_image, candidate1, candidate2, ...]
@@ -213,16 +218,29 @@ def compare_images_batch(
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[{
-                "role": "user",
-                "content": content_parts,
-            }],
-            max_tokens=1024,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a JSON-only API. You respond exclusively with valid JSON. Never include explanations or prose."
+                },
+                {
+                    "role": "user",
+                    "content": content_parts,
+                }
+            ],
+            max_tokens=2048,  # Increased for larger batches
+            temperature=0.1,
         )
     except Exception as exc:
         raise _map_openai_error(exc, provider=getattr(client, '_provider_id', None), model=model) from exc
     
     raw = response.choices[0].message.content or "{}"
+    
+    if log_callback:
+        log_callback("debug", f"[vision_batch] Raw response length: {len(raw)} chars")
+        log_callback("debug", f"[vision_batch] Raw response (first 500 chars): {raw[:500]}")
+        if len(raw) > 500:
+            log_callback("debug", f"[vision_batch] Raw response (last 200 chars): ...{raw[-200:]}")
     
     # Parse structured JSON response
     try:
@@ -234,6 +252,9 @@ def compare_images_batch(
         
         parsed = json.loads(raw)
         results_list = parsed.get("results", [])
+        
+        if log_callback:
+            log_callback("debug", f"[vision_batch] Parsed JSON: results_list={results_list}")
         
         # Map results back to candidate IDs
         result_map: dict[int, float] = {}

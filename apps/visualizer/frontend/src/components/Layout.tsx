@@ -31,8 +31,11 @@ export function Layout() {
                     className={({ isActive }) =>
                       `px-3 py-1.5 rounded-base text-sm font-medium transition-all duration-150
                       ${isActive
-                        ? 'bg-accent text-white shadow-sm'
+                        ? 'bg-accent text-white shadow-sm font-semibold'
                         : 'text-text-secondary hover:bg-surface hover:text-text'}`
+                    }
+                    style={({ isActive }) =>
+                      isActive ? { backgroundColor: 'var(--color-accent)', color: 'white' } : undefined
                     }
                   >
                     {item.label}
@@ -55,8 +58,11 @@ export function Layout() {
                 className={({ isActive }) =>
                   `px-3 py-1.5 rounded-base text-sm font-medium whitespace-nowrap transition-all
                   ${isActive
-                    ? 'bg-accent text-white shadow-sm'
+                    ? 'bg-accent text-white shadow-sm font-semibold'
                     : 'text-text-secondary hover:bg-surface hover:text-text'}`
+                }
+                style={({ isActive }) =>
+                  isActive ? { backgroundColor: 'var(--color-accent)', color: 'white' } : undefined
                 }
               >
                 {item.label}

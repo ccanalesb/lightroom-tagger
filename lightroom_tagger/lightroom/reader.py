@@ -1,4 +1,5 @@
 import json
+import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -7,8 +8,24 @@ from lightroom_tagger.core.config import load_config
 
 
 def connect_catalog(catalog_path: str) -> sqlite3.Connection:
-    """Connect to Lightroom catalog."""
-    conn = sqlite3.connect(catalog_path)
+    """Connect to Lightroom catalog.
+
+    Lightroom catalogs use SQLite WAL. On SMB/NAS (and some remote filesystems),
+    the default WAL path uses shared-memory helpers that often fail with
+    \"unable to open database file\" even for reads.
+
+    SQLite documents that WAL can still be used without shared memory if
+    ``locking_mode=EXCLUSIVE`` is set *before the first page access* (WAL docs,
+    § \"Use of WAL Without Shared-Memory\"). This project uses one connection per
+    scan on that catalog, which matches that mode.
+
+    Set ``LIGHTRoom_CATALOG_LOCKING_MODE=NORMAL`` to skip this (e.g. local-disk
+    testing). Close Lightroom before long scans if you see ``database is locked``:
+    exclusive mode conflicts with another process holding the catalog open.
+    """
+    conn = sqlite3.connect(catalog_path, timeout=30.0)
+    if os.getenv("LIGHTRoom_CATALOG_LOCKING_MODE", "EXCLUSIVE").upper() == "EXCLUSIVE":
+        conn.execute("PRAGMA locking_mode=EXCLUSIVE")
     conn.row_factory = sqlite3.Row
     return conn
 

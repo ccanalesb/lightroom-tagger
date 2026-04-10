@@ -20,9 +20,10 @@ const SOURCE_LABELS: Record<string, string> = {
 interface ModelListProps {
   models: ProviderModel[];
   onRemove: (modelId: string) => void;
+  onReorder: (modelId: string, direction: 'up' | 'down') => void;
 }
 
-export function ModelList({ models, onRemove }: ModelListProps) {
+export function ModelList({ models, onRemove, onReorder }: ModelListProps) {
   return (
     <table className="w-full text-sm">
       <thead>
@@ -30,11 +31,11 @@ export function ModelList({ models, onRemove }: ModelListProps) {
           <th className="pb-1">{PROVIDER_COL_MODEL}</th>
           <th className="pb-1">{PROVIDER_COL_VISION}</th>
           <th className="pb-1">{PROVIDER_COL_SOURCE}</th>
-          <th className="pb-1 w-10 text-right font-normal">{PROVIDER_COL_ACTIONS}</th>
+          <th className="pb-1 w-20 text-right font-normal">{PROVIDER_COL_ACTIONS}</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-border">
-        {models.map(model => (
+        {models.map((model, index) => (
           <tr key={model.id}>
             <td className="py-1.5 font-mono text-xs text-text">{model.name}</td>
             <td className="py-1.5">
@@ -48,16 +49,40 @@ export function ModelList({ models, onRemove }: ModelListProps) {
               {SOURCE_LABELS[model.source] ?? model.source}
             </td>
             <td className="py-1.5 text-right">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-label={PROVIDER_REMOVE_MODEL}
-                className="!px-1 !py-0 min-w-0 text-text-tertiary hover:text-error"
-                onClick={() => onRemove(model.id)}
-              >
-                ×
-              </Button>
+              <div className="flex items-center justify-end gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Move up"
+                  className="!px-2 !py-1 min-w-0 text-text hover:bg-surface border border-border"
+                  onClick={() => onReorder(model.id, 'up')}
+                  disabled={index === 0}
+                >
+                  ↑
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Move down"
+                  className="!px-2 !py-1 min-w-0 text-text hover:bg-surface border border-border"
+                  onClick={() => onReorder(model.id, 'down')}
+                  disabled={index === models.length - 1}
+                >
+                  ↓
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={PROVIDER_REMOVE_MODEL}
+                  className="!px-2 !py-1 min-w-0 text-error hover:bg-error hover:text-white border border-border"
+                  onClick={() => onRemove(model.id)}
+                >
+                  ×
+                </Button>
+              </div>
             </td>
           </tr>
         ))}

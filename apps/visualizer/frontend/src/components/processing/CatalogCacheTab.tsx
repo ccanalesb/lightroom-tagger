@@ -81,7 +81,7 @@ export function CatalogCacheTab() {
     : 0;
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       <Card padding="lg">
         <CardHeader>
           <CardTitle>Catalog Vision Cache</CardTitle>

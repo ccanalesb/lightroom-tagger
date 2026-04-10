@@ -99,26 +99,43 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             include_processed=force_reprocess)
 
     total = len(unprocessed)
+    if log_callback:
+        log_callback('info', f'Found {total} images to process (filters: month={month}, year={year}, last_months={last_months}, media_key={media_key})')
     if not unprocessed:
+        if log_callback:
+            log_callback('warning', 'No unprocessed images found matching filters')
         return stats, matches_found
 
     rejected = get_rejected_pairs(db)
 
     for idx, dump_media in enumerate(unprocessed, 1):
         stats['processed'] += 1
+        media_key = dump_media['media_key']
 
         candidates = find_candidates_by_date(db, dump_media, days_before=90)
+        initial_candidate_count = len(candidates)
 
         if rejected:
-            media_key = dump_media['media_key']
             candidates = [
                 c for c in candidates
                 if (c.get('key'), media_key) not in rejected
             ]
+        
+        # Limit candidates to prevent RAM issues (max 50)
+        MAX_CANDIDATES = 50
+        if len(candidates) > MAX_CANDIDATES:
+            if log_callback and idx <= 3:
+                log_callback('warning', f'[{media_key}] Limiting candidates from {len(candidates)} to {MAX_CANDIDATES} to prevent RAM issues')
+            candidates = candidates[:MAX_CANDIDATES]
+
+        if log_callback and idx <= 3:  # Log details for first 3 images
+            log_callback('debug', f'[{media_key}] Found {initial_candidate_count} candidates by date, {len(candidates)} after filters (limit={MAX_CANDIDATES})')
 
         if not candidates:
             mark_dump_media_attempted(db, dump_media['media_key'])
             stats['skipped'] += 1
+            if log_callback and idx <= 3:
+                log_callback('warning', f'[{media_key}] Skipped - no candidates found')
             continue
 
         dump_image = {

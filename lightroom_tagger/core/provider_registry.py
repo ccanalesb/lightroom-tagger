@@ -60,6 +60,20 @@ class ProviderRegistry:
         if provider_config.get("auto_discover"):
             models.extend(self._discover_models(provider_id, provider_config))
 
+        # Apply custom order if it exists
+        model_order = provider_config.get("model_order", [])
+        if model_order:
+            models_by_id = {m["id"]: m for m in models}
+            ordered = []
+            for model_id in model_order:
+                if model_id in models_by_id:
+                    ordered.append(models_by_id[model_id])
+            # Add any models not in the order (new discoveries)
+            for model in models:
+                if model["id"] not in model_order:
+                    ordered.append(model)
+            return ordered
+
         return models
 
     def get_client(self, provider_id: str) -> openai.OpenAI:
@@ -127,6 +141,16 @@ class ProviderRegistry:
         ]
         if len(self._providers[provider_id]["models"]) == original_count:
             return False
+        self._save_config()
+        return True
+
+    def reorder_models(self, provider_id: str, model_order: list[str]) -> bool:
+        """Reorder models for a provider. model_order is list of model IDs.
+        Saves order to model_order field, works for all model types."""
+        if provider_id not in self._providers:
+            raise KeyError(f"Unknown provider: {provider_id}")
+
+        self._providers[provider_id]["model_order"] = model_order
         self._save_config()
         return True
 

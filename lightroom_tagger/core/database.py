@@ -503,6 +503,36 @@ def get_catalog_images_needing_analysis(db: sqlite3.Connection) -> list:
     return [_deserialize_row(r) for r in rows]
 
 
+def get_catalog_images_missing_cache(db: sqlite3.Connection) -> list:
+    """Get catalog images without vision cache entries.
+    
+    Returns images that either:
+    - Don't have a cache entry at all
+    - Have a cache entry but the compressed file doesn't exist
+    """
+    rows = db.execute("""
+        SELECT i.* FROM images i
+        LEFT JOIN vision_cache vc ON i.key = vc.key
+        WHERE vc.key IS NULL OR vc.compressed_path IS NULL
+    """).fetchall()
+    
+    images = [_deserialize_row(r) for r in rows]
+    
+    # Also check if cached files actually exist on disk
+    cached_rows = db.execute("""
+        SELECT i.*, vc.compressed_path FROM images i
+        INNER JOIN vision_cache vc ON i.key = vc.key
+        WHERE vc.compressed_path IS NOT NULL
+    """).fetchall()
+    
+    for row in cached_rows:
+        compressed_path = row.get('compressed_path', '')
+        if compressed_path and not os.path.exists(compressed_path):
+            images.append(_deserialize_row(row))
+    
+    return images
+
+
 def get_all_catalog_images(db: sqlite3.Connection) -> list:
     """Get all catalog images with resolved file paths."""
     rows = db.execute("SELECT * FROM images").fetchall()

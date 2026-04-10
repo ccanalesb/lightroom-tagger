@@ -1,28 +1,20 @@
 import { useEffect } from 'react';
-import type { InstagramImage } from '../../services/api';
+import type { CatalogImage } from '../../services/api';
 import { Badge } from '../ui/Badge';
 import { MetadataRow } from '../ui/MetadataRow';
 import {
   IMAGE_DETAILS_TITLE,
-  IMAGE_DETAILS_AI_DESCRIPTION,
-  BADGE_MATCHED,
-  BADGE_DESCRIBED,
-  BADGE_PROCESSED,
   LABEL_FILENAME,
-  LABEL_FOLDER,
-  LABEL_SOURCE,
   LABEL_DATE,
-  LABEL_IMAGE_HASH_DISPLAY,
-  LABEL_CATALOG_MATCH,
   DATE_NO_DATE,
-  DATE_ESTIMATED_SUFFIX,
 } from '../../constants/strings';
-interface ImageDetailsModalProps {
-  image: InstagramImage;
+
+interface CatalogImageModalProps {
+  image: CatalogImage;
   onClose: () => void;
 }
 
-export function ImageDetailsModal({ image, onClose }: ImageDetailsModalProps) {
+export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -31,11 +23,11 @@ export function ImageDetailsModal({ image, onClose }: ImageDetailsModalProps) {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
 
-  const dateDisplay = image.created_at
-    ? new Date(image.created_at).toLocaleString()
-    : image.date_folder
-      ? `${image.date_folder.slice(0, 4)}/${image.date_folder.slice(4, 6)} ${DATE_ESTIMATED_SUFFIX}`
-      : DATE_NO_DATE;
+  const dateDisplay = image.date_taken
+    ? new Date(image.date_taken).toLocaleString()
+    : DATE_NO_DATE;
+
+  const keywords = Array.isArray(image.keywords) ? image.keywords : [];
 
   return (
     <div
@@ -60,7 +52,7 @@ export function ImageDetailsModal({ image, onClose }: ImageDetailsModalProps) {
         <div className="grid md:grid-cols-2 gap-6 p-6 overflow-y-auto max-h-[90vh]">
           <div className="aspect-square bg-surface rounded-base overflow-hidden">
             <img
-              src={`/api/images/instagram/${encodeURIComponent(image.key)}/thumbnail`}
+              src={`/api/images/catalog/${encodeURIComponent(image.key)}/thumbnail`}
               alt={image.filename}
               className="w-full h-full object-contain"
             />
@@ -70,36 +62,38 @@ export function ImageDetailsModal({ image, onClose }: ImageDetailsModalProps) {
             <div>
               <h2 className="text-card-title text-text mb-2">{IMAGE_DETAILS_TITLE}</h2>
               <div className="flex flex-wrap gap-2">
-                {image.matched_catalog_key && <Badge variant="success">{BADGE_MATCHED}</Badge>}
-                {image.description && <Badge variant="accent">{BADGE_DESCRIBED}</Badge>}
-                {image.processed && <Badge variant="default">{BADGE_PROCESSED}</Badge>}
+                {image.instagram_posted && <Badge variant="success">Posted to Instagram</Badge>}
+                {image.rating > 0 && <Badge variant="accent">{image.rating} Stars</Badge>}
+                {image.pick && <Badge variant="accent">Pick</Badge>}
+                {image.color_label && <Badge variant="default">{image.color_label}</Badge>}
               </div>
             </div>
 
             <div className="space-y-3">
               <MetadataRow label={LABEL_FILENAME} value={image.filename} />
-              <MetadataRow label={LABEL_FOLDER} value={image.instagram_folder} />
-              <MetadataRow label={LABEL_SOURCE} value={image.source_folder} />
+              {image.title && <MetadataRow label="Title" value={image.title} />}
               <MetadataRow label={LABEL_DATE} value={dateDisplay} />
-              {image.image_hash && (
-                <MetadataRow label={LABEL_IMAGE_HASH_DISPLAY} value={image.image_hash} mono />
-              )}
-              {image.matched_catalog_key && (
-                <MetadataRow label={LABEL_CATALOG_MATCH} value={image.matched_catalog_key} mono />
+              {image.filepath && <MetadataRow label="Path" value={image.filepath} mono />}
+              {image.width && image.height && (
+                <MetadataRow label="Dimensions" value={`${image.width} × ${image.height}`} />
               )}
             </div>
 
-            {image.description && (
+            {image.caption && (
               <div className="p-4 bg-surface rounded-base border border-border">
-                <h3 className="text-sm font-medium text-text mb-2">{IMAGE_DETAILS_AI_DESCRIPTION}</h3>
-                <p className="text-sm text-text-secondary">{image.description}</p>
+                <h3 className="text-sm font-medium text-text mb-2">Caption</h3>
+                <p className="text-sm text-text-secondary">{image.caption}</p>
               </div>
             )}
 
-            {image.caption && (
+            {keywords.length > 0 && (
               <div className="p-4 bg-surface rounded-base border border-border">
-                <h3 className="text-sm font-medium text-text mb-2">Instagram Caption</h3>
-                <p className="text-sm text-text-secondary">{image.caption}</p>
+                <h3 className="text-sm font-medium text-text mb-2">Keywords</h3>
+                <div className="flex flex-wrap gap-2">
+                  {keywords.map((keyword, idx) => (
+                    <Badge key={idx} variant="default">{keyword}</Badge>
+                  ))}
+                </div>
               </div>
             )}
           </div>

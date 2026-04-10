@@ -137,19 +137,63 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         
         # Prepare batch candidates with numeric IDs
         batch_candidates = []
+        failed_count = 0
+        skipped_no_path = 0
+        
+        # Get mount_point from config for resolving paths
+        from lightroom_tagger.core.config import load_config
+        config = load_config()
+        mount_point = config.mount_point
+        
         for idx, candidate in enumerate(candidates):
-            local_path = candidate.get('local_path')
-            if not local_path:
+            # DEBUG: Log candidate keys for first one
+            if idx == 0 and log_callback:
+                log_callback('debug', f'[{insta_filename}] Candidate keys: {list(candidate.keys())}')
+            
+            # Get path from candidate (may be 'local_path' or 'filepath')
+            local_path = candidate.get('local_path') or candidate.get('filepath')
+            
+            # Convert Windows UNC paths to Unix mount points
+            # e.g., //NAS/ccanales/... -> /Volumes/ccanales/...
+            if local_path and local_path.startswith('//'):
+                parts = local_path[2:].split('/', 2)  # Skip // and split into [server, share, rest]
+                if len(parts) >= 3:
+                    # For //NAS/ccanales/..., we want /Volumes/ccanales/...
+                    local_path = f'/Volumes/{parts[1]}/{parts[2]}'
+            
+            # Resolve path with mount_point if needed (for relative paths)
+            elif local_path and not _os.path.isabs(local_path):
+                local_path = _os.path.join(mount_point, local_path)
+            
+            if not local_path or not _os.path.exists(local_path):
+                skipped_no_path += 1
+                if log_callback and skipped_no_path <= 2:  # Log first 2
+                    log_callback('debug', f'[{insta_filename}] Candidate {idx} path missing/invalid: {local_path}')
                 continue
+                
             try:
                 cached_local_path = get_or_create_cached_image(db, candidate.get('key'), local_path)
                 batch_candidates.append((idx, cached_local_path or local_path))
-            except Exception:
+            except Exception as e:
+                failed_count += 1
+                if log_callback and failed_count <= 3:  # Log first 3 failures
+                    log_callback('error', f'[{insta_filename}] Failed to prepare candidate {idx}: {e}')
                 pass
+        
+        if log_callback:
+            if skipped_no_path > 0:
+                log_callback('debug', f'[{insta_filename}] Skipped {skipped_no_path} candidates with missing/invalid paths')
+            if failed_count > 0:
+                log_callback('warning', f'[{insta_filename}] Failed to prepare {failed_count} candidates for batch processing')
         
         # Call batch API
         batch_results = {}
+        if log_callback:
+            log_callback('debug', f'[{insta_filename}] Batch check: batch_candidates={len(batch_candidates)}, compressed_insta={"present" if compressed_insta else "missing"}')
+        
         if batch_candidates and compressed_insta:
+            if log_callback:
+                log_callback('debug', f'[{insta_filename}] Calling batch API with {len(batch_candidates)} candidates')
             try:
                 registry = ProviderRegistry()
                 # Use provided provider_id or fall back to first provider in fallback order
@@ -163,6 +207,8 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                     batch_candidates,
                     log_callback=log_callback,
                 )
+                if log_callback:
+                    log_callback('debug', f'[{insta_filename}] Batch API returned {len(batch_results)} results')
             except RateLimitError as e:
                 if log_callback:
                     log_callback('warning', f'[{insta_filename}] Batch API rate limited, falling back to sequential')
@@ -171,6 +217,9 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 if log_callback:
                     log_callback('warning', f'[{insta_filename}] Batch API error: {e}, falling back to sequential')
                 use_batch = False
+        else:
+            if log_callback:
+                log_callback('warning', f'[{insta_filename}] Batch API SKIPPED (batch_candidates={len(batch_candidates)}, compressed_insta={"present" if compressed_insta else "missing"})')
     
     if use_batch and batch_results:
         # Process batch results
