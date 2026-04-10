@@ -1,0 +1,75 @@
+# Hermes Agent Workspace Configuration
+# Project: lightroom-tagger
+
+workspace:
+  name: lightroom-tagger
+  root: /Users/ccanales/projects/lightroom-tagger
+  description: Instagram-Lightroom photo matching and tagging system
+
+environment:
+  # Python virtual environment (CRITICAL - activate before running Python)
+  - VIRTUAL_ENV: /Users/ccanales/projects/lightroom-tagger/.venv
+  - PATH: /Users/ccanales/projects/lightroom-tagger/.venv/bin:$PATH
+  
+  # Load GitHub token for Copilot API gateway
+  - GITHUB_TOKEN_FILE: .env.copilot
+  
+  # Python environment
+  - PYTHONPATH: /Users/ccanales/projects/lightroom-tagger
+  
+  # Catalog paths
+  - LIGHTROOM_CATALOG: /Users/ccanales/lightroom/FinalCatalog/FinalCatalog-v13-3.lrcat
+  - MOUNT_POINT: /Volumes/ccanales
+
+init_commands:
+  # Commands to run before any task execution
+  - source /Users/ccanales/projects/lightroom-tagger/.venv/bin/activate
+
+tools:
+  # Allow Hermes to use these tools in this workspace
+  - terminal
+  - read_file
+  - write_file
+  - search_files
+  - patch
+  - web_search
+  - execute_code
+
+plans:
+  # Available plans for this workspace
+  github_copilot_integration:
+    file: ~/.hermes/plans/github-copilot-integration.md
+    description: Integrate GitHub Copilot API provider
+    estimated_time: 30-60 minutes
+    requires_user_input: true  # Token creation step
+
+context:
+  # Important files for context
+  key_files:
+    - lightroom_tagger/core/provider_registry.py
+    - lightroom_tagger/core/vision_client.py
+    - lightroom_tagger/core/providers.json
+    - config.yaml
+    - pyproject.toml
+  
+  # Documentation
+  docs:
+    - docs/plans/2026-04-09-github-copilot-provider.md
+    - README.md
+
+notes: |
+  This workspace is for the lightroom-tagger project which matches Instagram
+  photos with Lightroom catalog images using vision models.
+  
+  Current providers: Ollama (local), NVIDIA NIM, OpenCode Go
+  Goal: Add GitHub Copilot as additional provider via API gateway
+  
+  Project structure:
+  - lightroom_tagger/core/ - Core library (providers, vision client, config)
+  - lightroom_tagger/lightroom/ - Lightroom catalog interaction
+  - lightroom_tagger/instagram/ - Instagram data handling
+  - apps/visualizer/ - Flask backend + React frontend for UI
+  
+  Testing:
+  - Backend: python -m pytest <path> -v
+  - Frontend: cd apps/visualizer/frontend && npx vitest run
