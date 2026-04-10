@@ -138,11 +138,6 @@ def init_database(db_path: str) -> sqlite3.Connection:
             catalog_path TEXT DEFAULT ''
         );
 
-        CREATE INDEX IF NOT EXISTS idx_images_filepath ON images(filepath);
-        CREATE INDEX IF NOT EXISTS idx_images_image_hash ON images(image_hash);
-        CREATE INDEX IF NOT EXISTS idx_images_date_taken ON images(date_taken);
-        CREATE INDEX IF NOT EXISTS idx_images_instagram_posted ON images(instagram_posted);
-
         CREATE TABLE IF NOT EXISTS instagram_dump_media (
             media_key TEXT PRIMARY KEY,
             file_path TEXT,
@@ -250,6 +245,19 @@ def init_database(db_path: str) -> sqlite3.Connection:
         "ON instagram_dump_media(processed, last_attempted_at)"
     )
 
+    # Legacy library DBs: existing `images` tables are not upgraded by
+    # CREATE TABLE IF NOT EXISTS — add any columns missing vs current schema.
+    _migrate_images_schema(conn)
+
+    # Indexes on `images` must run after column migration (legacy tables may
+    # lack e.g. image_hash until _migrate_images_schema).
+    conn.executescript("""
+        CREATE INDEX IF NOT EXISTS idx_images_filepath ON images(filepath);
+        CREATE INDEX IF NOT EXISTS idx_images_image_hash ON images(image_hash);
+        CREATE INDEX IF NOT EXISTS idx_images_date_taken ON images(date_taken);
+        CREATE INDEX IF NOT EXISTS idx_images_instagram_posted ON images(instagram_posted);
+    """)
+
     _migrate_unified_image_keys(conn)
     conn.commit()
     return conn
@@ -260,6 +268,46 @@ def _migrate_add_column(conn: sqlite3.Connection, table: str, column: str, col_t
     cols = {row['name'] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
     if column not in cols:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+
+
+def _migrate_images_schema(conn: sqlite3.Connection) -> None:
+    """Ensure `images` has every column used by catalog queries and upserts."""
+    for column, col_type in (
+        ("id", "TEXT"),
+        ("filename", "TEXT"),
+        ("filepath", "TEXT"),
+        ("date_taken", "TEXT"),
+        ("rating", "INTEGER DEFAULT 0"),
+        ("pick", "INTEGER DEFAULT 0"),
+        ("color_label", "TEXT DEFAULT ''"),
+        ("keywords", "TEXT DEFAULT '[]'"),
+        ("title", "TEXT DEFAULT ''"),
+        ("caption", "TEXT DEFAULT ''"),
+        ("description", "TEXT DEFAULT ''"),
+        ("copyright", "TEXT DEFAULT ''"),
+        ("camera_make", "TEXT DEFAULT ''"),
+        ("camera_model", "TEXT DEFAULT ''"),
+        ("lens", "TEXT DEFAULT ''"),
+        ("focal_length", "TEXT DEFAULT ''"),
+        ("aperture", "TEXT DEFAULT ''"),
+        ("shutter_speed", "TEXT DEFAULT ''"),
+        ("iso", "TEXT DEFAULT ''"),
+        ("gps_latitude", "REAL"),
+        ("gps_longitude", "REAL"),
+        ("width", "INTEGER"),
+        ("height", "INTEGER"),
+        ("file_size", "INTEGER"),
+        ("instagram_posted", "INTEGER DEFAULT 0"),
+        ("instagram_post_date", "TEXT"),
+        ("instagram_url", "TEXT"),
+        ("instagram_index", "INTEGER DEFAULT 0"),
+        ("image_hash", "TEXT"),
+        ("analyzed_at", "TEXT"),
+        ("phash", "TEXT"),
+        ("exif", "TEXT"),
+        ("catalog_path", "TEXT DEFAULT ''"),
+    ):
+        _migrate_add_column(conn, "images", column, col_type)
 
 
 # ---------------------------------------------------------------------------
@@ -299,8 +347,14 @@ def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
     db_path = _library_db_file_path(conn)
     bak_path = db_path + ".pre-key-migration.bak"
     if not os.path.exists(bak_path):
-        shutil.copy2(db_path, bak_path)
-        print(f"Backed up {db_path} before key migration")
+        try:
+            shutil.copy2(db_path, bak_path)
+            print(f"Backed up {db_path} before key migration")
+        except OSError as exc:
+            print(
+                f"Warning: could not back up {db_path} before key migration "
+                f"({exc}); continuing without backup"
+            )
 
     rows = conn.execute("SELECT * FROM images").fetchall()
     by_new_key: dict[str, list[str]] = {}
