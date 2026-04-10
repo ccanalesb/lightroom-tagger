@@ -19,6 +19,8 @@
 | 2 | `ac0cb41` | feat(02-02): add rotated timestamped catalog backup helper |
 | 3 | `7f1465b` | feat(02-02): run lock check and backup before catalog SQLite writes |
 | 4 | `aee3f70` | feat(02-02): fail vision_match job when catalog is locked |
+| — | `d06fe3d` | docs(02-02): add plan execution summary |
+| — | `465a754` | chore(02-02): advance STATE and ROADMAP after plan completion |
 
 ## Verification
 
@@ -28,3 +30,8 @@
 ## Note
 
 Backup filenames use second-resolution timestamps per plan; multiple backups in the same second target the same path and overwrite (rare in real job runs).
+
+## Planning sync
+
+- `STATE.md`: added **GSD progression** fields so `gsd-tools state advance-plan` can run (project STATE previously lacked **Current Plan** / **Total Plans in Phase**). After completion: **Current Plan:** 3 (next: 02-03), progress `completed_plans: 7`, `percent: 78`.
+- `ROADMAP.md`: Phase 2 execution table marks **02-02** **Done** (2026-04-10); `roadmap update-plan-progress 02` re-run after `02-02-SUMMARY.md` existed (2/4 summaries).
