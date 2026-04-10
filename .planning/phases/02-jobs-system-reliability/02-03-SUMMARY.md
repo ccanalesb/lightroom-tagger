@@ -29,6 +29,11 @@
 - **Handlers:** Shared `_failure_severity_from_exception` maps auth/invalid-request → warning, `PermissionError`/`OSError` → critical, Lightroom lock `RuntimeError` → critical; vision_match lock path uses `severity='critical'` explicitly.
 - **UI:** `Badge` variants per DESIGN.md: `warning` / `error`; critical uses `error` + `ring-2 ring-error`.
 
+## Deviations
+
+- **Bug (Rule 1):** Initial migration used `row[1]` on `PRAGMA table_info` results; the connection uses `_dict_factory`, so rows are dicts. Fixed to `row[\"name\"]` (follow-up commit after task 1).
+
 ## Verification
 
 - `cd apps/visualizer/frontend && npm run lint` — exit 0.
+- Backend: `init_db` smoke test on fresh DB and pre-existing `jobs` table without `error_severity` — column present after init.

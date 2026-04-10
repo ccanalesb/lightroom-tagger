@@ -50,7 +50,7 @@ def init_db(db_path: str) -> sqlite3.Connection:
         )
     """)
     pragma_info = conn.execute("PRAGMA table_info(jobs)").fetchall()
-    if not any(row[1] == "error_severity" for row in pragma_info):
+    if not any(row["name"] == "error_severity" for row in pragma_info):
         conn.execute("ALTER TABLE jobs ADD COLUMN error_severity TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_type ON jobs(type)")
