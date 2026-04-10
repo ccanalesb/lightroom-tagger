@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ImagesAPI, type CatalogImage } from '../../services/api';
-import { CatalogSettingsPanel } from './CatalogSettingsPanel';
 import { CatalogImageCard } from '../catalog/CatalogImageCard';
 import { CatalogImageModal } from '../catalog/CatalogImageModal';
 import { Input } from '../ui/Input';
@@ -166,8 +165,6 @@ export function CatalogTab() {
 
   return (
     <div className="space-y-6">
-      <CatalogSettingsPanel />
-
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-text-secondary">{summaryText}</p>
 

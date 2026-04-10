@@ -22,6 +22,7 @@ export const TAB_DESCRIPTIONS = 'Descriptions'
 export const TAB_CATALOG_CACHE = 'Catalog Cache'
 export const TAB_JOB_QUEUE = 'Job Queue'
 export const TAB_PROVIDERS = 'Providers'
+export const TAB_SETTINGS = 'Settings'
 
 // Placeholders
 export const PLACEHOLDER_COMING_SOON = 'Coming soon...'
