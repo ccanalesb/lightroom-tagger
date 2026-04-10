@@ -57,7 +57,7 @@
 | Plan | Title | Status |
 |------|--------|--------|
 | 02-01 | Cooperative job cancellation and shared JobRunner wiring | **Done** (2026-04-10) |
-| 02-02 | Catalog backup rotation and Lightroom lock guard before writes | Pending |
+| 02-02 | Catalog backup rotation and Lightroom lock guard before writes | **Done** (2026-04-10) |
 | 02-03 | Job failure severity in API and UI badges | Pending |
 | 02-04 | Job status UX alignment, orphan recovery copy, and handler cancel checks | Pending |
 
@@ -120,4 +120,4 @@ flowchart LR
 Deferred items remain as documented in [REQUIREMENTS.md](./REQUIREMENTS.md) (v2 and Out of Scope tables).
 
 ---
-*Roadmap created: 2026-04-10 · Last plan progress edit: 2026-04-10 (plan 02-01 complete).*
+*Roadmap created: 2026-04-10 · Last plan progress edit: 2026-04-10 (plans 02-01 and 02-02 complete).*
