@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 import os
 import sys
 import threading
 import time
+from typing import TYPE_CHECKING
 
 import config
+
+if TYPE_CHECKING:
+    from jobs.runner import JobRunner
 from database import add_job_log, get_active_jobs, get_job, get_pending_jobs, init_db, update_job_status
 from flask import Flask
 from flask_cors import CORS
@@ -17,6 +23,13 @@ db = None
 socketio = None
 job_processor_thread = None
 job_processor_running = False
+_job_runner: JobRunner | None = None
+
+
+def get_job_runner() -> JobRunner | None:
+    """Return the JobRunner used by the background processor thread, if started."""
+    return _job_runner
+
 
 def create_app():
     global db, socketio, job_processor_thread, job_processor_running
@@ -90,13 +103,14 @@ def _recover_orphaned_jobs(db):
 
 def _job_processor():
     """Background thread that processes pending jobs."""
-    global db, socketio, job_processor_running
+    global db, socketio, job_processor_running, _job_runner
 
     from jobs.handlers import JOB_HANDLERS
     from jobs.runner import JobRunner
 
     runner = JobRunner(db, emit_progress=lambda job_id, progress, step:
         socketio.emit('job_updated', get_job(db, job_id)) if socketio else None)
+    _job_runner = runner
 
     while job_processor_running:
         try:
@@ -108,6 +122,10 @@ def _job_processor():
                 metadata = job.get('metadata', {})
 
                 print(f"Processing job {job_id}: type={job_type}, status={job.get('status')}")
+
+                fresh = get_job(db, job_id)
+                if not fresh or fresh.get('status') != 'pending':
+                    continue
 
                 # Mark as running
                 runner.start_job(job_id, job_type, metadata)
@@ -122,9 +140,13 @@ def _job_processor():
                         print(f"Handler error for job {job_id}: {e}")
                         import traceback
                         traceback.print_exc()
-                        runner.fail_job(job_id, str(e))
+                        row_after = get_job(db, job_id)
+                        if row_after and row_after.get('status') == 'running':
+                            runner.fail_job(job_id, str(e))
                 else:
-                    runner.fail_job(job_id, f'Unknown job type: {job_type}')
+                    row_after = get_job(db, job_id)
+                    if row_after and row_after.get('status') == 'running':
+                        runner.fail_job(job_id, f'Unknown job type: {job_type}')
 
                 # Emit update after handler completes
                 socketio.emit('job_updated', get_job(db, job_id)) if socketio else None
