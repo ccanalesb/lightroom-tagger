@@ -122,7 +122,14 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 from lightroom_tagger.lightroom.writer import update_lightroom_from_matches
                 catalog_path = config.catalog_path or config.small_catalog_path
                 if catalog_path and Path(catalog_path).exists():
-                    lr_stats = update_lightroom_from_matches(catalog_path, matches)
+                    try:
+                        lr_stats = update_lightroom_from_matches(catalog_path, matches)
+                    except RuntimeError as e:
+                        if str(e) == "Close Lightroom before writing to catalog.":
+                            log_callback('error', str(e))
+                            runner.fail_job(job_id, str(e))
+                            return
+                        raise
                 else:
                     log_callback('warning', f'Lightroom catalog path not configured — {len(matches)} match(es) found but NOT written to catalog. Set CATALOG_PATH in .env to enable.')
 
