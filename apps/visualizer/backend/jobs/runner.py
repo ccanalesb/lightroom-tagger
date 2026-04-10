@@ -36,10 +36,17 @@ class JobRunner:
         add_job_log(self.db, job_id, 'info', 'Job completed successfully')
 
         update_job_field(self.db, job_id, 'result', result)
+        self.db.execute(
+            "UPDATE jobs SET error_severity = NULL WHERE id = ?",
+            (job_id,),
+        )
+        self.db.commit()
         self.clear_cancel_registration(job_id)
 
-    def fail_job(self, job_id: str, error: str):
+    def fail_job(self, job_id: str, error: str, *, severity: str = 'error') -> None:
         """Mark job as failed."""
+        if severity not in ('warning', 'error', 'critical'):
+            severity = 'error'
         row = get_job(self.db, job_id)
         if row and row.get('status') == 'cancelled':
             self.clear_cancel_registration(job_id)
@@ -47,7 +54,11 @@ class JobRunner:
         update_job_status(self.db, job_id, 'failed')
         add_job_log(self.db, job_id, 'error', error)
 
-        update_job_field(self.db, job_id, 'error', error)
+        self.db.execute(
+            "UPDATE jobs SET error = ?, error_severity = ? WHERE id = ?",
+            (error, severity, job_id),
+        )
+        self.db.commit()
         self.clear_cancel_registration(job_id)
 
     def is_cancelled(self, job_id: str) -> bool:
