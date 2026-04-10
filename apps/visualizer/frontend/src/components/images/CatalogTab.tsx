@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ImagesAPI, type CatalogImage } from '../../services/api';
 import { CatalogImageCard } from '../catalog/CatalogImageCard';
 import { CatalogImageModal } from '../catalog/CatalogImageModal';
@@ -8,12 +8,23 @@ import { FILTER_CLEAR, FILTER_ALL_DATES } from '../../constants/strings';
 import { formatMonth } from '../../utils/date';
 
 const LIMIT = 50;
+const DEBOUNCE_MS = 350;
+
+function useDebouncedValue<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return debounced;
+}
 
 export function CatalogTab() {
   const [images, setImages] = useState<CatalogImage[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const [fetching, setFetching] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [catalogFetchSucceeded, setCatalogFetchSucceeded] = useState(false);
   const [selectedImage, setSelectedImage] = useState<CatalogImage | null>(null);
@@ -26,13 +37,19 @@ export function CatalogTab() {
   const [colorLabel, setColorLabel] = useState('');
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
 
+  const debouncedKeyword = useDebouncedValue(keyword, DEBOUNCE_MS);
+  const debouncedColorLabel = useDebouncedValue(colorLabel, DEBOUNCE_MS);
+
+  const fetchId = useRef(0);
+
   const loadImages = useCallback(async () => {
+    const id = ++fetchId.current;
     try {
-      setLoading(true);
+      setFetching(true);
       setLoadError(null);
       const offset = (page - 1) * LIMIT;
-      const kw = keyword.trim();
-      const cl = colorLabel.trim();
+      const kw = debouncedKeyword.trim();
+      const cl = debouncedColorLabel.trim();
       const data = await ImagesAPI.listCatalog({
         ...(postedFilter !== undefined ? { posted: postedFilter } : {}),
         ...(monthFilter ? { month: monthFilter } : {}),
@@ -44,27 +61,32 @@ export function CatalogTab() {
         limit: LIMIT,
         offset,
       });
+      if (id !== fetchId.current) return;
       setImages(data.images);
       setTotal(data.total);
       setCatalogFetchSucceeded(true);
     } catch (err) {
+      if (id !== fetchId.current) return;
       console.error('Failed to load catalog images:', err);
       const message = err instanceof Error ? err.message : 'Failed to load catalog images';
       setLoadError(message);
       setImages([]);
       setTotal(0);
     } finally {
-      setLoading(false);
+      if (id === fetchId.current) {
+        setFetching(false);
+        setInitialLoad(false);
+      }
     }
   }, [
     page,
     postedFilter,
     monthFilter,
-    keyword,
+    debouncedKeyword,
     minRating,
     dateFrom,
     dateTo,
-    colorLabel,
+    debouncedColorLabel,
   ]);
 
   useEffect(() => {
@@ -99,11 +121,6 @@ export function CatalogTab() {
     setPage(1);
   };
 
-  const handleKeywordChange = (value: string) => {
-    setKeyword(value);
-    setPage(1);
-  };
-
   const handleMinRatingChange = (value: string) => {
     if (value === '') setMinRating('');
     else setMinRating(Number(value));
@@ -120,11 +137,6 @@ export function CatalogTab() {
     setPage(1);
   };
 
-  const handleColorLabelChange = (value: string) => {
-    setColorLabel(value);
-    setPage(1);
-  };
-
   const clearFilters = () => {
     setPostedFilter(undefined);
     setMonthFilter('');
@@ -136,6 +148,17 @@ export function CatalogTab() {
     setPage(1);
   };
 
+  // Reset to page 1 when debounced text filters change
+  const prevKeyword = useRef(debouncedKeyword);
+  const prevColor = useRef(debouncedColorLabel);
+  useEffect(() => {
+    if (prevKeyword.current !== debouncedKeyword || prevColor.current !== debouncedColorLabel) {
+      prevKeyword.current = debouncedKeyword;
+      prevColor.current = debouncedColorLabel;
+      setPage(1);
+    }
+  }, [debouncedKeyword, debouncedColorLabel]);
+
   const hasActiveFilters =
     postedFilter !== undefined ||
     Boolean(monthFilter) ||
@@ -144,6 +167,8 @@ export function CatalogTab() {
     Boolean(dateFrom) ||
     Boolean(dateTo) ||
     Boolean(colorLabel.trim());
+
+  const loading = initialLoad;
 
   const noFiltersAndEmptyDb =
     catalogFetchSucceeded && !loadError && total === 0 && !hasActiveFilters;
@@ -222,7 +247,7 @@ export function CatalogTab() {
               type="search"
               placeholder="Search…"
               value={keyword}
-              onChange={(e) => handleKeywordChange(e.target.value)}
+              onChange={(e) => setKeyword(e.target.value)}
               className="h-9 min-w-[8rem] w-36"
               aria-label="Keyword search"
               disabled={loading}
@@ -271,7 +296,7 @@ export function CatalogTab() {
             <Input
               placeholder="e.g. Red"
               value={colorLabel}
-              onChange={(e) => handleColorLabelChange(e.target.value)}
+              onChange={(e) => setColorLabel(e.target.value)}
               className="h-9 min-w-[6rem] w-28"
               aria-label="Color label"
               disabled={loading}
@@ -280,7 +305,7 @@ export function CatalogTab() {
         </div>
       </div>
 
-      {loading && !loadError ? (
+      {loading ? (
         <div className="text-center py-12">
           <p className="text-text-secondary">Loading catalog images…</p>
         </div>
@@ -314,14 +339,16 @@ export function CatalogTab() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {images.map((image) => (
-              <CatalogImageCard
-                key={image.id != null ? String(image.id) : image.key}
-                image={image}
-                onClick={() => setSelectedImage(image)}
-              />
-            ))}
+          <div className={`relative transition-opacity duration-150 ${fetching ? 'opacity-50 pointer-events-none' : ''}`}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {images.map((image) => (
+                <CatalogImageCard
+                  key={image.id != null ? String(image.id) : image.key}
+                  image={image}
+                  onClick={() => setSelectedImage(image)}
+                />
+              ))}
+            </div>
           </div>
 
           {totalPages > 1 && (
