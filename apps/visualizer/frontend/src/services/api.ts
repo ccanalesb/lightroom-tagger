@@ -89,14 +89,35 @@ export const ImagesAPI = {
   getCatalogMonths: () =>
     request<{ months: string[] }>('/images/catalog/months'),
 
-  listCatalog: (posted?: boolean, month?: string, limit?: number, offset?: number) => {
-    const params = new URLSearchParams()
-    if (posted !== undefined) params.set('posted', String(posted))
-    if (month) params.set('month', month)
-    if (limit) params.set('limit', String(limit))
-    if (offset) params.set('offset', String(offset))
+  /** Catalog browse; use listCatalog(params) with optional filters. */
+  listCatalog: (params?: {
+    posted?: boolean
+    month?: string
+    keyword?: string
+    min_rating?: number
+    date_from?: string
+    date_to?: string
+    color_label?: string
+    limit?: number
+    offset?: number
+  }) => {
+    const searchParams = new URLSearchParams()
+    if (params?.posted !== undefined) {
+      searchParams.set('posted', params.posted ? 'true' : 'false')
+    }
+    if (params?.month) searchParams.set('month', params.month)
+    if (params?.keyword) searchParams.set('keyword', params.keyword)
+    if (params?.min_rating !== undefined) {
+      searchParams.set('min_rating', String(params.min_rating))
+    }
+    if (params?.date_from) searchParams.set('date_from', params.date_from)
+    if (params?.date_to) searchParams.set('date_to', params.date_to)
+    if (params?.color_label) searchParams.set('color_label', params.color_label)
+    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit))
+    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
+    const qs = searchParams.toString()
     return request<{ total: number; images: CatalogImage[] }>(
-      `/images/catalog?${params.toString()}`
+      `/images/catalog${qs ? `?${qs}` : ''}`
     )
   },
 }
@@ -241,7 +262,7 @@ export interface InstagramImage {
 }
 
 export interface CatalogImage {
-  id: number
+  id: number | null
   key: string
   filename: string
   filepath: string
