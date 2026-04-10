@@ -21,6 +21,7 @@
 | 4 | `aee3f70` | feat(02-02): fail vision_match job when catalog is locked |
 | — | `d06fe3d` | docs(02-02): add plan execution summary |
 | — | `465a754` | chore(02-02): advance STATE and ROADMAP after plan completion |
+| — | `f5b336a` | docs(02-02): extend summary with planning sync and commit refs |
 
 ## Verification
 
