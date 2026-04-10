@@ -165,104 +165,118 @@ export function CatalogTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-text-secondary">{summaryText}</p>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={
-              postedFilter === undefined ? 'all' : postedFilter ? 'posted' : 'not-posted'
-            }
-            onChange={(e) => handlePostedFilterChange(e.target.value)}
-            disabled={loading}
-            className="px-3 py-2 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
-          >
-            <option value="all">All Images</option>
-            <option value="posted">Posted to Instagram</option>
-            <option value="not-posted">Not Posted</option>
-          </select>
-
-          {availableMonths.length > 0 && (
-            <select
-              value={monthFilter}
-              onChange={(e) => handleMonthFilterChange(e.target.value)}
-              disabled={loading}
-              className="px-3 py-2 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
-            >
-              <option value="">{FILTER_ALL_DATES}</option>
-              {availableMonths.map((month) => (
-                <option key={month} value={month}>
-                  {formatMonth(month)}
-                </option>
-              ))}
-            </select>
-          )}
-
-          <Input
-            type="search"
-            placeholder="Keyword"
-            value={keyword}
-            onChange={(e) => handleKeywordChange(e.target.value)}
-            className="min-w-[8rem] w-36"
-            aria-label="Keyword search"
-            disabled={loading}
-          />
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-text-secondary">Min stars</span>
-            <select
-              value={minRating === '' ? '' : String(minRating)}
-              onChange={(e) => handleMinRatingChange(e.target.value)}
-              disabled={loading}
-              className="px-3 py-2 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
-            >
-              <option value="">any</option>
-              <option value="0">0</option>
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-            </select>
-          </div>
-
-          <Input
-            type="date"
-            label="From"
-            value={dateFrom}
-            onChange={(e) => handleDateFromChange(e.target.value)}
-            className="w-auto"
-            disabled={loading}
-          />
-
-          <Input
-            type="date"
-            label="To"
-            value={dateTo}
-            onChange={(e) => handleDateToChange(e.target.value)}
-            className="w-auto"
-            disabled={loading}
-          />
-
-          <Input
-            placeholder="Color label"
-            value={colorLabel}
-            onChange={(e) => handleColorLabelChange(e.target.value)}
-            className="min-w-[7rem] w-32"
-            aria-label="Color label"
-            disabled={loading}
-          />
-
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-text-secondary">{summaryText}</p>
           {hasActiveFilters && (
             <button
               type="button"
               onClick={clearFilters}
               disabled={loading}
-              className="px-3 py-2 text-sm rounded-base border border-border bg-bg text-text-secondary hover:bg-surface hover:text-text transition-all disabled:opacity-60"
+              className="px-3 py-1.5 text-sm rounded-base border border-border bg-bg text-text-secondary hover:bg-surface hover:text-text transition-all disabled:opacity-60"
             >
               {FILTER_CLEAR}
             </button>
           )}
+        </div>
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-text-tertiary">Status</span>
+            <select
+              value={
+                postedFilter === undefined ? 'all' : postedFilter ? 'posted' : 'not-posted'
+              }
+              onChange={(e) => handlePostedFilterChange(e.target.value)}
+              disabled={loading}
+              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
+            >
+              <option value="all">All Images</option>
+              <option value="posted">Posted</option>
+              <option value="not-posted">Not Posted</option>
+            </select>
+          </div>
+
+          {availableMonths.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-text-tertiary">Month</span>
+              <select
+                value={monthFilter}
+                onChange={(e) => handleMonthFilterChange(e.target.value)}
+                disabled={loading}
+                className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
+              >
+                <option value="">{FILTER_ALL_DATES}</option>
+                {availableMonths.map((month) => (
+                  <option key={month} value={month}>
+                    {formatMonth(month)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-text-tertiary">Keyword</span>
+            <Input
+              type="search"
+              placeholder="Search…"
+              value={keyword}
+              onChange={(e) => handleKeywordChange(e.target.value)}
+              className="h-9 min-w-[8rem] w-36"
+              aria-label="Keyword search"
+              disabled={loading}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-text-tertiary">Min rating</span>
+            <select
+              value={minRating === '' ? '' : String(minRating)}
+              onChange={(e) => handleMinRatingChange(e.target.value)}
+              disabled={loading}
+              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
+            >
+              <option value="">Any</option>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>{'★'.repeat(n)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-text-tertiary">From</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => handleDateFromChange(e.target.value)}
+              disabled={loading}
+              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-text-tertiary">To</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => handleDateToChange(e.target.value)}
+              disabled={loading}
+              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-text-tertiary">Color label</span>
+            <Input
+              placeholder="e.g. Red"
+              value={colorLabel}
+              onChange={(e) => handleColorLabelChange(e.target.value)}
+              className="h-9 min-w-[6rem] w-28"
+              aria-label="Color label"
+              disabled={loading}
+            />
+          </div>
         </div>
       </div>
 
