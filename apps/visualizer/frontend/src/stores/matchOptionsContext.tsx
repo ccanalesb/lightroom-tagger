@@ -82,6 +82,7 @@ export function MatchOptionsProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook lives with provider
 export function useMatchOptions() {
   const context = useContext(MatchOptionsContext);
   if (!context) throw new Error('useMatchOptions must be used within MatchOptionsProvider');

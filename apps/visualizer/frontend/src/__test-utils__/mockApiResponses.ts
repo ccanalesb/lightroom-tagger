@@ -8,13 +8,23 @@ interface MockOptions {
 }
 
 export function mockApiResponses(
-  _models: { name: string; default: boolean }[] = [],
+  models: { name: string; default: boolean }[] = [],
   options: MockOptions = {},
 ) {
   const defaultProvider = options.defaultProvider ?? "ollama";
   const defaultModel = options.defaultModel ?? null;
 
   fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+    if (url.includes("/vision-models")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          models:
+            models.length > 0 ? models : [{ name: "gemma3:27b", default: true }],
+          fallback: models.length === 0,
+        }),
+      });
+    }
     if (url.includes("/providers/defaults")) {
       return Promise.resolve({
         ok: true,
