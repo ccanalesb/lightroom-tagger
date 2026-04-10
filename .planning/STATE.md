@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: Not started
-status: completed
-last_updated: "2026-04-10T18:54:45.121Z"
+current_plan: "03-02"
+status: executing
+last_updated: "2026-04-10T22:00:00.000Z"
 last_activity: 2026-04-10
 progress:
-  total_phases: 2
+  total_phases: 3
   completed_phases: 2
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  total_plans: 15
+  completed_plans: 10
+  percent: 67
 ---
 
 # Planning state
@@ -24,22 +24,22 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v1 |
-| Active phase | 2 — Jobs & system reliability |
+| Active phase | 3 — Instagram sync |
 | Phase status | In progress |
-| Last completed plan | 02-04 — Job status UX alignment, orphan recovery copy, and handler cancel checks |
+| Last completed plan | 03-01 — Matches API dump-media thumbnails and vision_match single-image result score |
 
 ## GSD progression
 
-**Current Plan:** Not started
-**Total Plans in Phase:** 4
-**Status:** Milestone complete
+**Next plan:** 03-02
+**Total Plans in Phase:** 6 (03-01 … 03-06)
+**Status:** Executing Phase 03 — Instagram sync
 **Last Activity:** 2026-04-10
 
 ## v1 phase checklist
 
 - [x] Phase 1 — Catalog management (CAT-01 … CAT-05) ✓
 - [ ] Phase 2 — Jobs & system reliability (SYS-01 … SYS-05)
-- [ ] Phase 3 — Instagram sync (IG-01 … IG-06)
+- [ ] Phase 3 — Instagram sync (IG-01 … IG-06) — plan 03-01 done
 - [ ] Phase 4 — AI analysis (AI-01 … AI-06)
 
 ## Traceability
@@ -53,6 +53,11 @@ Full requirement ↔ phase mapping: [REQUIREMENTS.md § Traceability](./REQUIREM
 - **2026-04-10:** Plan **02-02** executed — `writer.py` checks Lightroom lock paths before SQLite writes, rotated `shutil.copy2` backups (max 2) with `Catalog backup created:` logging; `handle_vision_match` fails the job with the fixed lock message when the writer raises.
 - **2026-04-10:** Plan **02-03** executed — `jobs.error_severity` column and migration; `fail_job`/`retry`/`complete_job` persistence; handler exception classification; frontend `Job` type, `ERROR_SEVERITY_LABELS`, severity badges in job detail modal and job cards.
 - **2026-04-10:** Plan **02-04** executed — `STATUS_LABELS.pending` → Queued; job detail status uses `STATUS_LABELS`; orphan recovery log copy in `app.py`; cooperative cancel in `handle_enrich_catalog`, `handle_batch_describe` (sequential + parallel), and `handle_prepare_catalog`.
+- **2026-04-10:** Plan **03-01** executed — `list_matches` joins `instagram_dump_media` via `_enrich_instagram_media` (`dump_instagram_by_key`); regression test `ig_dump_only`; `handle_vision_match` sets `result.best_score` when `matches` non-empty. See [SUMMARY.md](./phases/03-instagram-sync/SUMMARY.md).
+
+## Decisions (phase 3)
+
+- **D-03-01:** Match list `instagram_image` resolves **legacy `instagram_images` first**, then **enriched `instagram_dump_media`** by `insta_key`, so dump-only keys still get thumbnails/metadata in the API without duplicating legacy rows.
 
 ## Decisions (phase 2)
 

@@ -77,6 +77,17 @@
 4. User confirms or rejects individual proposed matches and those decisions persist in the UI.
 5. After confirmation, the user finds the `posted` keyword (or agreed token) on matched photos in Lightroom, sees posted state in the app, and can tell posted vs not-yet-posted at a glance.
 
+### Plan progress (execution)
+
+| Plan | Title | Status |
+|------|--------|--------|
+| 03-01 | Matches API dump-media thumbnails and vision_match single-image result score | **Done** (2026-04-10) |
+| 03-02 | Lightroom keyword from config.instagram_keyword (auto-tag unchanged) | Pending |
+| 03-03 | Instagram dump path in config + instagram_import job handler | Pending |
+| 03-04 | Frontend: configure dump path and Run Import job | Pending |
+| 03-05 | Ship Matches tab with MatchDetailModal and useMatchGroups | Pending |
+| 03-06 | Posted visibility end-to-end and catalog API regression | Pending |
+
 ---
 
 ## Phase 4 — AI analysis
@@ -120,4 +131,4 @@ flowchart LR
 Deferred items remain as documented in [REQUIREMENTS.md](./REQUIREMENTS.md) (v2 and Out of Scope tables).
 
 ---
-*Roadmap created: 2026-04-10 · Last plan progress edit: 2026-04-10 (plans 02-01 and 02-02 complete).*
+*Roadmap created: 2026-04-10 · Last plan progress edit: 2026-04-10 (plan 03-01 complete; Phase 3 execution table added).*
