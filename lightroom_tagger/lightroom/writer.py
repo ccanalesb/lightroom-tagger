@@ -1,6 +1,26 @@
+import logging
+import shutil
 import sqlite3
 import uuid
+from datetime import datetime
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+
+def _catalog_lock_candidates(catalog_path: str) -> list[Path]:
+    p = Path(catalog_path)
+    return [
+        p.parent / f"{p.stem}.lrcat-lock",
+        p.parent / f"{p.name}.lock",
+    ]
+
+
+def raise_if_catalog_locked(catalog_path: str) -> None:
+    for path in _catalog_lock_candidates(catalog_path):
+        if path.exists() and (path.is_file() or path.is_dir()):
+            raise RuntimeError("Close Lightroom before writing to catalog.")
+    return None
 
 
 def connect_catalog(catalog_path: str) -> sqlite3.Connection:
