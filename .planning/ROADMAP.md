@@ -52,6 +52,15 @@
 4. When an operation fails, the user sees a clear, specific error message suitable for retry or support (not a silent failure).
 5. When Lightroom has the catalog open, the user is prevented from or clearly warned about writes that could corrupt data.
 
+### Plan progress (execution)
+
+| Plan | Title | Status |
+|------|--------|--------|
+| 02-01 | Cooperative job cancellation and shared JobRunner wiring | **Done** (2026-04-10) |
+| 02-02 | Catalog backup rotation and Lightroom lock guard before writes | Pending |
+| 02-03 | Job failure severity in API and UI badges | Pending |
+| 02-04 | Job status UX alignment, orphan recovery copy, and handler cancel checks | Pending |
+
 ---
 
 ## Phase 3 — Instagram sync
@@ -111,4 +120,4 @@ flowchart LR
 Deferred items remain as documented in [REQUIREMENTS.md](./REQUIREMENTS.md) (v2 and Out of Scope tables).
 
 ---
-*Roadmap created: 2026-04-10*
+*Roadmap created: 2026-04-10 · Last plan progress edit: 2026-04-10 (plan 02-01 complete).*

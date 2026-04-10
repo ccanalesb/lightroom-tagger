@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 01 complete — ready for Phase 02
-last_updated: "2026-04-10T19:15:00Z"
+status: Executing Phase 02
+last_updated: "2026-04-10T20:00:00.000Z"
 progress:
-  total_phases: 4
+  total_phases: 2
   completed_phases: 1
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_plans: 9
+  completed_plans: 6
+  percent: 67
 ---
 
 # Planning state
@@ -23,7 +23,8 @@ progress:
 |-------|--------|
 | Active milestone | v1 |
 | Active phase | 2 — Jobs & system reliability |
-| Phase status | Not started |
+| Phase status | In progress |
+| Last completed plan | 02-01 — Cooperative job cancellation & JobRunner wiring |
 
 ## v1 phase checklist
 
@@ -39,6 +40,11 @@ Full requirement ↔ phase mapping: [REQUIREMENTS.md § Traceability](./REQUIREM
 ## Last update
 
 - **2026-04-10:** ROADMAP.md and STATE.md created; REQUIREMENTS.md traceability filled from v1 roadmap.
+- **2026-04-10:** Plan **02-01** executed — cooperative cancellation end-to-end: per-job `threading.Event`, `DELETE /api/jobs/<id>` sets DB then `signal_cancel`, processor and runner respect `cancelled` so `complete_job`/`fail_job` do not clobber; `vision_match` checks cancel between dump-media iterations via `should_cancel`.
+
+## Decisions (phase 2)
+
+- **D-02-01:** Cancel order for running jobs is **database `cancelled` first**, then in-memory `Event.set()`, so `start_job` and terminal transitions can race-safely consult DB status.
 
 ---
 *This file is the canonical planning pointer for “where we are” between phase transitions.*
