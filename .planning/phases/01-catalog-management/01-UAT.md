@@ -1,5 +1,5 @@
 ---
-status: partial
+status: diagnosed
 phase: 01-catalog-management
 source: [01-01-SUMMARY.md, 01-02-SUMMARY.md, 01-03-SUMMARY.md, 01-04-SUMMARY.md]
 started: 2026-04-10T11:45:00Z
@@ -96,52 +96,81 @@ blocked: 0
   reason: "User reported: i see the catalog, but no images below, and seing a 500 error"
   severity: major
   test: 2
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "GET /api/images/catalog returns 500. Likely cause: init_database runs _migrate_unified_image_keys which may fail (key collision or backup I/O), or query_catalog_images references columns (title, description, instagram_posted, color_label) that may not exist on legacy images tables. The 500 is caught by with_db's broad except and returned as JSON error."
+  artifacts:
+    - path: "apps/visualizer/backend/api/images.py"
+      issue: "500 from list_catalog_images — broad except masks root cause"
+    - path: "lightroom_tagger/core/database.py"
+      issue: "init_database/_migrate_unified_image_keys may fail; query_catalog_images may reference missing columns"
+    - path: "apps/visualizer/backend/utils/db.py"
+      issue: "with_db catches all exceptions as 500"
+  missing:
+    - "Read the error field from 500 JSON response to identify exact cause"
+    - "Add _migrate_add_column calls for any columns missing on legacy images tables"
+    - "Handle migration errors gracefully"
   debug_session: ""
 - truth: "With a populated catalog, the Catalog tab shows photos in pages. Total count reflects actual matching photos."
   status: failed
   reason: "User reported: the catalog is populated but i can't see any images"
   severity: major
   test: 4
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "Same 500 error as test 2 — API returns error, frontend catches but leaves total=0, triggering empty-state branch that hides everything including filters."
+  artifacts:
+    - path: "apps/visualizer/frontend/src/components/images/CatalogTab.tsx"
+      issue: "API failure leaves total=0, empty-state branch hides grid and filters"
+  missing:
+    - "Fix API 500 (same as test 2)"
+    - "Show error state instead of empty state on API failure"
   debug_session: ""
 - truth: "Typing a keyword in the search field filters photos matching that keyword. Total count updates to reflect filtered set."
   status: failed
   reason: "User reported: there is no search field at all"
   severity: major
   test: 5
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "Filter controls are only rendered in the success layout branch. noFiltersAndEmptyDb is misdefined as !hasActiveFilters (line 141-142), so when total===0 with no filters (including after a 500 failure), the early return hides all filter controls."
+  artifacts:
+    - path: "apps/visualizer/frontend/src/components/images/CatalogTab.tsx"
+      issue: "Lines 141-142: noFiltersAndEmptyDb = !hasActiveFilters — wrong condition"
+    - path: "apps/visualizer/frontend/src/components/images/CatalogTab.tsx"
+      issue: "Lines 157-171: empty state branch omits filter row entirely"
+  missing:
+    - "Always render filter bar on catalog tab regardless of total count"
+    - "Define noFiltersAndEmptyDb correctly to check actual DB emptiness, not just filter state"
+    - "Show error message on API failure instead of empty state"
   debug_session: ""
 - truth: "A Min stars dropdown filters the catalog to photos rated at or above the selected value."
   status: failed
   reason: "User reported: there is no rating filter at all"
   severity: major
   test: 6
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "Same as test 5 — filter controls hidden by noFiltersAndEmptyDb early return"
+  artifacts:
+    - path: "apps/visualizer/frontend/src/components/images/CatalogTab.tsx"
+      issue: "Lines 141-142, 157-171"
+  missing:
+    - "Same fix as test 5"
   debug_session: ""
 - truth: "Date range pickers filter photos to those taken within the selected range."
   status: failed
   reason: "User reported: no date filter visible — same root cause as tests 5-6, filter UI not rendering"
   severity: major
   test: 7
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "Same as test 5 — filter controls hidden by noFiltersAndEmptyDb early return"
+  artifacts:
+    - path: "apps/visualizer/frontend/src/components/images/CatalogTab.tsx"
+      issue: "Lines 141-142, 157-171"
+  missing:
+    - "Same fix as test 5"
   debug_session: ""
 - truth: "Color label field filters photos by color label, case-insensitive."
   status: failed
   reason: "User reported: no color label filter visible — same root cause as tests 5-7, filter UI not rendering"
   severity: major
   test: 8
-  root_cause: ""
-  artifacts: []
-  missing: []
+  root_cause: "Same as test 5 — filter controls hidden by noFiltersAndEmptyDb early return"
+  artifacts:
+    - path: "apps/visualizer/frontend/src/components/images/CatalogTab.tsx"
+      issue: "Lines 141-142, 157-171"
+  missing:
+    - "Same fix as test 5"
   debug_session: ""
