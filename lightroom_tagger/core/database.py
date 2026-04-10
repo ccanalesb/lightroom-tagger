@@ -363,8 +363,10 @@ def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
         by_new_key.setdefault(new_key, []).append(row)
 
     # Resolve collisions: multiple old keys map to the same unified key.
-    # Keep the row with the most data (non-null columns), delete the rest,
-    # and remap their dependent-table references to the survivor.
+    # Keep the row with the most data (non-null columns), delete the rest.
+    # For tables with unique key constraints (vision_cache, image_descriptions),
+    # delete the loser's row when the survivor already has one — UPDATE would
+    # violate UNIQUE.  For non-unique FK columns (matches, etc.) remap safely.
     duplicates_to_delete: list[str] = []
     for new_key, colliding_rows in by_new_key.items():
         if len(colliding_rows) <= 1:
@@ -376,15 +378,31 @@ def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
         for loser in colliding_rows[1:]:
             loser_key = loser["key"]
             survivor_key = survivor["key"]
+
+            # Tables with non-unique FK columns: safe to remap
             for stmt in (
                 "UPDATE matches SET catalog_key = ? WHERE catalog_key = ?",
                 "UPDATE rejected_matches SET catalog_key = ? WHERE catalog_key = ?",
-                "UPDATE vision_cache SET key = ? WHERE key = ?",
                 "UPDATE vision_comparisons SET catalog_key = ? WHERE catalog_key = ?",
-                "UPDATE image_descriptions SET image_key = ? WHERE image_key = ? AND image_type = 'catalog'",
                 "UPDATE instagram_dump_media SET matched_catalog_key = ? WHERE matched_catalog_key = ?",
             ):
                 conn.execute(stmt, (survivor_key, loser_key))
+
+            # Tables with unique key constraints: delete loser row if survivor
+            # already owns one, otherwise remap.
+            for del_stmt, upd_stmt in (
+                (
+                    "DELETE FROM vision_cache WHERE key = ? AND EXISTS (SELECT 1 FROM vision_cache WHERE key = ?)",
+                    "UPDATE vision_cache SET key = ? WHERE key = ?",
+                ),
+                (
+                    "DELETE FROM image_descriptions WHERE image_key = ? AND image_type = 'catalog' AND EXISTS (SELECT 1 FROM image_descriptions WHERE image_key = ? AND image_type = 'catalog')",
+                    "UPDATE image_descriptions SET image_key = ? WHERE image_key = ? AND image_type = 'catalog'",
+                ),
+            ):
+                conn.execute(del_stmt, (loser_key, survivor_key))
+                conn.execute(upd_stmt, (survivor_key, loser_key))
+
             duplicates_to_delete.append(loser_key)
             print(
                 f"migrate_unified_image_keys: merged duplicate "
