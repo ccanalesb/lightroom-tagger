@@ -15,6 +15,13 @@
 | 7 | `8bb1e1d` | feat(02-03): show error severity badge in job detail modal |
 | 8 | `ed2465e` | feat(02-03): show severity badge on failed job cards |
 
+### Planning artifacts
+
+| Commit | Message |
+|--------|---------|
+| `0ea9d0c` | docs(02-03): add plan execution summary |
+| `6e0011a` | chore(02-03): advance STATE and mark plan done in ROADMAP |
+
 ## Implementation notes
 
 - **Schema:** `jobs.error_severity TEXT`; idempotent `ALTER` after `PRAGMA table_info(jobs)`; helper `clear_job_failure_details` in `database.py` for future use (retry uses explicit `UPDATE` per plan).
