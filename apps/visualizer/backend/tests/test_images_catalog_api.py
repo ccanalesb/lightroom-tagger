@@ -19,6 +19,7 @@ def catalog_client(tmp_path, monkeypatch):
             "filename": "low.jpg",
             "rating": 3,
             "id": "100",
+            "instagram_posted": True,
         },
     )
     store_image(
@@ -53,6 +54,26 @@ def test_catalog_min_rating_filter(catalog_client):
     assert data["total"] == 1
     assert len(data["images"]) == 1
     assert data["images"][0]["rating"] >= 5
+    assert data["images"][0]["filename"] == "high.jpg"
+
+
+def test_catalog_posted_filter_true(catalog_client):
+    resp = catalog_client.get("/api/images/catalog?posted=true")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["total"] == 1
+    assert len(data["images"]) == 1
+    assert data["images"][0]["instagram_posted"] is True
+    assert data["images"][0]["filename"] == "low.jpg"
+
+
+def test_catalog_posted_filter_false(catalog_client):
+    resp = catalog_client.get("/api/images/catalog?posted=false")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["total"] == 1
+    assert len(data["images"]) == 1
+    assert data["images"][0]["instagram_posted"] is False
     assert data["images"][0]["filename"] == "high.jpg"
 
 
