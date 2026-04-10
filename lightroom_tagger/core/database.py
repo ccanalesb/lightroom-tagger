@@ -539,6 +539,78 @@ def search_by_instagram_posted(db: sqlite3.Connection, posted: bool = True) -> l
     return [_deserialize_row(r) for r in rows]
 
 
+def query_catalog_images(
+    db: sqlite3.Connection,
+    *,
+    posted: bool | None = None,
+    month: str | None = None,
+    keyword: str | None = None,
+    min_rating: int | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    color_label: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[dict], int]:
+    """List catalog images with AND-combined filters, SQL pagination, and total count."""
+    clauses: list[str] = ["1=1"]
+    bindings: list = []
+
+    if posted is True:
+        clauses.append("instagram_posted = 1")
+    elif posted is False:
+        clauses.append("instagram_posted = 0")
+
+    if month and len(month) == 6 and month.isdigit():
+        clauses.append("strftime('%Y%m', date_taken) = ?")
+        bindings.append(month)
+
+    kw = (keyword or "").strip()
+    if kw:
+        pattern = f"%{kw}%"
+        clauses.append(
+            "("
+            "keywords LIKE ? COLLATE NOCASE OR "
+            "filename LIKE ? COLLATE NOCASE OR "
+            "title LIKE ? COLLATE NOCASE OR "
+            "description LIKE ? COLLATE NOCASE"
+            ")"
+        )
+        bindings.extend([pattern, pattern, pattern, pattern])
+
+    if min_rating is not None:
+        clauses.append("rating >= ?")
+        bindings.append(min_rating)
+
+    if date_from:
+        clauses.append("date_taken >= ?")
+        bindings.append(date_from)
+
+    if date_to:
+        clauses.append("date_taken <= ?")
+        bindings.append(date_to)
+
+    cl = (color_label or "").strip()
+    if cl:
+        clauses.append("LOWER(color_label) = LOWER(?)")
+        bindings.append(cl)
+
+    where_sql = "WHERE " + " AND ".join(clauses)
+
+    count_row = db.execute(
+        f"SELECT COUNT(*) AS cnt FROM images {where_sql}",
+        bindings,
+    ).fetchone()
+    total_count = int(count_row["cnt"])
+
+    select_params = list(bindings) + [limit, offset]
+    rows = db.execute(
+        f"SELECT * FROM images {where_sql} ORDER BY date_taken DESC LIMIT ? OFFSET ?",
+        select_params,
+    ).fetchall()
+    return [_deserialize_row(r) for r in rows], total_count
+
+
 def get_images_without_hash(db: sqlite3.Connection) -> list[dict]:
     """Get all images that don't have a computed hash yet."""
     rows = db.execute(
