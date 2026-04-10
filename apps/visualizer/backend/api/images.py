@@ -5,6 +5,7 @@ from collections import OrderedDict
 
 from flask import Blueprint, jsonify, request, send_file
 from lightroom_tagger.core.database import (
+    query_catalog_images,
     reject_match,
     unvalidate_match,
     validate_match,
@@ -263,34 +264,50 @@ def get_catalog_months(db):
 @bp.route('/catalog', methods=['GET'])
 @with_db
 def list_catalog_images(db):
-    """List catalog images with optional filtering by posted status and date_taken month."""
+    """List catalog images with optional filtering and SQL-level pagination."""
     try:
-        images = db.execute("SELECT * FROM images").fetchall()
+        posted_raw = request.args.get('posted')
+        if posted_raw == 'true':
+            posted_filter = True
+        elif posted_raw == 'false':
+            posted_filter = False
+        else:
+            posted_filter = None
 
-        posted = request.args.get('posted')
-        month = request.args.get('month')  # YYYYMM format
+        month = request.args.get('month')
+        keyword = request.args.get('keyword', '')
+        min_rating = request.args.get('min_rating', type=int)
+        date_from = request.args.get('date_from', '')
+        date_to = request.args.get('date_to', '')
+        color_label = request.args.get('color_label', '')
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
 
-        if posted == 'true':
-            images = [img for img in images if img.get('instagram_posted')]
-        elif posted == 'false':
-            images = [img for img in images if not img.get('instagram_posted')]
+        rows, total = query_catalog_images(db,
+            posted=posted_filter,
+            month=month,
+            keyword=keyword.strip() or None,
+            min_rating=min_rating,
+            date_from=date_from or None,
+            date_to=date_to or None,
+            color_label=color_label.strip() or None,
+            limit=limit,
+            offset=offset,
+        )
 
-        if month and len(month) == 6:  # YYYYMM format
-            year = month[:4]
-            mon = month[4:6]
-            images = [
-                img for img in images
-                if img.get('date_taken') and 
-                   img['date_taken'].startswith(f"{year}-{mon}")
-            ]
-
-        paginated = images[offset:offset+limit]
+        images = []
+        for row in rows:
+            out = dict(row)
+            rid = out.get('id')
+            if rid is not None and str(rid).strip().isdigit():
+                out['id'] = int(rid)
+            else:
+                out['id'] = None
+            images.append(out)
 
         return jsonify({
-            'total': len(images),
-            'images': paginated,
+            'total': total,
+            'images': images,
         })
     except Exception as e:
         return error_server_error(str(e))
