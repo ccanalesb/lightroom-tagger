@@ -22,7 +22,7 @@
 
 ## Deviations
 
-None.
+- **`roadmap update-plan-progress`:** The CLI returned `updated: true` but the Phase 2 plan table row for 02-04 remained `Pending` in `.planning/ROADMAP.md`. The row was set to **Done** (2026-04-10) manually to match the completed work (same commit as STATE touch-up).
 
 ## Verification
 

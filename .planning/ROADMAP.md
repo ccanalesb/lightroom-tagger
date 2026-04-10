@@ -59,7 +59,7 @@
 | 02-01 | Cooperative job cancellation and shared JobRunner wiring | **Done** (2026-04-10) |
 | 02-02 | Catalog backup rotation and Lightroom lock guard before writes | **Done** (2026-04-10) |
 | 02-03 | Job failure severity in API and UI badges | **Done** (2026-04-10) |
-| 02-04 | Job status UX alignment, orphan recovery copy, and handler cancel checks | Pending |
+| 02-04 | Job status UX alignment, orphan recovery copy, and handler cancel checks | **Done** (2026-04-10) |
 
 ---
 
