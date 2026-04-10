@@ -56,6 +56,12 @@ export const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
+export const ERROR_SEVERITY_LABELS: Record<string, string> = {
+  warning: 'Warning',
+  error: 'Error',
+  critical: 'Critical',
+}
+
 // Generic Messages
 export const MSG_LOADING = 'Loading...'
 export const MSG_UNKNOWN_ERROR = 'Unknown error'
