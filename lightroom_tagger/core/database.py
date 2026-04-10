@@ -1,6 +1,7 @@
 import hashlib
 import json
 import os
+import shutil
 import sqlite3
 from datetime import datetime, timedelta
 
@@ -249,6 +250,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
         "ON instagram_dump_media(processed, last_attempted_at)"
     )
 
+    _migrate_unified_image_keys(conn)
     conn.commit()
     return conn
 
@@ -273,6 +275,90 @@ def generate_key(record: dict) -> str:
     date_part = date_taken[:10] if date_taken else 'unknown'
     filename = record.get('filename', 'unknown')
     return f"{date_part}_{filename}"
+
+
+def _library_db_file_path(conn: sqlite3.Connection) -> str:
+    """Resolve the on-disk path of the main attached database."""
+    for row in conn.execute("PRAGMA database_list").fetchall():
+        if row.get("name") == "main":
+            path = (row.get("file") or "").strip()
+            if path:
+                return path
+    raise RuntimeError(
+        "migrate_unified_image_keys: could not resolve main database file path"
+    )
+
+
+def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
+    """Remap legacy composite keys to date-truncated form; idempotent via user_version."""
+    row = conn.execute("PRAGMA user_version").fetchone()
+    current_uv = int(row["user_version"] if row else 0)
+    if current_uv >= 1:
+        return
+
+    db_path = _library_db_file_path(conn)
+    bak_path = db_path + ".pre-key-migration.bak"
+    if not os.path.exists(bak_path):
+        shutil.copy2(db_path, bak_path)
+        print(f"Backed up {db_path} before key migration")
+
+    rows = conn.execute("SELECT * FROM images").fetchall()
+    by_new_key: dict[str, list[str]] = {}
+    for row in rows:
+        new_key = generate_key(row)
+        by_new_key.setdefault(new_key, []).append(row["key"])
+    for new_key, old_keys in by_new_key.items():
+        if len(old_keys) > 1:
+            raise RuntimeError(
+                "migrate_unified_image_keys: key collision "
+                f"for unified key {new_key!r}: existing keys {old_keys!r}"
+            )
+
+    remaps: list[tuple[str, str]] = []
+    for row in rows:
+        old_key = row["key"]
+        new_key = generate_key(row)
+        if old_key != new_key:
+            remaps.append((old_key, new_key))
+
+    for old_key, new_key in remaps:
+        conn.execute(
+            "UPDATE matches SET catalog_key = ? WHERE catalog_key = ?",
+            (new_key, old_key),
+        )
+        conn.execute(
+            "UPDATE rejected_matches SET catalog_key = ? WHERE catalog_key = ?",
+            (new_key, old_key),
+        )
+        conn.execute(
+            "UPDATE vision_cache SET key = ? WHERE key = ?",
+            (new_key, old_key),
+        )
+        conn.execute(
+            "UPDATE vision_comparisons SET catalog_key = ? WHERE catalog_key = ?",
+            (new_key, old_key),
+        )
+        conn.execute(
+            "UPDATE image_descriptions SET image_key = ? "
+            "WHERE image_key = ? AND image_type = 'catalog'",
+            (new_key, old_key),
+        )
+        conn.execute(
+            "UPDATE instagram_dump_media SET matched_catalog_key = ? "
+            "WHERE matched_catalog_key = ?",
+            (new_key, old_key),
+        )
+        conn.execute(
+            "UPDATE images SET key = ? WHERE key = ?",
+            (new_key, old_key),
+        )
+
+    conn.execute("PRAGMA user_version = 1")
+
+
+def migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
+    """Public entry point for the unified composite key migration."""
+    _migrate_unified_image_keys(conn)
 
 
 def store_image(db: sqlite3.Connection, record: dict) -> str:

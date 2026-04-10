@@ -18,6 +18,7 @@ from lightroom_tagger.core.database import (
     init_database,
     init_image_descriptions_table,
     init_vision_comparisons_table,
+    migrate_unified_image_keys,
     store_image,
     store_image_description,
     store_images_batch,
@@ -40,6 +41,9 @@ class TestDatabase(unittest.TestCase):
     def tearDown(self):
         """Clean up temporary database."""
         self.db.close()
+        bak = self.temp_db_path + ".pre-key-migration.bak"
+        if os.path.exists(bak):
+            os.unlink(bak)
         os.unlink(self.temp_db_path)
 
     def test_init_database(self):
@@ -163,6 +167,28 @@ class TestDatabase(unittest.TestCase):
         count = clear_all(self.db)
         self.assertEqual(count, 2)
         self.assertEqual(get_image_count(self.db), 0)
+
+    def test_migrate_unified_image_keys_rewrites_legacy_key(self):
+        """Legacy full-datetime composite keys remap to YYYY-MM-DD_filename."""
+        self.db.execute("PRAGMA user_version = 0")
+        self.db.execute(
+            """
+            INSERT INTO images (key, id, filename, filepath, date_taken)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                "2024-01-15T00:00:00_photo.jpg",
+                "0",
+                "photo.jpg",
+                "",
+                "2024-01-15T00:00:00",
+            ),
+        )
+        self.db.commit()
+        migrate_unified_image_keys(self.db)
+        self.db.commit()
+        row = self.db.execute("SELECT key FROM images").fetchone()
+        self.assertEqual(row["key"], "2024-01-15_photo.jpg")
 
 
 class TestInstagramStatus(unittest.TestCase):
