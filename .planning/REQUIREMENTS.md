@@ -1,0 +1,119 @@
+# Requirements: Lightroom Tagger & Analyzer
+
+**Defined:** 2026-04-10
+**Core Value:** Know which catalog images are posted on Instagram and get artistic critique that helps you understand your photographic voice and posting strategy.
+
+## v1 Requirements
+
+Requirements for initial release. Each maps to roadmap phases.
+
+### Catalog Management
+
+- [ ] **CAT-01**: User can register a Lightroom catalog (.lrcat file)
+- [ ] **CAT-02**: User can browse photos from the catalog with pagination
+- [ ] **CAT-03**: User can search/filter photos by basic criteria
+- [ ] **CAT-04**: System maintains stable photo identity across sessions
+- [ ] **CAT-05**: System reads catalog safely without corruption risk
+
+### Instagram Sync
+
+- [ ] **IG-01**: User can upload Instagram export dump
+- [ ] **IG-02**: System parses images and metadata from dump
+- [ ] **IG-03**: System matches dump images to catalog photos with confidence scores
+- [ ] **IG-04**: User can confirm or reject proposed matches
+- [ ] **IG-05**: System writes "posted" keyword to confirmed matches in Lightroom catalog
+- [ ] **IG-06**: User can see which catalog photos are marked as posted
+
+### AI Analysis
+
+- [ ] **AI-01**: User can configure AI provider (Ollama, OpenAI, etc.)
+- [ ] **AI-02**: User can trigger on-demand description for a single photo
+- [ ] **AI-03**: User can trigger batch description for selected photos or timeframe
+- [ ] **AI-04**: System stores AI descriptions with source photo
+- [ ] **AI-05**: User can view AI descriptions alongside photos
+- [ ] **AI-06**: System tracks which photos have been analyzed
+
+### Jobs & System
+
+- [ ] **SYS-01**: User can see job status (queued, running, complete, failed)
+- [ ] **SYS-02**: User can cancel running jobs
+- [ ] **SYS-03**: System backs up catalog before any write operation
+- [ ] **SYS-04**: User receives clear error messages when operations fail
+- [ ] **SYS-05**: System prevents writes when Lightroom has catalog open
+
+## v2 Requirements
+
+Deferred to future release. Tracked but not in current roadmap.
+
+### Advanced AI Analysis
+
+- **AI-07**: Multi-perspective critique (street photographer, editor, publisher views)
+- **AI-08**: Structured artistic feedback (composition, narrative, rhythm)
+- **AI-09**: Score photos from different perspectives
+- **AI-10**: Improve critique prompts with photography theory knowledge
+
+### Analytics & Insights
+
+- **ANLZ-01**: Extract and display Instagram analytics (likes, saves, engagement)
+- **ANLZ-02**: Identify "best photos" combining AI scores and Instagram performance
+- **ANLZ-03**: Show photographer identity analysis across all work
+- **ANLZ-04**: Identify patterns in what performs well on Instagram
+- **ANLZ-05**: Suggest what to post next based on catalog analysis
+
+### Multi-Catalog
+
+- **MCAT-01**: User can switch between multiple registered catalogs
+- **MCAT-02**: System maintains unified photographer identity view across catalogs
+- **MCAT-03**: User can analyze catalog-specific work (e.g., wedding catalog) independently
+
+## Out of Scope
+
+Explicitly excluded. Documented to prevent scope creep.
+
+| Feature | Reason |
+|---------|--------|
+| Instagram API integration | Too restrictive and fragile; export-based workflow is reliable |
+| Lightroom plugin | Keep Lightroom unchanged; web app is more flexible |
+| Technical EXIF analysis | Focus is artistic critique, not camera settings |
+| Real-time Instagram syncing | Manual dump workflow sufficient for use case |
+| Batch analysis of entire catalog upfront | On-demand keeps costs controlled |
+| Support for multiple social platforms | Focus on Instagram first; add others only with clear demand |
+| Automated posting suggestions | Defer until patterns are proven valuable |
+
+## Traceability
+
+Which phases cover which requirements. Updated during roadmap creation.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| CAT-01 | TBD | Pending |
+| CAT-02 | TBD | Pending |
+| CAT-03 | TBD | Pending |
+| CAT-04 | TBD | Pending |
+| CAT-05 | TBD | Pending |
+| IG-01 | TBD | Pending |
+| IG-02 | TBD | Pending |
+| IG-03 | TBD | Pending |
+| IG-04 | TBD | Pending |
+| IG-05 | TBD | Pending |
+| IG-06 | TBD | Pending |
+| AI-01 | TBD | Pending |
+| AI-02 | TBD | Pending |
+| AI-03 | TBD | Pending |
+| AI-04 | TBD | Pending |
+| AI-05 | TBD | Pending |
+| AI-06 | TBD | Pending |
+| SYS-01 | TBD | Pending |
+| SYS-02 | TBD | Pending |
+| SYS-03 | TBD | Pending |
+| SYS-04 | TBD | Pending |
+| SYS-05 | TBD | Pending |
+
+**Coverage:**
+- v1 requirements: 22 total
+- Mapped to phases: 0 (roadmap not yet created)
+- Unmapped: 22 ⚠️
+
+---
+*Requirements defined: 2026-04-10*
+*Last updated: 2026-04-10 after initial definition*
