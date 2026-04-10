@@ -86,7 +86,7 @@
 | 03-03 | Instagram dump path in config + instagram_import job handler | **Done** (2026-04-10) |
 | 03-04 | Frontend: configure dump path and Run Import job | **Done** (2026-04-10) |
 | 03-05 | Ship Matches tab with MatchDetailModal and useMatchGroups | **Done** (2026-04-10) |
-| 03-06 | Posted visibility end-to-end and catalog API regression | Pending |
+| 03-06 | Posted visibility end-to-end and catalog API regression | **Done** (2026-04-10) |
 
 ---
 
@@ -131,4 +131,4 @@ flowchart LR
 Deferred items remain as documented in [REQUIREMENTS.md](./REQUIREMENTS.md) (v2 and Out of Scope tables).
 
 ---
-*Roadmap created: 2026-04-10 · Last plan progress edit: 2026-04-10 (plan 03-05 complete).*
+*Roadmap created: 2026-04-10 · Last plan progress edit: 2026-04-10 (plan 03-06 complete; Phase 3 plans 03-01 … 03-06 all done).*
