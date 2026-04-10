@@ -210,7 +210,7 @@ def add_keyword_to_images_batch(conn: sqlite3.Connection, image_keys: list[str],
 
 
 def update_lightroom_from_matches(catalog_path: str, matches: list) -> dict:
-    """Add 'Posted' keyword to matched catalog images.
+    """Add the configured Instagram keyword (Config.instagram_keyword, default Posted) to matched catalog images.
 
     Args:
         catalog_path: Path to Lightroom catalog
@@ -224,11 +224,15 @@ def update_lightroom_from_matches(catalog_path: str, matches: list) -> dict:
     if not matches:
         return stats
 
+    from lightroom_tagger.core.config import load_config
+
+    keyword_name = load_config().instagram_keyword.strip() or "Posted"
+
     raise_if_catalog_locked(catalog_path)
     _backup_path = backup_catalog_if_needed(catalog_path, max_backups=2)
 
     conn = connect_catalog(catalog_path)
-    keyword_id = get_or_create_keyword(conn, "Posted")
+    keyword_id = get_or_create_keyword(conn, keyword_name)
 
     for match in matches:
         catalog_key = match.get('catalog_key')
