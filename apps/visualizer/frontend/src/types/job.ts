@@ -16,6 +16,7 @@ export interface Job {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result: any | null
   error: string | null
+  error_severity?: 'warning' | 'error' | 'critical' | null
   created_at: string
   started_at: string | null
   completed_at: string | null
