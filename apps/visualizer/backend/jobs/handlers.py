@@ -544,6 +544,14 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
                 }
                 
                 for future in as_completed(futures):
+                    if runner.is_cancelled(job_id):
+                        add_job_log(
+                            runner.db,
+                            job_id,
+                            'info',
+                            'Batch describe cancel noted; finishing already-running tasks',
+                        )
+                        break
                     idx, key = futures[future]
                     progress = int(5 + (idx / total) * 90)
                     runner.update_progress(job_id, progress, f'Describing {idx}/{total}')
@@ -571,6 +579,10 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
                         add_job_log(runner.db, job_id, 'error',
                                     f'Stopping: {consecutive_failures} consecutive failures')
                         break
+
+            if runner.is_cancelled(job_id):
+                runner.finalize_cancelled(job_id)
+                return
         else:
             # Sequential fallback for single worker or small batches
             for idx, (key, itype) in enumerate(images_to_describe, 1):
