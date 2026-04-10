@@ -10,6 +10,7 @@ from lightroom_tagger.lightroom.writer import (
     get_or_create_keyword,
     image_has_keyword,
     keyword_exists,
+    update_lightroom_from_matches,
 )
 
 
@@ -113,6 +114,32 @@ class TestWriter(unittest.TestCase):
             result = add_keyword_to_image(self.mock_conn, 1, 42)
             self.assertTrue(result)
             self.mock_conn.commit.assert_called_once()
+
+    @patch('lightroom_tagger.lightroom.writer.get_image_local_id', return_value=None)
+    @patch('lightroom_tagger.lightroom.writer.add_keyword_to_image')
+    @patch('lightroom_tagger.lightroom.writer.get_or_create_keyword', return_value=99)
+    @patch('lightroom_tagger.lightroom.writer.connect_catalog')
+    @patch('lightroom_tagger.lightroom.writer.backup_catalog_if_needed')
+    @patch('lightroom_tagger.lightroom.writer.raise_if_catalog_locked')
+    @patch('lightroom_tagger.core.config.load_config')
+    def test_update_lightroom_from_matches_uses_config_instagram_keyword(
+        self,
+        mock_load_config,
+        mock_raise_locked,
+        mock_backup,
+        mock_connect,
+        mock_get_or_create_kw,
+        _mock_add_kw,
+        _mock_get_image_id,
+    ):
+        """update_lightroom_from_matches passes Config.instagram_keyword to get_or_create_keyword."""
+        mock_load_config.return_value = MagicMock(instagram_keyword='CustomIG')
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+
+        update_lightroom_from_matches('/fake/cat.lrcat', [{'catalog_key': '2024-01-01_x.jpg'}])
+
+        mock_get_or_create_kw.assert_called_once_with(mock_conn, 'CustomIG')
 
 
 if __name__ == "__main__":
