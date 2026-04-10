@@ -106,10 +106,18 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 provider_id=provider_id,
                 provider_model=provider_model,
                 max_workers=max_workers,
+                should_cancel=lambda: runner.is_cancelled(job_id),
             )
+
+            if runner.is_cancelled(job_id):
+                runner.finalize_cancelled(job_id)
+                return
 
             # Update Lightroom with "Posted" keyword for matched images
             lr_stats = {'success': 0, 'failed': 0}
+            if runner.is_cancelled(job_id):
+                runner.finalize_cancelled(job_id)
+                return
             if matches:
                 from lightroom_tagger.lightroom.writer import update_lightroom_from_matches
                 catalog_path = config.catalog_path or config.small_catalog_path
@@ -138,6 +146,9 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             db.close()
 
     except Exception as e:
+        if runner.is_cancelled(job_id):
+            runner.finalize_cancelled(job_id)
+            return
         runner.fail_job(job_id, str(e))
 
 
