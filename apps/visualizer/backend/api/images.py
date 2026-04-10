@@ -379,6 +379,33 @@ def list_matches(db):
         except sqlite3.OperationalError:
             pass
 
+        model_lookup = {}
+        try:
+            for row in db.execute("SELECT insta_key, model_used FROM matches").fetchall():
+                model_lookup[row['insta_key']] = row['model_used']
+        except sqlite3.OperationalError:
+            pass
+
+        insta_keys = {m.get('insta_key') for m in matches if m.get('insta_key')}
+        dump_instagram_by_key = {}
+        if insta_keys:
+            keys_list = list(insta_keys)
+            chunk_size = 500
+            dump_rows = []
+            for i in range(0, len(keys_list), chunk_size):
+                chunk = keys_list[i:i + chunk_size]
+                placeholders = ','.join('?' * len(chunk))
+                dump_rows.extend(
+                    db.execute(
+                        f"SELECT * FROM instagram_dump_media WHERE media_key IN ({placeholders})",
+                        chunk,
+                    ).fetchall()
+                )
+            enriched_dump_list = _enrich_instagram_media(
+                dump_rows, model_lookup, desc_lookup
+            )
+            dump_instagram_by_key = {row['key']: row for row in enriched_dump_list}
+
         groups = OrderedDict()
         all_enriched = []
 
@@ -392,8 +419,11 @@ def list_matches(db):
                 'score': match.get('total_score', 0),
             }
 
-            if insta_key and insta_key in instagram_lookup:
-                enriched['instagram_image'] = instagram_lookup[insta_key]
+            resolved_insta = None
+            if insta_key:
+                resolved_insta = instagram_lookup.get(insta_key) or dump_instagram_by_key.get(insta_key)
+            if resolved_insta:
+                enriched['instagram_image'] = resolved_insta
             if catalog_key and catalog_key in catalog_lookup:
                 enriched['catalog_image'] = catalog_lookup[catalog_key]
 
@@ -408,7 +438,7 @@ def list_matches(db):
             best = max((c.get('score') or 0) for c in candidates) if candidates else 0
             match_groups.append({
                 'instagram_key': insta_key,
-                'instagram_image': instagram_lookup.get(insta_key),
+                'instagram_image': instagram_lookup.get(insta_key) or dump_instagram_by_key.get(insta_key),
                 'candidates': candidates,
                 'best_score': best,
                 'candidate_count': len(candidates),
