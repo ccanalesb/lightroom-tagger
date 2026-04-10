@@ -32,6 +32,14 @@ def test_create_job(client):
     assert 'id' in response.json
     assert response.json['status'] == 'pending'
 
+def test_create_instagram_import_job(client):
+    response = client.post(
+        '/api/jobs/',
+        json={'type': 'instagram_import', 'metadata': {}},
+    )
+    assert response.status_code == 201
+    assert response.json['type'] == 'instagram_import'
+
 def test_get_job(client):
     create_resp = client.post('/api/jobs/',
         json={'type': 'vision_match', 'metadata': {}}
