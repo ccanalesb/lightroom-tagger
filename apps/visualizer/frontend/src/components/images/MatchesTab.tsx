@@ -20,7 +20,7 @@ function pickInitialMatch(group: MatchGroup): Match | undefined {
 }
 
 export function MatchesTab() {
-  const { matchGroups, fetchGroups, handleValidationChange, handleRejected } = useMatchGroups();
+  const { matchGroups, total, fetchGroups, handleValidationChange, handleRejected } = useMatchGroups();
   const [loading, setLoading] = useState(true);
   const [selectedGroup, setSelectedGroup] = useState<MatchGroup | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
@@ -28,7 +28,7 @@ export function MatchesTab() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void fetchGroups(100).finally(() => {
+    void fetchGroups(100, 0).finally(() => {
       if (!cancelled) setLoading(false);
     });
     return () => {
@@ -106,6 +106,13 @@ export function MatchesTab() {
               </CardContent>
             </Card>
           ))}
+          {matchGroups.length < total ? (
+            <div className="flex justify-center pt-2">
+              <Button type="button" variant="secondary" onClick={() => fetchGroups(50, matchGroups.length)}>
+                Load more
+              </Button>
+            </div>
+          ) : null}
         </div>
       )}
 

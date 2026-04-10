@@ -6,10 +6,21 @@ export function useMatchGroups() {
   const [matchGroups, setMatchGroups] = useState<MatchGroup[]>([]);
   const [total, setTotal] = useState(0);
 
-  const fetchGroups = useCallback(async (limit = 100) => {
-    const data = await MatchingAPI.list(limit);
-    setMatchGroups(data.match_groups ?? []);
-    setTotal(data.total_groups ?? data.total);
+  const fetchGroups = useCallback(async (limit = 100, offset = 0) => {
+    const data = await MatchingAPI.list(limit, offset);
+    if (offset === 0) {
+      setMatchGroups(data.match_groups ?? []);
+      setTotal(data.total_groups ?? data.total);
+    } else {
+      setMatchGroups((prev) => {
+        const keys = new Set(prev.map((g) => g.instagram_key));
+        const next = [...prev];
+        for (const g of data.match_groups ?? []) {
+          if (!keys.has(g.instagram_key)) next.push(g);
+        }
+        return next;
+      });
+    }
   }, []);
 
   const handleValidationChange = useCallback((match: Match, validated: boolean) => {
