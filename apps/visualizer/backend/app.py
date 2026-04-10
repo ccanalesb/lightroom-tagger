@@ -97,7 +97,12 @@ def _recover_orphaned_jobs(db):
     for job in get_active_jobs(db):
         if job['status'] == 'running':
             update_job_status(db, job['id'], 'failed')
-            add_job_log(db, job['id'], 'error', 'Job interrupted by server restart')
+            add_job_log(
+                db,
+                job['id'],
+                'error',
+                'This job was still running when the server restarted. It was marked failed; use Retry if you want to run it again.',
+            )
             print(f"Recovered orphaned job {job['id']}: marked as failed")
 
 
