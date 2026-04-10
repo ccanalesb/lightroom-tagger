@@ -15,7 +15,7 @@ class TestConfig(unittest.TestCase):
         )
         self.assertEqual(config.catalog_path, "/test/catalog.lrcat")
         self.assertEqual(config.db_path, "/test/db.json")
-        self.assertEqual(config.mount_point, "/mnt/nas")
+        self.assertEqual(config.mount_point, "")
         self.assertEqual(config.workers, 4)
         self.assertEqual(config.instagram_keyword, "Posted")
         self.assertEqual(config.hash_threshold, 5)
@@ -66,6 +66,14 @@ class TestLoadConfig(unittest.TestCase):
         config = load_config("config.yaml")
         self.assertEqual(config.catalog_path, "/file/catalog")
         self.assertEqual(config.db_path, "/file/db")
+
+    @patch("lightroom_tagger.core.config.open", new_callable=mock_open, read_data="")
+    @patch("lightroom_tagger.core.config.Path.exists", return_value=False)
+    @patch.dict("os.environ", {"INSTAGRAM_DUMP_PATH": "/env/instagram-dump"}, clear=True)
+    def test_load_config_instagram_dump_path_from_env(self, mock_exists, mock_file):
+        """INSTAGRAM_DUMP_PATH in the environment is mapped to Config.instagram_dump_path."""
+        config = load_config("nonexistent.yaml")
+        self.assertEqual(config.instagram_dump_path, "/env/instagram-dump")
 
 
 if __name__ == "__main__":

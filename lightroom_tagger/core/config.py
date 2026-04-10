@@ -12,13 +12,14 @@ load_dotenv()
 class Config:
     catalog_path: str = ""
     db_path: str = ""
-    mount_point: str = "/mnt/nas"
+    mount_point: str = ""
     workers: int = 4
     ai_model: str = "claude-3-5-sonnet-20241022"
     skip_ai: bool = False
     verbose: bool = False
-    instagram_url: str = "https://www.instagram.com/im.canales"
+    instagram_url: str = ""
     instagram_keyword: str = "Posted"
+    instagram_dump_path: str = ""
     hash_threshold: int = 5
     small_catalog_path: str = ""
     cloudflare_account_id: str = ""
@@ -79,13 +80,14 @@ def load_config(config_path: str = "config.yaml") -> Config:
     data = _load_from_env(data)
 
     defaults = {
-        "mount_point": "/mnt/nas",
+        "mount_point": "",
         "workers": 4,
         "ai_model": "claude-3-5-sonnet-20241022",
         "skip_ai": False,
         "verbose": False,
-        "instagram_url": "https://www.instagram.com/im.canales",
+        "instagram_url": "",
         "instagram_keyword": "Posted",
+        "instagram_dump_path": "",
         "hash_threshold": 5,
         "cloudflare_account_id": "",
         "cloudflare_api_token": "",
@@ -147,6 +149,7 @@ def _load_from_env(data: dict) -> dict:
         "LIGHTRoom_VERBOSE": "verbose",
         "LIGHTRoom_INSTAGRAM_URL": "instagram_url",
         "LIGHTRoom_INSTAGRAM_KEYWORD": "instagram_keyword",
+        "INSTAGRAM_DUMP_PATH": "instagram_dump_path",
         "LIGHTRoom_HASH_THRESHOLD": "hash_threshold",
         "CLOUDFLARE_ACCOUNT_ID": "cloudflare_account_id",
         "CLOUDFLARE_API_TOKEN": "cloudflare_api_token",
