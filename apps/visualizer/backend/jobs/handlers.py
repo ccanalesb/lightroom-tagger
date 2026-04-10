@@ -145,7 +145,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                     log_callback('warning', f'Lightroom catalog path not configured — {len(matches)} match(es) found but NOT written to catalog. Set CATALOG_PATH in .env to enable.')
 
             runner.update_progress(job_id, 100, 'Complete')
-            runner.complete_job(job_id, {
+            result_payload = {
                 'processed': stats['processed'],
                 'matched': stats['matched'],
                 'skipped': stats['skipped'],
@@ -158,7 +158,11 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 'weights': custom_weights,
                 **({"provider_id": provider_id} if provider_id else {}),
                 **({"provider_model": provider_model} if provider_model else {}),
-            })
+            }
+            if matches:
+                best_score = max(float(m.get('total_score') or 0) for m in matches)
+                result_payload['best_score'] = best_score
+            runner.complete_job(job_id, result_payload)
 
         finally:
             db.close()
