@@ -21,6 +21,8 @@
 |--------|---------|
 | `0ea9d0c` | docs(02-03): add plan execution summary |
 | `6e0011a` | chore(02-03): advance STATE and mark plan done in ROADMAP |
+| `bb34540` | docs(02-03): note metadata commits in summary |
+| `b5c2474` | fix(02-03): read PRAGMA table_info name from dict rows |
 
 ## Implementation notes
 
