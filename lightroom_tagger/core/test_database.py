@@ -191,6 +191,43 @@ class TestDatabase(unittest.TestCase):
         row = self.db.execute("SELECT key FROM images").fetchone()
         self.assertEqual(row["key"], "2024-01-15_photo.jpg")
 
+    def test_migrate_unified_image_keys_merges_collisions(self):
+        """Duplicate rows with different timestamp precision merge instead of crashing."""
+        self.db.execute("PRAGMA user_version = 0")
+        self.db.execute(
+            "INSERT INTO images (key, id, filename, filepath, date_taken, rating) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            ("2020-12-31T22:24:31__DSF2158", "100", "_DSF2158", "/path/a", "2020-12-31T22:24:31", 3),
+        )
+        self.db.execute(
+            "INSERT INTO images (key, id, filename, filepath, date_taken, rating) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            ("2020-12-31T22:24:31.000__DSF2158", "100", "_DSF2158", "/path/a", "2020-12-31T22:24:31.000", 0),
+        )
+        self.db.commit()
+
+        # Store a match referencing the loser key to verify remap
+        self.db.execute(
+            "INSERT INTO matches (catalog_key, insta_key, total_score) VALUES (?, ?, ?)",
+            ("2020-12-31T22:24:31.000__DSF2158", "insta_abc", 0.9),
+        )
+        self.db.commit()
+
+        migrate_unified_image_keys(self.db)
+        self.db.commit()
+
+        rows = self.db.execute("SELECT key FROM images").fetchall()
+        self.assertEqual(len(rows), 1, "Collision should leave exactly one row")
+        self.assertEqual(rows[0]["key"], "2020-12-31__DSF2158")
+
+        match = self.db.execute(
+            "SELECT catalog_key FROM matches WHERE insta_key = 'insta_abc'"
+        ).fetchone()
+        self.assertIsNotNone(match)
+        survivor_key = rows[0]["key"]
+        self.assertIn(survivor_key, match["catalog_key"],
+                       "Dependent match row should be remapped to survivor key")
+
 
 class TestQueryCatalogImages(unittest.TestCase):
     """Tests for query_catalog_images."""

@@ -357,20 +357,48 @@ def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
             )
 
     rows = conn.execute("SELECT * FROM images").fetchall()
-    by_new_key: dict[str, list[str]] = {}
+    by_new_key: dict[str, list[dict]] = {}
     for row in rows:
         new_key = generate_key(row)
-        by_new_key.setdefault(new_key, []).append(row["key"])
-    for new_key, old_keys in by_new_key.items():
-        if len(old_keys) > 1:
-            raise RuntimeError(
-                "migrate_unified_image_keys: key collision "
-                f"for unified key {new_key!r}: existing keys {old_keys!r}"
+        by_new_key.setdefault(new_key, []).append(row)
+
+    # Resolve collisions: multiple old keys map to the same unified key.
+    # Keep the row with the most data (non-null columns), delete the rest,
+    # and remap their dependent-table references to the survivor.
+    duplicates_to_delete: list[str] = []
+    for new_key, colliding_rows in by_new_key.items():
+        if len(colliding_rows) <= 1:
+            continue
+        def _non_null_count(r: dict) -> int:
+            return sum(1 for v in r.values() if v is not None and v != "" and v != 0)
+        colliding_rows.sort(key=_non_null_count, reverse=True)
+        survivor = colliding_rows[0]
+        for loser in colliding_rows[1:]:
+            loser_key = loser["key"]
+            survivor_key = survivor["key"]
+            for stmt in (
+                "UPDATE matches SET catalog_key = ? WHERE catalog_key = ?",
+                "UPDATE rejected_matches SET catalog_key = ? WHERE catalog_key = ?",
+                "UPDATE vision_cache SET key = ? WHERE key = ?",
+                "UPDATE vision_comparisons SET catalog_key = ? WHERE catalog_key = ?",
+                "UPDATE image_descriptions SET image_key = ? WHERE image_key = ? AND image_type = 'catalog'",
+                "UPDATE instagram_dump_media SET matched_catalog_key = ? WHERE matched_catalog_key = ?",
+            ):
+                conn.execute(stmt, (survivor_key, loser_key))
+            duplicates_to_delete.append(loser_key)
+            print(
+                f"migrate_unified_image_keys: merged duplicate "
+                f"{loser_key!r} into {survivor_key!r} (unified: {new_key!r})"
             )
+
+    for dup_key in duplicates_to_delete:
+        conn.execute("DELETE FROM images WHERE key = ?", (dup_key,))
 
     remaps: list[tuple[str, str]] = []
     for row in rows:
         old_key = row["key"]
+        if old_key in duplicates_to_delete:
+            continue
         new_key = generate_key(row)
         if old_key != new_key:
             remaps.append((old_key, new_key))
