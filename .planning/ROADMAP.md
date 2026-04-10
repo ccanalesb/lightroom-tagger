@@ -83,7 +83,7 @@
 |------|--------|--------|
 | 03-01 | Matches API dump-media thumbnails and vision_match single-image result score | **Done** (2026-04-10) |
 | 03-02 | Lightroom keyword from config.instagram_keyword (auto-tag unchanged) | **Done** (2026-04-10) |
-| 03-03 | Instagram dump path in config + instagram_import job handler | Pending |
+| 03-03 | Instagram dump path in config + instagram_import job handler | **Done** (2026-04-10) |
 | 03-04 | Frontend: configure dump path and Run Import job | Pending |
 | 03-05 | Ship Matches tab with MatchDetailModal and useMatchGroups | Pending |
 | 03-06 | Posted visibility end-to-end and catalog API regression | Pending |
