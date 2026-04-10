@@ -4,6 +4,7 @@
 import logging
 import os
 import sys
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 from pathlib import Path
@@ -41,7 +42,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      force_reprocess: bool = False,
                      provider_id: str | None = None,
                      provider_model: str | None = None,
-                     max_workers: int = 1) -> tuple:
+                     max_workers: int = 1,
+                     *, should_cancel: Callable[[], bool] | None = None) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -59,6 +61,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         log_callback: Optional callback(level, message) for detailed logging
         weights: Optional dict with 'phash', 'description', 'vision' keys for scoring weights
         force_descriptions: If True, regenerate descriptions even when one exists
+        should_cancel: If set, called before each item; return True to stop early
 
     Returns:
         Tuple of (stats dict, matches list)
@@ -109,6 +112,10 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
     rejected = get_rejected_pairs(db)
 
     for idx, dump_media in enumerate(unprocessed, 1):
+        if should_cancel is not None and should_cancel():
+            if log_callback:
+                log_callback('info', 'Matching stopped: cancel requested')
+            return stats, matches_found
         stats['processed'] += 1
         media_key = dump_media['media_key']
 
