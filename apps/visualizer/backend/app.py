@@ -128,7 +128,10 @@ def _job_processor():
                     continue
 
                 # Mark as running
-                runner.start_job(job_id, job_type, metadata)
+                started = runner.start_job(job_id, job_type, metadata)
+                if not started:
+                    socketio.emit('job_updated', get_job(db, job_id)) if socketio else None
+                    continue
                 socketio.emit('job_updated', get_job(db, job_id)) if socketio else None
 
                 # Execute handler
