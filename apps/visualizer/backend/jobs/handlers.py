@@ -9,6 +9,7 @@ from database import add_job_log, update_job_field
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import init_database
 from lightroom_tagger.core.provider_errors import AuthenticationError, InvalidRequestError
+from lightroom_tagger.scripts.import_instagram_dump import import_dump
 from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
 
 from . import path_setup as _path_setup  # noqa: F401
@@ -28,6 +29,71 @@ def handle_analyze_instagram(runner, job_id: str, metadata: dict):
     """Analyze Instagram images."""
     runner.update_progress(job_id, 50, 'Analyzing images...')
     runner.complete_job(job_id, {'images_processed': 0})
+
+
+def handle_instagram_import(runner, job_id: str, metadata: dict):
+    """Import Instagram export dump media into the library database."""
+    add_job_log(runner.db, job_id, 'info', 'Starting Instagram dump import...')
+    runner.update_progress(job_id, 10, 'Importing Instagram dump...')
+
+    try:
+        config = load_config()
+        raw = (
+            metadata.get('dump_path')
+            or config.instagram_dump_path
+            or os.getenv('INSTAGRAM_DUMP_PATH')
+            or ''
+        )
+        stripped = str(raw).strip()
+        if not stripped:
+            runner.fail_job(
+                job_id,
+                'Instagram dump path not configured or not a directory',
+                severity='warning',
+            )
+            return
+        dump_path = Path(stripped).expanduser()
+        if not os.path.isdir(dump_path):
+            runner.fail_job(
+                job_id,
+                'Instagram dump path not configured or not a directory',
+                severity='warning',
+            )
+            return
+
+        db_path = os.getenv('LIBRARY_DB')
+        if not db_path:
+            db_path = config.db_path or 'library.db'
+        if not os.path.exists(db_path):
+            raise FileNotFoundError(f"Database not found at: {db_path}")
+
+        skip_dedup = bool(metadata.get('skip_dedup', False))
+        reimport = bool(metadata.get('reimport', False))
+
+        db = init_database(db_path)
+        try:
+            imported = import_dump(
+                db,
+                str(dump_path),
+                skip_existing=not reimport,
+                skip_dedup=skip_dedup,
+            )
+        finally:
+            db.close()
+
+        runner.update_progress(job_id, 100, 'Complete')
+        runner.complete_job(
+            job_id,
+            {
+                'imported': imported,
+                'dump_path': str(dump_path),
+                'reimport': reimport,
+                'skip_dedup': skip_dedup,
+            },
+        )
+    except Exception as e:
+        severity = _failure_severity_from_exception(e)
+        runner.fail_job(job_id, str(e), severity=severity)
 
 
 def handle_vision_match(runner, job_id: str, metadata: dict):
@@ -653,6 +719,7 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
 
 JOB_HANDLERS = {
     'analyze_instagram': handle_analyze_instagram,
+    'instagram_import': handle_instagram_import,
     'vision_match': handle_vision_match,
     'enrich_catalog': handle_enrich_catalog,
     'prepare_catalog': handle_prepare_catalog,
