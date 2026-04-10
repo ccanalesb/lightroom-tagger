@@ -42,12 +42,16 @@ def init_db(db_path: str) -> sqlite3.Connection:
             logs TEXT DEFAULT '[]',
             result TEXT,
             error TEXT,
+            error_severity TEXT,
             created_at TEXT NOT NULL,
             started_at TEXT,
             completed_at TEXT,
             metadata TEXT DEFAULT '{}'
         )
     """)
+    pragma_info = conn.execute("PRAGMA table_info(jobs)").fetchall()
+    if not any(row[1] == "error_severity" for row in pragma_info):
+        conn.execute("ALTER TABLE jobs ADD COLUMN error_severity TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_type ON jobs(type)")
     conn.execute("""
@@ -61,6 +65,15 @@ def init_db(db_path: str) -> sqlite3.Connection:
     """)
     conn.commit()
     return conn
+
+
+def clear_job_failure_details(db: sqlite3.Connection, job_id: str) -> None:
+    """Clear persisted failure message and severity for a job."""
+    db.execute(
+        "UPDATE jobs SET error = NULL, error_severity = NULL WHERE id = ?",
+        (job_id,),
+    )
+    db.commit()
 
 
 def create_job(db: sqlite3.Connection, job_type: str, metadata: dict) -> str:
