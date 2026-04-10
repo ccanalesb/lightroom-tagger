@@ -68,3 +68,41 @@ def test_single_match_still_grouped():
         assert data['match_groups'][0]['candidate_count'] == 1
         assert data['total_matches'] == 1
         assert len(data['matches']) == 1
+
+
+def test_matches_include_instagram_image_from_dump_only():
+    """Dump-backed insta_key has instagram_image when row exists only in instagram_dump_media."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, 'test.db')
+        db = init_database(db_path)
+        db.execute(
+            "INSERT INTO images (key, filename, filepath, date_taken) VALUES (?, ?, ?, ?)",
+            ('2024-01-10_cat.jpg', 'cat.jpg', '/fake/cat.jpg', '2024-01-10'),
+        )
+        db.execute(
+            "INSERT INTO instagram_dump_media (media_key, file_path, date_folder, filename, processed) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ('202603/ig_dump_only', '/tmp/fake/posts/x.jpg', '202603', 'x.jpg', 0),
+        )
+        db.execute(
+            "INSERT INTO matches (catalog_key, insta_key, phash_distance, phash_score, desc_similarity, "
+            "vision_result, vision_score, total_score, rank) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ('2024-01-10_cat.jpg', '202603/ig_dump_only', 0, 0.0, 0.0, 'SAME', 0.0, 0.9, 1),
+        )
+        db.commit()
+        db.close()
+
+        client = _make_client(db_path)
+        resp = client.get('/api/images/matches?limit=50&offset=0')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        keys_seen = []
+        for g in data['match_groups']:
+            ig = g.get('instagram_image')
+            if ig:
+                keys_seen.append(ig.get('key'))
+        for m in data.get('matches', []):
+            ig = m.get('instagram_image')
+            if ig:
+                keys_seen.append(ig.get('key'))
+        assert '202603/ig_dump_only' in keys_seen
