@@ -60,6 +60,19 @@ export const ConfigAPI = {
       method: 'PUT',
       body: JSON.stringify({ catalog_path: catalogPath }),
     }),
+
+  getInstagramDump: () =>
+    request<{
+      instagram_dump_path: string
+      resolved_path: string
+      exists: boolean
+    }>('/config/instagram-dump'),
+
+  putInstagramDump: (instagramDumpPath: string) =>
+    request<{ instagram_dump_path: string; ok: boolean }>('/config/instagram-dump', {
+      method: 'PUT',
+      body: JSON.stringify({ instagram_dump_path: instagramDumpPath }),
+    }),
 }
 
 export const SystemAPI = {
