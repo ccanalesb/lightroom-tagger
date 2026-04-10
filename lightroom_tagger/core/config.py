@@ -138,6 +138,32 @@ def update_config_yaml_catalog_path(config_file: str, catalog_path: str) -> None
         )
 
 
+def update_config_yaml_instagram_dump_path(config_file: str, instagram_dump_path: str) -> None:
+    """Write ``instagram_dump_path`` into ``config_file`` YAML, preserving other keys."""
+    path = Path(config_file)
+    stripped = instagram_dump_path.strip()
+    if not stripped:
+        raise ValueError("instagram_dump_path must be non-empty")
+
+    if path.exists():
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        data = {}
+
+    data["instagram_dump_path"] = stripped
+
+    with open(path, "w") as stream:
+        yaml.safe_dump(
+            data,
+            stream,
+            default_flow_style=False,
+            sort_keys=False,
+            allow_unicode=True,
+        )
+
+
 def _load_from_env(data: dict) -> dict:
     env_mappings = {
         "LIGHTRoom_CATALOG": "catalog_path",
