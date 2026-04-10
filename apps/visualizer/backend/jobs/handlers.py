@@ -214,6 +214,9 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
         runner.update_progress(job_id, 20, f'Found {total} images to enrich')
 
         for i, record in enumerate(catalog_images):
+            if runner.is_cancelled(job_id):
+                runner.finalize_cancelled(job_id)
+                return
             try:
                 key = record.get('key')
                 filepath = record.get('filepath')
