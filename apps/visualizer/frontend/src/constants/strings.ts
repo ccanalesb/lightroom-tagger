@@ -49,7 +49,7 @@ export const LABEL_CATALOG_MATCH = 'Catalog Match'
 
 // Status Display
 export const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
+  pending: 'Queued',
   running: 'Running',
   completed: 'Completed',
   failed: 'Failed',
