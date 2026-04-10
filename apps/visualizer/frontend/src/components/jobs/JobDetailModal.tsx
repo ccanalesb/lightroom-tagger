@@ -14,6 +14,7 @@ import {
   JOB_DETAILS_RESULT,
   JOB_DETAILS_TITLE,
   MODAL_CLOSE,
+  STATUS_LABELS,
 } from '../../constants/strings';
 import { JobsAPI } from '../../services/api';
 import { useSocketStore } from '../../stores/socketStore';
@@ -158,7 +159,9 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
               <div>
                 <span className="text-text-secondary">Status:</span>
                 <div className="mt-1">
-                  <Badge variant={statusToBadgeVariant(displayJob.status)}>{displayJob.status}</Badge>
+                  <Badge variant={statusToBadgeVariant(displayJob.status)}>
+                    {STATUS_LABELS[displayJob.status] ?? displayJob.status}
+                  </Badge>
                 </div>
               </div>
               <div>
