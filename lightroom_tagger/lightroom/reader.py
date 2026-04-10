@@ -8,7 +8,14 @@ from lightroom_tagger.core.config import load_config
 
 
 def connect_catalog(catalog_path: str) -> sqlite3.Connection:
-    """Connect to Lightroom catalog.
+    """Connect to Lightroom catalog for reading.
+
+    By default opens the catalog with a SQLite URI and ``mode=ro`` so browsing
+    and scans cannot mutate the database. Set ``LIGHTRoom_CATALOG_READONLY_URI=0``
+    to use a plain path connection (legacy / troubleshooting).
+
+    **Writes to the catalog must use** ``lightroom_tagger/lightroom/writer.py``
+    **(or other documented write tools), not this function.**
 
     Lightroom catalogs use SQLite WAL. On SMB/NAS (and some remote filesystems),
     the default WAL path uses shared-memory helpers that often fail with
@@ -23,7 +30,13 @@ def connect_catalog(catalog_path: str) -> sqlite3.Connection:
     testing). Close Lightroom before long scans if you see ``database is locked``:
     exclusive mode conflicts with another process holding the catalog open.
     """
-    conn = sqlite3.connect(catalog_path, timeout=30.0)
+    readonly_uri = os.getenv("LIGHTRoom_CATALOG_READONLY_URI")
+    if readonly_uri != "0":
+        path_obj = Path(catalog_path).expanduser().resolve()
+        db_uri = path_obj.as_uri() + "?mode=ro"
+        conn = sqlite3.connect(db_uri, uri=True, timeout=30.0)
+    else:
+        conn = sqlite3.connect(catalog_path, timeout=30.0)
     if os.getenv("LIGHTRoom_CATALOG_LOCKING_MODE", "EXCLUSIVE").upper() == "EXCLUSIVE":
         conn.execute("PRAGMA locking_mode=EXCLUSIVE")
     conn.row_factory = sqlite3.Row
