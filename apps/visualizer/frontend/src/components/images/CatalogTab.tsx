@@ -50,6 +50,7 @@ export function CatalogTab() {
       const offset = (page - 1) * LIMIT;
       const kw = debouncedKeyword.trim();
       const cl = debouncedColorLabel.trim();
+      // IG-06: posted filter (images.instagram_posted) -> GET /api/images/catalog?posted=
       const data = await ImagesAPI.listCatalog({
         ...(postedFilter !== undefined ? { posted: postedFilter } : {}),
         ...(monthFilter ? { month: monthFilter } : {}),
