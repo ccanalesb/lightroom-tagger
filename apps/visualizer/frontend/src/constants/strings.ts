@@ -17,6 +17,8 @@ export const NAV_JOB_QUEUE = 'Job Queue'
 export const TAB_INSTAGRAM = 'Instagram'
 export const TAB_CATALOG = 'Catalog'
 export const TAB_MATCHES = 'Matches'
+export const MATCHES_TAB_EMPTY =
+  'No proposed matches yet. Run vision matching from Processing.'
 export const TAB_VISION_MATCHING = 'Vision Matching'
 export const TAB_DESCRIPTIONS = 'Descriptions'
 export const TAB_CATALOG_CACHE = 'Catalog Cache'
