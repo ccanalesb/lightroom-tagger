@@ -12,7 +12,9 @@ Know which catalog images are posted on Instagram and get artistic critique that
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] Register and browse Lightroom catalog safely with read-only enforcement (Validated in Phase 1: Catalog Management)
+- [x] Paginate and filter catalog photos by keyword, rating, date range, color label (Validated in Phase 1: Catalog Management)
+- [x] Stable photo identity across sessions via unified composite keys (Validated in Phase 1: Catalog Management)
 
 ### Active
 
@@ -41,7 +43,9 @@ Know which catalog images are posted on Instagram and get artistic critique that
 The user is a photographer managing work across multiple Lightroom catalogs (personal portfolio, client work like weddings, etc.). They post selectively to Instagram and want to understand both sides of their practice: what they publish vs what stays in the catalog.
 
 ### Current State
-- Existing Lightroom catalogs with substantial photo collections
+- Phase 1 complete — catalog browsing, filtering, and registration working via visualizer UI
+- Read-only catalog enforcement via SQLite URI `mode=ro` prevents accidental writes
+- Library DB keys unified with `YYYY-MM-DD_filename` format, migration with backup
 - Instagram presence with analytics data available via export dumps
 - Testing phase using cheap AI models (Ollama local/cloud)
 - Need to identify posting patterns and improve artistic decision-making
@@ -89,4 +93,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-10 after initialization*
+*Last updated: 2026-04-10 after Phase 1 completion*
