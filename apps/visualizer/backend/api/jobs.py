@@ -75,6 +75,11 @@ def retry_job(job_id):
 
     update_job_status(current_app.db, job_id, 'pending', progress=0, current_step=None)
     update_job_field(current_app.db, job_id, 'error', None)
+    current_app.db.execute(
+        "UPDATE jobs SET error_severity = NULL WHERE id = ?",
+        (job_id,),
+    )
+    current_app.db.commit()
     update_job_field(current_app.db, job_id, 'result', None)
     add_job_log(current_app.db, job_id, 'info', 'Job queued for retry')
 
