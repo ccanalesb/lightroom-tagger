@@ -86,34 +86,36 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CAT-01 | TBD | Pending |
-| CAT-02 | TBD | Pending |
-| CAT-03 | TBD | Pending |
-| CAT-04 | TBD | Pending |
-| CAT-05 | TBD | Pending |
-| IG-01 | TBD | Pending |
-| IG-02 | TBD | Pending |
-| IG-03 | TBD | Pending |
-| IG-04 | TBD | Pending |
-| IG-05 | TBD | Pending |
-| IG-06 | TBD | Pending |
-| AI-01 | TBD | Pending |
-| AI-02 | TBD | Pending |
-| AI-03 | TBD | Pending |
-| AI-04 | TBD | Pending |
-| AI-05 | TBD | Pending |
-| AI-06 | TBD | Pending |
-| SYS-01 | TBD | Pending |
-| SYS-02 | TBD | Pending |
-| SYS-03 | TBD | Pending |
-| SYS-04 | TBD | Pending |
-| SYS-05 | TBD | Pending |
+| CAT-01 | 1 · Catalog management | Pending |
+| CAT-02 | 1 · Catalog management | Pending |
+| CAT-03 | 1 · Catalog management | Pending |
+| CAT-04 | 1 · Catalog management | Pending |
+| CAT-05 | 1 · Catalog management | Pending |
+| SYS-01 | 2 · Jobs & system reliability | Pending |
+| SYS-02 | 2 · Jobs & system reliability | Pending |
+| SYS-03 | 2 · Jobs & system reliability | Pending |
+| SYS-04 | 2 · Jobs & system reliability | Pending |
+| SYS-05 | 2 · Jobs & system reliability | Pending |
+| IG-01 | 3 · Instagram sync | Pending |
+| IG-02 | 3 · Instagram sync | Pending |
+| IG-03 | 3 · Instagram sync | Pending |
+| IG-04 | 3 · Instagram sync | Pending |
+| IG-05 | 3 · Instagram sync | Pending |
+| IG-06 | 3 · Instagram sync | Pending |
+| AI-01 | 4 · AI analysis | Pending |
+| AI-02 | 4 · AI analysis | Pending |
+| AI-03 | 4 · AI analysis | Pending |
+| AI-04 | 4 · AI analysis | Pending |
+| AI-05 | 4 · AI analysis | Pending |
+| AI-06 | 4 · AI analysis | Pending |
 
 **Coverage:**
 - v1 requirements: 22 total
-- Mapped to phases: 0 (roadmap not yet created)
-- Unmapped: 22 ⚠️
+- Mapped to phases: 22
+- Unmapped: 0
+
+Roadmap: [.planning/ROADMAP.md](./ROADMAP.md)
 
 ---
 *Requirements defined: 2026-04-10*
-*Last updated: 2026-04-10 after initial definition*
+*Last updated: 2026-04-10 after roadmap creation*
