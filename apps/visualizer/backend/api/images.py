@@ -73,6 +73,82 @@ def _enrich_instagram_media(media_items, model_lookup=None, desc_lookup=None):
     return enriched
 
 
+def _canonical_path(path: str) -> str | None:
+    if not path or not str(path).strip():
+        return None
+    try:
+        return os.path.realpath(os.path.expanduser(str(path).strip()))
+    except OSError:
+        return None
+
+
+def _parent_dir_if_exists(path: str) -> str | None:
+    base = _canonical_path(path)
+    if not base:
+        return None
+    parent = os.path.dirname(base)
+    if parent and os.path.isdir(parent):
+        return parent
+    return None
+
+
+def _is_path_under_allowed_roots(file_path: str, roots: list[str]) -> bool:
+    if not file_path or not roots:
+        return False
+    try:
+        real_file = os.path.realpath(file_path)
+    except OSError:
+        return False
+    for root in roots:
+        if not root:
+            continue
+        if real_file == root:
+            return True
+        prefix = root + os.sep
+        if real_file.startswith(prefix):
+            return True
+    return False
+
+
+def _instagram_thumbnail_roots() -> list[str]:
+    from lightroom_tagger.core.config import load_config
+
+    cfg = load_config()
+    dump = (cfg.instagram_dump_path or "").strip()
+    if not dump:
+        return []
+    root = _canonical_path(dump)
+    if root and os.path.isdir(root):
+        return [root]
+    return []
+
+
+def _catalog_thumbnail_roots() -> list[str]:
+    from lightroom_tagger.core.config import load_config
+
+    cfg = load_config()
+    roots: list[str] = []
+    vc = _canonical_path(cfg.vision_cache_dir)
+    if vc:
+        roots.append(vc)
+    mp = (cfg.mount_point or "").strip()
+    if mp:
+        mp_real = _canonical_path(mp)
+        if mp_real and os.path.isdir(mp_real):
+            roots.append(mp_real)
+    for p in (cfg.catalog_path, cfg.small_catalog_path):
+        par = _parent_dir_if_exists(p)
+        if par and par not in roots:
+            roots.append(par)
+    seen: set[str] = set()
+    out: list[str] = []
+    for r in roots:
+        if r not in seen:
+            seen.add(r)
+            out.append(r)
+    return out
+
+
 def _extract_source_folder(file_path):
     """Extract source folder (posts, archived_posts) from file path."""
     if '/media/' in file_path:
@@ -193,6 +269,12 @@ def get_instagram_thumbnail(db, image_key):
         if not local_path or not os.path.exists(local_path):
             return error_not_found('file')
 
+        allowed_insta = _instagram_thumbnail_roots()
+        if not allowed_insta or not _is_path_under_allowed_roots(
+            local_path, allowed_insta
+        ):
+            return error_not_found('file')
+
         return send_file(local_path, mimetype='image/jpeg')
     except Exception as e:
         return error_server_error(str(e))
@@ -212,6 +294,7 @@ def get_catalog_thumbnail(db, image_key):
             return error_not_found('image')
 
         image = images[0]
+        allowed_cat = _catalog_thumbnail_roots()
 
         # Check vision cache first
         cached = db.execute(
@@ -219,7 +302,10 @@ def get_catalog_thumbnail(db, image_key):
             (image_key,),
         ).fetchone()
         if cached and cached.get('compressed_path') and os.path.exists(cached['compressed_path']):
-            return send_file(cached['compressed_path'], mimetype='image/jpeg')
+            cp = cached['compressed_path']
+            if not _is_path_under_allowed_roots(cp, allowed_cat):
+                return error_not_found('file')
+            return send_file(cp, mimetype='image/jpeg')
 
         # Resolve original path
         from lightroom_tagger.core.path_utils import resolve_catalog_path
@@ -228,11 +314,16 @@ def get_catalog_thumbnail(db, image_key):
         if not filepath or not os.path.exists(filepath):
             return error_not_found('file')
 
+        if not _is_path_under_allowed_roots(filepath, allowed_cat):
+            return error_not_found('file')
+
         # Generate cache on-the-fly for missing thumbnails
         try:
             from lightroom_tagger.core.vision_cache import get_or_create_cached_image
             cached_path = get_or_create_cached_image(db, image_key, filepath)
             if cached_path and os.path.exists(cached_path):
+                if not _is_path_under_allowed_roots(cached_path, allowed_cat):
+                    return error_not_found('file')
                 return send_file(cached_path, mimetype='image/jpeg')
         except Exception as cache_err:
             # If cache generation fails, log but don't break the request
