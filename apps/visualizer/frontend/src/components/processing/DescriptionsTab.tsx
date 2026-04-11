@@ -27,6 +27,7 @@ export function DescriptionsTab() {
   const { options, updateOption } = useMatchOptions();
   const [imageType, setImageType] = useState<ImageType>('both');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [batchMinRating, setBatchMinRating] = useState<number | null>(null);
   const [force, setForce] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
@@ -41,6 +42,7 @@ export function DescriptionsTab() {
         max_workers: options.maxWorkers,
       };
 
+      if (batchMinRating !== null) metadata.min_rating = batchMinRating;
       if (options.providerId) metadata.provider_id = options.providerId;
       if (options.providerModel) metadata.provider_model = options.providerModel;
 
@@ -51,7 +53,7 @@ export function DescriptionsTab() {
     } finally {
       setIsStarting(false);
     }
-  }, [imageType, dateFilter, force, options]);
+  }, [imageType, dateFilter, batchMinRating, force, options]);
 
   return (
     <div>
@@ -98,6 +100,30 @@ export function DescriptionsTab() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-text mb-2">
+                Minimum rating (catalog)
+              </label>
+              <select
+                value={batchMinRating === null ? '' : String(batchMinRating)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setBatchMinRating(v === '' ? null : Number(v));
+                }}
+                className="w-full px-3 py-2 rounded-base border border-border bg-bg text-text focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all"
+              >
+                <option value="">Any</option>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <option key={n} value={n}>
+                    {n}+ stars
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1.5 text-xs text-text-secondary">
+                Applies to catalog (and both); Instagram-only batches ignore this filter.
+              </p>
             </div>
 
             <div className="flex items-center space-x-2">
