@@ -9,37 +9,37 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Catalog Management
 
-- [ ] **CAT-01**: User can register a Lightroom catalog (.lrcat file)
-- [ ] **CAT-02**: User can browse photos from the catalog with pagination
-- [ ] **CAT-03**: User can search/filter photos by basic criteria
-- [ ] **CAT-04**: System maintains stable photo identity across sessions
-- [ ] **CAT-05**: System reads catalog safely without corruption risk
+- [x] **CAT-01**: User can register a Lightroom catalog (.lrcat file)
+- [x] **CAT-02**: User can browse photos from the catalog with pagination
+- [x] **CAT-03**: User can search/filter photos by basic criteria
+- [x] **CAT-04**: System maintains stable photo identity across sessions
+- [x] **CAT-05**: System reads catalog safely without corruption risk
 
 ### Instagram Sync
 
-- [ ] **IG-01**: User can upload Instagram export dump
-- [ ] **IG-02**: System parses images and metadata from dump
-- [ ] **IG-03**: System matches dump images to catalog photos with confidence scores
-- [ ] **IG-04**: User can confirm or reject proposed matches
-- [ ] **IG-05**: System writes "posted" keyword to confirmed matches in Lightroom catalog
-- [ ] **IG-06**: User can see which catalog photos are marked as posted
+- [x] **IG-01**: User can upload Instagram export dump
+- [x] **IG-02**: System parses images and metadata from dump
+- [x] **IG-03**: System matches dump images to catalog photos with confidence scores
+- [x] **IG-04**: User can confirm or reject proposed matches
+- [x] **IG-05**: System writes "posted" keyword to confirmed matches in Lightroom catalog
+- [x] **IG-06**: User can see which catalog photos are marked as posted
 
 ### AI Analysis
 
 - [x] **AI-01**: User can configure AI provider (Ollama, OpenAI, etc.)
-- [ ] **AI-02**: User can trigger on-demand description for a single photo
+- [x] **AI-02**: User can trigger on-demand description for a single photo
 - [x] **AI-03**: User can trigger batch description for selected photos or timeframe
 - [x] **AI-04**: System stores AI descriptions with source photo
-- [ ] **AI-05**: User can view AI descriptions alongside photos
+- [x] **AI-05**: User can view AI descriptions alongside photos
 - [x] **AI-06**: System tracks which photos have been analyzed
 
 ### Jobs & System
 
-- [ ] **SYS-01**: User can see job status (queued, running, complete, failed)
-- [ ] **SYS-02**: User can cancel running jobs
-- [ ] **SYS-03**: System backs up catalog before any write operation
-- [ ] **SYS-04**: User receives clear error messages when operations fail
-- [ ] **SYS-05**: System prevents writes when Lightroom has catalog open
+- [x] **SYS-01**: User can see job status (queued, running, complete, failed)
+- [x] **SYS-02**: User can cancel running jobs
+- [x] **SYS-03**: System backs up catalog before any write operation
+- [x] **SYS-04**: User receives clear error messages when operations fail
+- [x] **SYS-05**: System prevents writes when Lightroom has catalog open
 
 ## v2 Requirements
 
@@ -86,36 +86,36 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CAT-01 | 1 · Catalog management | Pending |
-| CAT-02 | 1 · Catalog management | Pending |
-| CAT-03 | 1 · Catalog management | Pending |
-| CAT-04 | 1 · Catalog management | Pending |
-| CAT-05 | 1 · Catalog management | Pending |
-| SYS-01 | 2 · Jobs & system reliability | Pending |
-| SYS-02 | 2 · Jobs & system reliability | Pending |
-| SYS-03 | 2 · Jobs & system reliability | Pending |
-| SYS-04 | 2 · Jobs & system reliability | Pending |
-| SYS-05 | 2 · Jobs & system reliability | Pending |
-| IG-01 | 3 · Instagram sync | Pending |
-| IG-02 | 3 · Instagram sync | Pending |
-| IG-03 | 3 · Instagram sync | Pending |
-| IG-04 | 3 · Instagram sync | Pending |
-| IG-05 | 3 · Instagram sync | Pending |
-| IG-06 | 3 · Instagram sync | Pending |
+| CAT-01 | 1 · Catalog management | Complete |
+| CAT-02 | 1 · Catalog management | Complete |
+| CAT-03 | 1 · Catalog management | Complete |
+| CAT-04 | 1 · Catalog management | Complete |
+| CAT-05 | 1 · Catalog management | Complete |
+| SYS-01 | 2 · Jobs & system reliability | Complete |
+| SYS-02 | 2 · Jobs & system reliability | Complete |
+| SYS-03 | 2 · Jobs & system reliability | Complete |
+| SYS-04 | 2 · Jobs & system reliability | Complete |
+| SYS-05 | 2 · Jobs & system reliability | Complete |
+| IG-01 | 3 · Instagram sync | Complete |
+| IG-02 | 3 · Instagram sync | Complete |
+| IG-03 | 3 · Instagram sync | Complete |
+| IG-04 | 3 · Instagram sync | Complete |
+| IG-05 | 3 · Instagram sync | Complete |
+| IG-06 | 3 · Instagram sync | Complete |
 | AI-01 | 4 · AI analysis | Complete |
-| AI-02 | 4 · AI analysis | Pending |
+| AI-02 | 4 · AI analysis | Complete |
 | AI-03 | 4 · AI analysis | Complete |
 | AI-04 | 4 · AI analysis | Complete |
-| AI-05 | 4 · AI analysis | Pending |
+| AI-05 | 4 · AI analysis | Complete |
 | AI-06 | 4 · AI analysis | Complete |
 
 **Coverage:**
 - v1 requirements: 22 total
 - Mapped to phases: 22
-- Unmapped: 0
+- Complete: 22
 
 Roadmap: [.planning/ROADMAP.md](./ROADMAP.md)
 
 ---
 *Requirements defined: 2026-04-10*
-*Last updated: 2026-04-10 after roadmap creation*
+*Last updated: 2026-04-11 — all 22 v1 requirements verified complete via browser agent UAT*
