@@ -1,0 +1,8 @@
+# UI review screenshots and captures — do not commit binaries
+*.png
+*.webp
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
