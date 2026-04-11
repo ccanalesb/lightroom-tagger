@@ -142,7 +142,8 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         batch_candidates = []
         failed_count = 0
         skipped_no_path = 0
-        
+        skipped_oversized = 0
+
         # Get mount_point from config for resolving paths
         from lightroom_tagger.core.config import load_config
         config = load_config()
@@ -176,7 +177,10 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 
             try:
                 cached_local_path = get_or_create_cached_image(db, candidate.get('key'), local_path)
-                batch_candidates.append((idx, cached_local_path or local_path))
+                if cached_local_path is None:
+                    skipped_oversized += 1
+                    continue
+                batch_candidates.append((idx, cached_local_path))
             except Exception as e:
                 failed_count += 1
                 if log_callback and failed_count <= 3:  # Log first 3 failures
@@ -186,9 +190,11 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         if log_callback:
             if skipped_no_path > 0:
                 log_callback('debug', f'[{insta_filename}] Skipped {skipped_no_path} candidates with missing/invalid paths')
+            if skipped_oversized > 0:
+                log_callback('info', f'[{insta_filename}] Skipped {skipped_oversized} oversized candidates')
             if failed_count > 0:
                 log_callback('warning', f'[{insta_filename}] Failed to prepare {failed_count} candidates for batch processing')
-        
+
         # Call batch API
         batch_results = {}
         if log_callback:
