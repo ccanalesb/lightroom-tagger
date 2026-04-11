@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 4
+current_plan: 6
 status: executing
-last_updated: "2026-04-11T16:41:02.022Z"
+last_updated: "2026-04-11T17:00:00.000Z"
 last_activity: 2026-04-11
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 21
-  completed_plans: 18
-  percent: 86
+  completed_plans: 19
+  percent: 90
 ---
 
 # Planning state
@@ -26,13 +26,13 @@ progress:
 | Active milestone | v1 |
 | Active phase | 4 — AI analysis |
 | Phase status | In progress |
-| Last completed plan | 04-04 — Batch describe: 12-month window, min_rating metadata, and SQL alignment |
+| Last completed plan | 04-05 — Provider health probe, connection badges, and description defaults UX |
 
 ## GSD progression
 
-**Current Plan:** 4
+**Current Plan:** 6
 **Total Plans in Phase:** 6
-**Status:** Executing Phase 04 — 3/6 plans with summaries (04-01, 04-04, 04-06)
+**Status:** Ready to execute
 **Last Activity:** 2026-04-11
 
 ## v1 phase checklist
@@ -62,9 +62,11 @@ Full requirement ↔ phase mapping: [REQUIREMENTS.md § Traceability](./REQUIREM
 - **2026-04-11:** Plan **04-06** executed — `.sr2` in `RAW_EXTENSIONS`; `MAX_CACHED_IMAGE_KB` (512) with `__oversized__` vision_cache sentinel; batch candidate prep skips `None` from `get_or_create_cached_image`; `is_vision_cache_valid` invalidates RAW rows cached as original path or oversized sentinel. See [04-06-SUMMARY.md](./phases/04-ai-analysis/04-06-SUMMARY.md).
 - **2026-04-11:** Plan **04-01** executed — `query_catalog_images` LEFT JOINs `image_descriptions` for `image_type = 'catalog'` with `analyzed` tri-state filter; `GET /api/images/catalog` accepts `?analyzed=true|false`, returns `ai_analyzed` plus embedded summary, best perspective, and parsed perspectives JSON. See [04-01-SUMMARY.md](./phases/04-ai-analysis/04-01-SUMMARY.md).
 - **2026-04-11:** Plan **04-04** executed — `handle_batch_describe` maps `12months` to a 12-month window; optional `min_rating` filters catalog SQL (force and `get_undescribed_catalog_images`); Instagram selection ignores `min_rating`; Descriptions tab exposes minimum catalog rating. See [04-04-SUMMARY.md](./phases/04-ai-analysis/04-04-SUMMARY.md).
+- **2026-04-11:** Plan **04-05** executed — `ProviderRegistry.probe_connection` + `GET /api/providers/<id>/health` (HTTP 200 with `reachable`); provider cards show Reachable/Unreachable; Descriptions tab seeds provider/model from `defaults.description` for batch jobs; Providers tab saves description defaults. See [04-05-SUMMARY.md](./phases/04-ai-analysis/04-05-SUMMARY.md).
 
 ## Decisions (phase 4)
 
+- **D-04-05:** **`GET /api/providers/<id>/health`** returns **HTTP 200** with **`reachable`** (and optional **`error`**) so the UI treats unreachable providers as payload, not transport errors. **Batch describe** reads **`defaults.description`** via local state on the Descriptions tab and does **not** write **`useMatchOptions`** provider fields, keeping vision-comparison defaults on the Matching tab unchanged.
 - **D-04-01:** **`analyzed`** catalog filter follows the same **`posted`** parsing contract (**`true`** / **`false`** / omit); **`ai_analyzed`** is derived from presence of a joined **`description_summary`** (NULL after LEFT JOIN means not analyzed). Legacy integration tests that use a minimal **`images`**-only schema **create an empty `image_descriptions` table** so the always-JOIN query stays valid.
 - **D-04-04:** **`min_rating`** applies to **catalog** selection only (including **`both`** for the catalog half); **Instagram-only** batches ignore it. Invalid metadata values are treated as **`None`** after **`int`** coercion fails. **`batch_describe`** tests patch **`jobs.handlers.add_job_log`** (not **`database.add_job_log`**) and set **`runner.is_cancelled.return_value = False`** so handler paths match production wiring under **`MagicMock`**.
 - **D-04-06:** **512KB** ceiling on vision cache files with **`__oversized__`** DB sentinel when conversion/compression cannot produce a small JPEG; **`.sr2`** included in **`RAW_EXTENSIONS`**; **batch vision** never receives **`None`** cache paths (skipped with one log line per Instagram image). **RAW** cache rows that point at the original file or the oversized sentinel **auto-invalidate** so improved RAW support can re-run without a manual cache wipe.

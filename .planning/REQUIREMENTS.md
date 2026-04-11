@@ -26,7 +26,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### AI Analysis
 
-- [ ] **AI-01**: User can configure AI provider (Ollama, OpenAI, etc.)
+- [x] **AI-01**: User can configure AI provider (Ollama, OpenAI, etc.)
 - [ ] **AI-02**: User can trigger on-demand description for a single photo
 - [x] **AI-03**: User can trigger batch description for selected photos or timeframe
 - [x] **AI-04**: System stores AI descriptions with source photo
@@ -102,7 +102,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | IG-04 | 3 · Instagram sync | Pending |
 | IG-05 | 3 · Instagram sync | Pending |
 | IG-06 | 3 · Instagram sync | Pending |
-| AI-01 | 4 · AI analysis | Pending |
+| AI-01 | 4 · AI analysis | Complete |
 | AI-02 | 4 · AI analysis | Pending |
 | AI-03 | 4 · AI analysis | Complete |
 | AI-04 | 4 · AI analysis | Complete |
