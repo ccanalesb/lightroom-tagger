@@ -545,12 +545,19 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
         lib_db = init_database(db_path)
 
         image_type = metadata.get('image_type', 'both')  # catalog, instagram, both
-        date_filter = metadata.get('date_filter', 'all')  # all, 3months, 6months
+        date_filter = metadata.get('date_filter', 'all')  # all, 3months, 6months, 12months
         force = metadata.get('force', False)
         desc_provider_id = metadata.get('provider_id')
         desc_provider_model = metadata.get('provider_model')
 
-        months = {'3months': 3, '6months': 6}.get(date_filter)
+        months = {'3months': 3, '6months': 6, '12months': 12}.get(date_filter)
+        min_rating_raw = metadata.get('min_rating')
+        min_rating = None
+        if min_rating_raw is not None:
+            try:
+                min_rating = int(min_rating_raw)
+            except (TypeError, ValueError):
+                min_rating = None
         max_workers = int(metadata.get('max_workers', 4))
 
         from lightroom_tagger.core.database import (
@@ -562,17 +569,25 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
 
         if image_type in ('catalog', 'both'):
             if force:
-                rows = lib_db.execute("SELECT key FROM images").fetchall()
+                sql = "SELECT key FROM images"
+                conditions: list[str] = []
+                sql_params: list = []
                 if months:
-                    rows = lib_db.execute(
-                        "SELECT key FROM images WHERE date_taken >= date('now', ?)",
-                        (f'-{months} months',),
-                    ).fetchall()
+                    conditions.append("date_taken >= date('now', ?)")
+                    sql_params.append(f'-{months} months')
+                if min_rating is not None:
+                    conditions.append("rating >= ?")
+                    sql_params.append(min_rating)
+                if conditions:
+                    sql += " WHERE " + " AND ".join(conditions)
+                rows = lib_db.execute(sql, tuple(sql_params)).fetchall()
                 images_to_describe += [(r['key'], 'catalog') for r in rows]
             else:
                 images_to_describe += [
                     (img['key'], 'catalog')
-                    for img in get_undescribed_catalog_images(lib_db, months=months)
+                    for img in get_undescribed_catalog_images(
+                        lib_db, months=months, min_rating=min_rating
+                    )
                 ]
 
         if image_type in ('instagram', 'both'):
