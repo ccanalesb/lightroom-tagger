@@ -104,6 +104,19 @@
 4. User returns later, sees descriptions still attached to the same photos, and reads them in context alongside the image.
 5. User can distinguish analyzed vs not-yet-analyzed photos from the UI (badge, filter, or list).
 
+**Plans:** 1/6 plans executed
+
+### Plan progress (execution)
+
+| Plan | Title | Status |
+|------|--------|--------|
+| 04-01 | Catalog analyzed filter and embedded description fields in API | Planned |
+| 04-02 | Catalog grid AI badges, score pill, and analyzed filter UI | Planned |
+| 04-03 | Catalog modal description panel and on-demand generate | Planned |
+| 04-04 | Batch describe: 12-month window, min_rating metadata, and SQL alignment | Planned |
+| 04-05 | Provider health probe, connection badges, and description defaults UX | Planned |
+| 04-06 | Vision pipeline safety nets: SR2 support, size validation, and pre-flight filtering | **Done** (2026-04-11) |
+
 ---
 
 ## Dependencies (high level)
@@ -131,4 +144,4 @@ flowchart LR
 Deferred items remain as documented in [REQUIREMENTS.md](./REQUIREMENTS.md) (v2 and Out of Scope tables).
 
 ---
-*Roadmap created: 2026-04-10 · Last plan progress edit: 2026-04-10 (plan 03-06 complete; Phase 3 plans 03-01 … 03-06 all done).*
+*Roadmap created: 2026-04-10 · Last plan progress edit: 2026-04-11 (plan 04-06 complete; Phase 4 in progress).*
