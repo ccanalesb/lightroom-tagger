@@ -3,6 +3,7 @@ from unittest.mock import PropertyMock, patch
 
 import pytest
 from app import create_app
+from lightroom_tagger.core.provider_registry import ProviderRegistry
 
 
 @pytest.fixture()
@@ -34,10 +35,8 @@ class TestListProviders:
         resp = client.get("/api/providers/")
         assert resp.status_code == 200
         data = resp.get_json()
-        ids = [provider["id"] for provider in data]
-        assert "ollama" in ids
-        assert "nvidia_nim" in ids
-        assert "openrouter" in ids
+        ids = {provider["id"] for provider in data}
+        assert ids == {p["id"] for p in ProviderRegistry().list_providers()}
 
     def test_should_include_availability_status(self, client):
         resp = client.get("/api/providers/")
@@ -47,12 +46,12 @@ class TestListProviders:
 
 
 class TestListModels:
-    def test_should_return_models_for_nvidia(self, client):
-        resp = client.get("/api/providers/nvidia_nim/models")
+    def test_should_return_models_for_provider_with_config_models(self, client):
+        resp = client.get("/api/providers/github_copilot/models")
         assert resp.status_code == 200
         data = resp.get_json()
         model_ids = [model["id"] for model in data]
-        assert "meta/llama-4-maverick-17b-128e-instruct" in model_ids
+        assert "gpt-4o" in model_ids
 
     def test_should_return_404_for_unknown_provider(self, client):
         resp = client.get("/api/providers/nonexistent/models")
@@ -64,7 +63,7 @@ class TestFallbackOrder:
         resp = client.get("/api/providers/fallback-order")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["order"] == ["ollama", "nvidia_nim", "openrouter"]
+        assert data["order"] == ProviderRegistry().fallback_order
 
     def test_put_fallback_order_should_update_order(self, client):
         from lightroom_tagger.core.provider_registry import ProviderRegistry
@@ -177,6 +176,26 @@ class TestDefaults:
                 json={"bad_key": {"provider": "ollama"}},
             )
         assert resp.status_code == 400
+
+
+class TestProviderHealth:
+    def test_health_reachable(self, client):
+        with patch.object(
+            ProviderRegistry, "probe_connection", return_value=(True, None)
+        ):
+            resp = client.get("/api/providers/ollama/health")
+        assert resp.status_code == 200
+        assert resp.get_json() == {"reachable": True}
+
+    def test_health_unreachable(self, client):
+        with patch.object(
+            ProviderRegistry, "probe_connection", return_value=(False, "boom")
+        ):
+            resp = client.get("/api/providers/ollama/health")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["reachable"] is False
+        assert "boom" in (data.get("error") or "")
 
 
 class TestUserModels:
