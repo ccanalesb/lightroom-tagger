@@ -13,10 +13,14 @@ import tempfile
 from lightroom_tagger.core.analyzer import compress_image, compute_phash, get_viewable_path
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import (
+    VISION_CACHE_OVERSIZED_SENTINEL,
     get_vision_cached_image,
     is_vision_cache_valid,
     store_vision_cached_image,
 )
+
+# Working cached JPEGs are ~50–135KB; larger outputs imply failed compression or oversized originals.
+MAX_CACHED_IMAGE_KB = 512
 
 
 def _is_path_in_temp_dir(path: str) -> bool:
@@ -71,7 +75,10 @@ def get_or_create_cached_image(db, catalog_key: str, original_path: str) -> str 
     if is_vision_cache_valid(db, catalog_key, original_path):
         cached = get_vision_cached_image(db, catalog_key)
         if cached:
-            return cached['compressed_path']
+            path = cached.get('compressed_path')
+            if path == VISION_CACHE_OVERSIZED_SENTINEL:
+                return None
+            return path
 
     # Need to create cache
     target_path = os.path.join(cache_dir, f"{catalog_key.replace('/', '_')}.jpg")
@@ -91,13 +98,27 @@ def get_or_create_cached_image(db, catalog_key: str, original_path: str) -> str 
         original_mtime = os.path.getmtime(original_path)
 
         if temp_path == viewable_path and viewable_path == original_path:
-            # Neither conversion nor compression worked; cache original path
+            # Neither conversion nor compression worked
+            size_kb = os.path.getsize(original_path) / 1024
+            if size_kb > MAX_CACHED_IMAGE_KB:
+                store_vision_cached_image(
+                    db, catalog_key, VISION_CACHE_OVERSIZED_SENTINEL, None, original_mtime,
+                )
+                return None
             store_vision_cached_image(db, catalog_key, original_path, phash, original_mtime)
             return original_path
 
         # Use the compressed file (or converted file if compression was no-op)
         source = temp_path if temp_path != viewable_path else viewable_path
         _place_into_cache(source, target_path, temp_files)
+
+        if os.path.getsize(target_path) / 1024 > MAX_CACHED_IMAGE_KB:
+            with contextlib.suppress(OSError):
+                os.unlink(target_path)
+            store_vision_cached_image(
+                db, catalog_key, VISION_CACHE_OVERSIZED_SENTINEL, None, original_mtime,
+            )
+            return None
 
         store_vision_cached_image(db, catalog_key, target_path, phash, original_mtime)
         return target_path

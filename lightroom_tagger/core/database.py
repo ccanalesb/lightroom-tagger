@@ -1169,6 +1169,9 @@ def get_rejected_pairs(db: sqlite3.Connection) -> set[tuple[str, str]]:
 # Vision cache
 # ---------------------------------------------------------------------------
 
+VISION_CACHE_OVERSIZED_SENTINEL = "__oversized__"
+
+
 def init_vision_cache_table(db: sqlite3.Connection):
     """No-op: table is created in init_database."""
     pass
@@ -1206,7 +1209,18 @@ def is_vision_cache_valid(db: sqlite3.Connection, catalog_key: str,
                            original_path: str) -> bool:
     """Check if cached image is still valid (mtime unchanged)."""
     cached = get_vision_cached_image(db, catalog_key)
-    if not cached or not os.path.exists(cached.get('compressed_path', '')):
+    if not cached:
+        return False
+    comp = cached.get('compressed_path') or ''
+
+    if comp == VISION_CACHE_OVERSIZED_SENTINEL:
+        try:
+            current_mtime = os.path.getmtime(original_path)
+            return cached.get('original_mtime') == current_mtime
+        except OSError:
+            return False
+
+    if not comp or not os.path.exists(comp):
         return False
     try:
         current_mtime = os.path.getmtime(original_path)
