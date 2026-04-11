@@ -649,6 +649,7 @@ def query_catalog_images(
     date_from: str | None = None,
     date_to: str | None = None,
     color_label: str | None = None,
+    analyzed: bool | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[dict], int]:
@@ -657,12 +658,12 @@ def query_catalog_images(
     bindings: list = []
 
     if posted is True:
-        clauses.append("instagram_posted = 1")
+        clauses.append("i.instagram_posted = 1")
     elif posted is False:
-        clauses.append("instagram_posted = 0")
+        clauses.append("i.instagram_posted = 0")
 
     if month and len(month) == 6 and month.isdigit():
-        clauses.append("strftime('%Y%m', date_taken) = ?")
+        clauses.append("strftime('%Y%m', i.date_taken) = ?")
         bindings.append(month)
 
     kw = (keyword or "").strip()
@@ -670,42 +671,54 @@ def query_catalog_images(
         pattern = f"%{kw}%"
         clauses.append(
             "("
-            "keywords LIKE ? COLLATE NOCASE OR "
-            "filename LIKE ? COLLATE NOCASE OR "
-            "title LIKE ? COLLATE NOCASE OR "
-            "description LIKE ? COLLATE NOCASE"
+            "i.keywords LIKE ? COLLATE NOCASE OR "
+            "i.filename LIKE ? COLLATE NOCASE OR "
+            "i.title LIKE ? COLLATE NOCASE OR "
+            "i.description LIKE ? COLLATE NOCASE"
             ")"
         )
         bindings.extend([pattern, pattern, pattern, pattern])
 
     if min_rating is not None:
-        clauses.append("rating >= ?")
+        clauses.append("i.rating >= ?")
         bindings.append(min_rating)
 
     if date_from:
-        clauses.append("date_taken >= ?")
+        clauses.append("i.date_taken >= ?")
         bindings.append(date_from)
 
     if date_to:
-        clauses.append("date_taken <= ?")
+        clauses.append("i.date_taken <= ?")
         bindings.append(date_to)
 
     cl = (color_label or "").strip()
     if cl:
-        clauses.append("LOWER(color_label) = LOWER(?)")
+        clauses.append("LOWER(i.color_label) = LOWER(?)")
         bindings.append(cl)
 
+    if analyzed is True:
+        clauses.append("d.image_key IS NOT NULL")
+    elif analyzed is False:
+        clauses.append("d.image_key IS NULL")
+
     where_sql = "WHERE " + " AND ".join(clauses)
+    join_sql = (
+        "FROM images i "
+        "LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog' "
+    )
 
     count_row = db.execute(
-        f"SELECT COUNT(*) AS cnt FROM images {where_sql}",
+        f"SELECT COUNT(*) AS cnt {join_sql} {where_sql}",
         bindings,
     ).fetchone()
     total_count = int(count_row["cnt"])
 
     select_params = list(bindings) + [limit, offset]
     rows = db.execute(
-        f"SELECT * FROM images {where_sql} ORDER BY date_taken DESC LIMIT ? OFFSET ?",
+        f"SELECT i.*, d.summary AS description_summary, "
+        f"d.best_perspective AS description_best_perspective, "
+        f"d.perspectives AS description_perspectives_json "
+        f"{join_sql} {where_sql} ORDER BY i.date_taken DESC LIMIT ? OFFSET ?",
         select_params,
     ).fetchall()
     return [_deserialize_row(r) for r in rows], total_count
