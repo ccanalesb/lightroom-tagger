@@ -29,6 +29,7 @@ export function CatalogTab() {
   const [catalogFetchSucceeded, setCatalogFetchSucceeded] = useState(false);
   const [selectedImage, setSelectedImage] = useState<CatalogImage | null>(null);
   const [postedFilter, setPostedFilter] = useState<boolean | undefined>(undefined);
+  const [analyzedFilter, setAnalyzedFilter] = useState<'all' | 'analyzed' | 'not_analyzed'>('all');
   const [monthFilter, setMonthFilter] = useState<string>('');
   const [keyword, setKeyword] = useState('');
   const [minRating, setMinRating] = useState<number | ''>('');
@@ -53,6 +54,11 @@ export function CatalogTab() {
       // IG-06: posted filter (images.instagram_posted) -> GET /api/images/catalog?posted=
       const data = await ImagesAPI.listCatalog({
         ...(postedFilter !== undefined ? { posted: postedFilter } : {}),
+        ...(analyzedFilter === 'analyzed'
+          ? { analyzed: true }
+          : analyzedFilter === 'not_analyzed'
+            ? { analyzed: false }
+            : {}),
         ...(monthFilter ? { month: monthFilter } : {}),
         ...(kw ? { keyword: kw } : {}),
         ...(minRating !== '' ? { min_rating: minRating } : {}),
@@ -82,6 +88,7 @@ export function CatalogTab() {
   }, [
     page,
     postedFilter,
+    analyzedFilter,
     monthFilter,
     debouncedKeyword,
     minRating,
@@ -117,6 +124,11 @@ export function CatalogTab() {
     setPage(1);
   };
 
+  const handleAnalyzedFilterChange = (filter: 'all' | 'analyzed' | 'not_analyzed') => {
+    setAnalyzedFilter(filter);
+    setPage(1);
+  };
+
   const handleMonthFilterChange = (month: string) => {
     setMonthFilter(month);
     setPage(1);
@@ -140,6 +152,7 @@ export function CatalogTab() {
 
   const clearFilters = () => {
     setPostedFilter(undefined);
+    setAnalyzedFilter('all');
     setMonthFilter('');
     setKeyword('');
     setMinRating('');
@@ -162,6 +175,7 @@ export function CatalogTab() {
 
   const hasActiveFilters =
     postedFilter !== undefined ||
+    analyzedFilter !== 'all' ||
     Boolean(monthFilter) ||
     Boolean(keyword.trim()) ||
     minRating !== '' ||
@@ -220,6 +234,23 @@ export function CatalogTab() {
               <option value="all">All Images</option>
               <option value="posted">Posted</option>
               <option value="not-posted">Not Posted</option>
+            </select>
+          </div>
+
+          {/* AI-06: catalog analyzed filter (IG-06 pattern for posted) */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-text-tertiary">Analyzed</span>
+            <select
+              value={analyzedFilter}
+              onChange={(e) =>
+                handleAnalyzedFilterChange(e.target.value as 'all' | 'analyzed' | 'not_analyzed')
+              }
+              disabled={loading}
+              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
+            >
+              <option value="all">All</option>
+              <option value="analyzed">Analyzed only</option>
+              <option value="not_analyzed">Not analyzed</option>
             </select>
           </div>
 
