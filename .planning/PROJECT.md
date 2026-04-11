@@ -21,18 +21,19 @@ Know which catalog images are posted on Instagram and get artistic critique that
 - [x] Actionable error severity classification with UI badges (Validated in Phase 2: Jobs & System Reliability)
 - [x] Lightroom-open guardrail via lock file detection before catalog writes (Validated in Phase 2: Jobs & System Reliability)
 
+- [x] Match Instagram dump images to Lightroom catalog entries (Validated in Phase 3: Instagram Sync)
+- [x] Confirm matches and write "posted" keyword back to Lightroom catalog (Validated in Phase 3: Instagram Sync)
+- [x] Generate on-demand AI descriptions for catalog images (Validated in Phase 4: AI Analysis)
+- [x] On-demand analysis jobs (single image or timeframe-based batches) (Validated in Phase 4: AI Analysis)
+- [x] Multi-perspective critique (street photographer, editor, publisher views) (Validated in Phase 4: AI Analysis)
+
 ### Active
 
-- [ ] Match Instagram dump images to Lightroom catalog entries
-- [ ] Confirm matches and write "posted" keyword back to Lightroom catalog
-- [ ] Generate on-demand AI descriptions for catalog images
 - [ ] Analyze photos from artistic perspectives (composition, narrative, rhythm)
 - [ ] Support multiple Lightroom catalogs with context switching
 - [ ] Identify "best photos" combining AI scores and Instagram performance
 - [ ] Extract and display Instagram analytics from dump data
 - [ ] Provide unified photographer identity analysis across all catalogs
-- [ ] Multi-perspective critique (street photographer, editor, publisher views)
-- [ ] On-demand analysis jobs (single image or timeframe-based batches)
 
 ### Out of Scope
 
@@ -50,11 +51,13 @@ The user is a photographer managing work across multiple Lightroom catalogs (per
 ### Current State
 - Phase 1 complete — catalog browsing, filtering, and registration working via visualizer UI
 - Phase 2 complete — job lifecycle, cooperative cancellation, catalog backup/lock guard, error severity
+- Phase 3 complete — Instagram dump import, image matching, posted keyword writeback, matches UI
+- Phase 4 complete — AI descriptions (single + batch), provider health probes, catalog analyzed filter, SR2 support
 - Read-only catalog enforcement via SQLite URI `mode=ro` prevents accidental writes
 - Library DB keys unified with `YYYY-MM-DD_filename` format, migration with backup
 - Instagram presence with analytics data available via export dumps
-- Testing phase using cheap AI models (Ollama local/cloud)
-- Need to identify posting patterns and improve artistic decision-making
+- AI providers configurable with health probes and separate description defaults
+- Batch describe supports 12-month windows, min_rating filter, SR2/RAW pipeline hardened
 
 ### Instagram Dump Format
 User provides Instagram export dumps containing images and analytics. App matches these to Lightroom catalog entries by comparing images, then writes keywords back to the SQLite catalog file.
@@ -99,4 +102,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-10 after Phase 2 completion*
+*Last updated: 2026-04-11 after Phase 4 completion (v1.0 milestone complete)*
