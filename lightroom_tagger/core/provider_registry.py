@@ -76,6 +76,22 @@ class ProviderRegistry:
 
         return models
 
+    def probe_connection(self, provider_id: str) -> tuple[bool, str | None]:
+        """Return (True, None) if the provider API responds to a models list call.
+
+        On failure, returns (False, error message) without raising.
+        Raises KeyError if ``provider_id`` is not registered.
+        """
+        if provider_id not in self._providers:
+            raise KeyError(provider_id)
+        try:
+            client = self.get_client(provider_id)
+            for _ in client.models.list(timeout=5.0):
+                break
+            return True, None
+        except Exception as exc:
+            return False, str(exc)
+
     def get_client(self, provider_id: str) -> openai.OpenAI:
         provider_config = self._providers[provider_id]
         base_url = self._resolve_base_url(provider_config)
