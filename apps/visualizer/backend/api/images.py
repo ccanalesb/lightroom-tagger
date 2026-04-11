@@ -160,6 +160,26 @@ def _extract_source_folder(file_path):
     return 'unknown'
 
 
+def _clamp_pagination(limit, offset, default_limit=50):
+    if limit is None:
+        limit = default_limit
+    else:
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            limit = default_limit
+    limit = max(1, min(500, limit))
+    if offset is None:
+        offset = 0
+    else:
+        try:
+            offset = int(offset)
+        except (TypeError, ValueError):
+            offset = 0
+    offset = max(0, offset)
+    return limit, offset
+
+
 def _filter_by_date(images, date_folder, date_from, date_to):
     """Filter images by date parameters."""
     if date_folder:
@@ -209,8 +229,10 @@ def list_instagram_images(db):
         enriched_images.sort(key=lambda x: x['instagram_folder'] or '', reverse=True)
 
         # Pagination
-        limit = request.args.get('limit', 50, type=int)
-        offset = request.args.get('offset', 0, type=int)
+        limit, offset = _clamp_pagination(
+            request.args.get('limit', 50, type=int),
+            request.args.get('offset', 0, type=int),
+        )
         total = len(enriched_images)
 
         paginated = enriched_images[offset:offset+limit]
@@ -379,8 +401,10 @@ def list_catalog_images(db):
         date_from = request.args.get('date_from', '')
         date_to = request.args.get('date_to', '')
         color_label = request.args.get('color_label', '')
-        limit = request.args.get('limit', 50, type=int)
-        offset = request.args.get('offset', 0, type=int)
+        limit, offset = _clamp_pagination(
+            request.args.get('limit', 50, type=int),
+            request.args.get('offset', 0, type=int),
+        )
 
         rows, total = query_catalog_images(db,
             posted=posted_filter,
@@ -441,8 +465,10 @@ def list_dump_media(db):
     try:
         processed = request.args.get('processed')
         matched = request.args.get('matched')
-        limit = request.args.get('limit', 50, type=int)
-        offset = request.args.get('offset', 0, type=int)
+        limit, offset = _clamp_pagination(
+            request.args.get('limit', 50, type=int),
+            request.args.get('offset', 0, type=int),
+        )
 
         if processed == 'true':
             media = db.execute(
@@ -566,8 +592,10 @@ def list_matches(db):
                 'has_validated': any(c.get('validated_at') for c in candidates),
             })
 
-        limit = request.args.get('limit', 50, type=int)
-        offset = request.args.get('offset', 0, type=int)
+        limit, offset = _clamp_pagination(
+            request.args.get('limit', 50, type=int),
+            request.args.get('offset', 0, type=int),
+        )
         paginated_groups = match_groups[offset:offset+limit]
         paginated_matches = []
         for grp in paginated_groups:
