@@ -2,6 +2,8 @@
 created: 2026-04-11T16:17:19.478Z
 title: Improve vision pipeline safety nets and SR2 support
 area: tooling
+plan: .planning/phases/04-ai-analysis/04-06-PLAN.md
+status: planned
 files:
   - lightroom_tagger/core/analyzer.py:13
   - lightroom_tagger/core/vision_cache.py:48-96
