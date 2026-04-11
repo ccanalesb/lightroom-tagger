@@ -1213,6 +1213,15 @@ def is_vision_cache_valid(db: sqlite3.Connection, catalog_key: str,
         return False
     comp = cached.get('compressed_path') or ''
 
+    from lightroom_tagger.core.analyzer import RAW_EXTENSIONS
+
+    ext = os.path.splitext(original_path)[1].lower()
+    if ext in RAW_EXTENSIONS:
+        if comp == original_path:
+            return False
+        if comp == VISION_CACHE_OVERSIZED_SENTINEL:
+            return False
+
     if comp == VISION_CACHE_OVERSIZED_SENTINEL:
         try:
             current_mtime = os.path.getmtime(original_path)
