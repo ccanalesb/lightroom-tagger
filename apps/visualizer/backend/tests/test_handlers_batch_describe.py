@@ -1,7 +1,15 @@
 from unittest.mock import patch, MagicMock
 
 
-@patch('database.add_job_log')
+def _make_runner():
+    """MagicMock runner with non-truthy is_cancelled (bare MagicMock is truthy when called)."""
+    runner = MagicMock()
+    runner.db = MagicMock()
+    runner.is_cancelled.return_value = False
+    return runner
+
+
+@patch('jobs.handlers.add_job_log')
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
@@ -26,7 +34,7 @@ def test_batch_describe_should_complete_with_zero_images(
     assert result['total'] == 0
 
 
-@patch('database.add_job_log')
+@patch('jobs.handlers.add_job_log')
 @patch('lightroom_tagger.core.description_service.describe_matched_image')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
 @patch('jobs.handlers.init_database')
@@ -42,8 +50,7 @@ def test_batch_describe_should_describe_catalog_images(
     mock_get.return_value = [{'key': 'img_001'}, {'key': 'img_002'}]
     mock_describe.return_value = True
 
-    runner = MagicMock()
-    runner.db = MagicMock()
+    runner = _make_runner()
 
     handle_batch_describe(runner, 'test-job', {'image_type': 'catalog'})
 
@@ -54,7 +61,7 @@ def test_batch_describe_should_describe_catalog_images(
     assert result['failed'] == 0
 
 
-@patch('database.add_job_log')
+@patch('jobs.handlers.add_job_log')
 @patch('lightroom_tagger.core.description_service.describe_matched_image')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
 @patch('jobs.handlers.init_database')
@@ -70,8 +77,7 @@ def test_batch_describe_should_count_failures(
     mock_get.return_value = [{'key': 'img_001'}, {'key': 'img_002'}]
     mock_describe.side_effect = [True, Exception('API error')]
 
-    runner = MagicMock()
-    runner.db = MagicMock()
+    runner = _make_runner()
 
     handle_batch_describe(runner, 'test-job', {'image_type': 'catalog'})
 
@@ -80,7 +86,7 @@ def test_batch_describe_should_count_failures(
     assert result['failed'] == 1
 
 
-@patch('database.add_job_log')
+@patch('jobs.handlers.add_job_log')
 @patch('lightroom_tagger.core.description_service.describe_matched_image')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
 @patch('jobs.handlers.init_database')
@@ -96,22 +102,25 @@ def test_batch_describe_should_stop_after_consecutive_failures(
     mock_get.return_value = [{'key': f'img_{i:03d}'} for i in range(15)]
     mock_describe.side_effect = Exception('rate limit')
 
-    runner = MagicMock()
-    runner.db = MagicMock()
+    runner = _make_runner()
 
-    handle_batch_describe(runner, 'test-job', {'image_type': 'catalog'})
+    handle_batch_describe(
+        runner,
+        'test-job',
+        {'image_type': 'catalog', 'max_workers': 1},
+    )
 
     assert mock_describe.call_count == 10
     result = runner.complete_job.call_args[0][1]
     assert result['failed'] == 10
 
 
-@patch('database.add_job_log')
+@patch('jobs.handlers.add_job_log')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-def test_batch_describe_should_set_vision_model_env(
+def test_batch_describe_legacy_vision_model_metadata_does_not_set_env(
     mock_getenv, mock_config, mock_init_db, mock_get, _mock_add_log,
 ):
     from jobs.handlers import handle_batch_describe
@@ -128,19 +137,18 @@ def test_batch_describe_should_set_vision_model_env(
 
     mock_get.side_effect = capture_env
 
-    runner = MagicMock()
-    runner.db = MagicMock()
+    runner = _make_runner()
 
     handle_batch_describe(runner, 'test-job', {
         'image_type': 'catalog',
         'vision_model': 'custom-model',
     })
 
-    assert captured_env.get('model') == 'custom-model'
+    assert captured_env.get('model') is None
     assert os.environ.get('DESCRIPTION_VISION_MODEL') is None
 
 
-@patch('database.add_job_log')
+@patch('jobs.handlers.add_job_log')
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
@@ -156,4 +164,59 @@ def test_batch_describe_should_fail_job_on_exception(
 
     handle_batch_describe(runner, 'test-job', {})
 
-    runner.fail_job.assert_called_once_with('test-job', 'config broken')
+    runner.fail_job.assert_called_once_with(
+        'test-job', 'config broken', severity='error',
+    )
+
+
+@patch('jobs.handlers.add_job_log')
+@patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
+@patch('jobs.handlers.init_database')
+@patch('jobs.handlers.load_config')
+@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+def test_batch_describe_passes_months_12_for_12months_date_filter(
+    mock_getenv, mock_config, mock_init_db, mock_get_undescribed, _mock_add_log,
+):
+    from jobs.handlers import handle_batch_describe
+
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_init_db.return_value = MagicMock()
+    mock_get_undescribed.return_value = []
+
+    runner = MagicMock()
+    runner.db = MagicMock()
+
+    handle_batch_describe(runner, 'job-12m', {
+        'image_type': 'catalog',
+        'date_filter': '12months',
+        'force': False,
+    })
+
+    mock_get_undescribed.assert_called_once()
+    assert mock_get_undescribed.call_args.kwargs['months'] == 12
+
+
+@patch('jobs.handlers.add_job_log')
+@patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
+@patch('jobs.handlers.init_database')
+@patch('jobs.handlers.load_config')
+@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+def test_batch_describe_passes_min_rating_for_catalog_selection(
+    mock_getenv, mock_config, mock_init_db, mock_get_undescribed, _mock_add_log,
+):
+    from jobs.handlers import handle_batch_describe
+
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_init_db.return_value = MagicMock()
+    mock_get_undescribed.return_value = []
+
+    runner = MagicMock()
+    runner.db = MagicMock()
+
+    handle_batch_describe(runner, 'job-rating', {
+        'image_type': 'catalog',
+        'min_rating': 3,
+    })
+
+    mock_get_undescribed.assert_called_once()
+    assert mock_get_undescribed.call_args.kwargs['min_rating'] == 3
