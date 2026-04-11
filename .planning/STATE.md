@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 current_plan: Not started
 status: completed
-last_updated: "2026-04-11T16:52:45.573Z"
+last_updated: "2026-04-11T19:00:23.780Z"
 last_activity: 2026-04-11
 progress:
   total_phases: 4
@@ -23,24 +23,16 @@ progress:
 
 | Field | Value |
 |-------|--------|
-| Active milestone | v1 |
-| Active phase | 4 — AI analysis |
-| Phase status | In progress |
-| Last completed plan | 04-05 — Provider health probe, connection badges, and description defaults UX |
-
-## GSD progression
-
-**Current Plan:** Not started
-**Total Plans in Phase:** 6
-**Status:** Milestone complete
-**Last Activity:** 2026-04-11
+| Active milestone | v1.0 — **SHIPPED** |
+| Status | Complete (2026-04-11) |
+| Next milestone | Not planned |
 
 ## v1 phase checklist
 
 - [x] Phase 1 — Catalog management (CAT-01 … CAT-05) ✓
 - [x] Phase 2 — Jobs & system reliability (SYS-01 … SYS-05) ✓
 - [x] Phase 3 — Instagram sync (IG-01 … IG-06) ✓
-- [ ] Phase 4 — AI analysis (AI-01 … AI-06)
+- [x] Phase 4 — AI analysis (AI-01 … AI-06) ✓
 
 ## Traceability
 

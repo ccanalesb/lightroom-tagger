@@ -78,11 +78,14 @@ Critique should come from defined perspectives (street photographer, editor, pub
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Export-based Instagram sync | Avoids API limitations, user owns data | — Pending |
-| Direct SQLite catalog writes | Only way to add keywords to Lightroom | — Pending |
-| On-demand analysis | Controls AI costs, scales with usage | — Pending |
-| Web app (not plugin) | Keeps Lightroom unchanged, easier deployment | — Pending |
-| Artistic over technical | User wants style/narrative critique, not EXIF analysis | — Pending |
+| Export-based Instagram sync | Avoids API limitations, user owns data | ✓ Good — reliable dump import pipeline |
+| Direct SQLite catalog writes | Only way to add keywords to Lightroom | ✓ Good — lock guard + backup make it safe |
+| On-demand analysis | Controls AI costs, scales with usage | ✓ Good — batch + single both work well |
+| Web app (not plugin) | Keeps Lightroom unchanged, easier deployment | ✓ Good — React visualizer works great |
+| Artistic over technical | User wants style/narrative critique, not EXIF analysis | ✓ Good — multi-perspective critique landed |
+| Cooperative cancellation via threading.Event | Clean job stop without data corruption | ✓ Good — propagates through all handlers |
+| 512KB vision cache ceiling | Prevents disk bloat from large RAW files | ✓ Good — oversized sentinel auto-invalidates |
+| Provider health probes | UX shows reachable/unreachable before job start | ✓ Good — prevents wasted job attempts |
 
 ## Evolution
 
