@@ -397,6 +397,10 @@ export interface ProviderDefaults {
 
 export const ProvidersAPI = {
   list: () => request<Provider[]>('/providers/'),
+  health: (providerId: string) =>
+    request<{ reachable: boolean; error?: string }>(
+      `/providers/${encodeURIComponent(providerId)}/health`,
+    ),
   listModels: (providerId: string) =>
     request<ProviderModel[]>(`/providers/${providerId}/models`),
   getFallbackOrder: () =>

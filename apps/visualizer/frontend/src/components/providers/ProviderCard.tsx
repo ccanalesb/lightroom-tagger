@@ -17,6 +17,9 @@ interface ProviderCardProps {
   onAddModel: (model: { id: string; name: string; vision: boolean }) => Promise<void>;
   onRemoveModel: (modelId: string) => void;
   onReorderModel: (modelId: string, direction: 'up' | 'down') => void;
+  /** null = probe not completed yet */
+  connectionReachable?: boolean | null;
+  connectionError?: string | null;
 }
 
 export function ProviderCard({
@@ -27,6 +30,8 @@ export function ProviderCard({
   onAddModel,
   onRemoveModel,
   onReorderModel,
+  connectionReachable = null,
+  connectionError = null,
 }: ProviderCardProps) {
   return (
     <div className="rounded-card border border-border bg-bg shadow-card">
@@ -40,6 +45,14 @@ export function ProviderCard({
           <Badge variant={provider.available ? 'success' : 'default'}>
             {provider.available ? PROVIDER_STATUS_AVAILABLE : PROVIDER_STATUS_UNAVAILABLE}
           </Badge>
+          {connectionReachable === true && (
+            <Badge variant="success">Reachable</Badge>
+          )}
+          {connectionReachable === false && (
+            <span title={connectionError ?? undefined}>
+              <Badge variant="error">Unreachable</Badge>
+            </span>
+          )}
         </div>
         <span className="text-text-tertiary text-sm shrink-0">{expanded ? '▲' : '▼'}</span>
       </button>

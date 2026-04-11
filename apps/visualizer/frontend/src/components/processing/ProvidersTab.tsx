@@ -8,6 +8,8 @@ export function ProvidersTab() {
   const { providers, fallbackOrder, loading, error, updateFallbackOrder } = useProviders();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [modelCache, setModelCache] = useState<Record<string, ProviderModel[]>>({});
+  const [reachability, setReachability] = useState<Record<string, boolean | null>>({});
+  const [connectionErrors, setConnectionErrors] = useState<Record<string, string | undefined>>({});
 
   const refreshModelsForProvider = useCallback(async (providerId: string) => {
     const models = await ProvidersAPI.listModels(providerId);
@@ -18,6 +20,46 @@ export function ProvidersTab() {
     if (!expandedId || modelCache[expandedId]) return;
     refreshModelsForProvider(expandedId).catch(console.error);
   }, [expandedId, modelCache, refreshModelsForProvider]);
+
+  useEffect(() => {
+    if (providers.length === 0) return;
+    let cancelled = false;
+    Promise.all(
+      providers.map(provider =>
+        ProvidersAPI.health(provider.id)
+          .then(response => ({
+            id: provider.id,
+            reachable: response.reachable,
+            detail: response.reachable ? undefined : response.error,
+          }))
+          .catch(err => ({
+            id: provider.id,
+            reachable: false,
+            detail: err instanceof Error ? err.message : String(err),
+          })),
+      ),
+    ).then(results => {
+      if (cancelled) return;
+      setReachability(prev => {
+        const next = { ...prev };
+        for (const row of results) {
+          next[row.id] = row.reachable;
+        }
+        return next;
+      });
+      setConnectionErrors(prev => {
+        const next = { ...prev };
+        for (const row of results) {
+          if (row.detail) next[row.id] = row.detail;
+          else delete next[row.id];
+        }
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [providers]);
 
   const handleAddModel = useCallback(
     async (providerId: string, model: { id: string; name: string; vision: boolean }) => {
@@ -99,6 +141,8 @@ export function ProvidersTab() {
             onReorderModel={(modelId, direction) => {
               handleReorderModel(provider.id, modelId, direction).catch(console.error);
             }}
+            connectionReachable={reachability[provider.id] ?? null}
+            connectionError={connectionErrors[provider.id] ?? null}
           />
         ))}
       </div>
