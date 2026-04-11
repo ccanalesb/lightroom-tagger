@@ -1,10 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { WorkerSlider } from '../matching/WorkerSlider';
 import { ProviderModelSelect } from '../ui/ProviderModelSelect';
 import { useMatchOptions } from '../../stores/matchOptionsContext';
-import { JobsAPI } from '../../services/api';
+import { JobsAPI, ProvidersAPI } from '../../services/api';
 import { ADVANCED_OPTIONS_TITLE } from '../../constants/strings';
 
 type ImageType = 'both' | 'instagram' | 'catalog';
@@ -31,6 +31,19 @@ export function DescriptionsTab() {
   const [force, setForce] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [descProviderId, setDescProviderId] = useState<string | null>(null);
+  const [descProviderModel, setDescProviderModel] = useState<string | null>(null);
+
+  useEffect(() => {
+    ProvidersAPI.getDefaults()
+      .then(defaults => {
+        if (defaults.description?.provider) {
+          setDescProviderId(defaults.description.provider);
+          setDescProviderModel(defaults.description.model ?? null);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   const startDescriptions = useCallback(async () => {
     setIsStarting(true);
@@ -43,8 +56,8 @@ export function DescriptionsTab() {
       };
 
       if (batchMinRating !== null) metadata.min_rating = batchMinRating;
-      if (options.providerId) metadata.provider_id = options.providerId;
-      if (options.providerModel) metadata.provider_model = options.providerModel;
+      if (descProviderId) metadata.provider_id = descProviderId;
+      if (descProviderModel) metadata.provider_model = descProviderModel;
 
       await JobsAPI.create('batch_describe', metadata);
       alert('Description generation job started! Check Job Queue tab to monitor progress.');
@@ -53,7 +66,7 @@ export function DescriptionsTab() {
     } finally {
       setIsStarting(false);
     }
-  }, [imageType, dateFilter, batchMinRating, force, options]);
+  }, [imageType, dateFilter, batchMinRating, force, options, descProviderId, descProviderModel]);
 
   return (
     <div>
@@ -160,11 +173,11 @@ export function DescriptionsTab() {
             {showAdvanced && (
               <div className="pt-4 border-t border-border space-y-4">
                 <ProviderModelSelect
-                  providerId={options.providerId}
-                  modelId={options.providerModel}
+                  providerId={descProviderId}
+                  modelId={descProviderModel}
                   onChange={(providerId, modelId) => {
-                    updateOption('providerId', providerId);
-                    updateOption('providerModel', modelId);
+                    setDescProviderId(providerId);
+                    setDescProviderModel(modelId);
                   }}
                 />
                 <WorkerSlider value={options.maxWorkers} onChange={(v) => updateOption('maxWorkers', v)} />
