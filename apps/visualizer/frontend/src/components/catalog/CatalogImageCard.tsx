@@ -1,4 +1,6 @@
 import type { CatalogImage } from '../../services/api';
+import { descriptionScoreColor } from '../../utils/scoreColorClasses';
+import { DESCRIPTION_PERSPECTIVE_LABELS } from '../DescriptionPanel/perspectiveLabels';
 import { Badge } from '../ui/Badge';
 
 interface CatalogImageCardProps {
@@ -10,6 +12,14 @@ export function CatalogImageCard({ image, onClick }: CatalogImageCardProps) {
   const dateDisplay = image.date_taken
     ? new Date(image.date_taken).toLocaleDateString()
     : 'No date';
+
+  const best = image.description_best_perspective;
+  const perspective =
+    best && image.description_perspectives
+      ? image.description_perspectives[best as keyof typeof image.description_perspectives]
+      : undefined;
+  const showScorePill =
+    Boolean(best) && perspective != null && typeof perspective.score === 'number';
 
   return (
     <div
@@ -34,6 +44,14 @@ export function CatalogImageCard({ image, onClick }: CatalogImageCardProps) {
           {image.instagram_posted && <Badge variant="success">Posted</Badge>}
           {image.rating > 0 && <Badge variant="accent">{image.rating}★</Badge>}
           {image.pick && <Badge variant="accent">Pick</Badge>}
+          {image.ai_analyzed && <Badge variant="accent">AI</Badge>}
+          {showScorePill && best && perspective && (
+            <span
+              className={`text-xs px-1.5 py-0.5 rounded font-medium ${descriptionScoreColor(perspective.score)}`}
+            >
+              {DESCRIPTION_PERSPECTIVE_LABELS[best] || best} {perspective.score}/10
+            </span>
+          )}
         </div>
       </div>
     </div>
