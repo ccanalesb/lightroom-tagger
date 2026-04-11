@@ -1362,7 +1362,9 @@ def get_image_description(db: sqlite3.Connection, image_key: str) -> dict | None
     return row
 
 
-def get_undescribed_catalog_images(db: sqlite3.Connection, months: int = None) -> list[dict]:
+def get_undescribed_catalog_images(
+    db: sqlite3.Connection, months: int | None = None, min_rating: int | None = None
+) -> list[dict]:
     """Get catalog images that don't have descriptions yet."""
     sql = """
         SELECT i.* FROM images i
@@ -1374,6 +1376,9 @@ def get_undescribed_catalog_images(db: sqlite3.Connection, months: int = None) -
     if months:
         sql += " AND i.date_taken >= date('now', ?)"
         params.append(f'-{months} months')
+    if min_rating is not None:
+        sql += " AND i.rating >= ?"
+        params.append(min_rating)
     rows = db.execute(sql, params).fetchall()
     return [_deserialize_row(r) for r in rows]
 
