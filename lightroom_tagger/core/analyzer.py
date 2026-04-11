@@ -9,7 +9,7 @@ import ollama
 
 from lightroom_tagger.core.config import load_config
 
-RAW_EXTENSIONS = {'.dng', '.raw', '.cr2', '.cr3', '.nef', '.arw', '.rw2', '.orf', '.raf', '.srw', '.x3f'}
+RAW_EXTENSIONS = {'.dng', '.raw', '.cr2', '.cr3', '.nef', '.arw', '.rw2', '.orf', '.raf', '.sr2', '.srw', '.x3f'}
 
 # Vision compression configuration
 VISION_MAX_DIMENSION = int(os.environ.get('VISION_MAX_DIMENSION', '1024'))
