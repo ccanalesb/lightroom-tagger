@@ -543,6 +543,9 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
         db_path = os.getenv('LIBRARY_DB')
         if not db_path:
             db_path = config.db_path or 'library.db'
+        if not os.path.exists(db_path):
+            runner.fail_job(job_id, f"Library database not found at: {db_path}")
+            return
         lib_db = init_database(db_path)
 
         image_type = metadata.get('image_type', 'both')  # catalog, instagram, both
