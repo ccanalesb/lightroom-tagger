@@ -1,5 +1,8 @@
-import { useEffect } from 'react';
-import type { CatalogImage } from '../../services/api';
+import { useCallback, useEffect, useState } from 'react';
+import type { CatalogImage, ImageDescription } from '../../services/api';
+import { DescriptionsAPI, ProvidersAPI } from '../../services/api';
+import { DescriptionPanel } from '../DescriptionPanel/DescriptionPanel';
+import { GenerateButton } from '../ui/description-atoms/GenerateButton';
 import { Badge } from '../ui/Badge';
 import { MetadataRow } from '../ui/MetadataRow';
 import {
@@ -15,6 +18,11 @@ interface CatalogImageModalProps {
 }
 
 export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
+  const [description, setDescription] = useState<ImageDescription | null>(null);
+  const [loadingDesc, setLoadingDesc] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [descError, setDescError] = useState<string | null>(null);
+
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -22,6 +30,56 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingDesc(true);
+    setDescError(null);
+    setDescription(null);
+
+    DescriptionsAPI.get(image.key)
+      .then((data) => {
+        if (!cancelled) {
+          setDescription(data.description);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setDescError(String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingDesc(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [image.key]);
+
+  const handleGenerateDescription = useCallback(async () => {
+    setGenerating(true);
+    setDescError(null);
+    try {
+      const defaults = await ProvidersAPI.getDefaults();
+      const d = defaults.description;
+      const data = await DescriptionsAPI.generate(
+        image.key,
+        'catalog',
+        false,
+        undefined,
+        d?.provider ?? undefined,
+        d?.model ?? undefined,
+      );
+      setDescription(data.description);
+    } catch (err) {
+      setDescError(String(err));
+    } finally {
+      setGenerating(false);
+    }
+  }, [image.key]);
 
   const dateDisplay = image.date_taken
     ? new Date(image.date_taken).toLocaleString()
@@ -63,6 +121,9 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
               <h2 className="text-card-title text-text mb-2">{IMAGE_DETAILS_TITLE}</h2>
               <div className="flex flex-wrap gap-2">
                 {image.instagram_posted && <Badge variant="success">Posted to Instagram</Badge>}
+                {description && (description.summary || description.best_perspective) && (
+                  <Badge variant="accent">AI</Badge>
+                )}
                 {image.rating > 0 && <Badge variant="accent">{image.rating} Stars</Badge>}
                 {image.pick && <Badge variant="accent">Pick</Badge>}
                 {image.color_label && <Badge variant="default">{image.color_label}</Badge>}
@@ -96,6 +157,24 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
                 </div>
               </div>
             )}
+
+            <div className="p-4 bg-surface rounded-base border border-border">
+              <h3 className="text-sm font-medium text-text mb-2">AI description</h3>
+              {loadingDesc && (
+                <p className="text-sm text-text-tertiary">Loading description…</p>
+              )}
+              {descError && <p className="text-sm text-error">{descError}</p>}
+              <DescriptionPanel description={description} compact />
+              <div className="mt-3 flex justify-end">
+                <GenerateButton
+                  hasDescription={Boolean(description?.summary)}
+                  generating={generating}
+                  onClick={() => {
+                    void handleGenerateDescription();
+                  }}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
