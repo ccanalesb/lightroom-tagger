@@ -50,6 +50,18 @@ def defaults():
     return jsonify(registry.defaults)
 
 
+@bp.route("/<provider_id>/health", methods=["GET"])
+def provider_health(provider_id: str):
+    registry = _get_registry()
+    try:
+        ok, detail = registry.probe_connection(provider_id)
+    except KeyError:
+        return jsonify({"error": "Unknown provider"}), 404
+    if ok:
+        return jsonify({"reachable": True})
+    return jsonify({"reachable": False, "error": detail})
+
+
 @bp.route("/<provider_id>/models/<path:model_id>", methods=["DELETE"])
 def delete_model(provider_id: str, model_id: str):
     deleted = delete_user_model(current_app.db, provider_id, model_id)
