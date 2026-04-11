@@ -29,9 +29,9 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **AI-01**: User can configure AI provider (Ollama, OpenAI, etc.)
 - [ ] **AI-02**: User can trigger on-demand description for a single photo
 - [x] **AI-03**: User can trigger batch description for selected photos or timeframe
-- [ ] **AI-04**: System stores AI descriptions with source photo
+- [x] **AI-04**: System stores AI descriptions with source photo
 - [ ] **AI-05**: User can view AI descriptions alongside photos
-- [ ] **AI-06**: System tracks which photos have been analyzed
+- [x] **AI-06**: System tracks which photos have been analyzed
 
 ### Jobs & System
 
@@ -105,9 +105,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AI-01 | 4 · AI analysis | Pending |
 | AI-02 | 4 · AI analysis | Pending |
 | AI-03 | 4 · AI analysis | Complete |
-| AI-04 | 4 · AI analysis | Pending |
+| AI-04 | 4 · AI analysis | Complete |
 | AI-05 | 4 · AI analysis | Pending |
-| AI-06 | 4 · AI analysis | Pending |
+| AI-06 | 4 · AI analysis | Complete |
 
 **Coverage:**
 - v1 requirements: 22 total

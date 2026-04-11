@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_plan: 2
+current_plan: 3
 status: executing
-last_updated: "2026-04-11T16:34:22.329Z"
+last_updated: "2026-04-11T17:30:00.000Z"
 last_activity: 2026-04-11
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 21
-  completed_plans: 16
-  percent: 76
+  completed_plans: 17
+  percent: 81
 ---
 
 # Planning state
@@ -26,13 +26,13 @@ progress:
 | Active milestone | v1 |
 | Active phase | 4 — AI analysis |
 | Phase status | In progress |
-| Last completed plan | 04-06 — Vision pipeline safety nets (SR2, cache cap, batch pre-filter) |
+| Last completed plan | 04-01 — Catalog analyzed filter and embedded description fields in API |
 
 ## GSD progression
 
-**Current Plan:** 2
+**Current Plan:** 3
 **Total Plans in Phase:** 6
-**Status:** Executing Phase 04 — 1/6 plans complete (04-06 done)
+**Status:** Executing Phase 04 — 2/6 plans with summaries (04-01, 04-06)
 **Last Activity:** 2026-04-11
 
 ## v1 phase checklist
@@ -60,9 +60,11 @@ Full requirement ↔ phase mapping: [REQUIREMENTS.md § Traceability](./REQUIREM
 - **2026-04-10:** Plan **03-05** executed — `MatchesTab` lists `GET /api/images/matches` via `useMatchGroups` and `MatchingAPI.list`, opens `MatchDetailModal` for validate/reject, empty copy `MATCHES_TAB_EMPTY`, pagination with **Load more** (`fetchGroups(50, matchGroups.length)`). See [03-05-SUMMARY.md](./phases/03-instagram-sync/03-05-SUMMARY.md).
 - **2026-04-10:** Plan **03-06** executed — catalog `posted` query integration tests; IG-06 trace comment on `ImagesAPI.listCatalog` in `CatalogTab`; `posted_to_instagram` in stats via SQL count. See [03-06-SUMMARY.md](./phases/03-instagram-sync/03-06-SUMMARY.md).
 - **2026-04-11:** Plan **04-06** executed — `.sr2` in `RAW_EXTENSIONS`; `MAX_CACHED_IMAGE_KB` (512) with `__oversized__` vision_cache sentinel; batch candidate prep skips `None` from `get_or_create_cached_image`; `is_vision_cache_valid` invalidates RAW rows cached as original path or oversized sentinel. See [04-06-SUMMARY.md](./phases/04-ai-analysis/04-06-SUMMARY.md).
+- **2026-04-11:** Plan **04-01** executed — `query_catalog_images` LEFT JOINs `image_descriptions` for `image_type = 'catalog'` with `analyzed` tri-state filter; `GET /api/images/catalog` accepts `?analyzed=true|false`, returns `ai_analyzed` plus embedded summary, best perspective, and parsed perspectives JSON. See [04-01-SUMMARY.md](./phases/04-ai-analysis/04-01-SUMMARY.md).
 
 ## Decisions (phase 4)
 
+- **D-04-01:** **`analyzed`** catalog filter follows the same **`posted`** parsing contract (**`true`** / **`false`** / omit); **`ai_analyzed`** is derived from presence of a joined **`description_summary`** (NULL after LEFT JOIN means not analyzed). Legacy integration tests that use a minimal **`images`**-only schema **create an empty `image_descriptions` table** so the always-JOIN query stays valid.
 - **D-04-06:** **512KB** ceiling on vision cache files with **`__oversized__`** DB sentinel when conversion/compression cannot produce a small JPEG; **`.sr2`** included in **`RAW_EXTENSIONS`**; **batch vision** never receives **`None`** cache paths (skipped with one log line per Instagram image). **RAW** cache rows that point at the original file or the oversized sentinel **auto-invalidate** so improved RAW support can re-run without a manual cache wipe.
 
 ## Decisions (phase 3)
