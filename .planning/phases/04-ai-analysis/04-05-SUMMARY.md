@@ -75,7 +75,7 @@ Each task was committed atomically:
 5. **Task 5: Description defaults for batch jobs only** - `792dc38` (feat)
 6. **Task 6: Providers tab — edit description defaults** - `2844809` (feat)
 
-**Plan metadata:** `d99c4cc` (docs: complete plan)
+**Plan metadata:** `cf68106` (docs: complete plan)
 
 ## Files Created/Modified
 
