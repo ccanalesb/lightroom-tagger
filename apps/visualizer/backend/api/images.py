@@ -274,6 +274,14 @@ def list_catalog_images(db):
         else:
             posted_filter = None
 
+        analyzed_raw = request.args.get('analyzed')
+        if analyzed_raw == 'true':
+            analyzed_filter = True
+        elif analyzed_raw == 'false':
+            analyzed_filter = False
+        else:
+            analyzed_filter = None
+
         month = request.args.get('month')
         keyword = request.args.get('keyword', '')
         min_rating = request.args.get('min_rating', type=int)
@@ -291,6 +299,7 @@ def list_catalog_images(db):
             date_from=date_from or None,
             date_to=date_to or None,
             color_label=color_label.strip() or None,
+            analyzed=analyzed_filter,
             limit=limit,
             offset=offset,
         )
@@ -298,6 +307,27 @@ def list_catalog_images(db):
         images = []
         for row in rows:
             out = dict(row)
+            desc_summary = out.pop('description_summary', None)
+            desc_best = out.pop('description_best_perspective', None)
+            desc_perspectives_json = out.pop('description_perspectives_json', None)
+
+            ai_analyzed = desc_summary is not None
+            out['ai_analyzed'] = ai_analyzed
+            if ai_analyzed:
+                out['description_summary'] = desc_summary or ''
+                out['description_best_perspective'] = desc_best or ''
+                if desc_perspectives_json:
+                    try:
+                        out['description_perspectives'] = json.loads(desc_perspectives_json)
+                    except (json.JSONDecodeError, TypeError):
+                        out['description_perspectives'] = {}
+                else:
+                    out['description_perspectives'] = {}
+            else:
+                out['description_summary'] = None
+                out['description_best_perspective'] = None
+                out['description_perspectives'] = None
+
             rid = out.get('id')
             if rid is not None and str(rid).strip().isdigit():
                 out['id'] = int(rid)
