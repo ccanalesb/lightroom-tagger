@@ -114,6 +114,7 @@ export const ImagesAPI = {
   /** Catalog browse; use listCatalog(params) with optional filters. */
   listCatalog: (params?: {
     posted?: boolean
+    analyzed?: boolean | null
     month?: string
     keyword?: string
     min_rating?: number
@@ -126,6 +127,11 @@ export const ImagesAPI = {
     const searchParams = new URLSearchParams()
     if (params?.posted !== undefined) {
       searchParams.set('posted', params.posted ? 'true' : 'false')
+    }
+    if (params?.analyzed === true) {
+      searchParams.set('analyzed', 'true')
+    } else if (params?.analyzed === false) {
+      searchParams.set('analyzed', 'false')
     }
     if (params?.month) searchParams.set('month', params.month)
     if (params?.keyword) searchParams.set('keyword', params.keyword)
@@ -301,6 +307,10 @@ export interface CatalogImage {
   instagram_posted: boolean
   instagram_url?: string
   image_hash?: string
+  ai_analyzed?: boolean
+  description_summary?: string | null
+  description_best_perspective?: string | null
+  description_perspectives?: ImageDescription['perspectives']
 }
 
 export interface PerspectiveScore {
