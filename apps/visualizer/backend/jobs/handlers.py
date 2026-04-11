@@ -265,6 +265,7 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
         runner.fail_job(job_id, f"Library database not found at: {db_path}")
         return
 
+    db = None
     try:
         db = init_database(db_path)
         init_catalog_table(db)
@@ -341,7 +342,7 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
         severity = _failure_severity_from_exception(e)
         runner.fail_job(job_id, str(e), severity=severity)
     finally:
-        if db:
+        if db is not None:
             db.close()
 
 
