@@ -638,10 +638,10 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
 
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = {
-                    executor.submit(process_image_worker, key, itype): (idx, key)
-                    for idx, (key, itype) in enumerate(images_to_describe, 1)
+                    executor.submit(process_image_worker, key, itype): key
+                    for key, itype in images_to_describe
                 }
-                
+                completed_parallel = 0
                 for future in as_completed(futures):
                     if runner.is_cancelled(job_id):
                         add_job_log(
@@ -651,10 +651,13 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
                             'Batch describe cancel noted; finishing already-running tasks',
                         )
                         break
-                    idx, key = futures[future]
-                    progress = int(5 + (idx / total) * 90)
-                    runner.update_progress(job_id, progress, f'Describing {idx}/{total}')
-                    
+                    key = futures[future]
+                    completed_parallel += 1
+                    progress = int(5 + (completed_parallel / total) * 90)
+                    runner.update_progress(
+                        job_id, progress, f'Describing {completed_parallel}/{total}'
+                    )
+
                     try:
                         result_key, status, error_msg = future.result()
                         if status == 'described':
