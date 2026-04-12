@@ -316,6 +316,43 @@ export const ANALYTICS_STAT_MEDIAN_LEN = 'Median caption length'
 export const ANALYTICS_STAT_POSTS_WITH_TAGS = 'Posts with hashtags'
 export const ANALYTICS_STAT_AVG_TAGS = 'Avg. hashtags per post (unique)'
 
+// Identity (Phase 8 / 08-02)
+export const IDENTITY_PAGE_TITLE = 'Identity'
+export const IDENTITY_PAGE_SUBTITLE =
+  'Best scored catalog photos, your style fingerprint from critique scores, and what to post next.'
+export const IDENTITY_SECTION_BEST_PHOTOS = 'Best photos'
+export const IDENTITY_SECTION_STYLE_FINGERPRINT = 'Style fingerprint'
+export const IDENTITY_SECTION_POST_NEXT = 'What to post next'
+export const IDENTITY_BEST_PHOTOS_HELP =
+  'Ranked by equal-weight aggregate over active perspectives (server order). Expand a row for per-perspective scores and rubric versions.'
+export const IDENTITY_BEST_PHOTOS_EMPTY_FALLBACK =
+  'No eligible ranked photos yet. Run scoring on more perspectives per image to meet coverage.'
+export const IDENTITY_LABEL_AGGREGATE = 'Aggregate'
+export const IDENTITY_LABEL_PERSPECTIVES_COVERED = 'Perspectives scored'
+export const IDENTITY_ACTION_SHOW_BREAKDOWN = 'Score breakdown'
+export const IDENTITY_ACTION_HIDE_BREAKDOWN = 'Hide breakdown'
+export const IDENTITY_COL_PERSPECTIVE = 'Perspective'
+export const IDENTITY_COL_SCORE = 'Score'
+export const IDENTITY_COL_PROMPT_VERSION = 'Prompt version'
+export const IDENTITY_COL_MODEL = 'Model'
+export const IDENTITY_FINGERPRINT_CHART_TITLE = 'Mean score by perspective (1–10)'
+export const IDENTITY_FINGERPRINT_DISTRIBUTION = 'Aggregate score distribution'
+export const IDENTITY_FINGERPRINT_TOKENS = 'Top rationale tokens'
+export const IDENTITY_FINGERPRINT_EVIDENCE = 'Example images'
+export const IDENTITY_FINGERPRINT_EMPTY =
+  'Not enough scored catalog data to chart. Score images across active perspectives.'
+export const IDENTITY_FINGERPRINT_LOW_DATA = 'Some perspectives have no scores yet.'
+export const IDENTITY_POST_NEXT_HELP =
+  'Unposted catalog images that meet coverage rules, with reasons from the server.'
+export const IDENTITY_POST_NEXT_EMPTY_FALLBACK = 'No suggestions right now.'
+export const IDENTITY_ACTION_OPEN_CATALOG = 'Open in catalog'
+export const IDENTITY_REASON_CODE_LABELS: Record<string, string> = {
+  high_score_unposted: 'High score (unposted)',
+  cadence_gap: 'Cadence',
+  underrepresented_theme: 'Theme variety',
+  eligible_unposted: 'Eligible unposted',
+}
+
 // Analytics — not posted catalog (POST-04 / 07-03)
 export const ANALYTICS_NOT_POSTED_TITLE = 'Not posted to Instagram'
 export const ANALYTICS_NOT_POSTED_HELP =
