@@ -7,3 +7,4 @@
 - **feat(06-02): register scores blueprint on Flask app** — `app.register_blueprint(scores.bp, url_prefix='/api/scores')` in `apps/visualizer/backend/app.py`.
 - **feat(06-02): add ScoresAPI and ImageScoreRow TypeScript helpers** — `apps/visualizer/frontend/src/services/api.ts` mirrors `DescriptionsAPI` path style under `VITE_API_URL`.
 - **test(06-02): cover list_score_history_for_perspective ordering** — `lightroom_tagger/core/test_database_scores.py` asserts `scored_at` descending.
+- **test(06-02): add Flask tests for scores API** — `apps/visualizer/backend/tests/test_scores_api.py` covers empty current, `is_current` filter, history 400, newest-first history.
