@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Advanced Critique & Insights
-current_plan: Not started
-status: defining_requirements
-last_updated: "2026-04-11T20:00:00.000Z"
-last_activity: 2026-04-11
+current_plan: Phase 5 — Structured scoring foundation
+status: ready_to_plan
+last_updated: "2026-04-12T12:00:00.000Z"
+last_activity: 2026-04-12
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
+  total_phases: 9
+  completed_phases: 4
+  total_plans: 18
   completed_plans: 0
   percent: 0
 ---
@@ -17,16 +17,16 @@ progress:
 # Planning state
 
 **Project:** Lightroom Tagger & Analyzer  
-**Roadmap:** [.planning/ROADMAP.md](./ROADMAP.md) (v2, 2026-04-11)
+**Roadmap:** [.planning/ROADMAP.md](./ROADMAP.md) (v1 complete · v2 Phases 5–9, 2026-04-12)
 
 ## Current focus
 
 | Field | Value |
 |-------|--------|
 | Active milestone | v2.0 — Advanced Critique & Insights |
-| Phase | Not started (defining requirements) |
-| Status | Defining requirements |
-| Last activity | 2026-04-11 — Milestone v2.0 started |
+| Phase | **5** — Structured scoring foundation |
+| Status | Ready to plan |
+| Last activity | 2026-04-12 — v2 roadmap created (Phases 5–9); traceability updated |
 
 ## Traceability
 
@@ -34,6 +34,8 @@ Full requirement ↔ phase mapping: [REQUIREMENTS.md § Traceability](./REQUIREM
 
 ## Last update
 
+- **2026-04-12:** ROADMAP.md extended with **Milestone v2.0 — Phases 5–9** (15 v2 requirements mapped). **STATE.md** set to Phase 5, status **Ready to plan**. **REQUIREMENTS.md** traceability updated for SCORE / POST / IDENT / DASH → Phases 5–9.
+- **2026-04-11:** Milestone v2.0 started (Advanced Critique & Insights); requirements defined in REQUIREMENTS.md.
 - **2026-04-10:** ROADMAP.md and STATE.md created; REQUIREMENTS.md traceability filled from v1 roadmap.
 - **2026-04-10:** Plan **02-01** executed — cooperative cancellation end-to-end: per-job `threading.Event`, `DELETE /api/jobs/<id>` sets DB then `signal_cancel`, processor and runner respect `cancelled` so `complete_job`/`fail_job` do not clobber; `vision_match` checks cancel between dump-media iterations via `should_cancel`.
 - **2026-04-10:** Plan **02-02** executed — `writer.py` checks Lightroom lock paths before SQLite writes, rotated `shutil.copy2` backups (max 2) with `Catalog backup created:` logging; `handle_vision_match` fails the job with the fixed lock message when the writer raises.

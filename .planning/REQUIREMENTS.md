@@ -80,29 +80,30 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SYS-01..05 | v1 Phase 2 · Jobs & system reliability | Complete |
 | IG-01..06 | v1 Phase 3 · Instagram sync | Complete |
 | AI-01..06 | v1 Phase 4 · AI analysis | Complete |
-| SCORE-01 | — | Pending |
-| SCORE-02 | — | Pending |
-| SCORE-03 | — | Pending |
-| SCORE-04 | — | Pending |
-| SCORE-05 | — | Pending |
-| SCORE-06 | — | Pending |
-| SCORE-07 | — | Pending |
-| POST-01 | — | Pending |
-| POST-02 | — | Pending |
-| POST-03 | — | Pending |
-| POST-04 | — | Pending |
-| IDENT-01 | — | Pending |
-| IDENT-02 | — | Pending |
-| IDENT-03 | — | Pending |
-| DASH-01 | — | Pending |
+| SCORE-01 | v2 Phase 6 · Scoring pipeline & catalog score UX | Pending |
+| SCORE-02 | v2 Phase 5 · Structured scoring foundation | Pending |
+| SCORE-03 | v2 Phase 6 · Scoring pipeline & catalog score UX | Pending |
+| SCORE-04 | v2 Phase 6 · Scoring pipeline & catalog score UX | Pending |
+| SCORE-05 | v2 Phase 5 · Structured scoring foundation | Pending |
+| SCORE-06 | v2 Phase 5 · Structured scoring foundation | Pending |
+| SCORE-07 | v2 Phase 5 · Structured scoring foundation | Pending |
+| POST-01 | v2 Phase 7 · Posting analytics | Pending |
+| POST-02 | v2 Phase 7 · Posting analytics | Pending |
+| POST-03 | v2 Phase 7 · Posting analytics | Pending |
+| POST-04 | v2 Phase 7 · Posting analytics | Pending |
+| IDENT-01 | v2 Phase 8 · Identity & “what to post next” | Pending |
+| IDENT-02 | v2 Phase 8 · Identity & “what to post next” | Pending |
+| IDENT-03 | v2 Phase 8 · Identity & “what to post next” | Pending |
+| DASH-01 | v2 Phase 9 · Insights dashboard | Pending |
 
 **Coverage:**
 - v1 requirements: 22 (complete)
 - v2 requirements: 15 total
-- Mapped to phases: 0 (awaiting roadmap)
+- Mapped to phases: 15 / 15 (Phases 5–9; see [ROADMAP.md](./ROADMAP.md))
 
 Roadmap: [.planning/ROADMAP.md](./ROADMAP.md)
 
 ---
 *Requirements defined: 2026-04-10*
 *v2 requirements added: 2026-04-11*
+*v2 roadmap / traceability: 2026-04-12*

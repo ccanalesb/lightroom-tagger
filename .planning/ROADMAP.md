@@ -1,15 +1,16 @@
-# Roadmap: Lightroom Tagger & Analyzer (v1)
+# Roadmap: Lightroom Tagger & Analyzer
 
-**Created:** 2026-04-10  
-**Source:** [.planning/REQUIREMENTS.md](./REQUIREMENTS.md) v1 requirement groups + dependency order from [.planning/research/SUMMARY.md](./research/SUMMARY.md)
+**v1 created:** 2026-04-10  
+**v2 milestone:** 2026-04-12 — Advanced Critique & Insights (Phases 5–9)  
+**Sources:** [.planning/REQUIREMENTS.md](./REQUIREMENTS.md), [.planning/research/SUMMARY.md](./research/SUMMARY.md), [.planning/PROJECT.md](./PROJECT.md)
 
 ## Principles
 
-- Phases are derived from the four v1 requirement sections (no extra buckets).
-- Each v1 requirement maps to **exactly one** phase (see traceability in REQUIREMENTS.md).
-- Execution order: stable catalog inventory first, then cross-cutting jobs and write-safety, then Instagram match/writeback, then AI on top of jobs and photos.
+- v1 Phases 1–4 shipped the MVP; v2 continues numbering at **Phase 5**.
+- Each v2 requirement maps to **exactly one** phase (see traceability in REQUIREMENTS.md).
+- Phase order: **schema, prompts, and output validation first**; **scoring pipeline second** (SCORE-07 no later than SCORE-01); **catalog surfacing of scores with jobs** third; **posting analytics** fourth; **identity, suggestions, and unified dashboard** last.
 
-## Phase overview
+## Milestone v1.0 — Phase overview (complete)
 
 | Phase | Name | v1 requirements |
 |-------|------|-------------------|
@@ -18,7 +19,7 @@
 | 3 | Instagram sync | IG-01 … IG-06 |
 | 4 | AI analysis | AI-01 … AI-06 |
 
-**Coverage:** 22 / 22 v1 requirements mapped.
+**Coverage:** 22 / 22 v1 requirements — **Complete** (2026-04-11).
 
 ---
 
@@ -117,7 +118,148 @@
 
 ---
 
+## Milestone v2.0 — Phase overview (Phases 5–9)
+
+| Phase | Name | v2 requirements |
+|-------|------|-----------------|
+| 5 | Structured scoring foundation | SCORE-02, SCORE-05, SCORE-06, SCORE-07 |
+| 6 | Scoring pipeline & catalog score UX | SCORE-01, SCORE-03, SCORE-04 |
+| 7 | Posting analytics | POST-01, POST-02, POST-03, POST-04 |
+| 8 | Identity & “what to post next” | IDENT-01, IDENT-02, IDENT-03 |
+| 9 | Insights dashboard | DASH-01 |
+
+**Coverage:** 15 / 15 v2 requirements mapped.
+
+**Dependency note:** Phase 6 depends on Phase 5 (validated contracts and persistence). Phases 8–9 depend on scored data from Phases 5–6 and benefit from posting analytics from Phase 7. Phase 7 is ingest- and match-driven and can proceed in parallel with Phase 6 once dump data exists from v1.
+
+---
+
+## Phase 5 — Structured scoring foundation
+
+**Requirements:** SCORE-02, SCORE-05, SCORE-06, SCORE-07
+
+**Intent:** Additive library DB shape for queryable per-perspective scores; photography-theory-grounded rubrics and configurable perspectives; strict structured-output validation and repair before any scoring job persists data. **SCORE-07 is satisfied here so the Phase 6 pipeline never commits unvalidated payloads.**
+
+### Success criteria (observable)
+
+1. User (or operator) can run migrations on a catalog library DB without breaking existing description rows; new score-related columns or tables exist and are documented for nullable / legacy semantics.
+2. User-facing copy or settings reflect at least one **new** critique perspective beyond the original three (e.g. color theory, emotional impact, or series coherence), selectable where perspectives are chosen for analysis.
+3. Critique prompts used for scoring reference photography theory framing (documented rubric sources or prompt library location), not only generic free-form instructions.
+4. When the system receives malformed structured LLM output, the user still sees either a repaired successful result or a failed job with a clear error — not silent corruption or empty score rows.
+5. Automated tests or golden fixtures demonstrate validation/retry behavior for representative malformed JSON (aligned with SCORE-07).
+
+### Plan progress (execution)
+
+| Plan | Title | Status |
+|------|--------|--------|
+| 05-01 | Library DB migration: queryable score storage, indexes, nullable legacy semantics | Not started |
+| 05-02 | Rubric prompt library: theory-grounded templates + configurable perspective registry | Not started |
+| 05-03 | Structured output schema (e.g. Pydantic), repair/retry path, and unit tests | Not started |
+| 05-04 | API/schema documentation for score fields and perspective keys | Not started |
+
+---
+
+## Phase 6 — Scoring pipeline & catalog score UX
+
+**Requirements:** SCORE-01, SCORE-03, SCORE-04
+
+**Intent:** Jobs and write path that produce numeric scores (1–10) per perspective with rationale; persist model and prompt/rubric version with each result; support re-run with a new rubric while retaining history; **catalog list and/or modal expose filters and sorting by persisted scores** (consumes SCORE-02 from Phase 5).
+
+### Success criteria (observable)
+
+1. User triggers scoring (single image or batch) and, on success, sees numeric scores per perspective with short written rationale in the catalog or image detail context.
+2. User inspects a scored image and can tell **which model and rubric/prompt version** produced the visible scores (badge, metadata panel, or equivalent).
+3. User re-runs scoring after a rubric update and can still access or compare **prior** scored generations distinct from the latest (version selector, history list, or dual timestamps).
+4. User applies a **score-based filter or sort** in the catalog grid (e.g. by perspective or axis) and the result set changes accordingly.
+5. Failed scoring jobs surface through existing job UX with enough detail to retry or change provider settings.
+
+### Plan progress (execution)
+
+| Plan | Title | Status |
+|------|--------|--------|
+| 06-01 | Scoring job handler(s), idempotency keys, integration with vision/provider stack | Not started |
+| 06-02 | Persist scores + rationale + `prompt_version` / model metadata via single write funnel | Not started |
+| 06-03 | Version history / supersede semantics in API and image detail UI | Not started |
+| 06-04 | Catalog API query params + UI controls for filter/sort by persisted scores | Not started |
+
+---
+
+## Phase 7 — Posting analytics
+
+**Requirements:** POST-01, POST-02, POST-03, POST-04
+
+**Intent:** Charts and views from Instagram **dump** timestamps and captions only (no engagement API); highlight cadence, timing patterns, caption/hashtag style, and **catalog vs posted** gaps.
+
+### Success criteria (observable)
+
+1. User opens a posting-analytics view and sees **posting frequency over time** as a timeline or histogram derived from matched dump timestamps.
+2. User sees **time-of-day and day-of-week** patterns (e.g. heatmap or equivalent) for when posts occurred.
+3. User sees **caption and hashtag** aggregates or summaries across posted images (frequencies, top tokens, or style summary — within v2 “simple analysis” scope).
+4. User opens a **not-yet-posted** or **gap** view listing catalog images that lack a confirmed post match, and can navigate from an item to the catalog.
+5. Chart labels or footers clarify timezone / export assumptions so users do not misread raw UTC as local wall time without notice.
+
+### Plan progress (execution)
+
+| Plan | Title | Status |
+|------|--------|--------|
+| 07-01 | Insights service + API: posting frequency buckets (UTC-normalized ingest) | Not started |
+| 07-02 | Time-of-day / day-of-week aggregation endpoints + chart payloads | Not started |
+| 07-03 | Caption & hashtag rollup queries + API | Not started |
+| 07-04 | Posted-gap catalog query + UI entry point | Not started |
+
+---
+
+## Phase 8 — Identity & “what to post next”
+
+**Requirements:** IDENT-01, IDENT-02, IDENT-03
+
+**Intent:** Rank “best photos” from aggregated perspective scores; surface a **style fingerprint** from patterns in scores/themes; suggest **what to post next** using catalog scores vs posting history gaps, with explainable hints (not a black box).
+
+### Success criteria (observable)
+
+1. User opens a “best photos” or ranked view and sees catalog images ordered by an **aggregated score** derived from existing perspective scores, with explicit labeling of which perspectives/versions contributed.
+2. User views a **style fingerprint** summary (themes, recurring strengths, or pattern labels) tied to **evidence** — e.g. linked example images or score breakdowns — not empty adjectives.
+3. User requests or sees **“what to post next”** suggestions that name **why** each candidate is suggested (gap vs history, under-represented theme, high score not yet posted, etc.).
+4. Empty or low-coverage states explain that more scoring or matching is needed instead of showing misleading rankings.
+5. All views respect **catalog scope** (single registered catalog) and do not leak other catalogs’ data.
+
+### Plan progress (execution)
+
+| Plan | Title | Status |
+|------|--------|--------|
+| 08-01 | Aggregation job or query layer for ranked “best photos” with coverage guards | Not started |
+| 08-02 | Style fingerprint synthesis (pattern rollup + UI presentation with examples) | Not started |
+| 08-03 | Suggestion heuristic: catalog scores × posting gaps + explainability copy | Not started |
+
+---
+
+## Phase 9 — Insights dashboard
+
+**Requirements:** DASH-01
+
+**Intent:** Single **insights** destination combining score distributions, posting patterns, and top-scored photos — reusing Phase 7–8 building blocks with cohesive layout and shared filters.
+
+### Success criteria (observable)
+
+1. User navigates to a dedicated **insights** page (or clearly named dashboard route) without hunting through disconnected tabs.
+2. The page shows **score distribution** (histogram, bucket chart, or equivalent) for at least one perspective or aggregate, with model/prompt version context where relevant.
+3. The page includes **posting pattern** visualizations consistent with Phase 7 (frequency and/or timing), or deep-links to them with shared date scope.
+4. The page surfaces **top-scored** or featured photos consistent with IDENT-01 logic, with click-through to the catalog image.
+5. Loading, error, and **empty states** are explicit (e.g. no dump imported, insufficient scored images).
+
+### Plan progress (execution)
+
+| Plan | Title | Status |
+|------|--------|--------|
+| 09-01 | Insights dashboard route + layout shell (charts placeholders wired to APIs) | Not started |
+| 09-02 | Integrate score distribution + posting widgets with shared scope controls | Not started |
+| 09-03 | Top-scored strip or grid + navigation to catalog modal | Not started |
+
+---
+
 ## Dependencies (high level)
+
+### v1
 
 ```mermaid
 flowchart LR
@@ -132,14 +274,31 @@ flowchart LR
   P2 --> P4
 ```
 
-- Phase 3 needs Phase 1 (catalog rows to match) and Phase 2 (backup, LR guard, jobs/errors for ingest and writeback).
-- Phase 4 needs Phase 1 (photos to analyze) and Phase 2 (job status, cancel, errors for AI jobs).
+### v2 (Phases 5–9)
+
+```mermaid
+flowchart LR
+  P5[Phase 5 Scoring foundation]
+  P6[Phase 6 Scoring pipeline and catalog UX]
+  P7[Phase 7 Posting analytics]
+  P8[Phase 8 Identity and suggestions]
+  P9[Phase 9 Insights dashboard]
+  P5 --> P6
+  P6 --> P8
+  P6 --> P9
+  P7 --> P9
+  P8 --> P9
+```
+
+- Phase 6 requires Phase 5 (schema, prompts, validation).
+- Phases 8–9 require Phase 6 (scored data). Phase 9 also composes Phase 7 (posting) and Phase 8 (ranking/fingerprint/suggestions) into one page.
+- Phase 7 can run in parallel with Phase 6 after v1 Instagram data exists; Phase 8 should follow Phase 6; Phase 9 follows 7 and 8.
 
 ---
 
-## Out of scope (v1)
+## Out of scope
 
-Deferred items remain as documented in [REQUIREMENTS.md](./REQUIREMENTS.md) (v2 and Out of Scope tables).
+Deferred and out-of-scope items remain as documented in [REQUIREMENTS.md](./REQUIREMENTS.md).
 
 ---
-*Roadmap created: 2026-04-10 · Last plan progress edit: 2026-04-11 (all 6 Phase 4 plans complete; all 4 phases complete).*
+*Roadmap v1 section: 2026-04-10 · v1 complete: 2026-04-11 · v2 Phases 5–9 added: 2026-04-12.*
