@@ -80,17 +80,20 @@ The user is a photographer managing work across multiple Lightroom catalogs (per
 - Phase 2 complete — job lifecycle, cooperative cancellation, catalog backup/lock guard, error severity
 - Phase 3 complete — Instagram dump import, image matching, posted keyword writeback, matches UI
 - Phase 4 complete — AI descriptions (single + batch), provider health probes, catalog analyzed filter, SR2 support
+- Phase 5 complete — structured scoring foundation: image_scores/perspectives schema, Pydantic validation with LLM repair, 4 rubrics (street/documentary/publisher/color_theory) with theory citations, dynamic prompt builder, perspectives REST API + CodeMirror UI, job checkpointing with fingerprinted resume, orphan recovery with auto-requeue
 - Read-only catalog enforcement via SQLite URI `mode=ro` prevents accidental writes
 - Library DB keys unified with `YYYY-MM-DD_filename` format, migration with backup
 - Instagram presence with analytics data available via export dumps
 - AI providers configurable with health probes and separate description defaults
 - Batch describe supports 12-month windows, min_rating filter, SR2/RAW pipeline hardened
+- Perspectives configurable via Processing UI; critique prompts built dynamically from DB with selectable slugs
+- Job checkpointing persists progress for crash recovery; orphaned jobs auto-resume if checkpointed
 
 ### Instagram Dump Format
 User provides Instagram export dumps containing images, captions, timestamps, and EXIF. App matches these to Lightroom catalog entries by comparing images, then writes keywords back to the SQLite catalog file. Note: Instagram exports do NOT include per-post engagement metrics (likes, saves, comments) — analytics are derived from posting patterns and AI scores only.
 
 ### Analysis Philosophy
-Critique should come from defined perspectives (street photographer, editor, publisher) with starting prompts refined by photography theory from books and publications. Focus is artistic execution and narrative fit, not technical metrics.
+Critique should come from defined perspectives (street photographer, documentary, publisher, color theory) with starting prompts refined by photography theory from books and publications. Perspectives are configurable via the Processing UI with CodeMirror markdown editing. Focus is artistic execution and narrative fit, not technical metrics.
 
 ## Constraints
 
@@ -132,4 +135,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-11 — v2.0 milestone started (Advanced Critique & Insights)*
+*Last updated: 2026-04-12 — Phase 5 complete (Structured Scoring Foundation)*
