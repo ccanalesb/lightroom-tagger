@@ -48,6 +48,24 @@ export const DATE_ESTIMATED_SUFFIX = '(est.)'
 // Image details
 export const IMAGE_DETAILS_TITLE = 'Image Details'
 export const IMAGE_DETAILS_AI_DESCRIPTION = 'AI Description'
+
+// Catalog image modal — critique scores (phase 06-03)
+export const SECTION_IMAGE_SCORES = 'Critique scores'
+export const ACTION_RUN_SCORING = 'Run scoring'
+export const SCORES_LOADING = 'Loading scores…'
+export const ACTION_SCORING_IN_PROGRESS = 'Scoring…'
+export const LABEL_SCORES_PERSPECTIVES = 'Perspectives'
+export const SCORES_LOADING_PERSPECTIVES = 'Loading perspectives…'
+export const SCORES_FORCE_SAME_RUBRIC = 'Force re-score same rubric revision'
+export const SCORES_EMPTY_HINT =
+  'No critique scores for this image yet. Run scoring from the button below or use Processing → Descriptions to batch score.'
+export const SCORES_VERSION_HISTORY = 'Version history'
+export const SCORES_LOADING_HISTORY = 'Loading history…'
+export const SCORES_NO_PRIOR_VERSIONS = 'No prior versions.'
+export const SCORES_OUTPUT_REPAIRED = 'Output was repaired before save'
+export const SCORES_NO_ACTIVE_PERSPECTIVES =
+  'No active perspectives to score. Add perspectives in Processing.'
+export const SCORES_FAILED_GENERIC = 'Scoring failed'
 export const LABEL_FOLDER = 'Folder'
 export const LABEL_SOURCE = 'Source'
 export const LABEL_DATE = 'Date'

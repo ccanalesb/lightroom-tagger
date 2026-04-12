@@ -1,65 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { API_DEFAULT_URL } from '../../constants/strings';
+import {
+  SCORES_EMPTY_HINT,
+  SCORES_LOADING,
+  SCORES_LOADING_HISTORY,
+  SCORES_NO_PRIOR_VERSIONS,
+  SCORES_OUTPUT_REPAIRED,
+  SCORES_VERSION_HISTORY,
+} from '../../constants/strings';
+import type { ImageScoreRow } from '../../services/api';
+import { ScoresAPI } from '../../services/api';
 import { Badge } from '../ui/Badge';
-
-const API_URL = import.meta.env.VITE_API_URL || API_DEFAULT_URL;
-
-export interface ImageScoreRow {
-  id?: number;
-  image_key: string;
-  image_type: string;
-  perspective_slug: string;
-  score: number;
-  rationale: string;
-  model_used: string;
-  prompt_version: string;
-  scored_at: string;
-  is_current: boolean;
-  repaired_from_malformed: boolean;
-}
-
-async function scoresJsonRequest<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-  });
-  if (!response.ok) {
-    let detail = `${response.status} ${response.statusText}`;
-    try {
-      const body = await response.json();
-      if (body && typeof (body as { error?: unknown }).error === 'string') {
-        detail = (body as { error: string }).error;
-      }
-    } catch {
-      /* ignore */
-    }
-    throw new Error(detail);
-  }
-  return response.json();
-}
-
-/** Mirrors `ScoresAPI` from `api.ts` (06-02); local until shared client lands. */
-const ScoresAPI = {
-  getCurrent: (imageKey: string, params?: { image_type?: 'catalog' | 'instagram' }) => {
-    const sp = new URLSearchParams();
-    if (params?.image_type) sp.set('image_type', params.image_type);
-    const qs = sp.toString();
-    return scoresJsonRequest<{ current: ImageScoreRow[] }>(
-      `/scores/${encodeURIComponent(imageKey)}${qs ? `?${qs}` : ''}`,
-    ).then((body) => body.current ?? []);
-  },
-
-  getHistory: (
-    imageKey: string,
-    params: { perspective_slug: string; image_type?: 'catalog' | 'instagram' },
-  ) => {
-    const sp = new URLSearchParams();
-    sp.set('perspective_slug', params.perspective_slug);
-    if (params.image_type) sp.set('image_type', params.image_type);
-    return scoresJsonRequest<{ history: ImageScoreRow[] }>(
-      `/scores/${encodeURIComponent(imageKey)}/history?${sp.toString()}`,
-    ).then((body) => body.history ?? []);
-  },
-};
 
 export interface ImageScoresPanelProps {
   imageKey: string;
@@ -122,7 +72,7 @@ export default function ImageScoresPanel({
     ScoresAPI.getCurrent(imageKey, { image_type: imageType })
       .then((data) => {
         if (!cancelled) {
-          setCurrent(data);
+          setCurrent(data.current ?? []);
         }
       })
       .catch((err) => {
@@ -154,11 +104,11 @@ export default function ImageScoresPanel({
       setHistoryLoading((h) => ({ ...h, [slug]: true }));
       setHistoryError((h) => ({ ...h, [slug]: null }));
       try {
-        const hist = await ScoresAPI.getHistory(imageKey, {
+        const body = await ScoresAPI.getHistory(imageKey, {
           perspective_slug: slug,
           image_type: imageType,
         });
-        setHistoryBySlug((c) => ({ ...c, [slug]: hist }));
+        setHistoryBySlug((c) => ({ ...c, [slug]: body.history ?? [] }));
       } catch (e) {
         setHistoryError((h) => ({ ...h, [slug]: String(e) }));
       } finally {
@@ -188,7 +138,7 @@ export default function ImageScoresPanel({
   }, []);
 
   if (loading) {
-    return <p className="text-sm text-text-tertiary">Loading scores…</p>;
+    return <p className="text-sm text-text-tertiary">{SCORES_LOADING}</p>;
   }
 
   if (error) {
@@ -196,12 +146,7 @@ export default function ImageScoresPanel({
   }
 
   if (rows.length === 0) {
-    return (
-      <p className="text-sm text-text-secondary">
-        No critique scores for this image yet. Run scoring from the button below or use Processing →
-        Descriptions to batch score.
-      </p>
-    );
+    return <p className="text-sm text-text-secondary">{SCORES_EMPTY_HINT}</p>;
   }
 
   return (
@@ -238,7 +183,7 @@ export default function ImageScoresPanel({
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-                Version history
+                {SCORES_VERSION_HISTORY}
               </button>
             </div>
             <p className="text-sm text-text-secondary whitespace-pre-wrap">{row.rationale}</p>
@@ -246,17 +191,17 @@ export default function ImageScoresPanel({
               {row.model_used} · {row.prompt_version} · {formatScoredAt(row.scored_at)}
             </p>
             {row.repaired_from_malformed && (
-              <p className="text-xs text-warning">Output was repaired before save</p>
+              <p className="text-xs text-warning">{SCORES_OUTPUT_REPAIRED}</p>
             )}
 
             {expanded && (
               <div className="pt-2 border-t border-border space-y-2">
                 {histLoading && (
-                  <p className="text-xs text-text-tertiary">Loading history…</p>
+                  <p className="text-xs text-text-tertiary">{SCORES_LOADING_HISTORY}</p>
                 )}
                 {histErr && <p className="text-xs text-error">{histErr}</p>}
                 {!histLoading && !histErr && historyRows && historyRows.length === 0 && (
-                  <p className="text-xs text-text-secondary">No prior versions.</p>
+                  <p className="text-xs text-text-secondary">{SCORES_NO_PRIOR_VERSIONS}</p>
                 )}
                 {!histLoading &&
                   !histErr &&

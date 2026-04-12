@@ -9,10 +9,18 @@ import { Badge } from '../ui/Badge';
 import { MetadataRow } from '../ui/MetadataRow';
 import { useJobSocket } from '../../hooks/useJobSocket';
 import {
-  IMAGE_DETAILS_TITLE,
-  LABEL_FILENAME,
-  LABEL_DATE,
+  ACTION_RUN_SCORING,
+  ACTION_SCORING_IN_PROGRESS,
   DATE_NO_DATE,
+  IMAGE_DETAILS_TITLE,
+  LABEL_DATE,
+  LABEL_FILENAME,
+  LABEL_SCORES_PERSPECTIVES,
+  SCORES_FAILED_GENERIC,
+  SCORES_FORCE_SAME_RUBRIC,
+  SCORES_LOADING_PERSPECTIVES,
+  SCORES_NO_ACTIVE_PERSPECTIVES,
+  SECTION_IMAGE_SCORES,
 } from '../../constants/strings';
 import ImageScoresPanel from './ImageScoresPanel';
 
@@ -135,7 +143,7 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
           } else if (job.status === 'failed') {
             setPendingScoreJobId(null);
             setScoring(false);
-            setScoreError(job.error ?? 'Scoring failed');
+            setScoreError(job.error ?? SCORES_FAILED_GENERIC);
           } else if (job.status === 'cancelled') {
             setPendingScoreJobId(null);
             setScoring(false);
@@ -170,7 +178,7 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
         ? selectedPerspectiveSlugs
         : activePerspectiveRows.map((r) => r.slug);
     if (slugs.length === 0) {
-      setScoreError('No active perspectives to score. Add perspectives in Processing.');
+      setScoreError(SCORES_NO_ACTIVE_PERSPECTIVES);
       return;
     }
     setScoring(true);
@@ -318,7 +326,7 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
             </div>
 
             <div className="p-4 bg-surface rounded-base border border-border">
-              <h3 className="text-sm font-medium text-text mb-2">Critique scores</h3>
+              <h3 className="text-sm font-medium text-text mb-2">{SECTION_IMAGE_SCORES}</h3>
               <ImageScoresPanel
                 imageKey={image.key}
                 imageType="catalog"
@@ -331,15 +339,15 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  <span className="text-sm text-text-secondary">Scoring…</span>
+                  <span className="text-sm text-text-secondary">{ACTION_SCORING_IN_PROGRESS}</span>
                 </div>
               )}
               {scoreError && <p className="text-sm text-error mt-2">{scoreError}</p>}
               <div className="mt-3 space-y-2">
-                <span className="block text-xs font-medium text-text">Perspectives</span>
+                <span className="block text-xs font-medium text-text">{LABEL_SCORES_PERSPECTIVES}</span>
                 <div className="flex flex-col gap-2 max-h-32 overflow-y-auto border border-border rounded-base p-2 bg-bg">
                   {activePerspectiveRows.length === 0 ? (
-                    <span className="text-xs text-text-secondary">Loading perspectives…</span>
+                    <span className="text-xs text-text-secondary">{SCORES_LOADING_PERSPECTIVES}</span>
                   ) : (
                     activePerspectiveRows.map((p) => (
                       <label
@@ -375,7 +383,7 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
                     className="w-3.5 h-3.5 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
                   />
                   <label htmlFor="catalog-score-force" className="text-xs text-text cursor-pointer">
-                    Force re-score same rubric revision
+                    {SCORES_FORCE_SAME_RUBRIC}
                   </label>
                 </div>
                 <div className="flex justify-end pt-1">
@@ -387,7 +395,7 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
                     }}
                     className="flex-shrink-0 px-3 py-1 rounded text-xs font-medium transition-colors bg-accent text-white hover:opacity-90 disabled:opacity-50"
                   >
-                    {scoring ? 'Scoring…' : 'Run scoring'}
+                    {scoring ? ACTION_SCORING_IN_PROGRESS : ACTION_RUN_SCORING}
                   </button>
                 </div>
               </div>
