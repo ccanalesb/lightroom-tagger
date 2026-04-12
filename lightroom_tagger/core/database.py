@@ -3,7 +3,8 @@ import json
 import os
 import shutil
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 
 def resolve_filepath(path: str) -> str:
@@ -89,6 +90,85 @@ def _serialize_json(value) -> str | None:
     if isinstance(value, str):
         return value
     return json.dumps(value)
+
+
+def _perspective_seed_description(markdown: str) -> str:
+    """First body line for ``perspectives.description`` when seeding from disk."""
+    lines = markdown.splitlines()
+    i = 0
+    while i < len(lines) and not lines[i].strip():
+        i += 1
+    if i >= len(lines):
+        return ""
+    first = lines[i].strip()
+    if first.startswith("# ") and not first.startswith("##"):
+        i += 1
+        while i < len(lines) and not lines[i].strip():
+            i += 1
+        if i >= len(lines):
+            return first.lstrip("#").strip()
+        return lines[i].strip()
+    return first
+
+
+def seed_perspectives_from_prompts_dir(
+    conn: sqlite3.Connection, prompts_dir: str | None = None
+) -> int:
+    """Insert default perspective rows from ``prompts/perspectives/*.md`` when the table is empty.
+
+    Default *prompts_dir* is the repo's ``prompts/perspectives`` directory, resolved from this
+    module's path: ``Path(__file__).resolve().parents[2] / "prompts" / "perspectives"``
+    (repo root → ``prompts`` → ``perspectives``). That matches editable installs where the
+    package lives under the project root; callers may pass an absolute path when bundling.
+
+    If ``SELECT COUNT(*) FROM perspectives`` is greater than zero, returns ``0`` without
+    reading files (factory seed runs once; DB remains authoritative afterward).
+
+    Returns the number of rows inserted.
+    """
+    if prompts_dir is None:
+        prompts_dir = str(
+            Path(__file__).resolve().parents[2] / "prompts" / "perspectives"
+        )
+
+    row = conn.execute("SELECT COUNT(*) AS cnt FROM perspectives").fetchone()
+    if row is not None and int(row["cnt"]) > 0:
+        return 0
+
+    base = Path(prompts_dir)
+    if not base.is_dir():
+        return 0
+
+    base_resolved = base.resolve()
+    inserted = 0
+    now = datetime.now(timezone.utc).isoformat()
+
+    for entry in sorted(base_resolved.iterdir(), key=lambda p: p.name):
+        if not entry.is_file() or entry.suffix.lower() != ".md":
+            continue
+        try:
+            entry.resolve().relative_to(base_resolved)
+        except ValueError:
+            continue
+
+        slug = entry.stem
+        source_filename = entry.name
+        text = entry.read_text(encoding="utf-8")
+        display_name = slug.replace("_", " ").title()
+        description = _perspective_seed_description(text)
+
+        conn.execute(
+            """
+            INSERT INTO perspectives (
+                slug, display_name, description, prompt_markdown,
+                active, source_filename, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+            """,
+            (slug, display_name, description, text, source_filename, now, now),
+        )
+        inserted += 1
+
+    return inserted
 
 
 def init_database(db_path: str) -> sqlite3.Connection:
@@ -294,6 +374,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
     """)
 
     _migrate_unified_image_keys(conn)
+    seed_perspectives_from_prompts_dir(conn)
     conn.commit()
     return conn
 
