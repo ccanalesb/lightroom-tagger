@@ -3,72 +3,61 @@
 **Defined:** 2026-04-10
 **Core Value:** Know which catalog images are posted on Instagram and get artistic critique that helps you understand your photographic voice and posting strategy.
 
-## v1 Requirements
+## v1 Requirements (Complete)
 
-Requirements for initial release. Each maps to roadmap phases.
-
-### Catalog Management
-
-- [x] **CAT-01**: User can register a Lightroom catalog (.lrcat file)
-- [x] **CAT-02**: User can browse photos from the catalog with pagination
-- [x] **CAT-03**: User can search/filter photos by basic criteria
-- [x] **CAT-04**: System maintains stable photo identity across sessions
-- [x] **CAT-05**: System reads catalog safely without corruption risk
-
-### Instagram Sync
-
-- [x] **IG-01**: User can upload Instagram export dump
-- [x] **IG-02**: System parses images and metadata from dump
-- [x] **IG-03**: System matches dump images to catalog photos with confidence scores
-- [x] **IG-04**: User can confirm or reject proposed matches
-- [x] **IG-05**: System writes "posted" keyword to confirmed matches in Lightroom catalog
-- [x] **IG-06**: User can see which catalog photos are marked as posted
-
-### AI Analysis
-
-- [x] **AI-01**: User can configure AI provider (Ollama, OpenAI, etc.)
-- [x] **AI-02**: User can trigger on-demand description for a single photo
-- [x] **AI-03**: User can trigger batch description for selected photos or timeframe
-- [x] **AI-04**: System stores AI descriptions with source photo
-- [x] **AI-05**: User can view AI descriptions alongside photos
-- [x] **AI-06**: System tracks which photos have been analyzed
-
-### Jobs & System
-
-- [x] **SYS-01**: User can see job status (queued, running, complete, failed)
-- [x] **SYS-02**: User can cancel running jobs
-- [x] **SYS-03**: System backs up catalog before any write operation
-- [x] **SYS-04**: User receives clear error messages when operations fail
-- [x] **SYS-05**: System prevents writes when Lightroom has catalog open
+All 22 requirements shipped in v1.0 (2026-04-11). See [milestones/v1.0-REQUIREMENTS.md](./milestones/v1.0-REQUIREMENTS.md) for full detail.
 
 ## v2 Requirements
 
-Deferred to future release. Tracked but not in current roadmap.
+Requirements for v2.0 Advanced Critique & Insights milestone.
 
-### Advanced AI Analysis
+### Structured Scoring & Prompts
 
-- **AI-07**: Multi-perspective critique (street photographer, editor, publisher views)
-- **AI-08**: Structured artistic feedback (composition, narrative, rhythm)
-- **AI-09**: Score photos from different perspectives
-- **AI-10**: Improve critique prompts with photography theory knowledge
+- [ ] **SCORE-01**: User can trigger scoring that produces numeric scores (1-10) per perspective with written rationale
+- [ ] **SCORE-02**: System persists scores as queryable fields (not just JSON blobs) so catalog can filter/sort by score
+- [ ] **SCORE-03**: System tracks which prompt version and model generated each score (rubric versioning)
+- [ ] **SCORE-04**: User can re-run scoring with an updated rubric and see both old and new results distinguished by version
+- [ ] **SCORE-05**: Critique prompts are grounded in photography theory from publications and critique frameworks
+- [ ] **SCORE-06**: User can add new critique perspectives beyond the existing three (e.g., color theory, emotional impact, series coherence)
+- [ ] **SCORE-07**: System validates structured LLM output and retries/repairs malformed JSON before persisting
 
-### Analytics & Insights
+### Posting Analytics
 
-- **ANLZ-01**: Extract and display Instagram analytics (likes, saves, engagement)
-- **ANLZ-02**: Identify "best photos" combining AI scores and Instagram performance
-- **ANLZ-03**: Show photographer identity analysis across all work
-- **ANLZ-04**: Identify patterns in what performs well on Instagram
-- **ANLZ-05**: Suggest what to post next based on catalog analysis
+- [ ] **POST-01**: User can see posting frequency over time (timeline chart)
+- [ ] **POST-02**: User can see time-of-day and day-of-week posting patterns (heatmap)
+- [ ] **POST-03**: User can see caption and hashtag usage analysis across posted images
+- [ ] **POST-04**: User can identify catalog images not yet posted (catalog vs posted gap view)
+
+### Identity & Suggestions
+
+- [ ] **IDENT-01**: User can see a "best photos" ranking based on aggregated AI perspective scores
+- [ ] **IDENT-02**: User can see a style fingerprint — recurring visual and thematic patterns across their work
+- [ ] **IDENT-03**: User can get "what to post next" suggestions based on catalog scores vs posting history gaps
+
+### Insights Dashboard
+
+- [ ] **DASH-01**: User can view a unified insights page with score distributions, posting patterns, and top-scored photos
+
+## Future Requirements
+
+Deferred beyond v2.0.
 
 ### Multi-Catalog
 
 - **MCAT-01**: User can switch between multiple registered catalogs
 - **MCAT-02**: System maintains unified photographer identity view across catalogs
-- **MCAT-03**: User can analyze catalog-specific work (e.g., wedding catalog) independently
+- **MCAT-03**: User can analyze catalog-specific work independently
+
+### Engagement Overlay
+
+- **ENG-01**: User can manually enter or import engagement data (likes, saves) for posted images
+- **ENG-02**: "Best photos" ranking incorporates engagement data alongside AI scores
+
+### Dashboard Drill-Down
+
+- **DRILL-01**: User can click chart data points to navigate to specific photos
 
 ## Out of Scope
-
-Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
@@ -77,8 +66,9 @@ Explicitly excluded. Documented to prevent scope creep.
 | Technical EXIF analysis | Focus is artistic critique, not camera settings |
 | Real-time Instagram syncing | Manual dump workflow sufficient for use case |
 | Batch analysis of entire catalog upfront | On-demand keeps costs controlled |
-| Support for multiple social platforms | Focus on Instagram first; add others only with clear demand |
-| Automated posting suggestions | Defer until patterns are proven valuable |
+| Per-post engagement metrics from dumps | Instagram exports don't include likes/saves/comments counts |
+| Embedding-based style fingerprint | Overkill — use score pattern analysis first |
+| Full NLP on captions | Simple frequency/hashtag analysis sufficient for v2 |
 
 ## Traceability
 
@@ -86,36 +76,33 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CAT-01 | 1 · Catalog management | Complete |
-| CAT-02 | 1 · Catalog management | Complete |
-| CAT-03 | 1 · Catalog management | Complete |
-| CAT-04 | 1 · Catalog management | Complete |
-| CAT-05 | 1 · Catalog management | Complete |
-| SYS-01 | 2 · Jobs & system reliability | Complete |
-| SYS-02 | 2 · Jobs & system reliability | Complete |
-| SYS-03 | 2 · Jobs & system reliability | Complete |
-| SYS-04 | 2 · Jobs & system reliability | Complete |
-| SYS-05 | 2 · Jobs & system reliability | Complete |
-| IG-01 | 3 · Instagram sync | Complete |
-| IG-02 | 3 · Instagram sync | Complete |
-| IG-03 | 3 · Instagram sync | Complete |
-| IG-04 | 3 · Instagram sync | Complete |
-| IG-05 | 3 · Instagram sync | Complete |
-| IG-06 | 3 · Instagram sync | Complete |
-| AI-01 | 4 · AI analysis | Complete |
-| AI-02 | 4 · AI analysis | Complete |
-| AI-03 | 4 · AI analysis | Complete |
-| AI-04 | 4 · AI analysis | Complete |
-| AI-05 | 4 · AI analysis | Complete |
-| AI-06 | 4 · AI analysis | Complete |
+| CAT-01..05 | v1 Phase 1 · Catalog management | Complete |
+| SYS-01..05 | v1 Phase 2 · Jobs & system reliability | Complete |
+| IG-01..06 | v1 Phase 3 · Instagram sync | Complete |
+| AI-01..06 | v1 Phase 4 · AI analysis | Complete |
+| SCORE-01 | — | Pending |
+| SCORE-02 | — | Pending |
+| SCORE-03 | — | Pending |
+| SCORE-04 | — | Pending |
+| SCORE-05 | — | Pending |
+| SCORE-06 | — | Pending |
+| SCORE-07 | — | Pending |
+| POST-01 | — | Pending |
+| POST-02 | — | Pending |
+| POST-03 | — | Pending |
+| POST-04 | — | Pending |
+| IDENT-01 | — | Pending |
+| IDENT-02 | — | Pending |
+| IDENT-03 | — | Pending |
+| DASH-01 | — | Pending |
 
 **Coverage:**
-- v1 requirements: 22 total
-- Mapped to phases: 22
-- Complete: 22
+- v1 requirements: 22 (complete)
+- v2 requirements: 15 total
+- Mapped to phases: 0 (awaiting roadmap)
 
 Roadmap: [.planning/ROADMAP.md](./ROADMAP.md)
 
 ---
 *Requirements defined: 2026-04-10*
-*Last updated: 2026-04-11 — all 22 v1 requirements verified complete via browser agent UAT*
+*v2 requirements added: 2026-04-11*
