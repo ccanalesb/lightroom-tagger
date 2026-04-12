@@ -232,6 +232,41 @@ def init_database(db_path: str) -> sqlite3.Connection:
         );
 
         CREATE INDEX IF NOT EXISTS idx_desc_image_type ON image_descriptions(image_type);
+
+        CREATE TABLE IF NOT EXISTS perspectives (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            slug TEXT NOT NULL UNIQUE,
+            display_name TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            prompt_markdown TEXT NOT NULL DEFAULT '',
+            active INTEGER NOT NULL DEFAULT 1,
+            source_filename TEXT,
+            updated_at TEXT,
+            created_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS image_scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_key TEXT NOT NULL,
+            image_type TEXT NOT NULL DEFAULT 'catalog',
+            perspective_slug TEXT NOT NULL,
+            score INTEGER NOT NULL CHECK (score BETWEEN 1 AND 10),
+            rationale TEXT NOT NULL DEFAULT '',
+            model_used TEXT NOT NULL DEFAULT '',
+            prompt_version TEXT NOT NULL DEFAULT '',
+            scored_at TEXT NOT NULL,
+            is_current INTEGER NOT NULL DEFAULT 1,
+            repaired_from_malformed INTEGER NOT NULL DEFAULT 0,
+            CONSTRAINT uq_image_scores_versioned
+                UNIQUE (image_key, image_type, perspective_slug, prompt_version)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_image_scores_perspective_score
+            ON image_scores(perspective_slug, score);
+        CREATE INDEX IF NOT EXISTS idx_image_scores_image
+            ON image_scores(image_key, image_type);
+        CREATE INDEX IF NOT EXISTS idx_image_scores_current
+            ON image_scores(image_key, image_type, perspective_slug, is_current);
     """)
 
     # Migrations for existing databases
@@ -1456,3 +1491,117 @@ def get_all_images_with_descriptions(db: sqlite3.Connection,
     rows = db.execute(page_sql, all_params).fetchall()
 
     return [_deserialize_row(r) for r in rows], total
+
+
+# ---------------------------------------------------------------------------
+# Perspectives & image scores (structured scoring)
+# ---------------------------------------------------------------------------
+#
+# ## Queryable score fields (image_scores)
+#
+# - **id**: Surrogate primary key for this score row.
+# - **image_key**: Library image identity (e.g. ``YYYY-MM-DD_filename.jpg``).
+# - **image_type**: ``catalog`` vs ``instagram`` (dump media keys).
+# - **perspective_slug**: Stable key matching ``perspectives.slug``.
+# - **score**: Integer rubric score 1–10.
+# - **rationale**: Short text justification from the model.
+# - **model_used**: Provider/model identifier for the scoring call.
+# - **prompt_version**: Rubric/prompt revision label; unique per image+type+slug.
+# - **scored_at**: ISO-8601 timestamp when the score was recorded.
+# - **is_current**: 1 if this row is the active score for this image+type+slug.
+# - **repaired_from_malformed**: 1 if the row was persisted after output repair.
+#
+# Join ``image_scores`` with ``LEFT JOIN`` from catalog/dump rows: **no matching
+# row means that image has not been scored yet** for that perspective (and type).
+
+
+def list_perspectives(
+    conn: sqlite3.Connection, *, active_only: bool = False
+) -> list[dict]:
+    """Return perspective rows as dicts ordered by ``slug``."""
+    sql = "SELECT * FROM perspectives"
+    if active_only:
+        sql += " WHERE active = 1"
+    sql += " ORDER BY slug ASC"
+    rows = conn.execute(sql).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_perspective_by_slug(conn: sqlite3.Connection, slug: str) -> dict | None:
+    """Return one perspective row by ``slug``, or ``None``."""
+    row = conn.execute(
+        "SELECT * FROM perspectives WHERE slug = ? LIMIT 1", (slug,)
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def insert_image_score(conn: sqlite3.Connection, row: dict) -> int:
+    """Insert one ``image_scores`` row; return ``lastrowid``.
+
+    Caller manages transactions and coordinating ``is_current`` / supersede calls.
+    """
+    cursor = conn.execute(
+        """
+        INSERT INTO image_scores (
+            image_key, image_type, perspective_slug, score, rationale,
+            model_used, prompt_version, scored_at, is_current,
+            repaired_from_malformed
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            row["image_key"],
+            row.get("image_type", "catalog"),
+            row["perspective_slug"],
+            row["score"],
+            row.get("rationale", ""),
+            row.get("model_used", ""),
+            row.get("prompt_version", ""),
+            row["scored_at"],
+            int(row.get("is_current", 1)),
+            int(row.get("repaired_from_malformed", 0)),
+        ),
+    )
+    last = cursor.lastrowid
+    assert last is not None
+    return int(last)
+
+
+def supersede_previous_current_scores(
+    conn: sqlite3.Connection,
+    image_key: str,
+    image_type: str,
+    perspective_slug: str,
+    new_prompt_version: str,
+) -> None:
+    """Set ``is_current = 0`` for rows matching key, type, and slug whose
+    ``prompt_version`` is not ``new_prompt_version``.
+
+    Call before inserting a new current row for the same image+type+slug so only
+    the new version remains ``is_current = 1``.
+    """
+    conn.execute(
+        """
+        UPDATE image_scores
+        SET is_current = 0
+        WHERE image_key = ?
+          AND image_type = ?
+          AND perspective_slug = ?
+          AND prompt_version != ?
+        """,
+        (image_key, image_type, perspective_slug, new_prompt_version),
+    )
+
+
+def get_current_scores_for_image(
+    conn: sqlite3.Connection, image_key: str, image_type: str = "catalog"
+) -> list[dict]:
+    """Return all ``image_scores`` rows for this image with ``is_current = 1``."""
+    rows = conn.execute(
+        """
+        SELECT * FROM image_scores
+        WHERE image_key = ? AND image_type = ? AND is_current = 1
+        ORDER BY perspective_slug ASC
+        """,
+        (image_key, image_type),
+    ).fetchall()
+    return [dict(r) for r in rows]
