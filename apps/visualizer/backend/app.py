@@ -72,9 +72,10 @@ def create_app():
     db = init_db(db_path)
     app.db = db
 
-    from api import descriptions, images, jobs, lt_config, perspectives, providers, scores, system
+    from api import analytics, descriptions, images, jobs, lt_config, perspectives, providers, scores, system
     app.register_blueprint(jobs.bp, url_prefix='/api/jobs')
     app.register_blueprint(images.bp, url_prefix='/api/images')
+    app.register_blueprint(analytics.bp, url_prefix='/api/analytics')
     app.register_blueprint(descriptions.bp, url_prefix='/api/descriptions')
     app.register_blueprint(providers.bp, url_prefix='/api/providers')
     app.register_blueprint(system.bp, url_prefix='/api')
