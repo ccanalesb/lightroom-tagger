@@ -201,3 +201,40 @@ Not modified (orchestrator-owned per wave instructions).
 ## STATE / ROADMAP
 
 Not modified (orchestrator-owned per wave instructions).
+
+---
+
+# Plan 05-06 — Execution summary
+
+**Phase:** 05 — Structured scoring foundation  
+**Plan:** Orphan job auto-resume on startup and UI notification  
+**Date:** 2026-04-12
+
+## Outcomes
+
+- **`_recover_orphaned_jobs`** (`apps/visualizer/backend/app.py`): For each **`running`** row from **`get_active_jobs`**, if **`metadata.checkpoint`** is a dict with **`checkpoint_version == 1`**, the job is moved to **`pending`** with progress preserved, **`current_step`** set to **`Recovered after restart`**, and an **`info`** log **`Recovered after restart; job re-queued with checkpoint.`**; otherwise **`failed`** with the unchanged legacy **`error`** log. **`print`** lines include **`re-queued pending with checkpoint`** vs **`marked as failed`**. Non-empty resume list triggers **`socketio.emit('jobs_recovered', {'job_ids': recovered_ids})`** when **`socketio`** is set.
+- **`apps/visualizer/backend/tests/test_orphan_recovery.py`**: Temp jobs DB — checkpointed running job ends **`pending`** with the exact info substring; running job with **`metadata` `{}`** ends **`failed`** with the restart substring in logs.
+- **Frontend**: **`useJobSocket`** accepts optional **`onJobsRecovered`** and registers **`jobs_recovered`**. **`ProcessingPage`** is the sole **`useJobSocket`** caller; job list state, initial load, and refresh are lifted from **`JobQueueTab`**, which now takes **`jobs`**, **`setJobs`**, **`jobsLoading`**, **`connected`**, and **`onRefreshJobs`**. Dismissible banner (exact copy: **`Some jobs were automatically resumed after the last server restart. Check the job queue for progress.`**) with **Dismiss** sits above the tabs, styled with **`border-border`** and **`bg-surface`**.
+
+## Commits
+
+1. `feat(05-06): checkpoint-aware orphan job recovery and jobs_recovered emit`
+2. `test(05-06): cover checkpoint orphan requeue and legacy fail path`
+3. `feat(05-06): jobs_recovered socket banner and single useJobSocket on Processing`
+4. `docs(05-06): append plan 05-06 summary to SUMMARY.md`
+
+## Verification
+
+| Check | Result |
+|--------|--------|
+| `uv run pytest apps/visualizer/backend/tests/test_orphan_recovery.py -q` | Pass |
+| `cd apps/visualizer/frontend && npm run lint` | Pass |
+| Plan grep strings (`app.py`, `useJobSocket.ts`, `ProcessingPage.tsx`, tests) | Pass |
+
+### Manual (operator)
+
+- Kill backend mid-batch-describe with checkpoint present, restart — job becomes **pending** and banner appears on **Processing** when **`jobs_recovered`** fires.
+
+## STATE / ROADMAP
+
+Not modified (orchestrator-owned per wave instructions).
