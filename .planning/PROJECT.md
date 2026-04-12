@@ -42,18 +42,18 @@ Know which catalog images are posted on Instagram and get artistic critique that
 - [x] On-demand analysis jobs (single image or timeframe-based batches) (Validated in Phase 4: AI Analysis)
 - [x] Multi-perspective critique (street photographer, editor, publisher views) (Validated in Phase 4: AI Analysis)
 
-### Active (v2.0)
+### Validated (v2.0)
 
-- [ ] Structured artistic scoring (composition, narrative, rhythm) as queryable numeric fields
-- [ ] New critique perspectives (color theory, emotional impact, series coherence)
-- [ ] Photography-theory-refined prompts for all perspectives
-- [ ] Per-perspective numeric scoring persisted and filterable in catalog UI
-- [ ] Posting frequency and timing pattern analysis from Instagram dump timestamps
-- [ ] Caption and hashtag style analysis
-- [ ] "Best photos" ranking by aggregated AI perspective scores
-- [ ] Photographer identity analysis — recurring themes and style fingerprint
-- [ ] "What to post next" suggestions based on catalog vs posting gaps
-- [ ] Insights dashboard with trend visualization
+- [x] Structured artistic scoring (1-10 per perspective) as queryable fields (Validated in Phase 6: Scoring Pipeline)
+- [x] New critique perspectives: color theory added to street/documentary/publisher (Validated in Phase 5: Structured Scoring Foundation)
+- [x] Photography-theory-refined prompts with Itten, Freeman, Berger citations (Validated in Phase 5: Structured Scoring Foundation)
+- [x] Per-perspective numeric scoring persisted and filterable/sortable in catalog UI (Validated in Phase 6: Scoring Pipeline)
+- [x] Posting frequency and timing pattern analysis from Instagram dump timestamps (Validated in Phase 7: Posting Analytics)
+- [x] Caption and hashtag style analysis (Validated in Phase 7: Posting Analytics)
+- [x] "Best photos" ranking by aggregated AI perspective scores (Validated in Phase 8: Identity & Suggestions)
+- [x] Photographer identity analysis — style fingerprint from score patterns (Validated in Phase 8: Identity & Suggestions)
+- [x] "What to post next" suggestions based on catalog vs posting gaps (Validated in Phase 8: Identity & Suggestions)
+- [x] Insights dashboard with KPI row, score distributions, posting cadence, quick-nav (Validated in Phase 9: Insights Dashboard)
 
 ### Deferred (future)
 
@@ -76,17 +76,17 @@ Know which catalog images are posted on Instagram and get artistic critique that
 The user is a photographer managing work across multiple Lightroom catalogs (personal portfolio, client work like weddings, etc.). They post selectively to Instagram and want to understand both sides of their practice: what they publish vs what stays in the catalog.
 
 ### Current State
-- Phase 1 complete — catalog browsing, filtering, and registration working via visualizer UI
-- Phase 2 complete — job lifecycle, cooperative cancellation, catalog backup/lock guard, error severity
-- Phase 3 complete — Instagram dump import, image matching, posted keyword writeback, matches UI
-- Phase 4 complete — AI descriptions (single + batch), provider health probes, catalog analyzed filter, SR2 support
-- Phase 5 complete — structured scoring foundation: image_scores/perspectives schema, Pydantic validation with LLM repair, 4 rubrics (street/documentary/publisher/color_theory) with theory citations, dynamic prompt builder, perspectives REST API + CodeMirror UI, job checkpointing with fingerprinted resume, orphan recovery with auto-requeue
+- v1.0 complete — Phases 1-4: catalog management, jobs, Instagram sync, AI descriptions
+- v2.0 complete — Phases 5-9: structured scoring, posting analytics, identity/suggestions, insights dashboard
+- Phase 5: image_scores/perspectives schema, Pydantic validation with LLM repair, 4 theory-grounded rubrics, perspectives REST API + CodeMirror UI, job checkpointing, orphan recovery
+- Phase 6: scoring pipeline (single_score + batch_score jobs), score REST API, catalog modal scores panel with version history, catalog filter/sort by score
+- Phase 7: posting analytics — frequency timeline, day-of-week × hour heatmap, caption/hashtag stats, unposted catalog gap view
+- Phase 8: identity service — best photos ranking, style fingerprint (radar chart + rationale tokens), what-to-post-next suggestions with reason codes
+- Phase 9: unified Insights dashboard composing KPIs, score distributions, posting cadence, top photos, quick-nav cards
 - Read-only catalog enforcement via SQLite URI `mode=ro` prevents accidental writes
 - Library DB keys unified with `YYYY-MM-DD_filename` format, migration with backup
-- Instagram presence with analytics data available via export dumps
 - AI providers configurable with health probes and separate description defaults
-- Batch describe supports 12-month windows, min_rating filter, SR2/RAW pipeline hardened
-- Perspectives configurable via Processing UI; critique prompts built dynamically from DB with selectable slugs
+- Perspectives configurable via Processing UI; critique prompts built dynamically from DB
 - Job checkpointing persists progress for crash recovery; orphaned jobs auto-resume if checkpointed
 
 ### Instagram Dump Format
@@ -135,4 +135,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-12 — Phase 5 complete (Structured Scoring Foundation)*
+*Last updated: 2026-04-12 — v2.0 milestone complete (Phases 5-9)*
