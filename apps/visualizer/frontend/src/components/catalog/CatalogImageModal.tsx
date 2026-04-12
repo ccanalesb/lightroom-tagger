@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CatalogImage, ImageDescription } from '../../services/api';
-import { DescriptionsAPI, JobsAPI, ProvidersAPI } from '../../services/api';
+import { DescriptionsAPI, JobsAPI, PerspectivesAPI, ProvidersAPI } from '../../services/api';
 import type { Job } from '../../types/job';
 import { DescriptionPanel } from '../DescriptionPanel/DescriptionPanel';
 import { GenerateButton } from '../ui/description-atoms/GenerateButton';
@@ -14,6 +14,7 @@ import {
   LABEL_DATE,
   DATE_NO_DATE,
 } from '../../constants/strings';
+import ImageScoresPanel from './ImageScoresPanel';
 
 interface CatalogImageModalProps {
   image: CatalogImage;
@@ -29,6 +30,15 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
   const [descProviderId, setDescProviderId] = useState<string | null>(null);
   const [descModelId, setDescModelId] = useState<string | null>(null);
   const [showModelOptions, setShowModelOptions] = useState(false);
+  const [scoring, setScoring] = useState(false);
+  const [scoreError, setScoreError] = useState<string | null>(null);
+  const [pendingScoreJobId, setPendingScoreJobId] = useState<string | null>(null);
+  const [scoresReloadToken, setScoresReloadToken] = useState(0);
+  const [scoreForce, setScoreForce] = useState(false);
+  const [activePerspectiveRows, setActivePerspectiveRows] = useState<
+    { slug: string; display_name: string }[]
+  >([]);
+  const [selectedPerspectiveSlugs, setSelectedPerspectiveSlugs] = useState<string[]>([]);
 
   useEffect(() => {
     ProvidersAPI.getDefaults()
@@ -39,6 +49,16 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    PerspectivesAPI.list({ active_only: true })
+      .then((rows) => {
+        const sorted = [...rows].sort((a, b) => a.slug.localeCompare(b.slug));
+        setActivePerspectiveRows(sorted.map((r) => ({ slug: r.slug, display_name: r.display_name })));
+        setSelectedPerspectiveSlugs(sorted.map((r) => r.slug));
+      })
+      .catch(() => {});
+  }, [image.key]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -82,24 +102,47 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
       .catch(() => {});
   }, [image.key]);
 
+  const perspectiveLabels = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const r of activePerspectiveRows) {
+      m[r.slug] = r.display_name;
+    }
+    return m;
+  }, [activePerspectiveRows]);
+
   useJobSocket({
     onJobUpdated: useCallback(
       (job: Job) => {
-        if (!pendingJobId || job.id !== pendingJobId) return;
-        if (job.status === 'completed') {
-          setPendingJobId(null);
-          setGenerating(false);
-          refreshDescription();
-        } else if (job.status === 'failed') {
-          setPendingJobId(null);
-          setGenerating(false);
-          setDescError(job.error ?? 'Description generation failed');
-        } else if (job.status === 'cancelled') {
-          setPendingJobId(null);
-          setGenerating(false);
+        if (pendingJobId && job.id === pendingJobId) {
+          if (job.status === 'completed') {
+            setPendingJobId(null);
+            setGenerating(false);
+            refreshDescription();
+          } else if (job.status === 'failed') {
+            setPendingJobId(null);
+            setGenerating(false);
+            setDescError(job.error ?? 'Description generation failed');
+          } else if (job.status === 'cancelled') {
+            setPendingJobId(null);
+            setGenerating(false);
+          }
+        }
+        if (pendingScoreJobId && job.id === pendingScoreJobId) {
+          if (job.status === 'completed') {
+            setPendingScoreJobId(null);
+            setScoring(false);
+            setScoresReloadToken((t) => t + 1);
+          } else if (job.status === 'failed') {
+            setPendingScoreJobId(null);
+            setScoring(false);
+            setScoreError(job.error ?? 'Scoring failed');
+          } else if (job.status === 'cancelled') {
+            setPendingScoreJobId(null);
+            setScoring(false);
+          }
         }
       },
-      [pendingJobId, refreshDescription],
+      [pendingJobId, pendingScoreJobId, refreshDescription],
     ),
   });
 
@@ -120,6 +163,40 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
       setGenerating(false);
     }
   }, [image.key, descProviderId, descModelId]);
+
+  const handleRunScoring = useCallback(async () => {
+    const slugs =
+      selectedPerspectiveSlugs.length > 0
+        ? selectedPerspectiveSlugs
+        : activePerspectiveRows.map((r) => r.slug);
+    if (slugs.length === 0) {
+      setScoreError('No active perspectives to score. Add perspectives in Processing.');
+      return;
+    }
+    setScoring(true);
+    setScoreError(null);
+    try {
+      const job = await JobsAPI.create('single_score', {
+        image_key: image.key,
+        image_type: 'catalog',
+        perspective_slugs: slugs,
+        force: scoreForce,
+        ...(descProviderId && { provider_id: descProviderId }),
+        ...(descModelId && { provider_model: descModelId }),
+      });
+      setPendingScoreJobId(job.id);
+    } catch (err) {
+      setScoreError(String(err));
+      setScoring(false);
+    }
+  }, [
+    image.key,
+    selectedPerspectiveSlugs,
+    activePerspectiveRows,
+    scoreForce,
+    descProviderId,
+    descModelId,
+  ]);
 
   const dateDisplay = image.date_taken
     ? new Date(image.date_taken).toLocaleString()
@@ -238,6 +315,82 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
                   className="mt-3"
                 />
               )}
+            </div>
+
+            <div className="p-4 bg-surface rounded-base border border-border">
+              <h3 className="text-sm font-medium text-text mb-2">Critique scores</h3>
+              <ImageScoresPanel
+                imageKey={image.key}
+                imageType="catalog"
+                reloadToken={scoresReloadToken}
+                perspectiveLabels={perspectiveLabels}
+              />
+              {scoring && (
+                <div className="flex items-center gap-2 py-2 mt-2">
+                  <svg className="animate-spin h-4 w-4 text-accent" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span className="text-sm text-text-secondary">Scoring…</span>
+                </div>
+              )}
+              {scoreError && <p className="text-sm text-error mt-2">{scoreError}</p>}
+              <div className="mt-3 space-y-2">
+                <span className="block text-xs font-medium text-text">Perspectives</span>
+                <div className="flex flex-col gap-2 max-h-32 overflow-y-auto border border-border rounded-base p-2 bg-bg">
+                  {activePerspectiveRows.length === 0 ? (
+                    <span className="text-xs text-text-secondary">Loading perspectives…</span>
+                  ) : (
+                    activePerspectiveRows.map((p) => (
+                      <label
+                        key={p.slug}
+                        className="flex items-center gap-2 text-xs text-text cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedPerspectiveSlugs.includes(p.slug)}
+                          onChange={() => {
+                            setSelectedPerspectiveSlugs((prev) =>
+                              prev.includes(p.slug)
+                                ? prev.filter((s) => s !== p.slug)
+                                : [...prev, p.slug].sort((a, b) => a.localeCompare(b)),
+                            );
+                          }}
+                          className="w-3.5 h-3.5 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
+                        />
+                        <span>
+                          {p.display_name}{' '}
+                          <span className="text-text-secondary">({p.slug})</span>
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    id="catalog-score-force"
+                    checked={scoreForce}
+                    onChange={(e) => setScoreForce(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
+                  />
+                  <label htmlFor="catalog-score-force" className="text-xs text-text cursor-pointer">
+                    Force re-score same rubric revision
+                  </label>
+                </div>
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    disabled={scoring}
+                    onClick={() => {
+                      void handleRunScoring();
+                    }}
+                    className="flex-shrink-0 px-3 py-1 rounded text-xs font-medium transition-colors bg-accent text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    {scoring ? 'Scoring…' : 'Run scoring'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
