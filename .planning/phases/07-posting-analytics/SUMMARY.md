@@ -29,3 +29,44 @@
 
 - Responses expose **`meta.timezone_assumption` / `timezone_note`** where applicable (POST roadmap / 07-CONTEXT).
 - Manual smoke: `curl -sS "http://127.0.0.1:<port>/api/analytics/posting-frequency?date_from=2024-01-01&date_to=2024-01-31"` → JSON with `meta.timezone_assumption`.
+
+---
+
+# Phase 07 — Plan 07-02 execution summary
+
+**Date:** 2026-04-12  
+**Plan:** 07-02 — Analytics page: posting timeline, heatmap, and caption/hashtag views
+
+## Delivered
+
+- **`recharts` ^3.8.1** — Added to `apps/visualizer/frontend` (install used `npm install --legacy-peer-deps` due to existing `@testing-library/react` vs React 19 peer conflict).
+- **`AnalyticsAPI`** in `src/services/api.ts` — Typed clients for `/api/analytics/posting-frequency`, `posting-heatmap`, and `caption-stats` (required `date_from` / `date_to` aligned with backend).
+- **Strings** — `NAV_ANALYTICS`, section titles, empty-state copy, heatmap legend, timezone disclaimer, caption stat labels.
+- **Navigation & route** — `Layout` nav item **Analytics**; `App` route `path="analytics"` with `ErrorBoundary`.
+- **`PostingFrequencyChart`** — Recharts `AreaChart` / `ResponsiveContainer`, theme CSS variables, loading/error/empty, optional meta line (granularity + timestamp source).
+- **`PostingHeatmap`** — 7×24 grid from API `cells`, `meta.dow_labels`, intensity from count/max, `title` tooltips, UTC legend.
+- **`CaptionHashtagPanel`** — Summary stats, scrollable top-hashtags table with bar widths; text-only hashtag display (no HTML injection).
+- **`AnalyticsPage`** — Default range last 12 months, date inputs + granularity + Apply, parallel fetches with `Promise.allSettled`, per-widget errors, `sr-only` `aria-live` for errors, footer with API `meta` timezone / scope text.
+
+## Commits (atomic; `/analytics` route committed after `AnalyticsPage` so `tsc` stays green between commits)
+
+1. `feat(07-02): add recharts dependency`
+2. `feat(07-02): add AnalyticsAPI client and types`
+3. `feat(07-02): add analytics navigation and copy strings`
+4. `feat(07-02): add Analytics link to main navigation`
+5. `feat(07-02): add PostingFrequencyChart with Recharts`
+6. `feat(07-02): add PostingHeatmap day-by-hour grid`
+7. `feat(07-02): add CaptionHashtagPanel stats and table`
+8. `feat(07-02): add Analytics page with date range and fetches`
+9. `feat(07-02): register /analytics route`
+10. `docs(07-02): append plan 07-02 execution summary`
+
+## Verification
+
+- `npm run build` and `npm run lint` in `apps/visualizer/frontend` (exit 0).
+- Manual: open `/analytics`, adjust range and **Apply**, confirm chart/heatmap/caption sections refetch.
+
+## Notes
+
+- **`unposted-catalog`** client left for plan 07-03 (not stubbed in `AnalyticsAPI`).
+- Heatmap cells use **`color-mix`** with `var(--color-accent)` for theme-aware intensity; requires a modern browser (same baseline as the rest of the UI).
