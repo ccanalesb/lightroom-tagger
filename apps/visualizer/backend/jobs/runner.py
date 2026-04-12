@@ -90,6 +90,17 @@ class JobRunner:
         new_meta = merge_checkpoint_into_metadata(meta, checkpoint_body)
         update_job_field(self.db, job_id, "metadata", new_meta)
 
+    def clear_checkpoint(self, job_id: str) -> None:
+        """Remove resume checkpoint from job metadata (e.g. after successful completion)."""
+        row = get_job(self.db, job_id)
+        if not row:
+            return
+        meta = row.get("metadata") or {}
+        if not isinstance(meta, dict):
+            meta = {}
+        new_meta = {**meta, "checkpoint": None}
+        update_job_field(self.db, job_id, "metadata", new_meta)
+
     def signal_cancel(self, job_id: str) -> None:
         """Set the cooperative cancel flag for a running job (no DB writes)."""
         if job_id in self.active_jobs:
