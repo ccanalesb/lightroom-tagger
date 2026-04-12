@@ -19,7 +19,12 @@ function useDebouncedValue<T>(value: T, delay: number): T {
   return debounced;
 }
 
-export function CatalogTab() {
+type CatalogTabProps = {
+  /** Fires when the posted / not-posted filter changes (for parent UI, e.g. Analytics cross-link). */
+  onPostedFilterChange?: (posted: boolean | undefined) => void;
+};
+
+export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
   const [images, setImages] = useState<CatalogImage[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -137,6 +142,10 @@ export function CatalogTab() {
   useEffect(() => {
     loadImages();
   }, [loadImages]);
+
+  useEffect(() => {
+    onPostedFilterChange?.(postedFilter);
+  }, [postedFilter, onPostedFilterChange]);
 
   const handlePostedFilterChange = (filter: string) => {
     if (filter === 'all') {
