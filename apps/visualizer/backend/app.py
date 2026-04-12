@@ -72,7 +72,7 @@ def create_app():
     db = init_db(db_path)
     app.db = db
 
-    from api import descriptions, images, jobs, lt_config, perspectives, providers, system
+    from api import descriptions, images, jobs, lt_config, perspectives, providers, scores, system
     app.register_blueprint(jobs.bp, url_prefix='/api/jobs')
     app.register_blueprint(images.bp, url_prefix='/api/images')
     app.register_blueprint(descriptions.bp, url_prefix='/api/descriptions')
@@ -80,6 +80,7 @@ def create_app():
     app.register_blueprint(system.bp, url_prefix='/api')
     app.register_blueprint(lt_config.bp, url_prefix='/api/config')
     app.register_blueprint(perspectives.bp, url_prefix='/api/perspectives')
+    app.register_blueprint(scores.bp, url_prefix='/api/scores')
 
     from websocket.events import register_socket_events
     register_socket_events(socketio)
