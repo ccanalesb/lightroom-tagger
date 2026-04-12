@@ -25,3 +25,21 @@
 ## Verification (plan 06-03)
 
 - `npm run build` and `npm run lint` in `apps/visualizer/frontend` — pass.
+
+## Plan 06-04
+
+- **feat(06-04): add catalog score join, filter, and sort to query_catalog_images** — `lightroom_tagger/core/database.py`: optional `score_perspective`, `min_score` (1–10, requires perspective), `sort_by_score` (`asc`|`desc`, requires perspective); `LEFT JOIN image_scores s` with `is_current=1` and `image_type='catalog'`; shared joins/WHERE for `COUNT(*)` and page rows; `ORDER BY (s.score IS NULL) ASC, s.score …, i.key ASC` so unscored rows sort after scored; exposes `catalog_perspective_score` in row dict when the join is active.
+- **feat(06-04): add catalog score query params to list_catalog_images** — `apps/visualizer/backend/api/images.py`: query params `score_perspective`, `min_score`, `sort_by_score`; slug validated with same charset as perspectives (`^[a-z][a-z0-9_]{0,63}$`); 400 when `sort_by_score` or `min_score` lacks perspective, invalid enum, or out-of-range `min_score`; response adds `catalog_perspective_score` and `catalog_score_perspective` only when a score perspective is requested.
+- **feat(06-04): extend listCatalog and CatalogImage for score filters** — `apps/visualizer/frontend/src/services/api.ts`: URL params and optional `CatalogImage` fields for persisted catalog scores.
+- **feat(06-04): add catalog score filter and sort controls to CatalogTab** — Perspective select (active perspectives + Any), min score 1–10 + Any, sort None / High→Low / Low→High; clears min/sort when perspective is Any; resets page on change; wired into `ImagesAPI.listCatalog`.
+- **feat(06-04): show persisted catalog score pill on CatalogImageCard** — Subtle `Badge` with optional truncated slug + `n/10` when `catalog_perspective_score` is present.
+- **test(06-04): cover query_catalog_images score sort and min_score** — `lightroom_tagger/core/test_database_scores.py`.
+- **chore(06-04): ruff import order in images blueprint** — isort-compatible grouping in `api/images.py`.
+- **test(06-04): add Flask tests for catalog score query params** — `apps/visualizer/backend/tests/test_catalog_score_query.py`: 400 when `sort_by_score` without `score_perspective`; ordered catalog list with seeded `image_scores`; `PRAGMA wal_checkpoint(TRUNCATE)` after seeding so the Flask client’s new connection sees WAL writes under the default journal mode.
+
+## Verification (plan 06-04)
+
+- `pytest lightroom_tagger/core/test_database_scores.py apps/visualizer/backend/tests/test_catalog_score_query.py -q` — pass.
+- `npm run build` in `apps/visualizer/frontend` — pass.
+- `mypy lightroom_tagger/core/database.py apps/visualizer/backend/api/images.py` — still reports many pre-existing issues across the import graph (same situation as plan 06-02 for `database.py`); no new errors specific to the score-catalog changes were isolated in that run.
+- `ruff check` on `lightroom_tagger/core/database.py` — still reports pre-existing issues in that large module; `ruff check apps/visualizer/backend/api/images.py apps/visualizer/backend/tests/test_catalog_score_query.py` — remaining SIM105 findings in `images.py` are pre-existing try/parse patterns, not introduced by 06-04.
