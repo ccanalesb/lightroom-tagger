@@ -8,8 +8,10 @@ from typing import Any
 import ollama
 
 from lightroom_tagger.core.config import load_config
+from lightroom_tagger.core.provider_errors import ContextLengthError
 
 RAW_EXTENSIONS = {'.dng', '.raw', '.cr2', '.cr3', '.nef', '.arw', '.rw2', '.orf', '.raf', '.sr2', '.srw', '.x3f'}
+VIDEO_EXTENSIONS = {'.mov', '.mp4', '.avi', '.mkv', '.wmv', '.m4v', '.3gp', '.webm', '.mts', '.m2ts'}
 
 # Vision compression configuration
 VISION_MAX_DIMENSION = int(os.environ.get('VISION_MAX_DIMENSION', '1024'))
@@ -517,10 +519,31 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
                     os.unlink(temp_file)
 
 
+MAX_TOKENS_ESCALATION = [256, 4096, 32768, 65536]
+
+# Shared across calls so that once a model needs higher max_tokens we
+# remember it for subsequent candidates instead of re-discovering every time.
+_model_min_tokens: dict[str, int] = {}
+
+# Models where max_tokens escalation was fully exhausted and still fails.
+# Keyed by "provider:model" — these are skipped immediately to avoid
+# wasting minutes on retries that will never succeed.
+_broken_provider_models: set[str] = set()
+
+
 def _compare_via_provider(local_path: str, insta_path: str,
                           provider_id: str, model: str | None,
                           log_callback=None) -> dict:
-    """Run vision comparison via the unified provider pipeline."""
+    """Run vision comparison via the unified provider pipeline.
+
+    Escalates ``max_tokens`` automatically on ``ContextLengthError``
+    (e.g. Claude extended-thinking models that require ``max_tokens >
+    thinking.budget_tokens``).  Models that succeed at 256 are never
+    affected — escalation only triggers after failure.
+
+    Discovered minimums are cached in ``_model_min_tokens`` so later
+    candidates skip the failing lower values.
+    """
     from lightroom_tagger.core.fallback import FallbackDispatcher
     from lightroom_tagger.core.provider_registry import ProviderRegistry
     from lightroom_tagger.core.vision_client import compare_images as _cmp
@@ -533,7 +556,52 @@ def _compare_via_provider(local_path: str, insta_path: str,
         model = models[0]["id"] if models else "gemma3:27b"
 
     def fn_factory(client, mdl):
-        return lambda: _cmp(client, mdl, local_path, insta_path, log_callback=log_callback)
+        from lightroom_tagger.core.provider_errors import InvalidRequestError
+
+        provider_key = f"{provider_id}:{mdl}"
+        if provider_key in _broken_provider_models:
+            def _skip():
+                raise InvalidRequestError(
+                    f"{mdl} is broken (max_tokens exhausted in prior call)",
+                    provider=provider_id, model=mdl,
+                )
+            return _skip
+
+        cached_min = _model_min_tokens.get(mdl, 0)
+        start_idx = 0
+        for i, val in enumerate(MAX_TOKENS_ESCALATION):
+            if val >= cached_min:
+                start_idx = i
+                break
+        state = {"idx": start_idx}
+
+        def _call():
+            tokens = MAX_TOKENS_ESCALATION[state["idx"]]
+            try:
+                return _cmp(client, mdl, local_path, insta_path,
+                            log_callback=log_callback, max_tokens=tokens)
+            except ContextLengthError:
+                if state["idx"] < len(MAX_TOKENS_ESCALATION) - 1:
+                    state["idx"] += 1
+                    next_val = MAX_TOKENS_ESCALATION[state["idx"]]
+                    _model_min_tokens[mdl] = next_val
+                    if log_callback:
+                        log_callback(
+                            "warning",
+                            f"[compare] Escalating max_tokens to "
+                            f"{next_val} for {mdl}",
+                        )
+                else:
+                    _broken_provider_models.add(provider_key)
+                    if log_callback:
+                        log_callback(
+                            "warning",
+                            f"[compare] max_tokens exhausted at {tokens} "
+                            f"for {mdl}, blacklisting for session",
+                        )
+                raise
+
+        return _call
 
     result, actual_provider, actual_model = dispatcher.call_with_fallback(
         operation="compare",

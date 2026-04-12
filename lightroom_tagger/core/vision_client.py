@@ -24,6 +24,7 @@ from lightroom_tagger.core.provider_errors import (
     ContextLengthError,
     InvalidRequestError,
     ModelUnavailableError,
+    PayloadTooLargeError,
     ProviderError,
     RateLimitError,
     TimeoutError,
@@ -83,6 +84,8 @@ def _map_openai_error(
         msg = str(exc).lower()
         if "context length" in msg or "too many tokens" in msg or "maximum" in msg:
             return ContextLengthError(str(exc), provider=provider, model=model)
+        if "budget_tokens" in msg or "thinking" in msg:
+            return ContextLengthError(str(exc), provider=provider, model=model)
         return InvalidRequestError(str(exc), provider=provider, model=model)
     if isinstance(exc, openai_sdk.APITimeoutError):
         return TimeoutError(str(exc), provider=provider, model=model)
@@ -91,6 +94,8 @@ def _map_openai_error(
     if isinstance(exc, openai_sdk.APIStatusError):
         status = getattr(exc.response, "status_code", 0) if exc.response else 0
         msg = str(exc).lower()
+        if status == 413:
+            return PayloadTooLargeError(str(exc), provider=provider, model=model)
         if "multimodal" in msg or "image_url" in msg or "modality" in msg:
             return InvalidRequestError(str(exc), provider=provider, model=model)
         if status == 503:
@@ -106,10 +111,15 @@ def compare_images(
     local_path: str,
     insta_path: str,
     log_callback: LogCallback = None,
+    max_tokens: int = 256,
 ) -> dict[str, Any]:
     """Compare two images via chat completions. Returns parsed result dict."""
     local_b64 = _encode_image(local_path)
     insta_b64 = _encode_image(insta_path)
+
+    kwargs: dict[str, Any] = {}
+    if "claude" in model.lower():
+        kwargs["extra_body"] = {"reasoning_effort": "none"}
 
     try:
         response = client.chat.completions.create(
@@ -122,7 +132,8 @@ def compare_images(
                     _image_url_part(insta_b64),
                 ],
             }],
-            max_tokens=256,
+            max_tokens=max_tokens,
+            **kwargs,
         )
     except Exception as exc:
         raise _map_openai_error(exc, provider=getattr(client, '_provider_id', None), model=model) from exc
@@ -148,6 +159,7 @@ def compare_images_batch(
     reference_path: str,
     candidates: list[tuple[int, str]],
     log_callback: LogCallback = None,
+    max_tokens: int = 4096,
 ) -> dict[int, float]:
     """
     Compare one reference image against N candidates in a single API call.
@@ -215,6 +227,10 @@ def compare_images_batch(
         cand_b64 = _encode_image(cand_path)
         content_parts.append(_image_url_part(cand_b64))
     
+    kwargs: dict[str, Any] = {}
+    if "claude" in model.lower():
+        kwargs["extra_body"] = {"reasoning_effort": "none"}
+
     try:
         response = client.chat.completions.create(
             model=model,
@@ -228,8 +244,9 @@ def compare_images_batch(
                     "content": content_parts,
                 }
             ],
-            max_tokens=2048,  # Increased for larger batches
+            max_tokens=max_tokens,
             temperature=0.1,
+            **kwargs,
         )
     except Exception as exc:
         raise _map_openai_error(exc, provider=getattr(client, '_provider_id', None), model=model) from exc

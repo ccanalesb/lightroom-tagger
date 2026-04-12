@@ -39,7 +39,11 @@ class ModelUnavailableError(ProviderError):
 
 
 class ContextLengthError(ProviderError):
-    """Token/context limit exceeded — retry with smaller image."""
+    """Token/context limit exceeded — retry with smaller image or higher max_tokens."""
+
+
+class PayloadTooLargeError(ProviderError):
+    """413 — request body exceeds provider limit (e.g. too many images in batch)."""
 
 
 class AuthenticationError(ProviderError):
@@ -56,6 +60,7 @@ RETRYABLE_ERRORS: frozenset[type[ProviderError]] = frozenset({
     ConnectionError,
     ModelUnavailableError,
     ContextLengthError,
+    PayloadTooLargeError,
 })
 
 NOT_RETRYABLE_ERRORS: frozenset[type[ProviderError]] = frozenset({

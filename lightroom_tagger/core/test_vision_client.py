@@ -8,8 +8,10 @@ import pytest
 from lightroom_tagger.core.provider_errors import (
     AuthenticationError,
     ConnectionError,
+    ContextLengthError,
     InvalidRequestError,
     ModelUnavailableError,
+    PayloadTooLargeError,
     RateLimitError,
     TimeoutError,
 )
@@ -70,6 +72,18 @@ class TestCompareImages:
         compare_images(client, "my-custom-model", temp_image, temp_image)
         call_args = client.chat.completions.create.call_args
         assert call_args.kwargs["model"] == "my-custom-model"
+
+    def test_should_use_default_max_tokens(self, temp_image):
+        client = _make_mock_client('{"confidence": 90, "reasoning": "same"}')
+        compare_images(client, "test-model", temp_image, temp_image)
+        call_args = client.chat.completions.create.call_args
+        assert call_args.kwargs["max_tokens"] == 256
+
+    def test_should_use_custom_max_tokens(self, temp_image):
+        client = _make_mock_client('{"confidence": 90, "reasoning": "same"}')
+        compare_images(client, "test-model", temp_image, temp_image, max_tokens=4096)
+        call_args = client.chat.completions.create.call_args
+        assert call_args.kwargs["max_tokens"] == 4096
 
     def test_should_invoke_log_callback(self, temp_image):
         client = _make_mock_client('{"confidence": 90, "reasoning": "same"}')
@@ -171,3 +185,66 @@ class TestErrorMapping:
         with pytest.raises(RateLimitError) as exc_info:
             compare_images(client, "m", temp_image, temp_image)
         assert exc_info.value.retry_after == 30.0
+
+    def test_should_map_413_to_payload_too_large(self, temp_image):
+        client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 413
+        mock_response.headers = {}
+        client.chat.completions.create.side_effect = openai_sdk.APIStatusError(
+            "Request Entity Too Large", response=mock_response, body=None
+        )
+        with pytest.raises(PayloadTooLargeError):
+            compare_images(client, "m", temp_image, temp_image)
+
+    def test_should_map_thinking_budget_tokens_to_context_length(self, temp_image):
+        client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.headers = {}
+        client.chat.completions.create.side_effect = openai_sdk.BadRequestError(
+            "`max_tokens` must be greater than `thinking.budget_tokens`",
+            response=mock_response,
+            body=None,
+        )
+        with pytest.raises(ContextLengthError):
+            compare_images(client, "m", temp_image, temp_image)
+
+    def test_should_map_budget_tokens_to_context_length(self, temp_image):
+        client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.headers = {}
+        client.chat.completions.create.side_effect = openai_sdk.BadRequestError(
+            "budget_tokens exceeds max_tokens",
+            response=mock_response,
+            body=None,
+        )
+        with pytest.raises(ContextLengthError):
+            compare_images(client, "m", temp_image, temp_image)
+
+    def test_should_still_map_context_length_patterns(self, temp_image):
+        client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.headers = {}
+        client.chat.completions.create.side_effect = openai_sdk.BadRequestError(
+            "maximum context length exceeded",
+            response=mock_response,
+            body=None,
+        )
+        with pytest.raises(ContextLengthError):
+            compare_images(client, "m", temp_image, temp_image)
+
+    def test_should_still_map_generic_bad_request_to_invalid(self, temp_image):
+        client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.headers = {}
+        client.chat.completions.create.side_effect = openai_sdk.BadRequestError(
+            "invalid model name",
+            response=mock_response,
+            body=None,
+        )
+        with pytest.raises(InvalidRequestError):
+            compare_images(client, "m", temp_image, temp_image)

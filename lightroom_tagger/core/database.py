@@ -928,7 +928,7 @@ def get_unprocessed_dump_media(db: sqlite3.Connection, limit: int = None,
         clauses.append("(last_attempted_at IS NULL OR last_attempted_at < ?)")
         params.append(run_start)
     where = " AND ".join(clauses) if clauses else "1=1"
-    sql = f"SELECT * FROM instagram_dump_media WHERE {where}"
+    sql = f"SELECT * FROM instagram_dump_media WHERE {where} ORDER BY date_folder DESC, media_key DESC"
     if limit:
         sql += " LIMIT ?"
         params.append(limit)
@@ -970,7 +970,7 @@ def get_instagram_by_date_filter(db: sqlite3.Connection, month: str = None,
         params.append(from_date)
 
     where = " AND ".join(clauses) if clauses else "1=1"
-    rows = db.execute(f"SELECT * FROM instagram_dump_media WHERE {where}", params).fetchall()
+    rows = db.execute(f"SELECT * FROM instagram_dump_media WHERE {where} ORDER BY date_folder DESC, media_key DESC", params).fetchall()
     return [_deserialize_row(r) for r in rows]
 
 
@@ -1226,9 +1226,12 @@ def is_vision_cache_valid(db: sqlite3.Connection, catalog_key: str,
         return False
     comp = cached.get('compressed_path') or ''
 
-    from lightroom_tagger.core.analyzer import RAW_EXTENSIONS
+    from lightroom_tagger.core.analyzer import RAW_EXTENSIONS, VIDEO_EXTENSIONS
 
     ext = os.path.splitext(original_path)[1].lower()
+    if ext in VIDEO_EXTENSIONS:
+        return False
+
     if ext in RAW_EXTENSIONS:
         if comp == original_path:
             return False

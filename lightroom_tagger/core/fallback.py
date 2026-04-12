@@ -68,8 +68,16 @@ class FallbackDispatcher:
             try:
                 result = retry_with_backoff(fn, retry_config, log_callback=log_callback)
                 return result, provider_id, current_model
-            except tuple(NOT_RETRYABLE_ERRORS):
-                raise
+            except tuple(NOT_RETRYABLE_ERRORS) as exc:
+                last_error = exc  # type: ignore[assignment]
+                if log_callback:
+                    remaining = order[index + 1:]
+                    next_label = remaining[0] if remaining else "none"
+                    log_callback(
+                        "warning",
+                        f"[{operation}] {provider_id} failed ({type(exc).__name__}), "
+                        f"fallback -> {next_label}",
+                    )
             except tuple(RETRYABLE_ERRORS) as exc:
                 last_error = exc  # type: ignore[assignment]
                 if log_callback:

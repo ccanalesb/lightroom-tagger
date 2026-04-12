@@ -1,7 +1,7 @@
 ---
 title: "feat: Reactive error handling for vision API pipeline"
 type: feat
-status: active
+status: done
 date: 2026-04-10
 ---
 
@@ -88,7 +88,7 @@ These are not bugs in every model — Ollama/Gemma works fine with `max_tokens=2
 
 ## Implementation Units
 
-- [ ] **Unit 1: Add `PayloadTooLargeError` and fix error classification**
+- [x] **Unit 1: Add `PayloadTooLargeError` and fix error classification**
 
 **Goal:** Correctly classify 413 and extended thinking errors so retry/fallback can handle them.
 
@@ -125,7 +125,7 @@ These are not bugs in every model — Ollama/Gemma works fine with `max_tokens=2
 
 ---
 
-- [ ] **Unit 2: Adaptive `max_tokens` in `compare_images`**
+- [x] **Unit 2: Adaptive `max_tokens` in `compare_images`**
 
 **Goal:** Allow `compare_images` to accept a configurable `max_tokens` so callers can escalate on `ContextLengthError`.
 
@@ -159,7 +159,7 @@ These are not bugs in every model — Ollama/Gemma works fine with `max_tokens=2
 
 ---
 
-- [ ] **Unit 3: Chunk batch requests by `batch_size`**
+- [x] **Unit 3: Chunk batch requests by `batch_size`**
 
 **Goal:** Split batch API calls into chunks respecting `vision_batch_size` config to avoid 413 errors.
 
@@ -194,7 +194,7 @@ These are not bugs in every model — Ollama/Gemma works fine with `max_tokens=2
 
 ---
 
-- [ ] **Unit 4: Adaptive `max_tokens` in batch path**
+- [x] **Unit 4: Adaptive `max_tokens` in batch path**
 
 **Goal:** Apply the same adaptive max_tokens escalation to the batch API path in `matcher.py`.
 

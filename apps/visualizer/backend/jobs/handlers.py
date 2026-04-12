@@ -177,6 +177,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 last_months=last_months,
                 progress_callback=progress_callback,
                 log_callback=log_callback,
+                weights=custom_weights,
                 media_key=media_key,
                 force_descriptions=force_descriptions,
                 force_reprocess=force_reprocess,
@@ -534,6 +535,52 @@ def _describe_single_image(lib_db, key: str, itype: str, force: bool, desc_provi
         return ('failed', False, str(e))
 
 
+def handle_single_describe(runner, job_id: str, metadata: dict):
+    """Generate an AI description for a single image, run as an async job."""
+    lib_db = None
+    try:
+        image_key = metadata.get('image_key')
+        image_type = metadata.get('image_type', 'catalog')
+        force = metadata.get('force', False)
+        provider_id = metadata.get('provider_id')
+        provider_model = metadata.get('provider_model')
+
+        if not image_key:
+            runner.fail_job(job_id, 'image_key is required in metadata')
+            return
+
+        config = load_config()
+        db_path = os.getenv('LIBRARY_DB')
+        if not db_path:
+            db_path = config.db_path or 'library.db'
+        if not os.path.exists(db_path):
+            runner.fail_job(job_id, f"Library database not found at: {db_path}")
+            return
+        lib_db = init_database(db_path)
+
+        runner.update_progress(job_id, 10, f'Describing {image_type} image…')
+
+        status, success, error_msg = _describe_single_image(
+            lib_db, image_key, image_type, force, provider_id, provider_model,
+        )
+
+        if success:
+            runner.complete_job(job_id, {
+                'image_key': image_key,
+                'image_type': image_type,
+                'status': status,
+            })
+        else:
+            runner.fail_job(job_id, error_msg or 'Description generation failed')
+
+    except Exception as e:
+        severity = _failure_severity_from_exception(e)
+        runner.fail_job(job_id, str(e), severity=severity)
+    finally:
+        if lib_db:
+            lib_db.close()
+
+
 def handle_batch_describe(runner, job_id: str, metadata: dict):
     """Generate AI descriptions for catalog and/or Instagram images in bulk."""
     lib_db = None
@@ -746,4 +793,5 @@ JOB_HANDLERS = {
     'enrich_catalog': handle_enrich_catalog,
     'prepare_catalog': handle_prepare_catalog,
     'batch_describe': handle_batch_describe,
+    'single_describe': handle_single_describe,
 }

@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CatalogImage, ImageDescription } from '../../services/api';
-import { DescriptionsAPI, ProvidersAPI } from '../../services/api';
+import { DescriptionsAPI, JobsAPI, ProvidersAPI } from '../../services/api';
+import type { Job } from '../../types/job';
 import { DescriptionPanel } from '../DescriptionPanel/DescriptionPanel';
 import { GenerateButton } from '../ui/description-atoms/GenerateButton';
+import { ProviderModelSelect } from '../ui/ProviderModelSelect';
 import { Badge } from '../ui/Badge';
 import { MetadataRow } from '../ui/MetadataRow';
+import { useJobSocket } from '../../hooks/useJobSocket';
 import {
   IMAGE_DETAILS_TITLE,
   LABEL_FILENAME,
@@ -22,6 +25,20 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
   const [loadingDesc, setLoadingDesc] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [descError, setDescError] = useState<string | null>(null);
+  const [pendingJobId, setPendingJobId] = useState<string | null>(null);
+  const [descProviderId, setDescProviderId] = useState<string | null>(null);
+  const [descModelId, setDescModelId] = useState<string | null>(null);
+  const [showModelOptions, setShowModelOptions] = useState(false);
+
+  useEffect(() => {
+    ProvidersAPI.getDefaults()
+      .then((defaults) => {
+        const d = defaults.description;
+        if (d?.provider) setDescProviderId(d.provider);
+        if (d?.model) setDescModelId(d.model);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -59,27 +76,50 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
     };
   }, [image.key]);
 
+  const refreshDescription = useCallback(() => {
+    DescriptionsAPI.get(image.key)
+      .then((data) => setDescription(data.description))
+      .catch(() => {});
+  }, [image.key]);
+
+  useJobSocket({
+    onJobUpdated: useCallback(
+      (job: Job) => {
+        if (!pendingJobId || job.id !== pendingJobId) return;
+        if (job.status === 'completed') {
+          setPendingJobId(null);
+          setGenerating(false);
+          refreshDescription();
+        } else if (job.status === 'failed') {
+          setPendingJobId(null);
+          setGenerating(false);
+          setDescError(job.error ?? 'Description generation failed');
+        } else if (job.status === 'cancelled') {
+          setPendingJobId(null);
+          setGenerating(false);
+        }
+      },
+      [pendingJobId, refreshDescription],
+    ),
+  });
+
   const handleGenerateDescription = useCallback(async () => {
     setGenerating(true);
     setDescError(null);
     try {
-      const defaults = await ProvidersAPI.getDefaults();
-      const d = defaults.description;
-      const data = await DescriptionsAPI.generate(
-        image.key,
-        'catalog',
-        false,
-        undefined,
-        d?.provider ?? undefined,
-        d?.model ?? undefined,
-      );
-      setDescription(data.description);
+      const job = await JobsAPI.create('single_describe', {
+        image_key: image.key,
+        image_type: 'catalog',
+        force: false,
+        ...(descProviderId && { provider_id: descProviderId }),
+        ...(descModelId && { provider_model: descModelId }),
+      });
+      setPendingJobId(job.id);
     } catch (err) {
       setDescError(String(err));
-    } finally {
       setGenerating(false);
     }
-  }, [image.key]);
+  }, [image.key, descProviderId, descModelId]);
 
   const dateDisplay = image.date_taken
     ? new Date(image.date_taken).toLocaleString()
@@ -164,8 +204,24 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
                 <p className="text-sm text-text-tertiary">Loading description…</p>
               )}
               {descError && <p className="text-sm text-error">{descError}</p>}
+              {generating && (
+                <div className="flex items-center gap-2 py-2">
+                  <svg className="animate-spin h-4 w-4 text-accent" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span className="text-sm text-text-secondary">Generating description…</span>
+                </div>
+              )}
               <DescriptionPanel description={description} compact />
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setShowModelOptions(!showModelOptions)}
+                  className="text-xs text-text-tertiary hover:text-text-secondary transition-colors"
+                >
+                  {showModelOptions ? 'Hide options' : 'Model options'}
+                </button>
                 <GenerateButton
                   hasDescription={Boolean(description?.summary)}
                   generating={generating}
@@ -174,6 +230,14 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
                   }}
                 />
               </div>
+              {showModelOptions && (
+                <ProviderModelSelect
+                  providerId={descProviderId}
+                  modelId={descModelId}
+                  onChange={(pid, mid) => { setDescProviderId(pid); setDescModelId(mid); }}
+                  className="mt-3"
+                />
+              )}
             </div>
           </div>
         </div>

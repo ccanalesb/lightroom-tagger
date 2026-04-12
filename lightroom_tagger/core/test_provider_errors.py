@@ -5,6 +5,7 @@ from lightroom_tagger.core.provider_errors import (
     ConnectionError,
     ModelUnavailableError,
     ContextLengthError,
+    PayloadTooLargeError,
     AuthenticationError,
     InvalidRequestError,
     RETRYABLE_ERRORS,
@@ -17,7 +18,7 @@ import pytest
 class TestProviderErrorHierarchy:
     @pytest.mark.parametrize("cls", [
         RateLimitError, TimeoutError, ConnectionError,
-        ModelUnavailableError, ContextLengthError,
+        ModelUnavailableError, ContextLengthError, PayloadTooLargeError,
         AuthenticationError, InvalidRequestError,
     ])
     def test_should_inherit_from_provider_error(self, cls):
@@ -25,7 +26,7 @@ class TestProviderErrorHierarchy:
 
     def test_should_include_retryable_errors(self):
         for cls in (RateLimitError, TimeoutError, ConnectionError,
-                    ModelUnavailableError, ContextLengthError):
+                    ModelUnavailableError, ContextLengthError, PayloadTooLargeError):
             assert cls in RETRYABLE_ERRORS
 
     def test_should_exclude_non_retryable_from_retryable_set(self):

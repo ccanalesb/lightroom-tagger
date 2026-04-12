@@ -197,6 +197,30 @@ A web application that connects your Lightroom catalog with Instagram to track w
 No project skills found. Add skills to any of: `.cursor/skills/`, `.agents/skills/`, `.cursor/skills/`, or `.github/skills/` with a `SKILL.md` index file.
 <!-- gsd-skills-end -->
 
+<!-- project-design-system-start -->
+## Design System Reference
+
+**For any frontend/UI work** (planning, executing, reviewing, or generating UI-SPEC.md), read and follow the project design system:
+
+**File:** `apps/visualizer/frontend/DESIGN.md`
+
+This is the canonical design reference for all visual decisions including:
+- Color palette (light + dark mode with warm neutrals)
+- Typography (Inter font, specific scale with weights and letter-spacing)
+- Component patterns (Button, Card, Badge, Input, Tabs)
+- Shadow system (card, deep — multi-layer sub-0.05 opacity)
+- Spacing (8px base grid)
+- Tailwind semantic classes (`bg-bg`, `text-text`, `border-border`, `text-accent`, etc.)
+- Single accent color (blue) for all interactive elements
+
+**Rules for GSD agents:**
+- When generating UI-SPEC.md, reference DESIGN.md tokens (not raw hex values)
+- When planning frontend phases, ensure tasks reference existing component patterns
+- When executing frontend code, use semantic Tailwind classes from the design system
+- When reviewing UI, audit against DESIGN.md standards
+- New components must support both light and dark mode via CSS variables
+<!-- project-design-system-end -->
+
 <!-- gsd-workflow-start source:GSD defaults -->
 ## GSD Workflow Enforcement
 

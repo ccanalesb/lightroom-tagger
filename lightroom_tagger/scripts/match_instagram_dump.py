@@ -128,15 +128,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                 if (c.get('key'), media_key) not in rejected
             ]
         
-        # Limit candidates to prevent RAM issues (max 50)
-        MAX_CANDIDATES = 50
-        if len(candidates) > MAX_CANDIDATES:
-            if log_callback and idx <= 3:
-                log_callback('warning', f'[{media_key}] Limiting candidates from {len(candidates)} to {MAX_CANDIDATES} to prevent RAM issues')
-            candidates = candidates[:MAX_CANDIDATES]
-
-        if log_callback and idx <= 3:  # Log details for first 3 images
-            log_callback('debug', f'[{media_key}] Found {initial_candidate_count} candidates by date, {len(candidates)} after filters (limit={MAX_CANDIDATES})')
+        if log_callback and idx <= 3:
+            log_callback('debug', f'[{media_key}] Found {initial_candidate_count} candidates by date, {len(candidates)} after filters')
 
         if not candidates:
             mark_dump_media_attempted(db, dump_media['media_key'])

@@ -1,3 +1,4 @@
+import os
 from collections.abc import Callable
 
 from lightroom_tagger.core.database import (
@@ -79,6 +80,59 @@ def text_similarity(text1: str, text2: str) -> float:
     return intersection / union if union > 0 else 0.0
 
 
+BATCH_MAX_TOKENS_ESCALATION = [4096, 32768, 65536]
+
+
+def _call_batch_chunk(
+    client,
+    model: str,
+    reference_path: str,
+    chunk: list[tuple[int, str]],
+    log_callback,
+    insta_filename: str,
+    chunk_num: int,
+    num_chunks: int,
+    max_tokens_idx: int = 0,
+) -> dict[int, float]:
+    """Call compare_images_batch for a single chunk with adaptive recovery.
+
+    - On PayloadTooLargeError: halve the chunk and retry both halves.
+    - On ContextLengthError: escalate max_tokens and retry the same chunk.
+      If all escalation levels are exhausted, re-raise so the caller can
+      fall back to sequential processing.
+    """
+    from lightroom_tagger.core.provider_errors import ContextLengthError, PayloadTooLargeError
+    from lightroom_tagger.core.vision_client import compare_images_batch
+
+    current_tokens = BATCH_MAX_TOKENS_ESCALATION[max_tokens_idx]
+
+    try:
+        return compare_images_batch(
+            client, model, reference_path, chunk,
+            log_callback=log_callback, max_tokens=current_tokens,
+        )
+    except PayloadTooLargeError:
+        if len(chunk) <= 1:
+            if log_callback:
+                log_callback('warning', f'[{insta_filename}] Batch {chunk_num}/{num_chunks}: single-item chunk still too large, skipping')
+            return {}
+        half = len(chunk) // 2
+        if log_callback:
+            log_callback('warning', f'[{insta_filename}] Batch {chunk_num}/{num_chunks}: 413 payload too large, splitting {len(chunk)} -> {half}+{len(chunk)-half}')
+        left = _call_batch_chunk(client, model, reference_path, chunk[:half], log_callback, insta_filename, chunk_num, num_chunks, max_tokens_idx)
+        right = _call_batch_chunk(client, model, reference_path, chunk[half:], log_callback, insta_filename, chunk_num, num_chunks, max_tokens_idx)
+        left.update(right)
+        return left
+    except ContextLengthError:
+        if max_tokens_idx < len(BATCH_MAX_TOKENS_ESCALATION) - 1:
+            next_idx = max_tokens_idx + 1
+            next_tokens = BATCH_MAX_TOKENS_ESCALATION[next_idx]
+            if log_callback:
+                log_callback('warning', f'[{insta_filename}] Batch {chunk_num}/{num_chunks}: escalating max_tokens {current_tokens} -> {next_tokens}')
+            return _call_batch_chunk(client, model, reference_path, chunk, log_callback, insta_filename, chunk_num, num_chunks, next_idx)
+        raise
+
+
 def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                                  phash_weight: float = 0.4, desc_weight: float = 0.3,
                                  vision_weight: float = 0.3,
@@ -86,7 +140,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                                  log_callback=None,
                                  provider_id: str | None = None,
                                  model: str | None = None,
-                                 batch_size: int = 20,
+                                 batch_size: int = 10,
                                  batch_threshold: int = 5,
                                  should_cancel: Callable[[], bool] | None = None) -> list[dict]:
     """Score candidates including vision comparison (one-by-one).
@@ -98,7 +152,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
     from lightroom_tagger.core.analyzer import compare_with_vision, get_vision_model, vision_score
     from lightroom_tagger.core.phash import hamming_distance
-    from lightroom_tagger.core.provider_errors import RateLimitError
+    from lightroom_tagger.core.provider_errors import InvalidRequestError, PayloadTooLargeError, RateLimitError
     from lightroom_tagger.core.vision_client import compare_images_batch
     from lightroom_tagger.core.provider_registry import ProviderRegistry
 
@@ -143,7 +197,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         failed_count = 0
         skipped_no_path = 0
         skipped_oversized = 0
-
+        
         # Get mount_point from config for resolving paths
         from lightroom_tagger.core.config import load_config
         config = load_config()
@@ -194,31 +248,104 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 log_callback('info', f'[{insta_filename}] Skipped {skipped_oversized} oversized candidates')
             if failed_count > 0:
                 log_callback('warning', f'[{insta_filename}] Failed to prepare {failed_count} candidates for batch processing')
+        
+        # Build idx->candidate lookup for immediate scoring after each chunk
+        candidate_by_idx = {idx: candidate for idx, candidate in enumerate(candidates)}
+        insta_key = insta_image.get('key')
+        model_label = f"{provider_id}:{model}" if provider_id and model else get_vision_model()
 
-        # Call batch API
-        batch_results = {}
+        def _score_and_store(chunk_results: dict[int, float]):
+            """Score chunk results immediately: write to DB and append to results."""
+            for cid, vision_confidence in chunk_results.items():
+                candidate = candidate_by_idx.get(cid)
+                if candidate is None:
+                    continue
+                catalog_key = candidate.get('key')
+
+                vision_score_val = vision_score(vision_confidence)
+                vision_result = 'SAME' if vision_confidence >= 80 else 'DIFFERENT' if vision_confidence <= 20 else 'UNCERTAIN'
+
+                cached_phash = get_cached_phash(db, catalog_key)
+                if cached_phash is not None:
+                    phash_dist = hamming_distance(insta_image.get('image_hash', ''), cached_phash)
+                    nonlocal cache_hits
+                    cache_hits += 1
+                else:
+                    phash_dist = hamming_distance(insta_image.get('image_hash', ''), candidate.get('image_hash', ''))
+                    nonlocal cache_misses
+                    cache_misses += 1
+
+                phash_score_val = max(0, 1 - (phash_dist / 16))
+                desc_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
+
+                insta_hash = insta_image.get('image_hash')
+                cand_hash = cached_phash if cached_phash is not None else candidate.get('image_hash')
+                phash_available = bool(insta_hash) and bool(cand_hash)
+                desc_available = bool((insta_image.get('description') or '').strip()) and bool((candidate.get('description') or '').strip())
+
+                active_weights = {}
+                if phash_available:
+                    active_weights['phash'] = phash_weight
+                if desc_available:
+                    active_weights['desc'] = desc_weight
+                active_weights['vision'] = vision_weight
+
+                weight_sum = sum(active_weights.values()) or 1.0
+                w_phash = active_weights.get('phash', 0) / weight_sum
+                w_desc = active_weights.get('desc', 0) / weight_sum
+                w_vision = active_weights['vision'] / weight_sum
+
+                total_score_val = (w_phash * phash_score_val) + (w_desc * desc_sim) + (w_vision * vision_score_val)
+
+                store_vision_comparison(db, catalog_key, insta_key, vision_result, vision_score_val, model_label)
+
+                results.append({
+                    'catalog_key': catalog_key,
+                    'insta_key': insta_key,
+                    'phash_distance': int(phash_dist),
+                    'phash_score': phash_score_val,
+                    'desc_similarity': desc_sim,
+                    'vision_result': vision_result,
+                    'vision_score': vision_score_val,
+                    'vision_reasoning': '',
+                    'total_score': total_score_val,
+                    'model_used': model_label,
+                    'rate_limited': False,
+                })
+
+        # Call batch API in chunks, scoring each chunk immediately
         if log_callback:
             log_callback('debug', f'[{insta_filename}] Batch check: batch_candidates={len(batch_candidates)}, compressed_insta={"present" if compressed_insta else "missing"}')
         
         if batch_candidates and compressed_insta:
+            num_chunks = (len(batch_candidates) + batch_size - 1) // batch_size
             if log_callback:
-                log_callback('debug', f'[{insta_filename}] Calling batch API with {len(batch_candidates)} candidates')
+                log_callback('info', f'[{insta_filename}] Processing {len(batch_candidates)} candidates in {num_chunks} batches of {batch_size}')
             try:
                 registry = ProviderRegistry()
-                # Use provided provider_id or fall back to first provider in fallback order
                 actual_provider_id = provider_id or registry.fallback_order[0]
                 client = registry.get_client(actual_provider_id)
                 requested_model = model or get_vision_model()
-                batch_results = compare_images_batch(
-                    client,
-                    requested_model,
-                    compressed_insta,
-                    batch_candidates,
-                    log_callback=log_callback,
-                )
+
+                for chunk_start in range(0, len(batch_candidates), batch_size):
+                    if should_cancel is not None and should_cancel():
+                        break
+                    chunk = batch_candidates[chunk_start:chunk_start + batch_size]
+                    chunk_num = chunk_start // batch_size + 1
+                    current_chunk_size = len(chunk)
+
+                    if log_callback:
+                        log_callback('debug', f'[{insta_filename}] Batch {chunk_num}/{num_chunks}: {current_chunk_size} candidates')
+
+                    chunk_results = _call_batch_chunk(
+                        client, requested_model, compressed_insta, chunk,
+                        log_callback, insta_filename, chunk_num, num_chunks,
+                    )
+                    _score_and_store(chunk_results)
+
                 if log_callback:
-                    log_callback('debug', f'[{insta_filename}] Batch API returned {len(batch_results)} results')
-            except RateLimitError as e:
+                    log_callback('debug', f'[{insta_filename}] Batch API scored {len(results)} total results')
+            except RateLimitError:
                 if log_callback:
                     log_callback('warning', f'[{insta_filename}] Batch API rate limited, falling back to sequential')
                 use_batch = False
@@ -229,75 +356,27 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         else:
             if log_callback:
                 log_callback('warning', f'[{insta_filename}] Batch API SKIPPED (batch_candidates={len(batch_candidates)}, compressed_insta={"present" if compressed_insta else "missing"})')
+
+        # Score candidates that were skipped (no valid path) with 0.0
+        scored_ids = {r['catalog_key'] for r in results}
+        for idx, candidate in enumerate(candidates):
+            catalog_key = candidate.get('key')
+            if catalog_key not in scored_ids:
+                _score_and_store({idx: 0.0})
     
     if should_cancel is not None and should_cancel():
         return results
 
-    if use_batch and batch_results:
-        # Process batch results
-        for idx, candidate in enumerate(candidates):
-            catalog_key = candidate.get('key')
-            insta_key = insta_image.get('key')
-            
-            # Get vision score from batch results
-            vision_confidence = batch_results.get(idx, 0.0)
-            vision_score_val = vision_score(vision_confidence)
-            vision_result = 'SAME' if vision_confidence >= 80 else 'DIFFERENT' if vision_confidence <= 20 else 'UNCERTAIN'
-            
-            # Compute phash and desc scores
-            cached_phash = get_cached_phash(db, catalog_key)
-            if cached_phash is not None:
-                phash_dist = hamming_distance(insta_image.get('image_hash', ''), cached_phash)
-                cache_hits += 1
-            else:
-                phash_dist = hamming_distance(insta_image.get('image_hash', ''), candidate.get('image_hash', ''))
-                cache_misses += 1
-            
-            phash_score_val = max(0, 1 - (phash_dist / 16))
-            desc_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
-            
-            # Weight redistribution logic
-            insta_hash = insta_image.get('image_hash')
-            cand_hash = cached_phash if cached_phash is not None else candidate.get('image_hash')
-            phash_available = bool(insta_hash) and bool(cand_hash)
-            desc_available = bool((insta_image.get('description') or '').strip()) and bool((candidate.get('description') or '').strip())
-            
-            active_weights = {}
-            if phash_available:
-                active_weights['phash'] = phash_weight
-            if desc_available:
-                active_weights['desc'] = desc_weight
-            active_weights['vision'] = vision_weight
-            
-            weight_sum = sum(active_weights.values()) or 1.0
-            w_phash = active_weights.get('phash', 0) / weight_sum
-            w_desc = active_weights.get('desc', 0) / weight_sum
-            w_vision = active_weights['vision'] / weight_sum
-            
-            total_score_val = (w_phash * phash_score_val) + (w_desc * desc_sim) + (w_vision * vision_score_val)
-            
-            model_label = f"{provider_id}:{model}" if provider_id and model else get_vision_model()
-            
-            # Store result
-            store_vision_comparison(db, catalog_key, insta_key, vision_result, vision_score_val, model_label)
-            
-            results.append({
-                'catalog_key': catalog_key,
-                'insta_key': insta_key,
-                'phash_distance': int(phash_dist),
-                'phash_score': phash_score_val,
-                'desc_similarity': desc_sim,
-                'vision_result': vision_result,
-                'vision_score': vision_score_val,
-                'vision_reasoning': '',
-                'total_score': total_score_val,
-                'model_used': model_label,
-                'rate_limited': False,
-            })
-    else:
+    if not use_batch:
         # Sequential fallback
+        consecutive_fatal = 0
+        FATAL_ABORT_THRESHOLD = 3
         for idx, candidate in enumerate(candidates, 1):
             if should_cancel is not None and should_cancel():
+                break
+            if consecutive_fatal >= FATAL_ABORT_THRESHOLD:
+                if log_callback:
+                    log_callback('warning', f'[{insta_filename}] Aborting remaining {len(candidates) - idx + 1} candidates after {FATAL_ABORT_THRESHOLD} consecutive fatal errors')
                 break
             catalog_key = candidate.get('key')
             insta_key = insta_image.get('key')
@@ -377,13 +456,22 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                     )
                 except RateLimitError as e:
                     consecutive_rate_limits += 1
+                    consecutive_fatal = 0
                     rate_limited_count += 1
                     if log_callback:
                         log_callback('warning', f'[{insta_filename}] Rate limited for {catalog_key} ({consecutive_rate_limits} consecutive)')
                     vision_result = 'RATE_LIMITED'
                     vision_score_val = 0.0
+                except InvalidRequestError as e:
+                    consecutive_rate_limits = 0
+                    consecutive_fatal += 1
+                    if log_callback:
+                        log_callback('error', f'[{insta_filename}] Fatal vision error for {catalog_key}: {e}')
+                    vision_result = 'ERROR'
+                    vision_score_val = 0.0
                 except Exception as e:
                     consecutive_rate_limits = 0
+                    consecutive_fatal = 0
                     if log_callback:
                         log_callback('error', f'[{insta_filename}] Vision error for {catalog_key}: {e}')
                     vision_result = 'ERROR'
@@ -440,6 +528,11 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
     if log_callback:
         log_callback('info', f'[{insta_filename}] Cache summary: {cache_hits} pHash hits, {cache_misses} pHash misses')
+        above = [r for r in results if r['total_score'] >= threshold]
+        log_callback('debug', f'[{insta_filename}] {len(results)} results, {len(above)} above threshold ({threshold})')
+        if above:
+            for r in above[:5]:
+                log_callback('info', f'[{insta_filename}] Above threshold: {r["catalog_key"]} total={r["total_score"]:.4f} vision={r["vision_score"]:.4f}')
         if results:
             best = results[0]
             best_pct = int(best['total_score'] * 100)
@@ -447,6 +540,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 log_callback('info', f'[{insta_filename}] Comparison complete - Best match: {best["catalog_key"]} ({best_pct}%)')
             else:
                 log_callback('info', f'[{insta_filename}] No match found above threshold ({threshold})')
+                log_callback('debug', f'[{insta_filename}] Best result: {best["catalog_key"]} total={best["total_score"]:.4f} vision={best["vision_score"]:.4f}')
 
     return results
 
@@ -504,6 +598,7 @@ def match_batch(db, insta_images: list, threshold: float = 0.7,
 def find_candidates_by_date(db, insta_image: dict, days_before: int = 90) -> list:
     """Find catalog candidates within date window before Instagram posting."""
     from datetime import datetime, timedelta
+    from lightroom_tagger.core.analyzer import VIDEO_EXTENSIONS
 
     date_folder = insta_image.get('date_folder', '')
     if len(date_folder) != 6:
@@ -517,6 +612,11 @@ def find_candidates_by_date(db, insta_image: dict, days_before: int = 90) -> lis
     candidates = []
     for row in db.execute("SELECT * FROM images").fetchall():
         img = _deserialize_row(row)
+        filepath = img.get('filepath', '')
+        if filepath:
+            ext = os.path.splitext(filepath)[1].lower()
+            if ext in VIDEO_EXTENSIONS:
+                continue
         date_taken = img.get('date_taken', '')
         if not date_taken:
             continue
@@ -527,4 +627,5 @@ def find_candidates_by_date(db, insta_image: dict, days_before: int = 90) -> lis
         except Exception:
             continue
 
+    candidates.sort(key=lambda c: c.get('date_taken', ''), reverse=True)
     return candidates

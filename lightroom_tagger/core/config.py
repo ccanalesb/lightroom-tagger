@@ -36,7 +36,7 @@ class Config:
     
     # Parallel processing configuration
     matching_workers: int = 4
-    vision_batch_size: int = 20
+    vision_batch_size: int = 10
     vision_batch_threshold: int = 5
 
     def __post_init__(self):
@@ -101,7 +101,7 @@ def load_config(config_path: str = "config.yaml") -> Config:
         "vision_cache_enabled": True,
         "ollama_host": "http://localhost:11434",
         "matching_workers": 4,
-        "vision_batch_size": 20,
+        "vision_batch_size": 10,
         "vision_batch_threshold": 5,
     }
 

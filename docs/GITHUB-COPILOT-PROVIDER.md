@@ -179,6 +179,80 @@ python -m lightroom_tagger.cli describe \
 
 ---
 
+## ⚠️ Extended Thinking and `copilot-api-plus`
+
+### The Problem
+
+`copilot-api-plus` automatically injects `thinking_budget` (extended thinking) into every request sent to Claude models. For vision comparison calls, this causes a guaranteed `400 Bad Request` because the injected `thinking.budget_tokens` exceeds `max_tokens`:
+
+```
+max_tokens must be greater than thinking.budget_tokens
+```
+
+No value of `max_tokens` fixes this — the proxy computes `thinking_budget` from model capabilities and it's always larger than any reasonable `max_tokens` for a structured JSON response.
+
+### The Fix
+
+Vision comparison calls (`compare_images`, `compare_images_batch`) send `extra_body={"reasoning_effort": "none"}` which tells the proxy to skip its automatic thinking injection (see `injectThinking()` in the proxy source — it short-circuits when `reasoning_effort` is already present).
+
+Description generation (`generate_description`) does **not** disable thinking, so Claude's extended reasoning is available when generating rich, structured image descriptions.
+
+### Why Only Vision Comparisons?
+
+| Call Type | Thinking | Reason |
+|-----------|----------|--------|
+| `compare_images` | Disabled | Returns tiny JSON (`{"confidence": 85, "verdict": "MATCH"}`). Thinking wastes tokens and triggers budget conflicts. |
+| `compare_images_batch` | Disabled | Same — structured JSON output, many images per call. |
+| `generate_description` | Enabled | Long-form creative output benefits from reasoning. The proxy's `thinking_budget` is sized for the model's `max_output_tokens`, so `max_tokens=2048` works when thinking adds depth. |
+
+### Diagnosing the Issue
+
+If you see repeated `ContextLengthError` or `400 Bad Request` from Claude models via GitHub Copilot, check:
+
+```bash
+# 1. Verify copilot-api-plus is the proxy
+ps aux | grep copilot-api
+
+# 2. Test directly — should succeed with reasoning_effort override
+python -c "
+from lightroom_tagger.core.provider_registry import ProviderRegistry
+registry = ProviderRegistry()
+client = registry.get_client('github_copilot')
+resp = client.chat.completions.create(
+    model='claude-sonnet-4.5',
+    messages=[{'role': 'user', 'content': 'Say hello'}],
+    max_tokens=256,
+    extra_body={'reasoning_effort': 'none'},
+)
+print(resp.choices[0].message.content)
+"
+
+# 3. This will FAIL without the override (proxy injects thinking)
+python -c "
+from lightroom_tagger.core.provider_registry import ProviderRegistry
+registry = ProviderRegistry()
+client = registry.get_client('github_copilot')
+resp = client.chat.completions.create(
+    model='claude-sonnet-4.5',
+    messages=[{'role': 'user', 'content': 'Say hello'}],
+    max_tokens=256,
+)
+print(resp.choices[0].message.content)
+"
+```
+
+### Defensive Layers
+
+Even if the proxy behavior changes, the codebase has defensive layers:
+
+1. **Error classification**: `budget_tokens` / `thinking` errors → `ContextLengthError`
+2. **`max_tokens` escalation**: Tries 256 → 4096 → 32768 → 65536 before giving up
+3. **Provider blacklisting**: After exhausting escalation, marks the provider+model as broken for the session — subsequent candidates skip instantly to fallback
+4. **Batch chunk halving**: `PayloadTooLargeError` (413) triggers recursive chunk splitting
+5. **Consecutive fatal abort**: 3+ consecutive `InvalidRequestError` in sequential mode aborts remaining candidates
+
+---
+
 ## 🆘 Troubleshooting
 
 ### Provider shows as unavailable

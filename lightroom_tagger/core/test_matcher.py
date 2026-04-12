@@ -1,8 +1,8 @@
 from contextlib import nullcontext
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, MagicMock, patch
 
 import lightroom_tagger.core.matcher as matcher_mod
-from lightroom_tagger.core.matcher import match_batch, match_image, score_candidates_with_vision
+from lightroom_tagger.core.matcher import match_batch, match_image, score_candidates_with_vision, find_candidates_by_date
 
 
 def test_match_filters_by_exif():
@@ -284,3 +284,25 @@ def test_batch_skips_oversized_cache_misses_with_zero_vision():
     assert by_key['cat0']['vision_score'] == 0.0
     assert by_key['cat0']['vision_result'] == 'DIFFERENT'
     assert by_key['cat1']['vision_score'] == 0.5
+
+
+class TestFindCandidatesByDate:
+    def test_excludes_video_files(self):
+        """Video files (.mov, .mp4, etc.) should never appear as candidates."""
+        db = MagicMock()
+        rows = [
+            {'key': 'img1', 'date_taken': '2025-01-15T12:00:00', 'filepath': '/photos/img1.arw'},
+            {'key': 'vid1', 'date_taken': '2025-01-15T12:00:00', 'filepath': '/photos/vid1.mov'},
+            {'key': 'vid2', 'date_taken': '2025-01-15T12:00:00', 'filepath': '/photos/vid2.MP4'},
+            {'key': 'img2', 'date_taken': '2025-01-15T12:00:00', 'filepath': '/photos/img2.jpg'},
+        ]
+        db.execute.return_value.fetchall.return_value = rows
+
+        insta_image = {'date_folder': '202502'}
+        candidates = find_candidates_by_date(db, insta_image, days_before=90)
+
+        keys = [c['key'] for c in candidates]
+        assert 'img1' in keys
+        assert 'img2' in keys
+        assert 'vid1' not in keys
+        assert 'vid2' not in keys
