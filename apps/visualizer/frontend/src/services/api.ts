@@ -308,6 +308,56 @@ export const DescriptionsAPI = {
 
 export type DescriptionListResult = Awaited<ReturnType<typeof DescriptionsAPI.list>>
 
+export interface ImageScoreRow {
+  id?: number
+  image_key: string
+  image_type: string
+  perspective_slug: string
+  score: number
+  rationale: string
+  model_used: string
+  prompt_version: string
+  scored_at: string
+  is_current: boolean
+  repaired_from_malformed: boolean
+}
+
+export interface ScoresCurrentResponse {
+  image_key: string
+  image_type: string
+  current: ImageScoreRow[]
+}
+
+export interface ScoresHistoryResponse {
+  image_key: string
+  image_type: string
+  perspective_slug: string
+  history: ImageScoreRow[]
+}
+
+export const ScoresAPI = {
+  getCurrent: (imageKey: string, params?: { image_type?: 'catalog' | 'instagram' }) => {
+    const sp = new URLSearchParams()
+    if (params?.image_type) sp.set('image_type', params.image_type)
+    const qs = sp.toString()
+    return request<ScoresCurrentResponse>(
+      `/scores/${encodeURIComponent(imageKey)}${qs ? `?${qs}` : ''}`,
+    )
+  },
+
+  getHistory: (
+    imageKey: string,
+    params: { perspective_slug: string; image_type?: 'catalog' | 'instagram' },
+  ) => {
+    const sp = new URLSearchParams()
+    sp.set('perspective_slug', params.perspective_slug)
+    if (params.image_type) sp.set('image_type', params.image_type)
+    return request<ScoresHistoryResponse>(
+      `/scores/${encodeURIComponent(imageKey)}/history?${sp.toString()}`,
+    )
+  },
+}
+
 export const DumpMediaAPI = {
   list: (filters?: { processed?: boolean; matched?: boolean; limit?: number; offset?: number }) => {
     const params = new URLSearchParams()
