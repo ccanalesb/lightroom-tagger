@@ -2,7 +2,7 @@
 export const APP_TITLE = 'Lightroom Tagger'
 
 // Navigation
-export const NAV_DASHBOARD = 'Dashboard'
+export const NAV_INSIGHTS = 'Insights'
 export const NAV_INSTAGRAM = 'Instagram'
 export const NAV_MATCHING = 'Matching'
 export const NAV_DESCRIPTIONS = 'Descriptions'
@@ -112,7 +112,7 @@ export const LABEL_CACHED = 'cached'
 export const LABEL_MODEL = 'model:'
 export const LABEL_SCORE = 'score:'
 
-// Dashboard
+// Dashboard / Insights home (KPI labels shared with legacy dashboard copy)
 export const DASHBOARD_CATALOG_IMAGES = 'Catalog Images'
 export const DASHBOARD_INSTAGRAM_IMAGES = 'Instagram Images'
 export const DASHBOARD_POSTED = 'Posted to Instagram'
@@ -121,6 +121,31 @@ export const DASHBOARD_RECENT_JOBS = 'Recent Jobs'
 export const DASHBOARD_NO_JOBS = 'No recent jobs'
 export const DASHBOARD_TOTAL_CATALOG = 'Total Catalog Images'
 export const DASHBOARD_MISSING = 'Missing'
+
+// Insights home (Phase 9)
+export const INSIGHTS_PAGE_TITLE = 'Insights'
+export const INSIGHTS_PAGE_SUBTITLE =
+  'Critique score summaries, posting cadence, and top catalog highlights — with shortcuts to Analytics, Identity, and Processing.'
+export const INSIGHTS_SECTION_SCORES = 'Scores & style'
+export const INSIGHTS_SECTION_POSTING = 'Posting cadence'
+export const INSIGHTS_SECTION_HIGHLIGHTS = 'Top scored photos'
+export const INSIGHTS_SECTION_EXPLORE = 'Explore'
+export const INSIGHTS_POSTING_RANGE_NOTE =
+  'Last 12 months, monthly buckets (UTC). Adjust range on the Analytics page.'
+export const INSIGHTS_FOOTER_TIMEZONE =
+  'Timestamps follow the same assumptions as Analytics (often UTC from export). Open Analytics for full filters and notes.'
+export const INSIGHTS_EMPTY_FINGERPRINT =
+  'Not enough scored catalog data yet. Run scoring from Processing to see distributions and perspective means.'
+export const INSIGHTS_QUICK_ANALYTICS_TITLE = 'Analytics'
+export const INSIGHTS_QUICK_ANALYTICS_DESC = 'Posting frequency, heatmaps, and caption aggregates.'
+export const INSIGHTS_QUICK_IDENTITY_TITLE = 'Identity'
+export const INSIGHTS_QUICK_IDENTITY_DESC = 'Best photos, style fingerprint, and post-next suggestions.'
+export const INSIGHTS_QUICK_PROCESSING_TITLE = 'Processing'
+export const INSIGHTS_QUICK_PROCESSING_DESC = 'Matching, descriptions, scoring jobs, and perspectives.'
+export const INSIGHTS_KPI_ACTIVE_JOBS = 'Active jobs'
+export const INSIGHTS_KPI_ACTIVE_JOBS_DESC = 'Queued or running'
+export const INSIGHTS_CADENCE_RECENT = 'Posts in last 4 weeks'
+export const INSIGHTS_CADENCE_PRIOR = 'vs prior 4 weeks'
 
 // Instagram Page
 export const INSTAGRAM_DOWNLOADED = 'Downloaded Instagram Images'

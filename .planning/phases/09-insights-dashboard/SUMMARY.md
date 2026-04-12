@@ -31,4 +31,12 @@ No local p95 multi-fetch benchmark in this pass; parallel GETs assumed acceptabl
 
 ## 09-02 — Unified Insights home
 
-*(Appended after implementation commit.)*
+**Implemented:** `/` (`DashboardPage`) composes parallel `Promise.allSettled` calls to `SystemAPI.stats`, `IdentityAPI.getStyleFingerprint`, `IdentityAPI.getBestPhotos({ limit: 8 })`, `AnalyticsAPI.getPostingFrequency` (12 months, `granularity: month`), and `JobsAPI.list` (active job count). Nav label **`NAV_INSIGHTS`** (“Insights”) in `Layout.tsx`.
+
+**Components:** `src/components/insights/` — `InsightsKpiRow`, `ScoreDistributionChart`, `PerspectiveRadarSummary`, `MiniPostingFrequencyChart` (cadence: last 28 days vs prior 28 days by bucket start), `TopPhotosStrip` (thumbnails + `CatalogImageModal`), `InsightsQuickNav`.
+
+**PostingFrequencyChart:** optional `compact` prop for the mini chart.
+
+**Tests:** `DashboardPage.test.tsx` (Vitest + RTL) mocks APIs and asserts main headings.
+
+**Verification:** `npm run build`, `npm run lint`, `npm test -- --run src/pages/DashboardPage.test.tsx` — all pass (2026-04-12).

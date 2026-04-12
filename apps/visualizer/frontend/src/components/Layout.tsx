@@ -3,7 +3,7 @@ import { ThemeToggle } from './ui/ThemeToggle';
 import {
   APP_TITLE,
   NAV_ANALYTICS,
-  NAV_DASHBOARD,
+  NAV_INSIGHTS,
   NAV_IDENTITY,
   NAV_IMAGES,
   NAV_PROCESSING,
@@ -11,7 +11,7 @@ import {
 
 export function Layout() {
   const navItems = [
-    { to: '/', label: NAV_DASHBOARD, exact: true },
+    { to: '/', label: NAV_INSIGHTS, exact: true },
     { to: '/images', label: NAV_IMAGES },
     { to: '/analytics', label: NAV_ANALYTICS },
     { to: '/identity', label: NAV_IDENTITY },

@@ -23,6 +23,8 @@ export interface PostingFrequencyChartProps {
   meta: PostingFrequencyMeta | null
   loading: boolean
   error: string | null
+  /** Smaller chart area for dashboard / embedded use */
+  compact?: boolean
 }
 
 function formatBucketLabel(iso: string): string {
@@ -36,16 +38,20 @@ export function PostingFrequencyChart({
   meta,
   loading,
   error,
+  compact = false,
 }: PostingFrequencyChartProps) {
   const data = buckets.map((b) => ({
     ...b,
     label: formatBucketLabel(b.bucket_start),
   }))
 
+  const minH = compact ? 'min-h-[180px]' : 'min-h-[280px]'
+  const chartH = compact ? 'h-[200px]' : 'h-[320px]'
+
   if (loading) {
     return (
       <div
-        className="flex min-h-[280px] items-center justify-center rounded-card border border-border bg-surface text-sm text-text-secondary"
+        className={`flex ${minH} items-center justify-center rounded-card border border-border bg-surface text-sm text-text-secondary`}
         role="status"
         aria-live="polite"
       >
@@ -57,7 +63,7 @@ export function PostingFrequencyChart({
   if (error) {
     return (
       <div
-        className="flex min-h-[280px] items-center justify-center rounded-card border border-border bg-surface px-4 text-center text-sm text-error"
+        className={`flex ${minH} items-center justify-center rounded-card border border-border bg-surface px-4 text-center text-sm text-error`}
         role="alert"
       >
         {error}
@@ -67,7 +73,9 @@ export function PostingFrequencyChart({
 
   if (data.length === 0) {
     return (
-      <div className="flex min-h-[280px] items-center justify-center rounded-card border border-dashed border-border bg-surface text-sm text-text-secondary">
+      <div
+        className={`flex ${minH} items-center justify-center rounded-card border border-dashed border-border bg-surface text-sm text-text-secondary`}
+      >
         No buckets in this range.
       </div>
     )
@@ -75,7 +83,7 @@ export function PostingFrequencyChart({
 
   return (
     <div className="w-full min-w-0 space-y-2">
-      <div className="h-[320px] w-full">
+      <div className={`${chartH} w-full`}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" vertical={false} />
