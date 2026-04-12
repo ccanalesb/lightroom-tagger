@@ -21,6 +21,13 @@ export function CatalogImageCard({ image, onClick }: CatalogImageCardProps) {
   const showScorePill =
     Boolean(best) && perspective != null && typeof perspective.score === 'number';
 
+  const persistedScore = image.catalog_perspective_score;
+  const showPersistedScorePill = typeof persistedScore === 'number';
+  const scoreSlugShort =
+    image.catalog_score_perspective && image.catalog_score_perspective.length > 10
+      ? `${image.catalog_score_perspective.slice(0, 10)}…`
+      : image.catalog_score_perspective;
+
   return (
     <div
       onClick={onClick}
@@ -51,6 +58,12 @@ export function CatalogImageCard({ image, onClick }: CatalogImageCardProps) {
             >
               {DESCRIPTION_PERSPECTIVE_LABELS[best] || best} {perspective.score}/10
             </span>
+          )}
+          {showPersistedScorePill && (
+            <Badge variant="default" className="!px-1.5 !py-0.5 text-[10px] font-medium opacity-90">
+              {scoreSlugShort ? `${scoreSlugShort} ` : ''}
+              {persistedScore}/10
+            </Badge>
           )}
         </div>
       </div>
