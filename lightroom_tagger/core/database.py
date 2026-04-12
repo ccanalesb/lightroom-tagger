@@ -1616,6 +1616,83 @@ def get_perspective_by_slug(conn: sqlite3.Connection, slug: str) -> dict | None:
     return dict(row) if row else None
 
 
+def insert_perspective(
+    conn: sqlite3.Connection,
+    *,
+    slug: str,
+    display_name: str,
+    prompt_markdown: str,
+    description: str = "",
+    active: bool = True,
+    source_filename: str | None = None,
+) -> None:
+    """Insert a ``perspectives`` row. Caller commits."""
+    now = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        """
+        INSERT INTO perspectives (
+            slug, display_name, description, prompt_markdown,
+            active, source_filename, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            slug,
+            display_name,
+            description,
+            prompt_markdown,
+            1 if active else 0,
+            source_filename,
+            now,
+            now,
+        ),
+    )
+
+
+def update_perspective(
+    conn: sqlite3.Connection,
+    slug: str,
+    *,
+    display_name: str | None = None,
+    description: str | None = None,
+    prompt_markdown: str | None = None,
+    active: bool | None = None,
+) -> bool:
+    """Partially update a perspective by ``slug``. Returns whether a row was updated."""
+    fields: list[str] = []
+    values: list = []
+    if display_name is not None:
+        fields.append("display_name = ?")
+        values.append(display_name)
+    if description is not None:
+        fields.append("description = ?")
+        values.append(description)
+    if prompt_markdown is not None:
+        fields.append("prompt_markdown = ?")
+        values.append(prompt_markdown)
+    if active is not None:
+        fields.append("active = ?")
+        values.append(1 if active else 0)
+    if not fields:
+        return False
+    now = datetime.now(timezone.utc).isoformat()
+    fields.append("updated_at = ?")
+    values.append(now)
+    values.append(slug)
+    cur = conn.execute(
+        f"UPDATE perspectives SET {', '.join(fields)} WHERE slug = ?",
+        tuple(values),
+    )
+    if cur.rowcount > 0:
+        return True
+    return get_perspective_by_slug(conn, slug) is not None
+
+
+def delete_perspective(conn: sqlite3.Connection, slug: str) -> bool:
+    """Delete a perspective by ``slug``. Returns whether a row was removed."""
+    cur = conn.execute("DELETE FROM perspectives WHERE slug = ?", (slug,))
+    return cur.rowcount > 0
+
+
 def insert_image_score(conn: sqlite3.Connection, row: dict) -> int:
     """Insert one ``image_scores`` row; return ``lastrowid``.
 
