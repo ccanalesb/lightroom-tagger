@@ -8,3 +8,10 @@
 - **feat(06-02): add ScoresAPI and ImageScoreRow TypeScript helpers** — `apps/visualizer/frontend/src/services/api.ts` mirrors `DescriptionsAPI` path style under `VITE_API_URL`.
 - **test(06-02): cover list_score_history_for_perspective ordering** — `lightroom_tagger/core/test_database_scores.py` asserts `scored_at` descending.
 - **test(06-02): add Flask tests for scores API** — `apps/visualizer/backend/tests/test_scores_api.py` covers empty current, `is_current` filter, history 400, newest-first history.
+- **fix(06-02): type-annotate scores routes for mypy** — `ResponseReturnValue` + `sqlite3.Connection` on handlers; ruff import order on `api/scores.py`.
+
+## Verification (plan 06-02)
+
+- `pytest lightroom_tagger/core/test_database_scores.py apps/visualizer/backend/tests/test_scores_api.py -q` — pass.
+- `mypy apps/visualizer/backend/api/scores.py --follow-imports=skip` — pass. Running `mypy lightroom_tagger/core/database.py` (with or without `--follow-imports=skip`) still reports many pre-existing issues in that module under `disallow_untyped_defs` / legacy signatures; new helpers are fully annotated.
+- `ruff check apps/visualizer/backend/api/scores.py` — pass. `ruff check` on `lightroom_tagger/core/database.py` and `apps/visualizer/backend/app.py` still reports pre-existing lint in those files (not introduced by 06-02).
