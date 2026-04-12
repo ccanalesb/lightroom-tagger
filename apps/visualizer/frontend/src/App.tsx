@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
+import { AnalyticsPage } from './pages/AnalyticsPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { ImagesPage } from './pages/ImagesPage'
 import { ProcessingPage } from './pages/ProcessingPage'
@@ -16,6 +17,7 @@ function App() {
             <Route path="/" element={<Layout />}>
               <Route index element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
               <Route path="images" element={<ErrorBoundary><ImagesPage /></ErrorBoundary>} />
+              <Route path="analytics" element={<ErrorBoundary><AnalyticsPage /></ErrorBoundary>} />
               <Route path="processing" element={<ErrorBoundary><ProcessingPage /></ErrorBoundary>} />
               <Route path="instagram" element={<Navigate to="/images" replace />} />
               <Route path="matching" element={<Navigate to="/processing" replace />} />
