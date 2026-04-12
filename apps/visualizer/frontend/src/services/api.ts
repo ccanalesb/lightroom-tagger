@@ -364,6 +364,104 @@ export const ScoresAPI = {
   },
 }
 
+// --- Analytics (Phase 7 /api/analytics) ---
+
+export type AnalyticsGranularity = 'day' | 'week' | 'month'
+
+export interface PostingFrequencyBucket {
+  bucket_start: string
+  count: number
+}
+
+export interface PostingFrequencyMeta {
+  timestamp_source?: string
+  granularity?: string
+  timezone_assumption?: string
+  date_from?: string
+  date_to?: string
+  bucket_expression?: string
+}
+
+export interface PostingFrequencyResponse {
+  buckets: PostingFrequencyBucket[]
+  meta: PostingFrequencyMeta
+}
+
+export interface HeatmapCell {
+  dow: number
+  hour: number
+  count: number
+}
+
+export interface PostingHeatmapMeta {
+  dow_labels?: string[]
+  timezone_assumption?: string
+  timezone_note?: string
+  date_from?: string
+  date_to?: string
+}
+
+export interface PostingHeatmapResponse {
+  cells: HeatmapCell[]
+  meta: PostingHeatmapMeta
+}
+
+export interface CaptionHashtagMeta {
+  timezone_assumption?: string
+  hashtag_pattern?: string
+  timestamp_scope?: string
+}
+
+export interface TopHashtagRow {
+  tag: string
+  count: number
+}
+
+export interface TopWordRow {
+  word: string
+  count: number
+}
+
+export interface CaptionStatsResponse {
+  post_count: number
+  with_caption_count: number
+  avg_caption_len: number
+  median_caption_len: number | null
+  top_hashtags: TopHashtagRow[]
+  posts_with_hashtags: number
+  avg_hashtags_per_post: number
+  top_words: TopWordRow[]
+  meta: CaptionHashtagMeta
+}
+
+export const AnalyticsAPI = {
+  getPostingFrequency: (params: {
+    date_from: string
+    date_to: string
+    granularity?: AnalyticsGranularity
+  }) => {
+    const sp = new URLSearchParams()
+    sp.set('date_from', params.date_from)
+    sp.set('date_to', params.date_to)
+    sp.set('granularity', params.granularity ?? 'day')
+    return request<PostingFrequencyResponse>(`/analytics/posting-frequency?${sp.toString()}`)
+  },
+
+  getPostingHeatmap: (params: { date_from: string; date_to: string }) => {
+    const sp = new URLSearchParams()
+    sp.set('date_from', params.date_from)
+    sp.set('date_to', params.date_to)
+    return request<PostingHeatmapResponse>(`/analytics/posting-heatmap?${sp.toString()}`)
+  },
+
+  getCaptionStats: (params: { date_from: string; date_to: string }) => {
+    const sp = new URLSearchParams()
+    sp.set('date_from', params.date_from)
+    sp.set('date_to', params.date_to)
+    return request<CaptionStatsResponse>(`/analytics/caption-stats?${sp.toString()}`)
+  },
+}
+
 export const DumpMediaAPI = {
   list: (filters?: { processed?: boolean; matched?: boolean; limit?: number; offset?: number }) => {
     const params = new URLSearchParams()
