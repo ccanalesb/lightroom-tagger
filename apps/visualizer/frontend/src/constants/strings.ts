@@ -11,6 +11,7 @@ export const NAV_IMAGES = 'Images'
 export const NAV_CATALOG = 'Catalog'
 export const NAV_MATCHES = 'Matches'
 export const NAV_PROCESSING = 'Processing'
+export const NAV_ANALYTICS = 'Analytics'
 export const NAV_JOB_QUEUE = 'Job Queue'
 
 // Tab labels
@@ -281,6 +282,39 @@ export const MATCH_CANDIDATES_OF = 'of'
 export const MATCH_CAROUSEL_PREVIOUS = 'Previous candidate'
 export const MATCH_CAROUSEL_NEXT = 'Next candidate'
 export const MATCH_CANDIDATE_LABEL = 'Candidate'
+
+// Analytics (Phase 7)
+export const ANALYTICS_PAGE_TITLE = 'Analytics'
+export const ANALYTICS_PAGE_SUBTITLE =
+  'Posting cadence, timing patterns, and caption aggregates from validated Instagram dump matches.'
+export const ANALYTICS_SECTION_FREQUENCY = 'Posting frequency'
+export const ANALYTICS_SECTION_HEATMAP = 'Posting time (day × hour)'
+export const ANALYTICS_SECTION_CAPTIONS = 'Captions & hashtags'
+export const ANALYTICS_LABEL_DATE_FROM = 'From'
+export const ANALYTICS_LABEL_DATE_TO = 'To'
+export const ANALYTICS_LABEL_GRANULARITY = 'Granularity'
+export const ANALYTICS_GRANULARITY_DAY = 'Daily'
+export const ANALYTICS_GRANULARITY_WEEK = 'Weekly'
+export const ANALYTICS_GRANULARITY_MONTH = 'Monthly'
+export const ANALYTICS_APPLY = 'Apply'
+export const ANALYTICS_LOADING = 'Loading analytics…'
+export const ANALYTICS_EMPTY_NO_POSTS =
+  'No validated posts in this date range. Validate matches on the Images page to populate analytics.'
+export const ANALYTICS_EMPTY_NO_DUMP =
+  'No posting data yet. Ingest an Instagram export dump and validate matches to see analytics.'
+export const ANALYTICS_HEATMAP_LEGEND = 'Darker cells = more posts (UTC hour)'
+export const ANALYTICS_TIMEZONE_DISCLAIMER =
+  'Times use the server’s assumptions (typically UTC from export timestamps). See the note below for details.'
+export const ANALYTICS_CAPTION_TOP_HASHTAGS = 'Top hashtags'
+export const ANALYTICS_CAPTION_STATS = 'Caption stats'
+export const ANALYTICS_COL_HASHTAG = 'Hashtag'
+export const ANALYTICS_COL_COUNT = 'Count'
+export const ANALYTICS_STAT_POSTS = 'Posts in range'
+export const ANALYTICS_STAT_WITH_CAPTION = 'With non-empty caption'
+export const ANALYTICS_STAT_AVG_LEN = 'Avg. caption length (chars)'
+export const ANALYTICS_STAT_MEDIAN_LEN = 'Median caption length'
+export const ANALYTICS_STAT_POSTS_WITH_TAGS = 'Posts with hashtags'
+export const ANALYTICS_STAT_AVG_TAGS = 'Avg. hashtags per post (unique)'
 
 // Cache Status
 export const CACHE_TITLE = 'Vision Cache'
