@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CaptionHashtagPanel } from '../components/analytics/CaptionHashtagPanel'
+import { UnpostedCatalogPanel } from '../components/analytics/UnpostedCatalogPanel'
 import { PostingFrequencyChart } from '../components/analytics/PostingFrequencyChart'
 import { PostingHeatmap } from '../components/analytics/PostingHeatmap'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
@@ -289,6 +290,8 @@ export function AnalyticsPage() {
         </h2>
         <CaptionHashtagPanel stats={captions} loading={loading} error={errCap} />
       </section>
+
+      <UnpostedCatalogPanel />
 
       <footer className="border-t border-border pt-6 text-xs text-text-tertiary space-y-2">
         <p>{ANALYTICS_TIMEZONE_DISCLAIMER}</p>
