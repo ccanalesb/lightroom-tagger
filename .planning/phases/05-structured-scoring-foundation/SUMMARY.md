@@ -159,3 +159,45 @@ Not modified (orchestrator-owned per wave instructions).
 ## STATE / ROADMAP
 
 Not modified (orchestrator-owned per wave instructions).
+
+---
+
+# Plan 05-04 — Execution summary
+
+**Phase:** 05 — Structured scoring foundation  
+**Plan:** Perspectives REST API, Processing UI (CodeMirror), and batch describe slug wiring  
+**Date:** 2026-04-12
+
+## Outcomes
+
+- **`lightroom_tagger/core/database.py`**: `insert_perspective`, `update_perspective`, `delete_perspective` (parameterized SQL); `update_perspective` treats SQLite no-op updates as success when the row still exists.
+- **`apps/visualizer/backend/api/perspectives.py`**: Blueprint under `/api/perspectives` with list (optional `active_only`), get, create, put (partial), delete, and `POST /<slug>/reset-default` (404 + `{"error": "no default file"}` when the resolved default file is missing). Header comment **`# image_scores JSON field keys (library DB)`** plus comma-separated keys. Validation: slug regex, `prompt_markdown` UTF-8 size cap **256 KiB** → 400 `prompt too large`; `source_filename` on reset must match `^[a-zA-Z0-9_\-]+\.md$` else 400 `invalid source_filename`; reset reads only under `prompts/perspectives/` relative to repo root.
+- **`apps/visualizer/backend/tests/test_perspectives_api.py`**: Temp `LIBRARY_DB` + `monkeypatch` on `utils.db.LIBRARY_DB`; list includes `street`, PUT/GET markdown round-trip, reset with bogus `source_filename` → 404 contract.
+- **Frontend**: `@uiw/react-codemirror` + `@codemirror/lang-markdown` (installed with `npm install --legacy-peer-deps` due to `@testing-library/react` vs React 19 peer conflict). `PerspectivesAPI`, `TAB_PERSPECTIVES`, `NAV_PERSPECTIVES_HELP` (substring **Reset reloads the markdown file from prompts/perspectives**), **`PerspectivesTab`** (list, Active checkbox → `PUT` with `{"active": bool}` only, CodeMirror editor, Save / Reset to default / Delete / Add modal), **`ProcessingPage`** tab `perspectives` and `?tab=perspectives`.
+- **`DescriptionsTab`**: Section titled exactly **Critique perspectives** — checkboxes over active perspectives, `metadata.perspective_slugs` array on `batch_describe` (empty array → backend treats as “use all active” via existing `description_service` behavior).
+- **`handlers.py`**: `_describe_single_image(..., perspective_slugs=None)` passes through to `describe_matched_image` / `describe_instagram_image`; `handle_single_describe` and `handle_batch_describe` (sequential + parallel worker) read `metadata['perspective_slugs']`.
+- **`jobs/checkpoint.py`**: `fingerprint_batch_describe` includes sorted `perspective_slugs` when metadata has a non-empty list so checkpoint resume does not ignore lens selection changes; **`test_job_checkpoint.py`** asserts fingerprint differs when `perspective_slugs` is set.
+
+## Commits
+
+1. `feat(05-04): add perspectives REST API and DB helpers`
+2. `test(05-04): add perspectives API integration tests`
+3. `feat(05-04): add Perspectives tab with CodeMirror and REST client`
+4. `feat(05-04): pass perspective_slugs through describe jobs and Descriptions UI`
+
+## Verification
+
+| Check | Result |
+|--------|--------|
+| `pytest apps/visualizer/backend/tests/test_perspectives_api.py -q` | Pass |
+| `pytest apps/visualizer/backend/tests/test_job_checkpoint.py apps/visualizer/backend/tests/test_handlers_batch_describe.py -q` | Pass |
+| `cd apps/visualizer/frontend && npm run lint` | Pass |
+| Manual | `/processing?tab=perspectives` — edit/save/refresh persistence (operator check) |
+
+## Deviations (Rule 4)
+
+1. **npm:** CodeMirror install required **`--legacy-peer-deps`** because devDependency `@testing-library/react@14` declares `react@^18` while the app uses React 19.
+
+## STATE / ROADMAP
+
+Not modified (orchestrator-owned per wave instructions).
