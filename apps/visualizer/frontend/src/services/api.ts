@@ -496,6 +496,134 @@ export const AnalyticsAPI = {
   },
 }
 
+// --- Identity (Phase 8) — GET /api/identity/best-photos, /api/identity/style-fingerprint, /api/identity/suggestions
+
+export interface IdentityPerPerspectiveScore {
+  perspective_slug: string
+  display_name: string
+  score: number
+  prompt_version: string
+  model_used: string
+  scored_at: string
+  rationale_preview: string
+}
+
+export interface IdentityBestPhotoItem {
+  image_key: string
+  aggregate_score: number
+  perspectives_covered: number
+  eligible?: boolean
+  per_perspective: IdentityPerPerspectiveScore[]
+  filename: string
+  date_taken: string
+  rating: number
+  instagram_posted: boolean
+}
+
+export interface IdentityBestPhotosMeta {
+  active_perspectives?: string[]
+  weighting?: string
+  min_perspectives_used?: number
+  coverage_rule?: string
+  total_catalog_images?: number
+  eligible_count?: number
+  scored_any_count?: number
+  coverage_note?: string
+}
+
+export interface IdentityBestPhotosResponse {
+  items: IdentityBestPhotoItem[]
+  total: number
+  meta: IdentityBestPhotosMeta
+}
+
+export interface StyleFingerprintPerPerspective {
+  perspective_slug: string
+  mean_score: number | null
+  median_score: number | null
+  count_scores: number
+}
+
+export interface StyleFingerprintMeta {
+  tokenization_note?: string
+  perspectives_included?: string[]
+  weighting?: string
+  scores_are_advisory?: string
+}
+
+export interface StyleFingerprintResponse {
+  per_perspective: StyleFingerprintPerPerspective[]
+  aggregate_distribution: Record<string, number>
+  aggregate_distribution_note?: string
+  top_rationale_tokens: { token: string; count: number }[]
+  evidence: Record<string, string[]>
+  evidence_note?: string
+  meta: StyleFingerprintMeta
+}
+
+export interface PostNextCandidate {
+  image_key: string
+  filename: string
+  date_taken: string
+  rating: number
+  aggregate_score: number
+  perspectives_covered: number
+  per_perspective: IdentityPerPerspectiveScore[]
+  reasons: string[]
+  reason_codes: string[]
+}
+
+export interface PostNextSuggestionsMeta {
+  weighting?: string
+  min_perspectives_used?: number
+  coverage_rule?: string
+  timezone_assumption?: string
+  high_score_rule?: string
+  posted_semantics?: string
+  cadence_gap?: boolean
+  cadence_note?: string
+}
+
+export interface PostNextSuggestionsResponse {
+  candidates: PostNextCandidate[]
+  meta: PostNextSuggestionsMeta
+  empty_state: string | null
+}
+
+export const IdentityAPI = {
+  getBestPhotos: (params?: { limit?: number; offset?: number; min_perspectives?: number }) => {
+    const sp = new URLSearchParams()
+    if (params?.limit !== undefined) sp.set('limit', String(params.limit))
+    if (params?.offset !== undefined) sp.set('offset', String(params.offset))
+    if (params?.min_perspectives !== undefined) {
+      sp.set('min_perspectives', String(params.min_perspectives))
+    }
+    const qs = sp.toString()
+    return request<IdentityBestPhotosResponse>(`/identity/best-photos${qs ? `?${qs}` : ''}`)
+  },
+
+  getStyleFingerprint: () => request<StyleFingerprintResponse>('/identity/style-fingerprint'),
+
+  getSuggestions: (params?: {
+    limit?: number
+    offset?: number
+    lookback_days_recent?: number
+    lookback_days_baseline?: number
+  }) => {
+    const sp = new URLSearchParams()
+    if (params?.limit !== undefined) sp.set('limit', String(params.limit))
+    if (params?.offset !== undefined) sp.set('offset', String(params.offset))
+    if (params?.lookback_days_recent !== undefined) {
+      sp.set('lookback_days_recent', String(params.lookback_days_recent))
+    }
+    if (params?.lookback_days_baseline !== undefined) {
+      sp.set('lookback_days_baseline', String(params.lookback_days_baseline))
+    }
+    const qs = sp.toString()
+    return request<PostNextSuggestionsResponse>(`/identity/suggestions${qs ? `?${qs}` : ''}`)
+  },
+}
+
 export const DumpMediaAPI = {
   list: (filters?: { processed?: boolean; matched?: boolean; limit?: number; offset?: number }) => {
     const params = new URLSearchParams()
