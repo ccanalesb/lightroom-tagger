@@ -2,6 +2,8 @@ import threading
 
 from database import add_job_log, get_job, update_job_field, update_job_status
 
+from .checkpoint import merge_checkpoint_into_metadata
+
 
 class JobRunner:
     def __init__(self, db, emit_progress=None):
@@ -76,6 +78,17 @@ class JobRunner:
 
     def clear_cancel_registration(self, job_id: str) -> None:
         self.active_jobs.pop(job_id, None)
+
+    def persist_checkpoint(self, job_id: str, checkpoint_body: dict) -> None:
+        """Merge versioned checkpoint data into ``jobs.metadata`` (jobs DB)."""
+        row = get_job(self.db, job_id)
+        if not row:
+            return
+        meta = row.get("metadata") or {}
+        if not isinstance(meta, dict):
+            meta = {}
+        new_meta = merge_checkpoint_into_metadata(meta, checkpoint_body)
+        update_job_field(self.db, job_id, "metadata", new_meta)
 
     def signal_cancel(self, job_id: str) -> None:
         """Set the cooperative cancel flag for a running job (no DB writes)."""
