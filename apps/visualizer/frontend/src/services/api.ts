@@ -434,6 +434,20 @@ export interface CaptionStatsResponse {
   meta: CaptionHashtagMeta
 }
 
+/** Lightweight row from `/api/analytics/unposted-catalog` (subset of catalog list). */
+export interface UnpostedCatalogItem {
+  key: string
+  filename: string
+  date_taken: string
+  rating: number
+}
+
+export interface UnpostedCatalogResponse {
+  total: number
+  images: UnpostedCatalogItem[]
+  pagination: PaginationMeta
+}
+
 export const AnalyticsAPI = {
   getPostingFrequency: (params: {
     date_from: string
@@ -459,6 +473,26 @@ export const AnalyticsAPI = {
     sp.set('date_from', params.date_from)
     sp.set('date_to', params.date_to)
     return request<CaptionStatsResponse>(`/analytics/caption-stats?${sp.toString()}`)
+  },
+
+  /** Catalog images with `instagram_posted = 0` (server-filtered). */
+  getUnpostedCatalog: (params?: {
+    date_from?: string
+    date_to?: string
+    min_rating?: number
+    month?: string
+    limit?: number
+    offset?: number
+  }) => {
+    const sp = new URLSearchParams()
+    if (params?.date_from) sp.set('date_from', params.date_from)
+    if (params?.date_to) sp.set('date_to', params.date_to)
+    if (params?.min_rating !== undefined) sp.set('min_rating', String(params.min_rating))
+    if (params?.month) sp.set('month', params.month)
+    if (params?.limit !== undefined) sp.set('limit', String(params.limit))
+    if (params?.offset !== undefined) sp.set('offset', String(params.offset))
+    const qs = sp.toString()
+    return request<UnpostedCatalogResponse>(`/analytics/unposted-catalog${qs ? `?${qs}` : ''}`)
   },
 }
 
