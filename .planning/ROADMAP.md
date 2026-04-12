@@ -122,13 +122,13 @@
 
 | Phase | Name | v2 requirements |
 |-------|------|-----------------|
-| 5 | Structured scoring foundation | SCORE-02, SCORE-05, SCORE-06, SCORE-07 |
+| 5 | Structured scoring foundation | SCORE-02, SCORE-05, SCORE-06, SCORE-07, JOB-01, JOB-02 |
 | 6 | Scoring pipeline & catalog score UX | SCORE-01, SCORE-03, SCORE-04 |
 | 7 | Posting analytics | POST-01, POST-02, POST-03, POST-04 |
 | 8 | Identity & “what to post next” | IDENT-01, IDENT-02, IDENT-03 |
 | 9 | Insights dashboard | DASH-01 |
 
-**Coverage:** 15 / 15 v2 requirements mapped.
+**Coverage:** 17 / 17 v2 requirements mapped.
 
 **Dependency note:** Phase 6 depends on Phase 5 (validated contracts and persistence). Phases 8–9 depend on scored data from Phases 5–6 and benefit from posting analytics from Phase 7. Phase 7 is ingest- and match-driven and can proceed in parallel with Phase 6 once dump data exists from v1.
 
@@ -136,9 +136,9 @@
 
 ## Phase 5 — Structured scoring foundation
 
-**Requirements:** SCORE-02, SCORE-05, SCORE-06, SCORE-07
+**Requirements:** SCORE-02, SCORE-05, SCORE-06, SCORE-07, JOB-01, JOB-02
 
-**Intent:** Additive library DB shape for queryable per-perspective scores; photography-theory-grounded rubrics and configurable perspectives; strict structured-output validation and repair before any scoring job persists data. **SCORE-07 is satisfied here so the Phase 6 pipeline never commits unvalidated payloads.**
+**Intent:** Additive library DB shape for queryable per-perspective scores; photography-theory-grounded rubrics and configurable perspectives; strict structured-output validation and repair before any scoring job persists data; **job checkpointing and auto-recovery so long-running jobs survive backend restarts.** SCORE-07 is satisfied here so the Phase 6 pipeline never commits unvalidated payloads. JOB-01/JOB-02 ensure scoring batch jobs (and existing describe jobs) don't lose progress on restart.
 
 ### Success criteria (observable)
 
@@ -147,6 +147,8 @@
 3. Critique prompts used for scoring reference photography theory framing (documented rubric sources or prompt library location), not only generic free-form instructions.
 4. When the system receives malformed structured LLM output, the user still sees either a repaired successful result or a failed job with a clear error — not silent corruption or empty score rows.
 5. Automated tests or golden fixtures demonstrate validation/retry behavior for representative malformed JSON (aligned with SCORE-07).
+6. When backend restarts mid-job, the job resumes from last checkpoint on startup — not from scratch. Progress already committed (e.g. 500/2000 images described) is preserved.
+7. Orphaned jobs (marked "running" but process dead) are detected on startup and either auto-resumed or marked for retry with clear status.
 
 ### Plan progress (execution)
 
@@ -156,6 +158,8 @@
 | 05-02 | Rubric prompt library: theory-grounded templates + configurable perspective registry | Not started |
 | 05-03 | Structured output schema (e.g. Pydantic), repair/retry path, and unit tests | Not started |
 | 05-04 | API/schema documentation for score fields and perspective keys | Not started |
+| 05-05 | Job checkpointing: periodic progress commit + resume-from-checkpoint on restart | Not started |
+| 05-06 | Orphan job recovery: startup detection of dead jobs + auto-resume or retry marking | Not started |
 
 ---
 

@@ -34,6 +34,11 @@ Requirements for v2.0 Advanced Critique & Insights milestone.
 - [ ] **IDENT-02**: User can see a style fingerprint — recurring visual and thematic patterns across their work
 - [ ] **IDENT-03**: User can get "what to post next" suggestions based on catalog scores vs posting history gaps
 
+### Job Resilience
+
+- [ ] **JOB-01**: Long-running jobs checkpoint progress so work is not lost on backend restart
+- [ ] **JOB-02**: Orphaned jobs are auto-recovered and resumed on backend startup
+
 ### Insights Dashboard
 
 - [ ] **DASH-01**: User can view a unified insights page with score distributions, posting patterns, and top-scored photos
@@ -80,30 +85,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SYS-01..05 | v1 Phase 2 · Jobs & system reliability | Complete |
 | IG-01..06 | v1 Phase 3 · Instagram sync | Complete |
 | AI-01..06 | v1 Phase 4 · AI analysis | Complete |
-| SCORE-01 | v2 Phase 6 · Scoring pipeline & catalog score UX | Pending |
 | SCORE-02 | v2 Phase 5 · Structured scoring foundation | Pending |
-| SCORE-03 | v2 Phase 6 · Scoring pipeline & catalog score UX | Pending |
-| SCORE-04 | v2 Phase 6 · Scoring pipeline & catalog score UX | Pending |
 | SCORE-05 | v2 Phase 5 · Structured scoring foundation | Pending |
 | SCORE-06 | v2 Phase 5 · Structured scoring foundation | Pending |
 | SCORE-07 | v2 Phase 5 · Structured scoring foundation | Pending |
+| JOB-01 | v2 Phase 5 · Structured scoring foundation | Pending |
+| JOB-02 | v2 Phase 5 · Structured scoring foundation | Pending |
+| SCORE-01 | v2 Phase 6 · Scoring pipeline & catalog score UX | Pending |
+| SCORE-03 | v2 Phase 6 · Scoring pipeline & catalog score UX | Pending |
+| SCORE-04 | v2 Phase 6 · Scoring pipeline & catalog score UX | Pending |
 | POST-01 | v2 Phase 7 · Posting analytics | Pending |
 | POST-02 | v2 Phase 7 · Posting analytics | Pending |
 | POST-03 | v2 Phase 7 · Posting analytics | Pending |
 | POST-04 | v2 Phase 7 · Posting analytics | Pending |
-| IDENT-01 | v2 Phase 8 · Identity & “what to post next” | Pending |
-| IDENT-02 | v2 Phase 8 · Identity & “what to post next” | Pending |
-| IDENT-03 | v2 Phase 8 · Identity & “what to post next” | Pending |
+| IDENT-01 | v2 Phase 8 · Identity & "what to post next" | Pending |
+| IDENT-02 | v2 Phase 8 · Identity & "what to post next" | Pending |
+| IDENT-03 | v2 Phase 8 · Identity & "what to post next" | Pending |
 | DASH-01 | v2 Phase 9 · Insights dashboard | Pending |
 
 **Coverage:**
 - v1 requirements: 22 (complete)
-- v2 requirements: 15 total
-- Mapped to phases: 15 / 15 (Phases 5–9; see [ROADMAP.md](./ROADMAP.md))
+- v2 requirements: 17 total
+- Mapped to phases: 17 / 17 (Phases 5-9; see [ROADMAP.md](./ROADMAP.md))
 
 Roadmap: [.planning/ROADMAP.md](./ROADMAP.md)
 
 ---
 *Requirements defined: 2026-04-10*
 *v2 requirements added: 2026-04-11*
-*v2 roadmap / traceability: 2026-04-12*
+*v2 roadmap / traceability: 2026-04-12 (JOB-01, JOB-02 added for job resilience)*
