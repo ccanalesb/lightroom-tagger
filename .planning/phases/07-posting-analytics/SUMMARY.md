@@ -70,3 +70,38 @@
 
 - **`unposted-catalog`** client left for plan 07-03 (not stubbed in `AnalyticsAPI`).
 - Heatmap cells use **`color-mix`** with `var(--color-accent)` for theme-aware intensity; requires a modern browser (same baseline as the rest of the UI).
+
+---
+
+# Phase 07 — Plan 07-03 execution summary
+
+**Date:** 2026-04-12  
+**Plan:** 07-03 — Catalog vs posted gap UI (unposted catalog browse, POST-04)
+
+## Delivered
+
+- **`AnalyticsAPI.getUnpostedCatalog`** in `src/services/api.ts` — Typed client for `GET /api/analytics/unposted-catalog` with `date_from`, `date_to`, `min_rating`, `month`, `limit`, `offset`; response matches backend (`total`, `images`, `pagination`).
+- **Strings** — `ANALYTICS_NOT_POSTED_*`, help copy, empty states, `IMAGES_OPEN_POSTING_ANALYTICS` for cross-link.
+- **`UnpostedCatalogPanel`** — Independent date / min-rating / month filters (Apply updates server query); paginated grid (50/page) reusing `CatalogImageCard` + `CatalogImageModal` via minimal `CatalogImage` stubs from API rows (key, filename, date_taken, rating only); loading/error/empty parity with other analytics sections.
+- **`AnalyticsPage`** — Renders `UnpostedCatalogPanel` after captions/hashtags; gap filters stay independent of the main analytics date range.
+- **Images → Catalog** — When **Not Posted** is selected, a callout with **`Link` to `/analytics`** appears above the catalog tab; `CatalogTab` reports posted filter via optional `onPostedFilterChange`.
+- **Tests** — `UnpostedCatalogPanel.test.tsx` (empty state + one-row grid), mocks `AnalyticsAPI.getUnpostedCatalog` and `ImagesAPI.getCatalogMonths`.
+
+## Commits (atomic)
+
+1. `feat(07-03): add AnalyticsAPI getUnpostedCatalog client`
+2. `feat(07-03): add strings for unposted catalog analytics panel`
+3. `feat(07-03): add UnpostedCatalogPanel with filters and catalog modal`
+4. `feat(07-03): mount UnpostedCatalogPanel on Analytics page`
+5. `feat(07-03): link to Analytics when catalog shows not posted filter`
+6. `test(07-03): add UnpostedCatalogPanel Vitest coverage`
+7. `docs(07-03): append plan 07-03 execution summary`
+
+## Verification
+
+- `npm test -- --run`, `npm run build`, `npm run lint` in `apps/visualizer/frontend` (exit 0).
+- Manual: `/analytics` → Not posted section lists `instagram_posted=0` rows; filters and pagination; card opens catalog modal.
+
+## Notes
+
+- Backend returns **`images`**, not `items`; pagination uses **`limit`/`offset`** (aligned with catalog list API).
