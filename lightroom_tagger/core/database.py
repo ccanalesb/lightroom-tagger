@@ -766,10 +766,39 @@ def query_catalog_images(
     date_to: str | None = None,
     color_label: str | None = None,
     analyzed: bool | None = None,
+    score_perspective: str | None = None,
+    min_score: int | None = None,
+    sort_by_score: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[dict], int]:
-    """List catalog images with AND-combined filters, SQL pagination, and total count."""
+    """List catalog images with AND-combined filters, SQL pagination, and total count.
+
+    Optional **score_perspective** enables a ``LEFT JOIN`` on ``image_scores`` for the
+    current row (``is_current=1``, ``image_type='catalog'``) for that slug.
+
+    **min_score** (1–10) requires **score_perspective** and keeps only rows with a
+    non-null score ``>= min_score``.
+
+    **sort_by_score** ``asc`` / ``desc`` requires **score_perspective**. Unscored rows
+    for that perspective sort after scored rows in both directions (``s.score IS NULL``
+    last via SQLite boolean ordering).
+    """
+    if sort_by_score is not None and sort_by_score not in ("asc", "desc"):
+        raise ValueError("sort_by_score must be 'asc' or 'desc'")
+
+    sp = (score_perspective or "").strip()
+    use_score_join = bool(sp)
+
+    if sort_by_score is not None and not use_score_join:
+        raise ValueError("sort_by_score requires score_perspective")
+
+    if min_score is not None and not use_score_join:
+        raise ValueError("min_score requires score_perspective")
+
+    if min_score is not None and not (1 <= min_score <= 10):
+        raise ValueError("min_score must be between 1 and 10")
+
     clauses: list[str] = ["1=1"]
     bindings: list = []
 
@@ -817,24 +846,48 @@ def query_catalog_images(
     elif analyzed is False:
         clauses.append("d.image_key IS NULL")
 
+    if min_score is not None:
+        clauses.append("s.score IS NOT NULL AND s.score >= ?")
+        bindings.append(min_score)
+
     where_sql = "WHERE " + " AND ".join(clauses)
     join_sql = (
         "FROM images i "
         "LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog' "
     )
+    join_bindings: list = []
+    if use_score_join:
+        join_sql += (
+            "LEFT JOIN image_scores s ON s.image_key = i.key "
+            "AND s.image_type = 'catalog' AND s.perspective_slug = ? AND s.is_current = 1 "
+        )
+        join_bindings.append(sp)
 
+    if sort_by_score == "desc":
+        order_sql = "ORDER BY (s.score IS NULL) ASC, s.score DESC, i.key ASC"
+    elif sort_by_score == "asc":
+        order_sql = "ORDER BY (s.score IS NULL) ASC, s.score ASC, i.key ASC"
+    else:
+        order_sql = "ORDER BY i.date_taken DESC"
+
+    select_cols = (
+        "i.*, d.summary AS description_summary, "
+        "d.best_perspective AS description_best_perspective, "
+        "d.perspectives AS description_perspectives_json"
+    )
+    if use_score_join:
+        select_cols += ", s.score AS catalog_perspective_score"
+
+    count_params = join_bindings + bindings
     count_row = db.execute(
         f"SELECT COUNT(*) AS cnt {join_sql} {where_sql}",
-        bindings,
+        count_params,
     ).fetchone()
     total_count = int(count_row["cnt"])
 
-    select_params = list(bindings) + [limit, offset]
+    select_params = join_bindings + bindings + [limit, offset]
     rows = db.execute(
-        f"SELECT i.*, d.summary AS description_summary, "
-        f"d.best_perspective AS description_best_perspective, "
-        f"d.perspectives AS description_perspectives_json "
-        f"{join_sql} {where_sql} ORDER BY i.date_taken DESC LIMIT ? OFFSET ?",
+        f"SELECT {select_cols} {join_sql} {where_sql} {order_sql} LIMIT ? OFFSET ?",
         select_params,
     ).fetchall()
     return [_deserialize_row(r) for r in rows], total_count
