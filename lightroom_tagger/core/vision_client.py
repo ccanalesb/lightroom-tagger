@@ -9,8 +9,10 @@ model identifier.  All provider-specific SDK errors are mapped into our
 from __future__ import annotations
 
 import base64
+import contextlib
 import os
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any, cast
 
 import openai as openai_sdk
 
@@ -37,6 +39,15 @@ COMPARISON_PROMPT = (
     '{"confidence": <0-100>, "reasoning": "<one sentence>"}\n\n'
     "confidence: 0 = definitely different photos, 100 = definitely the same photo.\n"
     "Focus on semantic content (subject, scene, composition), not pixel-level differences."
+)
+
+SCORE_JSON_REPAIR_SYSTEM = (
+    "You are a JSON repair tool. Output analysis is forbidden; emit data only.\n"
+    "Return a single JSON object with exactly these keys:\n"
+    '- "perspective_slug" (string)\n'
+    '- "score" (integer from 1 through 10 inclusive)\n'
+    '- "rationale" (string)\n'
+    "Do not wrap the JSON in markdown fences. Do not add any text before or after the object."
 )
 
 LogCallback = Callable[[str, str], None] | None
@@ -71,10 +82,8 @@ def _map_openai_error(
     if hasattr(exc, "response") and exc.response is not None:
         raw = exc.response.headers.get("retry-after")
         if raw:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 retry_after = float(raw)
-            except (ValueError, TypeError):
-                pass
 
     if isinstance(exc, openai_sdk.RateLimitError):
         return RateLimitError(str(exc), provider=provider, model=model, retry_after=retry_after)
@@ -124,19 +133,26 @@ def compare_images(
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": COMPARISON_PROMPT},
-                    _image_url_part(local_b64),
-                    _image_url_part(insta_b64),
+            messages=cast(
+                Any,
+                [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": COMPARISON_PROMPT},
+                            _image_url_part(local_b64),
+                            _image_url_part(insta_b64),
+                        ],
+                    }
                 ],
-            }],
+            ),
             max_tokens=max_tokens,
             **kwargs,
         )
     except Exception as exc:
-        raise _map_openai_error(exc, provider=getattr(client, '_provider_id', None), model=model) from exc
+        raise _map_openai_error(
+            exc, provider=getattr(client, "_provider_id", None), model=model
+        ) from exc
 
     raw = response.choices[0].message.content or ""
     result = parse_vision_response(raw)
@@ -163,7 +179,7 @@ def compare_images_batch(
 ) -> dict[int, float]:
     """
     Compare one reference image against N candidates in a single API call.
-    
+
     Parameters
     ----------
     client:
@@ -176,31 +192,28 @@ def compare_images_batch(
         List of (candidate_id, candidate_path) tuples
     log_callback:
         Optional logging callback
-    
+
     Returns
     -------
     dict[int, float]:
         Mapping of candidate_id -> confidence (0-100)
-    
+
     Raises
     ------
     ProviderError:
         On API/model errors (mapped from openai SDK)
     """
     import json
-    
+
     if not candidates:
         return {}
-    
+
     # Encode reference image once
     ref_b64 = _encode_image(reference_path)
-    
+
     # Build prompt for batch comparison with explicit JSON structure
-    candidate_info = "\n".join([
-        f"Candidate {cid}: (image attached)"
-        for cid, _ in candidates
-    ])
-    
+    candidate_info = "\n".join([f"Candidate {cid}: (image attached)" for cid, _ in candidates])
+
     batch_prompt = (
         "CRITICAL: You MUST respond with ONLY valid JSON. No explanations, no prose, ONLY JSON.\n\n"
         "Task: Compare the FIRST image (reference) against the remaining candidate images.\n"
@@ -216,17 +229,17 @@ def compare_images_batch(
         "- Include ALL candidate IDs in results\n\n"
         "RESPOND WITH ONLY THE JSON OBJECT. DO NOT ADD ANY OTHER TEXT."
     )
-    
+
     # Build message content: [prompt, ref_image, candidate1, candidate2, ...]
     content_parts: list[dict[str, Any]] = [
         {"type": "text", "text": batch_prompt},
         _image_url_part(ref_b64),
     ]
-    
-    for cid, cand_path in candidates:
+
+    for _cid, cand_path in candidates:
         cand_b64 = _encode_image(cand_path)
         content_parts.append(_image_url_part(cand_b64))
-    
+
     kwargs: dict[str, Any] = {}
     if "claude" in model.lower():
         kwargs["extra_body"] = {"reasoning_effort": "none"}
@@ -234,31 +247,36 @@ def compare_images_batch(
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a JSON-only API. You respond exclusively with valid JSON. Never include explanations or prose."
-                },
-                {
-                    "role": "user",
-                    "content": content_parts,
-                }
-            ],
+            messages=cast(
+                Any,
+                [
+                    {
+                        "role": "system",
+                        "content": "You are a JSON-only API. You respond exclusively with valid JSON. Never include explanations or prose.",
+                    },
+                    {
+                        "role": "user",
+                        "content": content_parts,
+                    },
+                ],
+            ),
             max_tokens=max_tokens,
             temperature=0.1,
             **kwargs,
         )
     except Exception as exc:
-        raise _map_openai_error(exc, provider=getattr(client, '_provider_id', None), model=model) from exc
-    
+        raise _map_openai_error(
+            exc, provider=getattr(client, "_provider_id", None), model=model
+        ) from exc
+
     raw = response.choices[0].message.content or "{}"
-    
+
     if log_callback:
         log_callback("debug", f"[vision_batch] Raw response length: {len(raw)} chars")
         log_callback("debug", f"[vision_batch] Raw response (first 500 chars): {raw[:500]}")
         if len(raw) > 500:
             log_callback("debug", f"[vision_batch] Raw response (last 200 chars): ...{raw[-200:]}")
-    
+
     # Parse structured JSON response
     try:
         # Extract JSON from markdown code blocks if present
@@ -266,13 +284,13 @@ def compare_images_batch(
             raw = raw.split("```json")[1].split("```")[0].strip()
         elif "```" in raw:
             raw = raw.split("```")[1].split("```")[0].strip()
-        
+
         parsed = json.loads(raw)
         results_list = parsed.get("results", [])
-        
+
         if log_callback:
             log_callback("debug", f"[vision_batch] Parsed JSON: results_list={results_list}")
-        
+
         # Map results back to candidate IDs
         result_map: dict[int, float] = {}
         for item in results_list:
@@ -280,16 +298,16 @@ def compare_images_batch(
             conf = item.get("confidence", 0)
             if cid is not None:
                 result_map[cid] = float(conf)
-        
+
         if log_callback:
             ref_name = os.path.basename(reference_path)
             log_callback(
                 "debug",
-                f"[vision_batch] {ref_name} vs {len(candidates)} candidates -> {len(result_map)} results"
+                f"[vision_batch] {ref_name} vs {len(candidates)} candidates -> {len(result_map)} results",
             )
-        
+
         return result_map
-    
+
     except (json.JSONDecodeError, KeyError, ValueError) as e:
         # Fallback: Return 0 confidence for all if parsing fails
         if log_callback:
@@ -309,17 +327,24 @@ def generate_description(
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": build_description_prompt()},
-                    _image_url_part(img_b64),
+            messages=cast(
+                Any,
+                [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": build_description_prompt()},
+                            _image_url_part(img_b64),
+                        ],
+                    }
                 ],
-            }],
+            ),
             max_tokens=2048,
         )
     except Exception as exc:
-        raise _map_openai_error(exc, provider=getattr(client, '_provider_id', None), model=model) from exc
+        raise _map_openai_error(
+            exc, provider=getattr(client, "_provider_id", None), model=model
+        ) from exc
 
     raw = response.choices[0].message.content or ""
 
@@ -327,3 +352,71 @@ def generate_description(
         log_callback("debug", f"[describe] {os.path.basename(image_path)} -> {len(raw)} chars")
 
     return raw
+
+
+def complete_chat_text(
+    client: openai_sdk.OpenAI,
+    model: str,
+    *,
+    system: str,
+    user: str,
+    max_tokens: int = 512,
+    temperature: float = 0.0,
+) -> str:
+    """Run a text-only chat completion (no images). Returns assistant message content."""
+    kwargs: dict[str, Any] = {}
+    if "claude" in model.lower():
+        kwargs["extra_body"] = {"reasoning_effort": "none"}
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=cast(
+                Any,
+                [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+            ),
+            max_tokens=max_tokens,
+            temperature=temperature,
+            **kwargs,
+        )
+    except Exception as exc:
+        raise _map_openai_error(
+            exc, provider=getattr(client, "_provider_id", None), model=model
+        ) from exc
+
+    return response.choices[0].message.content or ""
+
+
+def make_score_json_llm_fixer(
+    complete_text_fn: Callable[..., str],
+    **kwargs: Any,
+) -> Callable[[str, str], str]:
+    """Build an ``llm_fixer`` for :func:`parse_score_response_with_retry`.
+
+    The returned callable forwards to *complete_text_fn* with
+    :data:`SCORE_JSON_REPAIR_SYSTEM` and a user message containing truncated raw
+    output plus the validation error summary. Each invocation performs **at most
+    one** repair attempt; callers must not loop unbounded.
+
+    Phase 6 scoring handlers should pass a bound ``complete_chat_text`` (or
+    equivalent) with the job's OpenAI-compatible client and model — there is no
+    global default repair client in this module. Intended for use as the
+    ``llm_fixer`` argument to
+    ``lightroom_tagger.core.structured_output.parse_score_response_with_retry``.
+    """
+
+    def llm_fixer(raw: str, err: str) -> str:
+        truncated = raw[:4096]
+        user_msg = (
+            "The previous output is not valid JSON for the required score schema.\n\n"
+            f"Raw model output (first 4096 characters):\n{truncated}\n\n"
+            f"Validation error summary:\n{err}\n\n"
+            "Respond with ONLY the corrected JSON object. Keys must be exactly "
+            "perspective_slug, score, and rationale."
+        )
+        return complete_text_fn(system=SCORE_JSON_REPAIR_SYSTEM, user=user_msg, **kwargs)
+
+    return llm_fixer
