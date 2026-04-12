@@ -5,14 +5,20 @@ import sqlite3
 from collections import OrderedDict
 
 from flask import Blueprint, jsonify, request, send_file
+from utils.db import with_db
+from utils.responses import (
+    error_bad_request,
+    error_not_found,
+    error_server_error,
+    success_paginated,
+)
+
 from lightroom_tagger.core.database import (
     query_catalog_images,
     reject_match,
     unvalidate_match,
     validate_match,
 )
-from utils.db import with_db
-from utils.responses import error_bad_request, error_not_found, error_server_error, success_paginated
 
 _CATALOG_SCORE_PERSPECTIVE_SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
