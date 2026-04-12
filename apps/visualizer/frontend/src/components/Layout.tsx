@@ -1,16 +1,18 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { ThemeToggle } from './ui/ThemeToggle';
-import { 
-  APP_TITLE, 
-  NAV_DASHBOARD, 
-  NAV_IMAGES, 
-  NAV_PROCESSING 
+import {
+  APP_TITLE,
+  NAV_ANALYTICS,
+  NAV_DASHBOARD,
+  NAV_IMAGES,
+  NAV_PROCESSING,
 } from '../constants/strings';
 
 export function Layout() {
   const navItems = [
     { to: '/', label: NAV_DASHBOARD, exact: true },
     { to: '/images', label: NAV_IMAGES },
+    { to: '/analytics', label: NAV_ANALYTICS },
     { to: '/processing', label: NAV_PROCESSING },
   ];
 
