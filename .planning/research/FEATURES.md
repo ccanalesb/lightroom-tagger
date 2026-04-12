@@ -1,173 +1,172 @@
 # Feature Research
 
-**Domain:** Photography analysis, DAM-adjacent catalog tooling, and Instagram ↔ Lightroom alignment workflows  
-**Researched:** 2026-04-10  
-**Confidence:** MEDIUM (product landscape + PROJECT.md alignment; no primary user interviews cited)
+**Domain:** Structured AI critique scoring, photography-theory-grounded analysis, Instagram posting pattern analytics, photographer identity synthesis, and insights dashboards — building on an existing Lightroom catalog + dump-matched Instagram workflow  
+**Researched:** 2026-04-12  
+**Confidence:** MEDIUM (product/category patterns + photography education norms + PROJECT.md alignment; no primary user interviews cited)
 
 ## Feature Landscape
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist in any serious catalog-facing or “analyze my photos” product. Missing these makes the tool feel unfinished or untrustworthy.
+Features that serious “AI critique + library insights” experiences must satisfy once numeric scores and dashboards exist. Missing them undermines trust faster than missing a flashy chart.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **Non-destructive catalog interaction** | Photographers assume the app will not corrupt originals or silently rewrite unrelated catalog state. | MEDIUM | Read-heavy paths; narrow, auditable write surface (e.g. keywords only) builds trust. |
-| **Fast browse / filter / search** | Large libraries (10k–500k+ assets) are normal; sluggish grids or missing filters cause abandonment. | MEDIUM–HIGH | Pagination, lazy thumbs, indexed queries; depends on catalog schema and asset volume. |
-| **Clear asset identity** | Every row must map to one real file path + stable internal id; duplicates and moves must be explainable. | MEDIUM | Foundation for matching, jobs, and audit trails. |
-| **Human-in-the-loop confirmation for destructive or semantic changes** | Writes to the catalog (keywords, ratings) need review, undo story, or explicit scope. | LOW–MEDIUM | Especially for match → writeback flows. |
-| **Job visibility (queued / running / failed)** | Any AI or batch work is opaque without status, errors, and partial results. | LOW–MEDIUM | Table stakes for on-demand analysis products. |
-| **Provider / model configuration** | Users expect to point at an endpoint, pick a model, and see costs or limits surfaced. | LOW–MEDIUM | Multi-provider registries are increasingly expected, not “one hardcoded API.” |
-| **Export or copy-paste of results** | Critique and labels need to leave the app (notes, captions, client emails). | LOW | Markdown/clipboard/CSV hooks; low cost, high perceived quality. |
-| **Basic security posture for local data** | Catalogs and dumps contain personal work; “runs locally” or clear data boundaries matter. | MEDIUM | Path validation, no accidental exfiltration, documented retention. |
+| **Scores tied to visible rationale** | Photographers reject naked numbers; every axis needs a short justification in the same UI affordance as the score. | LOW–MEDIUM | Structured output: `{axis, score, rationale_snippet}` per perspective; not prose-only blobs. |
+| **Consistent rubric & scale** | Mixed 1–5 vs 1–10 or undefined “composition” makes filtering and ranking meaningless. | MEDIUM | Version prompts + schema; store `prompt_version` / `rubric_id` with each result for drift control. |
+| **Perspective-scoped scores** | A “publisher” composition score ≠ a “street photographer” composition score; users expect the persona to frame the metric. | MEDIUM | Same named axes can differ by perspective; UI must label perspective + axis. |
+| **Re-run / supersede analysis** | Models and rubrics change; users expect “analyze again” without orphan rows confusing the UI. | MEDIUM | Idempotent job keys + latest-wins or history with explicit “active” row. |
+| **Filter & sort in catalog UI** | If scores are persisted, they must behave like rating/color-label filters (range queries, null handling). | MEDIUM | Indexed app DB fields; clear “not yet analyzed” state. |
+| **Honest limits on “performance”** | Export dumps lack likes/saves; dashboards must not imply engagement where data does not exist. | LOW | Label charts as **posting behavior** (when/how often/caption patterns), not reach. |
+| **Job + error visibility for enrichment** | Batch scoring is still async AI; same job lifecycle expectations as description jobs. | LOW | Reuse cancellation, severity, provider health patterns. |
 
 ### Differentiators (Competitive Advantage)
 
-Features that win positioning when table stakes are met. For this project, differentiators should reinforce **Lightroom + Instagram dump alignment**, **artistic (not technical) critique**, and **multi-catalog identity**.
+Features that distinguish this product when table stakes are met — especially **Lightroom row linkage**, **dump-based posting truth**, and **artistic (not EXIF) theory**.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **Image-backed match: Instagram dump → Lightroom records** | Closes the loop between “what I published” and “where it lives in the catalog” without Instagram API dependency. | HIGH | Vision + hashing + review UI; quality of match UX is the moat. |
-| **Writeback of publication state to LRCAT (e.g. keywords)** | Keeps Lightroom as source of truth for culling and filtering posted vs unpublished. | MEDIUM | Depends on safe SQLite write path and user confirmation. |
-| **Multi-perspective artistic critique** | Feels like an editor’s room, not a single generic score — aligns with serious photographers and long-form reflection. | MEDIUM–HIGH | Prompt design, consistency, and perspective switching are the product. |
-| **Unified photographer identity / pattern view across catalogs** | Rare in tools that treat each library as isolated; supports split workflows (wedding vs personal). | HIGH | Needs cross-catalog aggregation, privacy boundaries, and consistent feature extraction. |
-| **Fusion of AI assessment with Instagram performance signals** | Connects *artistic intent* with *audience response* from dump analytics. | MEDIUM–HIGH | Depends on reliable matching and parsed dump metrics. |
-| **On-demand analysis with batch-by-scope jobs** | Cost control + user agency vs “analyze everything” SaaS. | MEDIUM | Job runner, retries, idempotency; aligns with stated architecture. |
-| **Visualizer / inspection UI for matches and critiques** | Speeds trust and correction — competitors often hide the reasoning chain. | MEDIUM | Side-by-side, confidence, and override flows differentiate quality. |
+| **Queryable multi-axis scores + narrative** | Turns critique from ephemeral chat into **library intelligence** — rank, filter, compare sets. | HIGH | Requires JSON schema, migrations, and UI binding; core v2 bet. |
+| **Photography-theory-grounded rubrics** | Anchors scores to recognizable craft language (figure–ground, rhythm, color relationships, sequence read) instead of vague “nice shot.” | MEDIUM–HIGH | Prompt engineering + reference texts in system context; periodic rubric versioning. |
+| **Additional perspectives (color, emotion, series)** | Mimics a **room of critics** rather than one model tone; matches serious practitioners’ mental model. | MEDIUM | Mostly prompt + schema extensions on the same vision pipeline. |
+| **Posting pattern analytics without API** | Heatmaps / histograms of **post time**, **frequency gaps**, **caption & hashtag motifs** from dump timestamps and text — still valuable without engagement metrics. | MEDIUM–HIGH | Parser stability + normalization of time zones; text clustering optional. |
+| **Catalog ↔ posted gap analysis** | “Strong in catalog, rarely posted” and inverse — unique when **match keys** tie IG posts to LRCAT rows. | HIGH | Needs reliable match state + score rollups per asset. |
+| **Photographer identity / style fingerprint** | Aggregated themes, palettes (from vision text), recurring subjects, and consistency signals across thousands of frames. | HIGH | Risk of vacuous generalities; needs careful prompting + optional user “north star” tags. |
+| **“What to post next” suggestions** | Action layer on top of gaps + scores + series coherence (e.g. break repetition, complete a sequence). | HIGH | Must expose **why** each suggestion; avoid black-box recommender feel. |
+| **Insights dashboard as first-class surface** | Cohesive charts + drill-down to assets — not buried modals. | MEDIUM | Recharts (or equivalent) + shared query layer with catalog filters. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-Features that sound appealing but conflict with constraints, positioning, or sustainable operations for this product class.
-
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| **Full-catalog mandatory AI indexing** | “Just score everything once.” | Runaway cost, weak value until matching/posting context exists, hard to iterate on prompts. | Time-boxed or selection-based jobs; progressive enrichment. |
-| **Instagram real-time sync via API** | Instant reflection of live account. | API limits, ToS risk, auth fragility, duplicates project decision (export dumps). | Scheduled manual dump import; diff-aware re-import. |
-| **Lightroom Classic plugin replacing web workflow** | “Stay inside LR.” | Distribution, signing, version matrix, crash support; PROJECT.md places this out of scope. | Keep narrow writeback + web for heavy UI. |
-| **EXIF / gear obsession as primary analysis** | Users love camera stats. | Conflicts with artistic positioning; commoditized by many free tools. | Optional sidebar or explicit “out of core narrative” labeling if ever added. |
-| **Auto-post / scheduler as core** | “End-to-end social tool.” | Different category (buffering, compliance, analytics APIs); dilutes critique + catalog story. | Deep link or export caption only. |
-| **Opaque “master quality score”** | Simple UX. | Photographers distrust single numbers; hard to defend across genres. | Multi-axis rubrics per perspective + textual rationale. |
-| **Silent auto-write of keywords** | Convenience. | Trust disaster; hard to audit; support burden. | Confirmed batches + dry-run + per-match toggles. |
+| **Single “master quality” leaderboard** | Simple sorting. | Collapses genres and intents; contradicts multi-perspective philosophy; hard to defend. | Weighted **per-perspective** composites with toggles; always show breakdown. |
+| **Scores without confidence / coverage flags** | Cleaner UI. | Vision crops, night shots, and abstracts produce noisy scores; users blame the product. | Optional low-confidence flag; axis-level “not applicable” or null. |
+| **Automated posting or scheduling** | “Close the loop.” | Different product category, compliance, and expectations; dilutes catalog + critique story. | Export caption ideas or copy-to-clipboard only. |
+| **Engagement-driven optimization from dumps** | “Tell me what Instagram liked.” | **Data not in export** (per PROJECT.md); faking it erodes trust. | Explicitly scope insights to **posting cadence + caption style + AI critique**. |
+| **Full-catalog mandatory scoring** | “Index everything.” | Cost explosion and stale rubrics; blocks prompt iteration. | Time-boxed batches, min_rating filters, user selections — same as analysis philosophy today. |
+| **Overfitted identity labels** | Users want a catchy “you are a X photographer.” | Stereotyping, wrong for hybrid practice; hard to correct. | **Evidence-linked** traits (“recurring: high contrast B&W night geometry”) with example thumbnails. |
+| **Opaque suggestion engine** | Feels magical. | No learning path; user cannot disagree or tune. | Rule-based + LLM explanations with **user-adjustable weights** (e.g. favor series completion vs novelty). |
 
 ## Feature Dependencies
 
 ```
-[Catalog registration & path resolution]
-    └──requires──> [Stable asset identity & thumbnails]
-                       └──requires──> [Safe read-only LRCAT access]
+[Existing: multi-perspective text critique jobs + vision pipeline]
+    └──requires──> [Provider registry, health probes, job lifecycle]  ✓ built
+    └──extends──> [Structured critique JSON schema (scores + rationale + perspective + versions)]
 
-[Instagram dump ingest & normalize]
-    └──requires──> [Parser for dump format + media layout]
-                       └──requires──> [Storage for IG copies / hashes]
+[Structured scoring persistence]
+    └──requires──> [Structured critique schema]
+    └──requires──> [App DB columns or JSON index strategy for filter/sort]
+    └──requires──> [Prompt/rubric versioning on each stored row]
 
-[Image match (dump ↔ catalog)]
-    └──requires──> [Catalog asset identity]
-    └──requires──> [Dump ingest]
-    └──requires──> [Vision or perceptual hash pipeline]
-                       └──requires──> [Job runner + status UI]
+[Catalog UI: score filters & “best photos” views]
+    └──requires──> [Structured scoring persistence]
+    └──requires──> [Null / not-analyzed semantics + indexed queries]
 
-[Match review & confirmation]
-    └──requires──> [Image match]
-    └──enhances──> [Keyword writeback to LRCAT]
+[New perspectives (color, emotional, series)]
+    └──requires──> [Structured scoring schema extension or parallel axes]
+    └──enhances──> [Same job runner + vision client — new prompt templates only]
 
-[Keyword writeback to LRCAT]
-    └──requires──> [Match review & confirmation]
-    └──requires──> [Transactional SQLite write strategy]
+[Photography-theory prompt refinement]
+    └──requires──> [Rubric text + examples in system/developer prompts]
+    └──couples──> [Version bumps invalidate comparability — store rubric_id]
 
-[Single-image / batch on-demand critique]
-    └──requires──> [Job runner + provider config]
-    └──requires──> [Catalog asset identity]
+[Posting frequency / timing analytics]
+    └──requires──> [Instagram dump ingest + normalized post timestamps]  ✓ built path
+    └──requires──> [Match: post ↔ catalog asset]  ✓ built path
+    └──optional──> [Time zone handling policy documented in UI]
 
-[Multi-perspective prompts]
-    └──enhances──> [Single-image / batch critique]
+[Caption / hashtag style analysis]
+    └──requires──> [Dump text fields in canonical post rows]
+    └──optional──> [NLP clustering / embeddings in app DB — heavier than regex summaries]
 
-[Instagram analytics fusion]
-    └──requires──> [Dump ingest]
-    └──requires──> [Image match]
-    └──enhances──> [“Best photos” / ranking views]
+[Photographer identity / fingerprint]
+    └──requires──> [Corpus of critiques or embeddings across analyzed assets]
+    └──requires──> [Aggregation job or incremental rollups]
+    └──conflicts──> [Sparse analysis coverage — identity weak until enough scored images]
 
-[Unified photographer identity across catalogs]
-    └──requires──> [Multi-catalog switching & registry]
-    └──requires──> [Critique / feature summaries per asset]
-    └──conflicts──> [Single-catalog siloed UX without shared user profile layer]
+[“What to post next” suggestions]
+    └──requires──> [Scores + posting history + optional series/cluster tags]
+    └──requires──> [Explicit rules or LLM with structured rationale output]
+    └──enhances──> [Insights dashboard surfacing]
+
+[Insights dashboard]
+    └──requires──> [Chart-friendly aggregates API over app DB]
+    └──requires──> [Posting analytics + score rollups + (optional) identity snapshot]
+    └──enhances──> [Discovery of batch scoring jobs — user sees “why run more analysis”]
 ```
 
 ### Dependency Notes
 
-- **Image match requires catalog identity + dump ingest:** Matching is meaningless without both sides normalized to comparable assets and metadata.
-- **Keyword writeback requires confirmed matches:** Prevents corrupting LRCAT keywords with low-confidence associations.
-- **Multi-perspective critique enhances generic critique:** Same infrastructure; differentiator is prompt/persona layer and UI surfacing, not a separate backend.
-- **Analytics fusion requires successful matching:** Performance metrics must attach to the correct catalog row.
-- **Unified identity conflicts with per-catalog silos:** Without a cross-catalog notion of “this photographer” and shared derived features, the narrative view fragments.
+- **Structured scoring is an extension of the description pipeline**, not a parallel system: same image preparation, provider calls, caching limits, and job records — add **schema validation** (e.g. Pydantic) and **persisted numeric fields** for UI queries.
+- **Comparability across time** requires stored **model + prompt/rubric version**; aggregations and “best photos” should default to **single-version cohorts** or show a warning when mixing.
+- **Posting insights** depend on **match quality**; unmatched posts should appear in analytics as **unlinked** so users do not confuse catalog coverage with Instagram coverage.
+- **Identity and suggestions** need **minimum sample thresholds**; without them, the UX should defer or show “analyze N more from this era.”
 
 ## MVP Definition
 
-### Launch With (v1)
+### Launch With (v2)
 
-Minimum viable product — enough to validate “I can see what’s posted, trust matches, and get useful critique.”
+Minimum scope to validate **“scores make the library more navigable, and posting patterns are understandable without engagement data.”**
 
-- [ ] **Register one or more catalogs + browse assets** — Proves integration path and performance baseline.
-- [ ] **Ingest Instagram dump (defined format) + list IG posts** — Establishes the non-API workflow.
-- [ ] **Match pipeline with confidence + manual confirm** — Core risk reducer; without it, writeback and analytics fusion are unsafe.
-- [ ] **Keyword writeback for “posted” (or equivalent) after confirmation** — Delivers the Lightroom-side payoff from PROJECT.md.
-- [ ] **On-demand critique for a single image (one perspective minimum, multi ready)** — Validates AI value without batch cost explosion.
-- [ ] **Job status and error surfacing** — Table stakes for async AI and matching.
+- [ ] **Structured output contract** per perspective: fixed axes (e.g. composition, narrative, rhythm) + numeric scores + short rationales + `rubric_version` / `prompt_version`.
+- [ ] **Persist scores in app DB** with catalog asset foreign keys; **filter/sort** in existing catalog UI for at least one perspective.
+- [ ] **Photography-theory-informed system prompts** for existing + new perspectives (documented rubric snippets, not opaque prose).
+- [ ] **At least one new perspective** shipped end-to-end (e.g. color theory **or** emotional impact **or** series coherence) with its own axis set.
+- [ ] **Posting cadence / timing visualization** from matched dump timestamps (e.g. histogram or heatmap by hour/weekday).
+- [ ] **Thin insights dashboard** landing: 2–4 high-signal charts + links into filtered catalog views (not a separate siloed app).
 
-### Add After Validation (v1.x)
+### Add After Validation (v2.x)
 
-Features to add once matching and single-image critique are trusted.
+Once users trust scores and charts are stable.
 
-- [ ] **Multi-perspective critique presets** — Trigger: users ask for “editor vs street” comparisons repeatedly.
-- [ ] **Timeframe / selection-based batch critique jobs** — Trigger: cost model is understood and jobs stable.
-- [ ] **Instagram analytics panels tied to matched rows** — Trigger: dump parsing proven stable across exports.
-- [ ] **“Best photos” composite ranking** — Trigger: both critique signals and performance data exist with acceptable noise.
+- [ ] **Full new-perspective set** (all planned dimensions) with UI to compare perspectives side-by-side.
+- [ ] **Caption & hashtag style panels** — readability, length, emoji/use, top tags, simple clustering.
+- [ ] **“Best photos” composite** with user-tunable weights per perspective/axis.
+- [ ] **Photographer identity summary** with evidence links (example images per claim).
+- [ ] **“What to post next”** v1: rule-heavy, explainable suggestions; optional LLM phrasing layer.
 
-### Future Consideration (v2+)
+### Future Consideration (post–v2)
 
-Defer until core workflows are sticky and data quality is high.
-
-- [ ] **Cross-catalog identity dashboard (deep synthesis)** — Needs enough labeled data and UX for privacy boundaries.
-- [ ] **Re-import diff / history of dumps** — Trigger: users re-export IG monthly and need merge semantics.
-- [ ] **Additional external sources (e.g. second platform)** — Trigger: explicit demand; avoid premature normalization.
+- [ ] **Cross-catalog identity** (per PROJECT.md deferred) — unified fingerprint when multi-catalog switching matures.
+- [ ] **Engagement fusion** — only if likes/saves enter via API or manual CSV; treat as optional overlay, not core truth.
+- [ ] **Re-import diff / multi-dump history** for longitudinal posting trend accuracy.
 
 ## Feature Prioritization Matrix
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Confirmed match + keyword writeback | HIGH | HIGH | P1 |
-| Dump ingest + IG post listing | HIGH | MEDIUM | P1 |
-| Catalog browse + multi-catalog switch | HIGH | MEDIUM | P1 |
-| Job runner + status / errors | MEDIUM | MEDIUM | P1 |
-| Single-image on-demand critique | HIGH | MEDIUM | P1 |
-| Multi-perspective critique | MEDIUM | MEDIUM | P2 |
-| Analytics fusion views | MEDIUM | HIGH | P2 |
-| Unified photographer identity narrative | HIGH | HIGH | P2 |
-| Batch critique by timeframe | MEDIUM | MEDIUM | P2 |
-| Re-import / dump diff | MEDIUM | HIGH | P3 |
-| Export integrations (Notion, etc.) | LOW–MEDIUM | LOW–MEDIUM | P3 |
+| Structured score schema + persistence + catalog filters | HIGH | HIGH | P1 |
+| Rubric versioning + re-run semantics | MEDIUM | MEDIUM | P1 |
+| Photography-theory prompt refinement (existing perspectives) | HIGH | MEDIUM | P1 |
+| Posting timing / frequency charts (matched posts) | HIGH | MEDIUM | P1 |
+| Minimal insights dashboard (drill-down to catalog) | HIGH | MEDIUM | P1 |
+| One new critique perspective (end-to-end) | MEDIUM | MEDIUM | P2 |
+| Caption / hashtag analytics | MEDIUM | MEDIUM | P2 |
+| “Best photos” weighted ranking | MEDIUM | MEDIUM | P2 |
+| Photographer identity synthesis w/ evidence | HIGH | HIGH | P2 |
+| “What to post next” suggestions (explainable) | HIGH | HIGH | P2 |
+| Full multi-perspective score comparison matrix UI | MEDIUM | MEDIUM | P2 |
+| Advanced series coherence (sequence-aware jobs) | MEDIUM | HIGH | P3 |
 
-**Priority key:**
+**Priority key:** P1 = v2 launch core; P2 = immediately after validation; P3 = stretch / higher research cost.
 
-- P1: Must have for launch
-- P2: Should have, add when possible
-- P3: Nice to have, future consideration
+## Expected User Behaviors
 
-## Competitor Feature Analysis
-
-| Feature | Lightroom Classic (native) | DAM / AI search (e.g. Excire-style) | Consumer cloud (Google/Apple Photos) | Our Approach |
-|---------|----------------------------|-------------------------------------|--------------------------------------|--------------|
-| Catalog of record | Native | Companion or separate index | Cloud library | **Read LRCAT; augment, don’t replace** |
-| AI labeling / search | Limited / manual keywords | Strong search, weak “critique” | Auto albums, faces | **Artistic critique + optional keywords** |
-| Instagram alignment | None | None | Weak / different goals | **Dump-based match + writeback** |
-| Multi-library identity | Per-catalog | Usually per-catalog | Single user cloud | **Explicit cross-catalog analyst view** |
-| Cost model | Subscription to Adobe | Product purchase / sub | Bundled | **On-demand jobs, user-chosen models** |
+- **Batch by intent, not by “whole catalog”:** Users run scoring on **recent work**, **portfolio shortlists**, or **high-rated** subsets — same pattern as current on-demand analysis; structured scoring amplifies the need for **scoped jobs** to control cost.
+- **Tune via re-analysis:** After rubric changes, users **re-run** key portfolios; the product should make **version cohorts** obvious so old scores are not mixed casually in ranking.
+- **Cross-check scores with prose:** Users read **rationales** when a score surprises; table-stakes UX is **score + snippet + jump to full critique**.
+- **Dashboard as triage:** Users open the insights page to spot **cadence gaps**, **overused caption patterns**, or **clusters of high composition / low narrative**, then **filter the catalog** from a chart click — navigation depth matters more than chart count.
+- **Skepticism toward identity labels:** Users accept **evidence-backed** summaries (“these 12 images share X”) and reject **vague personas**; suggestions succeed when **reasons** align with their own goals (series vs reach vs craft).
+- **Posting analytics without vanity metrics:** Users mentally substitute **“when I post”** and **“what I say”** for performance until engagement data exists — copy must avoid implying **reach**.
 
 ## Sources
 
-- **Internal:** `.planning/PROJECT.md` (requirements, constraints, out-of-scope decisions).
-- **Product landscape (general):** Adobe Lightroom / Bridge patterns; DAM and AI-search tools (Excire, Imagen, etc.) for expectations around large libraries and AI assist; consumer photo clouds for baseline “AI understands my library” assumptions.
-- **Gap:** Primary user interviews and quantitative survey not cited — confidence MEDIUM.
+- **Internal:** `.planning/PROJECT.md` (v2.0 goals, dump limitations, on-demand analysis philosophy, out-of-scope engagement).
+- **Photography pedagogy (general):** Critique norms in workshops and MFA-style feedback — multi-axis verbal critique (composition, light, color, intent, edit) rather than single grades; aligns with per-perspective rubrics.
+- **Product patterns:** DAM and photo-manager expectations for **filterable metadata**; BI-style dashboards for **behavioral** (timestamp) analytics where **outcome metrics** are absent.
+- **Gap:** Primary user interviews and quantitative usage study not cited — confidence MEDIUM.
 
 ---
-*Feature research for: Photography analysis & catalog management (Lightroom + Instagram dump workflows)*  
-*Researched: 2026-04-10*
+*Feature research for: v2 Advanced Critique & Insights (structured scoring, analytics, identity, dashboard)*  
+*Researched: 2026-04-12*

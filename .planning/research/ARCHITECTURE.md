@@ -1,314 +1,226 @@
-# Architecture Research
+# Architecture Research — v2.0 Structured Scoring, Analytics & Insights
 
-**Domain:** Photography analysis tools with Lightroom catalog integration (SQLite `.lrcat`, optional plugins, companion apps)
+**Domain:** Integrating structured AI critique scores, aggregate analytics, and an insights dashboard into the existing Lightroom Tagger visualizer stack.
 
-**Researched:** 2026-04-10
+**Researched:** 2026-04-12
 
-**Confidence:** MEDIUM — patterns are well established in desktop DAM tooling, SQLite reverse-engineering communities, and ML pipelines; exact Lightroom internal schema is undocumented and version-dependent.
+**Confidence:** HIGH for current-repo integration points (files and tables verified in tree); MEDIUM for specific schema choices (several valid SQLite shapes; product trade-offs decide).
 
-## Standard Architecture
+**Scope:** Only how **new** capabilities attach to the existing **Flask + React + dual-SQLite** system and the **on-demand description pipeline**. Generic DAM patterns are omitted unless they map to this repo.
 
-Tools that analyze photos and tie results back to Lightroom usually fall into one of three shapes:
+---
 
-1. **Lightroom Classic plugin (Lua + SDK)** — runs inside Lightroom; limited I/O; often delegates heavy work to an external helper or HTTP service.
-2. **External companion app** — reads/writes the catalog SQLite file and/or sidecar XMP; may use a **separate application database** for derived state (matches, AI text, analytics) that Lightroom never sees.
-3. **Hybrid** — thin plugin for menu hooks + external service for AI, matching, and reporting.
+## System Overview
 
-This project ([`.planning/PROJECT.md`](../PROJECT.md)) is explicitly a **web companion** with **direct `.lrcat` writes for keywords only** and a **library SQLite** for everything else — a common pattern when avoiding plugin distribution and keeping Lightroom’s UI unchanged.
+Existing runtime (unchanged roles):
 
-### System Overview
+- **Browser** → Flask REST (`apps/visualizer/backend/api/*`) + Socket.IO (`websocket/events.py`) for job progress.
+- **Background job thread** (`app.py` → `JobRunner` + `jobs/handlers.py`) → opens **`LIBRARY_DB`** via `lightroom_tagger.core.database.init_database` for matching, import, batch describe, etc.
+- **Visualizer DB** (`DATABASE_PATH` / `visualizer.db`) → job rows only; **not** catalog or AI outcomes.
+- **Library DB** (`LIBRARY_DB` / `library.db`) → `images`, `instagram_dump_media`, `matches`, `image_descriptions`, caches.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                     Presentation (UI / CLI / Plugin shell)                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │ Web / SPA    │  │ Desktop UI   │  │ CLI          │  │ LR Plugin    │       │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘       │
-│         │                 │                 │                 │               │
-├─────────┴─────────────────┴─────────────────┴─────────────────┴─────────────┤
-│                     Application / orchestration                             │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │  Job queue · REST/WebSocket · progress · auth (if multi-user)         │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-├───────────────────────────────────────────────────────────────────────────────┤
-│                     Domain services (boundaries below)                        │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐          │
-│  │ Catalog  │ │ Match    │ │ AI /     │ │ External │ │ Analytics│          │
-│  │ I/O      │ │ engine   │ │ vision   │ │ media    │ │ layer    │          │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘          │
-├───────┴────────────┴─────────────┴────────────┴─────────────┴─────────────────┤
-│                     Data & persistence                                        │
-│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐                 │
-│  │ App / library  │  │ Lightroom      │  │ Object / blob  │                 │
-│  │ SQLite (derived│  │ .lrcat (source │  │ cache (thumbs, │                 │
-│  │  state)        │  │  of truth LR)  │  │  resized, emb.)│                 │
-│  └────────────────┘  └────────────────┘  └────────────────┘                 │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Component Responsibilities
-
-| Component | Responsibility | Typical implementation |
-|-----------|----------------|------------------------|
-| **Catalog reader** | Open `.lrcat` safely; query `AgLibrary*` tables; resolve file paths; map to stable image IDs | Dedicated module with SQLite connection policy (WAL, timeouts, optional exclusive lock for NAS); **no business logic** mixed with SQL |
-| **Catalog writer** | Minimal, auditable mutations (keywords, labels, pick flags) consistent with LR rules | Small API surface; transactions; backup recommendation; schema-version checks |
-| **Library / app DB** | Cache of scan results, matches, AI outputs, job state — **not** replacing Lightroom as master for edits | Separate SQLite or Postgres; migrations; JSON columns for flexible AI payloads |
-| **Media access** | Resolve paths (UNC, NAS, moved volumes); read bytes for hashing and APIs | Path normalization layer; optional filesystem watcher (rare in LR tools) |
-| **Matching engine** | Propose and score catalog ↔ external image pairs (social export, second catalog, duplicates) | Candidate generation (date, filename, dimensions) → cheap signals (pHash, dHash) → optional expensive signals (embeddings, vision compare) |
-| **AI analysis pipeline** | Prompting, model routing, retries, cost control, result parsing | Provider abstraction (OpenAI-compatible or vendor SDKs); job-based execution; idempotent writes keyed by image + model + prompt version |
-| **Ingestion adapters** | Normalize third-party dumps (Instagram export, CSV) into canonical rows | Parsers + validation; stable IDs from platform paths or hashes |
-| **Multi-catalog manager** | Register many `.lrcat` paths; active catalog context; prevent cross-contamination | Catalog registry in app DB; per-catalog prefixes on imported rows or foreign keys |
-| **Analytics aggregation** | Roll up engagement metrics, posting history, “best of” composites | ETL into summary tables or materialized views; time-bucketed metrics |
-
-## Domain deep dive: major components
-
-### Lightroom SQLite catalog (read/write)
-
-**Boundary:** Only the **catalog I/O module** should execute raw SQL against `.lrcat`. Higher layers consume **typed records** (image ID, path, capture time, keywords).
-
-**Read path:** Query library asset tables, join to files and folders, decode Lightroom-specific encodings. Performance usually requires **batch queries** and **indexed columns** LR already provides — avoid N+1 queries per image.
-
-**Write path:** Keep **narrow** (e.g. keyword tags, pick status). Wider writes risk corruption or future Lightroom upgrades. Common practice: **backup catalog** before first write; document **Lightroom closed** or **read-only** expectations.
-
-**Operational concerns:** WAL mode, file locking, network filesystems (SMB/NAS), and concurrent Lightroom access — often handled with timeouts, single-connection discipline, or documented exclusivity.
-
-### Image matching algorithms
-
-**Boundary:** Matching consumes **normalized descriptors** (hashes, dimensions, timestamps) from both sides; it does not open SQLite directly unless implemented as a single monolith (still preferable to isolate behind a `Matcher` interface).
-
-**Typical stages (data flows one way):**
-
-1. **Candidate generation** — restrict search space (same day, same aspect ratio bucket, filename similarity).
-2. **Cheap similarity** — perceptual hash Hamming distance, optional difference hash.
-3. **Medium cost** — text/caption similarity if both sides have text; EXIF overlap.
-4. **Expensive confirmation** — vision model “same photo?” or embedding cosine similarity; capped concurrency.
-
-**Persistence boundary:** Store proposed matches, scores, and explainability in the **app DB**, not in `.lrcat`, until the user confirms and triggers keyword write-back.
-
-### AI analysis pipeline
-
-**Boundary:** **Prompt + model + image bytes in** → **structured JSON or text out** → **domain service** maps results to DB columns. The pipeline does not own catalog schema knowledge.
-
-**Major subcomponents:**
-
-- **Provider registry** — endpoints, API keys, model list.
-- **Dispatcher** — retries, fallback models/providers, rate-limit handling.
-- **Job runner** — long-running describe/compare batches; progress and cancellation.
-- **Cache** — hashed inputs → saved responses (filesystem or table) to save cost and stabilize UX.
-
-**Data flow direction:** UI/API → enqueue job → worker pulls work → reads image via path resolver → calls provider → writes rows → notifies UI.
-
-### Multi-catalog management
-
-**Boundary:** A **catalog context** (active `catalog_id` or path) is threaded through APIs and jobs. Aggregations that span catalogs use an explicit **cross-catalog query layer** so default filters never leak rows between catalogs.
-
-**Typical model:**
-
-- **Registry:** `(catalog_path, fingerprint or mtime, display name, last_scan_at)`.
-- **Scoped data:** All imported images and matches reference `catalog_id`.
-- **Unified “photographer” views:** Optional denormalized table or views that union metrics with `catalog_id` as a dimension (not merged master files).
-
-### Analytics aggregation
-
-**Boundary:** Raw events live in **ingestion tables** (per post, per export file). Aggregates are **derived** and refreshed on schedule or after import.
-
-**Common patterns:**
-
-- **Fact table:** one row per post or per image–post link with metrics as columns.
-- **Rollups:** by week, by hashtag, by AI “theme” tags if you classify posts.
-- **Join to catalog:** via stable match keys so Lightroom-side rows gain `likes`, `reach`, etc., for visualization only (still stored in app DB unless written to keywords as text).
-
-## Recommended Project Structure
-
-For a **Python library + optional web app** (matches this repo’s direction), a clear split is:
+v2.0 additions (logical boxes):
 
 ```
-lightroom_tagger/
-├── lightroom/              # .lrcat read/write only
-├── core/                   # matching, vision, app DB, config
-├── instagram/              # dump/adapters (example external source)
-└── scripts/                # one-off pipelines, CLI entry helpers
-
-apps/visualizer/            # thin HTTP + jobs + SPA (optional)
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                         React SPA (Vite, Tailwind)                                │
+│  Dashboard │ Images (Catalog / Matches / …) │ Processing (Jobs, Descriptions…)   │
+│       └─► NEW: Insights dashboard route/section + score filters in catalog UI      │
+└───────────────────────────────┬──────────────────────────────────────────────────┘
+                                │ REST (+ optional Socket.IO for long aggregates)
+                                ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                    Flask blueprints (apps/visualizer/backend/api)                 │
+│  images.py · descriptions.py · jobs.py · providers.py · system.py · lt_config.py │
+│       └─► NEW: insights.py (or extend images.py) — aggregation + ranking APIs      │
+└───────────────────────────────┬──────────────────────────────────────────────────┘
+                                │
+        ┌───────────────────────┴───────────────────────┐
+        ▼                                               ▼
+┌───────────────────┐                         ┌───────────────────────────────┐
+│ visualizer.db     │                         │ library.db (LIBRARY_DB)        │
+│ jobs, job_logs    │                         │ images, instagram_dump_media, │
+│ (unchanged role)  │                         │ matches, image_descriptions,   │
+└───────────────────┘                         │ NEW tables/columns for scores  │
+                                              │ + optional prompt_versions     │
+                                              └───────────────┬───────────────┘
+                                                              │
+                                                              │ read paths / captions
+                                                              ▼
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│              lightroom_tagger/core (domain — shared CLI + visualizer)             │
+│  analyzer.py (prompt + parse)  →  vision_client.generate_description               │
+│  description_service.py → store_image_description                                 │
+│       └─► NEW: scoring schema validation, template/version metadata, analytics   │
+│           module (pure SQL + Python rollups, no new process)                       │
+└──────────────────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+                    ProviderRegistry / FallbackDispatcher
+                                │
+                                ▼
+              Ollama / OpenAI-compatible vision endpoints (unchanged integration)
 ```
 
-### Structure Rationale
+---
 
-- **`lightroom/`:** Isolates undocumented Adobe schema and connection quirks from the rest of the system.
-- **`core/`:** Shared algorithms and persistence used by CLI and web.
-- **Source adapters (`instagram/`, future sources):** Ingestion boundaries stay swappable without touching matcher or LR writer.
-- **`apps/visualizer/`:** Presentation and **job orchestration** only; avoids duplicating matching/vision logic in TypeScript.
+## Component Responsibilities
+
+### Existing components (touch points for v2.0)
+
+| Area | Path / module | Role today | v2.0 relevance |
+|------|----------------|------------|----------------|
+| Description prompt & parse | `lightroom_tagger/core/analyzer.py` | `DESCRIPTION_PROMPT`, `parse_description_response`, per-perspective `score` inside `perspectives` JSON | Extend prompt for new dimensions/perspectives; tighten JSON schema; optionally attach **prompt_version** / **rubric_id** to outputs |
+| Vision I/O | `lightroom_tagger/core/vision_client.py` | `generate_description` uses `build_description_prompt` + `parse_vision_response` | Same call path; may add structured-output constraints or repair pass if model drifts |
+| Persist descriptions | `lightroom_tagger/core/description_service.py` | `describe_matched_image` / `describe_instagram_image` → `store_image_description` | After parse, populate new score columns or child table; keep **single write path** for batch + HTTP generate |
+| Library schema & CRUD | `lightroom_tagger/core/database.py` | `image_descriptions` + `store_image_description` | Migrations for queryable scores; indexes for sort/filter; optional normalization table |
+| Catalog API | `apps/visualizer/backend/api/images.py` | Catalog list with LEFT JOIN `image_descriptions`, `analyzed` filter | Expose numeric scores for filters, sort, badges; “best photos” precomputed or sort keys |
+| Descriptions API | `apps/visualizer/backend/api/descriptions.py` | List/get/generate descriptions | Return extended schema; optional `force` regenerate with new prompt version |
+| Jobs | `apps/visualizer/backend/jobs/handlers.py` | Batch describe, cancellation via `JobRunner` / `threading.Event` | Re-run jobs to backfill scores after schema/prompt change |
+| UI shell | `apps/visualizer/frontend/src/App.tsx`, `Layout.tsx` | Routes: `/`, `/images`, `/processing` | Add `/insights` or embed insights in `DashboardPage` |
+| Dashboard (minimal) | `pages/DashboardPage.tsx` | Counts from `ImagesAPI`, `JobsAPI` | Replace/extend with chart cards fed by new insights endpoints |
+
+### New components (recommended placement)
+
+| Component | Suggested location | Responsibility |
+|-----------|-------------------|----------------|
+| **Prompt template registry** | `lightroom_tagger/core/prompt_templates.py` (or versioned JSON under `lightroom_tagger/core/`) + optional DB table for operator overrides | Map `prompt_version` → full system prompt; allow A/B and audit trail without code deploy |
+| **Score schema validator** | `lightroom_tagger/core/scoring_schema.py` | Validate / coerce model JSON; define allowed dimensions per perspective; default missing scores to NULL |
+| **Analytics / insights service** | `lightroom_tagger/core/insights.py` (library-side) **or** `apps/visualizer/backend/services/insights.py` (API-only) | Posting histograms (from `instagram_dump_media.created_at`), caption/hashtag stats, score distributions, gaps (posted vs high-scoring catalog) |
+| **Insights API blueprint** | `apps/visualizer/backend/api/insights.py` | `GET` endpoints returning JSON aggregates (no heavy logic in route handlers — call service) |
+| **Insights UI** | `apps/visualizer/frontend/src/pages/InsightsPage.tsx` + `components/insights/*` | Charts, tables, filters; consumes insights API |
+| **Optional materialized snapshot** | New table e.g. `insights_cache` in **library.db** | Store precomputed rollups if aggregate queries become slow on large DBs |
+
+---
 
 ## Architectural Patterns
 
-### Pattern 1: Separate application database from Lightroom catalog
+1. **Single write funnel for AI results**  
+   All describe paths (HTTP `generate`, batch job handlers, future CLI) should continue to land in **`store_image_description`** (or one new helper it calls) so scores stay consistent.
 
-**What:** Treat `.lrcat` as Lightroom’s domain; store all analysis, matches, and analytics in an **app-owned** SQLite (or other) database.
+2. **JSON blob + extracted columns (hybrid)**  
+   Keep rich narrative in existing `perspectives` / `composition` / `technical` JSON for forward compatibility; add **queryable** REAL/INTEGER columns or a **child table** for filters (`WHERE score_composition >= 7`, index-friendly). Parsing JSON in every catalog list query does not scale.
 
-**When to use:** Almost always for companion apps and heavy AI pipelines.
+3. **Prompt versioning**  
+   Persist `prompt_version` (and optionally `schema_version`) on `image_descriptions` so aggregations can filter “same rubric only” and re-run jobs can target outdated rows.
 
-**Trade-offs:** Must run **scan/import** steps to stay in sync when the catalog changes; on the plus side, no risk of bloating or corrupting LR’s internal tables with experimental columns.
+4. **Read-only analytics on library.db**  
+   Aggregations are SELECT-only against `images`, `matches`, `instagram_dump_media`, `image_descriptions`. No Lightroom catalog writes required for insights.
 
-### Pattern 2: Job queue for AI and heavy matching
+5. **On-demand + job backfill**  
+   New fields appear first for **new** describes; optional job type **backfill_scores** recomputes from stored images when prompts change (same pattern as batch describe).
 
-**What:** All long-running work runs in **workers** (threads, processes, or task queue) with durable job state.
+6. **Dual-DB awareness**  
+   Insights and scores live in **library.db**. Job **orchestration** stays in **visualizer.db**; long-running aggregate jobs remain normal `jobs` rows if needed.
 
-**When to use:** Web UI, multi-image vision compares, or batch matching.
-
-**Trade-offs:** More moving parts vs. synchronous CLI; essential for progress, retry, and not blocking HTTP requests.
-
-### Pattern 3: Layered matching (cheap → expensive)
-
-**What:** Progressively filter candidates before calling cloud vision.
-
-**When to use:** Large catalogs and cost-sensitive AI.
-
-**Trade-offs:** More code and tuning; large savings in API spend and latency.
-
-### Pattern 4: Provider abstraction behind a small interface
-
-**What:** `compare_images`, `generate_description`, or `embed` with shared error types and retries.
-
-**When to use:** Multiple vendors (Ollama, OpenRouter, OpenAI) or model churn.
-
-**Trade-offs:** Slight indirection; avoids scattering HTTP details across matchers and UI.
+---
 
 ## Data Flow
 
-### Request flow (companion web app)
+### 1) Structured scoring (happy path)
 
 ```
-User action (UI)
-    ↓
-REST / WebSocket API
-    ↓
-Orchestration (validate catalog context, enqueue job)
-    ↓
-Worker: read app DB + resolve file paths
-    ↓
-Domain: matcher and/or vision_client
-    ↓
-Write results → app DB (and optionally .lrcat via writer)
-    ↓
-Push progress → UI
+UI or job → describe_image path (analyzer + vision_client)
+         → parse JSON → scoring_schema.validate/coerce
+         → merge into structured dict
+         → store_image_description (JSON + extracted numeric fields / child rows)
+         → catalog API includes scores in list/detail payloads
 ```
 
-### End-to-end: catalog → analysis → external source → write-back
+### 2) Catalog UI filter “min composition score ≥ N”
 
 ```
-.lrcat ──read──► Catalog reader ──► App DB (images, keywords mirror)
-                                        │
-Instagram dump ──ingest──► Adapter ───────┤
-                                        ▼
-                                  Matcher ◄──► Vision (optional)
-                                        │
-                                        ▼
-                                  matches / descriptions
-                                        │
-                    user confirm ───────┴──► .lrcat writer (keywords)
+Browser GET /api/images/catalog?min_score_composition=7
+       → SQL WHERE on indexed column(s) or JOIN to score table
+       → paginated rows with embedded description summary + scores
 ```
 
-### Key data flows
+### 3) Posting pattern analytics
 
-1. **Scan / sync:** `.lrcat` → normalized rows → **app DB** (one direction until explicit write-back).
-2. **Match:** External media + catalog rows → candidate set → scores → **app DB**; optional **LR writer** after approval.
-3. **Analyze:** Image path → resize/cache → provider API → parsed result → **app DB**; UI reads from app DB only.
-4. **Multi-catalog:** User selects catalog → all queries filtered by `catalog_id` → aggregations optionally **union** with catalog dimension.
-5. **Analytics:** Raw dump metrics → ingestion tables → scheduled rollups → dashboards join on **match keys** to catalog images.
+```
+GET /api/insights/posting-times
+       → SQL on instagram_dump_media.created_at (hour-of-day, DOW buckets)
+       → optional JOIN matches → catalog keys for “posted vs catalog rating” views
+```
 
-## Suggested build order (dependencies between components)
+### 4) Caption / hashtag style
 
-Build from **lowest dependency** to **highest**. Each step should be usable on its own (CLI or tests) before the next.
+```
+Read caption text from instagram_dump_media.caption
+       → Python tokenization / hashtag extraction in insights service
+       → aggregate counts; optional second-phase **AI caption critique** job writes to new columns or related table
+```
 
-| Order | Component | Depends on | Delivers |
-|-------|-----------|------------|----------|
-| 1 | **Config + paths** | — | Catalog paths, DB path, env |
-| 2 | **App DB schema + migrations** | Config | Stable tables for images, jobs |
-| 3 | **Catalog reader → app DB (scan)** | 1–2 | Usable inventory of images |
-| 4 | **Media path resolver + file reads** | 3 | Bytes for hashing |
-| 5 | **Hasher (pHash / metadata)** | 4 | Descriptors for matching |
-| 6 | **Ingestion adapter(s)** | 2, 5 | External rows comparable to catalog |
-| 7 | **Matcher (cheap stages first)** | 5–6 | Proposed matches without AI |
-| 8 | **Catalog writer (minimal)** | 3 | Proven safe keyword updates |
-| 9 | **Vision / AI client + cache** | 4–5 | Descriptions and compare scores |
-| 10 | **Vision-augmented matcher** | 7, 9 | Higher-quality matches |
-| 11 | **Job runner + progress** | 2 | Web-scale execution of 6–10 |
-| 12 | **Multi-catalog registry** | 2, 3 | Scoped scans and UI switching |
-| 13 | **Analytics aggregation** | 6, 7/10 | Dashboards and “best of” |
+### 5) “What to post next” / gap analysis
 
-**Implication for roadmap phasing:** Ship **scan + app DB** before any AI; ship **cheap matcher** before **vision**; ship **single-catalog** before **cross-catalog analytics** unless registry is trivial.
+```
+SQL: high-scoring catalog images (from scores) LEFT ANTI JOIN posted set
+       (via images.instagram_posted / matches / keywords — use one canonical signal)
+       → ranked list returned as JSON suggestion list
+```
 
-## Scaling Considerations
-
-| Scale | Architecture adjustments |
-|-------|---------------------------|
-| Single user, one catalog | Monolith + SQLite is sufficient; synchronous CLI OK for small batches |
-| Single user, large catalog | Indexed app DB, worker pool for hashing/matching, strict candidate limits before vision |
-| Multi-catalog, still single user | Catalog-scoped indices; avoid loading all catalogs in one process without need |
-| Multi-user hosted service | Move job queue to Redis/RQ or cloud tasks; **do not** share writable `.lrcat` paths; per-tenant storage |
-
-### Scaling Priorities
-
-1. **First bottleneck:** Full-catalog pairwise compare — fix with **candidate generation** and **descriptor indexes** (hash buckets).
-2. **Second bottleneck:** Vision API rate limits and cost — fix with **caching**, **concurrency caps**, and **tiered matching**.
-
-## Anti-Patterns
-
-### Anti-Pattern 1: Treating the Lightroom catalog as the app’s primary database
-
-**What people do:** Add many custom tables or bulk columns inside `.lrcat` via raw SQL.
-
-**Why it's wrong:** Undocumented schema, upgrade fragility, corruption risk, and merge/sync pain.
-
-**Do this instead:** Keep **derived state** in the **app DB**; use `.lrcat` for **minimal, Lightroom-native** fields (e.g. keywords) the user expects in LR.
-
-### Anti-Pattern 2: Unbounded vision calls during matching
-
-**What people do:** Call a VLM for every catalog image × every external image.
-
-**Why it's wrong:** Cost and latency explode; rate limits break the UX.
-
-**Do this instead:** **Layered matching** with hard caps; vision only on top-K pairs.
-
-### Anti-Pattern 3: Implicit multi-catalog queries
-
-**What people do:** One global `images` table without `catalog_id`, or forget filters in new endpoints.
-
-**Why it's wrong:** Cross-catalog data leaks and wrong write-back targets.
-
-**Do this instead:** **Mandatory catalog context** in APIs and job payloads; integration tests for isolation.
+---
 
 ## Integration Points
 
-### External Services
+### External services
 
-| Service | Integration pattern | Notes |
-|---------|-------------------|--------|
-| **Lightroom Classic** | SQLite file I/O + user workflow (close LR / backup) | Not a supported public SQL API — defensive coding and backups |
-| **Vision / LLM APIs** | HTTPS, OpenAI-compatible or vendor SDK | Token limits, image size caps, structured output parsing |
-| **Instagram (export)** | File-based dump ingestion | No API in this project’s scope; parsers are versioned with export format |
-| **Object storage (optional)** | S3-compatible for caches | Useful if moving off local disk for thumbnails |
+| Service | Pattern | v2.0 note |
+|---------|---------|-----------|
+| Vision / LLM (Ollama, OpenAI-compatible) | Existing `ProviderRegistry` + `vision_client.generate_description` | Prompt grows; monitor **context length** and **payload size** (same compression path as today) |
+| Instagram | Export files → `instagram_dump_media` | Timestamps and captions drive **posting analytics**; no API |
 
-### Internal Boundaries
+### Internal boundaries
 
-| Boundary | Communication | Notes |
-|----------|---------------|--------|
-| **Presentation ↔ Orchestration** | REST, WebSocket, CLI argv | No direct `.lrcat` access from frontend |
-| **Orchestration ↔ Domain** | Python function calls, job handlers | Handlers stay thin |
-| **Domain ↔ Lightroom file** | `lightroom.reader` / `lightroom.writer` only | Single ownership of PRAGMAs and SQL dialect assumptions |
-| **Domain ↔ App DB** | Repository-style module (`core.database`) | JSON serialization centralized |
-| **Matcher ↔ Vision** | Optional dependency injected or stage interface | Matcher usable without API keys |
-| **Ingestion ↔ Matcher** | Shared schema for “external image” rows | Adapters map to same descriptor pipeline as catalog |
+| Boundary | Today | v2.0 change |
+|----------|--------|-------------|
+| **analyzer ↔ vision_client** | Prompt string + parse | Add versioned template lookup; shared schema constants |
+| **description_service ↔ database** | `_store_structured` | Persist scores + version fields |
+| **API ↔ library.db** | `@with_db` per request | New insights routes; extend catalog query builder with score predicates |
+| **Handlers ↔ domain** | Handlers call `describe_matched_image` loops | Pass `prompt_version` / force flags in job metadata |
+| **React ↔ API** | `services/api.ts` | New client methods for `/api/insights/*`; catalog query params for scores |
+
+### Schema direction (library.db)
+
+**Today:** `image_descriptions` holds `perspectives` JSON (includes per-perspective `score` in practice) with `PRIMARY KEY (image_key)` — see `lightroom_tagger/core/database.py`.  
+**Caution:** Application code also uses `image_type`; composite uniqueness for `(image_key, image_type)` is not enforced at the DB level (see `.planning/codebase/CONCERNS.md`). v2.0 should avoid widening that mismatch when adding columns or child tables.
+
+**Likely additions (pick one strategy):**
+
+- **A — Flat columns** on `image_descriptions`: e.g. `score_composition`, `score_narrative`, `score_rhythm`, `prompt_version TEXT`, plus generated indexes. Simple queries; rigid schema.
+- **B — Normalized `image_critique_scores`**: `(image_key, image_type, perspective, dimension, score, prompt_version)` with composite index for filters. Flexible perspectives; more JOINs.
+- **C — Hybrid**: keep full JSON + **generated** rollups in A or B for hot query paths.
+
+**Posting / caption analytics** can remain query-time only until performance requires a small `insights_snapshot` table refreshed by a job.
+
+---
+
+## Suggested build order (dependencies)
+
+1. **Prompt + JSON schema** in `analyzer.py` / `scoring_schema.py` + tests (no UI) — defines contract for models.
+2. **Library DB migration** — columns or score table + `prompt_version`; extend `store_image_description` and deserialization helpers.
+3. **Wire description pipeline** — `description_service` + job handlers + `POST .../generate` paths populate new fields.
+4. **Catalog API** — extend `query_catalog_images` / `images.py` for sort/filter on new fields; frontend catalog filters.
+5. **Insights service + `/api/insights`** — posting patterns and score histograms from existing tables.
+6. **Insights UI** — new page or dashboard section; add a small chart dependency if needed (no chart library in `package.json` today).
+7. **Higher-level features** — “best photos” ranking, identity clustering, caption AI — build on stable scores + aggregates.
+
+This order respects the dependency chain: **no dashboard without queryable scores; no reliable scores without schema + prompt version**.
+
+---
 
 ## Sources
 
-- Adobe Lightroom Classic catalog as **SQLite** (community schema notes; version-specific) — treat as **unofficial**.
-- General **perceptual hashing** and **image retrieval** literature (pHash/dHash pipelines).
-- **OpenAI-compatible** multimodal APIs — common abstraction layer for local (Ollama) and cloud providers.
-- Internal alignment: [`.planning/codebase/ARCHITECTURE.md`](../codebase/ARCHITECTURE.md) (this repository’s implemented layering).
+- [`.planning/PROJECT.md`](../PROJECT.md) — v2.0 milestone requirements (structured scores, posting analytics, insights dashboard).
+- [`.planning/codebase/ARCHITECTURE.md`](../codebase/ARCHITECTURE.md) — implemented layers, dual-DB split, job thread model.
+- [`.planning/codebase/CONCERNS.md`](../codebase/CONCERNS.md) — `image_descriptions` key/`image_type` caveat, SQLite concurrency notes.
+- `lightroom_tagger/core/database.py` — `image_descriptions` table definition, `store_image_description`, related queries.
+- `lightroom_tagger/core/analyzer.py` — current structured JSON prompt and perspective scores embedded in JSON.
+- `lightroom_tagger/core/description_service.py` — single persistence path for catalog vs Instagram describes.
+- `apps/visualizer/backend/app.py` — blueprint registration and job processor wiring.
+- `apps/visualizer/frontend/package.json` — current frontend dependencies (no visualization chart library yet).
 
 ---
-*Architecture research for: photography analysis tools with Lightroom integration*
+*Architecture research for: v2.0 Advanced Critique & Insights integration*
 
-*Researched: 2026-04-10*
+*Researched: 2026-04-12*

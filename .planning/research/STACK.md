@@ -1,10 +1,10 @@
-# Stack Research
+# Stack Research — v2.0 Structured Critique, Analytics & Insights Dashboard
 
-**Domain:** Photography analysis tools with Lightroom Classic catalog integration (SQLite), Instagram export-dump matching, multi-perspective AI image critique, and analytics dashboards — *not* generic CRUD web apps.
+**Domain:** Additions for **structured AI scoring** (numeric rubrics per critique perspective), **photography-theory prompt engineering**, **analytics over Instagram dump timestamps and captions**, **lightweight time-series / pattern summaries**, and an **insights dashboard** in an existing **Flask + SQLite** backend and **React + TypeScript + Tailwind + Vite** frontend. Assumes validated core stack (catalog/jobs/vision matching/Ollama + OpenAI-compatible providers) is unchanged.
 
-**Researched:** 2026-04-10
+**Researched date:** 2026-04-12
 
-**Overall confidence:** **MEDIUM–HIGH** for data/AI layers (verified package versions on PyPI/npm); **MEDIUM** for API framework choice (this repo still ships Flask + Socket.IO; FastAPI is the stronger default for *new* greenfield services in 2026).
+**Confidence:** **HIGH** for schema validation + charting + client-side data fetching (versions verified via PyPI and npm registry JSON on this date). **MEDIUM** for optional “smart” time-series tooling (simple SQL/`datetime` often suffices before adding scientific Python). **MEDIUM** for **Instructor** vs. hand-rolled parse/retry (trade-off: convenience vs. dependency surface).
 
 ---
 
@@ -12,142 +12,81 @@
 
 ### Core Technologies
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| **Python** | **3.12+** (3.10 minimum acceptable) | Catalog tooling, matching, AI orchestration, backend API | Lightroom-adjacent work is file- and CPU-bound (thumbnails, hashing); a single language for SQLite access, image prep, and LLM clients keeps operational complexity low. Prefer 3.12 for performance and typing ergonomics. |
-| **`sqlite3` (stdlib)** | ships with Python | Read/write `.lrcat` and app-side job DBs | Lightroom Classic catalogs *are* SQLite files. Stdlib `sqlite3` is the most transparent, dependency-free way to run explicit SQL against Adobe’s schema and to control transactions for risky writes. |
-| **Pillow** | **12.2.0** | Decode, normalize orientation, resize for hashing and vision payloads | De-facto imaging stack in Python; broad format support for both catalog previews and Instagram dump JPEGs. Keeps you out of native OpenCV unless you need CV-heavy features. |
-| **ImageHash** | **4.3.2** | Perceptual / difference hashes for catalog ↔ dump image matching | Standard choice for “same photo, different export” problems at low cost and no GPU. Pairs with Hamming-distance thresholds; fits the project’s export-based Instagram workflow. |
-| **`openai`** | **2.31.0** | Chat / vision calls to OpenAI-compatible and OpenAI endpoints | Maintained first-party client; async support, retries patterns, and broad examples. Use for OpenRouter-style gateways via base URL + key if you stay OpenAI-API-shaped. |
-| **Ollama Python client** | **0.6.1** | Local / cheap cloud models for descriptions and critique experiments | Official client; aligns with PROJECT.md’s testing on Ollama before stepping up to hosted vision models. |
-| **LiteLLM** | **1.83.4** (optional but valuable) | Unified calls + routing across many providers (OpenAI, Anthropic, Gemini, Ollama, …) | When you outgrow a single SDK, LiteLLM reduces bespoke adapter code for multi-provider critique and A/B model quality. **Confidence: MEDIUM** — heavier dependency surface; pull in when you actually run 3+ providers in production. |
-| **FastAPI** | **0.135.3** | HTTP API + background-task friendly ASGI app | OpenAPI generation, native Pydantic validation, and async I/O suit on-demand analysis jobs and concurrent thumbnail reads. **Rationale vs current repo:** Flask + Socket.IO still works, but FastAPI + structured schemas is the mainstream 2025–2026 default for new Python APIs that coordinate LLMs and long-running work. |
-| **Uvicorn** | **0.44.0** | ASGI server for FastAPI | Standard pairing; use `uvicorn[standard]` for production-oriented extras. |
-| **React** | **19.2.5** | Dashboard UI (catalogs, jobs, critique, analytics) | Ecosystem scale for data-dense UIs; matches the direction of the existing visualizer frontend. |
-| **Vite** | **8.0.8** | Frontend build / dev server | Current major line on npm; fast HMR for iterative dashboard work. **Note:** This repo’s `package.json` may still pin Vite 5 — treat 8.x as the target when you modernize the lockfile. |
-| **TypeScript** | **5.8+** (track latest stable) | Type-safe UI and API contracts | Reduces regressions when critique payloads and analytics shapes evolve. |
-| **Recharts** | **3.8.1** | Analytics charts (Instagram metrics, posting cadence, model scores) | Declarative React charts without owning a full D3 pipeline; adequate for dashboard-style analytics tied to dump-derived series. |
+| Technology | Version | Purpose | Why recommended |
+|------------|---------|---------|------------------|
+| **Pydantic** | **2.12.5** | Canonical models for critique payloads (per-perspective scores, rationales, tags), API response shapes, and config for “strict” JSON decoding | Gives queryable numeric fields a single source of truth in Python, integrates cleanly with Flask via explicit `model_validate` / `model_dump`, and pairs with the OpenAI Python SDK’s Pydantic-oriented parsing helpers on providers that honor JSON-schema constraints. |
+| **openai** | **2.31.0** (upgrade from loose `>=1.0`) | Chat/vision calls **plus** structured parsing where the endpoint supports schema-constrained JSON | One maintained client for OpenAI-compatible gateways; v2 line documents patterns aligned with structured outputs. Keeps the same integration style as the rest of the repo while unlocking parse-and-validate flows for scoring rubrics. |
+| **Recharts** | **3.8.1** | Line/area (posting cadence), bar (score distributions), composed charts for dashboard cards | Declarative React + SVG charts that fit Tailwind layout without owning a full D3 program; adequate for tens of thousands of points when the **backend pre-aggregates** series. |
+| **TanStack Query (React Query)** | **5.99.0** | Server state for dashboard endpoints: caching, stale-while-revalidate, keyed refetch per catalog / date range / filter set | Avoids ad hoc `useEffect` fetch spaghetti as you add many insight widgets; works with existing REST JSON from Flask and does not require API redesign. |
 
 ### Supporting Libraries
 
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| **Pydantic** | **2.12.5** | Strict schemas for multi-perspective critique JSON, job payloads, provider configs | Always — especially when you ask models for structured fields (scores, rationales per persona). |
-| **httpx** | latest stable with your resolver | Async-capable HTTP for non-OpenAI providers | When LiteLLM is too much but you still need custom REST (e.g. niche vision API). |
-| **tenacity** | latest stable | Retries with backoff for flaky AI and storage paths | Long-running batch jobs against NAS-hosted previews. |
-| **python-socketio** + **socket.io-client** | **5.x** / **4.8.3** | Live job progress and log streaming | Already matches the project’s job/processing UX; keep if you stay on Socket.IO semantics. |
-| **Zustand** | **5.0.12** | Lightweight client state | Fine for catalog context switching and job UI without Redux boilerplate. |
-| **Polars** | latest stable (optional) | Columnar analytics over exported metrics tables | When Instagram dump tables grow large and you want fast aggregations in the backend or notebooks — not required for MVP charts fed by pre-aggregated API endpoints. |
-| **pytest** + **ruff** + **mypy** | per `pyproject.toml` | Tests and quality gates | Protect SQLite write paths and hashing/matching invariants. |
-
-### Development Tools
-
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| **uv** or **pip** + **venv** | Python env and lockfile | Repo already uses `uv.lock`; keep one lockfile per deployable. |
-| **npm / pnpm** | Frontend installs | Pin major versions; run `npm audit` on dashboard dependencies. |
-| **SQLite CLI** | Forensics on `.lrcat` copies | Practice on *copies* only; never attach tools to a catalog Lightroom has open. |
-| **Catalog backup discipline** | Risk control for writes | Adobe’s DB is undocumented; backups before keyword writes are part of the “stack,” not optional tooling. |
+| Library | Version | Purpose | When to use |
+|---------|---------|-----------|-------------|
+| **date-fns** | **4.1.0** | Parse/normalize ISO timestamps from dumps, bucket by local day/hour/DOW for “posting rhythm” views | Always if much date math moves to the browser; keeps timezone and calendar edge cases out of hand-rolled `Date` code. |
+| **Zod** | **4.3.6** (or **3.24.x** if a peer dependency forces it) | Mirror critical API DTOs on the frontend (scores, aggregates) for safe chart input | When you want compile-time-friendly parsing at the UI boundary without generating OpenAPI clients yet. |
+| **instructor** | **1.15.1** | Optional wrapper: Pydantic-centric structured extraction, retries, multi-provider adapters | Pull in if Ollama + multiple OpenAI-shaped hosts need **uniform** retry/validation behavior beyond what you want to maintain by hand. |
+| **json-repair** | **0.59.2** | Best-effort repair of slightly malformed JSON from smaller local models before Pydantic validation | When you stay on models that do not reliably enforce JSON grammar; use behind a metric/log so you can drop it if quality improves. |
+| **pandas** | **2.3.3** (project still `>=3.10`) **or** **3.0.2** (if minimum Python is raised to **≥3.11**) | Notebook/backend ETL for caption token stats, hashtag counts, rolling posting windows | Use when aggregations outgrow readable SQL but **before** reaching for distributed tooling; **3.0.2 requires Python ≥3.11** per PyPI metadata. |
+| **NumPy** | **2.4.4** | Arrays for optional numeric summaries | Typically a **transitive** dependency of pandas; only list explicitly if you add small custom vectorized stats without pandas. |
 
 ---
 
-## Installation
+## Installation commands
+
+Backend (from repo root; align pins with your chosen installer):
 
 ```bash
-# Core Python (example pins — align with your pyproject/uv.lock)
-uv add "pillow>=12.2.0" "ImageHash>=4.3.2" "openai>=2.31.0" "ollama>=0.6.1" "pydantic>=2.12.5"
-uv add "fastapi>=0.135.0" "uvicorn[standard]>=0.44.0"
+uv add "pydantic>=2.12.5" "openai>=2.31.0"
 
-# Optional: multi-provider routing
-uv add "litellm>=1.83.0"
+# Optional — structured extraction helpers / salvage parsing
+uv add "instructor>=1.15.1" "json-repair>=0.59.2"
 
-# Frontend (dashboard + analytics)
-npm install react@^19 react-dom@^19 vite@^8 recharts@^3.8 zustand@^5 socket.io-client@^4.8
+# Optional — heavier analytics (pick ONE pandas line for your Python floor)
+uv add "pandas>=2.3.3,<3"        # if requires-python includes 3.10
+# uv add "pandas>=3.0.2"         # only after requires-python >=3.11
+```
 
-# Dev
-uv add --dev pytest ruff mypy
-npm install -D typescript @vitejs/plugin-react vitest
+Frontend (`apps/visualizer/frontend`):
+
+```bash
+npm install recharts@^3.8.1 @tanstack/react-query@^5.99.0 date-fns@^4.1.0 zod@^4.3.6
 ```
 
 ---
 
-## Alternatives Considered
+## Alternatives considered
 
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| **ImageHash (pHash/dHash)** | **CLIP / SigLIP embeddings** + vector index | Heavy crops, color grading, or collage borders break naive hashes; you need semantic “same scene” matching and can pay GPU + index maintenance. |
-| **FastAPI + Uvicorn** | **Flask + Flask-SocketIO** (this repo today) | Team already standardized on Flask; lowest migration cost; synchronous style is acceptable at low concurrency. **Flask 3.1.3** + **Flask-SocketIO 5.6.1** are current PyPI versions if you stay. |
-| **LiteLLM** | **Hand-rolled provider modules** | Only one provider forever, or you need minimal dependencies and full control over HTTP traces. |
-| **Recharts** | **Observable Plot**, **ECharts**, **D3 direct** | You want richer interaction layers or non-React embedding; cost is more custom code. |
-| **Stdlib sqlite3** | **sqlcipher** / encrypted catalogs | Rare; only if you encrypt catalog copies at rest yourself — not Adobe’s default. |
+| Choice | Alternative | When the alternative wins |
+|--------|-------------|-----------------------------|
+| **Pydantic + OpenAI SDK parsing** | **instructor** everywhere | You want one abstraction across many providers and built-in retry recipes, and accept the extra dependency chain. |
+| **Recharts** | **@tremor/react**, **Apache ECharts** (`echarts-for-react`), **Visx** | Tremor for rapid dashboard UI kits; ECharts for dense interaction/performance at very large series; Visx when you need bespoke photo-centric visuals and already know D3 concepts. |
+| **TanStack Query** | **SWR**, **RTK Query**, hand-rolled fetch | SWR is comparable for many dashboards; RTK Query fits if you centralize on Redux Toolkit (you currently use Zustand, so Query is the lighter fit). |
+| **pandas** | **Polars**, **SQL-only** in SQLite/app DB | Polars when analytics grow large enough to justify another dataframe API; SQL-only when every insight is a well-defined aggregate query and the UI only plots small result sets. |
+| **date-fns** | **Day.js**, **Luxon**, **Temporal polyfills** | Day.js for tiny bundles; Luxon/Temporal when you need first-class timezone and calendar policies beyond what date-fns already covers. |
+| **Zod** | **Valibot**, **TypeScript-only types** | Valibot for smaller bundles; TS-only when you fully trust the server and want zero runtime parse cost (weaker guardrail for evolving Flask JSON). |
 
 ---
 
-## What NOT to Use
+## What NOT to use
 
-| Avoid | Why | Use Instead |
+| Avoid | Why | Use instead |
 |-------|-----|-------------|
-| **ORM (SQLAlchemy, etc.) mapped to Adobe `AgLibrary*` tables** | Undocumented, version-sensitive schema; migrations break between Lightroom releases. | Thin SQL modules + integration tests against catalog *copies*; document queries you rely on. |
-| **Instagram Graph API as the primary sync path** | PROJECT.md explicitly scopes out API/scraping; permissions, rate limits, and product churn. | Export dumps + local ingest + hash matching. |
-| **OpenCV as the default image stack** | Heavier native dependency for workflows that only need decode, resize, and hash. | Pillow + ImageHash; add OpenCV only for specific CV features (e.g. feature matching). |
-| **Up-front embedding / critique of entire catalogs** | Conflicts with on-demand cost control and stated non-goals. | Job queue for single-image or time-window batches; cache results in *your* app DB, not inside `.lrcat`. |
-| **Lightroom Classic SDK plugin as the web app substitute** | Different distribution, update model, and UX surface; PROJECT.md keeps Lightroom unchanged except keywords. | Web app + controlled SQLite keyword writes when Lightroom is closed (or documented safe windows). |
-| **Writing to `.lrcat` while Lightroom has it open** | Risk of corruption and lock conflicts. | User workflow: quit Lightroom or use a documented read-only path; automate only with explicit safeguards. |
-
----
-
-## Stack Patterns by Variant
-
-**If you keep Flask for the visualizer backend:**
-
-- Use **Flask 3.1.x** + **Flask-SocketIO 5.6.x** with explicit thread/process model docs for SQLite.
-- Because migration is non-trivial and the current job runner already works.
-
-**If you greenfield the API layer:**
-
-- Use **FastAPI 0.135.x** + **Pydantic 2.12.x** + **Uvicorn 0.44.x**, keep Socket.IO or move progress to SSE/WebSockets with a single documented pattern.
-- Because structured critique contracts and async file/AI I/O benefit most.
-
-**If matching quality plateaus:**
-
-- Add **embedding retrieval** for candidate shortlists only (e.g. same day or same album), not whole-catalog brute force.
-- Because cost scales with corpus size; hashes stay the filter.
-
----
-
-## Version Compatibility
-
-| Package A | Compatible With | Notes |
-|-----------|-----------------|-------|
-| `openai` **2.31.x** | `pydantic` **2.12.x** | OpenAI SDK v2 expects Pydantic v2 models for structured parsing patterns. |
-| `fastapi` **0.135.x** | `pydantic` **2.12.x**, `starlette` (transitive) | Let FastAPI resolve Starlette; avoid pinning Starlette manually unless tests fail. |
-| `recharts` **3.8.x** | `react` **19.2.x** | Verify peer dependency range on install; Recharts 3.x targets React 18+ / 19. |
-| `vite` **8.x** | `@vitejs/plugin-react` **current** | Bump plugin-react alongside Vite majors. |
-| `ImageHash` **4.3.x** | `pillow` **12.x** | ImageHash lists Pillow as dependency; keep Pillow current for security fixes. |
-
----
-
-## Confidence by Recommendation
-
-| Area | Confidence | Reason |
-|------|------------|--------|
-| Pillow + ImageHash for dump ↔ catalog matching | **HIGH** | Industry-standard pipeline for perceptual dedup; low operational risk. |
-| Stdlib `sqlite3` for `.lrcat` | **HIGH** | Matches Adobe’s on-disk format; maximum control for transactional keyword writes. |
-| OpenAI SDK + optional LiteLLM for critique | **HIGH** (SDK), **MEDIUM** (LiteLLM) | SDK is stable; LiteLLM adds features and transitive weight. |
-| FastAPI as preferred *new* API layer | **MEDIUM** | Strong ecosystem default, but this repository already invested in Flask + Socket.IO. |
-| Recharts for analytics | **MEDIUM** | Good for standard dashboards; may need escape hatches for bespoke photo-centric viz. |
-| Polars for analytics ETL | **LOW–MEDIUM** | Valuable at scale, not mandatory if Postgres/SQLite aggregations suffice. |
+| **LangChain / LlamaIndex** (for this milestone) | Your flow is bounded: prompt templates + one vision/text call + validate + persist. Frameworks add indirection, version churn, and harder testing for little gain. | Plain Python string/Jinja templates + Pydantic validation + your existing job runner. |
+| **Prophet, heavy forecasting stacks, or a separate TSDB** | Instagram export analytics here are **exploratory** (cadence, DOW/hour histograms, gaps vs catalog), not sub-minute operational metrics. | SQLite aggregates + optional pandas rolling/groupby; upgrade only if you later prove forecast accuracy is a product requirement. |
+| **Full OpenAPI codegen pipeline** (initially) | Valuable at scale, but easy to over-build before critique JSON and insight endpoints stabilize. | Pydantic models on the server + Zod (optional) on the client, then codegen later if duplication hurts. |
+| **Embedding every image for “style fingerprint”** (as the first implementation) | High GPU/storage cost; overlaps poorly with “on-demand analysis” unless carefully scoped. | Start with **textual** themes from existing critiques + hashtag/caption stats + score clustering; add embeddings only as a deliberate phase with a budget. |
+| **ORM mapped to Adobe `AgLibrary*` tables** | Undocumented, version-sensitive Lightroom schema. | Keep thin SQL for `.lrcat`; store critique scores and analytics in **your** app tables or sidecar DB as already implied by PROJECT.md. |
 
 ---
 
 ## Sources
 
-- **PyPI JSON API** — verified 2026-04-10 versions: `fastapi` 0.135.3, `uvicorn` 0.44.0, `openai` 2.31.0, `pillow` 12.2.0, `ImageHash` 4.3.2, `ollama` 0.6.1, `litellm` 1.83.4, `pydantic` 2.12.5, `flask` 3.1.3, `flask-socketio` 5.6.1.
-- **`npm view`** — verified 2026-04-10: `vite` 8.0.8, `react` 19.2.5, `recharts` 3.8.1, `socket.io-client` 4.8.3, `zustand` 5.0.12.
-- [https://github.com/hfiguiere/lrcat-extractor/blob/master/doc/lrcat_format.md](https://github.com/hfiguiere/lrcat-extractor/blob/master/doc/lrcat_format.md) — community Lightroom catalog structure reference (**MEDIUM** confidence: unofficial but widely used).
-- `.planning/PROJECT.md` — scope, constraints, and explicit out-of-scope items (Instagram API, batch whole-catalog analysis).
+- **PyPI JSON API** (`https://pypi.org/pypi/{package}/json`), retrieved **2026-04-12**: `pydantic` **2.12.5**, `openai` **2.31.0**, `instructor` **1.15.1**, `json-repair` **0.59.2**, `pandas` **3.0.2** (requires Python **≥3.11**), `numpy` **2.4.4**; latest **pandas 2.x** line noted as **2.3.3** for **Python 3.10** compatibility.
+- **npm registry** (`https://registry.npmjs.org/{package}/latest`), retrieved **2026-04-12**: `recharts` **3.8.1**, `@tanstack/react-query` **5.99.0**, `date-fns` **4.1.0**, `zod` **4.3.6**.
+- **`.planning/PROJECT.md`** — v2.0 scope (structured scores, new perspectives, posting/caption analytics, insights dashboard) and constraints (SQLite catalogs, export-based Instagram, on-demand analysis).
+- **`pyproject.toml`** / **`apps/visualizer/frontend/package.json`** — current Python `>=3.10` floor and existing React 19 / Vite 5 / Tailwind 3 baseline for integration assumptions.
 
 ---
-*Stack research for: photography analysis + Lightroom SQLite + Instagram dumps + AI critique + analytics dashboard*
 
-*Researched: 2026-04-10*
+*Research scope: NEW v2.0 capabilities only — structured AI output, scoring schemas, analytics computation, dashboard visualization, and critique prompt patterns. Core Flask/React/job/vision stack treated as validated and out of scope for this document.*
