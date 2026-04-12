@@ -8,6 +8,21 @@ A web application that connects your Lightroom catalog with Instagram to track w
 
 Know which catalog images are posted on Instagram and get artistic critique that helps you understand your photographic voice and posting strategy.
 
+## Current Milestone: v2.0 Advanced Critique & Insights
+
+**Goal:** Deepen AI critique quality with structured scoring and new perspectives, then surface patterns and insights across the catalog and posting history.
+
+**Target features:**
+- Refine critique prompts with photography theory; structured scores (composition, narrative, rhythm) as queryable fields
+- New critique perspectives beyond street/editor/publisher (e.g., color theory, emotional impact, series coherence)
+- Per-perspective numeric scoring persisted and filterable
+- Posting frequency and timing pattern analysis from dump timestamps
+- Caption/hashtag style analysis
+- "Best photos" ranking based on aggregated AI perspective scores
+- Photographer identity analysis — recurring themes, style fingerprint across catalog
+- "What to post next" suggestions based on catalog analysis vs posting history gaps
+- Insights dashboard UI to visualize trends and patterns
+
 ## Requirements
 
 ### Validated
@@ -27,13 +42,24 @@ Know which catalog images are posted on Instagram and get artistic critique that
 - [x] On-demand analysis jobs (single image or timeframe-based batches) (Validated in Phase 4: AI Analysis)
 - [x] Multi-perspective critique (street photographer, editor, publisher views) (Validated in Phase 4: AI Analysis)
 
-### Active
+### Active (v2.0)
 
-- [ ] Analyze photos from artistic perspectives (composition, narrative, rhythm)
+- [ ] Structured artistic scoring (composition, narrative, rhythm) as queryable numeric fields
+- [ ] New critique perspectives (color theory, emotional impact, series coherence)
+- [ ] Photography-theory-refined prompts for all perspectives
+- [ ] Per-perspective numeric scoring persisted and filterable in catalog UI
+- [ ] Posting frequency and timing pattern analysis from Instagram dump timestamps
+- [ ] Caption and hashtag style analysis
+- [ ] "Best photos" ranking by aggregated AI perspective scores
+- [ ] Photographer identity analysis — recurring themes and style fingerprint
+- [ ] "What to post next" suggestions based on catalog vs posting gaps
+- [ ] Insights dashboard with trend visualization
+
+### Deferred (future)
+
 - [ ] Support multiple Lightroom catalogs with context switching
-- [ ] Identify "best photos" combining AI scores and Instagram performance
-- [ ] Extract and display Instagram analytics from dump data
-- [ ] Provide unified photographer identity analysis across all catalogs
+- [ ] Unified photographer identity view across catalogs
+- [ ] Instagram engagement data (likes/saves) — requires API or manual entry
 
 ### Out of Scope
 
@@ -42,6 +68,7 @@ Know which catalog images are posted on Instagram and get artistic critique that
 - Lightroom plugin — Web app keeps Lightroom as-is, only writes keywords
 - Real-time Instagram syncing — Manual dump workflow is sufficient
 - Batch analysis of entire catalog upfront — On-demand only to control costs
+- Per-post engagement metrics from dumps — Instagram exports don't include likes/saves/comments counts
 
 ## Context
 
@@ -60,7 +87,7 @@ The user is a photographer managing work across multiple Lightroom catalogs (per
 - Batch describe supports 12-month windows, min_rating filter, SR2/RAW pipeline hardened
 
 ### Instagram Dump Format
-User provides Instagram export dumps containing images and analytics. App matches these to Lightroom catalog entries by comparing images, then writes keywords back to the SQLite catalog file.
+User provides Instagram export dumps containing images, captions, timestamps, and EXIF. App matches these to Lightroom catalog entries by comparing images, then writes keywords back to the SQLite catalog file. Note: Instagram exports do NOT include per-post engagement metrics (likes, saves, comments) — analytics are derived from posting patterns and AI scores only.
 
 ### Analysis Philosophy
 Critique should come from defined perspectives (street photographer, editor, publisher) with starting prompts refined by photography theory from books and publications. Focus is artistic execution and narrative fit, not technical metrics.
@@ -105,4 +132,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-11 after Phase 4 completion (v1.0 milestone complete)*
+*Last updated: 2026-04-11 — v2.0 milestone started (Advanced Critique & Insights)*

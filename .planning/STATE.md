@@ -1,38 +1,32 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
+milestone: v2.0
+milestone_name: Advanced Critique & Insights
 current_plan: Not started
-status: completed
-last_updated: "2026-04-11T19:00:23.780Z"
+status: defining_requirements
+last_updated: "2026-04-11T20:00:00.000Z"
 last_activity: 2026-04-11
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 21
-  completed_plans: 21
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Planning state
 
 **Project:** Lightroom Tagger & Analyzer  
-**Roadmap:** [.planning/ROADMAP.md](./ROADMAP.md) (v1, 2026-04-10)
+**Roadmap:** [.planning/ROADMAP.md](./ROADMAP.md) (v2, 2026-04-11)
 
 ## Current focus
 
 | Field | Value |
 |-------|--------|
-| Active milestone | v1.0 — **SHIPPED** |
-| Status | Complete (2026-04-11) |
-| Next milestone | Not planned |
-
-## v1 phase checklist
-
-- [x] Phase 1 — Catalog management (CAT-01 … CAT-05) ✓
-- [x] Phase 2 — Jobs & system reliability (SYS-01 … SYS-05) ✓
-- [x] Phase 3 — Instagram sync (IG-01 … IG-06) ✓
-- [x] Phase 4 — AI analysis (AI-01 … AI-06) ✓
+| Active milestone | v2.0 — Advanced Critique & Insights |
+| Phase | Not started (defining requirements) |
+| Status | Defining requirements |
+| Last activity | 2026-04-11 — Milestone v2.0 started |
 
 ## Traceability
 
