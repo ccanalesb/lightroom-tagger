@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ImagesAPI, PerspectivesAPI, type CatalogImage } from '../../services/api';
 import { CatalogImageCard } from '../catalog/CatalogImageCard';
 import { CatalogImageModal } from '../catalog/CatalogImageModal';
@@ -9,6 +10,26 @@ import { formatMonth } from '../../utils/date';
 
 const LIMIT = 50;
 const DEBOUNCE_MS = 350;
+
+function catalogStubForDeepLink(imageKey: string): CatalogImage {
+  return {
+    id: null,
+    key: imageKey,
+    filename: '',
+    filepath: '',
+    date_taken: '',
+    rating: 0,
+    pick: false,
+    color_label: '',
+    keywords: [],
+    title: '',
+    caption: '',
+    copyright: '',
+    width: 0,
+    height: 0,
+    instagram_posted: false,
+  };
+}
 
 function useDebouncedValue<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -25,6 +46,8 @@ type CatalogTabProps = {
 };
 
 export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [images, setImages] = useState<CatalogImage[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -142,6 +165,16 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
   useEffect(() => {
     loadImages();
   }, [loadImages]);
+
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    const raw = sp.get('image_key');
+    if (!raw) return;
+    setSelectedImage(catalogStubForDeepLink(raw));
+    sp.delete('image_key');
+    const next = sp.toString();
+    navigate({ pathname: location.pathname, search: next ? `?${next}` : '' }, { replace: true });
+  }, [location.search, location.pathname, navigate]);
 
   useEffect(() => {
     onPostedFilterChange?.(postedFilter);
