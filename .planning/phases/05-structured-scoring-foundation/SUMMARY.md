@@ -31,3 +31,44 @@ Plan **verification** asked for mypy and ruff exit 0 on `database.py`. The file 
 ## STATE / ROADMAP
 
 Not modified (orchestrator-owned per wave instructions).
+
+---
+
+# Plan 05-03 — Execution summary
+
+**Phase:** 05 — Structured scoring foundation  
+**Plan:** Pydantic structured output validation, repair, retry, and golden fixtures  
+**Date:** 2026-04-12
+
+## Outcomes
+
+- Runtime dependency **`pydantic>=2.0,<3`** added; `uv.lock` refreshed.
+- New module **`lightroom_tagger/core/structured_output.py`**: `ScoreResponse` / `PerspectiveScorePayload`, deterministic `repair_json_text` (fence extraction aligned with `parse_description_response`, trailing-comma pass with documented string-limitation note), `parse_score_response`, `parse_score_response_with_retry` (optional `fixer` then optional `llm_fixer`, each at most once), `StructuredOutputError` with 200-char preview cap and `input too large` guard at 512k chars.
+- **`lightroom_tagger/core/vision_client.py`**: `SCORE_JSON_REPAIR_SYSTEM`, `complete_chat_text`, `make_score_json_llm_fixer` for D-12 LLM JSON-only repair (no global default; Phase 6 binds client/model).
+- **`lightroom_tagger/core/test_structured_output.py`**: golden fixtures `RAW_*`, fixer/llm_fixer paths, preview truncation, `score == 11` `ValidationError`, and `make_score_json_llm_fixer` wiring smoke test.
+
+## Commits
+
+1. `chore(05-03): add pydantic v2 dependency and refresh uv.lock`
+2. `feat(05-03): add structured_output score JSON repair and validation`
+3. `feat(05-03): add make_score_json_llm_fixer and text completion helper`
+4. `test(05-03): add golden fixtures for structured score output`
+
+## Verification
+
+| Check | Result |
+|--------|--------|
+| `pytest lightroom_tagger/core/test_structured_output.py -q` | Pass |
+| `ruff check lightroom_tagger/core/structured_output.py lightroom_tagger/core/vision_client.py lightroom_tagger/core/test_structured_output.py` | Pass |
+| `mypy lightroom_tagger/core/structured_output.py lightroom_tagger/core/vision_client.py` | **Fail** (transitive imports pull `analyzer`, `database`, etc.; see Rule 4) |
+| `mypy --follow-imports=silent` on the same two modules | Pass |
+
+## Deviations (Rule 4)
+
+1. **Mypy:** Plain `mypy` on the two library files follows imports into modules with pre-existing errors. Verification used `--follow-imports=silent` for an accurate check of the new/edited surface, matching the practical gate used when the rest of the package is not mypy-clean.
+2. **`vision_client.py`:** Ruff `--fix` cleaned whitespace/import issues across the file (not only new helpers), and `typing.cast(Any, …)` wraps `messages` on four `chat.completions.create` sites so `mypy --follow-imports=silent` passes on `vision_client.py`.
+3. **Plan text vs. implementation:** The plan’s “on `ValidationError`, if `repair_json_text` changed text and second parse succeeds” branch is not implemented as a separate step after `parse_score_response` fails, because `parse_score_response` already runs `repair_json_text` before validation; a second identical parse cannot succeed. `repaired_flag` is set when an injected `fixer` or `llm_fixer` recovers.
+
+## STATE / ROADMAP
+
+Not modified (orchestrator-owned per wave instructions).
