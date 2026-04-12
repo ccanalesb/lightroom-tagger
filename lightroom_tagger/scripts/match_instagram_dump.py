@@ -43,7 +43,9 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      provider_id: str | None = None,
                      provider_model: str | None = None,
                      max_workers: int = 1,
-                     *, should_cancel: Callable[[], bool] | None = None) -> tuple:
+                     *, should_cancel: Callable[[], bool] | None = None,
+                     resume_processed_keys: set[str] | None = None,
+                     on_media_complete: Callable[[str], None] | None = None) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -62,6 +64,9 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         weights: Optional dict with 'phash', 'description', 'vision' keys for scoring weights
         force_descriptions: If True, regenerate descriptions even when one exists
         should_cancel: If set, called before each item; return True to stop early
+        resume_processed_keys: If set, skip dump rows whose ``media_key`` is in this set
+            (no stats increment for skipped rows).
+        on_media_complete: If set, invoked once per media row after its iteration finishes.
 
     Returns:
         Tuple of (stats dict, matches list)
@@ -116,8 +121,10 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             if log_callback:
                 log_callback('info', 'Matching stopped: cancel requested')
             return stats, matches_found
-        stats['processed'] += 1
         media_key = dump_media['media_key']
+        if resume_processed_keys is not None and media_key in resume_processed_keys:
+            continue
+        stats['processed'] += 1
 
         candidates = find_candidates_by_date(db, dump_media, days_before=90)
         initial_candidate_count = len(candidates)
@@ -227,6 +234,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
 
         if progress_callback:
             progress_callback(idx, total, f'Processing {dump_media["media_key"]} ({idx}/{total})')
+        if on_media_complete is not None:
+            on_media_complete(dump_media['media_key'])
 
     return stats, matches_found
 
