@@ -115,3 +115,47 @@ Not modified (orchestrator-owned per wave instructions).
 ## STATE / ROADMAP
 
 Not modified (orchestrator-owned per wave instructions).
+
+---
+
+# Plan 05-05 — Execution summary
+
+**Phase:** 05 — Structured scoring foundation  
+**Plan:** Job checkpoint persistence for long-running handlers  
+**Date:** 2026-04-12
+
+## Outcomes
+
+- **`apps/visualizer/backend/jobs/checkpoint.py`**: `CHECKPOINT_VERSION = 1`, `fingerprint_batch_describe`, `fingerprint_vision_match`, `fingerprint_catalog_keys` (enrich + prepare), `merge_checkpoint_into_metadata`; module docstring lists checkpoint field shapes per job type.
+- **`JobRunner`**: `persist_checkpoint`, `clear_checkpoint` (sets `metadata.checkpoint` to JSON `null` on success paths).
+- **`handle_batch_describe`**: Fingerprint over full candidate list; resumes from `processed_pairs` (`"key|itype"`); `record_done` on coordinator thread only in parallel mode; size guard `fail_job` when over **100_000** entries; `info` log substring **`checkpoint mismatch`** when fingerprint differs.
+- **`handle_vision_match`**: Fingerprint over threshold/weights/date/provider/max_workers/etc.; `resume_processed_keys` + `on_media_complete` wired to **`match_dump_media`**; coordinator-only checkpoint writes.
+- **`handle_enrich_catalog` / `handle_prepare_catalog`**: Fingerprint from sorted catalog keys + total; monotonic `processed_image_keys`; prepare only submits pending images not in checkpoint; coordinator-only persists for parallel prepare.
+- **`lightroom_tagger/scripts/match_instagram_dump.py`**: Keyword-only **`resume_processed_keys`** (skip before `processed` increment) and **`on_media_complete`** (end of loop body, same level as `progress_callback`).
+- **`apps/visualizer/backend/tests/test_job_checkpoint.py`**: Fingerprint stability + force sensitivity; `persist_checkpoint` round-trip; **`clear_checkpoint`** leaves `metadata.checkpoint` **None**.
+
+## Commits
+
+1. `feat(05-05): add job checkpoint helpers and persist_checkpoint` (task 1)
+2. `feat(05-05): add resume skip and completion callback to match_dump_media` (task 3 — committed before task 2 so handlers compile against the new API)
+3. `feat(05-05): persist and clear job checkpoints in long-running handlers` (task 2)
+4. `fix(05-05): satisfy ruff and mypy for checkpoint-related modules` (ruff SIM102/SIM113/B905 on touched handler paths; explicit `json.dumps` kwargs for mypy; `pyproject.toml` **`per-file-ignores`** for `match_instagram_dump.py` **E402/I001**; inner unused concurrent imports removed)
+5. `test(05-05): add job checkpoint fingerprint and persistence tests` (task 4)
+
+## Verification
+
+| Check | Result |
+|--------|--------|
+| `pytest apps/visualizer/backend/tests/test_job_checkpoint.py -q` | Pass |
+| `pytest apps/visualizer/backend/tests/test_handlers_batch_describe.py apps/visualizer/backend/tests/test_handlers_single_match.py -q` | Pass |
+| `ruff check` on plan-listed modules | Pass |
+| `mypy apps/visualizer/backend/jobs/checkpoint.py` | Pass |
+
+## Deviations (Rule 1)
+
+1. **Commit order vs. plan task order:** Task **3** (`match_dump_media` kwargs) was committed **before** task **2** (handlers) so the vision_match call site is valid at every commit.
+2. **`pyproject.toml`:** Added **`[tool.ruff.lint.per-file-ignores]`** for `lightroom_tagger/scripts/match_instagram_dump.py` (**E402**, **I001**) because the script intentionally mutates `sys.path` before package imports; fixing import order would be a larger structural change than this plan required.
+
+## STATE / ROADMAP
+
+Not modified (orchestrator-owned per wave instructions).
