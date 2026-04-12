@@ -1763,3 +1763,43 @@ def get_current_scores_for_image(
         (image_key, image_type),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def list_score_history_for_perspective(
+    conn: sqlite3.Connection, image_key: str, image_type: str, perspective_slug: str
+) -> list[dict]:
+    """Return all ``image_scores`` rows for one image and perspective, newest first.
+
+    Rows include ``id``, ``is_current``, ``prompt_version``, ``model_used``,
+    ``repaired_from_malformed``, and the rest of the table columns. After
+    :func:`supersede_previous_current_scores`, older rubric versions remain with
+    ``is_current = 0`` on purpose; API consumers use ``is_current`` to mark the
+    active rubric version.
+    """
+    rows = conn.execute(
+        """
+        SELECT * FROM image_scores
+        WHERE image_key = ? AND image_type = ? AND perspective_slug = ?
+        ORDER BY scored_at DESC, id DESC
+        """,
+        (image_key, image_type, perspective_slug),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def list_all_scores_for_image(
+    conn: sqlite3.Connection, image_key: str, image_type: str
+) -> list[dict]:
+    """Return every ``image_scores`` row for an image, grouped by slug then recency.
+
+    Perspectives are ordered alphabetically; within each slug, rows are newest first.
+    """
+    rows = conn.execute(
+        """
+        SELECT * FROM image_scores
+        WHERE image_key = ? AND image_type = ?
+        ORDER BY perspective_slug ASC, scored_at DESC, id DESC
+        """,
+        (image_key, image_type),
+    ).fetchall()
+    return [dict(r) for r in rows]
