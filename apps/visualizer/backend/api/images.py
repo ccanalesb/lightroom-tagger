@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sqlite3
 from collections import OrderedDict
 
@@ -11,7 +12,9 @@ from lightroom_tagger.core.database import (
     validate_match,
 )
 from utils.db import with_db
-from utils.responses import error_not_found, error_server_error, success_paginated
+from utils.responses import error_bad_request, error_not_found, error_server_error, success_paginated
+
+_CATALOG_SCORE_PERSPECTIVE_SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 bp = Blueprint('images', __name__)
 
@@ -401,23 +404,64 @@ def list_catalog_images(db):
         date_from = request.args.get('date_from', '')
         date_to = request.args.get('date_to', '')
         color_label = request.args.get('color_label', '')
+
+        score_perspective = (request.args.get('score_perspective') or '').strip()
+        if score_perspective and not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(score_perspective):
+            return error_bad_request('invalid score_perspective slug')
+
+        sort_raw = (request.args.get('sort_by_score') or '').strip().lower()
+        sort_by_score = None
+        if sort_raw:
+            if sort_raw not in ('asc', 'desc'):
+                return error_bad_request('sort_by_score must be asc or desc')
+            sort_by_score = sort_raw
+
+        if sort_by_score and not score_perspective:
+            return error_bad_request('sort_by_score requires score_perspective')
+
+        min_score = None
+        if 'min_score' in request.args:
+            min_score_raw = request.args.get('min_score')
+            if min_score_raw is None or str(min_score_raw).strip() == '':
+                min_score = None
+            else:
+                try:
+                    min_score = int(min_score_raw)
+                except (TypeError, ValueError):
+                    return error_bad_request('min_score must be an integer')
+                if min_score < 1 or min_score > 10:
+                    return error_bad_request('min_score must be between 1 and 10')
+
+        if min_score is not None and not score_perspective:
+            return error_bad_request('min_score requires score_perspective')
+
         limit, offset = _clamp_pagination(
             request.args.get('limit', 50, type=int),
             request.args.get('offset', 0, type=int),
         )
 
-        rows, total = query_catalog_images(db,
-            posted=posted_filter,
-            month=month,
-            keyword=keyword.strip() or None,
-            min_rating=min_rating,
-            date_from=date_from or None,
-            date_to=date_to or None,
-            color_label=color_label.strip() or None,
-            analyzed=analyzed_filter,
-            limit=limit,
-            offset=offset,
-        )
+        score_perspective_arg = score_perspective or None
+        try:
+            rows, total = query_catalog_images(
+                db,
+                posted=posted_filter,
+                month=month,
+                keyword=keyword.strip() or None,
+                min_rating=min_rating,
+                date_from=date_from or None,
+                date_to=date_to or None,
+                color_label=color_label.strip() or None,
+                analyzed=analyzed_filter,
+                score_perspective=score_perspective_arg,
+                min_score=min_score,
+                sort_by_score=sort_by_score,
+                limit=limit,
+                offset=offset,
+            )
+        except ValueError as err:
+            return error_bad_request(str(err))
+
+        score_join_active = bool(score_perspective_arg)
 
         images = []
         for row in rows:
@@ -425,6 +469,11 @@ def list_catalog_images(db):
             desc_summary = out.pop('description_summary', None)
             desc_best = out.pop('description_best_perspective', None)
             desc_perspectives_json = out.pop('description_perspectives_json', None)
+
+            if score_join_active:
+                cps = out.pop('catalog_perspective_score', None)
+                out['catalog_perspective_score'] = int(cps) if cps is not None else None
+                out['catalog_score_perspective'] = score_perspective_arg
 
             ai_analyzed = desc_summary is not None
             out['ai_analyzed'] = ai_analyzed
