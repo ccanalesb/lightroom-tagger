@@ -1,15 +1,19 @@
 """Read-only REST API for persisted ``image_scores`` rows (library DB)."""
 from __future__ import annotations
 
+import sqlite3
+from typing import Any
+
 from flask import Blueprint, jsonify, request
-from lightroom_tagger.core.database import (
-    get_current_scores_for_image,
-    list_score_history_for_perspective,
-)
+from flask.typing import ResponseReturnValue
 from utils.db import with_db
 from utils.responses import error_bad_request
 
 from api.perspectives import _SLUG_RE
+from lightroom_tagger.core.database import (
+    get_current_scores_for_image,
+    list_score_history_for_perspective,
+)
 
 bp = Blueprint("scores", __name__)
 
@@ -21,7 +25,7 @@ def _normalize_score_row(row: dict) -> dict:
     return out
 
 
-def _image_type_from_request() -> tuple[str | None, object | None]:
+def _image_type_from_request() -> tuple[str | None, Any]:
     raw = (request.args.get("image_type") or "catalog").strip().lower()
     if raw not in ("catalog", "instagram"):
         return None, error_bad_request("image_type must be catalog or instagram")
@@ -30,7 +34,7 @@ def _image_type_from_request() -> tuple[str | None, object | None]:
 
 @bp.route("/<path:image_key>/history", methods=["GET"])
 @with_db
-def get_score_history(db, image_key: str):
+def get_score_history(db: sqlite3.Connection, image_key: str) -> ResponseReturnValue:
     image_type, err = _image_type_from_request()
     if err is not None:
         return err
@@ -55,7 +59,7 @@ def get_score_history(db, image_key: str):
 
 @bp.route("/<path:image_key>", methods=["GET"])
 @with_db
-def get_current_scores(db, image_key: str):
+def get_current_scores(db: sqlite3.Connection, image_key: str) -> ResponseReturnValue:
     image_type, err = _image_type_from_request()
     if err is not None:
         return err
