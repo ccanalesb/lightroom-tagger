@@ -93,3 +93,30 @@ def build_description_user_prompt(
 
     parts.append(json_template)
     return "\n\n".join(parts)
+
+
+def build_scoring_user_prompt(perspective_row: dict) -> str:
+    """Build the user message for a single-perspective numeric score (vision) call.
+
+    Expects a ``perspectives``-shaped dict: ``slug``, ``display_name``, ``prompt_markdown``.
+    The model must return **only** JSON matching :class:`~lightroom_tagger.core.structured_output.ScoreResponse`
+    (not the multi-perspective describe schema from :func:`build_description_user_prompt`).
+    """
+    slug = str(perspective_row["slug"])
+    display_name = str(perspective_row["display_name"])
+    body = str(perspective_row.get("prompt_markdown", "")).strip()
+
+    json_contract = (
+        "Respond with ONLY a single JSON object and no other text. Keys must be exactly:\n"
+        '- "perspective_slug" (string, must equal this slug verbatim)\n'
+        '- "score" (integer from 1 through 10 inclusive)\n'
+        '- "rationale" (concise plain string; no markdown code fences)\n'
+        "Use the full rubric honestly; most images land between 4–6."
+    )
+
+    return (
+        "You are scoring one photograph for a single critical perspective. "
+        "Apply the rubric below; be direct and specific.\n\n"
+        f"## Perspective: {display_name} ({slug})\n{body}\n\n"
+        f"{json_contract}"
+    )
