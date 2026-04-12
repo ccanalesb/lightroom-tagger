@@ -316,6 +316,19 @@ export const ANALYTICS_STAT_MEDIAN_LEN = 'Median caption length'
 export const ANALYTICS_STAT_POSTS_WITH_TAGS = 'Posts with hashtags'
 export const ANALYTICS_STAT_AVG_TAGS = 'Avg. hashtags per post (unique)'
 
+// Analytics — not posted catalog (POST-04 / 07-03)
+export const ANALYTICS_NOT_POSTED_TITLE = 'Not posted to Instagram'
+export const ANALYTICS_NOT_POSTED_HELP =
+  'Catalog images with instagram_posted = 0. Filters apply on the server when you click Apply.'
+export const ANALYTICS_NOT_POSTED_MIN_RATING = 'Min rating'
+export const ANALYTICS_NOT_POSTED_FROM_DATE = 'From date'
+export const ANALYTICS_NOT_POSTED_TO_DATE = 'To date'
+export const ANALYTICS_NOT_POSTED_MONTH = 'Month'
+export const ANALYTICS_NOT_POSTED_EMPTY_ALL_POSTED =
+  'All catalog images are marked posted on Instagram.'
+export const ANALYTICS_NOT_POSTED_EMPTY_NO_MATCH = 'No images match filters'
+export const IMAGES_OPEN_POSTING_ANALYTICS = 'Open posting analytics'
+
 // Cache Status
 export const CACHE_TITLE = 'Vision Cache'
 export const CACHE_PREPARE_BUTTON = 'Prepare Catalog'
