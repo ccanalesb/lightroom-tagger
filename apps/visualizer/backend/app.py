@@ -94,17 +94,42 @@ def create_app():
 
 
 def _recover_orphaned_jobs(db):
-    """Mark any 'running' jobs as failed — they were interrupted by a server restart."""
+    """Re-queue running jobs that have a v1 checkpoint; fail the rest (restart recovery)."""
+    recovered_ids: list[str] = []
     for job in get_active_jobs(db):
-        if job['status'] == 'running':
-            update_job_status(db, job['id'], 'failed')
+        if job['status'] != 'running':
+            continue
+        job_id = job['id']
+        meta = job.get('metadata') or {}
+        ck = meta.get('checkpoint') if isinstance(meta, dict) else None
+        if isinstance(ck, dict) and ck.get('checkpoint_version') == 1:
+            update_job_status(
+                db,
+                job_id,
+                'pending',
+                progress=job.get('progress') or 0,
+                current_step='Recovered after restart',
+            )
             add_job_log(
                 db,
-                job['id'],
+                job_id,
+                'info',
+                'Recovered after restart; job re-queued with checkpoint.',
+            )
+            recovered_ids.append(job_id)
+            print(f"Recovered orphaned job {job_id}: re-queued pending with checkpoint")
+        else:
+            update_job_status(db, job_id, 'failed')
+            add_job_log(
+                db,
+                job_id,
                 'error',
                 'This job was still running when the server restarted. It was marked failed; use Retry if you want to run it again.',
             )
-            print(f"Recovered orphaned job {job['id']}: marked as failed")
+            print(f"Recovered orphaned job {job_id}: marked as failed")
+
+    if recovered_ids and socketio:
+        socketio.emit('jobs_recovered', {'job_ids': recovered_ids})
 
 
 def _job_processor():
