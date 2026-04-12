@@ -6,12 +6,6 @@ from pathlib import Path
 
 from database import add_job_log, get_job, update_job_field
 
-from .checkpoint import (
-    fingerprint_batch_describe,
-    fingerprint_catalog_keys,
-    fingerprint_vision_match,
-)
-
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import init_database
 from lightroom_tagger.core.provider_errors import AuthenticationError, InvalidRequestError
@@ -19,6 +13,11 @@ from lightroom_tagger.scripts.import_instagram_dump import import_dump
 from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
 
 from . import path_setup as _path_setup  # noqa: F401
+from .checkpoint import (
+    fingerprint_batch_describe,
+    fingerprint_catalog_keys,
+    fingerprint_vision_match,
+)
 
 _CHECKPOINT_MAX_ENTRIES = 100_000
 
@@ -152,17 +151,20 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             meta_vm = row_vm.get('metadata') or {}
             if isinstance(meta_vm, dict):
                 chk_vm = meta_vm.get('checkpoint')
-                if isinstance(chk_vm, dict) and chk_vm.get('checkpoint_version') == 1:
-                    if chk_vm.get('job_type') == 'vision_match':
-                        if chk_vm.get('fingerprint') == fp_vm:
-                            resume_media = set(chk_vm.get('processed_media_keys') or [])
-                        else:
-                            add_job_log(
-                                runner.db,
-                                job_id,
-                                'info',
-                                'checkpoint mismatch: vision_match fingerprint changed, starting fresh',
-                            )
+                if (
+                    isinstance(chk_vm, dict)
+                    and chk_vm.get('checkpoint_version') == 1
+                    and chk_vm.get('job_type') == 'vision_match'
+                ):
+                    if chk_vm.get('fingerprint') == fp_vm:
+                        resume_media = set(chk_vm.get('processed_media_keys') or [])
+                    else:
+                        add_job_log(
+                            runner.db,
+                            job_id,
+                            'info',
+                            'checkpoint mismatch: vision_match fingerprint changed, starting fresh',
+                        )
 
         done_media: set[str] = set(resume_media)
         # Coordinator thread only: on_media_complete calls runner.persist_checkpoint (not workers).
@@ -362,17 +364,20 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
             meta_en = row_en.get('metadata') or {}
             if isinstance(meta_en, dict):
                 chk_en = meta_en.get('checkpoint')
-                if isinstance(chk_en, dict) and chk_en.get('checkpoint_version') == 1:
-                    if chk_en.get('job_type') == 'enrich_catalog':
-                        if chk_en.get('fingerprint') == fp_en:
-                            processed_ck = set(chk_en.get('processed_image_keys') or [])
-                        else:
-                            add_job_log(
-                                runner.db,
-                                job_id,
-                                'info',
-                                'checkpoint mismatch: enrich_catalog fingerprint changed, starting fresh',
-                            )
+                if (
+                    isinstance(chk_en, dict)
+                    and chk_en.get('checkpoint_version') == 1
+                    and chk_en.get('job_type') == 'enrich_catalog'
+                ):
+                    if chk_en.get('fingerprint') == fp_en:
+                        processed_ck = set(chk_en.get('processed_image_keys') or [])
+                    else:
+                        add_job_log(
+                            runner.db,
+                            job_id,
+                            'info',
+                            'checkpoint mismatch: enrich_catalog fingerprint changed, starting fresh',
+                        )
 
         processed = 0
         skipped = 0
@@ -537,17 +542,20 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
             meta_pr = row_pr.get('metadata') or {}
             if isinstance(meta_pr, dict):
                 chk_pr = meta_pr.get('checkpoint')
-                if isinstance(chk_pr, dict) and chk_pr.get('checkpoint_version') == 1:
-                    if chk_pr.get('job_type') == 'prepare_catalog':
-                        if chk_pr.get('fingerprint') == fp_pr:
-                            processed_prep = set(chk_pr.get('processed_image_keys') or [])
-                        else:
-                            add_job_log(
-                                runner.db,
-                                job_id,
-                                'info',
-                                'checkpoint mismatch: prepare_catalog fingerprint changed, starting fresh',
-                            )
+                if (
+                    isinstance(chk_pr, dict)
+                    and chk_pr.get('checkpoint_version') == 1
+                    and chk_pr.get('job_type') == 'prepare_catalog'
+                ):
+                    if chk_pr.get('fingerprint') == fp_pr:
+                        processed_prep = set(chk_pr.get('processed_image_keys') or [])
+                    else:
+                        add_job_log(
+                            runner.db,
+                            job_id,
+                            'info',
+                            'checkpoint mismatch: prepare_catalog fingerprint changed, starting fresh',
+                        )
 
         def _prepare_image_pending(img: dict) -> bool:
             k = img.get('key')
@@ -567,7 +575,7 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
                 return ('failed', key, f'File not found: {filepath}')
 
             thread_db = sqlite3.connect(db_path)
-            thread_db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r))
+            thread_db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=False))
             thread_db.execute("PRAGMA journal_mode=WAL")
             thread_db.execute("PRAGMA busy_timeout=5000")
             try:
@@ -598,8 +606,7 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
                     executor.submit(process_single_image, img, db_path): img
                     for img in pending_images
                 }
-                completed = 0
-                for _future in as_completed(futures):
+                for completed, _future in enumerate(as_completed(futures), start=1):
                     if runner.is_cancelled(job_id):
                         add_job_log(
                             runner.db,
@@ -608,7 +615,6 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
                             'Prepare catalog cache stopped: cancel requested',
                         )
                         break
-                    completed += 1
                     result = _future.result()
                     kind = result[0]
                     if kind == 'already_cached':
@@ -689,7 +695,7 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
 def _describe_single_image(lib_db, key: str, itype: str, force: bool, desc_provider_id, desc_provider_model) -> tuple[str, bool, str | None]:
     """
     Describe a single image (DRY helper).
-    
+
     Returns:
         (status, success, error_message) where status is 'described'|'skipped'|'failed'
     """
@@ -697,7 +703,7 @@ def _describe_single_image(lib_db, key: str, itype: str, force: bool, desc_provi
         describe_instagram_image,
         describe_matched_image,
     )
-    
+
     try:
         if itype == 'catalog':
             result = describe_matched_image(
@@ -709,7 +715,7 @@ def _describe_single_image(lib_db, key: str, itype: str, force: bool, desc_provi
                 lib_db, key, force=force,
                 provider_id=desc_provider_id, model=desc_provider_model,
             )
-        
+
         if result:
             return ('described', True, None)
         else:
@@ -847,17 +853,20 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
             meta_bd = row_bd.get('metadata') or {}
             if isinstance(meta_bd, dict):
                 chk_bd = meta_bd.get('checkpoint')
-                if isinstance(chk_bd, dict) and chk_bd.get('checkpoint_version') == 1:
-                    if chk_bd.get('job_type') == 'batch_describe':
-                        if chk_bd.get('fingerprint') == fp_bd:
-                            processed_pairs = set(chk_bd.get('processed_pairs') or [])
-                        else:
-                            add_job_log(
-                                runner.db,
-                                job_id,
-                                'info',
-                                'checkpoint mismatch: batch_describe fingerprint changed, starting fresh',
-                            )
+                if (
+                    isinstance(chk_bd, dict)
+                    and chk_bd.get('checkpoint_version') == 1
+                    and chk_bd.get('job_type') == 'batch_describe'
+                ):
+                    if chk_bd.get('fingerprint') == fp_bd:
+                        processed_pairs = set(chk_bd.get('processed_pairs') or [])
+                    else:
+                        add_job_log(
+                            runner.db,
+                            job_id,
+                            'info',
+                            'checkpoint mismatch: batch_describe fingerprint changed, starting fresh',
+                        )
 
         def pair_label(key: str, itype: str) -> str:
             return f'{key}|{itype}'
@@ -924,8 +933,7 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
                     executor.submit(process_image_worker, key, itype): (key, itype)
                     for key, itype in images_to_describe
                 }
-                completed_parallel = 0
-                for future in as_completed(futures):
+                for completed_parallel, future in enumerate(as_completed(futures), start=1):
                     if runner.is_cancelled(job_id):
                         add_job_log(
                             runner.db,
@@ -935,7 +943,6 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
                         )
                         break
                     coord_key, coord_itype = futures[future]
-                    completed_parallel += 1
                     progress = int(5 + (completed_parallel / total) * 90)
                     runner.update_progress(
                         job_id, progress, f'Describing {completed_parallel}/{total}'
@@ -981,11 +988,11 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
                     return
                 progress = int(5 + (idx / total) * 90)
                 runner.update_progress(job_id, progress, f'Describing {idx}/{total}: {key}')
-                
+
                 status, success, error_msg = _describe_single_image(
                     lib_db, key, itype, force, desc_provider_id, desc_provider_model
                 )
-                
+
                 if status == 'described':
                     described += 1
                     consecutive_failures = 0

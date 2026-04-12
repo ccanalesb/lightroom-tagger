@@ -72,7 +72,6 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         Tuple of (stats dict, matches list)
     """
     from datetime import datetime
-    from concurrent.futures import ThreadPoolExecutor, as_completed
 
     config = load_config()
     default_weights = {'phash': 0.4, 'description': 0.3, 'vision': 0.3}
@@ -134,7 +133,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                 c for c in candidates
                 if (c.get('key'), media_key) not in rejected
             ]
-        
+
         if log_callback and idx <= 3:
             log_callback('debug', f'[{media_key}] Found {initial_candidate_count} candidates by date, {len(candidates)} after filters')
 

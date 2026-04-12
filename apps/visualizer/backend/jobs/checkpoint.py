@@ -22,8 +22,6 @@ from typing import Any
 
 CHECKPOINT_VERSION: int = 1
 
-_CHECKPOINT_JSON_KWARGS = {"sort_keys": True, "separators": (",", ":")}
-
 
 def fingerprint_batch_describe(
     metadata: dict[str, Any], ordered_pairs: list[tuple[str, str]]
@@ -46,7 +44,7 @@ def fingerprint_batch_describe(
         "provider_id": metadata.get("provider_id"),
         "provider_model": metadata.get("provider_model"),
     }
-    canonical = json.dumps(payload, **_CHECKPOINT_JSON_KWARGS)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
@@ -79,14 +77,14 @@ def fingerprint_vision_match(
         "weights": stable_weights,
         "year": year,
     }
-    canonical = json.dumps(payload, **_CHECKPOINT_JSON_KWARGS)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def fingerprint_catalog_keys(*, total: int, keys: list[str]) -> str:
     """SHA-256 hex for enrich_catalog / prepare_catalog input identity."""
     payload = {"keys": sorted(keys), "total": int(total)}
-    canonical = json.dumps(payload, **_CHECKPOINT_JSON_KWARGS)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
