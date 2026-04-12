@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { WorkerSlider } from '../matching/WorkerSlider';
 import { ProviderModelSelect } from '../ui/ProviderModelSelect';
 import { useMatchOptions } from '../../stores/matchOptionsContext';
-import { JobsAPI, ProvidersAPI } from '../../services/api';
+import { JobsAPI, PerspectivesAPI, ProvidersAPI } from '../../services/api';
 import { ADVANCED_OPTIONS_TITLE } from '../../constants/strings';
 
 type ImageType = 'both' | 'instagram' | 'catalog';
@@ -33,6 +33,20 @@ export function DescriptionsTab() {
   const [isStarting, setIsStarting] = useState(false);
   const [descProviderId, setDescProviderId] = useState<string | null>(null);
   const [descProviderModel, setDescProviderModel] = useState<string | null>(null);
+  const [activePerspectiveRows, setActivePerspectiveRows] = useState<
+    { slug: string; display_name: string }[]
+  >([]);
+  const [selectedPerspectiveSlugs, setSelectedPerspectiveSlugs] = useState<string[]>([]);
+
+  useEffect(() => {
+    PerspectivesAPI.list({ active_only: true })
+      .then((rows) => {
+        const sorted = [...rows].sort((a, b) => a.slug.localeCompare(b.slug));
+        setActivePerspectiveRows(sorted.map((r) => ({ slug: r.slug, display_name: r.display_name })));
+        setSelectedPerspectiveSlugs(sorted.map((r) => r.slug));
+      })
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
     ProvidersAPI.getDefaults()
@@ -58,6 +72,7 @@ export function DescriptionsTab() {
       if (batchMinRating !== null) metadata.min_rating = batchMinRating;
       if (descProviderId) metadata.provider_id = descProviderId;
       if (descProviderModel) metadata.provider_model = descProviderModel;
+      metadata.perspective_slugs = [...selectedPerspectiveSlugs];
 
       await JobsAPI.create('batch_describe', metadata);
       alert('Description generation job started! Check Job Queue tab to monitor progress.');
@@ -66,7 +81,16 @@ export function DescriptionsTab() {
     } finally {
       setIsStarting(false);
     }
-  }, [imageType, dateFilter, batchMinRating, force, options, descProviderId, descProviderModel]);
+  }, [
+    imageType,
+    dateFilter,
+    batchMinRating,
+    force,
+    options,
+    descProviderId,
+    descProviderModel,
+    selectedPerspectiveSlugs,
+  ]);
 
   return (
     <div>
@@ -113,6 +137,41 @@ export function DescriptionsTab() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <span className="block text-sm font-medium text-text mb-2">Critique perspectives</span>
+              <p className="text-xs text-text-secondary mb-2">
+                Uncheck to limit which active lenses run. None selected uses all active perspectives.
+              </p>
+              <div className="flex flex-col gap-2 max-h-40 overflow-y-auto border border-border rounded-base p-3 bg-bg">
+                {activePerspectiveRows.length === 0 ? (
+                  <span className="text-sm text-text-secondary">Loading perspectives…</span>
+                ) : (
+                  activePerspectiveRows.map((p) => (
+                    <label
+                      key={p.slug}
+                      className="flex items-center gap-2 text-sm text-text cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedPerspectiveSlugs.includes(p.slug)}
+                        onChange={() => {
+                          setSelectedPerspectiveSlugs((prev) =>
+                            prev.includes(p.slug)
+                              ? prev.filter((s) => s !== p.slug)
+                              : [...prev, p.slug].sort((a, b) => a.localeCompare(b)),
+                          );
+                        }}
+                        className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
+                      />
+                      <span>
+                        {p.display_name} <span className="text-text-secondary">({p.slug})</span>
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
             </div>
 
             <div>

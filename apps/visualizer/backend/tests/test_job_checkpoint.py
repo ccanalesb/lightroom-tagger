@@ -23,6 +23,8 @@ def test_fingerprint_batch_describe_stable_and_force_sensitive() -> None:
     assert a == b
     meta_force = {**meta, "force": True}
     assert fingerprint_batch_describe(meta_force, pairs) != a
+    meta_ps = {**meta, "perspective_slugs": ["street", "documentary"]}
+    assert fingerprint_batch_describe(meta_ps, pairs) != a
 
 
 def test_persist_checkpoint_round_trip_and_clear() -> None:

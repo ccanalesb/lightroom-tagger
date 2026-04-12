@@ -692,7 +692,15 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
             lib_db.close()
 
 
-def _describe_single_image(lib_db, key: str, itype: str, force: bool, desc_provider_id, desc_provider_model) -> tuple[str, bool, str | None]:
+def _describe_single_image(
+    lib_db,
+    key: str,
+    itype: str,
+    force: bool,
+    desc_provider_id,
+    desc_provider_model,
+    perspective_slugs: list[str] | None = None,
+) -> tuple[str, bool, str | None]:
     """
     Describe a single image (DRY helper).
 
@@ -709,11 +717,13 @@ def _describe_single_image(lib_db, key: str, itype: str, force: bool, desc_provi
             result = describe_matched_image(
                 lib_db, key, force=force,
                 provider_id=desc_provider_id, model=desc_provider_model,
+                perspective_slugs=perspective_slugs,
             )
         else:
             result = describe_instagram_image(
                 lib_db, key, force=force,
                 provider_id=desc_provider_id, model=desc_provider_model,
+                perspective_slugs=perspective_slugs,
             )
 
         if result:
@@ -747,10 +757,17 @@ def handle_single_describe(runner, job_id: str, metadata: dict):
             return
         lib_db = init_database(db_path)
 
+        raw_ps = metadata.get('perspective_slugs')
+        if isinstance(raw_ps, list) and len(raw_ps) > 0:
+            perspective_slugs = [str(x) for x in raw_ps]
+        else:
+            perspective_slugs = None
+
         runner.update_progress(job_id, 10, f'Describing {image_type} image…')
 
         status, success, error_msg = _describe_single_image(
             lib_db, image_key, image_type, force, provider_id, provider_model,
+            perspective_slugs,
         )
 
         if success:
@@ -799,6 +816,12 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
             except (TypeError, ValueError):
                 min_rating = None
         max_workers = int(metadata.get('max_workers', 4))
+
+        raw_ps = metadata.get('perspective_slugs')
+        if isinstance(raw_ps, list) and len(raw_ps) > 0:
+            perspective_slugs = [str(x) for x in raw_ps]
+        else:
+            perspective_slugs = None
 
         from lightroom_tagger.core.database import (
             get_undescribed_catalog_images,
@@ -922,7 +945,8 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
                 worker_db = init_database(db_path)
                 try:
                     status, success, error_msg = _describe_single_image(
-                        worker_db, key, itype, force, desc_provider_id, desc_provider_model
+                        worker_db, key, itype, force, desc_provider_id, desc_provider_model,
+                        perspective_slugs,
                     )
                     return (key, status, error_msg)
                 finally:
@@ -990,7 +1014,8 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
                 runner.update_progress(job_id, progress, f'Describing {idx}/{total}: {key}')
 
                 status, success, error_msg = _describe_single_image(
-                    lib_db, key, itype, force, desc_provider_id, desc_provider_model
+                    lib_db, key, itype, force, desc_provider_id, desc_provider_model,
+                    perspective_slugs,
                 )
 
                 if status == 'described':

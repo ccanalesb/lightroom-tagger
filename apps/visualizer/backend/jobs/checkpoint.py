@@ -4,7 +4,8 @@ Checkpoint payloads are versioned with ``checkpoint_version: 1`` and a fingerpri
 stale metadata from different inputs is ignored (handlers log ``checkpoint mismatch``).
 
 **batch_describe** — ``job_type``, ``fingerprint``, ``processed_pairs`` (``\"key|itype\"`` strings),
-``total_at_start``.
+``total_at_start``. Fingerprint includes sorted ``perspective_slugs`` when metadata carries a
+non-empty list (empty/missing → ``null`` in the canonical payload).
 
 **vision_match** — ``job_type``, ``fingerprint``, ``processed_media_keys`` (Instagram dump
 ``media_key`` values).
@@ -34,6 +35,11 @@ def fingerprint_batch_describe(
     except (TypeError, ValueError):
         min_rating = None
     pairs = [f"{key}|{itype}" for key, itype in ordered_pairs]
+    ps_raw = metadata.get("perspective_slugs")
+    if isinstance(ps_raw, list) and len(ps_raw) > 0:
+        perspective_slugs_fp: Any = sorted(str(x) for x in ps_raw)
+    else:
+        perspective_slugs_fp = None
     payload = {
         "date_filter": metadata.get("date_filter", "all"),
         "force": bool(metadata.get("force", False)),
@@ -41,6 +47,7 @@ def fingerprint_batch_describe(
         "max_workers": int(metadata.get("max_workers", 4)),
         "min_rating": min_rating,
         "pairs": pairs,
+        "perspective_slugs": perspective_slugs_fp,
         "provider_id": metadata.get("provider_id"),
         "provider_model": metadata.get("provider_model"),
     }
