@@ -31,6 +31,7 @@ export function DescriptionsTab() {
   const [force, setForce] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [isStartingScore, setIsStartingScore] = useState(false);
   const [descProviderId, setDescProviderId] = useState<string | null>(null);
   const [descProviderModel, setDescProviderModel] = useState<string | null>(null);
   const [activePerspectiveRows, setActivePerspectiveRows] = useState<
@@ -59,38 +60,54 @@ export function DescriptionsTab() {
       .catch(console.error);
   }, []);
 
+  const buildBatchJobMetadata = useCallback((): Record<string, unknown> => {
+    const metadata: Record<string, unknown> = {
+      image_type: imageType,
+      date_filter: dateFilter,
+      force,
+      max_workers: options.maxWorkers,
+    };
+    if (batchMinRating !== null) metadata.min_rating = batchMinRating;
+    if (descProviderId) metadata.provider_id = descProviderId;
+    if (descProviderModel) metadata.provider_model = descProviderModel;
+    metadata.perspective_slugs = [...selectedPerspectiveSlugs];
+    return metadata;
+  }, [
+    imageType,
+    dateFilter,
+    batchMinRating,
+    force,
+    options.maxWorkers,
+    descProviderId,
+    descProviderModel,
+    selectedPerspectiveSlugs,
+  ]);
+
   const startDescriptions = useCallback(async () => {
     setIsStarting(true);
     try {
-      const metadata: Record<string, unknown> = {
-        image_type: imageType,
-        date_filter: dateFilter,
-        force,
-        max_workers: options.maxWorkers,
-      };
-
-      if (batchMinRating !== null) metadata.min_rating = batchMinRating;
-      if (descProviderId) metadata.provider_id = descProviderId;
-      if (descProviderModel) metadata.provider_model = descProviderModel;
-      metadata.perspective_slugs = [...selectedPerspectiveSlugs];
-
-      await JobsAPI.create('batch_describe', metadata);
+      await JobsAPI.create('batch_describe', buildBatchJobMetadata());
       alert('Description generation job started! Check Job Queue tab to monitor progress.');
     } catch (error) {
       alert(`Failed to start job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsStarting(false);
     }
-  }, [
-    imageType,
-    dateFilter,
-    batchMinRating,
-    force,
-    options,
-    descProviderId,
-    descProviderModel,
-    selectedPerspectiveSlugs,
-  ]);
+  }, [buildBatchJobMetadata]);
+
+  const startBatchScoring = useCallback(async () => {
+    setIsStartingScore(true);
+    try {
+      await JobsAPI.create('batch_score', buildBatchJobMetadata());
+      alert(
+        'Batch scoring job started (1–10 scores + short rationale per perspective). Check Job Queue for progress.',
+      );
+    } catch (error) {
+      alert(`Failed to start scoring job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsStartingScore(false);
+    }
+  }, [buildBatchJobMetadata]);
 
   return (
     <div>
@@ -243,9 +260,21 @@ export function DescriptionsTab() {
               </div>
             )}
 
-            <div className="pt-4">
+            <div className="pt-4 space-y-3">
               <Button variant="primary" size="lg" fullWidth onClick={startDescriptions} disabled={isStarting}>
                 {isStarting ? 'Starting Job...' : 'Generate Descriptions'}
+              </Button>
+              <p className="text-xs text-text-secondary text-center">
+                Descriptions produce the full structured JSON critique. Scoring runs a separate job that only records numeric scores and brief rationale rows per perspective.
+              </p>
+              <Button
+                variant="secondary"
+                size="lg"
+                fullWidth
+                onClick={startBatchScoring}
+                disabled={isStartingScore}
+              >
+                {isStartingScore ? 'Starting…' : 'Run batch scoring'}
               </Button>
             </div>
           </div>
