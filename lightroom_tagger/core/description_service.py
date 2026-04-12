@@ -1,14 +1,20 @@
 """Describe matched catalog and Instagram images on demand."""
 import os
+import sqlite3
+from collections.abc import Callable
 
 from lightroom_tagger.core.analyzer import describe_image, get_description_model
 from lightroom_tagger.core.database import (
     get_image,
     get_image_description,
     get_instagram_dump_media,
+    list_perspectives,
     resolve_filepath,
     store_image_description,
 )
+from lightroom_tagger.core.prompt_builder import build_description_user_prompt
+
+LogCallback = Callable[[str, str], None] | None
 
 
 def _description_structured_is_valid(structured: dict) -> bool:
@@ -17,10 +23,26 @@ def _description_structured_is_valid(structured: dict) -> bool:
     return isinstance(summary, str) and bool(summary.strip())
 
 
-def describe_matched_image(db, catalog_key: str, force: bool = False,
+def _resolve_description_user_prompt(
+    db: sqlite3.Connection, perspective_slugs: list[str] | None
+) -> str | None:
+    """Return assembled user prompt text, or ``None`` to use the legacy monolithic prompt."""
+    active_rows = list_perspectives(db, active_only=True)
+    if perspective_slugs:
+        by_slug = {r["slug"]: r for r in active_rows}
+        rows = [by_slug[s] for s in perspective_slugs if s in by_slug]
+    else:
+        rows = active_rows
+    if not rows:
+        return None
+    return build_description_user_prompt(rows)
+
+
+def describe_matched_image(db: sqlite3.Connection, catalog_key: str, force: bool = False,
                            provider_id: str | None = None,
                            model: str | None = None,
-                           log_callback=None) -> bool:
+                           log_callback: LogCallback = None,
+                           perspective_slugs: list[str] | None = None) -> bool:
     """Generate and store a description for a catalog image if needed.
 
     Returns True if a non-empty description was stored. Returns False if
@@ -38,9 +60,10 @@ def describe_matched_image(db, catalog_key: str, force: bool = False,
     if not os.path.exists(filepath):
         return False
 
+    user_prompt = _resolve_description_user_prompt(db, perspective_slugs)
     structured = describe_image(
         filepath, provider_id=provider_id, model=model,
-        log_callback=log_callback,
+        log_callback=log_callback, user_prompt=user_prompt,
     )
     if not _description_structured_is_valid(structured):
         return False
@@ -53,10 +76,11 @@ def describe_matched_image(db, catalog_key: str, force: bool = False,
     return True
 
 
-def describe_instagram_image(db, media_key: str, force: bool = False,
+def describe_instagram_image(db: sqlite3.Connection, media_key: str, force: bool = False,
                              provider_id: str | None = None,
                              model: str | None = None,
-                             log_callback=None) -> bool:
+                             log_callback: LogCallback = None,
+                             perspective_slugs: list[str] | None = None) -> bool:
     """Generate and store a description for an Instagram image if needed.
 
     Uses the local file from instagram_dump_media. Returns True if a
@@ -73,9 +97,10 @@ def describe_instagram_image(db, media_key: str, force: bool = False,
     if not os.path.exists(filepath):
         return False
 
+    user_prompt = _resolve_description_user_prompt(db, perspective_slugs)
     structured = describe_image(
         filepath, provider_id=provider_id, model=model,
-        log_callback=log_callback,
+        log_callback=log_callback, user_prompt=user_prompt,
     )
     if not _description_structured_is_valid(structured):
         return False
@@ -88,8 +113,13 @@ def describe_instagram_image(db, media_key: str, force: bool = False,
     return True
 
 
-def _store_structured(db, image_key: str, image_type: str, structured: dict,
-                      model_used: str | None = None):
+def _store_structured(
+    db: sqlite3.Connection,
+    image_key: str,
+    image_type: str,
+    structured: dict,
+    model_used: str | None = None,
+) -> None:
     store_image_description(db, {
         'image_key': image_key,
         'image_type': image_type,

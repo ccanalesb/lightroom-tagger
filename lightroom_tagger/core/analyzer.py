@@ -37,6 +37,7 @@ def get_description_model() -> str:
         return os.environ['DESCRIPTION_VISION_MODEL']
     return get_vision_model()
 
+# Legacy monolithic prompt; prefer prompt_builder + DB perspectives when available.
 DESCRIPTION_PROMPT = """You are an experienced photo editor reviewing images for a photography portfolio. Be direct and constructive. State clearly what works and what doesn't — no flattery, no sugarcoating, but also no performative negativity. Every image has strengths and weaknesses; identify both with specifics.
 
 Analyze this photograph from three expert perspectives and return a structured JSON response.
@@ -315,7 +316,7 @@ def extract_exif(path: str) -> dict[str, Any]:
 
 def describe_image(path: str, agent_type: str | None = None,
                     provider_id: str | None = None, model: str | None = None,
-                    log_callback=None) -> dict:
+                    log_callback=None, user_prompt: str | None = None) -> dict:
     """Generate structured description using configured agent.
 
     When *provider_id* is given the new multi-provider pipeline is used
@@ -323,7 +324,9 @@ def describe_image(path: str, agent_type: str | None = None,
     Ollama path for backward compatibility.
     """
     if provider_id is not None:
-        return _describe_image_via_provider(path, provider_id, model, log_callback)
+        return _describe_image_via_provider(
+            path, provider_id, model, log_callback, user_prompt=user_prompt
+        )
 
     if agent_type is None:
         try:
@@ -333,7 +336,7 @@ def describe_image(path: str, agent_type: str | None = None,
             agent_type = 'local'
 
     if agent_type == 'local':
-        raw = run_local_agent(path)
+        raw = run_local_agent(path, user_prompt=user_prompt)
     elif agent_type == 'external':
         raw = run_external_agent(path)
     else:
@@ -343,7 +346,8 @@ def describe_image(path: str, agent_type: str | None = None,
 
 
 def _describe_image_via_provider(path: str, provider_id: str,
-                                  model: str | None, log_callback=None) -> dict:
+                                  model: str | None, log_callback=None,
+                                  user_prompt: str | None = None) -> dict:
     """Generate description via the unified provider pipeline."""
     from lightroom_tagger.core.fallback import FallbackDispatcher
     from lightroom_tagger.core.provider_registry import ProviderRegistry
@@ -367,7 +371,13 @@ def _describe_image_via_provider(path: str, provider_id: str,
 
     try:
         def fn_factory(client, mdl):
-            return lambda: _gen(client, mdl, compressed, log_callback=log_callback)
+            return lambda: _gen(
+                client,
+                mdl,
+                compressed,
+                log_callback=log_callback,
+                user_prompt=user_prompt,
+            )
 
         raw, actual_provider, actual_model = dispatcher.call_with_fallback(
             operation="describe",
@@ -387,7 +397,7 @@ def _describe_image_via_provider(path: str, provider_id: str,
                     os.unlink(f)
 
 
-def run_local_agent(path: str) -> str:
+def run_local_agent(path: str, user_prompt: str | None = None) -> str:
     """Run local vision model (e.g., LLaVA) via Ollama Python client."""
     temp_files: list[str] = []
     viewable = get_viewable_path(path)
@@ -398,13 +408,17 @@ def run_local_agent(path: str) -> str:
     if compressed != viewable:
         temp_files.append(compressed)
 
+    prompt_text = build_description_prompt()
+    if user_prompt is not None and user_prompt.strip():
+        prompt_text = user_prompt.strip()
+
     try:
         response = ollama.chat(
             model=get_description_model(),
             messages=[
                 {
                     'role': 'user',
-                    'content': build_description_prompt(),
+                    'content': prompt_text,
                     'images': [compressed],
                 }
             ],

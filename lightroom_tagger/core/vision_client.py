@@ -320,9 +320,14 @@ def generate_description(
     model: str,
     image_path: str,
     log_callback: LogCallback = None,
+    *,
+    user_prompt: str | None = None,
 ) -> str:
     """Generate a structured description for a single image. Returns raw text."""
     img_b64 = _encode_image(image_path)
+    text_prompt = build_description_prompt()
+    if user_prompt is not None and user_prompt.strip():
+        text_prompt = user_prompt.strip()
 
     try:
         response = client.chat.completions.create(
@@ -333,7 +338,7 @@ def generate_description(
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": build_description_prompt()},
+                            {"type": "text", "text": text_prompt},
                             _image_url_part(img_b64),
                         ],
                     }
