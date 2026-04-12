@@ -5,9 +5,14 @@ import type { Job } from '../types/job'
 interface UseJobSocketOptions {
   onJobCreated?: (job: Job) => void
   onJobUpdated?: (job: Job) => void
+  onJobsRecovered?: (payload: { job_ids: string[] }) => void
 }
 
-export function useJobSocket({ onJobCreated, onJobUpdated }: UseJobSocketOptions) {
+export function useJobSocket({
+  onJobCreated,
+  onJobUpdated,
+  onJobsRecovered,
+}: UseJobSocketOptions) {
   const socket = useSocketStore((s) => s.socket)
   const connected = useSocketStore((s) => s.connected)
   const connect = useSocketStore((s) => s.connect)
@@ -23,12 +28,14 @@ export function useJobSocket({ onJobCreated, onJobUpdated }: UseJobSocketOptions
 
     if (onJobCreated) socket.on('job_created', onJobCreated)
     if (onJobUpdated) socket.on('job_updated', onJobUpdated)
+    if (onJobsRecovered) socket.on('jobs_recovered', onJobsRecovered)
 
     return () => {
       if (onJobCreated) socket.off('job_created', onJobCreated)
       if (onJobUpdated) socket.off('job_updated', onJobUpdated)
+      if (onJobsRecovered) socket.off('jobs_recovered', onJobsRecovered)
     }
-  }, [socket, connected, onJobCreated, onJobUpdated])
+  }, [socket, connected, onJobCreated, onJobUpdated, onJobsRecovered])
 
   return { connected, socket }
 }

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, Tab } from '../components/ui/Tabs';
 import { MatchingTab } from '../components/processing/MatchingTab';
@@ -8,6 +8,10 @@ import { JobQueueTab } from '../components/processing/JobQueueTab';
 import { ProvidersTab } from '../components/processing/ProvidersTab';
 import { SettingsTab } from '../components/processing/SettingsTab';
 import { PerspectivesTab } from '../components/processing/PerspectivesTab';
+import { Button } from '../components/ui/Button';
+import { useJobSocket } from '../hooks/useJobSocket';
+import { JobsAPI } from '../services/api';
+import type { Job } from '../types/job';
 import {
   TAB_VISION_MATCHING,
   TAB_DESCRIPTIONS,
@@ -38,10 +42,65 @@ function tabIdFromSearch(search: string): ProcessingTabId {
   return 'matching';
 }
 
+const JOBS_RECOVERED_BANNER =
+  'Some jobs were automatically resumed after the last server restart. Check the job queue for progress.';
+
 export function ProcessingPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const activeTab = useMemo(() => tabIdFromSearch(location.search), [location.search]);
+
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsRecoveredBanner, setJobsRecoveredBanner] = useState<string | null>(null);
+
+  const refreshJobs = useCallback(async () => {
+    setJobsLoading(true);
+    try {
+      const data = await JobsAPI.list();
+      setJobs(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to load jobs:', err);
+    } finally {
+      setJobsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        const data = await JobsAPI.list();
+        if (mounted) {
+          setJobs(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error('Failed to load jobs:', err);
+      } finally {
+        if (mounted) {
+          setJobsLoading(false);
+        }
+      }
+    }
+    void load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleJobCreated = useCallback((newJob: Job) => {
+    setJobs((prev) => [newJob, ...prev]);
+  }, []);
+
+  const handleJobUpdated = useCallback((updatedJob: Job) => {
+    setJobs((prev) => prev.map((j) => (j.id === updatedJob.id ? updatedJob : j)));
+  }, []);
+
+  const { connected } = useJobSocket({
+    onJobCreated: handleJobCreated,
+    onJobUpdated: handleJobUpdated,
+    onJobsRecovered: () => setJobsRecoveredBanner(JOBS_RECOVERED_BANNER),
+  });
 
   const handleTabChange = (id: string) => {
     if (!PROCESSING_TAB_IDS.includes(id as ProcessingTabId)) return;
@@ -57,7 +116,19 @@ export function ProcessingPage() {
     { id: 'descriptions', label: TAB_DESCRIPTIONS, content: <DescriptionsTab /> },
     { id: 'perspectives', label: TAB_PERSPECTIVES, content: <PerspectivesTab /> },
     { id: 'cache', label: TAB_CATALOG_CACHE, content: <CatalogCacheTab /> },
-    { id: 'jobs', label: TAB_JOB_QUEUE, content: <JobQueueTab /> },
+    {
+      id: 'jobs',
+      label: TAB_JOB_QUEUE,
+      content: (
+        <JobQueueTab
+          jobs={jobs}
+          setJobs={setJobs}
+          jobsLoading={jobsLoading}
+          connected={connected}
+          onRefreshJobs={refreshJobs}
+        />
+      ),
+    },
     { id: 'providers', label: TAB_PROVIDERS, content: <ProvidersTab /> },
     { id: 'settings', label: TAB_SETTINGS, content: <SettingsTab /> },
   ];
@@ -70,6 +141,23 @@ export function ProcessingPage() {
           Vision matching, descriptions, catalog cache management, and job monitoring
         </p>
       </div>
+
+      {jobsRecoveredBanner ? (
+        <div
+          className="mb-4 flex items-start justify-between gap-4 rounded-card border border-border bg-surface p-4 shadow-card"
+          role="status"
+        >
+          <p className="text-sm text-text">{jobsRecoveredBanner}</p>
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            onClick={() => setJobsRecoveredBanner(null)}
+          >
+            Dismiss
+          </Button>
+        </div>
+      ) : null}
 
       <Tabs tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
     </div>

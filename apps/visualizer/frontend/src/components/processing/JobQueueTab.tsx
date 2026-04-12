@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { MouseEvent } from 'react';
-import { useJobSocket } from '../../hooks/useJobSocket';
 import { JobsAPI } from '../../services/api';
 import type { Job } from '../../types/job';
 import { JobDetailModal } from '../jobs/JobDetailModal';
@@ -28,9 +27,21 @@ function progressWidthPercent(job: Job): number {
   return Math.min(100, p <= 1 ? p * 100 : p);
 }
 
-export function JobQueueTab() {
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
+export interface JobQueueTabProps {
+  jobs: Job[];
+  setJobs: Dispatch<SetStateAction<Job[]>>;
+  jobsLoading: boolean;
+  connected: boolean;
+  onRefreshJobs: () => void | Promise<void>;
+}
+
+export function JobQueueTab({
+  jobs,
+  setJobs,
+  jobsLoading,
+  connected,
+  onRefreshJobs,
+}: JobQueueTabProps) {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
@@ -50,43 +61,12 @@ export function JobQueueTab() {
   };
 
   useEffect(() => {
-    let mounted = true;
-    async function fetchJobs() {
-      try {
-        const data = await JobsAPI.list();
-        if (mounted) {
-          setJobs(Array.isArray(data) ? data : []);
-        }
-      } catch (err) {
-        console.error('Failed to load jobs:', err);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-    fetchJobs();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const handleJobCreated = useCallback((newJob: Job) => {
-    setJobs((prev) => [newJob, ...prev]);
-  }, []);
-
-  const handleJobUpdated = useCallback(
-    (updatedJob: Job) => {
-      setJobs((prev) => prev.map((j) => (j.id === updatedJob.id ? updatedJob : j)));
-      setSelectedJob((prev) => (prev?.id === updatedJob.id ? updatedJob : prev));
-    },
-    [],
-  );
-
-  const { connected } = useJobSocket({
-    onJobCreated: handleJobCreated,
-    onJobUpdated: handleJobUpdated,
-  });
+    setSelectedJob((prev) => {
+      if (!prev) return null;
+      const match = jobs.find((j) => j.id === prev.id);
+      return match ?? prev;
+    });
+  }, [jobs]);
 
   return (
     <div className="space-y-4">
@@ -97,12 +77,18 @@ export function JobQueueTab() {
             {connected ? 'Connected' : 'Disconnected'}
           </span>
         </div>
-        <Button variant="secondary" size="sm" onClick={() => window.location.reload()}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            void onRefreshJobs();
+          }}
+        >
           Refresh
         </Button>
       </div>
 
-      {loading ? (
+      {jobsLoading ? (
         <Card padding="lg">
           <div className="text-center py-8 text-text-secondary">Loading jobs...</div>
         </Card>
