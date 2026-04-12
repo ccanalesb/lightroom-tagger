@@ -4,6 +4,7 @@ import {
   APP_TITLE,
   NAV_ANALYTICS,
   NAV_DASHBOARD,
+  NAV_IDENTITY,
   NAV_IMAGES,
   NAV_PROCESSING,
 } from '../constants/strings';
@@ -13,6 +14,7 @@ export function Layout() {
     { to: '/', label: NAV_DASHBOARD, exact: true },
     { to: '/images', label: NAV_IMAGES },
     { to: '/analytics', label: NAV_ANALYTICS },
+    { to: '/identity', label: NAV_IDENTITY },
     { to: '/processing', label: NAV_PROCESSING },
   ];
 

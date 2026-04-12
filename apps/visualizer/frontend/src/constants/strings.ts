@@ -12,6 +12,7 @@ export const NAV_CATALOG = 'Catalog'
 export const NAV_MATCHES = 'Matches'
 export const NAV_PROCESSING = 'Processing'
 export const NAV_ANALYTICS = 'Analytics'
+export const NAV_IDENTITY = 'Identity'
 export const NAV_JOB_QUEUE = 'Job Queue'
 
 // Tab labels
