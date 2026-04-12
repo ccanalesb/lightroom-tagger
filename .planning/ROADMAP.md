@@ -138,15 +138,15 @@
 
 **Requirements:** SCORE-02, SCORE-05, SCORE-06, SCORE-07, JOB-01, JOB-02
 
-**Intent:** Additive library DB shape for queryable per-perspective scores; photography-theory-grounded rubrics and configurable perspectives; strict structured-output validation and repair before any scoring job persists data; **job checkpointing and auto-recovery so long-running jobs survive backend restarts.** SCORE-07 is satisfied here so the Phase 6 pipeline never commits unvalidated payloads. JOB-01/JOB-02 ensure scoring batch jobs (and existing describe jobs) don't lose progress on restart.
+**Intent:** Additive library DB shape for queryable per-perspective scores; photography-theory-grounded rubrics and configurable perspectives; **SCORE-07 foundation:** Pydantic score validation, deterministic repair, **LLM JSON-repair hook** (`make_score_json_llm_fixer` + `parse_score_response_with_retry`), golden tests — so Phase 6 scoring handlers only need to wire the live fixer at call time (see 05-03 must_haves). Describe pipeline `parse_description_response` stays legacy until a later phase refactors it. **Job checkpointing and auto-recovery** so long-running jobs survive backend restarts. JOB-01/JOB-02 ensure scoring batch jobs (and existing describe jobs) don't lose progress on restart.
 
 ### Success criteria (observable)
 
 1. User (or operator) can run migrations on a catalog library DB without breaking existing description rows; new score-related columns or tables exist and are documented for nullable / legacy semantics.
 2. User-facing copy or settings reflect at least one **new** critique perspective beyond the original three (e.g. color theory, emotional impact, or series coherence), selectable where perspectives are chosen for analysis.
 3. Critique prompts used for scoring reference photography theory framing (documented rubric sources or prompt library location), not only generic free-form instructions.
-4. When the system receives malformed structured LLM output, the user still sees either a repaired successful result or a failed job with a clear error — not silent corruption or empty score rows.
-5. Automated tests or golden fixtures demonstrate validation/retry behavior for representative malformed JSON (aligned with SCORE-07).
+4. For **score-shaped** structured output, malformed LLM output is handled per D-12: deterministic repair, then optional LLM JSON repair, then explicit failure — not silent corruption or empty score rows (full describe blob validation is Phase 6+ unless separately scoped).
+5. Automated tests or golden fixtures demonstrate validation/repair/**llm_fixer** behavior for representative malformed JSON (aligned with SCORE-07 / plan 05-03).
 6. When backend restarts mid-job, the job resumes from last checkpoint on startup — not from scratch. Progress already committed (e.g. 500/2000 images described) is preserved.
 7. Orphaned jobs (marked "running" but process dead) are detected on startup and either auto-resumed or marked for retry with clear status.
 
