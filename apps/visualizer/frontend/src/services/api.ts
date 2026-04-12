@@ -30,6 +30,83 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json()
 }
 
+async function requestVoid(path: string, options?: RequestInit): Promise<void> {
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options?.headers,
+    },
+  })
+
+  if (!response.ok) {
+    let detail = `${response.status} ${response.statusText}`
+    try {
+      const body = await response.json()
+      if (body && typeof (body as { error?: unknown }).error === 'string') {
+        detail = (body as { error: string }).error
+      }
+    } catch {
+      /* ignore non-JSON error bodies */
+    }
+    throw new Error(detail)
+  }
+}
+
+export interface PerspectiveSummary {
+  id: number
+  slug: string
+  display_name: string
+  description: string
+  active: boolean
+  source_filename: string | null
+  updated_at: string | null
+}
+
+export interface PerspectiveDetail extends PerspectiveSummary {
+  prompt_markdown: string
+  created_at?: string | null
+}
+
+export const PerspectivesAPI = {
+  list: (params?: { active_only?: boolean }) => {
+    const sp = new URLSearchParams()
+    if (params?.active_only) sp.set('active_only', 'true')
+    const qs = sp.toString()
+    return request<PerspectiveSummary[]>(`/perspectives/${qs ? `?${qs}` : ''}`)
+  },
+
+  get: (slug: string) =>
+    request<PerspectiveDetail>(`/perspectives/${encodeURIComponent(slug)}`),
+
+  create: (body: {
+    slug: string
+    display_name: string
+    prompt_markdown: string
+    description?: string
+    active?: boolean
+  }) =>
+    request<PerspectiveDetail>('/perspectives/', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  update: (slug: string, body: Record<string, unknown>) =>
+    request<PerspectiveDetail>(`/perspectives/${encodeURIComponent(slug)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+
+  remove: (slug: string) =>
+    requestVoid(`/perspectives/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
+
+  resetDefault: (slug: string) =>
+    request<PerspectiveDetail>(
+      `/perspectives/${encodeURIComponent(slug)}/reset-default`,
+      { method: 'POST' },
+    ),
+}
+
 export const JobsAPI = {
   list: (status?: string) =>
     request<Job[]>(status? `/jobs/?status=${status}` : '/jobs/'),

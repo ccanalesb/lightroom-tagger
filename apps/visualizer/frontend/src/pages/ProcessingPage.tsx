@@ -7,9 +7,11 @@ import { CatalogCacheTab } from '../components/processing/CatalogCacheTab';
 import { JobQueueTab } from '../components/processing/JobQueueTab';
 import { ProvidersTab } from '../components/processing/ProvidersTab';
 import { SettingsTab } from '../components/processing/SettingsTab';
+import { PerspectivesTab } from '../components/processing/PerspectivesTab';
 import {
   TAB_VISION_MATCHING,
   TAB_DESCRIPTIONS,
+  TAB_PERSPECTIVES,
   TAB_CATALOG_CACHE,
   TAB_JOB_QUEUE,
   TAB_PROVIDERS,
@@ -17,7 +19,15 @@ import {
   NAV_PROCESSING,
 } from '../constants/strings';
 
-const PROCESSING_TAB_IDS = ['matching', 'descriptions', 'cache', 'jobs', 'providers', 'settings'] as const;
+const PROCESSING_TAB_IDS = [
+  'matching',
+  'descriptions',
+  'perspectives',
+  'cache',
+  'jobs',
+  'providers',
+  'settings',
+] as const;
 type ProcessingTabId = (typeof PROCESSING_TAB_IDS)[number];
 
 function tabIdFromSearch(search: string): ProcessingTabId {
@@ -45,6 +55,7 @@ export function ProcessingPage() {
   const tabs: Tab[] = [
     { id: 'matching', label: TAB_VISION_MATCHING, content: <MatchingTab /> },
     { id: 'descriptions', label: TAB_DESCRIPTIONS, content: <DescriptionsTab /> },
+    { id: 'perspectives', label: TAB_PERSPECTIVES, content: <PerspectivesTab /> },
     { id: 'cache', label: TAB_CATALOG_CACHE, content: <CatalogCacheTab /> },
     { id: 'jobs', label: TAB_JOB_QUEUE, content: <JobQueueTab /> },
     { id: 'providers', label: TAB_PROVIDERS, content: <ProvidersTab /> },

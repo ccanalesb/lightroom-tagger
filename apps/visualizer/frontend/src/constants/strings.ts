@@ -21,10 +21,15 @@ export const MATCHES_TAB_EMPTY =
   'No proposed matches yet. Run vision matching from Processing.'
 export const TAB_VISION_MATCHING = 'Vision Matching'
 export const TAB_DESCRIPTIONS = 'Descriptions'
+export const TAB_PERSPECTIVES = 'Perspectives'
 export const TAB_CATALOG_CACHE = 'Catalog Cache'
 export const TAB_JOB_QUEUE = 'Job Queue'
 export const TAB_PROVIDERS = 'Providers'
 export const TAB_SETTINGS = 'Settings'
+
+/** Processing — Perspectives tab subtitle (D-10 / SCORE-06). */
+export const NAV_PERSPECTIVES_HELP =
+  'Edit critique rubrics in the library database. Reset reloads the markdown file from prompts/perspectives for the selected slug.'
 
 // Placeholders
 export const PLACEHOLDER_COMING_SOON = 'Coming soon...'

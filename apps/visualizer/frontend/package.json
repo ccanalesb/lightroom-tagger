@@ -12,6 +12,8 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@uiw/react-codemirror": "^4.25.9",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^6.20.0",
