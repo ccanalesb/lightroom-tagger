@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ImagesAPI, type CatalogImage } from '../../services/api';
+import { ImagesAPI, PerspectivesAPI, type CatalogImage } from '../../services/api';
 import { CatalogImageCard } from '../catalog/CatalogImageCard';
 import { CatalogImageModal } from '../catalog/CatalogImageModal';
 import { Input } from '../ui/Input';
@@ -37,6 +37,12 @@ export function CatalogTab() {
   const [dateTo, setDateTo] = useState('');
   const [colorLabel, setColorLabel] = useState('');
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
+  const [scorePerspectives, setScorePerspectives] = useState<{ slug: string; display_name: string }[]>(
+    [],
+  );
+  const [scorePerspective, setScorePerspective] = useState('');
+  const [minCatalogScore, setMinCatalogScore] = useState<number | ''>('');
+  const [sortByScore, setSortByScore] = useState<'none' | 'asc' | 'desc'>('none');
 
   const debouncedKeyword = useDebouncedValue(keyword, DEBOUNCE_MS);
   const debouncedColorLabel = useDebouncedValue(colorLabel, DEBOUNCE_MS);
@@ -65,6 +71,13 @@ export function CatalogTab() {
         ...(dateFrom ? { date_from: dateFrom } : {}),
         ...(dateTo ? { date_to: dateTo } : {}),
         ...(cl ? { color_label: cl } : {}),
+        ...(scorePerspective
+          ? {
+              score_perspective: scorePerspective,
+              ...(minCatalogScore !== '' ? { min_score: minCatalogScore } : {}),
+              ...(sortByScore !== 'none' ? { sort_by_score: sortByScore } : {}),
+            }
+          : {}),
         limit: LIMIT,
         offset,
       });
@@ -95,6 +108,9 @@ export function CatalogTab() {
     dateFrom,
     dateTo,
     debouncedColorLabel,
+    scorePerspective,
+    minCatalogScore,
+    sortByScore,
   ]);
 
   useEffect(() => {
@@ -107,6 +123,15 @@ export function CatalogTab() {
       }
     };
     fetchMonths();
+  }, []);
+
+  useEffect(() => {
+    PerspectivesAPI.list({ active_only: true })
+      .then((rows) => {
+        const sorted = [...rows].sort((a, b) => a.slug.localeCompare(b.slug));
+        setScorePerspectives(sorted.map((r) => ({ slug: r.slug, display_name: r.display_name })));
+      })
+      .catch((err) => console.error('Failed to load perspectives:', err));
   }, []);
 
   useEffect(() => {
@@ -140,6 +165,26 @@ export function CatalogTab() {
     setPage(1);
   };
 
+  const handleScorePerspectiveChange = (slug: string) => {
+    setScorePerspective(slug);
+    if (!slug) {
+      setMinCatalogScore('');
+      setSortByScore('none');
+    }
+    setPage(1);
+  };
+
+  const handleMinCatalogScoreChange = (value: string) => {
+    if (value === '') setMinCatalogScore('');
+    else setMinCatalogScore(Number(value));
+    setPage(1);
+  };
+
+  const handleSortByScoreChange = (value: 'none' | 'asc' | 'desc') => {
+    setSortByScore(value);
+    setPage(1);
+  };
+
   const handleDateFromChange = (value: string) => {
     setDateFrom(value);
     setPage(1);
@@ -159,6 +204,9 @@ export function CatalogTab() {
     setDateFrom('');
     setDateTo('');
     setColorLabel('');
+    setScorePerspective('');
+    setMinCatalogScore('');
+    setSortByScore('none');
     setPage(1);
   };
 
@@ -181,7 +229,10 @@ export function CatalogTab() {
     minRating !== '' ||
     Boolean(dateFrom) ||
     Boolean(dateTo) ||
-    Boolean(colorLabel.trim());
+    Boolean(colorLabel.trim()) ||
+    Boolean(scorePerspective) ||
+    minCatalogScore !== '' ||
+    sortByScore !== 'none';
 
   const loading = initialLoad;
 
@@ -333,6 +384,54 @@ export function CatalogTab() {
               aria-label="Color label"
               disabled={loading}
             />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-text-tertiary">Score perspective</span>
+            <select
+              value={scorePerspective}
+              onChange={(e) => handleScorePerspectiveChange(e.target.value)}
+              disabled={loading}
+              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60 min-w-[8rem]"
+            >
+              <option value="">Any</option>
+              {scorePerspectives.map((p) => (
+                <option key={p.slug} value={p.slug}>
+                  {p.display_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-text-tertiary">Min score</span>
+            <select
+              value={minCatalogScore === '' ? '' : String(minCatalogScore)}
+              onChange={(e) => handleMinCatalogScoreChange(e.target.value)}
+              disabled={loading || !scorePerspective}
+              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
+            >
+              <option value="">Any</option>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                <option key={n} value={n}>
+                  {n}+
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-text-tertiary">Sort by score</span>
+            <select
+              value={sortByScore}
+              onChange={(e) => handleSortByScoreChange(e.target.value as 'none' | 'asc' | 'desc')}
+              disabled={loading || !scorePerspective}
+              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
+            >
+              <option value="none">None</option>
+              <option value="desc">High → Low</option>
+              <option value="asc">Low → High</option>
+            </select>
           </div>
         </div>
       </div>
