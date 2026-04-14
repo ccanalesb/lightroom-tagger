@@ -74,7 +74,7 @@ def style_fingerprint(db: sqlite3.Connection) -> ResponseReturnValue:
 def suggestions(db: sqlite3.Connection) -> ResponseReturnValue:
     """What to post next: unposted, coverage-eligible images with reason codes."""
     try:
-        limit, _offset = _clamp_pagination(
+        limit, offset = _clamp_pagination(
             request.args.get("limit", 20, type=int),
             request.args.get("offset", 0, type=int),
         )
@@ -88,9 +88,17 @@ def suggestions(db: sqlite3.Connection) -> ResponseReturnValue:
         payload = suggest_what_to_post_next(
             db,
             limit=limit,
+            offset=offset,
             lookback_days_recent=look_recent if look_recent is not None else 30,
             lookback_days_baseline=look_base if look_base is not None else 90,
         )
-        return jsonify(payload)
+        return jsonify(
+            {
+                "candidates": payload["candidates"],
+                "total": payload["total"],
+                "meta": payload["meta"],
+                "empty_state": payload["empty_state"],
+            }
+        )
     except Exception:
         return error_server_error()
