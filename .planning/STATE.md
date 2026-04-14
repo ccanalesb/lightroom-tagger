@@ -22,9 +22,9 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v2.0 — Advanced Critique & Insights |
-| Phase | **5** — Structured scoring foundation |
+| Phase | **11** — Verification and documentation update |
 | Status | Ready to plan |
-| Last activity | 2026-04-12 — v2 roadmap created (Phases 5–9); traceability updated |
+| Last activity | 2026-04-14 — Phase 10 complete; batch scoring fix + integration bugs resolved |
 
 ## Traceability
 
