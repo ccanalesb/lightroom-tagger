@@ -36,6 +36,7 @@ describe('IdentityPage', () => {
     })
     vi.spyOn(IdentityAPI, 'getSuggestions').mockResolvedValue({
       candidates: [],
+      total: 0,
       meta: {},
       empty_state: null,
     })

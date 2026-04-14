@@ -126,6 +126,9 @@ export const JobsAPI = {
 
   cancel: (id: string) =>
     request<void>(`/jobs/${id}`, { method: 'DELETE' }),
+
+  retry: (id: string) =>
+    request<Job>(`/jobs/${id}/retry`, { method: 'POST' }),
 }
 
 export const ConfigAPI = {
@@ -510,6 +513,7 @@ export interface IdentityPerPerspectiveScore {
 
 export interface IdentityBestPhotoItem {
   image_key: string
+  image_type?: 'catalog' | 'instagram'
   aggregate_score: number
   perspectives_covered: number
   eligible?: boolean
@@ -563,6 +567,7 @@ export interface StyleFingerprintResponse {
 
 export interface PostNextCandidate {
   image_key: string
+  image_type?: 'catalog' | 'instagram'
   filename: string
   date_taken: string
   rating: number
@@ -586,6 +591,7 @@ export interface PostNextSuggestionsMeta {
 
 export interface PostNextSuggestionsResponse {
   candidates: PostNextCandidate[]
+  total: number
   meta: PostNextSuggestionsMeta
   empty_state: string | null
 }
@@ -698,6 +704,7 @@ export interface CatalogImage {
   width: number
   height: number
   instagram_posted: boolean
+  image_type?: 'catalog' | 'instagram'
   instagram_url?: string
   image_hash?: string
   ai_analyzed?: boolean
