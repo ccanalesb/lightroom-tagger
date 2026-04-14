@@ -312,7 +312,7 @@ flowchart LR
 
 1. User runs batch scoring with Force off after bulk describe and the job queues **all unscored** images (not zero).
 2. `/api/identity/suggestions` with `offset` returns a shifted result set consistent with `limit`.
-3. Identity rankings aggregate scores per `(image_key, image_type)` so catalog and Instagram keys cannot collide.
+3. Identity rankings aggregate catalog-only scores (excluding Instagram rows) so catalog and Instagram keys cannot collide.
 
 ### Plan progress (execution)
 
