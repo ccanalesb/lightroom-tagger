@@ -154,12 +154,12 @@
 
 | Plan | Title | Status |
 |------|--------|--------|
-| 05-01 | Library DB migration: queryable score storage, indexes, nullable legacy semantics | Not started |
-| 05-02 | Rubric prompt library: theory-grounded templates + configurable perspective registry | Not started |
-| 05-03 | Structured output schema (e.g. Pydantic), repair/retry path, and unit tests | Not started |
-| 05-04 | API/schema documentation for score fields and perspective keys | Not started |
-| 05-05 | Job checkpointing: periodic progress commit + resume-from-checkpoint on restart | Not started |
-| 05-06 | Orphan job recovery: startup detection of dead jobs + auto-resume or retry marking | Not started |
+| 05-01 | Library DB migration: queryable score storage, indexes, nullable legacy semantics | **Done** |
+| 05-02 | Rubric prompt library: theory-grounded templates + configurable perspective registry | **Done** |
+| 05-03 | Structured output schema (e.g. Pydantic), repair/retry path, and unit tests | **Done** |
+| 05-04 | API/schema documentation for score fields and perspective keys | **Done** |
+| 05-05 | Job checkpointing: periodic progress commit + resume-from-checkpoint on restart | **Done** |
+| 05-06 | Orphan job recovery: startup detection of dead jobs + auto-resume or retry marking | **Done** |
 
 ---
 
@@ -181,10 +181,10 @@
 
 | Plan | Title | Status |
 |------|--------|--------|
-| 06-01 | Scoring job handler(s), idempotency keys, integration with vision/provider stack | Not started |
-| 06-02 | Persist scores + rationale + `prompt_version` / model metadata via single write funnel | Not started |
-| 06-03 | Version history / supersede semantics in API and image detail UI | Not started |
-| 06-04 | Catalog API query params + UI controls for filter/sort by persisted scores | Not started |
+| 06-01 | Scoring job handler(s), idempotency keys, integration with vision/provider stack | **Done** |
+| 06-02 | Persist scores + rationale + `prompt_version` / model metadata via single write funnel | **Done** |
+| 06-03 | Version history / supersede semantics in API and image detail UI | **Done** |
+| 06-04 | Catalog API query params + UI controls for filter/sort by persisted scores | **Done** |
 
 ---
 
@@ -206,10 +206,10 @@
 
 | Plan | Title | Status |
 |------|--------|--------|
-| 07-01 | Insights service + API: posting frequency buckets (UTC-normalized ingest) | Not started |
-| 07-02 | Time-of-day / day-of-week aggregation endpoints + chart payloads | Not started |
-| 07-03 | Caption & hashtag rollup queries + API | Not started |
-| 07-04 | Posted-gap catalog query + UI entry point | Not started |
+| 07-01 | Insights service + API: posting frequency buckets (UTC-normalized ingest) | **Done** |
+| 07-02 | Time-of-day / day-of-week aggregation endpoints + chart payloads | **Done** |
+| 07-03 | Caption & hashtag rollup queries + API | **Done** |
+| 07-04 | Posted-gap catalog query + UI entry point | **Done** |
 
 ---
 
@@ -231,9 +231,9 @@
 
 | Plan | Title | Status |
 |------|--------|--------|
-| 08-01 | Aggregation job or query layer for ranked “best photos” with coverage guards | Not started |
-| 08-02 | Style fingerprint synthesis (pattern rollup + UI presentation with examples) | Not started |
-| 08-03 | Suggestion heuristic: catalog scores × posting gaps + explainability copy | Not started |
+| 08-01 | Aggregation job or query layer for ranked “best photos” with coverage guards | **Done** |
+| 08-02 | Style fingerprint synthesis (pattern rollup + UI presentation with examples) | **Done** |
+| 08-03 | Suggestion heuristic: catalog scores × posting gaps + explainability copy | **Done** |
 
 ---
 
@@ -255,9 +255,9 @@
 
 | Plan | Title | Status |
 |------|--------|--------|
-| 09-01 | Insights dashboard route + layout shell (charts placeholders wired to APIs) | Not started |
-| 09-02 | Integrate score distribution + posting widgets with shared scope controls | Not started |
-| 09-03 | Top-scored strip or grid + navigation to catalog modal | Not started |
+| 09-01 | Insights dashboard route + layout shell (charts placeholders wired to APIs) | **Done** |
+| 09-02 | Integrate score distribution + posting widgets with shared scope controls | **Done** |
+| 09-03 | Top-scored strip or grid + navigation to catalog modal | **Done** |
 
 ---
 
@@ -334,7 +334,7 @@ flowchart LR
 ### Success criteria (observable)
 
 1. Each of Phases 6, 7, 8, 9 has a VERIFICATION.md with status, requirement-by-requirement evidence, and automated check results.
-2. ROADMAP.md plan progress tables for Phases 5–9 reflect **Done** status with dates.
+2. ROADMAP.md plan progress tables for Phases 5–9 reflect **Done** status without per-plan dates.
 3. REQUIREMENTS.md checkboxes and traceability status reflect verified completion for all 17 v2 requirements.
 
 ### Plan progress (execution)
