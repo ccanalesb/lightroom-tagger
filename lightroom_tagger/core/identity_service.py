@@ -20,10 +20,11 @@ from typing import Any, cast
 
 from lightroom_tagger.core.posting_analytics import _EN_STOPWORDS, get_posting_frequency
 
-# Current catalog scores only for aggregations (see 08-CONTEXT.md).
+# Current catalog scores only — identity aggregation excludes non-catalog rows (D-40 / phase 10).
 _SCORES_BASE_SQL = """
     SELECT
         s.image_key,
+        s.image_type,
         s.perspective_slug,
         s.score,
         s.rationale,
@@ -34,7 +35,8 @@ _SCORES_BASE_SQL = """
     FROM image_scores s
     INNER JOIN perspectives p
         ON p.slug = s.perspective_slug AND p.active = 1
-    WHERE s.image_type = 'catalog' AND s.is_current = 1
+    WHERE s.is_current = 1
+        AND s.image_type = 'catalog'
 """
 
 _WORD_RE = re.compile(r"[\w']+", flags=re.UNICODE)
@@ -50,10 +52,8 @@ def _active_perspective_slugs(conn: sqlite3.Connection) -> list[str]:
 
 
 def _default_min_perspectives(active_count: int) -> int:
-    """D-41: ``min(2, ceil(0.5 * active_perspective_count))`` for active_count >= 1."""
-    if active_count <= 0:
-        return 1
-    return min(2, (active_count + 1) // 2)
+    """Minimum 1 perspective required for eligibility."""
+    return 1
 
 
 def _tokenize_rationale(text: str | None) -> list[str]:
@@ -156,10 +156,7 @@ def compute_image_aggregate_scores(
             items.append(row)
 
     scored_any_count = len(by_key)
-    coverage_rule = (
-        "eligible when perspectives_covered >= min_perspectives; "
-        "default min_perspectives = min(2, ceil(active_count/2)) per D-41"
-    )
+    coverage_rule = "eligible when perspectives_covered >= min_perspectives (default 1)"
     meta: dict[str, Any] = {
         "active_perspectives": active_slugs,
         "weighting": "equal",
@@ -171,8 +168,8 @@ def compute_image_aggregate_scores(
     }
     if eligible_count == 0 and active_count > 0:
         meta["coverage_note"] = (
-            "No catalog images meet the minimum perspective coverage for ranking; "
-            "score more perspectives per image or lower min_perspectives."
+            "No images meet the minimum perspective coverage for ranking; "
+            "score at least one perspective per image."
         )
     return items, meta
 
@@ -181,19 +178,38 @@ def _image_meta_map(conn: sqlite3.Connection, keys: list[str]) -> dict[str, dict
     if not keys:
         return {}
     placeholders = ",".join("?" * len(keys))
+    out: dict[str, dict[str, Any]] = {}
+    # Catalog images
     rows = conn.execute(
         f"SELECT key, filename, date_taken, rating, instagram_posted FROM images "
         f"WHERE key IN ({placeholders})",
         keys,
     ).fetchall()
-    out: dict[str, dict[str, Any]] = {}
     for r in rows:
         out[str(r["key"])] = {
             "filename": r.get("filename") or "",
             "date_taken": r.get("date_taken") or "",
             "rating": int(r["rating"] or 0),
             "instagram_posted": bool(r.get("instagram_posted")),
+            "image_type": "catalog",
         }
+    # Instagram images (keys not already resolved above)
+    missing = [k for k in keys if k not in out]
+    if missing:
+        ig_placeholders = ",".join("?" * len(missing))
+        ig_rows = conn.execute(
+            f"SELECT media_key, filename, created_at FROM instagram_dump_media "
+            f"WHERE media_key IN ({ig_placeholders})",
+            missing,
+        ).fetchall()
+        for r in ig_rows:
+            out[str(r["media_key"])] = {
+                "filename": r.get("filename") or r.get("media_key") or "",
+                "date_taken": r.get("created_at") or "",
+                "rating": 0,
+                "instagram_posted": True,
+                "image_type": "instagram",
+            }
     return out
 
 
