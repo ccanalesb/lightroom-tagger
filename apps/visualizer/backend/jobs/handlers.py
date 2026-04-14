@@ -1217,11 +1217,7 @@ def handle_batch_score(runner, job_id: str, metadata: dict):
         else:
             perspective_slugs = None
 
-        from lightroom_tagger.core.database import (
-            get_undescribed_catalog_images,
-            get_undescribed_instagram_images,
-            list_perspectives,
-        )
+        from lightroom_tagger.core.database import list_perspectives
 
         images_for_scores: list[tuple[str, str]] = []
 
@@ -1241,12 +1237,19 @@ def handle_batch_score(runner, job_id: str, metadata: dict):
                 rows = lib_db.execute(sql, tuple(sql_params)).fetchall()
                 images_for_scores += [(r['key'], 'catalog') for r in rows]
             else:
-                images_for_scores += [
-                    (img['key'], 'catalog')
-                    for img in get_undescribed_catalog_images(
-                        lib_db, months=months, min_rating=min_rating
-                    )
-                ]
+                sql = "SELECT key FROM images"
+                conditions = []
+                sql_params = []
+                if months:
+                    conditions.append("date_taken >= date('now', ?)")
+                    sql_params.append(f'-{months} months')
+                if min_rating is not None:
+                    conditions.append("rating >= ?")
+                    sql_params.append(min_rating)
+                if conditions:
+                    sql += " WHERE " + " AND ".join(conditions)
+                rows = lib_db.execute(sql, tuple(sql_params)).fetchall()
+                images_for_scores += [(r['key'], 'catalog') for r in rows]
 
         if image_type in ('instagram', 'both'):
             if force:
@@ -1258,10 +1261,13 @@ def handle_batch_score(runner, job_id: str, metadata: dict):
                     ).fetchall()
                 images_for_scores += [(r['media_key'], 'instagram') for r in rows]
             else:
-                images_for_scores += [
-                    (img['media_key'], 'instagram')
-                    for img in get_undescribed_instagram_images(lib_db, months=months)
-                ]
+                rows = lib_db.execute("SELECT media_key FROM instagram_dump_media").fetchall()
+                if months:
+                    rows = lib_db.execute(
+                        "SELECT media_key FROM instagram_dump_media WHERE created_at >= date('now', ?)",
+                        (f'-{months} months',),
+                    ).fetchall()
+                images_for_scores += [(r['media_key'], 'instagram') for r in rows]
 
         slugs = perspective_slugs
         if not slugs:
