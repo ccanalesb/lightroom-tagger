@@ -366,6 +366,7 @@ def suggest_what_to_post_next(
     conn: sqlite3.Connection,
     *,
     limit: int,
+    offset: int = 0,
     lookback_days_recent: int = 30,
     lookback_days_baseline: int = 90,
 ) -> dict[str, Any]:
@@ -469,8 +470,12 @@ def suggest_what_to_post_next(
 
     mid = median(unposted_aggs) if unposted_aggs else 0.0
 
+    total_candidates = len(candidates_full)
+    lim = max(0, limit)
+    page = candidates_full[offset : offset + lim]
+
     out_candidates: list[dict[str, Any]] = []
-    for cand in candidates_full[: max(0, limit)]:
+    for cand in page:
         reasons: list[str] = []
         codes: list[str] = []
         agg = float(cand["aggregate_score"])
@@ -533,6 +538,7 @@ def suggest_what_to_post_next(
 
     return {
         "candidates": out_candidates,
+        "total": total_candidates,
         "meta": suggestions_meta,
         "empty_state": empty_state,
     }
