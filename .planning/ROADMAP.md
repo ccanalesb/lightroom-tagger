@@ -300,9 +300,70 @@ flowchart LR
 
 ---
 
+## Phase 10 — Batch scoring fix and integration bug fixes
+
+**Requirements:** SCORE-01, SCORE-04, IDENT-01, IDENT-02, IDENT-03
+**Gap Closure:** Closes critical integration gaps from v2.0 audit (2026-04-14)
+**Depends on:** Phase 6
+
+**Intent:** Fix `batch_score` non-force image selection (queries undescribed instead of unscored), wire `offset` through identity suggestions endpoint, and disambiguate identity aggregation keys by `(image_key, image_type)`.
+
+### Success criteria (observable)
+
+1. User runs batch scoring with Force off after bulk describe and the job queues **all unscored** images (not zero).
+2. `/api/identity/suggestions` with `offset` returns a shifted result set consistent with `limit`.
+3. Identity rankings aggregate scores per `(image_key, image_type)` so catalog and Instagram keys cannot collide.
+
+### Plan progress (execution)
+
+| Plan | Title | Status |
+|------|--------|--------|
+| 10-01 | Fix batch_score image selection to target unscored images | Not started |
+| 10-02 | Wire offset through suggestions endpoint and disambiguate identity keys | Not started |
+
+---
+
+## Phase 11 — Phase 6–9 verification and documentation update
+
+**Requirements:** SCORE-01, SCORE-03, SCORE-04, POST-01, POST-02, POST-03, POST-04, IDENT-01, IDENT-02, IDENT-03, DASH-01
+**Gap Closure:** Creates missing VERIFICATION.md for Phases 6–9, updates ROADMAP.md progress tables and REQUIREMENTS.md checkboxes
+**Depends on:** Phase 10
+
+**Intent:** Formally verify all delivered code in Phases 6–9 against plan must-haves and success criteria; update stale documentation to reflect actual project state.
+
+### Success criteria (observable)
+
+1. Each of Phases 6, 7, 8, 9 has a VERIFICATION.md with status, requirement-by-requirement evidence, and automated check results.
+2. ROADMAP.md plan progress tables for Phases 5–9 reflect **Done** status with dates.
+3. REQUIREMENTS.md checkboxes and traceability status reflect verified completion for all 17 v2 requirements.
+
+### Plan progress (execution)
+
+| Plan | Title | Status |
+|------|--------|--------|
+| 11-01 | Create VERIFICATION.md for Phases 6–9 with automated checks | Not started |
+| 11-02 | Update ROADMAP.md progress tables and REQUIREMENTS.md checkboxes | Not started |
+
+---
+
+## Dependencies (high level) — gap closure
+
+```mermaid
+flowchart LR
+  P10[Phase 10 Bug fixes]
+  P11[Phase 11 Verification and docs]
+  P6[Phase 6 Scoring pipeline]
+  P6 --> P10
+  P10 --> P11
+```
+
+- Phase 10 fixes code bugs before Phase 11 can verify correctness.
+
+---
+
 ## Out of scope
 
 Deferred and out-of-scope items remain as documented in [REQUIREMENTS.md](./REQUIREMENTS.md).
 
 ---
-*Roadmap v1 section: 2026-04-10 · v1 complete: 2026-04-11 · v2 Phases 5–9 added: 2026-04-12.*
+*Roadmap v1 section: 2026-04-10 · v1 complete: 2026-04-11 · v2 Phases 5–9 added: 2026-04-12 · Gap closure Phases 10–11 added: 2026-04-14.*

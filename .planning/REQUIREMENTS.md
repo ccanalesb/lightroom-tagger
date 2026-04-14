@@ -91,22 +91,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCORE-07 | v2 Phase 5 · Structured scoring foundation | Pending |
 | JOB-01 | v2 Phase 5 · Structured scoring foundation | Pending |
 | JOB-02 | v2 Phase 5 · Structured scoring foundation | Pending |
-| SCORE-01 | v2 Phase 6 · Scoring pipeline & catalog score UX | Pending |
-| SCORE-03 | v2 Phase 6 · Scoring pipeline & catalog score UX | Pending |
-| SCORE-04 | v2 Phase 6 · Scoring pipeline & catalog score UX | Pending |
-| POST-01 | v2 Phase 7 · Posting analytics | Pending |
-| POST-02 | v2 Phase 7 · Posting analytics | Pending |
-| POST-03 | v2 Phase 7 · Posting analytics | Pending |
-| POST-04 | v2 Phase 7 · Posting analytics | Pending |
-| IDENT-01 | v2 Phase 8 · Identity & "what to post next" | Pending |
-| IDENT-02 | v2 Phase 8 · Identity & "what to post next" | Pending |
-| IDENT-03 | v2 Phase 8 · Identity & "what to post next" | Pending |
-| DASH-01 | v2 Phase 9 · Insights dashboard | Pending |
+| SCORE-01 | v2 Phase 6 + Phase 10 (bug fix) · verify Phase 11 | Pending |
+| SCORE-03 | v2 Phase 6 · verify Phase 11 | Pending |
+| SCORE-04 | v2 Phase 6 + Phase 10 (bug fix) · verify Phase 11 | Pending |
+| POST-01 | v2 Phase 7 · verify Phase 11 | Pending |
+| POST-02 | v2 Phase 7 · verify Phase 11 | Pending |
+| POST-03 | v2 Phase 7 · verify Phase 11 | Pending |
+| POST-04 | v2 Phase 7 · verify Phase 11 | Pending |
+| IDENT-01 | v2 Phase 8 + Phase 10 (bug fix) · verify Phase 11 | Pending |
+| IDENT-02 | v2 Phase 8 + Phase 10 (bug fix) · verify Phase 11 | Pending |
+| IDENT-03 | v2 Phase 8 + Phase 10 (bug fix) · verify Phase 11 | Pending |
+| DASH-01 | v2 Phase 9 · verify Phase 11 | Pending |
 
 **Coverage:**
 - v1 requirements: 22 (complete)
 - v2 requirements: 17 total
-- Mapped to phases: 17 / 17 (Phases 5-9; see [ROADMAP.md](./ROADMAP.md))
+- Mapped to phases: 17 / 17 (Phases 5–9 delivered; bug fixes Phase 10; verification Phase 11)
 
 Roadmap: [.planning/ROADMAP.md](./ROADMAP.md)
 
@@ -114,3 +114,4 @@ Roadmap: [.planning/ROADMAP.md](./ROADMAP.md)
 *Requirements defined: 2026-04-10*
 *v2 requirements added: 2026-04-11*
 *v2 roadmap / traceability: 2026-04-12 (JOB-01, JOB-02 added for job resilience)*
+*Gap closure phases 10–11 added: 2026-04-14*
