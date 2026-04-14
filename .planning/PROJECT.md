@@ -78,6 +78,7 @@ The user is a photographer managing work across multiple Lightroom catalogs (per
 ### Current State
 - v1.0 complete — Phases 1-4: catalog management, jobs, Instagram sync, AI descriptions
 - v2.0 complete — Phases 5-9: structured scoring, posting analytics, identity/suggestions, insights dashboard
+- Phase 10: bug fixes — batch_score non-force path uses correct image selection, suggestions endpoint wired with offset/total pagination, identity aggregation restricted to catalog-only scores
 - Phase 5: image_scores/perspectives schema, Pydantic validation with LLM repair, 4 theory-grounded rubrics, perspectives REST API + CodeMirror UI, job checkpointing, orphan recovery
 - Phase 6: scoring pipeline (single_score + batch_score jobs), score REST API, catalog modal scores panel with version history, catalog filter/sort by score
 - Phase 7: posting analytics — frequency timeline, day-of-week × hour heatmap, caption/hashtag stats, unposted catalog gap view
@@ -135,4 +136,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-12 — v2.0 milestone complete (Phases 5-9)*
+*Last updated: 2026-04-14 — Phase 10 complete (batch scoring fix + integration bugs)*
