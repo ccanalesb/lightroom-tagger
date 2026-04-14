@@ -13,35 +13,35 @@ Requirements for v2.0 Advanced Critique & Insights milestone.
 
 ### Structured Scoring & Prompts
 
-- [ ] **SCORE-01**: User can trigger scoring that produces numeric scores (1-10) per perspective with written rationale
-- [ ] **SCORE-02**: System persists scores as queryable fields (not just JSON blobs) so catalog can filter/sort by score
-- [ ] **SCORE-03**: System tracks which prompt version and model generated each score (rubric versioning)
-- [ ] **SCORE-04**: User can re-run scoring with an updated rubric and see both old and new results distinguished by version
-- [ ] **SCORE-05**: Critique prompts are grounded in photography theory from publications and critique frameworks
-- [ ] **SCORE-06**: User can add new critique perspectives beyond the existing three (e.g., color theory, emotional impact, series coherence)
-- [ ] **SCORE-07**: System validates structured LLM output and retries/repairs malformed JSON before persisting
+- [x] **SCORE-01**: User can trigger scoring that produces numeric scores (1-10) per perspective with written rationale (Validated in Phase 6 + Phase 10 fix; see 06-VERIFICATION.md and 10-VERIFICATION.md)
+- [x] **SCORE-02**: System persists scores as queryable fields (not just JSON blobs) so catalog can filter/sort by score (Validated in Phase 5; see 05-VERIFICATION.md)
+- [x] **SCORE-03**: System tracks which prompt version and model generated each score (rubric versioning) (Validated in Phase 6; see 06-VERIFICATION.md)
+- [x] **SCORE-04**: User can re-run scoring with an updated rubric and see both old and new results distinguished by version (Validated in Phase 6 + Phase 10 fix; see 06-VERIFICATION.md and 10-VERIFICATION.md)
+- [x] **SCORE-05**: Critique prompts are grounded in photography theory from publications and critique frameworks (Validated in Phase 5; see 05-VERIFICATION.md)
+- [x] **SCORE-06**: User can add new critique perspectives beyond the existing three (e.g., color theory, emotional impact, series coherence) (Validated in Phase 5; see 05-VERIFICATION.md)
+- [x] **SCORE-07**: System validates structured LLM output and retries/repairs malformed JSON before persisting (Validated in Phase 5; see 05-VERIFICATION.md)
 
 ### Posting Analytics
 
-- [ ] **POST-01**: User can see posting frequency over time (timeline chart)
-- [ ] **POST-02**: User can see time-of-day and day-of-week posting patterns (heatmap)
-- [ ] **POST-03**: User can see caption and hashtag usage analysis across posted images
-- [ ] **POST-04**: User can identify catalog images not yet posted (catalog vs posted gap view)
+- [x] **POST-01**: User can see posting frequency over time (timeline chart) (Validated in Phase 7; see 07-VERIFICATION.md)
+- [x] **POST-02**: User can see time-of-day and day-of-week posting patterns (heatmap) (Validated in Phase 7; see 07-VERIFICATION.md)
+- [x] **POST-03**: User can see caption and hashtag usage analysis across posted images (Validated in Phase 7; see 07-VERIFICATION.md)
+- [x] **POST-04**: User can identify catalog images not yet posted (catalog vs posted gap view) (Validated in Phase 7; see 07-VERIFICATION.md)
 
 ### Identity & Suggestions
 
-- [ ] **IDENT-01**: User can see a "best photos" ranking based on aggregated AI perspective scores
-- [ ] **IDENT-02**: User can see a style fingerprint — recurring visual and thematic patterns across their work
-- [ ] **IDENT-03**: User can get "what to post next" suggestions based on catalog scores vs posting history gaps
+- [x] **IDENT-01**: User can see a "best photos" ranking based on aggregated AI perspective scores (Validated in Phase 8 + Phase 10 fix; see 08-VERIFICATION.md and 10-VERIFICATION.md)
+- [x] **IDENT-02**: User can see a style fingerprint — recurring visual and thematic patterns across their work (Validated in Phase 8 + Phase 10 fix; see 08-VERIFICATION.md and 10-VERIFICATION.md)
+- [x] **IDENT-03**: User can get "what to post next" suggestions based on catalog scores vs posting history gaps (Validated in Phase 8 + Phase 10 fix; see 08-VERIFICATION.md and 10-VERIFICATION.md)
 
 ### Job Resilience
 
-- [ ] **JOB-01**: Long-running jobs checkpoint progress so work is not lost on backend restart
-- [ ] **JOB-02**: Orphaned jobs are auto-recovered and resumed on backend startup
+- [x] **JOB-01**: Long-running jobs checkpoint progress so work is not lost on backend restart (Validated in Phase 5; see 05-VERIFICATION.md)
+- [x] **JOB-02**: Orphaned jobs are auto-recovered and resumed on backend startup (Validated in Phase 5; see 05-VERIFICATION.md)
 
 ### Insights Dashboard
 
-- [ ] **DASH-01**: User can view a unified insights page with score distributions, posting patterns, and top-scored photos
+- [x] **DASH-01**: User can view a unified insights page with score distributions, posting patterns, and top-scored photos (Validated in Phase 9; see 09-VERIFICATION.md)
 
 ## Future Requirements
 
@@ -106,7 +106,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 **Coverage:**
 - v1 requirements: 22 (complete)
 - v2 requirements: 17 total
-- Mapped to phases: 17 / 17 (Phases 5–9 delivered; bug fixes Phase 10; verification Phase 11)
+- Mapped to phases: 17 / 17 (Phases 5–9 delivered; bug fixes Phase 10; verification Phase 11 — documentation updated Phase 11)
 
 Roadmap: [.planning/ROADMAP.md](./ROADMAP.md)
 
