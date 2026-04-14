@@ -227,3 +227,34 @@ def test_suggestions_cadence_gap_meta_optional(tmp_path) -> None:
     meta = out.get("meta") or {}
     assert meta.get("cadence_gap") is True
     assert meta.get("cadence_note")
+
+
+def test_suggestions_offset_returns_second_page(tmp_path) -> None:
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    slugs = _active_slugs(conn)
+    s0, s1 = slugs[0], slugs[1]
+
+    for i, day in enumerate(["2024-08-01", "2024-08-02", "2024-08-03"]):
+        k = store_image(
+            conn,
+            {
+                "date_taken": day,
+                "filename": f"pg{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        score = 9 - i
+        _add_score(conn, k, s0, score)
+        _add_score(conn, k, s1, score)
+    conn.commit()
+
+    base = suggest_what_to_post_next(conn, limit=10, offset=0)
+    assert base["total"] >= 3
+    assert len(base["candidates"]) >= 3
+    expected_second = base["candidates"][1]["image_key"]
+
+    out = suggest_what_to_post_next(conn, limit=1, offset=1)
+    assert out["total"] >= 3
+    assert len(out["candidates"]) == 1
+    assert out["candidates"][0]["image_key"] == expected_second
