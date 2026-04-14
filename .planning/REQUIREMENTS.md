@@ -85,27 +85,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SYS-01..05 | v1 Phase 2 · Jobs & system reliability | Complete |
 | IG-01..06 | v1 Phase 3 · Instagram sync | Complete |
 | AI-01..06 | v1 Phase 4 · AI analysis | Complete |
-| SCORE-02 | v2 Phase 5 · Structured scoring foundation | Pending |
-| SCORE-05 | v2 Phase 5 · Structured scoring foundation | Pending |
-| SCORE-06 | v2 Phase 5 · Structured scoring foundation | Pending |
-| SCORE-07 | v2 Phase 5 · Structured scoring foundation | Pending |
-| JOB-01 | v2 Phase 5 · Structured scoring foundation | Pending |
-| JOB-02 | v2 Phase 5 · Structured scoring foundation | Pending |
-| SCORE-01 | v2 Phase 6 + Phase 10 (bug fix) · verify Phase 11 | Pending |
-| SCORE-03 | v2 Phase 6 · verify Phase 11 | Pending |
-| SCORE-04 | v2 Phase 6 + Phase 10 (bug fix) · verify Phase 11 | Pending |
-| POST-01 | v2 Phase 7 · verify Phase 11 | Pending |
-| POST-02 | v2 Phase 7 · verify Phase 11 | Pending |
-| POST-03 | v2 Phase 7 · verify Phase 11 | Pending |
-| POST-04 | v2 Phase 7 · verify Phase 11 | Pending |
-| IDENT-01 | v2 Phase 8 + Phase 10 (bug fix) · verify Phase 11 | Pending |
-| IDENT-02 | v2 Phase 8 + Phase 10 (bug fix) · verify Phase 11 | Pending |
-| IDENT-03 | v2 Phase 8 + Phase 10 (bug fix) · verify Phase 11 | Pending |
-| DASH-01 | v2 Phase 9 · verify Phase 11 | Pending |
+| SCORE-02 | v2 Phase 5 · Structured scoring foundation | Complete |
+| SCORE-05 | v2 Phase 5 · Structured scoring foundation | Complete |
+| SCORE-06 | v2 Phase 5 · Structured scoring foundation | Complete |
+| SCORE-07 | v2 Phase 5 · Structured scoring foundation | Complete |
+| JOB-01 | v2 Phase 5 · Structured scoring foundation | Complete |
+| JOB-02 | v2 Phase 5 · Structured scoring foundation | Complete |
+| SCORE-01 | v2 Phase 6 + Phase 10 (bug fix) | Complete |
+| SCORE-03 | v2 Phase 6 | Complete |
+| SCORE-04 | v2 Phase 6 + Phase 10 (bug fix) | Complete |
+| POST-01 | v2 Phase 7 | Complete |
+| POST-02 | v2 Phase 7 | Complete |
+| POST-03 | v2 Phase 7 | Complete |
+| POST-04 | v2 Phase 7 | Complete |
+| IDENT-01 | v2 Phase 8 + Phase 10 (bug fix) | Complete |
+| IDENT-02 | v2 Phase 8 + Phase 10 (bug fix) | Complete |
+| IDENT-03 | v2 Phase 8 + Phase 10 (bug fix) | Complete |
+| DASH-01 | v2 Phase 9 | Complete |
 
 **Coverage:**
 - v1 requirements: 22 (complete)
-- v2 requirements: 17 total
+- v2 requirements: 17 total — **17 / 17** verified / complete (documentation)
 - Mapped to phases: 17 / 17 (Phases 5–9 delivered; bug fixes Phase 10; verification Phase 11 — documentation updated Phase 11)
 
 Roadmap: [.planning/ROADMAP.md](./ROADMAP.md)
