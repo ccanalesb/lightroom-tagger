@@ -1,5 +1,24 @@
 # Milestones
 
+## v2.0 Advanced Critique & Insights (Shipped: 2026-04-15)
+
+**Phases:** 7 | **Plans:** 24 | **Commits:** ~130 | **LOC:** ~32K | **Timeline:** 4 days (2026-04-12 → 2026-04-15)
+
+**Delivered:** Structured artistic scoring, posting analytics, photographer identity analysis, and a unified insights dashboard on top of the v1 catalog + Instagram workflow.
+
+**Key accomplishments:**
+
+- Structured scoring foundation: Pydantic-validated per-perspective scores (1–10) with photography-theory-grounded rubrics (Freeman, Berger, Itten), configurable perspectives via REST API + CodeMirror UI, and LLM JSON repair pipeline
+- Scoring pipeline & catalog UX: Single and batch scoring jobs with model/rubric version tracking, score history with supersede semantics, and catalog filter/sort by persisted scores
+- Posting analytics: Frequency timeline, day-of-week × hour heatmap, caption/hashtag stats, and unposted catalog gap view from Instagram dump timestamps
+- Identity & suggestions: Best photos ranking by aggregated scores, style fingerprint (radar chart + rationale tokens with evidence), and "what to post next" with explainable reason codes
+- Insights dashboard: Unified home composing KPI row, score distributions, posting cadence, top-scored photos strip, and quick-nav cards via parallel API composition
+- Job resilience: Checkpoint-based progress persistence surviving backend restarts, orphan job auto-recovery on startup with UI notification
+
+**Requirements:** 17/17 v2 requirements complete
+
+---
+
 ## v1.0 Lightroom Tagger MVP (Shipped: 2026-04-11)
 
 **Phases:** 4 | **Plans:** 21 | **Commits:** 405 | **LOC:** ~28K | **Timeline:** 28 days
