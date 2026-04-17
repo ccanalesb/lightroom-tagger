@@ -79,6 +79,10 @@ Related seeds:
 
 - SEED-003 (rethink identity page clarity) — adjacent UX/clarity concerns, may want to
   coordinate if a broader UI polish milestone is scoped.
+- SEED-011 (adopt CVA for Tailwind variants) — the *implementation technique* for the
+  unified badge/card visual language this seed calls for. Ideally SEED-011 lands first
+  or together with this seed's component work, so the unification is expressed as
+  declarative `cva()` variants rather than rebuilt in the old ad-hoc style.
 
 ## Notes
 
