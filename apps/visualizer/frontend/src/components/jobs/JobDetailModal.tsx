@@ -9,6 +9,11 @@ import {
   JOB_DETAILS_ERROR,
   ERROR_SEVERITY_LABELS,
   JOB_DETAILS_LOGS,
+  JOB_DETAILS_LOGS_TRUNCATED_HEADER,
+  JOB_DETAILS_LOGS_SHOW_ALL,
+  JOB_DETAILS_LOGS_SHOW_ALL_LOADING,
+  JOB_DETAILS_LOADING_ARIA,
+  JOB_DETAILS_FETCH_ERROR,
   JOB_DETAILS_METADATA,
   JOB_DETAILS_PROGRESS,
   JOB_DETAILS_RESULT,
@@ -67,6 +72,26 @@ function progressFillClass(status: Job['status']): string {
   }
 }
 
+function SkeletonLine({ widthClass }: { widthClass: string }) {
+  return <div className={`h-3 ${widthClass} rounded-base bg-surface animate-pulse`} />;
+}
+
+function SkeletonSection({ label }: { label: string }) {
+  return (
+    <div
+      className="space-y-2 rounded-base border border-border p-3"
+      role="status"
+      aria-live="polite"
+      aria-label={label}
+    >
+      <div className="h-4 w-32 rounded-base bg-surface animate-pulse" />
+      <SkeletonLine widthClass="w-full" />
+      <SkeletonLine widthClass="w-5/6" />
+      <SkeletonLine widthClass="w-2/3" />
+    </div>
+  );
+}
+
 interface JobDetailModalProps {
   job: Job;
   onClose: () => void;
@@ -76,16 +101,40 @@ interface JobDetailModalProps {
 export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProps) {
   const [localJob, setLocalJob] = useState<Job>(job);
   const [retrying, setRetrying] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [logsExpanded, setLogsExpanded] = useState(false);
+  const [expandingLogs, setExpandingLogs] = useState(false);
   const socket = useSocketStore((state) => state.socket);
 
   useEffect(() => {
-    JobsAPI.get(job.id)
+    setLocalJob(job);
+    setLogsExpanded(false);
+    setExpandingLogs(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setFetchError(null);
+    JobsAPI.get(job.id, { logs_limit: 20 })
       .then((freshJob) => {
+        if (cancelled) return;
         setLocalJob(freshJob);
       })
       .catch((err) => {
+        if (cancelled) return;
         console.error('Failed to fetch job details:', err);
+        setFetchError(JOB_DETAILS_FETCH_ERROR);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [job.id]);
 
   useEffect(() => {
@@ -120,6 +169,20 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
       console.error('Retry failed:', err);
     } finally {
       setRetrying(false);
+    }
+  };
+
+  const handleExpandLogs = async () => {
+    if (logsExpanded || expandingLogs) return;
+    setExpandingLogs(true);
+    try {
+      const fullJob = await JobsAPI.get(displayJob.id, { logs_limit: 0 });
+      setLocalJob(fullJob);
+      setLogsExpanded(true);
+    } catch (err) {
+      console.error('Failed to load full logs:', err);
+    } finally {
+      setExpandingLogs(false);
     }
   };
 
@@ -186,23 +249,43 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
 
             {renderProgress()}
 
-            {displayJob.current_step && (
+            {fetchError && (
+              <div
+                className="rounded-base border border-error/50 bg-red-50 dark:bg-red-950/30 p-3"
+                role="alert"
+              >
+                <p className="text-sm text-error">{fetchError}</p>
+              </div>
+            )}
+
+            {loading && !displayJob.current_step ? (
+              <div
+                className="rounded-base border border-border bg-accent-light p-3"
+                role="status"
+                aria-label={JOB_DETAILS_LOADING_ARIA}
+              >
+                <SkeletonLine widthClass="w-24" />
+                <div className="mt-2 h-3 w-2/3 rounded-base bg-accent/20 animate-pulse" />
+              </div>
+            ) : displayJob.current_step ? (
               <div className="rounded-base border border-border bg-accent-light p-3">
                 <span className="text-sm font-medium text-accent">{JOB_DETAILS_CURRENT_STEP}:</span>
                 <p className="text-sm text-text mt-1">{displayJob.current_step}</p>
               </div>
-            )}
+            ) : null}
 
-            {displayJob.metadata && Object.keys(displayJob.metadata).length > 0 && (
+            {loading ? (
+              <SkeletonSection label={JOB_DETAILS_LOADING_ARIA} />
+            ) : displayJob.metadata && Object.keys(displayJob.metadata).length > 0 ? (
               <div className="rounded-base border border-border p-3">
                 <h4 className="font-medium text-sm mb-2 text-text">{JOB_DETAILS_METADATA}</h4>
                 <pre className="text-xs bg-surface p-2 rounded-base overflow-x-auto text-text border border-border">
                   {JSON.stringify(displayJob.metadata, null, 2)}
                 </pre>
               </div>
-            )}
+            ) : null}
 
-            {(displayJob.metadata?.method || displayJob.result?.method) && (
+            {!loading && (displayJob.metadata?.method || displayJob.result?.method) && (
               <div className="rounded-base border border-border bg-surface p-3">
                 <h4 className="font-medium text-sm mb-2 text-text">Configuration</h4>
                 <div className="text-sm space-y-1 text-text">
@@ -289,7 +372,7 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
               </div>
             )}
 
-            {displayJob.result && (
+            {!loading && displayJob.result && (
               <div className="rounded-base border border-border border-success/40 bg-surface p-3">
                 <h4 className="font-medium text-sm mb-2 text-success">{JOB_DETAILS_RESULT}</h4>
                 <pre className="text-xs bg-bg p-2 rounded-base overflow-x-auto text-text border border-border">
@@ -328,32 +411,56 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
               </Button>
             )}
 
-            {displayJob.logs && displayJob.logs.length > 0 && (
-              <div className="rounded-base border border-border p-3">
-                <h4 className="font-medium text-sm mb-2 text-text">{JOB_DETAILS_LOGS}</h4>
-                <div className="bg-surface text-text p-3 rounded-base font-mono text-xs max-h-48 overflow-y-auto border border-border">
-                  {displayJob.logs.map((log, idx) => (
-                    <div key={idx} className="mb-1">
-                      <span className="text-text-tertiary">
-                        {new Date(log.timestamp).toLocaleTimeString()}
-                      </span>
-                      <span
-                        className={`ml-2 ${
-                          log.level === 'error'
-                            ? 'text-error'
-                            : log.level === 'warning'
-                              ? 'text-warning'
-                              : 'text-success'
-                        }`}
+            {loading ? (
+              <SkeletonSection label={JOB_DETAILS_LOADING_ARIA} />
+            ) : displayJob.logs && displayJob.logs.length > 0 ? (() => {
+              const logsShown = displayJob.logs.length;
+              const logsTotal = displayJob.logs_total ?? logsShown;
+              const isTruncated = logsTotal > logsShown;
+              return (
+                <div className="rounded-base border border-border p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-sm text-text">
+                      {isTruncated ? JOB_DETAILS_LOGS_TRUNCATED_HEADER(logsShown, logsTotal) : JOB_DETAILS_LOGS}
+                    </h4>
+                    {isTruncated && !logsExpanded && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        type="button"
+                        onClick={() => {
+                          void handleExpandLogs();
+                        }}
+                        disabled={expandingLogs}
                       >
-                        [{log.level}]
-                      </span>
-                      <span className="ml-2">{log.message}</span>
-                    </div>
-                  ))}
+                        {expandingLogs ? JOB_DETAILS_LOGS_SHOW_ALL_LOADING : JOB_DETAILS_LOGS_SHOW_ALL(logsTotal)}
+                      </Button>
+                    )}
+                  </div>
+                  <div className="bg-surface text-text p-3 rounded-base font-mono text-xs max-h-48 overflow-y-auto border border-border">
+                    {displayJob.logs.map((log, idx) => (
+                      <div key={idx} className="mb-1">
+                        <span className="text-text-tertiary">
+                          {new Date(log.timestamp).toLocaleTimeString()}
+                        </span>
+                        <span
+                          className={`ml-2 ${
+                            log.level === 'error'
+                              ? 'text-error'
+                              : log.level === 'warning'
+                                ? 'text-warning'
+                                : 'text-success'
+                          }`}
+                        >
+                          [{log.level}]
+                        </span>
+                        <span className="ml-2">{log.message}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })() : null}
           </div>
         </Card>
       </div>
