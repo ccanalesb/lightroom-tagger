@@ -106,3 +106,98 @@ def test_matches_include_instagram_image_from_dump_only():
             if ig:
                 keys_seen.append(ig.get('key'))
         assert '202603/ig_dump_only' in keys_seen
+
+
+def test_list_matches_sorts_unvalidated_before_validated_bucket():
+    """Unvalidated groups sort before validated bucket regardless of Instagram created_at."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, 'test.db')
+        db = init_database(db_path)
+        db.execute(
+            "INSERT INTO images (key, filename, filepath, date_taken) VALUES (?, ?, ?, ?)",
+            ('ck_sort_a', 'a.jpg', '/fake/a.jpg', '2024-01-01'),
+        )
+        db.execute(
+            "INSERT INTO images (key, filename, filepath, date_taken) VALUES (?, ?, ?, ?)",
+            ('ck_sort_b', 'b.jpg', '/fake/b.jpg', '2024-01-02'),
+        )
+        db.execute(
+            "INSERT INTO instagram_dump_media (media_key, file_path, date_folder, filename, processed, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            ('ig/sort_unval', '/tmp/u.jpg', '202604', 'u.jpg', 0, '2026-04-15T12:00:00'),
+        )
+        db.execute(
+            "INSERT INTO instagram_dump_media (media_key, file_path, date_folder, filename, processed, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            ('ig/sort_val', '/tmp/v.jpg', '202001', 'v.jpg', 0, '2020-06-01T08:00:00'),
+        )
+        store_match(db, {
+            'catalog_key': 'ck_sort_a', 'insta_key': 'ig/sort_unval',
+            'phash_distance': 0, 'phash_score': 0.9, 'desc_similarity': 0.8,
+            'vision_result': 'SAME', 'vision_score': 0.95, 'total_score': 0.9, 'rank': 1,
+        })
+        store_match(db, {
+            'catalog_key': 'ck_sort_b', 'insta_key': 'ig/sort_val',
+            'phash_distance': 0, 'phash_score': 0.9, 'desc_similarity': 0.8,
+            'vision_result': 'SAME', 'vision_score': 0.95, 'total_score': 0.85, 'rank': 1,
+        })
+        db.execute(
+            "UPDATE matches SET validated_at = ? WHERE insta_key = ?",
+            ('2026-04-16T10:00:00', 'ig/sort_val'),
+        )
+        db.commit()
+        db.close()
+
+        client = _make_client(db_path)
+        resp = client.get('/api/images/matches')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['match_groups'][0]['instagram_key'] == 'ig/sort_unval'
+
+
+def test_list_matches_tombstone_all_rejected_after_validated():
+    """Fully-rejected insta_key with no matches rows appears after validated groups in reviewed bucket."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, 'test.db')
+        db = init_database(db_path)
+        db.execute(
+            "INSERT INTO images (key, filename, filepath, date_taken) VALUES (?, ?, ?, ?)",
+            ('ck_tomb_v', 'v.jpg', '/fake/v.jpg', '2024-03-01'),
+        )
+        db.execute(
+            "INSERT INTO instagram_dump_media (media_key, file_path, date_folder, filename, processed, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            ('ig/tomb_val', '/tmp/tv.jpg', '202604', 'tv.jpg', 0, '2026-06-01T12:00:00'),
+        )
+        db.execute(
+            "INSERT INTO instagram_dump_media (media_key, file_path, date_folder, filename, processed, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            ('ig/tomb_dead', '/tmp/td.jpg', '201901', 'td.jpg', 0, '2019-01-01T08:00:00'),
+        )
+        store_match(db, {
+            'catalog_key': 'ck_tomb_v', 'insta_key': 'ig/tomb_val',
+            'phash_distance': 0, 'phash_score': 0.9, 'desc_similarity': 0.8,
+            'vision_result': 'SAME', 'vision_score': 0.95, 'total_score': 0.9, 'rank': 1,
+        })
+        db.execute(
+            "UPDATE matches SET validated_at = ? WHERE insta_key = ?",
+            ('2026-04-10T10:00:00', 'ig/tomb_val'),
+        )
+        db.execute(
+            "INSERT INTO rejected_matches (catalog_key, insta_key, rejected_at) VALUES (?, ?, ?)",
+            ('ck_tomb_r', 'ig/tomb_dead', '2026-04-11T10:00:00'),
+        )
+        db.commit()
+        db.close()
+
+        client = _make_client(db_path)
+        resp = client.get('/api/images/matches')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        groups = data['match_groups']
+        assert len(groups) == 2
+        assert groups[0]['instagram_key'] == 'ig/tomb_val'
+        assert groups[0]['has_validated'] is True
+        assert groups[1]['instagram_key'] == 'ig/tomb_dead'
+        assert groups[1]['all_rejected'] is True
+        assert groups[1]['candidates'] == []
