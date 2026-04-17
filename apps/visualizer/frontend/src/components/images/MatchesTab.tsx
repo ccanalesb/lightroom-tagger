@@ -7,6 +7,9 @@ import {
   MATCH_VALIDATED,
   MATCHES_TAB_EMPTY,
   MSG_LOADING,
+  MATCHES_VALIDATED_DIVIDER_LABEL,
+  MATCH_TOMBSTONE_NO_MATCH_BADGE,
+  MATCH_TOMBSTONE_CARD_ARIA_LABEL,
 } from '../../constants/strings';
 import { useMatchGroups } from '../../hooks/useMatchGroups';
 import { MatchDetailModal } from '../matching/match-detail-modal/MatchDetailModal';
@@ -17,6 +20,84 @@ function pickInitialMatch(group: MatchGroup): Match | undefined {
   const rank1 = group.candidates.find((c) => c.rank === 1);
   if (rank1) return rank1;
   return group.candidates.reduce((best, c) => (c.score > best.score ? c : best));
+}
+
+function ActionableMatchGroupCard({
+  group,
+  onOpenReview,
+}: {
+  group: MatchGroup;
+  onOpenReview: (group: MatchGroup) => void;
+}) {
+  return (
+    <Card padding="md">
+      <CardContent>
+        <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+          <div className="aspect-square w-full max-w-[120px] shrink-0 bg-surface rounded-base overflow-hidden mx-auto sm:mx-0">
+            <img
+              src={`/api/images/instagram/${encodeURIComponent(group.instagram_key)}/thumbnail`}
+              alt=""
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-sm text-text break-all">{group.instagram_key}</span>
+              {group.has_validated ? <Badge variant="success">{MATCH_VALIDATED}</Badge> : null}
+            </div>
+            <p className="text-sm text-text-secondary">
+              {group.candidate_count} candidate{group.candidate_count === 1 ? '' : 's'} · best score{' '}
+              {group.best_score.toFixed(2)}
+            </p>
+            <Button type="button" variant="primary" size="sm" onClick={() => onOpenReview(group)}>
+              Review
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TombstoneMatchGroupCard({ group }: { group: MatchGroup }) {
+  return (
+    <Card padding="md">
+      <CardContent>
+        <div
+          className="flex flex-col sm:flex-row gap-4 sm:items-center"
+          aria-label={MATCH_TOMBSTONE_CARD_ARIA_LABEL}
+        >
+          <div className="aspect-square w-full max-w-[120px] shrink-0 bg-surface rounded-base overflow-hidden mx-auto sm:mx-0">
+            <img
+              src={`/api/images/instagram/${encodeURIComponent(group.instagram_key)}/thumbnail`}
+              alt=""
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-sm text-text break-all">{group.instagram_key}</span>
+              <Badge variant="error">{MATCH_TOMBSTONE_NO_MATCH_BADGE}</Badge>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReviewedMatchGroupCard({
+  group,
+  onOpenReview,
+}: {
+  group: MatchGroup;
+  onOpenReview: (group: MatchGroup) => void;
+}) {
+  const isTombstone = Boolean(group.all_rejected) || group.candidate_count === 0;
+  if (isTombstone) {
+    return <TombstoneMatchGroupCard group={group} />;
+  }
+  return <ActionableMatchGroupCard group={group} onOpenReview={onOpenReview} />;
 }
 
 export function MatchesTab() {
@@ -50,13 +131,17 @@ export function MatchesTab() {
     selectedGroup &&
     (matchGroups.find((g) => g.instagram_key === selectedGroup.instagram_key) ?? selectedGroup);
   const liveMatch =
-    liveGroup && selectedMatch
+    liveGroup && selectedMatch && liveGroup.candidates.length > 0
       ? liveGroup.candidates.find(
           (c) =>
             c.catalog_key === selectedMatch.catalog_key &&
             c.instagram_key === selectedMatch.instagram_key,
-        ) ?? selectedMatch
-      : selectedMatch;
+        ) ?? null
+      : null;
+
+  const unvalidatedGroups = matchGroups.filter((g) => !g.has_validated && !g.all_rejected);
+  const reviewedGroups = matchGroups.filter((g) => g.has_validated || Boolean(g.all_rejected));
+  const showValidatedDivider = unvalidatedGroups.length > 0 && reviewedGroups.length > 0;
 
   return (
     <div className="space-y-6">
@@ -76,35 +161,19 @@ export function MatchesTab() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {matchGroups.map((group) => (
-            <Card key={group.instagram_key} padding="md">
-              <CardContent>
-                <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
-                  <div className="aspect-square w-full max-w-[120px] shrink-0 bg-surface rounded-base overflow-hidden mx-auto sm:mx-0">
-                    <img
-                      src={`/api/images/instagram/${encodeURIComponent(group.instagram_key)}/thumbnail`}
-                      alt=""
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-sm text-text break-all">{group.instagram_key}</span>
-                      {group.has_validated ? (
-                        <Badge variant="success">{MATCH_VALIDATED}</Badge>
-                      ) : null}
-                    </div>
-                    <p className="text-sm text-text-secondary">
-                      {group.candidate_count} candidate{group.candidate_count === 1 ? '' : 's'} · best
-                      score {group.best_score.toFixed(2)}
-                    </p>
-                    <Button type="button" variant="primary" size="sm" onClick={() => openReview(group)}>
-                      Review
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {unvalidatedGroups.map((group) => (
+            <ActionableMatchGroupCard key={group.instagram_key} group={group} onOpenReview={openReview} />
+          ))}
+          {showValidatedDivider ? (
+            <div
+              className="w-full border-t border-border pt-4 text-center text-xs text-text-secondary"
+              role="separator"
+            >
+              {MATCHES_VALIDATED_DIVIDER_LABEL}
+            </div>
+          ) : null}
+          {reviewedGroups.map((group) => (
+            <ReviewedMatchGroupCard key={group.instagram_key} group={group} onOpenReview={openReview} />
           ))}
           {matchGroups.length < total ? (
             <div className="flex justify-center pt-2">
@@ -116,7 +185,7 @@ export function MatchesTab() {
         </div>
       )}
 
-      {liveGroup && liveMatch ? (
+      {liveGroup && liveGroup.candidates.length > 0 && liveMatch ? (
         <MatchDetailModal
           match={liveMatch}
           group={() =>
