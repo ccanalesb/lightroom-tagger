@@ -945,6 +945,40 @@ def _map_job_progress(progress_range: tuple[float, float], pct: int) -> int:
     return int(lo + (hi - lo) * pct / 100)
 
 
+def _analyze_load_checkpoint(runner, job_id: str) -> dict:
+    """Load the nested ``batch_analyze`` checkpoint body (without ``checkpoint_version``) or ``{}``."""
+    row = get_job(runner.db, job_id)
+    if not row:
+        return {}
+    meta = row.get('metadata') or {}
+    if not isinstance(meta, dict):
+        return {}
+    chk = meta.get('checkpoint')
+    if not isinstance(chk, dict):
+        return {}
+    if chk.get('checkpoint_version') != 1 or chk.get('job_type') != 'batch_analyze':
+        return {}
+    return {k: v for k, v in chk.items() if k != 'checkpoint_version'}
+
+
+def _analyze_merge_persist(
+    runner,
+    job_id: str,
+    *,
+    stage: str,
+    describe: dict,
+    score: dict,
+) -> None:
+    """Persist the nested batch_analyze checkpoint body for ``stage`` with both sub-objects."""
+    checkpoint_body = {
+        'job_type': 'batch_analyze',
+        'stage': stage,
+        'describe': describe,
+        'score': score,
+    }
+    runner.persist_checkpoint(job_id, checkpoint_body)
+
+
 def _run_describe_pass(
     runner,
     job_id: str,
@@ -955,13 +989,25 @@ def _run_describe_pass(
     db_path: str,
     progress_range: tuple[float, float],
     log_prefix: str = "",
-) -> None:
-    """Shared describe pipeline used by handle_batch_describe and (Plan 02) batch_analyze.
+    finalize: bool = True,
+    nested_analyze_checkpoint: bool = False,
+) -> dict | None:
+    """Shared describe pipeline used by handle_batch_describe and batch_analyze.
 
-    Moves the post-selection processing body of ``handle_batch_describe`` here verbatim; every
-    internal ``update_progress`` call is remapped through ``_map_job_progress(progress_range, …)``
-    and every log message is prefixed with ``log_prefix`` when non-empty. Checkpoint payloads
-    remain ``{'job_type': 'batch_describe', …}`` unchanged (Plan 01 contract).
+    Moves the post-selection processing body of ``handle_batch_describe`` here; every internal
+    ``update_progress`` call is remapped through ``_map_job_progress(progress_range, ...)`` and
+    every log message is prefixed with ``log_prefix`` when non-empty.
+
+    When ``nested_analyze_checkpoint=False`` (default) the helper reads and writes the flat
+    ``{'job_type': 'batch_describe', ...}`` checkpoint (Plan 01 contract). When ``True`` the
+    helper instead loads the ``describe`` sub-object from a ``batch_analyze`` checkpoint and
+    persists via :func:`_analyze_merge_persist` with ``stage='describe'``.
+
+    When ``finalize=True`` (default) the helper calls ``runner.clear_checkpoint`` +
+    ``runner.complete_job`` on the success path exactly as before. When ``False`` it returns the
+    result-summary dict instead (caller owns terminal completion). ``fail_job`` /
+    ``finalize_cancelled`` / early zero-work ``complete_job`` paths always run regardless of
+    ``finalize``; callers check the ``None`` return to detect those short-circuit paths.
     """
     image_type = metadata.get('image_type', 'both')
     date_filter = metadata.get('date_filter', 'all')
@@ -980,27 +1026,41 @@ def _run_describe_pass(
     total_at_start = len(images_to_describe)
     fp_bd = fingerprint_batch_describe(metadata, images_to_describe)
     processed_pairs: set[str] = set()
-    row_bd = get_job(runner.db, job_id)
-    if row_bd:
-        meta_bd = row_bd.get('metadata') or {}
-        if isinstance(meta_bd, dict):
-            chk_bd = meta_bd.get('checkpoint')
-            if (
-                isinstance(chk_bd, dict)
-                and chk_bd.get('checkpoint_version') == 1
-                and chk_bd.get('job_type') == 'batch_describe'
-            ):
-                if chk_bd.get('fingerprint') == fp_bd:
-                    processed_pairs = set(chk_bd.get('processed_pairs') or [])
-                else:
-                    add_job_log(
-                        runner.db,
-                        job_id,
-                        'info',
-                        f'{log_prefix}checkpoint mismatch: batch_describe fingerprint changed, starting fresh'
-                        if log_prefix else
-                        'checkpoint mismatch: batch_describe fingerprint changed, starting fresh',
-                    )
+    if nested_analyze_checkpoint:
+        nested_chk = _analyze_load_checkpoint(runner, job_id)
+        describe_obj = nested_chk.get('describe') if isinstance(nested_chk, dict) else None
+        if isinstance(describe_obj, dict):
+            if describe_obj.get('fingerprint') == fp_bd:
+                processed_pairs = set(describe_obj.get('processed_pairs') or [])
+            elif describe_obj.get('fingerprint'):
+                add_job_log(
+                    runner.db,
+                    job_id,
+                    'info',
+                    'checkpoint mismatch: batch_analyze describe fingerprint changed, starting describe fresh',
+                )
+    else:
+        row_bd = get_job(runner.db, job_id)
+        if row_bd:
+            meta_bd = row_bd.get('metadata') or {}
+            if isinstance(meta_bd, dict):
+                chk_bd = meta_bd.get('checkpoint')
+                if (
+                    isinstance(chk_bd, dict)
+                    and chk_bd.get('checkpoint_version') == 1
+                    and chk_bd.get('job_type') == 'batch_describe'
+                ):
+                    if chk_bd.get('fingerprint') == fp_bd:
+                        processed_pairs = set(chk_bd.get('processed_pairs') or [])
+                    else:
+                        add_job_log(
+                            runner.db,
+                            job_id,
+                            'info',
+                            f'{log_prefix}checkpoint mismatch: batch_describe fingerprint changed, starting fresh'
+                            if log_prefix else
+                            'checkpoint mismatch: batch_describe fingerprint changed, starting fresh',
+                        )
 
     def pair_label(key: str, itype: str) -> str:
         return f'{key}|{itype}'
@@ -1041,11 +1101,12 @@ def _run_describe_pass(
     )
 
     if total_at_start == 0:
-        runner.clear_checkpoint(job_id)
-        runner.complete_job(job_id, {
-            'described': 0, 'skipped': 0, 'failed': 0, 'total': 0,
-        })
-        return
+        empty = {'described': 0, 'skipped': 0, 'failed': 0, 'total': 0}
+        if finalize:
+            runner.clear_checkpoint(job_id)
+            runner.complete_job(job_id, empty)
+            return None
+        return empty
 
     def record_done(desc_key: str, itype: str) -> bool:
         processed_pairs.add(pair_label(desc_key, itype))
@@ -1056,15 +1117,28 @@ def _run_describe_pass(
                 severity='error',
             )
             return False
-        runner.persist_checkpoint(
-            job_id,
-            {
-                'job_type': 'batch_describe',
-                'fingerprint': fp_bd,
-                'processed_pairs': sorted(processed_pairs),
-                'total_at_start': total_at_start,
-            },
-        )
+        describe_payload = {
+            'fingerprint': fp_bd,
+            'processed_pairs': sorted(processed_pairs),
+            'total_at_start': total_at_start,
+        }
+        if nested_analyze_checkpoint:
+            existing = _analyze_load_checkpoint(runner, job_id)
+            score_sibling = existing.get('score') if isinstance(existing, dict) else None
+            if not isinstance(score_sibling, dict):
+                score_sibling = {}
+            _analyze_merge_persist(
+                runner,
+                job_id,
+                stage='describe',
+                describe=describe_payload,
+                score=score_sibling,
+            )
+        else:
+            runner.persist_checkpoint(
+                job_id,
+                {'job_type': 'batch_describe', **describe_payload},
+            )
         return True
 
     described = 0
@@ -1186,7 +1260,7 @@ def _run_describe_pass(
 
     row_status = get_job(runner.db, job_id)
     if row_status and row_status.get('status') == 'failed':
-        return
+        return None
 
     result_summary = {
         'described': described,
@@ -1206,10 +1280,13 @@ def _run_describe_pass(
             ' — check file paths and provider connectivity',
             severity='error',
         )
-        return
+        return None
 
-    runner.clear_checkpoint(job_id)
-    runner.complete_job(job_id, result_summary)
+    if finalize:
+        runner.clear_checkpoint(job_id)
+        runner.complete_job(job_id, result_summary)
+        return None
+    return result_summary
 
 
 def handle_batch_describe(runner, job_id: str, metadata: dict):
@@ -1316,13 +1393,23 @@ def _run_score_pass(
     db_path: str,
     progress_range: tuple[float, float],
     log_prefix: str = "",
-) -> None:
-    """Shared score pipeline used by handle_batch_score and (Plan 02) batch_analyze.
+    finalize: bool = True,
+    nested_analyze_checkpoint: bool = False,
+) -> dict | None:
+    """Shared score pipeline used by handle_batch_score and batch_analyze.
 
     Moves the post-selection processing body of ``handle_batch_score`` here; every internal
     ``update_progress`` call is remapped through ``_map_job_progress(progress_range, ...)`` and
-    every log message is prefixed with ``log_prefix`` when non-empty. Checkpoint payloads
-    remain ``{'job_type': 'batch_score', ...}`` unchanged (Plan 01 contract).
+    every log message is prefixed with ``log_prefix`` when non-empty.
+
+    When ``nested_analyze_checkpoint=False`` (default) the helper reads and writes the flat
+    ``{'job_type': 'batch_score', ...}`` checkpoint (Plan 01 contract). When ``True`` the helper
+    instead loads the ``score`` sub-object from a ``batch_analyze`` checkpoint and persists via
+    :func:`_analyze_merge_persist` with ``stage='score'``.
+
+    When ``finalize=True`` (default) the helper calls ``runner.clear_checkpoint`` +
+    ``runner.complete_job`` on the success path exactly as before. When ``False`` it returns
+    the result-summary dict instead (caller owns terminal completion).
     """
     image_type = metadata.get('image_type', 'both')
     date_filter = metadata.get('date_filter', 'all')
@@ -1351,27 +1438,41 @@ def _run_score_pass(
     total_at_start = len(work_triples)
     fp_bs = fingerprint_batch_score(metadata, work_triples)
     processed_triplets: set[str] = set()
-    row_bs = get_job(runner.db, job_id)
-    if row_bs:
-        meta_bs = row_bs.get('metadata') or {}
-        if isinstance(meta_bs, dict):
-            chk_bs = meta_bs.get('checkpoint')
-            if (
-                isinstance(chk_bs, dict)
-                and chk_bs.get('checkpoint_version') == 1
-                and chk_bs.get('job_type') == 'batch_score'
-            ):
-                if chk_bs.get('fingerprint') == fp_bs:
-                    processed_triplets = set(chk_bs.get('processed_triplets') or [])
-                else:
-                    add_job_log(
-                        runner.db,
-                        job_id,
-                        'info',
-                        f'{log_prefix}checkpoint mismatch: batch_score fingerprint changed, starting fresh'
-                        if log_prefix else
-                        'checkpoint mismatch: batch_score fingerprint changed, starting fresh',
-                    )
+    if nested_analyze_checkpoint:
+        nested_chk = _analyze_load_checkpoint(runner, job_id)
+        score_obj = nested_chk.get('score') if isinstance(nested_chk, dict) else None
+        if isinstance(score_obj, dict):
+            if score_obj.get('fingerprint') == fp_bs:
+                processed_triplets = set(score_obj.get('processed_triplets') or [])
+            elif score_obj.get('fingerprint'):
+                add_job_log(
+                    runner.db,
+                    job_id,
+                    'info',
+                    'checkpoint mismatch: batch_analyze score fingerprint changed, starting score fresh',
+                )
+    else:
+        row_bs = get_job(runner.db, job_id)
+        if row_bs:
+            meta_bs = row_bs.get('metadata') or {}
+            if isinstance(meta_bs, dict):
+                chk_bs = meta_bs.get('checkpoint')
+                if (
+                    isinstance(chk_bs, dict)
+                    and chk_bs.get('checkpoint_version') == 1
+                    and chk_bs.get('job_type') == 'batch_score'
+                ):
+                    if chk_bs.get('fingerprint') == fp_bs:
+                        processed_triplets = set(chk_bs.get('processed_triplets') or [])
+                    else:
+                        add_job_log(
+                            runner.db,
+                            job_id,
+                            'info',
+                            f'{log_prefix}checkpoint mismatch: batch_score fingerprint changed, starting fresh'
+                            if log_prefix else
+                            'checkpoint mismatch: batch_score fingerprint changed, starting fresh',
+                        )
 
     def triplet_label(key: str, itype: str, slug: str) -> str:
         return f'{key}|{itype}|{slug}'
@@ -1424,11 +1525,12 @@ def _run_score_pass(
     )
 
     if total_at_start == 0:
-        runner.clear_checkpoint(job_id)
-        runner.complete_job(job_id, {
-            'scored': 0, 'skipped': 0, 'failed': 0, 'total': 0,
-        })
-        return
+        empty = {'scored': 0, 'skipped': 0, 'failed': 0, 'total': 0}
+        if finalize:
+            runner.clear_checkpoint(job_id)
+            runner.complete_job(job_id, empty)
+            return None
+        return empty
 
     def record_done(score_key: str, itype: str, slug: str) -> bool:
         processed_triplets.add(triplet_label(score_key, itype, slug))
@@ -1439,15 +1541,28 @@ def _run_score_pass(
                 severity='error',
             )
             return False
-        runner.persist_checkpoint(
-            job_id,
-            {
-                'job_type': 'batch_score',
-                'fingerprint': fp_bs,
-                'processed_triplets': sorted(processed_triplets),
-                'total_at_start': total_at_start,
-            },
-        )
+        score_payload = {
+            'fingerprint': fp_bs,
+            'processed_triplets': sorted(processed_triplets),
+            'total_at_start': total_at_start,
+        }
+        if nested_analyze_checkpoint:
+            existing = _analyze_load_checkpoint(runner, job_id)
+            describe_sibling = existing.get('describe') if isinstance(existing, dict) else None
+            if not isinstance(describe_sibling, dict):
+                describe_sibling = {}
+            _analyze_merge_persist(
+                runner,
+                job_id,
+                stage='score',
+                describe=describe_sibling,
+                score=score_payload,
+            )
+        else:
+            runner.persist_checkpoint(
+                job_id,
+                {'job_type': 'batch_score', **score_payload},
+            )
         return True
 
     scored = 0
@@ -1583,7 +1698,7 @@ def _run_score_pass(
 
     row_score = get_job(runner.db, job_id)
     if row_score and row_score.get('status') == 'failed':
-        return
+        return None
 
     score_result = {
         'scored': scored,
@@ -1603,10 +1718,13 @@ def _run_score_pass(
             ' — check file paths and provider connectivity',
             severity='error',
         )
-        return
+        return None
 
-    runner.clear_checkpoint(job_id)
-    runner.complete_job(job_id, score_result)
+    if finalize:
+        runner.clear_checkpoint(job_id)
+        runner.complete_job(job_id, score_result)
+        return None
+    return score_result
 
 
 def handle_batch_score(runner, job_id: str, metadata: dict):
@@ -1709,6 +1827,160 @@ def handle_batch_score(runner, job_id: str, metadata: dict):
             lib_db.close()
 
 
+def handle_batch_analyze(runner, job_id: str, metadata: dict):
+    """Unified analyze: run describe then score over a single shared (key, itype) selection.
+
+    Drives one job through two stages with split progress (``0..50`` describe, ``50..100`` score),
+    ``current_step`` updates (``'Describing'`` / ``'Scoring'``), nested ``batch_analyze``
+    checkpoints, and a combined ``complete_job`` payload (D-06 keys). ``force_describe`` /
+    ``force_score`` in ``metadata`` are normalized into per-stage ``force`` via shallow-merge
+    before hitting the helpers' fingerprint + pre-filter logic (D-11).
+    """
+    lib_db = None
+    old_model_env = os.environ.get('DESCRIPTION_VISION_MODEL')
+    try:
+        config = load_config()
+        db_path = os.getenv('LIBRARY_DB')
+        if not db_path:
+            db_path = config.db_path or 'library.db'
+        if not os.path.exists(db_path):
+            runner.fail_job(job_id, f"Library database not found at: {db_path}")
+            return
+        lib_db = init_database(db_path)
+
+        image_type = metadata.get('image_type', 'both')
+        date_filter = metadata.get('date_filter', 'all')
+        force = bool(metadata.get('force_describe', False))
+
+        months = {'3months': 3, '6months': 6, '12months': 12}.get(date_filter)
+        min_rating_raw = metadata.get('min_rating')
+        min_rating = None
+        if min_rating_raw is not None:
+            try:
+                min_rating = int(min_rating_raw)
+            except (TypeError, ValueError):
+                min_rating = None
+
+        from lightroom_tagger.core.database import (
+            get_undescribed_catalog_images,
+            get_undescribed_instagram_images,
+        )
+
+        shared_selection: list[tuple[str, str]] = []
+
+        if image_type in ('catalog', 'both'):
+            if force:
+                sql = "SELECT key FROM images"
+                conditions: list[str] = []
+                sql_params: list = []
+                if months:
+                    conditions.append("date_taken >= date('now', ?)")
+                    sql_params.append(f'-{months} months')
+                if min_rating is not None:
+                    conditions.append("rating >= ?")
+                    sql_params.append(min_rating)
+                if conditions:
+                    sql += " WHERE " + " AND ".join(conditions)
+                rows = lib_db.execute(sql, tuple(sql_params)).fetchall()
+                shared_selection += [(r['key'], 'catalog') for r in rows]
+            else:
+                shared_selection += [
+                    (img['key'], 'catalog')
+                    for img in get_undescribed_catalog_images(
+                        lib_db, months=months, min_rating=min_rating
+                    )
+                ]
+
+        if image_type in ('instagram', 'both'):
+            if force:
+                rows = lib_db.execute("SELECT media_key FROM instagram_dump_media").fetchall()
+                if months:
+                    rows = lib_db.execute(
+                        "SELECT media_key FROM instagram_dump_media WHERE created_at >= date('now', ?)",
+                        (f'-{months} months',),
+                    ).fetchall()
+                shared_selection += [(r['media_key'], 'instagram') for r in rows]
+            else:
+                shared_selection += [
+                    (img['media_key'], 'instagram')
+                    for img in get_undescribed_instagram_images(lib_db, months=months)
+                ]
+
+        metadata_for_describe = {**metadata, 'force': bool(metadata.get('force_describe', False))}
+        metadata_for_score = {**metadata, 'force': bool(metadata.get('force_score', False))}
+
+        describe_fp = fingerprint_batch_describe(metadata_for_describe, shared_selection)
+        loaded_chk = _analyze_load_checkpoint(runner, job_id)
+        skip_describe = False
+        if loaded_chk.get('stage') == 'score':
+            describe_sub = loaded_chk.get('describe') or {}
+            if isinstance(describe_sub, dict) and describe_sub.get('fingerprint') == describe_fp:
+                skip_describe = True
+
+        describe_summary: dict | None = None
+        if skip_describe:
+            describe_summary = {
+                'described': 0,
+                'skipped': 0,
+                'failed': 0,
+                'total': int((loaded_chk.get('describe') or {}).get('total_at_start') or 0),
+            }
+        else:
+            update_job_field(runner.db, job_id, 'current_step', 'Describing')
+            describe_summary = _run_describe_pass(
+                runner,
+                job_id,
+                metadata_for_describe,
+                lib_db,
+                shared_selection,
+                db_path=db_path,
+                progress_range=(0, 50),
+                log_prefix='[describe] ',
+                finalize=False,
+                nested_analyze_checkpoint=True,
+            )
+            if describe_summary is None:
+                return
+
+        update_job_field(runner.db, job_id, 'current_step', 'Scoring')
+        score_summary = _run_score_pass(
+            runner,
+            job_id,
+            metadata_for_score,
+            lib_db,
+            shared_selection,
+            db_path=db_path,
+            progress_range=(50, 100),
+            log_prefix='[score] ',
+            finalize=False,
+            nested_analyze_checkpoint=True,
+        )
+        if score_summary is None:
+            return
+
+        combined = {
+            'describe_total': int(describe_summary.get('total', 0)),
+            'describe_succeeded': int(describe_summary.get('described', 0)),
+            'describe_failed': int(describe_summary.get('failed', 0)),
+            'score_total': int(score_summary.get('total', 0)),
+            'score_succeeded': int(score_summary.get('scored', 0)),
+            'score_failed': int(score_summary.get('failed', 0)),
+        }
+        runner.clear_checkpoint(job_id)
+        runner.complete_job(job_id, combined)
+
+    except Exception as e:
+        severity = _failure_severity_from_exception(e)
+        runner.fail_job(job_id, str(e), severity=severity)
+    finally:
+        if old_model_env is not None:
+            os.environ['DESCRIPTION_VISION_MODEL'] = old_model_env
+        else:
+            os.environ.pop('DESCRIPTION_VISION_MODEL', None)
+        if lib_db:
+            lib_db.close()
+
+
 JOB_HANDLERS = {
     'analyze_instagram': handle_analyze_instagram,
     'instagram_import': handle_instagram_import,
@@ -1719,4 +1991,5 @@ JOB_HANDLERS = {
     'single_describe': handle_single_describe,
     'single_score': handle_single_score,
     'batch_score': handle_batch_score,
+    'batch_analyze': handle_batch_analyze,
 }

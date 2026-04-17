@@ -17,6 +17,14 @@ non-empty list (empty/missing → ``null`` in the canonical payload).
 **batch_score** — ``job_type``, ``fingerprint``, ``processed_triplets`` (``\"key|itype|slug\"`` strings),
 ``total_at_start`` (int). Fingerprint canonical JSON matches ``batch_describe`` knobs plus an ordered
 triple list (sorted by ``f\"{key}|{itype}|{slug}\"``).
+
+**batch_analyze** — top-level ``job_type: 'batch_analyze'`` with ``stage`` (``'describe'`` or
+``'score'``) and two nested objects: ``describe`` (``fingerprint``, ``processed_pairs``,
+``total_at_start``) and ``score`` (``fingerprint``, ``processed_triplets``, ``total_at_start``).
+``checkpoint_version: 1`` still applies at the merged checkpoint root. Fingerprints for each
+``batch_analyze`` sub-object are computed exactly as ``batch_describe`` / ``batch_score`` over
+their own slice of ``metadata`` (the analyze handler normalizes ``force_describe`` /
+``force_score`` into each sub-payload before fingerprinting).
 """
 
 from __future__ import annotations
