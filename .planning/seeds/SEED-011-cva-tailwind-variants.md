@@ -151,6 +151,9 @@ green. If there's no visual regression net, add one before large refactors.
   SEED-011 lands first or lands together with SEED-008's component work.
 - SEED-007 (reusable filter component) — the filter primitives should also use CVA
 - SEED-003 (rethink Identity page) — any new primitives introduced there should use CVA
+- SEED-012 (skeleton loading + reusable image-grid) — the new `<Skeleton>` and
+  `<ImageGrid>` primitives should be authored with CVA from day one; if this seed
+  ships first they become prime refactor targets
 
 ## Notes
 

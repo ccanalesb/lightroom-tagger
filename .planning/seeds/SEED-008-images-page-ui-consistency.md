@@ -83,6 +83,9 @@ Related seeds:
   unified badge/card visual language this seed calls for. Ideally SEED-011 lands first
   or together with this seed's component work, so the unification is expressed as
   declarative `cva()` variants rather than rebuilt in the old ad-hoc style.
+- SEED-012 (skeleton loading + reusable image-grid) — proposes the `<ImageGrid>`
+  primitive that would render the unified card/match components this seed describes.
+  Natural pair; ideally scoped into the same milestone.
 
 ## Notes
 
