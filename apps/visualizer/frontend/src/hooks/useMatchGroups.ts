@@ -13,10 +13,11 @@ export function useMatchGroups() {
       setTotal(data.total_groups ?? data.total);
     } else {
       setMatchGroups((prev) => {
-        const keys = new Set(prev.map((g) => g.instagram_key));
         const next = [...prev];
         for (const g of data.match_groups ?? []) {
-          if (!keys.has(g.instagram_key)) next.push(g);
+          const idx = next.findIndex((existing) => existing.instagram_key === g.instagram_key);
+          if (idx >= 0) next[idx] = g;
+          else next.push(g);
         }
         return next;
       });
@@ -42,9 +43,8 @@ export function useMatchGroups() {
   }, []);
 
   const handleRejected = useCallback((match: Match) => {
-    setMatchGroups((prev) => {
-      let removedEntireGroup = false;
-      const next = prev.flatMap((group) => {
+    setMatchGroups((prev) =>
+      prev.flatMap((group) => {
         if (group.instagram_key !== match.instagram_key) return [group];
         const remaining = group.candidates.filter(
           (candidate) =>
@@ -54,8 +54,16 @@ export function useMatchGroups() {
             )
         );
         if (remaining.length === 0) {
-          removedEntireGroup = true;
-          return [];
+          return [
+            {
+              ...group,
+              candidates: [],
+              candidate_count: 0,
+              best_score: 0,
+              has_validated: false,
+              all_rejected: true,
+            },
+          ];
         }
         return [
           {
@@ -66,12 +74,8 @@ export function useMatchGroups() {
             has_validated: remaining.some((candidate) => candidate.validated_at),
           },
         ];
-      });
-      if (removedEntireGroup) {
-        setTotal((groupCount) => groupCount - 1);
-      }
-      return next;
-    });
+      })
+    );
   }, []);
 
   return { matchGroups, total, fetchGroups, handleValidationChange, handleRejected };
