@@ -23,6 +23,7 @@ export const MATCHES_TAB_EMPTY =
   'No proposed matches yet. Run vision matching from Processing.'
 export const TAB_VISION_MATCHING = 'Vision Matching'
 export const TAB_DESCRIPTIONS = 'Descriptions'
+export const TAB_ANALYZE = 'Analyze'
 export const TAB_PERSPECTIVES = 'Perspectives'
 export const TAB_CATALOG_CACHE = 'Catalog Cache'
 export const TAB_JOB_QUEUE = 'Job Queue'
@@ -550,3 +551,22 @@ export const DESC_ERROR_RATE_LIMIT = 'Rate limited — try a different provider 
 export const DESC_ERROR_AUTH = 'Authentication failed — check your API key.'
 export const DESC_ERROR_UNAVAILABLE = 'Provider unavailable — try a different provider.'
 export const DESC_ERROR_GENERIC = 'Description generation failed.'
+
+// Analyze (Processing → Analyze tab, Phase 3 / JOB-06)
+export const ANALYZE_CARD_TITLE = 'Analyze Images'
+export const ANALYZE_CARD_SUBTITLE =
+  'Run AI description + scoring in a single job. Advanced options let you run stages separately.'
+export const ANALYZE_PRIMARY_BUTTON = 'Analyze'
+export const ANALYZE_PRIMARY_BUTTON_STARTING = 'Starting…'
+export const ANALYZE_ADVANCED_RUN_SEPARATELY_TITLE = 'Run stages separately'
+export const ANALYZE_ADVANCED_DESCRIBE_ONLY = 'Generate Descriptions only'
+export const ANALYZE_ADVANCED_SCORE_ONLY = 'Run scoring only'
+export const ANALYZE_FORCE_DESCRIBE_LABEL = 'Force regenerate descriptions'
+export const ANALYZE_FORCE_SCORE_LABEL = 'Force regenerate scores'
+export const ANALYZE_JOB_STARTED =
+  'Analyze job started! Check Job Queue tab to monitor progress.'
+export const ANALYZE_DESCRIBE_JOB_STARTED =
+  'Description generation job started! Check Job Queue tab to monitor progress.'
+export const ANALYZE_SCORE_JOB_STARTED =
+  'Batch scoring job started (1–10 scores + short rationale per perspective). Check Job Queue for progress.'
+export const ANALYZE_JOB_FAILED_PREFIX = 'Failed to start job:'

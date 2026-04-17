@@ -25,7 +25,7 @@ function App() {
               <Route path="matching" element={<Navigate to="/processing" replace />} />
               <Route
                 path="descriptions"
-                element={<Navigate to={{ pathname: '/processing', search: '?tab=descriptions' }} replace />}
+                element={<Navigate to={{ pathname: '/processing', search: '?tab=analyze' }} replace />}
               />
               <Route path="jobs" element={<Navigate to={{ pathname: '/processing', search: '?tab=jobs' }} replace />} />
               <Route

@@ -106,14 +106,14 @@ export function MatchDetailModal({
 
       if (nextCandidate && onCandidateChange) {
         setRejectedAck(true);
-        rejectAdvanceTimerRef.current = window.setTimeout(() => {
+        rejectAdvanceTimerRef.current = setTimeout(() => {
           rejectAdvanceTimerRef.current = null;
           onCandidateChange(nextCandidate);
         }, MULTI_CANDIDATE_REJECT_ADVANCE_MS);
       } else {
         setRejectedAck(true);
         /* 1500ms — MATCH_DETAIL_REJECTED_AUTOCLOSE_MS (D-03 / D-05) */
-        autoCloseTimerRef.current = window.setTimeout(() => {
+        autoCloseTimerRef.current = setTimeout(() => {
           autoCloseTimerRef.current = null;
           onClose();
         }, MATCH_DETAIL_REJECTED_AUTOCLOSE_MS);

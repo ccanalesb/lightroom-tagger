@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, Tab } from '../components/ui/Tabs';
 import { MatchingTab } from '../components/processing/MatchingTab';
-import { DescriptionsTab } from '../components/processing/DescriptionsTab';
+import { AnalyzeTab } from '../components/processing/AnalyzeTab';
 import { CatalogCacheTab } from '../components/processing/CatalogCacheTab';
 import { JobQueueTab } from '../components/processing/JobQueueTab';
 import { ProvidersTab } from '../components/processing/ProvidersTab';
@@ -14,7 +14,7 @@ import { JobsAPI } from '../services/api';
 import type { Job } from '../types/job';
 import {
   TAB_VISION_MATCHING,
-  TAB_DESCRIPTIONS,
+  TAB_ANALYZE,
   TAB_PERSPECTIVES,
   TAB_CATALOG_CACHE,
   TAB_JOB_QUEUE,
@@ -27,7 +27,7 @@ const PAGE_SIZE = 50;
 
 const PROCESSING_TAB_IDS = [
   'matching',
-  'descriptions',
+  'analyze',
   'perspectives',
   'cache',
   'jobs',
@@ -141,7 +141,7 @@ export function ProcessingPage() {
 
   const tabs: Tab[] = [
     { id: 'matching', label: TAB_VISION_MATCHING, content: <MatchingTab /> },
-    { id: 'descriptions', label: TAB_DESCRIPTIONS, content: <DescriptionsTab /> },
+    { id: 'analyze', label: TAB_ANALYZE, content: <AnalyzeTab /> },
     { id: 'perspectives', label: TAB_PERSPECTIVES, content: <PerspectivesTab /> },
     { id: 'cache', label: TAB_CATALOG_CACHE, content: <CatalogCacheTab /> },
     {

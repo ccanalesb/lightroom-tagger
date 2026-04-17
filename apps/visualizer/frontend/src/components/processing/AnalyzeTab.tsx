@@ -5,7 +5,22 @@ import { WorkerSlider } from '../matching/WorkerSlider';
 import { ProviderModelSelect } from '../ui/ProviderModelSelect';
 import { useMatchOptions } from '../../stores/matchOptionsContext';
 import { JobsAPI, PerspectivesAPI, ProvidersAPI } from '../../services/api';
-import { ADVANCED_OPTIONS_TITLE } from '../../constants/strings';
+import {
+  ADVANCED_OPTIONS_TITLE,
+  ANALYZE_ADVANCED_DESCRIBE_ONLY,
+  ANALYZE_ADVANCED_RUN_SEPARATELY_TITLE,
+  ANALYZE_ADVANCED_SCORE_ONLY,
+  ANALYZE_CARD_SUBTITLE,
+  ANALYZE_CARD_TITLE,
+  ANALYZE_DESCRIBE_JOB_STARTED,
+  ANALYZE_FORCE_DESCRIBE_LABEL,
+  ANALYZE_FORCE_SCORE_LABEL,
+  ANALYZE_JOB_FAILED_PREFIX,
+  ANALYZE_JOB_STARTED,
+  ANALYZE_PRIMARY_BUTTON,
+  ANALYZE_PRIMARY_BUTTON_STARTING,
+  ANALYZE_SCORE_JOB_STARTED,
+} from '../../constants/strings';
 
 type ImageType = 'both' | 'instagram' | 'catalog';
 type DateFilter = 'all' | '3months' | '6months' | '12months';
@@ -23,14 +38,16 @@ const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
   { value: '12months', label: 'Last 12 months' },
 ];
 
-export function DescriptionsTab() {
+export function AnalyzeTab() {
   const { options, updateOption } = useMatchOptions();
   const [imageType, setImageType] = useState<ImageType>('both');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [batchMinRating, setBatchMinRating] = useState<number | null>(null);
-  const [force, setForce] = useState(false);
+  const [forceDescribe, setForceDescribe] = useState(false);
+  const [forceScore, setForceScore] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [isStarting, setIsStarting] = useState(false);
+  const [isStartingAnalyze, setIsStartingAnalyze] = useState(false);
+  const [isStartingDescribe, setIsStartingDescribe] = useState(false);
   const [isStartingScore, setIsStartingScore] = useState(false);
   const [descProviderId, setDescProviderId] = useState<string | null>(null);
   const [descProviderModel, setDescProviderModel] = useState<string | null>(null);
@@ -60,11 +77,10 @@ export function DescriptionsTab() {
       .catch(console.error);
   }, []);
 
-  const buildBatchJobMetadata = useCallback((): Record<string, unknown> => {
+  const buildSharedBaseMetadata = useCallback((): Record<string, unknown> => {
     const metadata: Record<string, unknown> = {
       image_type: imageType,
       date_filter: dateFilter,
-      force,
       max_workers: options.maxWorkers,
     };
     if (batchMinRating !== null) metadata.min_rating = batchMinRating;
@@ -76,51 +92,80 @@ export function DescriptionsTab() {
     imageType,
     dateFilter,
     batchMinRating,
-    force,
     options.maxWorkers,
     descProviderId,
     descProviderModel,
     selectedPerspectiveSlugs,
   ]);
 
-  const startDescriptions = useCallback(async () => {
-    setIsStarting(true);
+  const buildBatchJobMetadata = useCallback((): Record<string, unknown> => {
+    return {
+      ...buildSharedBaseMetadata(),
+      force_describe: forceDescribe,
+      force_score: forceScore,
+    };
+  }, [buildSharedBaseMetadata, forceDescribe, forceScore]);
+
+  const startAnalyze = useCallback(async () => {
+    setIsStartingAnalyze(true);
     try {
-      await JobsAPI.create('batch_describe', buildBatchJobMetadata());
-      alert('Description generation job started! Check Job Queue tab to monitor progress.');
+      await JobsAPI.create('batch_analyze', buildBatchJobMetadata());
+      alert(ANALYZE_JOB_STARTED);
     } catch (error) {
-      alert(`Failed to start job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(
+        `${ANALYZE_JOB_FAILED_PREFIX} ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      );
     } finally {
-      setIsStarting(false);
+      setIsStartingAnalyze(false);
     }
   }, [buildBatchJobMetadata]);
 
-  const startBatchScoring = useCallback(async () => {
+  const startDescriptionsOnly = useCallback(async () => {
+    setIsStartingDescribe(true);
+    try {
+      const base = buildSharedBaseMetadata();
+      await JobsAPI.create('batch_describe', { ...base, 'force': forceDescribe });
+      alert(ANALYZE_DESCRIBE_JOB_STARTED);
+    } catch (error) {
+      alert(
+        `${ANALYZE_JOB_FAILED_PREFIX} ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      );
+    } finally {
+      setIsStartingDescribe(false);
+    }
+  }, [buildSharedBaseMetadata, forceDescribe]);
+
+  const startScoringOnly = useCallback(async () => {
     setIsStartingScore(true);
     try {
-      await JobsAPI.create('batch_score', buildBatchJobMetadata());
-      alert(
-        'Batch scoring job started (1–10 scores + short rationale per perspective). Check Job Queue for progress.',
-      );
+      const base = buildSharedBaseMetadata();
+      await JobsAPI.create('batch_score', { ...base, 'force': forceScore });
+      alert(ANALYZE_SCORE_JOB_STARTED);
     } catch (error) {
-      alert(`Failed to start scoring job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(
+        `${ANALYZE_JOB_FAILED_PREFIX} ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+      );
     } finally {
       setIsStartingScore(false);
     }
-  }, [buildBatchJobMetadata]);
+  }, [buildSharedBaseMetadata, forceScore]);
 
   return (
     <div>
       <Card padding="lg">
         <CardHeader>
-          <CardTitle>Generate Image Descriptions</CardTitle>
+          <CardTitle>{ANALYZE_CARD_TITLE}</CardTitle>
         </CardHeader>
 
         <CardContent>
           <div className="space-y-6">
-            <p className="text-sm text-text-secondary">
-              AI-generated descriptions improve matching accuracy by providing semantic context.
-            </p>
+            <p className="text-sm text-text-secondary">{ANALYZE_CARD_SUBTITLE}</p>
 
             <div>
               <label className="block text-sm font-medium text-text mb-2">
@@ -218,13 +263,32 @@ export function DescriptionsTab() {
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
-                id="force-regenerate"
-                checked={force}
-                onChange={(e) => setForce(e.target.checked)}
+                id="force-regenerate-describe"
+                checked={forceDescribe}
+                onChange={(e) => setForceDescribe(e.target.checked)}
                 className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
               />
-              <label htmlFor="force-regenerate" className="text-sm text-text cursor-pointer">
-                Force regenerate existing descriptions
+              <label
+                htmlFor="force-regenerate-describe"
+                className="text-sm text-text cursor-pointer"
+              >
+                {ANALYZE_FORCE_DESCRIBE_LABEL}
+              </label>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="force-regenerate-score"
+                checked={forceScore}
+                onChange={(e) => setForceScore(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
+              />
+              <label
+                htmlFor="force-regenerate-score"
+                className="text-sm text-text cursor-pointer"
+              >
+                {ANALYZE_FORCE_SCORE_LABEL}
               </label>
             </div>
 
@@ -257,24 +321,46 @@ export function DescriptionsTab() {
                   }}
                 />
                 <WorkerSlider value={options.maxWorkers} onChange={(v) => updateOption('maxWorkers', v)} />
+
+                <div className="pt-4 border-t border-border space-y-3">
+                  <h3 className="text-sm font-semibold text-text">
+                    {ANALYZE_ADVANCED_RUN_SEPARATELY_TITLE}
+                  </h3>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    fullWidth
+                    onClick={startDescriptionsOnly}
+                    disabled={isStartingDescribe}
+                  >
+                    {isStartingDescribe
+                      ? ANALYZE_PRIMARY_BUTTON_STARTING
+                      : ANALYZE_ADVANCED_DESCRIBE_ONLY}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    fullWidth
+                    onClick={startScoringOnly}
+                    disabled={isStartingScore}
+                  >
+                    {isStartingScore
+                      ? ANALYZE_PRIMARY_BUTTON_STARTING
+                      : ANALYZE_ADVANCED_SCORE_ONLY}
+                  </Button>
+                </div>
               </div>
             )}
 
             <div className="pt-4 space-y-3">
-              <Button variant="primary" size="lg" fullWidth onClick={startDescriptions} disabled={isStarting}>
-                {isStarting ? 'Starting Job...' : 'Generate Descriptions'}
-              </Button>
-              <p className="text-xs text-text-secondary text-center">
-                Descriptions produce the full structured JSON critique. Scoring runs a separate job that only records numeric scores and brief rationale rows per perspective.
-              </p>
               <Button
-                variant="secondary"
+                variant="primary"
                 size="lg"
                 fullWidth
-                onClick={startBatchScoring}
-                disabled={isStartingScore}
+                onClick={startAnalyze}
+                disabled={isStartingAnalyze}
               >
-                {isStartingScore ? 'Starting…' : 'Run batch scoring'}
+                {isStartingAnalyze ? ANALYZE_PRIMARY_BUTTON_STARTING : ANALYZE_PRIMARY_BUTTON}
               </Button>
             </div>
           </div>
