@@ -940,6 +940,278 @@ def handle_single_score(runner, job_id: str, metadata: dict):
             lib_db.close()
 
 
+def _map_job_progress(progress_range: tuple[float, float], pct: int) -> int:
+    lo, hi = progress_range
+    return int(lo + (hi - lo) * pct / 100)
+
+
+def _run_describe_pass(
+    runner,
+    job_id: str,
+    metadata: dict,
+    lib_db,
+    selection: list[tuple[str, str]],
+    *,
+    db_path: str,
+    progress_range: tuple[float, float],
+    log_prefix: str = "",
+) -> None:
+    """Shared describe pipeline used by handle_batch_describe and (Plan 02) batch_analyze.
+
+    Moves the post-selection processing body of ``handle_batch_describe`` here verbatim; every
+    internal ``update_progress`` call is remapped through ``_map_job_progress(progress_range, …)``
+    and every log message is prefixed with ``log_prefix`` when non-empty. Checkpoint payloads
+    remain ``{'job_type': 'batch_describe', …}`` unchanged (Plan 01 contract).
+    """
+    image_type = metadata.get('image_type', 'both')
+    date_filter = metadata.get('date_filter', 'all')
+    force = metadata.get('force', False)
+    desc_provider_id = metadata.get('provider_id')
+    desc_provider_model = metadata.get('provider_model')
+    max_workers = int(metadata.get('max_workers', 4))
+
+    raw_ps = metadata.get('perspective_slugs')
+    if isinstance(raw_ps, list) and len(raw_ps) > 0:
+        perspective_slugs = [str(x) for x in raw_ps]
+    else:
+        perspective_slugs = None
+
+    images_to_describe: list[tuple[str, str]] = list(selection)
+    total_at_start = len(images_to_describe)
+    fp_bd = fingerprint_batch_describe(metadata, images_to_describe)
+    processed_pairs: set[str] = set()
+    row_bd = get_job(runner.db, job_id)
+    if row_bd:
+        meta_bd = row_bd.get('metadata') or {}
+        if isinstance(meta_bd, dict):
+            chk_bd = meta_bd.get('checkpoint')
+            if (
+                isinstance(chk_bd, dict)
+                and chk_bd.get('checkpoint_version') == 1
+                and chk_bd.get('job_type') == 'batch_describe'
+            ):
+                if chk_bd.get('fingerprint') == fp_bd:
+                    processed_pairs = set(chk_bd.get('processed_pairs') or [])
+                else:
+                    add_job_log(
+                        runner.db,
+                        job_id,
+                        'info',
+                        f'{log_prefix}checkpoint mismatch: batch_describe fingerprint changed, starting fresh'
+                        if log_prefix else
+                        'checkpoint mismatch: batch_describe fingerprint changed, starting fresh',
+                    )
+
+    def pair_label(key: str, itype: str) -> str:
+        return f'{key}|{itype}'
+
+    images_to_describe = [
+        (k, t) for k, t in images_to_describe if pair_label(k, t) not in processed_pairs
+    ]
+
+    if not force and images_to_describe:
+        already_described: set[str] = set()
+        rows_desc = lib_db.execute(
+            "SELECT image_key FROM image_descriptions"
+        ).fetchall()
+        for r in rows_desc:
+            already_described.add(r['image_key'])
+        before_desc = len(images_to_describe)
+        images_to_describe = [
+            (k, t) for k, t in images_to_describe
+            if k not in already_described
+        ]
+        skipped_by_db = before_desc - len(images_to_describe)
+        if skipped_by_db:
+            add_job_log(
+                runner.db, job_id, 'info',
+                f'{log_prefix}Skipped {skipped_by_db} already-described images (DB pre-filter)'
+                if log_prefix else
+                f'Skipped {skipped_by_db} already-described images (DB pre-filter)',
+            )
+
+    total = len(images_to_describe)
+    already_done = total_at_start - total
+    runner.update_progress(
+        job_id,
+        _map_job_progress(progress_range, int(5 + (already_done / max(total_at_start, 1)) * 90)),
+        f'{log_prefix}Found {total_at_start} images to describe ({total} remaining)'
+        if log_prefix else
+        f'Found {total_at_start} images to describe ({total} remaining)',
+    )
+
+    if total_at_start == 0:
+        runner.clear_checkpoint(job_id)
+        runner.complete_job(job_id, {
+            'described': 0, 'skipped': 0, 'failed': 0, 'total': 0,
+        })
+        return
+
+    def record_done(desc_key: str, itype: str) -> bool:
+        processed_pairs.add(pair_label(desc_key, itype))
+        if len(processed_pairs) > _CHECKPOINT_MAX_ENTRIES:
+            runner.fail_job(
+                job_id,
+                'checkpoint too large: exceeds 100000 entries',
+                severity='error',
+            )
+            return False
+        runner.persist_checkpoint(
+            job_id,
+            {
+                'job_type': 'batch_describe',
+                'fingerprint': fp_bd,
+                'processed_pairs': sorted(processed_pairs),
+                'total_at_start': total_at_start,
+            },
+        )
+        return True
+
+    described = 0
+    skipped = 0
+    failed = 0
+    consecutive_failures = 0
+
+    if max_workers > 1 and total > 3:
+        def process_image_worker(key: str, itype: str):
+            """Worker function with its own DB connection."""
+            worker_db = init_database(db_path)
+            try:
+                status, success, error_msg = _describe_single_image(
+                    worker_db, key, itype, force, desc_provider_id, desc_provider_model,
+                    perspective_slugs,
+                )
+                return (key, status, error_msg)
+            finally:
+                worker_db.close()
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(process_image_worker, key, itype): (key, itype)
+                for key, itype in images_to_describe
+            }
+            for completed_parallel, future in enumerate(as_completed(futures), start=1):
+                if runner.is_cancelled(job_id):
+                    add_job_log(
+                        runner.db,
+                        job_id,
+                        'info',
+                        f'{log_prefix}Batch describe cancel noted; finishing already-running tasks'
+                        if log_prefix else
+                        'Batch describe cancel noted; finishing already-running tasks',
+                    )
+                    break
+                coord_key, coord_itype = futures[future]
+                pct = int(5 + ((already_done + completed_parallel) / max(total_at_start, 1)) * 90)
+                runner.update_progress(
+                    job_id,
+                    _map_job_progress(progress_range, pct),
+                    f'{log_prefix}Describing {already_done + completed_parallel}/{total_at_start}'
+                    if log_prefix else
+                    f'Describing {already_done + completed_parallel}/{total_at_start}',
+                )
+
+                try:
+                    result_key, status, error_msg = future.result()
+                    if status == 'described':
+                        described += 1
+                        consecutive_failures = 0
+                        if not record_done(result_key, coord_itype):
+                            break
+                    elif status == 'skipped':
+                        skipped += 1
+                        add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{result_key}: {error_msg}' if log_prefix else f'{result_key}: {error_msg}')
+                        if not record_done(result_key, coord_itype):
+                            break
+                    else:  # failed
+                        failed += 1
+                        consecutive_failures += 1
+                        add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{result_key}: {error_msg}' if log_prefix else f'{result_key}: {error_msg}')
+                except Exception as e:
+                    failed += 1
+                    consecutive_failures += 1
+                    add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{coord_key}: {e}' if log_prefix else f'{coord_key}: {e}')
+
+                if consecutive_failures >= 10:
+                    add_job_log(runner.db, job_id, 'error',
+                                f'{log_prefix}Stopping: {consecutive_failures} consecutive failures'
+                                if log_prefix else
+                                f'Stopping: {consecutive_failures} consecutive failures')
+                    break
+
+        if runner.is_cancelled(job_id):
+            runner.finalize_cancelled(job_id)
+            return
+    else:
+        for idx, (key, itype) in enumerate(images_to_describe, 1):
+            if runner.is_cancelled(job_id):
+                add_job_log(runner.db, job_id, 'info', f'{log_prefix}Batch describe stopped: cancel requested' if log_prefix else 'Batch describe stopped: cancel requested')
+                runner.finalize_cancelled(job_id)
+                return
+            pct = int(5 + ((already_done + idx) / max(total_at_start, 1)) * 90)
+            runner.update_progress(
+                job_id,
+                _map_job_progress(progress_range, pct),
+                f'{log_prefix}Describing {already_done + idx}/{total_at_start}: {key}'
+                if log_prefix else
+                f'Describing {already_done + idx}/{total_at_start}: {key}',
+            )
+
+            status, success, error_msg = _describe_single_image(
+                lib_db, key, itype, force, desc_provider_id, desc_provider_model,
+                perspective_slugs,
+            )
+
+            if status == 'described':
+                described += 1
+                consecutive_failures = 0
+                if not record_done(key, itype):
+                    break
+            elif status == 'skipped':
+                skipped += 1
+                add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{key}: {error_msg}' if log_prefix else f'{key}: {error_msg}')
+                if not record_done(key, itype):
+                    break
+            else:  # failed
+                failed += 1
+                consecutive_failures += 1
+                add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{key}: {error_msg}' if log_prefix else f'{key}: {error_msg}')
+
+            if consecutive_failures >= 10:
+                add_job_log(runner.db, job_id, 'error',
+                            f'{log_prefix}Stopping: {consecutive_failures} consecutive failures'
+                            if log_prefix else
+                            f'Stopping: {consecutive_failures} consecutive failures')
+                break
+
+    row_status = get_job(runner.db, job_id)
+    if row_status and row_status.get('status') == 'failed':
+        return
+
+    result_summary = {
+        'described': described,
+        'skipped': skipped,
+        'failed': failed,
+        'total': total_at_start,
+        'image_type': image_type,
+        'date_filter': date_filter,
+        'force': force,
+    }
+
+    if described == 0 and consecutive_failures >= 10:
+        runner.fail_job(
+            job_id,
+            f'Aborted after {consecutive_failures} consecutive failures'
+            ' with 0 successful descriptions'
+            ' — check file paths and provider connectivity',
+            severity='error',
+        )
+        return
+
+    runner.clear_checkpoint(job_id)
+    runner.complete_job(job_id, result_summary)
+
+
 def handle_batch_describe(runner, job_id: str, metadata: dict):
     """Generate AI descriptions for catalog and/or Instagram images in bulk."""
     lib_db = None
@@ -957,8 +1229,6 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
         image_type = metadata.get('image_type', 'both')  # catalog, instagram, both
         date_filter = metadata.get('date_filter', 'all')  # all, 3months, 6months, 12months
         force = metadata.get('force', False)
-        desc_provider_id = metadata.get('provider_id')
-        desc_provider_model = metadata.get('provider_model')
 
         months = {'3months': 3, '6months': 6, '12months': 12}.get(date_filter)
         min_rating_raw = metadata.get('min_rating')
@@ -968,13 +1238,6 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
                 min_rating = int(min_rating_raw)
             except (TypeError, ValueError):
                 min_rating = None
-        max_workers = int(metadata.get('max_workers', 4))
-
-        raw_ps = metadata.get('perspective_slugs')
-        if isinstance(raw_ps, list) and len(raw_ps) > 0:
-            perspective_slugs = [str(x) for x in raw_ps]
-        else:
-            perspective_slugs = None
 
         from lightroom_tagger.core.database import (
             get_undescribed_catalog_images,
@@ -1021,221 +1284,16 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
                     for img in get_undescribed_instagram_images(lib_db, months=months)
                 ]
 
-        total_at_start = len(images_to_describe)
-        fp_bd = fingerprint_batch_describe(metadata, images_to_describe)
-        processed_pairs: set[str] = set()
-        row_bd = get_job(runner.db, job_id)
-        if row_bd:
-            meta_bd = row_bd.get('metadata') or {}
-            if isinstance(meta_bd, dict):
-                chk_bd = meta_bd.get('checkpoint')
-                if (
-                    isinstance(chk_bd, dict)
-                    and chk_bd.get('checkpoint_version') == 1
-                    and chk_bd.get('job_type') == 'batch_describe'
-                ):
-                    if chk_bd.get('fingerprint') == fp_bd:
-                        processed_pairs = set(chk_bd.get('processed_pairs') or [])
-                    else:
-                        add_job_log(
-                            runner.db,
-                            job_id,
-                            'info',
-                            'checkpoint mismatch: batch_describe fingerprint changed, starting fresh',
-                        )
-
-        def pair_label(key: str, itype: str) -> str:
-            return f'{key}|{itype}'
-
-        images_to_describe = [
-            (k, t) for k, t in images_to_describe if pair_label(k, t) not in processed_pairs
-        ]
-
-        if not force and images_to_describe:
-            already_described: set[str] = set()
-            rows_desc = lib_db.execute(
-                "SELECT image_key FROM image_descriptions"
-            ).fetchall()
-            for r in rows_desc:
-                already_described.add(r['image_key'])
-            before_desc = len(images_to_describe)
-            images_to_describe = [
-                (k, t) for k, t in images_to_describe
-                if k not in already_described
-            ]
-            skipped_by_db = before_desc - len(images_to_describe)
-            if skipped_by_db:
-                add_job_log(
-                    runner.db, job_id, 'info',
-                    f'Skipped {skipped_by_db} already-described images (DB pre-filter)',
-                )
-
-        total = len(images_to_describe)
-        already_done = total_at_start - total
-        runner.update_progress(
+        _run_describe_pass(
+            runner,
             job_id,
-            int(5 + (already_done / max(total_at_start, 1)) * 90),
-            f'Found {total_at_start} images to describe ({total} remaining)',
+            metadata,
+            lib_db,
+            images_to_describe,
+            db_path=db_path,
+            progress_range=(0, 100),
+            log_prefix="",
         )
-
-        if total_at_start == 0:
-            runner.clear_checkpoint(job_id)
-            runner.complete_job(job_id, {
-                'described': 0, 'skipped': 0, 'failed': 0, 'total': 0,
-            })
-            return
-
-        def record_done(desc_key: str, itype: str) -> bool:
-            processed_pairs.add(pair_label(desc_key, itype))
-            if len(processed_pairs) > _CHECKPOINT_MAX_ENTRIES:
-                runner.fail_job(
-                    job_id,
-                    'checkpoint too large: exceeds 100000 entries',
-                    severity='error',
-                )
-                return False
-            # Parallel path: record_done runs in main thread only; calls runner.persist_checkpoint.
-            runner.persist_checkpoint(
-                job_id,
-                {
-                    'job_type': 'batch_describe',
-                    'fingerprint': fp_bd,
-                    'processed_pairs': sorted(processed_pairs),
-                    'total_at_start': total_at_start,
-                },
-            )
-            return True
-
-        described = 0
-        skipped = 0
-        failed = 0
-        consecutive_failures = 0
-
-        # Use parallel processing if max_workers > 1 and batch is large enough
-        if max_workers > 1 and total > 3:
-            def process_image_worker(key: str, itype: str):
-                """Worker function with its own DB connection."""
-                worker_db = init_database(db_path)
-                try:
-                    status, success, error_msg = _describe_single_image(
-                        worker_db, key, itype, force, desc_provider_id, desc_provider_model,
-                        perspective_slugs,
-                    )
-                    return (key, status, error_msg)
-                finally:
-                    worker_db.close()
-
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {
-                    executor.submit(process_image_worker, key, itype): (key, itype)
-                    for key, itype in images_to_describe
-                }
-                for completed_parallel, future in enumerate(as_completed(futures), start=1):
-                    if runner.is_cancelled(job_id):
-                        add_job_log(
-                            runner.db,
-                            job_id,
-                            'info',
-                            'Batch describe cancel noted; finishing already-running tasks',
-                        )
-                        break
-                    coord_key, coord_itype = futures[future]
-                    progress = int(5 + ((already_done + completed_parallel) / max(total_at_start, 1)) * 90)
-                    runner.update_progress(
-                        job_id, progress, f'Describing {already_done + completed_parallel}/{total_at_start}'
-                    )
-
-                    try:
-                        result_key, status, error_msg = future.result()
-                        if status == 'described':
-                            described += 1
-                            consecutive_failures = 0
-                            if not record_done(result_key, coord_itype):
-                                break
-                        elif status == 'skipped':
-                            skipped += 1
-                            add_job_log(runner.db, job_id, 'warning', f'{result_key}: {error_msg}')
-                            if not record_done(result_key, coord_itype):
-                                break
-                        else:  # failed
-                            failed += 1
-                            consecutive_failures += 1
-                            add_job_log(runner.db, job_id, 'warning', f'{result_key}: {error_msg}')
-                    except Exception as e:
-                        failed += 1
-                        consecutive_failures += 1
-                        add_job_log(runner.db, job_id, 'warning', f'{coord_key}: {e}')
-
-                    if consecutive_failures >= 10:
-                        add_job_log(runner.db, job_id, 'error',
-                                    f'Stopping: {consecutive_failures} consecutive failures')
-                        break
-
-            if runner.is_cancelled(job_id):
-                runner.finalize_cancelled(job_id)
-                return
-        else:
-            # Sequential fallback for single worker or small batches
-            for idx, (key, itype) in enumerate(images_to_describe, 1):
-                if runner.is_cancelled(job_id):
-                    add_job_log(runner.db, job_id, 'info', 'Batch describe stopped: cancel requested')
-                    runner.finalize_cancelled(job_id)
-                    return
-                progress = int(5 + ((already_done + idx) / max(total_at_start, 1)) * 90)
-                runner.update_progress(job_id, progress, f'Describing {already_done + idx}/{total_at_start}: {key}')
-
-                status, success, error_msg = _describe_single_image(
-                    lib_db, key, itype, force, desc_provider_id, desc_provider_model,
-                    perspective_slugs,
-                )
-
-                if status == 'described':
-                    described += 1
-                    consecutive_failures = 0
-                    if not record_done(key, itype):
-                        break
-                elif status == 'skipped':
-                    skipped += 1
-                    add_job_log(runner.db, job_id, 'warning', f'{key}: {error_msg}')
-                    if not record_done(key, itype):
-                        break
-                else:  # failed
-                    failed += 1
-                    consecutive_failures += 1
-                    add_job_log(runner.db, job_id, 'warning', f'{key}: {error_msg}')
-
-                if consecutive_failures >= 10:
-                    add_job_log(runner.db, job_id, 'error',
-                                f'Stopping: {consecutive_failures} consecutive failures')
-                    break
-
-        row_status = get_job(runner.db, job_id)
-        if row_status and row_status.get('status') == 'failed':
-            return
-
-        result_summary = {
-            'described': described,
-            'skipped': skipped,
-            'failed': failed,
-            'total': total_at_start,
-            'image_type': image_type,
-            'date_filter': date_filter,
-            'force': force,
-        }
-
-        if described == 0 and consecutive_failures >= 10:
-            runner.fail_job(
-                job_id,
-                f'Aborted after {consecutive_failures} consecutive failures'
-                ' with 0 successful descriptions'
-                ' — check file paths and provider connectivity',
-                severity='error',
-            )
-            return
-
-        runner.clear_checkpoint(job_id)
-        runner.complete_job(job_id, result_summary)
-
     except Exception as e:
         severity = _failure_severity_from_exception(e)
         runner.fail_job(job_id, str(e), severity=severity)
@@ -1246,6 +1304,309 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
             os.environ.pop('DESCRIPTION_VISION_MODEL', None)
         if lib_db:
             lib_db.close()
+
+
+def _run_score_pass(
+    runner,
+    job_id: str,
+    metadata: dict,
+    lib_db,
+    selection: list[tuple[str, str]],
+    *,
+    db_path: str,
+    progress_range: tuple[float, float],
+    log_prefix: str = "",
+) -> None:
+    """Shared score pipeline used by handle_batch_score and (Plan 02) batch_analyze.
+
+    Moves the post-selection processing body of ``handle_batch_score`` here; every internal
+    ``update_progress`` call is remapped through ``_map_job_progress(progress_range, ...)`` and
+    every log message is prefixed with ``log_prefix`` when non-empty. Checkpoint payloads
+    remain ``{'job_type': 'batch_score', ...}`` unchanged (Plan 01 contract).
+    """
+    image_type = metadata.get('image_type', 'both')
+    date_filter = metadata.get('date_filter', 'all')
+    force = metadata.get('force', False)
+    score_provider_id = metadata.get('provider_id')
+    score_provider_model = metadata.get('provider_model')
+    max_workers = int(metadata.get('max_workers', 4))
+
+    raw_ps = metadata.get('perspective_slugs')
+    if isinstance(raw_ps, list) and len(raw_ps) > 0:
+        perspective_slugs = [str(x) for x in raw_ps]
+    else:
+        perspective_slugs = None
+
+    from lightroom_tagger.core.database import list_perspectives
+
+    images_for_scores: list[tuple[str, str]] = list(selection)
+
+    slugs = perspective_slugs
+    if not slugs:
+        slugs = [r['slug'] for r in list_perspectives(lib_db, active_only=True)]
+
+    work_triples: list[tuple[str, str, str]] = [
+        (k, t, s) for k, t in images_for_scores for s in slugs
+    ]
+    total_at_start = len(work_triples)
+    fp_bs = fingerprint_batch_score(metadata, work_triples)
+    processed_triplets: set[str] = set()
+    row_bs = get_job(runner.db, job_id)
+    if row_bs:
+        meta_bs = row_bs.get('metadata') or {}
+        if isinstance(meta_bs, dict):
+            chk_bs = meta_bs.get('checkpoint')
+            if (
+                isinstance(chk_bs, dict)
+                and chk_bs.get('checkpoint_version') == 1
+                and chk_bs.get('job_type') == 'batch_score'
+            ):
+                if chk_bs.get('fingerprint') == fp_bs:
+                    processed_triplets = set(chk_bs.get('processed_triplets') or [])
+                else:
+                    add_job_log(
+                        runner.db,
+                        job_id,
+                        'info',
+                        f'{log_prefix}checkpoint mismatch: batch_score fingerprint changed, starting fresh'
+                        if log_prefix else
+                        'checkpoint mismatch: batch_score fingerprint changed, starting fresh',
+                    )
+
+    def triplet_label(key: str, itype: str, slug: str) -> str:
+        return f'{key}|{itype}|{slug}'
+
+    work_triples = [
+        (k, t, s) for k, t, s in work_triples
+        if triplet_label(k, t, s) not in processed_triplets
+    ]
+
+    if not force and work_triples:
+        from lightroom_tagger.core.scoring_service import compute_prompt_version
+        from lightroom_tagger.core.database import get_perspective_by_slug
+        slug_versions = {}
+        for s in slugs:
+            prow = get_perspective_by_slug(lib_db, s)
+            if prow:
+                slug_versions[s] = compute_prompt_version(prow)
+        if slug_versions:
+            already_scored: set[str] = set()
+            for slug, pv in slug_versions.items():
+                rows = lib_db.execute(
+                    "SELECT image_key, image_type FROM image_scores "
+                    "WHERE perspective_slug = ? AND prompt_version = ? AND is_current = 1",
+                    (slug, pv),
+                ).fetchall()
+                for r in rows:
+                    already_scored.add(triplet_label(r['image_key'], r['image_type'], slug))
+            before = len(work_triples)
+            work_triples = [
+                (k, t, s) for k, t, s in work_triples
+                if triplet_label(k, t, s) not in already_scored
+            ]
+            skipped_by_db = before - len(work_triples)
+            if skipped_by_db:
+                add_job_log(
+                    runner.db, job_id, 'info',
+                    f'{log_prefix}Skipped {skipped_by_db} already-scored triplets (DB pre-filter)'
+                    if log_prefix else
+                    f'Skipped {skipped_by_db} already-scored triplets (DB pre-filter)',
+                )
+
+    total = len(work_triples)
+    already_done = total_at_start - total
+    runner.update_progress(
+        job_id,
+        _map_job_progress(progress_range, int(5 + (already_done / max(total_at_start, 1)) * 90)),
+        f'{log_prefix}Found {total_at_start} scoring units ({total} remaining)'
+        if log_prefix else
+        f'Found {total_at_start} scoring units ({total} remaining)',
+    )
+
+    if total_at_start == 0:
+        runner.clear_checkpoint(job_id)
+        runner.complete_job(job_id, {
+            'scored': 0, 'skipped': 0, 'failed': 0, 'total': 0,
+        })
+        return
+
+    def record_done(score_key: str, itype: str, slug: str) -> bool:
+        processed_triplets.add(triplet_label(score_key, itype, slug))
+        if len(processed_triplets) > _CHECKPOINT_MAX_ENTRIES:
+            runner.fail_job(
+                job_id,
+                'checkpoint too large: exceeds 100000 entries',
+                severity='error',
+            )
+            return False
+        runner.persist_checkpoint(
+            job_id,
+            {
+                'job_type': 'batch_score',
+                'fingerprint': fp_bs,
+                'processed_triplets': sorted(processed_triplets),
+                'total_at_start': total_at_start,
+            },
+        )
+        return True
+
+    scored = 0
+    skipped = 0
+    failed = 0
+    consecutive_failures = 0
+
+    if max_workers > 1 and total > 3:
+        def process_score_worker(key: str, itype: str, slug: str):
+            worker_db = init_database(db_path)
+            try:
+                return _score_single_image(
+                    worker_db, key, itype, slug, force,
+                    score_provider_id, score_provider_model, None,
+                )
+            finally:
+                worker_db.close()
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(process_score_worker, key, itype, slug): (key, itype, slug)
+                for key, itype, slug in work_triples
+            }
+            for completed_parallel, future in enumerate(as_completed(futures), start=1):
+                if runner.is_cancelled(job_id):
+                    add_job_log(
+                        runner.db,
+                        job_id,
+                        'info',
+                        f'{log_prefix}Batch score cancel noted; finishing already-running tasks'
+                        if log_prefix else
+                        'Batch score cancel noted; finishing already-running tasks',
+                    )
+                    break
+                coord_key, coord_itype, coord_slug = futures[future]
+                pct = int(5 + ((already_done + completed_parallel) / max(total_at_start, 1)) * 90)
+                runner.update_progress(
+                    job_id,
+                    _map_job_progress(progress_range, pct),
+                    f'{log_prefix}Scoring {already_done + completed_parallel}/{total_at_start}'
+                    if log_prefix else
+                    f'Scoring {already_done + completed_parallel}/{total_at_start}',
+                )
+                try:
+                    status, _success, error_msg = future.result()
+                    if status == 'scored':
+                        scored += 1
+                        consecutive_failures = 0
+                        if not record_done(coord_key, coord_itype, coord_slug):
+                            break
+                    elif status == 'skipped':
+                        skipped += 1
+                        add_job_log(
+                            runner.db, job_id, 'warning',
+                            f'{log_prefix}{coord_key}|{coord_slug}: {error_msg}'
+                            if log_prefix else
+                            f'{coord_key}|{coord_slug}: {error_msg}',
+                        )
+                        if not record_done(coord_key, coord_itype, coord_slug):
+                            break
+                    else:
+                        failed += 1
+                        consecutive_failures += 1
+                        add_job_log(
+                            runner.db, job_id, 'warning',
+                            f'{log_prefix}{coord_key}|{coord_slug}: {error_msg}'
+                            if log_prefix else
+                            f'{coord_key}|{coord_slug}: {error_msg}',
+                        )
+                except Exception as e:
+                    failed += 1
+                    consecutive_failures += 1
+                    add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{coord_key}: {e}' if log_prefix else f'{coord_key}: {e}')
+
+                if consecutive_failures >= 10:
+                    add_job_log(
+                        runner.db, job_id, 'error',
+                        f'{log_prefix}Stopping: {consecutive_failures} consecutive failures'
+                        if log_prefix else
+                        f'Stopping: {consecutive_failures} consecutive failures',
+                    )
+                    break
+
+        if runner.is_cancelled(job_id):
+            runner.finalize_cancelled(job_id)
+            return
+    else:
+        for idx, (key, itype, slug) in enumerate(work_triples, 1):
+            if runner.is_cancelled(job_id):
+                add_job_log(runner.db, job_id, 'info', f'{log_prefix}Batch score stopped: cancel requested' if log_prefix else 'Batch score stopped: cancel requested')
+                runner.finalize_cancelled(job_id)
+                return
+            pct = int(5 + ((already_done + idx) / max(total_at_start, 1)) * 90)
+            runner.update_progress(
+                job_id,
+                _map_job_progress(progress_range, pct),
+                f'{log_prefix}Scoring {already_done + idx}/{total_at_start}: {key}|{slug}'
+                if log_prefix else
+                f'Scoring {already_done + idx}/{total_at_start}: {key}|{slug}',
+            )
+
+            def log_callback(level, message):
+                add_job_log(runner.db, job_id, level, f'{log_prefix}{message}' if log_prefix else message)
+
+            status, _success, error_msg = _score_single_image(
+                lib_db, key, itype, slug, force,
+                score_provider_id, score_provider_model, log_callback,
+            )
+
+            if status == 'scored':
+                scored += 1
+                consecutive_failures = 0
+                if not record_done(key, itype, slug):
+                    break
+            elif status == 'skipped':
+                skipped += 1
+                add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{key}|{slug}: {error_msg}' if log_prefix else f'{key}|{slug}: {error_msg}')
+                if not record_done(key, itype, slug):
+                    break
+            else:
+                failed += 1
+                consecutive_failures += 1
+                add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{key}|{slug}: {error_msg}' if log_prefix else f'{key}|{slug}: {error_msg}')
+
+            if consecutive_failures >= 10:
+                add_job_log(
+                    runner.db, job_id, 'error',
+                    f'{log_prefix}Stopping: {consecutive_failures} consecutive failures'
+                    if log_prefix else
+                    f'Stopping: {consecutive_failures} consecutive failures',
+                )
+                break
+
+    row_score = get_job(runner.db, job_id)
+    if row_score and row_score.get('status') == 'failed':
+        return
+
+    score_result = {
+        'scored': scored,
+        'skipped': skipped,
+        'failed': failed,
+        'total': total_at_start,
+        'image_type': image_type,
+        'date_filter': date_filter,
+        'force': force,
+    }
+
+    if scored == 0 and consecutive_failures >= 10:
+        runner.fail_job(
+            job_id,
+            f'Aborted after {consecutive_failures} consecutive failures'
+            ' with 0 successful scores'
+            ' — check file paths and provider connectivity',
+            severity='error',
+        )
+        return
+
+    runner.clear_checkpoint(job_id)
+    runner.complete_job(job_id, score_result)
 
 
 def handle_batch_score(runner, job_id: str, metadata: dict):
@@ -1268,9 +1629,6 @@ def handle_batch_score(runner, job_id: str, metadata: dict):
 
         image_type = metadata.get('image_type', 'both')
         date_filter = metadata.get('date_filter', 'all')
-        force = metadata.get('force', False)
-        score_provider_id = metadata.get('provider_id')
-        score_provider_model = metadata.get('provider_model')
 
         months = {'3months': 3, '6months': 6, '12months': 12}.get(date_filter)
         min_rating_raw = metadata.get('min_rating')
@@ -1280,15 +1638,7 @@ def handle_batch_score(runner, job_id: str, metadata: dict):
                 min_rating = int(min_rating_raw)
             except (TypeError, ValueError):
                 min_rating = None
-        max_workers = int(metadata.get('max_workers', 4))
-
-        raw_ps = metadata.get('perspective_slugs')
-        if isinstance(raw_ps, list) and len(raw_ps) > 0:
-            perspective_slugs = [str(x) for x in raw_ps]
-        else:
-            perspective_slugs = None
-
-        from lightroom_tagger.core.database import list_perspectives
+        force = metadata.get('force', False)
 
         images_for_scores: list[tuple[str, str]] = []
 
@@ -1340,248 +1690,16 @@ def handle_batch_score(runner, job_id: str, metadata: dict):
                     ).fetchall()
                 images_for_scores += [(r['media_key'], 'instagram') for r in rows]
 
-        slugs = perspective_slugs
-        if not slugs:
-            slugs = [r['slug'] for r in list_perspectives(lib_db, active_only=True)]
-
-        work_triples: list[tuple[str, str, str]] = [
-            (k, t, s) for k, t in images_for_scores for s in slugs
-        ]
-        total_at_start = len(work_triples)
-        fp_bs = fingerprint_batch_score(metadata, work_triples)
-        processed_triplets: set[str] = set()
-        row_bs = get_job(runner.db, job_id)
-        if row_bs:
-            meta_bs = row_bs.get('metadata') or {}
-            if isinstance(meta_bs, dict):
-                chk_bs = meta_bs.get('checkpoint')
-                if (
-                    isinstance(chk_bs, dict)
-                    and chk_bs.get('checkpoint_version') == 1
-                    and chk_bs.get('job_type') == 'batch_score'
-                ):
-                    if chk_bs.get('fingerprint') == fp_bs:
-                        processed_triplets = set(chk_bs.get('processed_triplets') or [])
-                    else:
-                        add_job_log(
-                            runner.db,
-                            job_id,
-                            'info',
-                            'checkpoint mismatch: batch_score fingerprint changed, starting fresh',
-                        )
-
-        def triplet_label(key: str, itype: str, slug: str) -> str:
-            return f'{key}|{itype}|{slug}'
-
-        work_triples = [
-            (k, t, s) for k, t, s in work_triples
-            if triplet_label(k, t, s) not in processed_triplets
-        ]
-
-        if not force and work_triples:
-            from lightroom_tagger.core.scoring_service import compute_prompt_version
-            from lightroom_tagger.core.database import get_perspective_by_slug
-            slug_versions = {}
-            for s in slugs:
-                prow = get_perspective_by_slug(lib_db, s)
-                if prow:
-                    slug_versions[s] = compute_prompt_version(prow)
-            if slug_versions:
-                already_scored: set[str] = set()
-                for slug, pv in slug_versions.items():
-                    rows = lib_db.execute(
-                        "SELECT image_key, image_type FROM image_scores "
-                        "WHERE perspective_slug = ? AND prompt_version = ? AND is_current = 1",
-                        (slug, pv),
-                    ).fetchall()
-                    for r in rows:
-                        already_scored.add(triplet_label(r['image_key'], r['image_type'], slug))
-                before = len(work_triples)
-                work_triples = [
-                    (k, t, s) for k, t, s in work_triples
-                    if triplet_label(k, t, s) not in already_scored
-                ]
-                skipped_by_db = before - len(work_triples)
-                if skipped_by_db:
-                    add_job_log(
-                        runner.db, job_id, 'info',
-                        f'Skipped {skipped_by_db} already-scored triplets (DB pre-filter)',
-                    )
-
-        total = len(work_triples)
-        already_done = total_at_start - total
-        runner.update_progress(
+        _run_score_pass(
+            runner,
             job_id,
-            int(5 + (already_done / max(total_at_start, 1)) * 90),
-            f'Found {total_at_start} scoring units ({total} remaining)',
+            metadata,
+            lib_db,
+            images_for_scores,
+            db_path=db_path,
+            progress_range=(0, 100),
+            log_prefix="",
         )
-
-        if total_at_start == 0:
-            runner.clear_checkpoint(job_id)
-            runner.complete_job(job_id, {
-                'scored': 0, 'skipped': 0, 'failed': 0, 'total': 0,
-            })
-            return
-
-        def record_done(score_key: str, itype: str, slug: str) -> bool:
-            processed_triplets.add(triplet_label(score_key, itype, slug))
-            if len(processed_triplets) > _CHECKPOINT_MAX_ENTRIES:
-                runner.fail_job(
-                    job_id,
-                    'checkpoint too large: exceeds 100000 entries',
-                    severity='error',
-                )
-                return False
-            runner.persist_checkpoint(
-                job_id,
-                {
-                    'job_type': 'batch_score',
-                    'fingerprint': fp_bs,
-                    'processed_triplets': sorted(processed_triplets),
-                    'total_at_start': total_at_start,
-                },
-            )
-            return True
-
-        scored = 0
-        skipped = 0
-        failed = 0
-        consecutive_failures = 0
-
-        if max_workers > 1 and total > 3:
-            def process_score_worker(key: str, itype: str, slug: str):
-                worker_db = init_database(db_path)
-                try:
-                    return _score_single_image(
-                        worker_db, key, itype, slug, force,
-                        score_provider_id, score_provider_model, None,
-                    )
-                finally:
-                    worker_db.close()
-
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {
-                    executor.submit(process_score_worker, key, itype, slug): (key, itype, slug)
-                    for key, itype, slug in work_triples
-                }
-                for completed_parallel, future in enumerate(as_completed(futures), start=1):
-                    if runner.is_cancelled(job_id):
-                        add_job_log(
-                            runner.db,
-                            job_id,
-                            'info',
-                            'Batch score cancel noted; finishing already-running tasks',
-                        )
-                        break
-                    coord_key, coord_itype, coord_slug = futures[future]
-                    progress = int(5 + ((already_done + completed_parallel) / max(total_at_start, 1)) * 90)
-                    runner.update_progress(
-                        job_id, progress, f'Scoring {already_done + completed_parallel}/{total_at_start}'
-                    )
-                    try:
-                        status, _success, error_msg = future.result()
-                        if status == 'scored':
-                            scored += 1
-                            consecutive_failures = 0
-                            if not record_done(coord_key, coord_itype, coord_slug):
-                                break
-                        elif status == 'skipped':
-                            skipped += 1
-                            add_job_log(
-                                runner.db, job_id, 'warning',
-                                f'{coord_key}|{coord_slug}: {error_msg}',
-                            )
-                            if not record_done(coord_key, coord_itype, coord_slug):
-                                break
-                        else:
-                            failed += 1
-                            consecutive_failures += 1
-                            add_job_log(
-                                runner.db, job_id, 'warning',
-                                f'{coord_key}|{coord_slug}: {error_msg}',
-                            )
-                    except Exception as e:
-                        failed += 1
-                        consecutive_failures += 1
-                        add_job_log(runner.db, job_id, 'warning', f'{coord_key}: {e}')
-
-                    if consecutive_failures >= 10:
-                        add_job_log(
-                            runner.db, job_id, 'error',
-                            f'Stopping: {consecutive_failures} consecutive failures',
-                        )
-                        break
-
-            if runner.is_cancelled(job_id):
-                runner.finalize_cancelled(job_id)
-                return
-        else:
-            for idx, (key, itype, slug) in enumerate(work_triples, 1):
-                if runner.is_cancelled(job_id):
-                    add_job_log(runner.db, job_id, 'info', 'Batch score stopped: cancel requested')
-                    runner.finalize_cancelled(job_id)
-                    return
-                progress = int(5 + ((already_done + idx) / max(total_at_start, 1)) * 90)
-                runner.update_progress(
-                    job_id, progress, f'Scoring {already_done + idx}/{total_at_start}: {key}|{slug}',
-                )
-
-                def log_callback(level, message):
-                    add_job_log(runner.db, job_id, level, message)
-
-                status, _success, error_msg = _score_single_image(
-                    lib_db, key, itype, slug, force,
-                    score_provider_id, score_provider_model, log_callback,
-                )
-
-                if status == 'scored':
-                    scored += 1
-                    consecutive_failures = 0
-                    if not record_done(key, itype, slug):
-                        break
-                elif status == 'skipped':
-                    skipped += 1
-                    add_job_log(runner.db, job_id, 'warning', f'{key}|{slug}: {error_msg}')
-                    if not record_done(key, itype, slug):
-                        break
-                else:
-                    failed += 1
-                    consecutive_failures += 1
-                    add_job_log(runner.db, job_id, 'warning', f'{key}|{slug}: {error_msg}')
-
-                if consecutive_failures >= 10:
-                    add_job_log(
-                        runner.db, job_id, 'error',
-                        f'Stopping: {consecutive_failures} consecutive failures',
-                    )
-                    break
-
-        row_score = get_job(runner.db, job_id)
-        if row_score and row_score.get('status') == 'failed':
-            return
-
-        score_result = {
-            'scored': scored,
-            'skipped': skipped,
-            'failed': failed,
-            'total': total_at_start,
-            'image_type': image_type,
-            'date_filter': date_filter,
-            'force': force,
-        }
-
-        if scored == 0 and consecutive_failures >= 10:
-            runner.fail_job(
-                job_id,
-                f'Aborted after {consecutive_failures} consecutive failures'
-                ' with 0 successful scores'
-                ' — check file paths and provider connectivity',
-                severity='error',
-            )
-            return
-
-        runner.clear_checkpoint(job_id)
-        runner.complete_job(job_id, score_result)
 
     except Exception as e:
         severity = _failure_severity_from_exception(e)
