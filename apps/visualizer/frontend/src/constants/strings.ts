@@ -477,6 +477,18 @@ export const MATCH_REJECT_BODY = 'This will remove the match and blocklist this 
 export const MATCH_REJECT_CANCEL = 'Cancel'
 export const MATCH_REJECT_CONFIRM = 'Reject Match'
 
+/** Inline header label after a successful reject (modal stays open). */
+export const MATCH_DETAIL_REJECTED_LABEL = 'Rejected'
+/** Delay before auto-closing the modal after reject when no further candidates (ms). */
+export const MATCH_DETAIL_REJECTED_AUTOCLOSE_MS = 1500
+/** Badge on fully-rejected tombstone groups (no catalog matches left). */
+export const MATCH_TOMBSTONE_NO_MATCH_BADGE = 'No match'
+/** Row between unvalidated match groups and validated / tombstone groups on Matches tab. */
+export const MATCHES_VALIDATED_DIVIDER_LABEL = '— Validated —'
+/** Non-clickable tombstone card: screen readers only. */
+export const MATCH_TOMBSTONE_CARD_ARIA_LABEL =
+  'Reviewed Instagram post with no remaining catalog matches'
+
 export const MODAL_MATCH_THIS_PHOTO = 'Match This Photo'
 export const MODAL_MATCH_RUNNING = 'Matching...'
 export const MODAL_MATCH_RESULT_FOUND = 'Match found!'
