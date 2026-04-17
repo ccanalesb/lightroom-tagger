@@ -6,6 +6,8 @@ import { JobDetailModal } from '../jobs/JobDetailModal';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
+import { Pagination } from '../ui/Pagination';
+import { JOB_QUEUE_PAGINATION_RANGE } from '../../constants/strings';
 
 function getStatusVariant(status: Job['status']): 'default' | 'success' | 'warning' | 'error' | 'accent' {
   switch (status) {
@@ -27,12 +29,20 @@ function progressWidthPercent(job: Job): number {
   return Math.min(100, p <= 1 ? p * 100 : p);
 }
 
+export interface JobQueueTabPagination {
+  offset: number;
+  limit: number;
+  total: number;
+}
+
 export interface JobQueueTabProps {
   jobs: Job[];
   setJobs: Dispatch<SetStateAction<Job[]>>;
   jobsLoading: boolean;
   connected: boolean;
   onRefreshJobs: () => void | Promise<void>;
+  pagination: JobQueueTabPagination;
+  onOffsetChange: (offset: number) => void;
 }
 
 export function JobQueueTab({
@@ -41,10 +51,23 @@ export function JobQueueTab({
   jobsLoading,
   connected,
   onRefreshJobs,
+  pagination,
+  onOffsetChange,
 }: JobQueueTabProps) {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+
+  const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
+  const totalPages = Math.max(1, Math.ceil(pagination.total / pagination.limit));
+  const rangeStart = pagination.total === 0 ? 0 : pagination.offset + 1;
+  const rangeEnd = Math.min(pagination.offset + jobs.length, pagination.total);
+  const handlePageChange = (page: number) => {
+    const nextOffset = Math.max(0, (page - 1) * pagination.limit);
+    if (nextOffset !== pagination.offset) {
+      onOffsetChange(nextOffset);
+    }
+  };
 
   const cancelJob = async (jobId: string, e: MouseEvent) => {
     e.stopPropagation();
@@ -207,6 +230,19 @@ export function JobQueueTab({
               </tbody>
             </table>
           </div>
+          {pagination.total > pagination.limit && (
+            <div className="flex items-center justify-between gap-4 border-t border-border px-4 py-3">
+              <span className="text-xs text-text-secondary">
+                {JOB_QUEUE_PAGINATION_RANGE(rangeStart, rangeEnd, pagination.total)}
+              </span>
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                disabled={jobsLoading}
+              />
+            </div>
+          )}
         </Card>
       )}
 

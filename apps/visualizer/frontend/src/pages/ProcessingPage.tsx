@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, Tab } from '../components/ui/Tabs';
 import { MatchingTab } from '../components/processing/MatchingTab';
@@ -22,6 +22,8 @@ import {
   TAB_SETTINGS,
   NAV_PROCESSING,
 } from '../constants/strings';
+
+const PAGE_SIZE = 50;
 
 const PROCESSING_TAB_IDS = [
   'matching',
@@ -52,49 +54,69 @@ export function ProcessingPage() {
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsTotal, setJobsTotal] = useState(0);
+  const [jobsOffset, setJobsOffset] = useState(0);
   const [jobsRecoveredBanner, setJobsRecoveredBanner] = useState<string | null>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const refreshJobs = useCallback(async () => {
+  const refreshJobs = useCallback(async (offsetOverride?: number) => {
+    const nextOffset = offsetOverride ?? jobsOffset;
     setJobsLoading(true);
     try {
-      const data = await JobsAPI.list();
-      setJobs(Array.isArray(data) ? data : []);
+      const response = await JobsAPI.list({ limit: PAGE_SIZE, offset: nextOffset });
+      setJobs(Array.isArray(response?.data) ? response.data : []);
+      setJobsTotal(typeof response?.total === 'number' ? response.total : 0);
     } catch (err) {
       console.error('Failed to load jobs:', err);
     } finally {
       setJobsLoading(false);
     }
-  }, []);
+  }, [jobsOffset]);
 
   useEffect(() => {
     let mounted = true;
     async function load() {
       try {
-        const data = await JobsAPI.list();
-        if (mounted) {
-          setJobs(Array.isArray(data) ? data : []);
-        }
+        const response = await JobsAPI.list({ limit: PAGE_SIZE, offset: jobsOffset });
+        if (!mounted) return;
+        setJobs(Array.isArray(response?.data) ? response.data : []);
+        setJobsTotal(typeof response?.total === 'number' ? response.total : 0);
       } catch (err) {
         console.error('Failed to load jobs:', err);
       } finally {
-        if (mounted) {
-          setJobsLoading(false);
-        }
+        if (mounted) setJobsLoading(false);
       }
     }
     void load();
     return () => {
       mounted = false;
     };
+  }, [jobsOffset]);
+
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+    }
+    refreshTimerRef.current = setTimeout(() => {
+      void refreshJobs();
+    }, 400);
+  }, [refreshJobs]);
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+      }
+    };
   }, []);
 
-  const handleJobCreated = useCallback((newJob: Job) => {
-    setJobs((prev) => [newJob, ...prev]);
-  }, []);
+  const handleJobCreated = useCallback(() => {
+    scheduleRefresh();
+  }, [scheduleRefresh]);
 
-  const handleJobUpdated = useCallback((updatedJob: Job) => {
-    setJobs((prev) => prev.map((j) => (j.id === updatedJob.id ? updatedJob : j)));
-  }, []);
+  const handleJobUpdated = useCallback(() => {
+    scheduleRefresh();
+  }, [scheduleRefresh]);
 
   const { connected } = useJobSocket({
     onJobCreated: handleJobCreated,
@@ -125,7 +147,13 @@ export function ProcessingPage() {
           setJobs={setJobs}
           jobsLoading={jobsLoading}
           connected={connected}
-          onRefreshJobs={refreshJobs}
+          onRefreshJobs={() => refreshJobs()}
+          pagination={{
+            offset: jobsOffset,
+            limit: PAGE_SIZE,
+            total: jobsTotal,
+          }}
+          onOffsetChange={setJobsOffset}
         />
       ),
     },
