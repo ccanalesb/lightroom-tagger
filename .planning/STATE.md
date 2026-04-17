@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish & Consolidate
-status: Phase 1 complete — ready to plan Phase 2
-last_updated: "2026-04-17T19:00:00.000Z"
+status: Phase 2 context captured — ready to plan
+last_updated: "2026-04-17T18:06:52.257Z"
 progress:
   total_phases: 6
   completed_phases: 1
@@ -52,6 +52,7 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 
 ## Last update
 
+- **2026-04-17:** Phase 2 context gathered. 4 gray areas discussed (pagination ↔ live updates, log truncation, modal loading UX, page size & refresh semantics). 26 decisions captured in `.planning/phases/02-job-queue-and-processing-ux/02-CONTEXT.md`. Backend: `list_jobs` grows `limit`/`offset` + new `count_jobs` helper + `success_paginated` envelope; `get_job` grows `?logs_limit=N`. Frontend: `ProcessingPage` lifts pagination state, debounced refetch on socket events, hybrid skeleton in `JobDetailModal`, "Show all N logs" expansion, `<Pagination>` wired into `JobQueueTab` (page size 50, reset on filter, Refresh pins page).
 - **2026-04-17:** Phase 1 execution complete. 5 plans / 2 waves / 10 code commits. All automated checks green (13 backend phase tests, 106 frontend tests, lint clean). Pre-existing `test_providers_api.py::TestDefaults` failure noted, unrelated to Phase 1. Verification: 17/17 must-haves passed.
 - **2026-04-17:** Phase 1 planning complete. 5 plans in 2 waves. POLISH-01/02 covered; D-01..D-14 all mapped. Plan-checker passed on iteration 2.
 - **2026-04-17:** v2.1 roadmap approved — 6 phases, 15 requirements. Phase 5 depends on Phase 4 (filter framework). Ready to discuss Phase 1.
