@@ -3,6 +3,7 @@ import os
 import re
 import sqlite3
 from collections import OrderedDict
+from datetime import datetime
 
 from flask import Blueprint, jsonify, request, send_file
 from utils.db import with_db
@@ -645,7 +646,94 @@ def list_matches(db):
                 'best_score': best,
                 'candidate_count': len(candidates),
                 'has_validated': any(c.get('validated_at') for c in candidates),
+                'all_rejected': False if len(candidates) > 0 else True,
             })
+
+        insta_keys_with_matches = frozenset(groups.keys())
+
+        try:
+            rejected_inst_keys = [
+                row['insta_key']
+                for row in db.execute("SELECT DISTINCT insta_key FROM rejected_matches").fetchall()
+                if row.get('insta_key')
+            ]
+        except sqlite3.OperationalError:
+            rejected_inst_keys = []
+
+        tombstone_only_keys = []
+        for ik in rejected_inst_keys:
+            if ik in insta_keys_with_matches:
+                continue
+            still_has = db.execute(
+                "SELECT 1 FROM matches WHERE insta_key = ? LIMIT 1", (ik,)
+            ).fetchone()
+            if not still_has:
+                tombstone_only_keys.append(ik)
+
+        if tombstone_only_keys:
+            keys_to_enrich = [
+                k for k in tombstone_only_keys
+                if k not in dump_instagram_by_key and k not in instagram_lookup
+            ]
+            if keys_to_enrich:
+                chunk_size = 500
+                extra_dump_rows = []
+                for i in range(0, len(keys_to_enrich), chunk_size):
+                    chunk = keys_to_enrich[i:i + chunk_size]
+                    placeholders = ','.join('?' * len(chunk))
+                    extra_dump_rows.extend(
+                        db.execute(
+                            f"SELECT * FROM instagram_dump_media WHERE media_key IN ({placeholders})",
+                            chunk,
+                        ).fetchall()
+                    )
+                for row in _enrich_instagram_media(extra_dump_rows, model_lookup, desc_lookup):
+                    dump_instagram_by_key[row['key']] = row
+
+        for ik in tombstone_only_keys:
+            match_groups.append({
+                'instagram_key': ik,
+                'instagram_image': instagram_lookup.get(ik) or dump_instagram_by_key.get(ik),
+                'candidates': [],
+                'best_score': 0.0,
+                'candidate_count': 0,
+                'has_validated': False,
+                'all_rejected': True,
+            })
+
+        def _parse_ts(ts):
+            if not ts:
+                return None
+            s = str(ts).replace('Z', '+00:00')
+            try:
+                return datetime.fromisoformat(s).timestamp()
+            except ValueError:
+                return None
+
+        def _photo_ts_float(group_dict):
+            ig = group_dict.get('instagram_image') or {}
+            if isinstance(ig, dict):
+                ts = _parse_ts(ig.get('created_at'))
+                if ts is not None:
+                    return ts
+            best_cat_ts = None
+            for c in group_dict.get('candidates') or []:
+                cat = c.get('catalog_image') or {}
+                dt = cat.get('date_taken')
+                t = _parse_ts(dt)
+                if t is not None and (best_cat_ts is None or t > best_cat_ts):
+                    best_cat_ts = t
+            return best_cat_ts
+
+        def _match_group_sort_key(g):
+            # Bucket 0 = actionable (unvalidated, not all-rejected tombstone); 1 = reviewed bucket.
+            sort_bucket = 1 if (g.get('all_rejected') or g.get('has_validated')) else 0
+            photo_ts = _photo_ts_float(g)
+            if photo_ts is None:
+                return (sort_bucket, 1, 0.0)
+            return (sort_bucket, 0, -photo_ts)
+
+        match_groups.sort(key=_match_group_sort_key)
 
         limit, offset = _clamp_pagination(
             request.args.get('limit', 50, type=int),
