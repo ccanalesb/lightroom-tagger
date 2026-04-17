@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   MODAL_CLOSE,
   MATCHING_RESULTS,
@@ -9,9 +9,12 @@ import {
   MATCH_VALIDATED,
   MATCH_REJECT,
   MATCH_DETAIL_UNVALIDATE_FIRST,
+  MATCH_DETAIL_REJECTED_LABEL,
+  MATCH_DETAIL_REJECTED_AUTOCLOSE_MS,
 } from '../../../constants/strings';
 import type { Match, MatchGroup } from '../../../services/api';
 import { MatchingAPI } from '../../../services/api';
+import { Badge } from '../../ui/Badge';
 import { CandidateTabBar } from './CandidateTabBar';
 import { MatchImagesSection } from './MatchImagesSection';
 import { MatchDescriptionsSection } from './MatchDescriptionsSection';
@@ -19,6 +22,17 @@ import { MatchMetadataSection } from './MatchMetadataSection';
 import { RejectConfirmModal } from './RejectConfirmModal';
 import { VisionReasoningNote } from './VisionReasoningNote';
 import { visionBadgeClasses } from '../../../utils/visionBadge';
+
+/** Delay before switching tabs after reject when another candidate exists (modal stays open). */
+export const MULTI_CANDIDATE_REJECT_ADVANCE_MS = 800;
+
+function findNextCandidateInOrder(candidates: Match[], current: Match): Match | undefined {
+  const idx = candidates.findIndex(
+    (c) => c.catalog_key === current.catalog_key && c.instagram_key === current.instagram_key,
+  );
+  if (idx === -1 || idx >= candidates.length - 1) return undefined;
+  return candidates[idx + 1];
+}
 
 interface MatchDetailModalProps {
   match: Match;
@@ -42,10 +56,32 @@ export function MatchDetailModal({
   const [validated, setValidated] = useState(!!match.validated_at);
   const [busy, setBusy] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectedAck, setRejectedAck] = useState(false);
+  const autoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rejectAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function clearRejectFlowTimers() {
+    if (autoCloseTimerRef.current !== null) {
+      clearTimeout(autoCloseTimerRef.current);
+      autoCloseTimerRef.current = null;
+    }
+    if (rejectAdvanceTimerRef.current !== null) {
+      clearTimeout(rejectAdvanceTimerRef.current);
+      rejectAdvanceTimerRef.current = null;
+    }
+  }
 
   useEffect(() => {
     setValidated(!!match.validated_at);
   }, [match.validated_at]);
+
+  useEffect(() => {
+    setRejectedAck(false);
+    clearRejectFlowTimers();
+    return () => {
+      clearRejectFlowTimers();
+    };
+  }, [match.catalog_key, match.instagram_key]);
 
   async function handleValidate() {
     setBusy(true);
@@ -59,11 +95,29 @@ export function MatchDetailModal({
   }
 
   async function handleRejectConfirm() {
+    const candidates = resolvedGroup?.candidates ?? [];
+    const nextCandidate = findNextCandidateInOrder(candidates, match);
+
     setBusy(true);
     try {
       await MatchingAPI.reject(match.catalog_key, match.instagram_key);
       onRejected?.(match);
-      onClose();
+      clearRejectFlowTimers();
+
+      if (nextCandidate && onCandidateChange) {
+        setRejectedAck(true);
+        rejectAdvanceTimerRef.current = window.setTimeout(() => {
+          rejectAdvanceTimerRef.current = null;
+          onCandidateChange(nextCandidate);
+        }, MULTI_CANDIDATE_REJECT_ADVANCE_MS);
+      } else {
+        setRejectedAck(true);
+        /* 1500ms — MATCH_DETAIL_REJECTED_AUTOCLOSE_MS (D-03 / D-05) */
+        autoCloseTimerRef.current = window.setTimeout(() => {
+          autoCloseTimerRef.current = null;
+          onClose();
+        }, MATCH_DETAIL_REJECTED_AUTOCLOSE_MS);
+      }
     } finally {
       setBusy(false);
       setShowRejectModal(false);
@@ -83,27 +137,34 @@ export function MatchDetailModal({
           className="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex justify-between items-center p-4 border-b">
-            <h3 className="text-lg font-bold text-gray-900">{MATCHING_RESULTS}</h3>
-            <div className="flex items-center gap-2">
+          <div className="flex justify-between items-center p-4 border-b gap-3">
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+              <h3 className="text-lg font-bold text-gray-900">{MATCHING_RESULTS}</h3>
+              {rejectedAck ? (
+                <Badge variant="error" className="shrink-0">
+                  {MATCH_DETAIL_REJECTED_LABEL}
+                </Badge>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={handleValidate}
-                disabled={busy}
+                disabled={busy || validated || rejectedAck}
                 className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
                   validated
                     ? 'bg-green-600 text-white hover:bg-green-700'
                     : 'border border-green-600 text-green-600 hover:bg-green-50'
-                }`}
+                } ${busy || validated || rejectedAck ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 {validated ? `\u2713 ${MATCH_VALIDATED}` : MATCH_VALIDATE}
               </button>
               <button
                 type="button"
                 onClick={() => setShowRejectModal(true)}
-                disabled={busy || validated}
+                disabled={busy || validated || rejectedAck}
                 className={`px-3 py-1 rounded text-sm font-medium border transition-colors ${
-                  validated
+                  validated || rejectedAck
                     ? 'border-gray-300 text-gray-300 cursor-not-allowed'
                     : 'border-red-500 text-red-500 hover:bg-red-50'
                 }`}
