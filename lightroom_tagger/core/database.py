@@ -253,7 +253,8 @@ def init_database(db_path: str) -> sqlite3.Connection:
             instagram_folder TEXT,
             crawled_at TEXT,
             phash TEXT,
-            exif TEXT
+            exif TEXT,
+            created_at TEXT
         );
 
         CREATE INDEX IF NOT EXISTS idx_insta_images_local_path ON instagram_images(local_path);
@@ -352,6 +353,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
 
     # Migrations for existing databases
     _migrate_add_column(conn, 'instagram_dump_media', 'last_attempted_at', 'TEXT')
+    _migrate_add_column(conn, 'instagram_images', 'created_at', 'TEXT')
     _migrate_add_column(conn, 'matches', 'model_used', 'TEXT')
     _migrate_add_column(conn, 'matches', 'validated_at', 'TEXT')
     _migrate_add_column(conn, 'matches', 'rank', 'INTEGER DEFAULT 1')
@@ -1297,14 +1299,58 @@ def store_match(db: sqlite3.Connection, record: dict, commit: bool = True) -> st
     return f"{catalog_key} <-> {insta_key}"
 
 
+def _backfill_instagram_created_at_from_catalog(
+    db: sqlite3.Connection, catalog_key: str, insta_key: str
+) -> None:
+    """If catalog has date_taken and Instagram side has no created_at, copy it (D-12)."""
+    cat = db.execute(
+        "SELECT date_taken FROM images WHERE key = ?", (catalog_key,)
+    ).fetchone()
+    if not cat:
+        return
+    raw_dt = cat.get("date_taken")
+    if raw_dt is None or (isinstance(raw_dt, str) and not raw_dt.strip()):
+        return
+    date_val = raw_dt.strip() if isinstance(raw_dt, str) else str(raw_dt)
+
+    insta_img = db.execute(
+        "SELECT key, created_at FROM instagram_images WHERE key = ? LIMIT 1",
+        (insta_key,),
+    ).fetchone()
+    if insta_img is not None:
+        ca = insta_img.get("created_at")
+        if ca is None or (isinstance(ca, str) and not str(ca).strip()):
+            db.execute(
+                "UPDATE instagram_images SET created_at = ? WHERE key = ?",
+                (date_val, insta_key),
+            )
+        return
+
+    dump = db.execute(
+        "SELECT media_key, created_at FROM instagram_dump_media WHERE media_key = ? LIMIT 1",
+        (insta_key,),
+    ).fetchone()
+    if dump is None:
+        return
+    ca = dump.get("created_at")
+    if ca is None or (isinstance(ca, str) and not str(ca).strip()):
+        db.execute(
+            "UPDATE instagram_dump_media SET created_at = ? WHERE media_key = ?",
+            (date_val, insta_key),
+        )
+
+
 def validate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bool:
     """Stamp a match as human-validated."""
-    cursor = db.execute(
-        "UPDATE matches SET validated_at = ? WHERE catalog_key = ? AND insta_key = ?",
-        (datetime.now().isoformat(), catalog_key, insta_key),
-    )
-    db.commit()
-    return cursor.rowcount > 0
+    with db:
+        cursor = db.execute(
+            "UPDATE matches SET validated_at = ? WHERE catalog_key = ? AND insta_key = ?",
+            (datetime.now().isoformat(), catalog_key, insta_key),
+        )
+        if cursor.rowcount == 0:
+            return False
+        _backfill_instagram_created_at_from_catalog(db, catalog_key, insta_key)
+    return True
 
 
 def unvalidate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bool:
