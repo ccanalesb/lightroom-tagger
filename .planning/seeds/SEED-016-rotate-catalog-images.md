@@ -46,11 +46,22 @@ any of:
 
 **Medium** — a phase or two.
 
+**Hard constraint: never modify the source image.** Rotation is a display-only
+concern. The original catalog file (and anything referenced by Lightroom) must
+stay untouched. Default implementation is a CSS transform on the rendered
+`<img>` — source bytes are never rewritten.
+
+Open discussion (not default): if display-time rotation ever becomes
+expensive or messy to maintain (e.g., interactions with layout, export, or
+pre-generated thumbnail sizes), it may be cheaper to rotate the **compressed /
+cached preview** instead — still never the original. This is a trade-off to
+revisit when the seed surfaces, not a decision to make now.
+
 Minimum viable slice (must-have):
 
 - Rotation control (left 90° / right 90°, keyboard shortcut) on catalog images
   inside the match detail modal.
-- CSS `transform: rotate(...)` on the image element; preserves source file.
+- CSS `transform: rotate(...)` on the image element; source file untouched.
 - Respect image EXIF orientation if it isn't already being honored (verify
   first — may be handled by the browser, may not).
 
@@ -59,14 +70,14 @@ Full medium scope (why this isn't "small"):
 - Apply the same rotation control to **every surface** that displays catalog
   images: `CatalogImageModal`, `CatalogImageCard`, `CatalogTab`, match card,
   identity grids, insights strips.
-- Decide on persistence model:
+- Decide on persistence model (all options keep the source file untouched):
   1. **Session-only** — rotation resets on reload (simplest, no backend).
   2. **Per-user preference** — persisted locally (localStorage) keyed by
      `catalog_key`.
-  3. **Catalog-level** — stored in DB so it follows the image everywhere and
-     optionally writes back to the Lightroom catalog. Biggest payoff, biggest
-     scope.
-- Likely land on (2) for this milestone and leave (3) as a follow-up.
+  3. **Catalog-level metadata** — stored in our DB as a display-rotation
+     value tied to `catalog_key`; never written back to Lightroom, never
+     applied to the source file.
+  - Likely land on (2) for this milestone and leave (3) as a follow-up.
 - Extract a small reusable `RotatableImage` (or similar) component so every
   catalog-image surface gets the behavior for free — this is the architectural
   payoff that justifies medium over small.
@@ -80,6 +91,9 @@ Risks / open questions:
   transform; verify on the Images page where many render at once).
 - Interaction with any future crop / zoom / pan features — design the API so
   it composes.
+- If we ever need to rotate the compressed/cached preview (fallback path),
+  make sure it's clearly a **derived artifact** — regeneratable from the
+  untouched source, never the only copy.
 
 ## Breadcrumbs
 
