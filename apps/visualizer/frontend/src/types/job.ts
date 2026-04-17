@@ -13,6 +13,7 @@ export interface Job {
   progress: number
   current_step: string | null
   logs: JobLog[]
+  logs_total?: number
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   result: any | null
   error: string | null

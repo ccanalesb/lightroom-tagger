@@ -152,8 +152,10 @@ export function DashboardPage() {
       setLoadingFrequency(false)
 
       if (r4.status === 'fulfilled') {
-        const pending = r4.value.filter((job) => job.status === 'pending' || job.status === 'running')
-          .length
+        const jobsList = Array.isArray(r4.value?.data) ? r4.value.data : []
+        const pending = jobsList.filter(
+          (job) => job.status === 'pending' || job.status === 'running',
+        ).length
         setActiveJobs(pending)
       } else {
         setActiveJobs(0)

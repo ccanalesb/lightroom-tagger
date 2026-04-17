@@ -8,48 +8,100 @@ describe('JobsAPI', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
-  
-  it('should list all jobs', async () => {
-    const mockJobs = [{ id: '1', type: 'test', status: 'pending' }]
+
+  it('should list all jobs (paginated envelope)', async () => {
+    const envelope = {
+      total: 1,
+      data: [{ id: '1', type: 'test', status: 'pending' }],
+      pagination: { offset: 0, limit: 50, current_page: 1, total_pages: 1, has_more: false },
+    }
     fetchMock.mockResolvedValueOnce({
       ok: true,
-      json: async () => mockJobs,
+      json: async () => envelope,
     })
-    
-    const jobs = await JobsAPI.list()
-    
+
+    const result = await JobsAPI.list()
+
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/jobs/'),
       expect.objectContaining({ headers: { 'Content-Type': 'application/json' } })
     )
-    expect(jobs).toEqual(mockJobs)
+    expect(result).toEqual(envelope)
+    expect(result.data).toHaveLength(1)
+    expect(result.total).toBe(1)
   })
-  
+
+  it('list() forwards status, limit, and offset as query params', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        total: 0,
+        data: [],
+        pagination: { offset: 100, limit: 25, current_page: 5, total_pages: 0, has_more: false },
+      }),
+    })
+    await JobsAPI.list({ status: 'pending', limit: 25, offset: 100 })
+    const url = fetchMock.mock.calls[0][0] as string
+    expect(url).toContain('status=pending')
+    expect(url).toContain('limit=25')
+    expect(url).toContain('offset=100')
+  })
+
+  it('get(id) without options calls /jobs/<id> with no query string', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 'abc', logs: [], logs_total: 0 }),
+    })
+    await JobsAPI.get('abc')
+    const url = fetchMock.mock.calls[0][0] as string
+    expect(url).toMatch(/\/jobs\/abc$/)
+  })
+
+  it('get(id, { logs_limit: 20 }) appends ?logs_limit=20', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 'abc', logs: [], logs_total: 0 }),
+    })
+    await JobsAPI.get('abc', { logs_limit: 20 })
+    const url = fetchMock.mock.calls[0][0] as string
+    expect(url).toContain('logs_limit=20')
+  })
+
+  it('get(id, { logs_limit: 0 }) still appends ?logs_limit=0 (expand path)', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 'abc', logs: [], logs_total: 0 }),
+    })
+    await JobsAPI.get('abc', { logs_limit: 0 })
+    const url = fetchMock.mock.calls[0][0] as string
+    expect(url).toContain('logs_limit=0')
+  })
+
   it('should get job by id', async () => {
     const mockJob = { id: '123', type: 'test', status: 'running' }
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => mockJob,
     })
-    
+
     const job = await JobsAPI.get('123')
-    
+
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/jobs/123'),
       expect.any(Object)
     )
     expect(job).toEqual(mockJob)
   })
-  
+
   it('should create job', async () => {
     const mockJob = { id: '456', type: 'analyze', status: 'pending' }
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => mockJob,
     })
-    
+
     const job = await JobsAPI.create('analyze', { test: true })
-    
+
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/jobs/'),
       expect.objectContaining({
@@ -59,14 +111,14 @@ describe('JobsAPI', () => {
     )
     expect(job).toEqual(mockJob)
   })
-  
+
   it('should throw on error', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: false,
       status: 404,
       statusText: 'Not Found',
     })
-    
+
     await expect(JobsAPI.get('nonexistent')).rejects.toThrow('404 Not Found')
   })
 })

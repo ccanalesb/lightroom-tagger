@@ -48,7 +48,11 @@ describe('DashboardPage', () => {
       buckets: [{ bucket_start: '2025-01-01', count: 1 }],
       meta: { timezone_assumption: 'UTC' },
     })
-    vi.spyOn(JobsAPI, 'list').mockResolvedValue([])
+    vi.spyOn(JobsAPI, 'list').mockResolvedValue({
+      total: 0,
+      data: [],
+      pagination: { offset: 0, limit: 50, current_page: 1, total_pages: 0, has_more: false },
+    })
   })
 
   afterEach(() => {

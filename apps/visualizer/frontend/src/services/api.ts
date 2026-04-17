@@ -107,12 +107,34 @@ export const PerspectivesAPI = {
     ),
 }
 
-export const JobsAPI = {
-  list: (status?: string) =>
-    request<Job[]>(status? `/jobs/?status=${status}` : '/jobs/'),
+export interface JobsListResponse {
+  total: number
+  data: Job[]
+  pagination: PaginationMeta
+}
 
-  get: (id: string) =>
-    request<Job>(`/jobs/${id}`),
+export interface JobsGetOptions {
+  logs_limit?: number
+}
+
+export const JobsAPI = {
+  list: (params?: { status?: string; limit?: number; offset?: number }) => {
+    const sp = new URLSearchParams()
+    if (params?.status) sp.set('status', params.status)
+    if (params?.limit !== undefined) sp.set('limit', String(params.limit))
+    if (params?.offset !== undefined) sp.set('offset', String(params.offset))
+    const qs = sp.toString()
+    return request<JobsListResponse>(`/jobs/${qs ? `?${qs}` : ''}`)
+  },
+
+  get: (id: string, options?: JobsGetOptions) => {
+    const sp = new URLSearchParams()
+    if (options?.logs_limit !== undefined) {
+      sp.set('logs_limit', String(options.logs_limit))
+    }
+    const qs = sp.toString()
+    return request<Job>(`/jobs/${id}${qs ? `?${qs}` : ''}`)
+  },
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   create: (type: string, metadata?: Record<string, any>) =>

@@ -228,6 +228,17 @@ export const JOB_DETAILS_METADATA = 'Metadata'
 export const JOB_DETAILS_RESULT = 'Result'
 export const JOB_DETAILS_ERROR = 'Error'
 export const JOB_DETAILS_LOGS = 'Logs'
+export const JOB_DETAILS_LOGS_TRUNCATED_HEADER = (shown: number, total: number) =>
+  `Logs (${shown} of ${total})`
+export const JOB_DETAILS_LOGS_SHOW_ALL = (total: number) => `Show all ${total} logs`
+export const JOB_DETAILS_LOGS_SHOW_ALL_LOADING = 'Loading…'
+export const JOB_DETAILS_LOADING_ARIA = 'Loading job details'
+export const JOB_DETAILS_FETCH_ERROR =
+  'Could not refresh job details. Showing the last known summary.'
+
+// Job Queue
+export const JOB_QUEUE_PAGINATION_RANGE = (start: number, end: number, total: number) =>
+  `Showing ${start}–${end} of ${total}`
 
 // Job Configuration Display
 export const JOB_CONFIG_METHOD = 'Matching Method'
