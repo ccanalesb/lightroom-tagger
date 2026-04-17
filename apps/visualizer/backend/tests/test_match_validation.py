@@ -106,6 +106,43 @@ def test_validate_writes_catalog_date_to_instagram_created_at_write_when_missing
         assert row['created_at'] == catalog_date
 
 
+def test_validate_writes_catalog_date_to_instagram_when_created_at_missing():
+    """D-12: missing instagram_images.created_at is filled from catalog date_taken on validate."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, 'test.db')
+        db = init_database(db_path)
+        catalog_date = '2024-03-20T08:00:00'
+        insta_key = 'insta_row_001'
+        db.execute(
+            "INSERT INTO images (key, filename, filepath, date_taken) VALUES (?, ?, ?, ?)",
+            ('cat_ig_001', 'photo.jpg', '/fake/photo.jpg', catalog_date),
+        )
+        db.execute(
+            "INSERT INTO instagram_images (key, local_path, post_url, filename, created_at) "
+            "VALUES (?, ?, ?, ?, NULL)",
+            (insta_key, '/fake/a.jpg', '', 'a.jpg'),
+        )
+        db.execute(
+            "INSERT INTO matches (catalog_key, insta_key, total_score, vision_result, validated_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ('cat_ig_001', insta_key, 0.85, 'SAME', None),
+        )
+        db.commit()
+        db.close()
+
+        client = _make_client(db_path)
+        resp = client.patch(f'/api/images/matches/cat_ig_001/{insta_key}/validate')
+        assert resp.status_code == 200
+
+        db = init_database(db_path)
+        row = db.execute(
+            "SELECT created_at FROM instagram_images WHERE key = ?",
+            (insta_key,),
+        ).fetchone()
+        db.close()
+        assert row['created_at'] == catalog_date
+
+
 def test_reject_match_should_delete_and_blocklist():
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, 'test.db')
