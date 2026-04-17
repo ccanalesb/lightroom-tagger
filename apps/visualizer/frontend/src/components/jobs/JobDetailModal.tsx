@@ -115,6 +115,16 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
   }, [job.id]);
 
   useEffect(() => {
+    setLocalJob((prev) =>
+      prev.id === job.id &&
+      prev.status === job.status &&
+      prev.progress === job.progress
+        ? prev
+        : { ...prev, status: job.status, progress: job.progress, current_step: job.current_step }
+    );
+  }, [job.id, job.status, job.progress, job.current_step]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setFetchError(null);

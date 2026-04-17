@@ -145,3 +145,21 @@ def test_get_job_logs_total_present_when_no_param(client):
     response = client.get(f'/api/jobs/{job_id}').json
     assert len(response['logs']) == 3
     assert response['logs_total'] == 3
+
+
+def test_list_jobs_limit_clamped_below(client):
+    response = client.get('/api/jobs/?limit=0')
+    assert response.status_code == 200
+    assert response.json['pagination']['limit'] == 1
+
+
+def test_list_jobs_limit_clamped_above(client):
+    response = client.get('/api/jobs/?limit=10000')
+    assert response.status_code == 200
+    assert response.json['pagination']['limit'] == 500
+
+
+def test_list_jobs_offset_clamped_negative(client):
+    response = client.get('/api/jobs/?offset=-5')
+    assert response.status_code == 200
+    assert response.json['pagination']['offset'] == 0

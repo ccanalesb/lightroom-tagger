@@ -58,39 +58,45 @@ export function ProcessingPage() {
   const [jobsOffset, setJobsOffset] = useState(0);
   const [jobsRecoveredBanner, setJobsRecoveredBanner] = useState<string | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const jobsReqSeqRef = useRef(0);
 
   const refreshJobs = useCallback(async (offsetOverride?: number) => {
     const nextOffset = offsetOverride ?? jobsOffset;
+    const seq = ++jobsReqSeqRef.current;
     setJobsLoading(true);
     try {
       const response = await JobsAPI.list({ limit: PAGE_SIZE, offset: nextOffset });
+      if (seq !== jobsReqSeqRef.current) return;
       setJobs(Array.isArray(response?.data) ? response.data : []);
       setJobsTotal(typeof response?.total === 'number' ? response.total : 0);
     } catch (err) {
+      if (seq !== jobsReqSeqRef.current) return;
       console.error('Failed to load jobs:', err);
     } finally {
-      setJobsLoading(false);
+      if (seq === jobsReqSeqRef.current) {
+        setJobsLoading(false);
+      }
     }
   }, [jobsOffset]);
 
   useEffect(() => {
-    let mounted = true;
+    const seq = ++jobsReqSeqRef.current;
     async function load() {
       try {
         const response = await JobsAPI.list({ limit: PAGE_SIZE, offset: jobsOffset });
-        if (!mounted) return;
+        if (seq !== jobsReqSeqRef.current) return;
         setJobs(Array.isArray(response?.data) ? response.data : []);
         setJobsTotal(typeof response?.total === 'number' ? response.total : 0);
       } catch (err) {
+        if (seq !== jobsReqSeqRef.current) return;
         console.error('Failed to load jobs:', err);
       } finally {
-        if (mounted) setJobsLoading(false);
+        if (seq === jobsReqSeqRef.current) {
+          setJobsLoading(false);
+        }
       }
     }
     void load();
-    return () => {
-      mounted = false;
-    };
   }, [jobsOffset]);
 
   const scheduleRefresh = useCallback(() => {
