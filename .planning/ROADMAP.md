@@ -35,7 +35,7 @@
 
 Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a continuation of v2.0.
 
-- [ ] Phase 1: Matching & review polish — POLISH-01, POLISH-02
+- [x] Phase 1: Matching & review polish — POLISH-01, POLISH-02 — completed 2026-04-17
 - [ ] Phase 2: Job queue & processing UX — JOB-03, JOB-04, JOB-05
 - [ ] Phase 3: Unified Analyze job — JOB-06
 - [ ] Phase 4: Reusable filter framework — FILTER-01, FILTER-02
@@ -46,7 +46,7 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 
 | Phase | Goal | Requirements | Success criteria | Status |
 |-------|------|--------------|------------------|--------|
-| 1. Matching & review polish | Smooth the match-review flow | POLISH-01, POLISH-02 | 3 | Pending |
+| 1. Matching & review polish | Smooth the match-review flow | POLISH-01, POLISH-02 | 3 | ✅ Complete (2026-04-17) |
 | 2. Job queue & processing UX | Make heavy jobs and long queues feel fast | JOB-03, JOB-04, JOB-05 | 4 | Pending |
 | 3. Unified Analyze job | One default flow for full AI analysis | JOB-06 | 3 | Pending |
 | 4. Reusable filter framework | Declarative filter foundation (proved by CatalogTab) | FILTER-01, FILTER-02 | 4 | Pending |

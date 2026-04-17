@@ -12,8 +12,8 @@
 
 ### Matching & review flow polish
 
-- [ ] **POLISH-01**: User can reject a match without losing context — modal stays open, shows rejected state, auto-advances to the next candidate when the match group has multiple candidates _(SEED-004)_
-- [ ] **POLISH-02**: User sees matches sorted with unvalidated groups first, then by newest photo (Instagram `created_at`) within each bucket _(SEED-015)_
+- [x] **POLISH-01**: User can reject a match without losing context — modal stays open, shows rejected state, auto-advances to the next candidate when the match group has multiple candidates _(SEED-004)_ — completed 2026-04-17 (Phase 1)
+- [x] **POLISH-02**: User sees matches sorted with unvalidated groups first, then by newest photo (Instagram `created_at`) within each bucket _(SEED-015)_ — completed 2026-04-17 (Phase 1)
 
 ### Job queue & processing UX
 
@@ -73,8 +73,8 @@ These requirements were considered but deferred to a later milestone.
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| POLISH-01 | Phase 1 | Pending |
-| POLISH-02 | Phase 1 | Pending |
+| POLISH-01 | Phase 1 | Complete |
+| POLISH-02 | Phase 1 | Complete |
 | JOB-03 | Phase 2 | Pending |
 | JOB-04 | Phase 2 | Pending |
 | JOB-05 | Phase 2 | Pending |
