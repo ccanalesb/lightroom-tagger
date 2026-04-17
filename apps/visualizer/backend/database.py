@@ -151,18 +151,30 @@ def update_job_field(db: sqlite3.Connection, job_id: str, field: str, value) -> 
     db.commit()
 
 
-def list_jobs(db: sqlite3.Connection, status: str = None, limit: int = 50) -> list:
-    """List jobs, optionally filtered by status."""
+def list_jobs(db: sqlite3.Connection, status: str = None, limit: int = 50, offset: int = 0) -> list:
+    """List jobs, optionally filtered by status, paginated via limit/offset."""
     if status:
         rows = db.execute(
-            "SELECT * FROM jobs WHERE status = ? ORDER BY created_at DESC LIMIT ?",
-            (status, limit)
+            "SELECT * FROM jobs WHERE status = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (status, limit, offset)
         ).fetchall()
     else:
         rows = db.execute(
-            "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?", (limit,)
+            "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (limit, offset)
         ).fetchall()
     return [_deserialize_job(r) for r in rows]
+
+
+def count_jobs(db: sqlite3.Connection, status: str = None) -> int:
+    """Count jobs, optionally filtered by status."""
+    if status:
+        row = db.execute(
+            "SELECT COUNT(*) AS c FROM jobs WHERE status = ?", (status,)
+        ).fetchone()
+    else:
+        row = db.execute("SELECT COUNT(*) AS c FROM jobs").fetchone()
+    return int(row["c"]) if row else 0
 
 
 def get_active_jobs(db: sqlite3.Connection) -> list:

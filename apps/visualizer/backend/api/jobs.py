@@ -1,4 +1,5 @@
-from database import add_job_log, create_job, get_active_jobs, get_job, list_jobs, update_job_field, update_job_status
+from database import add_job_log, count_jobs, create_job, get_active_jobs, get_job, list_jobs, update_job_field, update_job_status
+from utils.responses import success_paginated
 from flask import Blueprint, current_app, jsonify, request
 
 bp = Blueprint('jobs', __name__)
@@ -6,8 +7,13 @@ bp = Blueprint('jobs', __name__)
 @bp.route('/', methods=['GET'])
 def list_all_jobs():
     status = request.args.get('status')
-    jobs = list_jobs(current_app.db, status=status)
-    return jsonify(jobs)
+    limit = request.args.get('limit', default=50, type=int)
+    offset = request.args.get('offset', default=0, type=int)
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
+    jobs = list_jobs(current_app.db, status=status, limit=limit, offset=offset)
+    total = count_jobs(current_app.db, status=status)
+    return success_paginated(jobs, total=total, offset=offset, limit=limit)
 
 @bp.route('/', methods=['POST'])
 def create_new_job():
@@ -30,6 +36,15 @@ def get_job_details(job_id):
 
     if not job:
         return jsonify({'error': 'Job not found'}), 404
+
+    logs_limit_raw = request.args.get('logs_limit', type=int)
+    logs = job.get('logs') or []
+    logs_total = len(logs)
+    if logs_limit_raw is not None and logs_limit_raw > 0:
+        effective_limit = max(1, min(logs_limit_raw, 10_000))
+        if logs_total > effective_limit:
+            job['logs'] = logs[-effective_limit:]
+    job['logs_total'] = logs_total
 
     return jsonify(job)
 
