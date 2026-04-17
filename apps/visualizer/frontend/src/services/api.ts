@@ -769,6 +769,7 @@ export interface Match {
   insta_description?: ImageDescription
 }
 
+/** Match group from `GET /api/images/matches` (`match_groups[]`). */
 export interface MatchGroup {
   instagram_key: string
   instagram_image?: InstagramImage
@@ -776,6 +777,8 @@ export interface MatchGroup {
   best_score: number
   candidate_count: number
   has_validated: boolean
+  /** True when every candidate is rejected and none validated (tombstone group). Omitted on older responses. */
+  all_rejected?: boolean
 }
 
 export interface DumpMedia {
