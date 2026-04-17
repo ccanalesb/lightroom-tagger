@@ -70,6 +70,42 @@ def test_validate_nonexistent_match_should_return_404():
         assert resp.status_code == 404
 
 
+def test_validate_writes_catalog_date_to_instagram_created_at_write_when_missing():
+    """D-12: missing dump-media created_at is filled from catalog date_taken on validate."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, 'test.db')
+        db = init_database(db_path)
+        catalog_date = '2024-01-15T10:30:00'
+        db.execute(
+            "INSERT INTO images (key, filename, filepath, date_taken) VALUES (?, ?, ?, ?)",
+            ('cat_001', 'photo.jpg', '/fake/photo.jpg', catalog_date),
+        )
+        db.execute(
+            "INSERT INTO instagram_dump_media (media_key, filename, file_path, created_at) "
+            "VALUES (?, ?, ?, NULL)",
+            ('ig_001', 'insta.jpg', '/fake/insta.jpg'),
+        )
+        db.execute(
+            "INSERT INTO matches (catalog_key, insta_key, total_score, vision_result, validated_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ('cat_001', 'ig_001', 0.85, 'SAME', None),
+        )
+        db.commit()
+        db.close()
+
+        client = _make_client(db_path)
+        resp = client.patch('/api/images/matches/cat_001/ig_001/validate')
+        assert resp.status_code == 200
+
+        db = init_database(db_path)
+        row = db.execute(
+            "SELECT created_at FROM instagram_dump_media WHERE media_key = ?",
+            ('ig_001',),
+        ).fetchone()
+        db.close()
+        assert row['created_at'] == catalog_date
+
+
 def test_reject_match_should_delete_and_blocklist():
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, 'test.db')
