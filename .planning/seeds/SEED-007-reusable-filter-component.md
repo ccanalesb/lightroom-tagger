@@ -2,8 +2,9 @@
 id: SEED-007
 status: dormant
 planted: 2026-04-15
+amended: 2026-04-17
 planted_during: v2.0 (milestone complete)
-trigger_when: next UX improvements milestone or Images page redesign
+trigger_when: next UX improvements milestone, Images page redesign, or Analytics/Insights filter work
 scope: Medium
 ---
 
@@ -16,6 +17,8 @@ The Images page has three tabs (Catalog, Instagram, Matches) and each has a comp
 - **Catalog tab** has 11+ independent filter pieces (posted, analyzed, month, keyword, minRating, dateFrom, dateTo, colorLabel, scorePerspective, minCatalogScore, sortByScore), each as its own `useState` with its own UI treatment.
 - **Instagram tab** has just a date/month dropdown.
 - **Matches tab** has no filters at all.
+- **Analytics page** has its own from/to/granularity filter UI (`AppliedFilters` in `AnalyticsPage.tsx`) implemented independently — another consumer that should adopt the shared framework.
+- **Insights → Top Photos strip** has no filter at all, but SEED-009 calls for adding a posted/unposted tri-state filter to it — that should come from this same framework, not a bespoke implementation.
 
 This inconsistency creates two real problems:
 
@@ -32,8 +35,10 @@ This seed should be presented during `/gsd-new-milestone` when the milestone
 scope matches any of these conditions:
 - UX consistency or information architecture improvements
 - Images page or filter experience redesign
+- Analytics or Insights page filter / UX work
 - Design system or component library work
 - Preparation for natural language search (SEED-005) — which builds on structured filters
+- Work on SEED-009 (posted vs unposted on Insights top photos) — that seed depends on this framework
 
 ## Scope Estimate
 
@@ -65,6 +70,7 @@ Related code and decisions found in the current codebase:
 - `apps/visualizer/frontend/src/components/images/MatchesTab.tsx` — no filters at all despite the page being filter-heavy
 - `apps/visualizer/frontend/src/components/processing/DescriptionsTab.tsx` — another independent filter implementation
 - `apps/visualizer/frontend/src/components/analytics/UnpostedCatalogPanel.tsx` — yet another filter implementation
+- `apps/visualizer/frontend/src/pages/AnalyticsPage.tsx` — `AppliedFilters` (from/to/granularity) state and bespoke filter UI (line 45+); should migrate to shared framework
 
 ### Existing primitives that could be reused
 - `apps/visualizer/frontend/src/hooks/useDebouncedValue.ts` — already used for keyword/color debouncing; would live inside the new hook
@@ -77,6 +83,7 @@ Related code and decisions found in the current codebase:
 ### Related seeds
 - SEED-005 (natural language search) — a structured filter framework is the backbone that natural-language queries would ultimately compile into
 - SEED-003 (rethink Identity page) — the Identity page would also benefit from consistent filter UI
+- SEED-009 (posted vs unposted on Insights top photos) — depends on the posted tri-state filter from this framework
 
 ## Notes
 
@@ -89,3 +96,7 @@ A reasonable phased rollout within the milestone:
 - **Phase 4:** Add URL sync so filter state survives reloads and deep-links. Add saved-filter presets if time permits.
 
 Consider whether filters should sync to URL params (`?posted=true&month=2025-03`) for shareable filtered views. This is a meaningful UX upgrade and is easier to design in from the start than retrofit later.
+
+## Amendments
+
+**2026-04-17:** Added Analytics page (`AnalyticsPage.tsx` with its bespoke `AppliedFilters` from/to/granularity UI) as another consumer of the shared filter framework. Also linked to SEED-009 (posted vs unposted on Insights top photos), which depends on the posted tri-state toggle this framework provides. User confirmed Analytics filter reuse during the planting of SEED-009.
