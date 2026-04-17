@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish & Consolidate
-status: Phase 3 context gathered — ready for planning
-last_updated: "2026-04-17T23:00:00.000Z"
+status: Phase 3 planned — ready to execute
+last_updated: "2026-04-17T23:59:00.000Z"
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 9
+  total_plans: 13
   completed_plans: 9
 ---
 
@@ -21,9 +21,9 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v2.1 Polish & Consolidate |
-| Phase | Phase 3 — Unified Analyze job (context gathered) |
-| Status | Phase 3 context gathered — 6 gray areas discussed, 18 decisions captured; ready for planning |
-| Last activity | 2026-04-17 — Phase 3 discuss-phase complete (all 6 areas) |
+| Phase | Phase 3 — Unified Analyze job (planned) |
+| Status | Phase 3 planned — 4 plans in 3 waves; plan-checker passed on iteration 1; ready to execute |
+| Last activity | 2026-04-17 — Phase 3 planning complete (4 PLAN.md files) |
 
 ## Project Reference
 
@@ -52,6 +52,7 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 
 ## Last update
 
+- **2026-04-17:** Phase 3 planning complete. 4 PLAN.md files written in 3 waves. **Wave 1:** 01-PLAN (extract `_run_describe_pass` / `_run_score_pass` helpers; rewire existing handlers as thin wrappers — SC-3 guard via unchanged describe/score test files). **Wave 2:** 02-PLAN (`handle_batch_analyze` orchestration, nested `describe`+`score` checkpoints with `stage` field, D-06 combined result keys, D-07 50/50 progress split, D-08 `current_step` via `update_job_field`, `JOB_HANDLERS` registration, `checkpoint.py` docstring for D-18 — orphan recovery stays checkpoint-version-based with no allowlist edits). **Wave 3 (parallel):** 03-PLAN (new `test_handlers_batch_analyze.py` covering zero-work, sequencing, per-stage resume, partial-describe-does-not-block-score, shared selection, `current_step` transitions; plus `batch_analyze` orphan recovery test), 04-PLAN (`git mv` DescriptionsTab→AnalyzeTab, `?tab=analyze` slug, `ANALYZE_*` string constants, primary Analyze CTA, "Run stages separately" in Advanced disclosure with D-11 force-checkbox translation to flat `force` for legacy handlers). Plan-checker: PASS on iteration 1 (all SC-1/SC-2/SC-3 satisfied, D-01..D-18 covered, frontmatter valid, `depends_on` 01→02→{03,04}).
 - **2026-04-17:** Phase 3 context gathered. All 6 gray areas discussed (orchestration model, failure handling, progress reporting, UI surface, tab rename, checkpoint semantics). 18 decisions captured in `.planning/phases/03-unified-analyze-job/03-CONTEXT.md`. Backend: extract `_run_describe_pass` / `_run_score_pass` helpers; existing handlers become thin wrappers with zero behavior change (SC-3 guarantee). New `handle_batch_analyze` queries shared selection once, calls both passes in sequence, 50/50 progress split, `current_step` = "Describing" / "Scoring". Per-stage sub-checkpoints reuse existing fingerprint helpers unchanged. Frontend: full rename `DescriptionsTab.tsx` → `AnalyzeTab.tsx` (file, component, nav label, URL slug, tests); primary "Analyze" button + separate-stage buttons inside Advanced disclosure; two independent force checkboxes (`force_describe` / `force_score`).
 - **2026-04-17:** Phase 2 execution complete. 4 plans / 2 waves / 5 code commits. Backend: paginated `/api/jobs/` envelope + `count_jobs` helper + `logs_limit` truncation with clamp tests (14 jobs-api tests pass). Frontend: `JobsAPI` envelope + `logs_limit` opt, `DashboardPage` migration, `JobDetailModal` targeted skeleton + D-04 fetch-error + "Show all N logs" expansion + prop-sync for status/progress/current_step, `ProcessingPage` lifted pagination (PAGE_SIZE=50) + debounced refetch + request-seq in-flight guard, `JobQueueTab` pagination inside Card (11 frontend tests added). Code review: APPROVED with medium follow-ups addressed inline (prop-sync staleness, request-seq guard, clamp tests).
 - **2026-04-17:** Phase 2 planning complete. 4 PLAN.md files written in 2 waves. **Wave 1 (backend):** 01-PLAN (pagination + `logs_limit` + `count_jobs` + test extensions). **Wave 2 (frontend, depends on 01):** 02-PLAN (API client envelope + types + strings + DashboardPage migration), 03-PLAN (JobDetailModal targeted skeleton + D-04 inline error + log truncation/expansion + `[job.id]` prop-sync), 04-PLAN (ProcessingPage lifted pagination state + debounced refetch + JobQueueTab pagination inside Card). Plan-checker: PASS after 1 revision (9 findings resolved — DashboardPage call site, skeleton scope, D-04 fetch-error, job.id reset, PAGE_SIZE=50, Pagination inside Card, strings.ts constants for "Showing X–Y of Z" and "Loading…", test describe collision).
