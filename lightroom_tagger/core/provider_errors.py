@@ -57,7 +57,6 @@ class InvalidRequestError(ProviderError):
 RETRYABLE_ERRORS: frozenset[type[ProviderError]] = frozenset({
     RateLimitError,
     TimeoutError,
-    ConnectionError,
     ModelUnavailableError,
     ContextLengthError,
     PayloadTooLargeError,
@@ -66,4 +65,7 @@ RETRYABLE_ERRORS: frozenset[type[ProviderError]] = frozenset({
 NOT_RETRYABLE_ERRORS: frozenset[type[ProviderError]] = frozenset({
     AuthenticationError,
     InvalidRequestError,
+    # Connection refused / DNS failure is permanent for that provider — fall
+    # through to the next model immediately rather than burning retry backoff.
+    ConnectionError,
 })

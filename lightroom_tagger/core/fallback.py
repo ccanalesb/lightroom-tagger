@@ -33,6 +33,9 @@ class FallbackDispatcher:
     ) -> tuple[Any, str, str]:
         """Execute *fn_factory(client, model)* with retry and fallback.
 
+        Tries the requested model first, then all other models in the same
+        provider (in configured order), then moves on to each fallback provider.
+
         Parameters
         ----------
         operation:
@@ -51,79 +54,63 @@ class FallbackDispatcher:
         -------
         ``(result, actual_provider_id, actual_model)``
         """
-        primary_id = provider_id
-        order = self._build_order(primary_id)
-        if not order:
+        attempts = self._build_attempts(provider_id, model)
+        if not attempts:
             raise ProviderError("No available providers for operation")
         last_error: ProviderError | None = None
 
-        for index, provider_id in enumerate(order):
-            client = self._registry.get_client(provider_id)
-            retry_config = self._registry.get_retry_config(provider_id)
-
-            current_model = model if provider_id == primary_id else self._pick_fallback_model(provider_id)
-
-            fn = fn_factory(client, current_model)
+        for index, (pid, mid) in enumerate(attempts):
+            client = self._registry.get_client(pid)
+            retry_config = self._registry.get_retry_config(pid)
+            fn = fn_factory(client, mid)
 
             try:
                 result = retry_with_backoff(fn, retry_config, log_callback=log_callback)
-                return result, provider_id, current_model
-            except tuple(NOT_RETRYABLE_ERRORS) as exc:
+                return result, pid, mid
+            except tuple(NOT_RETRYABLE_ERRORS | RETRYABLE_ERRORS) as exc:
                 last_error = exc  # type: ignore[assignment]
                 if log_callback:
-                    remaining = order[index + 1:]
-                    next_label = remaining[0] if remaining else "none"
+                    remaining = attempts[index + 1:]
+                    next_label = f"{remaining[0][0]}/{remaining[0][1]}" if remaining else "none"
                     log_callback(
                         "warning",
-                        f"[{operation}] {provider_id} failed ({type(exc).__name__}), "
-                        f"fallback -> {next_label}",
-                    )
-            except tuple(RETRYABLE_ERRORS) as exc:
-                last_error = exc  # type: ignore[assignment]
-                if log_callback:
-                    remaining = order[index + 1:]
-                    next_label = remaining[0] if remaining else "none"
-                    log_callback(
-                        "warning",
-                        f"[{operation}] {provider_id} failed ({type(exc).__name__}), "
+                        f"[{operation}] {pid}/{mid} failed ({type(exc).__name__}), "
                         f"fallback -> {next_label}",
                     )
 
         raise last_error  # type: ignore[misc]
 
-    def _build_order(self, primary: str) -> list[str]:
-        """Return [primary] + remaining fallback order (excluding primary).
+    def _build_attempts(self, primary_id: str, primary_model: str) -> list[tuple[str, str]]:
+        """Return ordered list of (provider_id, model_id) to try.
 
-        Only includes providers that are available (API key present) and have
-        at least one model configured or discoverable.
+        Starts with all vision models in the primary provider (requested model
+        first, then the rest in configured order), then the first vision model
+        from each fallback provider in fallback order.
         """
         available_ids = {
             entry["id"]
             for entry in self._registry.list_providers()
             if entry.get("available")
         }
-        full_order = [primary] + [
-            provider_id
-            for provider_id in self._registry.fallback_order
-            if provider_id != primary
-        ]
-        result = []
-        for provider_id in full_order:
-            if provider_id not in available_ids:
-                continue
-            if provider_id == primary:
-                result.append(provider_id)
-            elif self._registry.list_models(provider_id):
-                result.append(provider_id)
-        return result
 
-    def _pick_fallback_model(self, provider_id: str) -> str:
-        """Pick the first vision model for a fallback provider."""
-        models = self._registry.list_models(provider_id)
-        if not models:
-            raise ModelUnavailableError(
-                f"No models available for fallback provider '{provider_id}'.",
-                provider=provider_id,
-            )
-        vision_models = [m for m in models if m.get("vision")]
-        return vision_models[0]["id"] if vision_models else models[0]["id"]
+        attempts: list[tuple[str, str]] = []
+
+        # Primary provider: requested model first, then remaining vision models
+        if primary_id in available_ids:
+            all_models = self._registry.list_models(primary_id)
+            vision_models = [m["id"] for m in all_models if m.get("vision")]
+            # Requested model goes first (even if not in the list)
+            ordered = [primary_model] + [m for m in vision_models if m != primary_model]
+            for mid in ordered:
+                attempts.append((primary_id, mid))
+
+        # Fallback providers: first vision model each
+        for pid in self._registry.fallback_order:
+            if pid == primary_id or pid not in available_ids:
+                continue
+            all_models = self._registry.list_models(pid)
+            vision_models = [m["id"] for m in all_models if m.get("vision")]
+            if vision_models:
+                attempts.append((pid, vision_models[0]))
+
+        return attempts

@@ -13,6 +13,7 @@ from lightroom_tagger.core.database import (
     store_image_description,
 )
 from lightroom_tagger.core.prompt_builder import build_description_user_prompt
+from lightroom_tagger.core.vision_cache import get_or_create_cached_image
 
 LogCallback = Callable[[str, str], None] | None
 
@@ -60,9 +61,13 @@ def describe_matched_image(db: sqlite3.Connection, catalog_key: str, force: bool
     if not os.path.exists(filepath):
         return False
 
+    # Use vision cache to avoid redundant RAW→JPG conversion + compression
+    cached_path = get_or_create_cached_image(db, catalog_key, filepath)
+    image_for_describe = cached_path if cached_path and os.path.exists(cached_path) else filepath
+
     user_prompt = _resolve_description_user_prompt(db, perspective_slugs)
     structured = describe_image(
-        filepath, provider_id=provider_id, model=model,
+        image_for_describe, provider_id=provider_id, model=model,
         log_callback=log_callback, user_prompt=user_prompt,
     )
     if not _description_structured_is_valid(structured):

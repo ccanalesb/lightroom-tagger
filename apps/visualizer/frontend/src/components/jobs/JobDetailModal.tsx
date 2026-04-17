@@ -75,6 +75,7 @@ interface JobDetailModalProps {
 
 export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProps) {
   const [localJob, setLocalJob] = useState<Job>(job);
+  const [retrying, setRetrying] = useState(false);
   const socket = useSocketStore((state) => state.socket);
 
   useEffect(() => {
@@ -108,6 +109,19 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
   }, [socket, job.id, onJobUpdate]);
 
   const displayJob = localJob.id === job.id ? localJob : job;
+
+  const handleRetry = async () => {
+    setRetrying(true);
+    try {
+      const updated = await JobsAPI.retry(displayJob.id);
+      setLocalJob(updated);
+      onJobUpdate?.(updated);
+    } catch (err) {
+      console.error('Retry failed:', err);
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   const renderProgress = () => {
     if (displayJob.progress === undefined) return null;
@@ -300,6 +314,18 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
                 </div>
                 <p className="text-sm text-error font-mono">{displayJob.error}</p>
               </div>
+            )}
+
+            {(displayJob.status === 'failed' || displayJob.status === 'cancelled') && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleRetry}
+                disabled={retrying}
+                type="button"
+              >
+                {retrying ? 'Retrying...' : 'Retry this job'}
+              </Button>
             )}
 
             {displayJob.logs && displayJob.logs.length > 0 && (

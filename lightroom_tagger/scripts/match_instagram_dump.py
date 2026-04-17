@@ -45,7 +45,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      max_workers: int = 1,
                      *, should_cancel: Callable[[], bool] | None = None,
                      resume_processed_keys: set[str] | None = None,
-                     on_media_complete: Callable[[str], None] | None = None) -> tuple:
+                     on_media_complete: Callable[[str], None] | None = None,
+                     batch_progress_callback: Callable[[int, int, int, int], None] | None = None) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -169,6 +170,12 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             }
             vision_candidates.append(candidate)
 
+        def _make_batch_cb(item_idx, item_total):
+            def _cb(chunk, num_chunks):
+                if batch_progress_callback:
+                    batch_progress_callback(item_idx, item_total, chunk, num_chunks)
+            return _cb
+
         results = score_candidates_with_vision(
             db, dump_image, vision_candidates,
             phash_weight=weights.get('phash', 0.4),
@@ -181,6 +188,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             batch_size=config.vision_batch_size,
             batch_threshold=config.vision_batch_threshold,
             should_cancel=should_cancel,
+            batch_progress_callback=_make_batch_cb(idx, total),
         )
 
         if should_cancel is not None and should_cancel():

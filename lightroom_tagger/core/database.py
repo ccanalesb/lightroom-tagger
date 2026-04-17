@@ -35,26 +35,27 @@ def resolve_filepath(path: str) -> str:
     if prefix and mount:
         prefix_parts = prefix.lstrip('/').split('/')
         if len(prefix_parts) >= 2 and prefix_parts[1] == share_name:
-            # Match found - construct path: /mount/rest
-            if rest_of_path:
-                return os.path.join(mount, rest_of_path)
-            else:
-                return mount
+            configured = os.path.join(mount, rest_of_path) if rest_of_path else mount
+            if os.path.exists(configured):
+                return configured
 
-    # Auto-detect mount if not configured
-    if not mount:
-        try:
-            for name in sorted(os.listdir('/Volumes/'), reverse=True):
-                if name.startswith(share_name):
-                    candidate = os.path.join('/Volumes', name)
-                    if os.path.ismount(candidate):
-                        mount = candidate
-                        if rest_of_path:
-                            return os.path.join(mount, rest_of_path)
-                        else:
-                            return mount
-        except OSError:
-            pass
+    # Auto-detect: scan /Volumes/ for matching mounts (handles -1 suffix etc.)
+    try:
+        for name in sorted(os.listdir('/Volumes/'), reverse=True):
+            if name.startswith(share_name):
+                candidate = os.path.join('/Volumes', name)
+                if os.path.ismount(candidate):
+                    resolved = os.path.join(candidate, rest_of_path) if rest_of_path else candidate
+                    if os.path.exists(resolved):
+                        return resolved
+    except OSError:
+        pass
+
+    # Last resort: return configured path even if it doesn't exist
+    if prefix and mount:
+        prefix_parts = prefix.lstrip('/').split('/')
+        if len(prefix_parts) >= 2 and prefix_parts[1] == share_name:
+            return os.path.join(mount, rest_of_path) if rest_of_path else mount
 
     return path
 
@@ -1075,6 +1076,14 @@ def get_dump_media_by_hash(db: sqlite3.Connection, image_hash: str) -> list:
     return [_deserialize_row(r) for r in rows]
 
 
+_VIDEO_EXTENSIONS_CLAUSE = (
+    "LOWER(file_path) NOT LIKE '%.mp4' AND "
+    "LOWER(file_path) NOT LIKE '%.mov' AND "
+    "LOWER(file_path) NOT LIKE '%.avi' AND "
+    "LOWER(file_path) NOT LIKE '%.mkv'"
+)
+
+
 def get_unprocessed_dump_media(db: sqlite3.Connection, limit: int = None,
                                 run_start: str = None,
                                 include_processed: bool = False) -> list:
@@ -1085,7 +1094,7 @@ def get_unprocessed_dump_media(db: sqlite3.Connection, limit: int = None,
                    (last_attempted_at >= run_start).
         include_processed: If True, also return already-processed rows.
     """
-    clauses: list[str] = []
+    clauses: list[str] = [_VIDEO_EXTENSIONS_CLAUSE]
     params: list = []
     if not include_processed:
         clauses.append("processed = 0")
@@ -1115,7 +1124,7 @@ def get_instagram_by_date_filter(db: sqlite3.Connection, month: str = None,
         run_start: ISO timestamp; skip images already attempted in this run.
         include_processed: If True, also return already-processed rows.
     """
-    clauses: list[str] = []
+    clauses: list[str] = [_VIDEO_EXTENSIONS_CLAUSE]
     params: list = []
     if not include_processed:
         clauses.append("processed = 0")

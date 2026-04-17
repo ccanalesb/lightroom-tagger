@@ -115,8 +115,9 @@ def test_batch_describe_should_stop_after_consecutive_failures(
     )
 
     assert mock_describe.call_count == 10
-    result = runner.complete_job.call_args[0][1]
-    assert result['failed'] == 10
+    runner.fail_job.assert_called_once()
+    msg = runner.fail_job.call_args[0][1]
+    assert '10 consecutive failures' in msg
 
 
 @patch('jobs.handlers.add_job_log')

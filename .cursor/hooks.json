@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/safe-kill-port.sh",
+        "matcher": "kill|lsof.*xargs.*kill|pkill",
+        "failClosed": true
+      }
+    ]
+  }
+}

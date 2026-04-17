@@ -44,6 +44,7 @@ export function JobQueueTab({
 }: JobQueueTabProps) {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const cancelJob = async (jobId: string, e: MouseEvent) => {
     e.stopPropagation();
@@ -57,6 +58,19 @@ export function JobQueueTab({
       alert(`Failed to cancel job: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setCancellingId(null);
+    }
+  };
+
+  const retryJob = async (jobId: string, e: MouseEvent) => {
+    e.stopPropagation();
+    setRetryingId(jobId);
+    try {
+      const updated = await JobsAPI.retry(jobId);
+      setJobs((prev) => prev.map((j) => (j.id === jobId ? updated : j)));
+    } catch (err) {
+      alert(`Failed to retry job: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setRetryingId(null);
     }
   };
 
@@ -164,7 +178,7 @@ export function JobQueueTab({
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right text-sm">
+                    <td className="px-6 py-4 text-right text-sm space-x-2">
                       {(job.status === 'pending' || job.status === 'running') && (
                         <Button
                           variant="danger"
@@ -174,6 +188,17 @@ export function JobQueueTab({
                           type="button"
                         >
                           {cancellingId === job.id ? 'Cancelling...' : 'Cancel'}
+                        </Button>
+                      )}
+                      {(job.status === 'failed' || job.status === 'cancelled') && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => retryJob(job.id, e)}
+                          disabled={retryingId === job.id}
+                          type="button"
+                        >
+                          {retryingId === job.id ? 'Retrying...' : 'Retry'}
                         </Button>
                       )}
                     </td>

@@ -235,7 +235,7 @@ export function CatalogImageModal({ image, onClose }: CatalogImageModalProps) {
         <div className="grid md:grid-cols-2 gap-6 p-6 overflow-y-auto max-h-[90vh]">
           <div className="aspect-square bg-surface rounded-base overflow-hidden">
             <img
-              src={`/api/images/catalog/${encodeURIComponent(image.key)}/thumbnail`}
+              src={`/api/images/${image.image_type ?? 'catalog'}/${encodeURIComponent(image.key)}/thumbnail`}
               alt={image.filename}
               className="w-full h-full object-contain"
             />

@@ -24,6 +24,7 @@ from lightroom_tagger.core.analyzer import (
     get_viewable_path,
     run_local_agent,
 )
+from lightroom_tagger.core.vision_cache import get_or_create_cached_image
 from lightroom_tagger.core.database import (
     get_image,
     get_instagram_dump_media,
@@ -156,12 +157,25 @@ def score_image_for_perspective(
         delete_scores_for_version(db, image_key, image_type, perspective_slug, pv)
 
     temp_files: list[str] = []
-    viewable = get_viewable_path(filepath)
-    if viewable != filepath:
-        temp_files.append(viewable)
-    compressed = compress_image(viewable)
-    if compressed != viewable:
-        temp_files.append(compressed)
+    # Use vision cache for catalog images to avoid redundant RAW→JPG + compress
+    if image_type == "catalog":
+        cached = get_or_create_cached_image(db, image_key, filepath)
+        if cached and os.path.exists(cached):
+            compressed = cached
+        else:
+            viewable = get_viewable_path(filepath)
+            if viewable != filepath:
+                temp_files.append(viewable)
+            compressed = compress_image(viewable)
+            if compressed != viewable:
+                temp_files.append(compressed)
+    else:
+        viewable = get_viewable_path(filepath)
+        if viewable != filepath:
+            temp_files.append(viewable)
+        compressed = compress_image(viewable)
+        if compressed != viewable:
+            temp_files.append(compressed)
 
     user_prompt = build_scoring_user_prompt(prow)
 
@@ -220,12 +234,21 @@ def score_image_for_perspective(
                 with contextlib.suppress(Exception):
                     os.unlink(f)
 
-    got_slug = parsed.perspective_slug.strip()
+    # Normalize the returned slug: lowercase and strip parenthetical suffixes
+    # e.g. "Documentary" -> "documentary", "Street (street)" -> "street"
+    import re as _re
+    got_slug = _re.sub(r'\s*\(.*\)\s*$', '', parsed.perspective_slug.strip()).lower().strip()
     if got_slug != perspective_slug.strip():
+        if log_callback:
+            log_callback(
+                "warning",
+                f"Slug mismatch: model returned {parsed.perspective_slug!r}, "
+                f"normalized to {got_slug!r}, expected {perspective_slug!r} — skipping",
+            )
         return (
             "failed",
             False,
-            f"Model returned perspective_slug {got_slug!r}; expected {perspective_slug!r}",
+            f"Model returned perspective_slug {parsed.perspective_slug!r}; expected {perspective_slug!r}",
         )
 
     scored_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -250,6 +273,10 @@ def score_image_for_perspective(
         db.commit()
     except Exception as exc:
         db.rollback()
+        # Swallow duplicate key errors — parallel workers may race on the same image
+        import sqlite3 as _sqlite3
+        if isinstance(exc, _sqlite3.IntegrityError) and "UNIQUE constraint" in str(exc):
+            return ("skipped", False, "Score already written by concurrent worker")
         return ("failed", False, str(exc))
 
     return ("scored", True, None)

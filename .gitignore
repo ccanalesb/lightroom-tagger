@@ -86,3 +86,6 @@ lightroom_tagger/core/providers.json
 *.db-shm
 .agent-browser-shots/*
 config.yaml
+.env
+apps/visualizer/backend/*.crt
+apps/visualizer/backend/*.key

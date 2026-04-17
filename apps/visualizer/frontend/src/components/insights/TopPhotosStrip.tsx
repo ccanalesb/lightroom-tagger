@@ -27,6 +27,7 @@ function bestPhotoToCatalogStub(row: IdentityBestPhotoItem): CatalogImage {
     width: 0,
     height: 0,
     instagram_posted: Boolean(row.instagram_posted),
+    image_type: (row.image_type as 'catalog' | 'instagram') ?? 'catalog',
   }
 }
 
@@ -78,7 +79,7 @@ export function TopPhotosStrip({ items, loading, error, emptyMessage }: TopPhoto
               >
                 <div className="relative aspect-[4/3] bg-surface">
                   <img
-                    src={`/api/images/catalog/${encodeURIComponent(row.image_key)}/thumbnail`}
+                    src={`/api/images/${row.image_type ?? 'catalog'}/${encodeURIComponent(row.image_key)}/thumbnail`}
                     alt={row.filename}
                     className="h-full w-full object-cover"
                     loading="lazy"

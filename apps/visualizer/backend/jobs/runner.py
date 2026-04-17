@@ -23,8 +23,11 @@ class JobRunner:
         return True
 
     def update_progress(self, job_id: str, progress: int, current_step: str):
-        """Update job progress. No-op if the job has been cancelled."""
+        """Update job progress. No-op if the job has been cancelled or already completed."""
         if self.is_cancelled(job_id):
+            return
+        row = get_job(self.db, job_id)
+        if row and row.get('status') in ('completed', 'cancelled'):
             return
         update_job_status(self.db, job_id, 'running', progress=progress, current_step=current_step)
         add_job_log(self.db, job_id, 'info', current_step)

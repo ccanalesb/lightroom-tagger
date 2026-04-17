@@ -24,6 +24,8 @@ socketio = None
 job_processor_thread = None
 job_processor_running = False
 _job_runner: JobRunner | None = None
+_running_job_ids: set[str] = set()
+_running_job_ids_lock = threading.Lock()
 
 
 def get_job_runner() -> JobRunner | None:
@@ -98,13 +100,29 @@ def create_app():
     from websocket.events import register_socket_events
     register_socket_events(socketio)
 
+    if not os.environ.get('WERKZEUG_RUN_MAIN') and config.FLASK_DEBUG:
+        return app
+
     _recover_orphaned_jobs(db)
 
     job_processor_running = True
-    job_processor_thread = threading.Thread(target=_job_processor, daemon=True)
-    job_processor_thread.start()
+    _start_job_processor_thread()
 
     return app
+
+
+def _start_job_processor_thread():
+    """Start the job processor thread, wrapped in a watchdog that restarts it on crash."""
+    def watchdog():
+        while job_processor_running:
+            t = threading.Thread(target=_job_processor, daemon=True, name="job-processor")
+            t.start()
+            t.join()  # blocks until the thread exits for any reason
+            if job_processor_running:
+                print("Job processor thread exited unexpectedly — restarting in 2s")
+                time.sleep(2)
+
+    threading.Thread(target=watchdog, daemon=True, name="job-processor-watchdog").start()
 
 
 def _recover_orphaned_jobs(db):
@@ -179,30 +197,43 @@ def _job_processor():
                     continue
                 socketio.emit('job_updated', get_job(db, job_id)) if socketio else None
 
-                # Execute handler
+                # Execute handler — guard against duplicate execution if a stale
+                # handler thread from a previous watchdog cycle is still running.
+                with _running_job_ids_lock:
+                    if job_id in _running_job_ids:
+                        print(f"Job {job_id} is already running in another thread — skipping duplicate dispatch")
+                        continue
+                    _running_job_ids.add(job_id)
+
                 handler = JOB_HANDLERS.get(job_type)
-                if handler:
-                    try:
-                        handler(runner, job_id, metadata)
-                    except Exception as e:
-                        print(f"Handler error for job {job_id}: {e}")
-                        import traceback
-                        traceback.print_exc()
+                try:
+                    if handler:
+                        try:
+                            handler(runner, job_id, metadata)
+                        except Exception as e:
+                            print(f"Handler error for job {job_id}: {e}")
+                            import traceback
+                            traceback.print_exc()
+                            row_after = get_job(db, job_id)
+                            if row_after and row_after.get('status') == 'running':
+                                runner.fail_job(job_id, str(e))
+                    else:
                         row_after = get_job(db, job_id)
                         if row_after and row_after.get('status') == 'running':
-                            runner.fail_job(job_id, str(e))
-                else:
-                    row_after = get_job(db, job_id)
-                    if row_after and row_after.get('status') == 'running':
-                        runner.fail_job(job_id, f'Unknown job type: {job_type}')
+                            runner.fail_job(job_id, f'Unknown job type: {job_type}')
+                finally:
+                    with _running_job_ids_lock:
+                        _running_job_ids.discard(job_id)
 
                 # Emit update after handler completes
                 socketio.emit('job_updated', get_job(db, job_id)) if socketio else None
 
-        except Exception as e:
+        except BaseException as e:
             import traceback
             print(f"Job processor error: {e}")
             print(traceback.format_exc())
+            if isinstance(e, (SystemExit, KeyboardInterrupt)):
+                raise  # let the thread die so the watchdog can restart it
 
         time.sleep(1)  # Check every second
 

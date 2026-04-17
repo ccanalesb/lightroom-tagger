@@ -142,7 +142,8 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                                  model: str | None = None,
                                  batch_size: int = 10,
                                  batch_threshold: int = 5,
-                                 should_cancel: Callable[[], bool] | None = None) -> list[dict]:
+                                 should_cancel: Callable[[], bool] | None = None,
+                                 batch_progress_callback: Callable[[int, int], None] | None = None) -> list[dict]:
     """Score candidates including vision comparison (one-by-one).
 
     Uses vision comparison cache to avoid re-comparing already processed pairs.
@@ -342,6 +343,8 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                         log_callback, insta_filename, chunk_num, num_chunks,
                     )
                     _score_and_store(chunk_results)
+                    if batch_progress_callback:
+                        batch_progress_callback(chunk_num, num_chunks)
 
                 if log_callback:
                     log_callback('debug', f'[{insta_filename}] Batch API scored {len(results)} total results')

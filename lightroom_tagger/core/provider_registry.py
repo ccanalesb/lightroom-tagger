@@ -97,10 +97,12 @@ class ProviderRegistry:
         base_url = self._resolve_base_url(provider_config)
         api_key = self._resolve_api_key(provider_config)
         extra_headers = provider_config.get("extra_headers", {})
+        timeout = float(provider_config.get("request_timeout_seconds", 120))
         client = openai.OpenAI(
             base_url=base_url,
             api_key=api_key,
             default_headers=extra_headers or None,
+            timeout=timeout,
         )
         client._provider_id = provider_id  # type: ignore[attr-defined]
         return client
@@ -162,11 +164,18 @@ class ProviderRegistry:
 
     def reorder_models(self, provider_id: str, model_order: list[str]) -> bool:
         """Reorder models for a provider. model_order is list of model IDs.
-        Saves order to model_order field, works for all model types."""
+
+        Preserves any existing model_order entries not present in the new list
+        (e.g. cloud models the UI doesn't know about) by appending them at the end.
+        """
         if provider_id not in self._providers:
             raise KeyError(f"Unknown provider: {provider_id}")
 
-        self._providers[provider_id]["model_order"] = model_order
+        existing_order = self._providers[provider_id].get("model_order", [])
+        new_set = set(model_order)
+        # Append any previously-known entries that aren't in the new order
+        tail = [mid for mid in existing_order if mid not in new_set]
+        self._providers[provider_id]["model_order"] = model_order + tail
         self._save_config()
         return True
 
