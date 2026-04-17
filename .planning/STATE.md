@@ -5,7 +5,7 @@ milestone_name: Polish & Consolidate
 status: Defining requirements
 last_updated: "2026-04-17"
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -22,9 +22,9 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v2.1 Polish & Consolidate |
-| Phase | Not started (defining requirements) |
-| Status | Defining requirements |
-| Last activity | 2026-04-17 — v2.1 milestone started (phase numbering reset to 1) |
+| Phase | Phase 1 — Matching & review polish (ready to start) |
+| Status | Roadmap approved — ready to discuss/plan Phase 1 |
+| Last activity | 2026-04-17 — v2.1 roadmap approved (6 phases, 15 requirements) |
 
 ## Project Reference
 
@@ -45,6 +45,7 @@ Full requirement ↔ phase mapping will be filled by roadmapper in REQUIREMENTS.
 
 ## Last update
 
+- **2026-04-17:** v2.1 roadmap approved — 6 phases, 15 requirements. Phase 5 depends on Phase 4 (filter framework). Ready to discuss Phase 1.
 - **2026-04-17:** v2.1 milestone started. Scope: 9 seeds (polish, consolidation, reusable filter foundation). Phase numbering reset to 1.
 
 ---

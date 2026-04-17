@@ -71,27 +71,25 @@ These requirements were considered but deferred to a later milestone.
 
 ## Traceability
 
-Requirement ↔ phase mapping will be filled by the roadmapper after phase structure is defined.
-
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| POLISH-01 | — | Pending |
-| POLISH-02 | — | Pending |
-| JOB-03 | — | Pending |
-| JOB-04 | — | Pending |
-| JOB-05 | — | Pending |
-| JOB-06 | — | Pending |
-| FILTER-01 | — | Pending |
-| FILTER-02 | — | Pending |
-| IDENT-04 | — | Pending |
-| IDENT-05 | — | Pending |
-| DASH-02 | — | Pending |
-| DASH-03 | — | Pending |
-| UI-01 | — | Pending |
-| UI-02 | — | Pending |
-| UI-03 | — | Pending |
+| POLISH-01 | Phase 1 | Pending |
+| POLISH-02 | Phase 1 | Pending |
+| JOB-03 | Phase 2 | Pending |
+| JOB-04 | Phase 2 | Pending |
+| JOB-05 | Phase 2 | Pending |
+| JOB-06 | Phase 3 | Pending |
+| FILTER-01 | Phase 4 | Pending |
+| FILTER-02 | Phase 4 | Pending |
+| IDENT-04 | Phase 5 | Pending |
+| IDENT-05 | Phase 5 | Pending |
+| DASH-02 | Phase 5 | Pending |
+| DASH-03 | Phase 5 | Pending |
+| UI-01 | Phase 6 | Pending |
+| UI-02 | Phase 6 | Pending |
+| UI-03 | Phase 6 | Pending |
 
-**Total:** 15 requirements across 6 categories.
+**Total:** 15 requirements across 6 phases.
 
 ---
 
