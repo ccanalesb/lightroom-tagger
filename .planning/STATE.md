@@ -2,14 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish & Consolidate
-status: Defining requirements
-last_updated: "2026-04-17"
+status: Ready to execute
+last_updated: "2026-04-17T17:40:00.000Z"
 progress:
-  total_phases: 6
+  total_phases: 1
   completed_phases: 0
-  total_plans: 0
+  total_plans: 5
   completed_plans: 0
-  percent: 0
 ---
 
 # Planning state
@@ -22,9 +21,9 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v2.1 Polish & Consolidate |
-| Phase | Phase 1 — Matching & review polish (ready to start) |
-| Status | Roadmap approved — ready to discuss/plan Phase 1 |
-| Last activity | 2026-04-17 — v2.1 roadmap approved (6 phases, 15 requirements) |
+| Phase | Phase 1 — Matching & review polish (planned, ready to execute) |
+| Status | 5 plans created, plan-checker passed (iter 2) — ready to execute |
+| Last activity | 2026-04-17 — Phase 1 planning complete (5 plans, 2 waves) |
 
 ## Project Reference
 
@@ -45,6 +44,7 @@ Full requirement ↔ phase mapping will be filled by roadmapper in REQUIREMENTS.
 
 ## Last update
 
+- **2026-04-17:** Phase 1 planning complete. 5 plans in 2 waves. POLISH-01/02 covered; D-01..D-14 all mapped. Plan-checker passed on iteration 2.
 - **2026-04-17:** v2.1 roadmap approved — 6 phases, 15 requirements. Phase 5 depends on Phase 4 (filter framework). Ready to discuss Phase 1.
 - **2026-04-17:** v2.1 milestone started. Scope: 9 seeds (polish, consolidation, reusable filter foundation). Phase numbering reset to 1.
 
