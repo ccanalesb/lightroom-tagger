@@ -36,8 +36,8 @@
 Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a continuation of v2.0.
 
 - [x] Phase 1: Matching & review polish — POLISH-01, POLISH-02 — completed 2026-04-17
-- [ ] Phase 2: Job queue & processing UX — JOB-03, JOB-04, JOB-05
-- [ ] Phase 3: Unified Analyze job — JOB-06
+- [x] Phase 2: Job queue & processing UX — JOB-03, JOB-04, JOB-05 — completed 2026-04-17
+- [x] Phase 3: Unified Analyze job — JOB-06 — completed 2026-04-17
 - [ ] Phase 4: Reusable filter framework — FILTER-01, FILTER-02
 - [ ] Phase 5: Identity & Insights clarity — IDENT-04, IDENT-05, DASH-02, DASH-03 _(depends on Phase 4)_
 - [ ] Phase 6: Images page visual consistency — UI-01, UI-02, UI-03
@@ -47,8 +47,8 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 | Phase | Goal | Requirements | Success criteria | Status |
 |-------|------|--------------|------------------|--------|
 | 1. Matching & review polish | Smooth the match-review flow | POLISH-01, POLISH-02 | 3 | ✅ Complete (2026-04-17) |
-| 2. Job queue & processing UX | Make heavy jobs and long queues feel fast | JOB-03, JOB-04, JOB-05 | 4 | Pending |
-| 3. Unified Analyze job | One default flow for full AI analysis | JOB-06 | 3 | Pending |
+| 2. Job queue & processing UX | Make heavy jobs and long queues feel fast | JOB-03, JOB-04, JOB-05 | 4 | ✅ Complete (2026-04-17) |
+| 3. Unified Analyze job | One default flow for full AI analysis | JOB-06 | 3 | ✅ Complete (2026-04-17) |
 | 4. Reusable filter framework | Declarative filter foundation (proved by CatalogTab) | FILTER-01, FILTER-02 | 4 | Pending |
 | 5. Identity & Insights clarity | Posted/unposted visibility + narrative flow | IDENT-04, IDENT-05, DASH-02, DASH-03 | 4 | Pending |
 | 6. Images page visual consistency | Unify badge + card language on Images page | UI-01, UI-02, UI-03 | 3 | Pending |
