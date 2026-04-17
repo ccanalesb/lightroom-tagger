@@ -137,7 +137,7 @@ def add_job_log(db: sqlite3.Connection, job_id: str, level: str, message: str):
 
 
 _ALLOWED_JOB_UPDATE_FIELDS = frozenset({
-    "metadata", "result", "error", "logs",
+    "metadata", "result", "error", "logs", "current_step",
 })
 
 
