@@ -8,6 +8,19 @@ A web application that connects your Lightroom catalog with Instagram to track w
 
 Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
 
+## Current Milestone: v2.1 Polish & Consolidate
+
+**Goal:** Tighten v2.0's shipped surface — remove UX friction, fix inconsistencies, consolidate redundant workflows, and lay reusable filter foundations — before net-new capability in v3.0.
+
+**Target features:**
+- Matching & review flow polish (keep modal open after reject, sort unvalidated first)
+- Job queue & processing UX (modal loading UX, pagination, unified "Analyze" job)
+- Identity & Insights clarity (posted badges, narrative flow, posted/unposted split)
+- Images page visual consistency (badge/card unification)
+- Reusable filter framework (foundation for badge/card unification and posted/unposted split)
+
+**Seeds incorporated:** SEED-001, SEED-002, SEED-003, SEED-004, SEED-007, SEED-008, SEED-009, SEED-013, SEED-015
+
 ## Requirements
 
 ### Validated
@@ -120,4 +133,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-15 after v2.0 milestone*
+*Last updated: 2026-04-17 — v2.1 Polish & Consolidate milestone started*
