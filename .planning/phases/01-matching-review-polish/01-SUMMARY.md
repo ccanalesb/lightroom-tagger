@@ -58,7 +58,7 @@ Each task was committed atomically:
 1. **Task 1.1: Backend sort, tombstones, and `all_rejected` on groups** — `7d4bff4` (feat)
 2. **Task 1.2: Pytest coverage for sort and tombstone serialization** — `5167ae9` (test)
 
-**Plan metadata:** `5a96bbb` (docs: complete plan)
+3. **Plan documentation (`01-SUMMARY.md`)** — `621ee5e` (docs: complete plan)
 
 ## Files created/modified
 
