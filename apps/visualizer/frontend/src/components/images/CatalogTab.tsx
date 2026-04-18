@@ -7,6 +7,7 @@ import { Input } from '../ui/Input';
 import { Pagination } from '../ui/Pagination';
 import { FILTER_CLEAR, FILTER_ALL_DATES } from '../../constants/strings';
 import { formatMonth } from '../../utils/date';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 const LIMIT = 50;
 const DEBOUNCE_MS = 350;
@@ -29,15 +30,6 @@ function catalogStubForDeepLink(imageKey: string): CatalogImage {
     height: 0,
     instagram_posted: false,
   };
-}
-
-function useDebouncedValue<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(id);
-  }, [value, delay]);
-  return debounced;
 }
 
 type CatalogTabProps = {
