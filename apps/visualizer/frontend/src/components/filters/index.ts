@@ -1,1 +1,8 @@
 export * from './types'
+export { FilterChip } from './FilterChip'
+export { ToggleFilter } from './ToggleFilter'
+export { SelectFilter } from './SelectFilter'
+export { DateRangeFilter } from './DateRangeFilter'
+export { SearchFilter } from './SearchFilter'
+export { FilterBar } from './FilterBar'
+export type { FilterBarProps } from './FilterBar'
