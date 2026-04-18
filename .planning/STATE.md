@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish & Consolidate
-status: Phase 4 context gathered — ready to plan Phase 4
+status: Phase 4 planned — ready to execute
 last_updated: "2026-04-17T23:59:00.000Z"
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 17
+  total_plans: 21
   completed_plans: 13
 ---
 
@@ -21,9 +21,9 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v2.1 Polish & Consolidate |
-| Phase | Phase 4 — Reusable filter framework (context gathered) |
-| Status | Phase 4 context gathered; FILTER-01/02 scope locked to CatalogTab migration per REQUIREMENTS.md Implementation Guidance; 22 decisions captured; ready to plan |
-| Last activity | 2026-04-17 — Phase 4 context gathered (non-interactive — user waived gray-area discussion) |
+| Phase | Phase 4 — Reusable filter framework (planned) |
+| Status | Phase 4 planned — 4 plans / 3 waves / ready to execute; plan-checker passed on iteration 2 after 2 blockers + 6 warnings resolved |
+| Last activity | 2026-04-17 — Phase 4 planned (research + UI-SPEC skipped per user; CONTEXT.md was the spec) |
 
 ## Project Reference
 
@@ -52,6 +52,7 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 
 ## Last update
 
+- **2026-04-17:** Phase 4 planned. `/gsd-plan-phase 4` executed; user opted to skip both research and UI-SPEC (CONTEXT.md's 22 decisions already served as the spec). Planner produced 4 plans across 3 waves: Plan 01 (Wave 1, useDebouncedValue extraction + filter schema types + strings), Plan 02 (Wave 2, useFilters hook), Plan 03 (Wave 2, FilterBar + primitives), Plan 04 (Wave 3, CatalogTab big-bang migration). Plan-checker iteration 1 found 2 BLOCKERS (03's missing depends_on 02; 03's chip rendering would show empty values during debounce window) + 6 warnings (mis-cited D-22 in plans 01/04, manual smoke in autonomous plan 04's verification, FilterBar scaffold ending in `return null`, SelectFilter hardcoding `scorePerspective` key check, missing `className` on SelectFilterDescriptor type, undocumented "Clear" → "Clear all" copy change). Planner revision addressed all 10 items surgically; iteration 2 VERIFICATION PASSED. Requirements coverage: FILTER-01 (plans 01, 03, 04), FILTER-02 (plans 01, 02, 04). All plans autonomous: true. Plan 04's manual browser smoke is documented as "Human UAT checklist (D-20 layer 3)" in must_haves, not gating machine verification.
 - **2026-04-17:** Phase 4 context gathered. `/gsd-discuss-phase 4` invoked via `/gsd-next`; user declined interactive gray-area walk-through ("i think im good") after presentation of six candidate areas (schema shape, hook semantics, query-param mapping, FilterBar layout, migration strategy, AnalyticsPage parity). Claude inferred 22 decisions (D-01..D-22) from CatalogTab.tsx (the de-facto spec, 11 filters across 100+ lines of useState), REQUIREMENTS.md Implementation Guidance (hard scope lock: CatalogTab migration only, other tabs deferred), and prior-phase patterns (central `constants/strings.ts`, container/presenter split, no new primitives without need). Key decisions: 4 primitives (toggle/select/dateRange/search — no numberRange, no dependentGroup); hook returns an object with `values`/`rawValues`/`setValue`/`setValues`/`clearAll`/`activeCount`/`toQueryParams`/`isActive`, live-update only (AnalyticsPage's apply-button paradigm deferred); `enabledBy: {filterKey, when}` for dependent filters with automatic clearing when parent unsets; debounce from schema (350ms default); query-param mapping via per-descriptor `paramName` (default snake_case) + `toParam`; chips **supplement** inline controls (not replace) — minimal UX shift; big-bang migration in one plan with three-layer regression strategy (existing tests unchanged + new framework tests + manual smoke); outward `onPostedFilterChange` prop survives as-is. Full ambiguity list + Claude's Discretion items captured in CONTEXT.md for the planner.
 - **2026-04-17:** Phase 3 execution complete. 4 plans / 3 waves / 4 code commits. **Wave 1 (d0aa5fd):** extracted `_run_describe_pass` / `_run_score_pass` helpers; existing `handle_batch_describe` / `handle_batch_score` are thin wrappers — SC-3 preserved (tests for both handlers unchanged and green). **Wave 2 (1f96bd2):** implemented `handle_batch_analyze` with nested `describe` + `score` checkpoints keyed by `stage`, 50/50 progress split via `_map_job_progress`, `current_step` transitions via `update_job_field` (added `'current_step'` to `_ALLOWED_JOB_UPDATE_FIELDS`), `JOB_HANDLERS['batch_analyze']` registration, `checkpoint.py` docstring update for D-18. **Wave 3 (b5e1299, 60e9eae):** new `test_handlers_batch_analyze.py` (6 tests covering zero-work, describe→score, partial-describe + full-score, current_step ordering, resume skip, fingerprint mismatch reset) + `batch_analyze` orphan recovery test; frontend full rename `DescriptionsTab.tsx` → `AnalyzeTab.tsx` via `git mv`, `?tab=analyze` slug, `ANALYZE_*` / `TAB_ANALYZE` strings, primary Analyze CTA, "Run stages separately" inside Advanced disclosure, two independent force checkboxes. Drive-by TS fix in `MatchDetailModal.tsx` (pre-existing `window.setTimeout` → `setTimeout`) to clear the plan AC `tsc --noEmit exit 0`. Verification: 21/21 Phase 3 tests pass, full backend 138 pass (1 pre-existing provider-defaults failure unrelated), 121 frontend tests pass.
 - **2026-04-17:** Phase 3 planning complete. 4 PLAN.md files written in 3 waves. **Wave 1:** 01-PLAN (extract `_run_describe_pass` / `_run_score_pass` helpers; rewire existing handlers as thin wrappers — SC-3 guard via unchanged describe/score test files). **Wave 2:** 02-PLAN (`handle_batch_analyze` orchestration, nested `describe`+`score` checkpoints with `stage` field, D-06 combined result keys, D-07 50/50 progress split, D-08 `current_step` via `update_job_field`, `JOB_HANDLERS` registration, `checkpoint.py` docstring for D-18 — orphan recovery stays checkpoint-version-based with no allowlist edits). **Wave 3 (parallel):** 03-PLAN (new `test_handlers_batch_analyze.py` covering zero-work, sequencing, per-stage resume, partial-describe-does-not-block-score, shared selection, `current_step` transitions; plus `batch_analyze` orphan recovery test), 04-PLAN (`git mv` DescriptionsTab→AnalyzeTab, `?tab=analyze` slug, `ANALYZE_*` string constants, primary Analyze CTA, "Run stages separately" in Advanced disclosure with D-11 force-checkbox translation to flat `force` for legacy handlers). Plan-checker: PASS on iteration 1 (all SC-1/SC-2/SC-3 satisfied, D-01..D-18 covered, frontmatter valid, `depends_on` 01→02→{03,04}).
