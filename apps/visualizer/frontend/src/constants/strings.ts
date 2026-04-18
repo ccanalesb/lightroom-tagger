@@ -219,6 +219,39 @@ export const FILTER_CLEAR_ALL = 'Clear all'
 /** aria-label for per-chip remove control (D-16). */
 export const FILTER_CHIP_REMOVE_ARIA = (filterLabel: string) => `Remove ${filterLabel} filter`
 
+// Catalog tab — filters (extracted from CatalogTab.tsx during plan 04-04 migration)
+export const CATALOG_FILTER_LABEL_STATUS = 'Status'
+export const CATALOG_FILTER_LABEL_ANALYZED = 'Analyzed'
+export const CATALOG_FILTER_LABEL_MONTH = 'Month'
+export const CATALOG_FILTER_LABEL_KEYWORD = 'Keyword'
+export const CATALOG_FILTER_LABEL_MIN_RATING = 'Min rating'
+export const CATALOG_FILTER_LABEL_FROM = 'From'
+export const CATALOG_FILTER_LABEL_TO = 'To'
+export const CATALOG_FILTER_LABEL_DATE_RANGE = 'Date'
+export const CATALOG_FILTER_LABEL_COLOR = 'Color label'
+export const CATALOG_FILTER_LABEL_SCORE_PERSPECTIVE = 'Score perspective'
+export const CATALOG_FILTER_LABEL_MIN_SCORE = 'Min score'
+export const CATALOG_FILTER_LABEL_SORT_SCORE = 'Sort by score'
+
+export const CATALOG_FILTER_POSTED_ALL = 'All Images'
+export const CATALOG_FILTER_POSTED = 'Posted'
+export const CATALOG_FILTER_NOT_POSTED = 'Not Posted'
+
+export const CATALOG_FILTER_ANALYZED_ALL = 'All'
+export const CATALOG_FILTER_ANALYZED_ONLY = 'Analyzed only'
+export const CATALOG_FILTER_NOT_ANALYZED = 'Not analyzed'
+
+export const CATALOG_FILTER_MIN_RATING_ANY = 'Any'
+export const CATALOG_FILTER_SCORE_ANY = 'Any'
+export const CATALOG_FILTER_SORT_NONE = 'None'
+export const CATALOG_FILTER_SORT_HIGH_LOW = 'High → Low'
+export const CATALOG_FILTER_SORT_LOW_HIGH = 'Low → High'
+
+export const CATALOG_FILTER_KEYWORD_PLACEHOLDER = 'Search…'
+export const CATALOG_FILTER_KEYWORD_ARIA = 'Keyword search'
+export const CATALOG_FILTER_COLOR_PLACEHOLDER = 'e.g. Red'
+export const CATALOG_FILTER_COLOR_ARIA = 'Color label'
+
 // Config
 export const ITEMS_PER_PAGE = 48
 
