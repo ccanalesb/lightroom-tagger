@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish & Consolidate
-status: Phase 4 complete — filter framework live on CatalogTab
-last_updated: "2026-04-17T22:35:00.000Z"
+status: Phase 4.1 complete — filter framework now live on CatalogTab + InstagramTab
+last_updated: "2026-04-17T22:40:00.000Z"
 progress:
-  total_phases: 6
-  completed_phases: 4
-  total_plans: 21
-  completed_plans: 17
+  total_phases: 7
+  completed_phases: 5
+  total_plans: 22
+  completed_plans: 18
 ---
 
 # Planning state
@@ -21,9 +21,9 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v2.1 Polish & Consolidate |
-| Phase | Phase 4 — Reusable filter framework (complete) |
-| Status | Phase 4 complete — 4 plans / 3 waves / 15 code commits; 134/134 frontend tests pass, lint + tsc clean; CatalogTab end-to-end on the new framework |
-| Last activity | 2026-04-17 — Phase 4 executed and verified |
+| Phase | Phase 4.1 — InstagramTab filter migration (complete, INSERTED) |
+| Status | Phase 4.1 complete — 1 plan / 2 commits; 136/136 frontend tests pass, lint + tsc clean; InstagramTab + CatalogTab both on the framework |
+| Last activity | 2026-04-17 — Phase 4.1 inserted and shipped (user-requested InstagramTab migration inside v2.1) |
 
 ## Project Reference
 
@@ -47,11 +47,13 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 | JOB-03..05 | Phase 2 | ✅ Complete (2026-04-17) |
 | JOB-06 | Phase 3 | ✅ Complete (2026-04-17) |
 | FILTER-01, 02 | Phase 4 | ✅ Complete (2026-04-17) |
+| FILTER-02 (InstagramTab consumer) | Phase 4.1 | ✅ Complete (2026-04-17) |
 | IDENT-04, 05, DASH-02, 03 | Phase 5 | Pending |
 | UI-01, 02, 03 | Phase 6 | Pending |
 
 ## Last update
 
+- **2026-04-17:** Phase 4.1 inserted + executed (user-requested). InstagramTab migrated onto the Phase 4 framework via one `useMemo`d single-descriptor `instagramSchema` (`select` / `dateFolder` → `paramName: 'date_folder'`) + `useFilters` + `<FilterBar>`. Removed `dateFilter` `useState`, `handleFilterChange`, `clearFilter`, the inline `<select>` + Clear button block, and the `FILTER_CLEAR` import. `fetchImages` now spreads `filters.toQueryParams()`. Filter-change → offset-0 parity preserved via `useRef<boolean>(true)` first-run guard + `useEffect` on committed `dateFolder`. Clear-button copy shifts from `FILTER_CLEAR` ("Clear") to `FILTER_CLEAR_ALL` ("Clear all"), matching CatalogTab. Minor UX shift: filter now always renders (even with zero months loaded, "All dates" is the only option) — mirrors CatalogTab's behavior. Added RTL smoke test (2 assertions: baseline `listInstagram` call has no `date_folder`, and the "Date" label renders). Verification: 136/136 frontend tests pass (+2 new), lint clean, `tsc --noEmit` clean. Remaining ad-hoc filter consumers (`MatchesTab`, `DescriptionsTab`, `MatchingTab`, `AnalyticsPage`, `UnpostedCatalogPanel`) stay deferred to SEED-007 full rollout.
 - **2026-04-17:** Phase 4 execution complete. 4 plans / 3 waves / 15 code commits. **Plan 01** extracted `useDebouncedValue` into a shared hook, defined the `FilterSchema` discriminated union (`toggle` / `select` / `dateRange` / `search` + helpers `defaultFormatValue`, `isDescriptorEnabled`, `descriptorDefault`, `DEFAULT_SEARCH_DEBOUNCE_MS`), and added `FILTER_CLEAR_ALL` / `FILTER_CHIP_REMOVE_ARIA` strings. **Plan 02** implemented `useFilters(schema)`: `rawValues` ↔ `committedValues` with `useRef`-debounced search, `applyDependentClears` cascading resets via `enabledBy`, per-descriptor `paramName` / `toParam` + snake_case default + `dateRange` → `date_from` / `date_to` splitting, and `activeCount` / `isActive` using raw values for search descriptors (D-06). **Plan 03** built the UI: `FilterChip` over `ui/Badge` + ghost `ui/Button`, shared `CONTROL` Tailwind class, primitives (`ToggleFilter`, `SelectFilter` with `className` append + `numberValue` coercion, `DateRangeFilter` preserving legacy flex-wrap, `SearchFilter` wrapping `ui/Input` on `rawValue`), and `FilterBar` that consumes `filters: UseFiltersReturn` (not calling `useFilters` itself — D-18) with summary slot + top-right Clear-all + chip strip + inline control row. **Plan 04** big-bang migrated `CatalogTab.tsx`: eleven filter `useState` + ten `handle*` replaced by one `useMemo`d `catalogSchema`, `useFilters(catalogSchema)`, and `<FilterBar>`. `ImagesAPI.listCatalog` receives `filters.toQueryParams()`; `onPostedFilterChange` fires via `useEffect` (D-21); deep link (`image_key`) and month / perspective fetches untouched; pagination reset uses two effects — immediate for non-search values, `useRef`-deferred for committed `keyword` / `colorLabel` (parity with legacy debounce-triggered reset). Added RTL smoke test (`CatalogTab.test.tsx`) and extracted all catalog filter copy to `constants/strings.ts`. Verification: 134/134 frontend tests pass (25 files), lint clean (`--max-warnings 0`), `tsc --noEmit` clean. VERIFICATION.md + 04-SUMMARY.md written. Requirements FILTER-01 and FILTER-02 complete. Phase 5 (depends on 4 via DASH-03) unblocked.
 - **2026-04-17:** Phase 4 planned. `/gsd-plan-phase 4` executed; user opted to skip both research and UI-SPEC (CONTEXT.md's 22 decisions already served as the spec). Planner produced 4 plans across 3 waves: Plan 01 (Wave 1, useDebouncedValue extraction + filter schema types + strings), Plan 02 (Wave 2, useFilters hook), Plan 03 (Wave 2, FilterBar + primitives), Plan 04 (Wave 3, CatalogTab big-bang migration). Plan-checker iteration 1 found 2 BLOCKERS (03's missing depends_on 02; 03's chip rendering would show empty values during debounce window) + 6 warnings (mis-cited D-22 in plans 01/04, manual smoke in autonomous plan 04's verification, FilterBar scaffold ending in `return null`, SelectFilter hardcoding `scorePerspective` key check, missing `className` on SelectFilterDescriptor type, undocumented "Clear" → "Clear all" copy change). Planner revision addressed all 10 items surgically; iteration 2 VERIFICATION PASSED. Requirements coverage: FILTER-01 (plans 01, 03, 04), FILTER-02 (plans 01, 02, 04). All plans autonomous: true. Plan 04's manual browser smoke is documented as "Human UAT checklist (D-20 layer 3)" in must_haves, not gating machine verification.
 - **2026-04-17:** Phase 4 context gathered. `/gsd-discuss-phase 4` invoked via `/gsd-next`; user declined interactive gray-area walk-through ("i think im good") after presentation of six candidate areas (schema shape, hook semantics, query-param mapping, FilterBar layout, migration strategy, AnalyticsPage parity). Claude inferred 22 decisions (D-01..D-22) from CatalogTab.tsx (the de-facto spec, 11 filters across 100+ lines of useState), REQUIREMENTS.md Implementation Guidance (hard scope lock: CatalogTab migration only, other tabs deferred), and prior-phase patterns (central `constants/strings.ts`, container/presenter split, no new primitives without need). Key decisions: 4 primitives (toggle/select/dateRange/search — no numberRange, no dependentGroup); hook returns an object with `values`/`rawValues`/`setValue`/`setValues`/`clearAll`/`activeCount`/`toQueryParams`/`isActive`, live-update only (AnalyticsPage's apply-button paradigm deferred); `enabledBy: {filterKey, when}` for dependent filters with automatic clearing when parent unsets; debounce from schema (350ms default); query-param mapping via per-descriptor `paramName` (default snake_case) + `toParam`; chips **supplement** inline controls (not replace) — minimal UX shift; big-bang migration in one plan with three-layer regression strategy (existing tests unchanged + new framework tests + manual smoke); outward `onPostedFilterChange` prop survives as-is. Full ambiguity list + Claude's Discretion items captured in CONTEXT.md for the planner.
