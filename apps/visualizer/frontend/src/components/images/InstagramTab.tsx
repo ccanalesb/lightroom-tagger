@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageError, SkeletonGrid } from '../ui/page-states';
 import { ImageDetailsModal } from '../instagram/ImageDetailsModal';
 import { InstagramImageCard } from '../instagram/InstagramImageCard';
 import { Pagination } from '../ui/Pagination';
-import { FILTER_ALL_DATES, FILTER_CLEAR, ITEMS_PER_PAGE } from '../../constants/strings';
+import { FILTER_ALL_DATES, ITEMS_PER_PAGE } from '../../constants/strings';
 import { useModal } from '../../hooks/useModal';
+import { useFilters } from '../../hooks/useFilters';
+import { FilterBar } from '../filters/FilterBar';
+import type { FilterSchema } from '../filters/types';
 import type { InstagramImage } from '../../services/api';
 import { ImagesAPI } from '../../services/api';
 import { formatMonth } from '../../utils/date';
@@ -18,20 +21,43 @@ export function InstagramTab() {
     total_pages: 1,
     has_more: false,
   });
-  const [dateFilter, setDateFilter] = useState('');
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const { isOpen, selectedItem, open, close } = useModal<InstagramImage>();
 
+  const instagramSchema = useMemo<FilterSchema>(
+    () => [
+      {
+        type: 'select',
+        key: 'dateFolder',
+        label: 'Date',
+        paramName: 'date_folder',
+        defaultValue: '',
+        options: [
+          { value: '', label: FILTER_ALL_DATES },
+          ...availableMonths.map((month) => ({
+            value: month,
+            label: formatMonth(month),
+          })),
+        ],
+      },
+    ],
+    [availableMonths],
+  );
+
+  const filters = useFilters(instagramSchema);
+  const { values: filterValues, toQueryParams } = filters;
+  const dateFolder = filterValues.dateFolder as string | undefined;
+
   const fetchImages = useCallback(
-    async (newOffset: number, filter: string = dateFilter) => {
+    async (newOffset: number) => {
       setIsLoading(true);
       try {
         const params = {
+          ...toQueryParams(),
           limit: ITEMS_PER_PAGE,
           offset: newOffset,
-          ...(filter && { date_folder: filter }),
         };
         const data = await ImagesAPI.listInstagram(params);
         setImages(data.images);
@@ -44,7 +70,7 @@ export function InstagramTab() {
         setIsLoading(false);
       }
     },
-    [dateFilter]
+    [toQueryParams],
   );
 
   useEffect(() => {
@@ -69,53 +95,32 @@ export function InstagramTab() {
     initialize();
   }, []);
 
+  const firstRun = useRef(true);
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    fetchImages(0);
+  }, [dateFolder, fetchImages]);
+
   const handlePageChange = (page: number) => {
     const newOffset = (page - 1) * ITEMS_PER_PAGE;
     fetchImages(newOffset);
   };
 
-  const handleFilterChange = (filter: string) => {
-    setDateFilter(filter);
-    fetchImages(0, filter);
-  };
-
-  const clearFilter = () => {
-    setDateFilter('');
-    fetchImages(0, '');
-  };
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-text-secondary">
-          {total.toLocaleString()} images total
-        </p>
-
-        {availableMonths.length > 0 && (
-          <div className="flex items-center space-x-2">
-            <select
-              value={dateFilter}
-              onChange={(e) => handleFilterChange(e.target.value)}
-              className="px-3 py-2 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all"
-            >
-              <option value="">{FILTER_ALL_DATES}</option>
-              {availableMonths.map((month) => (
-                <option key={month} value={month}>
-                  {formatMonth(month)}
-                </option>
-              ))}
-            </select>
-            {dateFilter && (
-              <button
-                onClick={clearFilter}
-                className="px-3 py-2 text-sm rounded-base border border-border bg-bg text-text-secondary hover:bg-surface hover:text-text transition-all"
-              >
-                {FILTER_CLEAR}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+      <FilterBar
+        schema={instagramSchema}
+        filters={filters}
+        summary={
+          <p className="text-sm text-text-secondary">
+            {total.toLocaleString()} images total
+          </p>
+        }
+        disabled={isLoading}
+      />
 
       {error && <PageError message={error} />}
       {isLoading && <SkeletonGrid count={ITEMS_PER_PAGE} />}
