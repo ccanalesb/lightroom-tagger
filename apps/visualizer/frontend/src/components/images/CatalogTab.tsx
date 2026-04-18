@@ -1,16 +1,43 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ImagesAPI, PerspectivesAPI, type CatalogImage } from '../../services/api';
 import { CatalogImageCard } from '../catalog/CatalogImageCard';
 import { CatalogImageModal } from '../catalog/CatalogImageModal';
-import { Input } from '../ui/Input';
 import { Pagination } from '../ui/Pagination';
-import { FILTER_CLEAR, FILTER_ALL_DATES } from '../../constants/strings';
+import {
+  FILTER_ALL_DATES,
+  CATALOG_FILTER_LABEL_STATUS,
+  CATALOG_FILTER_LABEL_ANALYZED,
+  CATALOG_FILTER_LABEL_MONTH,
+  CATALOG_FILTER_LABEL_KEYWORD,
+  CATALOG_FILTER_LABEL_MIN_RATING,
+  CATALOG_FILTER_LABEL_DATE_RANGE,
+  CATALOG_FILTER_LABEL_COLOR,
+  CATALOG_FILTER_LABEL_SCORE_PERSPECTIVE,
+  CATALOG_FILTER_LABEL_MIN_SCORE,
+  CATALOG_FILTER_LABEL_SORT_SCORE,
+  CATALOG_FILTER_POSTED_ALL,
+  CATALOG_FILTER_POSTED,
+  CATALOG_FILTER_NOT_POSTED,
+  CATALOG_FILTER_ANALYZED_ALL,
+  CATALOG_FILTER_ANALYZED_ONLY,
+  CATALOG_FILTER_NOT_ANALYZED,
+  CATALOG_FILTER_MIN_RATING_ANY,
+  CATALOG_FILTER_SCORE_ANY,
+  CATALOG_FILTER_SORT_NONE,
+  CATALOG_FILTER_SORT_HIGH_LOW,
+  CATALOG_FILTER_SORT_LOW_HIGH,
+  CATALOG_FILTER_KEYWORD_PLACEHOLDER,
+  CATALOG_FILTER_KEYWORD_ARIA,
+  CATALOG_FILTER_COLOR_PLACEHOLDER,
+  CATALOG_FILTER_COLOR_ARIA,
+} from '../../constants/strings';
 import { formatMonth } from '../../utils/date';
-import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { useFilters } from '../../hooks/useFilters';
+import { FilterBar } from '../filters/FilterBar';
+import type { FilterSchema } from '../filters/types';
 
 const LIMIT = 50;
-const DEBOUNCE_MS = 350;
 
 function catalogStubForDeepLink(imageKey: string): CatalogImage {
   return {
@@ -37,6 +64,62 @@ type CatalogTabProps = {
   onPostedFilterChange?: (posted: boolean | undefined) => void;
 };
 
+const postedSerialize = (value: unknown): string => {
+  if (value === undefined) return 'all';
+  return value === true ? 'posted' : 'not-posted';
+};
+const postedDeserialize = (raw: string): unknown => {
+  if (raw === 'posted') return true;
+  if (raw === 'not-posted') return false;
+  return undefined;
+};
+
+const analyzedSerialize = (value: unknown): string => {
+  if (value === undefined) return 'all';
+  return value === true ? 'analyzed' : 'not_analyzed';
+};
+const analyzedDeserialize = (raw: string): unknown => {
+  if (raw === 'analyzed') return true;
+  if (raw === 'not_analyzed') return false;
+  return undefined;
+};
+
+const formatPostedChip = (value: unknown): string => {
+  if (value === true) return CATALOG_FILTER_POSTED;
+  if (value === false) return CATALOG_FILTER_NOT_POSTED;
+  return CATALOG_FILTER_POSTED_ALL;
+};
+
+const formatAnalyzedChip = (value: unknown): string => {
+  if (value === true) return CATALOG_FILTER_ANALYZED_ONLY;
+  if (value === false) return CATALOG_FILTER_NOT_ANALYZED;
+  return CATALOG_FILTER_ANALYZED_ALL;
+};
+
+const formatMinRatingChip = (value: unknown): string => {
+  if (value === '' || value === undefined || value === null) return CATALOG_FILTER_MIN_RATING_ANY;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  return '★'.repeat(n);
+};
+
+const formatDateRangeChip = (value: unknown): string => {
+  if (!value || typeof value !== 'object') return '';
+  const v = value as { from?: string; to?: string };
+  const from = typeof v.from === 'string' ? v.from : '';
+  const to = typeof v.to === 'string' ? v.to : '';
+  if (from && to) return `${from} → ${to}`;
+  if (from) return `from ${from}`;
+  if (to) return `to ${to}`;
+  return '';
+};
+
+const formatSortChip = (value: unknown): string => {
+  if (value === 'desc') return CATALOG_FILTER_SORT_HIGH_LOW;
+  if (value === 'asc') return CATALOG_FILTER_SORT_LOW_HIGH;
+  return CATALOG_FILTER_SORT_NONE;
+};
+
 export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -48,24 +131,144 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [catalogFetchSucceeded, setCatalogFetchSucceeded] = useState(false);
   const [selectedImage, setSelectedImage] = useState<CatalogImage | null>(null);
-  const [postedFilter, setPostedFilter] = useState<boolean | undefined>(undefined);
-  const [analyzedFilter, setAnalyzedFilter] = useState<'all' | 'analyzed' | 'not_analyzed'>('all');
-  const [monthFilter, setMonthFilter] = useState<string>('');
-  const [keyword, setKeyword] = useState('');
-  const [minRating, setMinRating] = useState<number | ''>('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [colorLabel, setColorLabel] = useState('');
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
-  const [scorePerspectives, setScorePerspectives] = useState<{ slug: string; display_name: string }[]>(
-    [],
-  );
-  const [scorePerspective, setScorePerspective] = useState('');
-  const [minCatalogScore, setMinCatalogScore] = useState<number | ''>('');
-  const [sortByScore, setSortByScore] = useState<'none' | 'asc' | 'desc'>('none');
+  const [scorePerspectives, setScorePerspectives] = useState<
+    { slug: string; display_name: string }[]
+  >([]);
 
-  const debouncedKeyword = useDebouncedValue(keyword, DEBOUNCE_MS);
-  const debouncedColorLabel = useDebouncedValue(colorLabel, DEBOUNCE_MS);
+  const catalogSchema = useMemo<FilterSchema>(() => {
+    return [
+      {
+        type: 'toggle',
+        key: 'posted',
+        label: CATALOG_FILTER_LABEL_STATUS,
+        options: [
+          { value: 'all', label: CATALOG_FILTER_POSTED_ALL },
+          { value: 'posted', label: CATALOG_FILTER_POSTED },
+          { value: 'not-posted', label: CATALOG_FILTER_NOT_POSTED },
+        ],
+        serialize: postedSerialize,
+        deserialize: postedDeserialize,
+        formatValue: formatPostedChip,
+      },
+      {
+        type: 'toggle',
+        key: 'analyzed',
+        label: CATALOG_FILTER_LABEL_ANALYZED,
+        options: [
+          { value: 'all', label: CATALOG_FILTER_ANALYZED_ALL },
+          { value: 'analyzed', label: CATALOG_FILTER_ANALYZED_ONLY },
+          { value: 'not_analyzed', label: CATALOG_FILTER_NOT_ANALYZED },
+        ],
+        serialize: analyzedSerialize,
+        deserialize: analyzedDeserialize,
+        formatValue: formatAnalyzedChip,
+      },
+      ...(availableMonths.length > 0
+        ? ([
+            {
+              type: 'select',
+              key: 'month',
+              label: CATALOG_FILTER_LABEL_MONTH,
+              options: [
+                { value: '', label: FILTER_ALL_DATES },
+                ...availableMonths.map((m) => ({ value: m, label: formatMonth(m) })),
+              ],
+              formatValue: (v: unknown) =>
+                typeof v === 'string' && v !== '' ? formatMonth(v) : FILTER_ALL_DATES,
+            },
+          ] as FilterSchema)
+        : []),
+      {
+        type: 'search',
+        key: 'keyword',
+        label: CATALOG_FILTER_LABEL_KEYWORD,
+        debounceMs: 350,
+        placeholder: CATALOG_FILTER_KEYWORD_PLACEHOLDER,
+        ariaLabel: CATALOG_FILTER_KEYWORD_ARIA,
+        className: 'h-9 min-w-[8rem] w-36',
+      },
+      {
+        type: 'select',
+        key: 'minRating',
+        label: CATALOG_FILTER_LABEL_MIN_RATING,
+        paramName: 'min_rating',
+        numberValue: true,
+        options: [
+          { value: '', label: CATALOG_FILTER_MIN_RATING_ANY },
+          ...[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: '★'.repeat(n) })),
+        ],
+        formatValue: formatMinRatingChip,
+      },
+      {
+        type: 'dateRange',
+        key: 'dateRange',
+        label: CATALOG_FILTER_LABEL_DATE_RANGE,
+        chipLabel: CATALOG_FILTER_LABEL_DATE_RANGE,
+        formatValue: formatDateRangeChip,
+      },
+      {
+        type: 'search',
+        key: 'colorLabel',
+        label: CATALOG_FILTER_LABEL_COLOR,
+        paramName: 'color_label',
+        debounceMs: 350,
+        placeholder: CATALOG_FILTER_COLOR_PLACEHOLDER,
+        ariaLabel: CATALOG_FILTER_COLOR_ARIA,
+        className: 'h-9 min-w-[6rem] w-28',
+      },
+      {
+        type: 'select',
+        key: 'scorePerspective',
+        label: CATALOG_FILTER_LABEL_SCORE_PERSPECTIVE,
+        className: 'min-w-[8rem]',
+        options: [
+          { value: '', label: CATALOG_FILTER_SCORE_ANY },
+          ...scorePerspectives.map((p) => ({ value: p.slug, label: p.display_name })),
+        ],
+        formatValue: (v) => {
+          if (!v) return CATALOG_FILTER_SCORE_ANY;
+          const match = scorePerspectives.find((p) => p.slug === v);
+          return match ? match.display_name : String(v);
+        },
+      },
+      {
+        type: 'select',
+        key: 'minCatalogScore',
+        label: CATALOG_FILTER_LABEL_MIN_SCORE,
+        paramName: 'min_score',
+        numberValue: true,
+        options: [
+          { value: '', label: CATALOG_FILTER_SCORE_ANY },
+          ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => ({
+            value: String(n),
+            label: `${n}+`,
+          })),
+        ],
+        enabledBy: { filterKey: 'scorePerspective', when: (v) => Boolean(v) },
+        formatValue: (v) =>
+          v === '' || v === undefined || v === null ? CATALOG_FILTER_SCORE_ANY : `${v}+`,
+      },
+      {
+        type: 'select',
+        key: 'sortByScore',
+        label: CATALOG_FILTER_LABEL_SORT_SCORE,
+        paramName: 'sort_by_score',
+        defaultValue: 'none',
+        options: [
+          { value: 'none', label: CATALOG_FILTER_SORT_NONE },
+          { value: 'desc', label: CATALOG_FILTER_SORT_HIGH_LOW },
+          { value: 'asc', label: CATALOG_FILTER_SORT_LOW_HIGH },
+        ],
+        enabledBy: { filterKey: 'scorePerspective', when: (v) => Boolean(v) },
+        toParam: (v) => (v === 'none' || v === '' || v === undefined ? undefined : v),
+        formatValue: formatSortChip,
+      },
+    ];
+  }, [availableMonths, scorePerspectives]);
+
+  const filters = useFilters(catalogSchema);
+  const { values: filterValues, rawValues: filterRawValues, toQueryParams, activeCount } = filters;
 
   const fetchId = useRef(0);
 
@@ -75,29 +278,8 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
       setFetching(true);
       setLoadError(null);
       const offset = (page - 1) * LIMIT;
-      const kw = debouncedKeyword.trim();
-      const cl = debouncedColorLabel.trim();
-      // IG-06: posted filter (images.instagram_posted) -> GET /api/images/catalog?posted=
       const data = await ImagesAPI.listCatalog({
-        ...(postedFilter !== undefined ? { posted: postedFilter } : {}),
-        ...(analyzedFilter === 'analyzed'
-          ? { analyzed: true }
-          : analyzedFilter === 'not_analyzed'
-            ? { analyzed: false }
-            : {}),
-        ...(monthFilter ? { month: monthFilter } : {}),
-        ...(kw ? { keyword: kw } : {}),
-        ...(minRating !== '' ? { min_rating: minRating } : {}),
-        ...(dateFrom ? { date_from: dateFrom } : {}),
-        ...(dateTo ? { date_to: dateTo } : {}),
-        ...(cl ? { color_label: cl } : {}),
-        ...(scorePerspective
-          ? {
-              score_perspective: scorePerspective,
-              ...(minCatalogScore !== '' ? { min_score: minCatalogScore } : {}),
-              ...(sortByScore !== 'none' ? { sort_by_score: sortByScore } : {}),
-            }
-          : {}),
+        ...toQueryParams(),
         limit: LIMIT,
         offset,
       });
@@ -118,20 +300,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
         setInitialLoad(false);
       }
     }
-  }, [
-    page,
-    postedFilter,
-    analyzedFilter,
-    monthFilter,
-    debouncedKeyword,
-    minRating,
-    dateFrom,
-    dateTo,
-    debouncedColorLabel,
-    scorePerspective,
-    minCatalogScore,
-    sortByScore,
-  ]);
+  }, [page, toQueryParams]);
 
   useEffect(() => {
     const fetchMonths = async () => {
@@ -168,106 +337,45 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
     navigate({ pathname: location.pathname, search: next ? `?${next}` : '' }, { replace: true });
   }, [location.search, location.pathname, navigate]);
 
+  const postedCommitted = filterValues.posted as boolean | undefined;
   useEffect(() => {
-    onPostedFilterChange?.(postedFilter);
-  }, [postedFilter, onPostedFilterChange]);
+    onPostedFilterChange?.(postedCommitted);
+  }, [postedCommitted, onPostedFilterChange]);
 
-  const handlePostedFilterChange = (filter: string) => {
-    if (filter === 'all') {
-      setPostedFilter(undefined);
-    } else if (filter === 'posted') {
-      setPostedFilter(true);
-    } else if (filter === 'not-posted') {
-      setPostedFilter(false);
-    }
-    setPage(1);
-  };
+  const dateRangeValue = filterValues.dateRange as { from?: string; to?: string } | undefined;
+  const dateRangeFrom = dateRangeValue?.from ?? '';
+  const dateRangeTo = dateRangeValue?.to ?? '';
 
-  const handleAnalyzedFilterChange = (filter: 'all' | 'analyzed' | 'not_analyzed') => {
-    setAnalyzedFilter(filter);
-    setPage(1);
-  };
-
-  const handleMonthFilterChange = (month: string) => {
-    setMonthFilter(month);
-    setPage(1);
-  };
-
-  const handleMinRatingChange = (value: string) => {
-    if (value === '') setMinRating('');
-    else setMinRating(Number(value));
-    setPage(1);
-  };
-
-  const handleScorePerspectiveChange = (slug: string) => {
-    setScorePerspective(slug);
-    if (!slug) {
-      setMinCatalogScore('');
-      setSortByScore('none');
-    }
-    setPage(1);
-  };
-
-  const handleMinCatalogScoreChange = (value: string) => {
-    if (value === '') setMinCatalogScore('');
-    else setMinCatalogScore(Number(value));
-    setPage(1);
-  };
-
-  const handleSortByScoreChange = (value: 'none' | 'asc' | 'desc') => {
-    setSortByScore(value);
-    setPage(1);
-  };
-
-  const handleDateFromChange = (value: string) => {
-    setDateFrom(value);
-    setPage(1);
-  };
-
-  const handleDateToChange = (value: string) => {
-    setDateTo(value);
-    setPage(1);
-  };
-
-  const clearFilters = () => {
-    setPostedFilter(undefined);
-    setAnalyzedFilter('all');
-    setMonthFilter('');
-    setKeyword('');
-    setMinRating('');
-    setDateFrom('');
-    setDateTo('');
-    setColorLabel('');
-    setScorePerspective('');
-    setMinCatalogScore('');
-    setSortByScore('none');
-    setPage(1);
-  };
-
-  // Reset to page 1 when debounced text filters change
-  const prevKeyword = useRef(debouncedKeyword);
-  const prevColor = useRef(debouncedColorLabel);
+  // D-10: non-search filter changes reset page to 1 immediately.
   useEffect(() => {
-    if (prevKeyword.current !== debouncedKeyword || prevColor.current !== debouncedColorLabel) {
-      prevKeyword.current = debouncedKeyword;
-      prevColor.current = debouncedColorLabel;
+    setPage(1);
+  }, [
+    filterValues.posted,
+    filterValues.analyzed,
+    filterValues.month,
+    filterValues.minRating,
+    dateRangeFrom,
+    dateRangeTo,
+    filterValues.scorePerspective,
+    filterValues.minCatalogScore,
+    filterValues.sortByScore,
+  ]);
+
+  // Debounced text parity with legacy lines 255–264: reset page on committed keyword / colorLabel change.
+  const prevKeyword = useRef(filterValues.keyword);
+  const prevColor = useRef(filterValues.colorLabel);
+  useEffect(() => {
+    if (
+      prevKeyword.current !== filterValues.keyword ||
+      prevColor.current !== filterValues.colorLabel
+    ) {
+      prevKeyword.current = filterValues.keyword;
+      prevColor.current = filterValues.colorLabel;
       setPage(1);
     }
-  }, [debouncedKeyword, debouncedColorLabel]);
+  }, [filterValues.keyword, filterValues.colorLabel]);
 
-  const hasActiveFilters =
-    postedFilter !== undefined ||
-    analyzedFilter !== 'all' ||
-    Boolean(monthFilter) ||
-    Boolean(keyword.trim()) ||
-    minRating !== '' ||
-    Boolean(dateFrom) ||
-    Boolean(dateTo) ||
-    Boolean(colorLabel.trim()) ||
-    Boolean(scorePerspective) ||
-    minCatalogScore !== '' ||
-    sortByScore !== 'none';
-
+  const hasActiveFilters = activeCount > 0;
   const loading = initialLoad;
 
   const noFiltersAndEmptyDb =
@@ -288,187 +396,17 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
     return `Showing ${images.length} of ${total.toLocaleString()} images`;
   })();
 
+  // Silence unused-var warning for rawValues destructure — kept for future debug / UAT.
+  void filterRawValues;
+
   return (
     <div className="space-y-6">
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-text-secondary">{summaryText}</p>
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              disabled={loading}
-              className="px-3 py-1.5 text-sm rounded-base border border-border bg-bg text-text-secondary hover:bg-surface hover:text-text transition-all disabled:opacity-60"
-            >
-              {FILTER_CLEAR}
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-text-tertiary">Status</span>
-            <select
-              value={
-                postedFilter === undefined ? 'all' : postedFilter ? 'posted' : 'not-posted'
-              }
-              onChange={(e) => handlePostedFilterChange(e.target.value)}
-              disabled={loading}
-              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
-            >
-              <option value="all">All Images</option>
-              <option value="posted">Posted</option>
-              <option value="not-posted">Not Posted</option>
-            </select>
-          </div>
-
-          {/* AI-06: catalog analyzed filter (IG-06 pattern for posted) */}
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-text-tertiary">Analyzed</span>
-            <select
-              value={analyzedFilter}
-              onChange={(e) =>
-                handleAnalyzedFilterChange(e.target.value as 'all' | 'analyzed' | 'not_analyzed')
-              }
-              disabled={loading}
-              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
-            >
-              <option value="all">All</option>
-              <option value="analyzed">Analyzed only</option>
-              <option value="not_analyzed">Not analyzed</option>
-            </select>
-          </div>
-
-          {availableMonths.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-text-tertiary">Month</span>
-              <select
-                value={monthFilter}
-                onChange={(e) => handleMonthFilterChange(e.target.value)}
-                disabled={loading}
-                className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
-              >
-                <option value="">{FILTER_ALL_DATES}</option>
-                {availableMonths.map((month) => (
-                  <option key={month} value={month}>
-                    {formatMonth(month)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-text-tertiary">Keyword</span>
-            <Input
-              type="search"
-              placeholder="Search…"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              className="h-9 min-w-[8rem] w-36"
-              aria-label="Keyword search"
-              disabled={loading}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-text-tertiary">Min rating</span>
-            <select
-              value={minRating === '' ? '' : String(minRating)}
-              onChange={(e) => handleMinRatingChange(e.target.value)}
-              disabled={loading}
-              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
-            >
-              <option value="">Any</option>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <option key={n} value={n}>{'★'.repeat(n)}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-text-tertiary">From</span>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => handleDateFromChange(e.target.value)}
-              disabled={loading}
-              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-text-tertiary">To</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => handleDateToChange(e.target.value)}
-              disabled={loading}
-              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-text-tertiary">Color label</span>
-            <Input
-              placeholder="e.g. Red"
-              value={colorLabel}
-              onChange={(e) => setColorLabel(e.target.value)}
-              className="h-9 min-w-[6rem] w-28"
-              aria-label="Color label"
-              disabled={loading}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-text-tertiary">Score perspective</span>
-            <select
-              value={scorePerspective}
-              onChange={(e) => handleScorePerspectiveChange(e.target.value)}
-              disabled={loading}
-              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60 min-w-[8rem]"
-            >
-              <option value="">Any</option>
-              {scorePerspectives.map((p) => (
-                <option key={p.slug} value={p.slug}>
-                  {p.display_name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-text-tertiary">Min score</span>
-            <select
-              value={minCatalogScore === '' ? '' : String(minCatalogScore)}
-              onChange={(e) => handleMinCatalogScoreChange(e.target.value)}
-              disabled={loading || !scorePerspective}
-              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
-            >
-              <option value="">Any</option>
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                <option key={n} value={n}>
-                  {n}+
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-text-tertiary">Sort by score</span>
-            <select
-              value={sortByScore}
-              onChange={(e) => handleSortByScoreChange(e.target.value as 'none' | 'asc' | 'desc')}
-              disabled={loading || !scorePerspective}
-              className="h-9 px-3 rounded-base border border-border bg-bg text-text text-sm focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all disabled:opacity-60"
-            >
-              <option value="none">None</option>
-              <option value="desc">High → Low</option>
-              <option value="asc">Low → High</option>
-            </select>
-          </div>
-        </div>
-      </div>
+      <FilterBar
+        schema={catalogSchema}
+        filters={filters}
+        summary={<p className="text-sm text-text-secondary">{summaryText}</p>}
+        disabled={loading}
+      />
 
       {loading ? (
         <div className="text-center py-12">
@@ -484,8 +422,18 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
         </div>
       ) : noFiltersAndEmptyDb ? (
         <div className="text-center py-12">
-          <svg className="mx-auto h-12 w-12 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <svg
+            className="mx-auto h-12 w-12 text-text-tertiary"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
           </svg>
           <h3 className="mt-2 text-sm font-medium text-text">No Catalog Images</h3>
           <p className="mt-1 text-sm text-text-secondary">
@@ -494,17 +442,29 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
         </div>
       ) : total === 0 && hasActiveFilters ? (
         <div className="text-center py-12">
-          <svg className="mx-auto h-12 w-12 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <svg
+            className="mx-auto h-12 w-12 text-text-tertiary"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
           </svg>
           <h3 className="mt-2 text-sm font-medium text-text">No Images Found</h3>
-          <p className="mt-1 text-sm text-text-secondary">
-            Try changing or clearing the filters.
-          </p>
+          <p className="mt-1 text-sm text-text-secondary">Try changing or clearing the filters.</p>
         </div>
       ) : (
         <>
-          <div className={`relative transition-opacity duration-150 ${fetching ? 'opacity-50 pointer-events-none' : ''}`}>
+          <div
+            className={`relative transition-opacity duration-150 ${
+              fetching ? 'opacity-50 pointer-events-none' : ''
+            }`}
+          >
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {images.map((image) => (
                 <CatalogImageCard
@@ -517,20 +477,13 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
           </div>
 
           {totalPages > 1 && (
-            <Pagination
-              currentPage={page}
-              totalPages={totalPages}
-              onPageChange={setPage}
-            />
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
           )}
         </>
       )}
 
       {selectedImage && (
-        <CatalogImageModal
-          image={selectedImage}
-          onClose={() => setSelectedImage(null)}
-        />
+        <CatalogImageModal image={selectedImage} onClose={() => setSelectedImage(null)} />
       )}
     </div>
   );
