@@ -213,6 +213,12 @@ export const PAGINATION_NEXT = 'Next →'
 export const FILTER_ALL_DATES = 'All dates'
 export const FILTER_CLEAR = 'Clear'
 
+/** FilterBar — primary reset (D-17); Catalog migration uses this label. */
+export const FILTER_CLEAR_ALL = 'Clear all'
+
+/** aria-label for per-chip remove control (D-16). */
+export const FILTER_CHIP_REMOVE_ARIA = (filterLabel: string) => `Remove ${filterLabel} filter`
+
 // Config
 export const ITEMS_PER_PAGE = 48
 
