@@ -174,6 +174,75 @@ def compute_image_aggregate_scores(
     return items, meta
 
 
+def compute_single_image_aggregate_scores(
+    conn: sqlite3.Connection,
+    image_key: str,
+) -> dict[str, Any] | None:
+    """Aggregate identity scores for a single catalog image.
+
+    Reuses :data:`_SCORES_BASE_SQL` (``is_current = 1`` AND
+    ``image_type = 'catalog'``) and the active-perspectives / equal-weight
+    rules from :func:`compute_image_aggregate_scores`. Returns a per-image
+    record (``image_key``, ``aggregate_score``, ``perspectives_covered``,
+    ``eligible``, ``per_perspective``) or ``None`` when no current catalog
+    scores exist for ``image_key`` on active perspectives.
+    """
+    active_slugs = _active_perspective_slugs(conn)
+    if not active_slugs:
+        return None
+    slug_set = set(active_slugs)
+    min_used = _default_min_perspectives(len(active_slugs))
+
+    rows = conn.execute(
+        _SCORES_BASE_SQL + "\n        AND s.image_key = ?",
+        (image_key,),
+    ).fetchall()
+
+    perspectives: list[dict[str, Any]] = []
+    for r in rows:
+        slug = str(r["perspective_slug"])
+        if slug not in slug_set:
+            continue
+        perspectives.append(
+            {
+                "perspective_slug": slug,
+                "display_name": r["perspective_display_name"] or slug,
+                "score": int(r["score"]),
+                "rationale": r.get("rationale") or "",
+                "model_used": r.get("model_used") or "",
+                "prompt_version": r.get("prompt_version") or "",
+                "scored_at": r.get("scored_at") or "",
+            }
+        )
+
+    if not perspectives:
+        return None
+
+    n = len(perspectives)
+    agg = sum(p["score"] for p in perspectives) / n
+    per_out: list[dict[str, Any]] = []
+    for p in sorted(perspectives, key=lambda x: x["perspective_slug"]):
+        per_out.append(
+            {
+                "perspective_slug": p["perspective_slug"],
+                "display_name": p["display_name"],
+                "score": p["score"],
+                "prompt_version": p["prompt_version"],
+                "model_used": p["model_used"],
+                "scored_at": p["scored_at"],
+                "rationale_preview": _truncate_rationale(p.get("rationale")),
+            }
+        )
+
+    return {
+        "image_key": str(image_key),
+        "aggregate_score": round(agg, 4),
+        "perspectives_covered": n,
+        "eligible": n >= min_used,
+        "per_perspective": per_out,
+    }
+
+
 def _image_meta_map(conn: sqlite3.Connection, keys: list[str]) -> dict[str, dict[str, Any]]:
     if not keys:
         return {}

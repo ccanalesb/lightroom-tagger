@@ -15,10 +15,16 @@ from utils.responses import (
 )
 
 from lightroom_tagger.core.database import (
+    get_image,
+    get_image_description,
+    get_instagram_dump_media,
     query_catalog_images,
     reject_match,
     unvalidate_match,
     validate_match,
+)
+from lightroom_tagger.core.identity_service import (
+    compute_single_image_aggregate_scores,
 )
 
 _CATALOG_SCORE_PERSPECTIVE_SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
@@ -799,5 +805,142 @@ def reject_match_endpoint(db, catalog_key, insta_key):
 
         reject_match(db, catalog_key, insta_key)
         return jsonify({'rejected': True})
+    except Exception as e:
+        return error_server_error(str(e))
+_DETAIL_IMAGE_TYPES = ('catalog', 'instagram')
+
+
+def _build_catalog_detail(db, image_key, score_perspective):
+    """Build the catalog detail payload; returns (payload_dict, 404_flag)."""
+    row = get_image(db, image_key)
+    if not row:
+        return None, True
+
+    out = dict(row)
+    out['image_type'] = 'catalog'
+
+    desc_row = get_image_description(db, image_key)
+    if desc_row and desc_row.get('image_type') == 'catalog':
+        out['ai_analyzed'] = True
+        out['description_summary'] = desc_row.get('summary') or ''
+        out['description_best_perspective'] = desc_row.get('best_perspective') or ''
+        persp = desc_row.get('perspectives')
+        out['description_perspectives'] = persp if isinstance(persp, dict) else {}
+    else:
+        out['ai_analyzed'] = False
+        out['description_summary'] = None
+        out['description_best_perspective'] = None
+        out['description_perspectives'] = None
+
+    # Identity aggregate (may be None when no scores yet).
+    identity = compute_single_image_aggregate_scores(db, image_key)
+    if identity is not None:
+        out['identity_aggregate_score'] = identity['aggregate_score']
+        out['identity_perspectives_covered'] = identity['perspectives_covered']
+        out['identity_eligible'] = identity['eligible']
+        out['identity_per_perspective'] = identity['per_perspective']
+    else:
+        out['identity_aggregate_score'] = None
+        out['identity_perspectives_covered'] = 0
+        out['identity_eligible'] = False
+        out['identity_per_perspective'] = []
+
+    # Per-slug catalog score (same semantics as list endpoint).
+    if score_perspective:
+        score_row = db.execute(
+            "SELECT score FROM image_scores "
+            "WHERE image_key = ? AND image_type = 'catalog' "
+            "AND perspective_slug = ? AND is_current = 1",
+            (image_key, score_perspective),
+        ).fetchone()
+        out['catalog_perspective_score'] = (
+            int(score_row['score']) if score_row else None
+        )
+        out['catalog_score_perspective'] = score_perspective
+    else:
+        out['catalog_perspective_score'] = None
+        out['catalog_score_perspective'] = None
+
+    # Every persisted current score perspective for this image (drives modal picker).
+    slug_rows = db.execute(
+        "SELECT DISTINCT perspective_slug FROM image_scores "
+        "WHERE image_key = ? AND image_type = 'catalog' AND is_current = 1 "
+        "ORDER BY perspective_slug",
+        (image_key,),
+    ).fetchall()
+    out['available_score_perspectives'] = [
+        str(r['perspective_slug']) for r in slug_rows
+    ]
+
+    rid = out.get('id')
+    if rid is not None and str(rid).strip().isdigit():
+        out['id'] = int(rid)
+    else:
+        out['id'] = None
+
+    return out, False
+
+
+def _build_instagram_detail(db, image_key):
+    """Build the instagram detail payload; returns (payload_dict, 404_flag)."""
+    row = get_instagram_dump_media(db, image_key)
+    if not row:
+        return None, True
+
+    out = dict(row)
+    out['image_type'] = 'instagram'
+    # Normalize to the same ``key`` alias catalog uses.
+    out['key'] = row.get('media_key') or image_key
+
+    desc_row = get_image_description(db, image_key)
+    if desc_row and desc_row.get('image_type') == 'instagram':
+        out['ai_analyzed'] = True
+        out['description_summary'] = desc_row.get('summary') or ''
+        out['description_best_perspective'] = desc_row.get('best_perspective') or ''
+        persp = desc_row.get('perspectives')
+        out['description_perspectives'] = persp if isinstance(persp, dict) else {}
+    else:
+        out['ai_analyzed'] = False
+        out['description_summary'] = None
+        out['description_best_perspective'] = None
+        out['description_perspectives'] = None
+
+    # Instagram rows have no identity scoring (catalog-only by design).
+    out['identity_aggregate_score'] = None
+    out['identity_perspectives_covered'] = 0
+    out['identity_eligible'] = False
+    out['identity_per_perspective'] = []
+    out['catalog_perspective_score'] = None
+    out['catalog_score_perspective'] = None
+    out['available_score_perspectives'] = []
+
+    return out, False
+
+
+@bp.route('/<string:image_type>/<path:image_key>', methods=['GET'])
+@with_db
+def get_image_detail(db, image_type, image_key):
+    """Single-image detail payload — used by the consolidated image-view modal."""
+    if image_type not in _DETAIL_IMAGE_TYPES:
+        return error_bad_request(
+            f"invalid image_type; expected one of {_DETAIL_IMAGE_TYPES}"
+        )
+
+    score_perspective = (request.args.get('score_perspective') or '').strip()
+    if score_perspective and not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(score_perspective):
+        return error_bad_request('invalid score_perspective slug')
+    if score_perspective and image_type != 'catalog':
+        return error_bad_request('score_perspective is only valid for catalog images')
+
+    try:
+        if image_type == 'catalog':
+            payload, not_found = _build_catalog_detail(
+                db, image_key, score_perspective or None
+            )
+        else:
+            payload, not_found = _build_instagram_detail(db, image_key)
+        if not_found:
+            return error_not_found('image')
+        return jsonify(payload)
     except Exception as e:
         return error_server_error(str(e))
