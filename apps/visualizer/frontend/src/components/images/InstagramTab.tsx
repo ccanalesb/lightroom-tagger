@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageError, SkeletonGrid } from '../ui/page-states';
-import { ImageDetailsModal } from '../instagram/ImageDetailsModal';
-import { InstagramImageCard } from '../instagram/InstagramImageCard';
+import { ImageDetailModal, ImageTile, fromInstagramRow } from '../image-view';
+import { Badge } from '../ui/Badge';
 import { Pagination } from '../ui/Pagination';
-import { FILTER_ALL_DATES, ITEMS_PER_PAGE } from '../../constants/strings';
+import {
+  BADGE_DESCRIBED,
+  BADGE_MATCHED,
+  FILTER_ALL_DATES,
+  ITEMS_PER_PAGE,
+} from '../../constants/strings';
 import { useModal } from '../../hooks/useModal';
 import { useFilters } from '../../hooks/useFilters';
 import { FilterBar } from '../filters/FilterBar';
@@ -129,7 +134,22 @@ export function InstagramTab() {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {images.map((image) => (
-              <InstagramImageCard key={image.key} image={image} onClick={() => open(image)} />
+              <ImageTile
+                key={image.key}
+                image={fromInstagramRow(image)}
+                variant="grid"
+                primaryScoreSource="none"
+                subtitle={image.instagram_folder || image.source_folder || undefined}
+                overlayBadges={
+                  <>
+                    {image.matched_catalog_key ? (
+                      <Badge variant="success">{BADGE_MATCHED}</Badge>
+                    ) : null}
+                    {image.description ? <Badge variant="accent">{BADGE_DESCRIBED}</Badge> : null}
+                  </>
+                }
+                onClick={() => open(image)}
+              />
             ))}
           </div>
 
@@ -145,7 +165,15 @@ export function InstagramTab() {
         </>
       )}
 
-      {isOpen && selectedItem && <ImageDetailsModal image={selectedItem} onClose={close} />}
+      {isOpen && selectedItem && (
+        <ImageDetailModal
+          imageType="instagram"
+          imageKey={selectedItem.key}
+          initialImage={fromInstagramRow(selectedItem)}
+          primaryScoreSource="none"
+          onClose={close}
+        />
+      )}
     </div>
   );
 }
