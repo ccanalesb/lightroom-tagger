@@ -3,7 +3,7 @@ import os
 import sqlite3
 from collections.abc import Callable
 
-from lightroom_tagger.core.analyzer import describe_image, get_description_model
+from lightroom_tagger.core.analyzer import VIDEO_EXTENSIONS, describe_image, get_description_model
 from lightroom_tagger.core.database import (
     get_image,
     get_image_description,
@@ -16,6 +16,21 @@ from lightroom_tagger.core.prompt_builder import build_description_user_prompt
 from lightroom_tagger.core.vision_cache import get_or_create_cached_image
 
 LogCallback = Callable[[str, str], None] | None
+
+
+# File extensions the vision pipeline cannot describe. These get short-circuited
+# before we ever call into compression / the provider dispatcher — otherwise a
+# .mov file falls all the way through to the LLM (compress_image silently
+# returns the raw bytes on failure) and stalls the worker on multi-minute retry
+# backoffs, which in turn wedges the batch-describe ``as_completed`` loop.
+_NON_DESCRIBABLE_EXTENSIONS = VIDEO_EXTENSIONS
+
+
+def _is_non_describable_path(filepath: str | None) -> bool:
+    if not filepath:
+        return False
+    ext = os.path.splitext(filepath)[1].lower()
+    return ext in _NON_DESCRIBABLE_EXTENSIONS
 
 
 def _description_structured_is_valid(structured: dict) -> bool:
@@ -58,6 +73,11 @@ def describe_matched_image(db: sqlite3.Connection, catalog_key: str, force: bool
         return False
 
     filepath = resolve_filepath(image['filepath'])
+    if _is_non_describable_path(filepath):
+        # Videos / unsupported container formats cannot be sent to the vision
+        # model: the compressor silently falls back to the raw bytes and the
+        # provider then retries for minutes, wedging the worker pool.
+        return False
     if not os.path.exists(filepath):
         return False
 
@@ -99,6 +119,8 @@ def describe_instagram_image(db: sqlite3.Connection, media_key: str, force: bool
         return False
 
     filepath = dump_media['file_path']
+    if _is_non_describable_path(filepath):
+        return False
     if not os.path.exists(filepath):
         return False
 

@@ -151,6 +151,20 @@ export const JobsAPI = {
 
   retry: (id: string) =>
     request<Job>(`/jobs/${id}/retry`, { method: 'POST' }),
+
+  health: () =>
+    request<JobsHealth>('/jobs/health'),
+}
+
+export interface JobsHealth {
+  library_db: {
+    path: string | null
+    source: 'env' | 'config' | 'default' | 'none'
+    exists: boolean
+    reason: string | null
+  }
+  jobs_requiring_catalog: string[]
+  catalog_available: boolean
 }
 
 export const ConfigAPI = {

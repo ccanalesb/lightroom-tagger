@@ -90,6 +90,42 @@ class TestDescribeMatchedImage:
         result = describe_matched_image(db, catalog_key)
         assert result is False
 
+    def test_skips_video_without_calling_provider(self, tmp_path):
+        """Video files must never reach describe_image — the vision pipeline
+        cannot process them and would otherwise wedge the worker pool on
+        multi-minute retry backoffs."""
+        from lightroom_tagger.core.description_service import describe_matched_image
+
+        db = _make_db(tmp_path)
+        filepath = str(tmp_path / 'clip.mov')
+        open(filepath, 'w').close()
+        catalog_key = store_image(db, {'filepath': filepath, 'filename': 'clip.mov'})
+
+        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc, \
+             patch('lightroom_tagger.core.description_service.get_or_create_cached_image') as mock_cache:
+            result = describe_matched_image(db, catalog_key)
+
+        assert result is False
+        mock_desc.assert_not_called()
+        mock_cache.assert_not_called()
+        assert get_image_description(db, catalog_key) is None
+
+    def test_skips_video_even_with_force(self, tmp_path):
+        """force=True must not override the video short-circuit — the provider
+        still cannot describe video bytes."""
+        from lightroom_tagger.core.description_service import describe_matched_image
+
+        db = _make_db(tmp_path)
+        filepath = str(tmp_path / 'clip.mp4')
+        open(filepath, 'w').close()
+        catalog_key = store_image(db, {'filepath': filepath, 'filename': 'clip.mp4'})
+
+        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc:
+            result = describe_matched_image(db, catalog_key, force=True)
+
+        assert result is False
+        mock_desc.assert_not_called()
+
     def test_does_not_store_empty_summary(self, tmp_path):
         from lightroom_tagger.core.description_service import describe_matched_image
 
@@ -130,6 +166,26 @@ class TestDescribeMatchedImage:
 
         assert result is False
         assert get_image_description(db, catalog_key)['summary'] == 'keep me'
+
+
+class TestDescribeInstagramImage:
+    def test_skips_video_without_calling_provider(self, tmp_path):
+        from lightroom_tagger.core.database import store_instagram_dump_media
+        from lightroom_tagger.core.description_service import describe_instagram_image
+
+        db = _make_db(tmp_path)
+        filepath = str(tmp_path / 'story.mov')
+        open(filepath, 'w').close()
+        store_instagram_dump_media(db, {
+            'media_key': 'IGVID', 'file_path': filepath, 'caption': '',
+            'timestamp': None, 'taken_at': None,
+        })
+
+        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc:
+            result = describe_instagram_image(db, 'IGVID')
+
+        assert result is False
+        mock_desc.assert_not_called()
 
 
 class TestMatchDumpMediaDescriptions:

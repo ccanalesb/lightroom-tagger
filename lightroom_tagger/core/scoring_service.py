@@ -19,6 +19,7 @@ from typing import Any
 import ollama
 
 from lightroom_tagger.core.analyzer import (
+    VIDEO_EXTENSIONS,
     compress_image,
     get_description_model,
     get_viewable_path,
@@ -30,6 +31,7 @@ from lightroom_tagger.core.database import (
     get_instagram_dump_media,
     get_perspective_by_slug,
     insert_image_score,
+    library_write,
     resolve_filepath,
     supersede_previous_current_scores,
 )
@@ -138,6 +140,17 @@ def score_image_for_perspective(
     else:
         return ("failed", False, f"Invalid image_type: {image_type!r}")
 
+    # Videos (and other unsupported containers) cannot be sent to the vision
+    # model: compress_image silently falls back to the raw bytes and the
+    # provider then spends minutes retrying before giving up, which wedges
+    # the scoring worker pool. Short-circuit early with a clean skip.
+    if os.path.splitext(filepath)[1].lower() in VIDEO_EXTENSIONS:
+        return (
+            "skipped",
+            False,
+            f"Video file not scorable: {os.path.basename(filepath)}",
+        )
+
     prow = get_perspective_by_slug(db, perspective_slug)
     if not prow:
         return ("failed", False, f"Unknown perspective slug: {perspective_slug!r}")
@@ -153,8 +166,10 @@ def score_image_for_perspective(
             "Score already current for this image, perspective, and prompt version",
         )
 
-    if force:
-        delete_scores_for_version(db, image_key, image_type, perspective_slug, pv)
+    # ``force`` DELETE is performed inside the ``library_write`` block below,
+    # not here — that way it shares the writer seat with the UPDATE+INSERT
+    # pair and no worker ever opens an unserialized write transaction on the
+    # library DB.
 
     temp_files: list[str] = []
     # Use vision cache for catalog images to avoid redundant RAW→JPG + compress
@@ -253,33 +268,38 @@ def score_image_for_perspective(
 
     scored_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
+    # All library-DB writes for this image happen atomically inside
+    # ``library_write`` — one process-wide writer seat, one ``BEGIN IMMEDIATE``
+    # transaction, one commit. This both fixes the deferred-read-to-write
+    # upgrade race and serializes workers cooperatively instead of having
+    # them race SQLite's writer lock.
     try:
-        supersede_previous_current_scores(db, image_key, image_type, perspective_slug, pv)
-        insert_image_score(
-            db,
-            {
-                "image_key": image_key,
-                "image_type": image_type,
-                "perspective_slug": perspective_slug,
-                "score": parsed.score,
-                "rationale": parsed.rationale,
-                "model_used": model_label,
-                "prompt_version": pv,
-                "scored_at": scored_at,
-                "is_current": 1,
-                "repaired_from_malformed": 1 if repaired else 0,
-            },
-        )
-        db.commit()
-    except Exception as exc:
-        db.rollback()
-        # Swallow duplicate key errors — parallel workers may race on the same image
-        import sqlite3 as _sqlite3
-        if isinstance(exc, _sqlite3.IntegrityError) and "UNIQUE constraint" in str(exc):
+        with library_write(db, log=log_callback):
+            if force:
+                delete_scores_for_version(db, image_key, image_type, perspective_slug, pv)
+            supersede_previous_current_scores(db, image_key, image_type, perspective_slug, pv)
+            insert_image_score(
+                db,
+                {
+                    "image_key": image_key,
+                    "image_type": image_type,
+                    "perspective_slug": perspective_slug,
+                    "score": parsed.score,
+                    "rationale": parsed.rationale,
+                    "model_used": model_label,
+                    "prompt_version": pv,
+                    "scored_at": scored_at,
+                    "is_current": 1,
+                    "repaired_from_malformed": 1 if repaired else 0,
+                },
+            )
+        return ("scored", True, None)
+    except sqlite3.IntegrityError as exc:
+        if "UNIQUE constraint" in str(exc):
             return ("skipped", False, "Score already written by concurrent worker")
         return ("failed", False, str(exc))
-
-    return ("scored", True, None)
+    except Exception as exc:
+        return ("failed", False, str(exc))
 
 
 __all__ = [

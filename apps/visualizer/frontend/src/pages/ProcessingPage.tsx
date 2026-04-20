@@ -5,6 +5,7 @@ import { MatchingTab } from '../components/processing/MatchingTab';
 import { AnalyzeTab } from '../components/processing/AnalyzeTab';
 import { CatalogCacheTab } from '../components/processing/CatalogCacheTab';
 import { JobQueueTab } from '../components/processing/JobQueueTab';
+import { JobsHealthBanner } from '../components/processing/JobsHealthBanner';
 import { ProvidersTab } from '../components/processing/ProvidersTab';
 import { SettingsTab } from '../components/processing/SettingsTab';
 import { PerspectivesTab } from '../components/processing/PerspectivesTab';
@@ -60,53 +61,51 @@ export function ProcessingPage() {
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const jobsReqSeqRef = useRef(0);
 
-  const refreshJobs = useCallback(async (offsetOverride?: number) => {
+  const fetchJobs = useCallback(async (offsetOverride: number | undefined, showSpinner: boolean) => {
     const nextOffset = offsetOverride ?? jobsOffset;
     const seq = ++jobsReqSeqRef.current;
-    setJobsLoading(true);
+    if (showSpinner) setJobsLoading(true);
     try {
       const response = await JobsAPI.list({ limit: PAGE_SIZE, offset: nextOffset });
       if (seq !== jobsReqSeqRef.current) return;
       setJobs(Array.isArray(response?.data) ? response.data : []);
       setJobsTotal(typeof response?.total === 'number' ? response.total : 0);
+      // Always clear the spinner on a successful response, even for silent
+      // refreshes. Previously the spinner was only cleared on the loud path,
+      // so a silent refresh that landed after the initial load could strand
+      // ``jobsLoading=true`` forever ("jobs are still loading i can't see them").
+      setJobsLoading(false);
     } catch (err) {
       if (seq !== jobsReqSeqRef.current) return;
       console.error('Failed to load jobs:', err);
-    } finally {
-      if (seq === jobsReqSeqRef.current) {
-        setJobsLoading(false);
-      }
+      // On error we still need to exit the loading state so the user sees
+      // an empty table instead of a perpetual spinner.
+      setJobsLoading(false);
     }
   }, [jobsOffset]);
 
+  // User-triggered refresh (Refresh button) keeps the spinner for explicit feedback.
+  const refreshJobs = useCallback((offsetOverride?: number) => fetchJobs(offsetOverride, true), [fetchJobs]);
+
+  // Socket-driven refresh must not remount the table (causes flicker/full re-render).
+  const refreshJobsSilently = useCallback(() => fetchJobs(undefined, false), [fetchJobs]);
+
+  // Initial load + reload on pagination change. Uses the loud path so the
+  // user sees a spinner while the very first response is in flight.
   useEffect(() => {
-    const seq = ++jobsReqSeqRef.current;
-    async function load() {
-      try {
-        const response = await JobsAPI.list({ limit: PAGE_SIZE, offset: jobsOffset });
-        if (seq !== jobsReqSeqRef.current) return;
-        setJobs(Array.isArray(response?.data) ? response.data : []);
-        setJobsTotal(typeof response?.total === 'number' ? response.total : 0);
-      } catch (err) {
-        if (seq !== jobsReqSeqRef.current) return;
-        console.error('Failed to load jobs:', err);
-      } finally {
-        if (seq === jobsReqSeqRef.current) {
-          setJobsLoading(false);
-        }
-      }
-    }
-    void load();
+    void fetchJobs(jobsOffset, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobsOffset]);
 
-  const scheduleRefresh = useCallback(() => {
+  // Debounce silent refreshes so bursts of socket events coalesce into one fetch.
+  const scheduleSilentRefresh = useCallback(() => {
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
     }
     refreshTimerRef.current = setTimeout(() => {
-      void refreshJobs();
+      void refreshJobsSilently();
     }, 400);
-  }, [refreshJobs]);
+  }, [refreshJobsSilently]);
 
   useEffect(() => {
     return () => {
@@ -116,13 +115,37 @@ export function ProcessingPage() {
     };
   }, []);
 
-  const handleJobCreated = useCallback(() => {
-    scheduleRefresh();
-  }, [scheduleRefresh]);
+  const handleJobCreated = useCallback(
+    (job: Job) => {
+      // The new row may belong to a different page — defer to a silent refresh
+      // rather than prepending blindly (which would drift pagination counts).
+      if (jobsOffset === 0) {
+        setJobs((prev) => {
+          if (prev.some((j) => j.id === job.id)) return prev;
+          const next = [job, ...prev];
+          return next.length > PAGE_SIZE ? next.slice(0, PAGE_SIZE) : next;
+        });
+        setJobsTotal((prev) => prev + 1);
+      } else {
+        scheduleSilentRefresh();
+      }
+    },
+    [jobsOffset, scheduleSilentRefresh],
+  );
 
-  const handleJobUpdated = useCallback(() => {
-    scheduleRefresh();
-  }, [scheduleRefresh]);
+  const handleJobUpdated = useCallback((job: Job) => {
+    // Patch the updated job in place. Status/progress flip live without the
+    // whole table unmounting — no spinner, no flicker.
+    setJobs((prev) => {
+      let changed = false;
+      const next = prev.map((j) => {
+        if (j.id !== job.id) return j;
+        changed = true;
+        return job;
+      });
+      return changed ? next : prev;
+    });
+  }, []);
 
   const { connected } = useJobSocket({
     onJobCreated: handleJobCreated,
@@ -175,6 +198,8 @@ export function ProcessingPage() {
           Vision matching, descriptions, catalog cache management, and job monitoring
         </p>
       </div>
+
+      <JobsHealthBanner />
 
       {jobsRecoveredBanner ? (
         <div

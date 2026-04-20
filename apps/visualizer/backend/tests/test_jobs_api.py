@@ -163,3 +163,222 @@ def test_list_jobs_offset_clamped_negative(client):
     response = client.get('/api/jobs/?offset=-5')
     assert response.status_code == 200
     assert response.json['pagination']['offset'] == 0
+
+
+def test_cancel_returns_503_json_when_database_locked(client, monkeypatch):
+    import sqlite3
+    from api import jobs as jobs_api
+
+    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    job_id = create_resp.json['id']
+
+    def _raise_locked(*_args, **_kwargs):
+        raise sqlite3.OperationalError('database is locked')
+
+    monkeypatch.setattr(jobs_api, 'update_job_status', _raise_locked)
+
+    response = client.delete(f'/api/jobs/{job_id}')
+    assert response.status_code == 503
+    assert response.is_json
+    assert response.json['code'] == 'db_busy'
+    assert 'locked' not in response.json['error'].lower() or 'busy' in response.json['error'].lower()
+
+
+def test_retry_returns_503_json_when_database_locked(client, monkeypatch):
+    import sqlite3
+    from database import update_job_status
+    from api import jobs as jobs_api
+
+    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    job_id = create_resp.json['id']
+    update_job_status(client.application.db, job_id, 'failed')
+
+    def _raise_locked(*_args, **_kwargs):
+        raise sqlite3.OperationalError('database is locked')
+
+    monkeypatch.setattr(jobs_api, 'update_job_status', _raise_locked)
+
+    response = client.post(f'/api/jobs/{job_id}/retry')
+    assert response.status_code == 503
+    assert response.is_json
+    assert response.json['code'] == 'db_busy'
+
+
+def test_health_reports_library_db_status(client, tmp_path, monkeypatch):
+    db = tmp_path / 'library.db'
+    db.touch()
+    monkeypatch.setenv('LIBRARY_DB', str(db))
+    response = client.get('/api/jobs/health')
+    assert response.status_code == 200
+    body = response.json
+    assert body['catalog_available'] is True
+    assert body['library_db']['path'] == str(db)
+    assert body['library_db']['exists'] is True
+    assert 'batch_describe' in body['jobs_requiring_catalog']
+    assert body['jobs_requiring_catalog'] == sorted(body['jobs_requiring_catalog'])
+
+
+def test_health_flags_catalog_unavailable_when_env_path_missing(client, tmp_path, monkeypatch):
+    monkeypatch.setenv('LIBRARY_DB', str(tmp_path / 'nope.db'))
+    response = client.get('/api/jobs/health')
+    assert response.status_code == 200
+    body = response.json
+    assert body['catalog_available'] is False
+    assert body['library_db']['exists'] is False
+    assert body['library_db']['reason']
+
+
+def test_create_catalog_job_rejected_when_library_db_missing(client, tmp_path, monkeypatch):
+    monkeypatch.setenv('LIBRARY_DB', str(tmp_path / 'nope.db'))
+    response = client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
+    assert response.status_code == 422
+    body = response.json
+    assert body['code'] == 'catalog_unavailable'
+    assert 'batch_describe' in body['error']
+    assert body['library_db']['exists'] is False
+
+
+def test_create_non_catalog_job_allowed_when_library_db_missing(client, tmp_path, monkeypatch):
+    """Jobs that don't touch the catalog (e.g. ``analyze_instagram``) stay allowed."""
+    monkeypatch.setenv('LIBRARY_DB', str(tmp_path / 'nope.db'))
+    response = client.post('/api/jobs/', json={'type': 'analyze_instagram', 'metadata': {}})
+    assert response.status_code == 201
+    assert response.json['status'] == 'pending'
+
+
+def test_create_catalog_job_allowed_when_library_db_exists(client, tmp_path, monkeypatch):
+    db = tmp_path / 'library.db'
+    db.touch()
+    monkeypatch.setenv('LIBRARY_DB', str(db))
+    response = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    assert response.status_code == 201
+
+
+def test_cancel_is_idempotent_on_already_cancelled_job(client):
+    """Rapid double-clicks in the UI shouldn't produce a misleading 400.
+
+    The first DELETE flips ``pending``/``running`` to ``cancelled``; a second
+    DELETE against the same id used to return 400 ("Can only cancel running
+    or pending jobs"). Now it returns 200 with ``cancel_noop: true`` so the
+    UI can silently reconcile.
+    """
+    from database import update_job_status
+
+    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    job_id = create_resp.json['id']
+    update_job_status(client.application.db, job_id, 'cancelled')
+
+    response = client.delete(f'/api/jobs/{job_id}')
+    assert response.status_code == 200
+    body = response.json
+    assert body['id'] == job_id
+    assert body['status'] == 'cancelled'
+    assert body['cancel_noop'] is True
+    assert 'cancelled' in body['cancel_noop_reason']
+
+
+def test_cancel_is_idempotent_on_completed_job(client):
+    """Cancel against a completed job is treated as a no-op, not an error."""
+    from database import update_job_status
+
+    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    job_id = create_resp.json['id']
+    update_job_status(client.application.db, job_id, 'completed')
+
+    response = client.delete(f'/api/jobs/{job_id}')
+    assert response.status_code == 200
+    assert response.json['cancel_noop'] is True
+    assert response.json['status'] == 'completed'
+
+
+def test_cancel_is_idempotent_on_failed_job(client):
+    """Cancel against a failed job is treated as a no-op, not an error."""
+    from database import update_job_status
+
+    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    job_id = create_resp.json['id']
+    update_job_status(client.application.db, job_id, 'failed')
+
+    response = client.delete(f'/api/jobs/{job_id}')
+    assert response.status_code == 200
+    assert response.json['cancel_noop'] is True
+    assert response.json['status'] == 'failed'
+
+
+def test_processor_health_reports_not_running_before_thread_start(client):
+    """When the test fixture builds an app without starting the processor
+    thread, the endpoint still returns 200 with ``running: false`` and null
+    heartbeat fields. This is the signal a human would use during an
+    incident: "the processor isn't alive at all".
+    """
+    response = client.get('/api/jobs/_processor_health')
+    assert response.status_code == 200
+    body = response.json
+    assert body['running'] is False
+    assert body['started_at'] is None
+    assert body['last_iteration_at'] is None
+    assert body['last_iteration_age_seconds'] is None
+    assert body['iterations_total'] == 0
+    assert body['current_job_id'] is None
+    assert body['pending_count'] == 0
+    assert body['stale'] is False  # No heartbeat yet — not stale, just absent.
+
+
+def test_processor_health_marks_stale_after_heartbeat_ages_out(client, monkeypatch):
+    """If the processor *has* ticked but stopped ticking, ``stale`` flips
+    to True. We fake an ancient heartbeat via the module-level dict.
+    """
+    import time as _time
+
+    from app import _processor_health, _processor_health_lock
+
+    with _processor_health_lock:
+        _processor_health['started_at'] = _time.time() - 300
+        # Older than _PROCESSOR_STALE_AFTER_SECONDS (15s).
+        _processor_health['last_iteration_at'] = _time.time() - 60
+        _processor_health['iterations_total'] = 42
+
+    try:
+        response = client.get('/api/jobs/_processor_health')
+        assert response.status_code == 200
+        body = response.json
+        assert body['iterations_total'] == 42
+        assert body['last_iteration_age_seconds'] is not None
+        assert body['last_iteration_age_seconds'] > body['stale_threshold_seconds']
+        assert body['stale'] is True
+    finally:
+        # Reset module state so we don't poison sibling tests.
+        with _processor_health_lock:
+            _processor_health['started_at'] = None
+            _processor_health['last_iteration_at'] = None
+            _processor_health['iterations_total'] = 0
+
+
+def test_processor_health_reports_pending_count_from_db(client):
+    """Pending jobs in the DB show up in ``pending_count`` so operators
+    can spot "pending not being picked up" from one endpoint.
+    """
+    # Enqueue two jobs.
+    client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+
+    response = client.get('/api/jobs/_processor_health')
+    assert response.status_code == 200
+    assert response.json['pending_count'] == 2
+
+
+def test_cancel_does_not_swallow_non_lock_operational_errors(client, monkeypatch):
+    """Non-lock OperationalErrors must propagate so real bugs aren't hidden as 503s."""
+    import sqlite3
+    from api import jobs as jobs_api
+
+    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    job_id = create_resp.json['id']
+
+    def _raise_other(*_args, **_kwargs):
+        raise sqlite3.OperationalError('no such table: jobs')
+
+    monkeypatch.setattr(jobs_api, 'update_job_status', _raise_other)
+
+    with pytest.raises(sqlite3.OperationalError, match='no such table'):
+        client.delete(f'/api/jobs/{job_id}')

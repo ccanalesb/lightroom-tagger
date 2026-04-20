@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { WorkerSlider } from '../matching/WorkerSlider';
@@ -6,6 +6,19 @@ import { ProviderModelSelect } from '../ui/ProviderModelSelect';
 import { useMatchOptions } from '../../stores/matchOptionsContext';
 import { JobsAPI, PerspectivesAPI, ProvidersAPI } from '../../services/api';
 import {
+  ADVANCED_DATE_12MONTHS,
+  ADVANCED_DATE_18MONTHS,
+  ADVANCED_DATE_1MONTH,
+  ADVANCED_DATE_24MONTHS,
+  ADVANCED_DATE_2MONTHS,
+  ADVANCED_DATE_3MONTHS,
+  ADVANCED_DATE_6MONTHS,
+  ADVANCED_DATE_9MONTHS,
+  ADVANCED_DATE_ALL,
+  ADVANCED_DATE_YEAR_2023,
+  ADVANCED_DATE_YEAR_2024,
+  ADVANCED_DATE_YEAR_2025,
+  ADVANCED_DATE_YEAR_2026,
   ADVANCED_OPTIONS_TITLE,
   ANALYZE_ADVANCED_DESCRIBE_ONLY,
   ANALYZE_ADVANCED_RUN_SEPARATELY_TITLE,
@@ -23,7 +36,26 @@ import {
 } from '../../constants/strings';
 
 type ImageType = 'both' | 'instagram' | 'catalog';
-type DateFilter = 'all' | '3months' | '6months' | '12months';
+
+// Date-filter options mirror the richer contract MatchingTab uses. The value
+// is either ``'all'`` (no window), ``'<N>months'`` (last-N-months rolling
+// window), or a four-digit year (specific calendar year). The backend
+// ``_resolve_date_window`` helper accepts these as ``last_months: N`` or
+// ``year: 'YYYY'`` — we translate in ``buildDateMetadata`` below.
+type DateFilter =
+  | 'all'
+  | '1months'
+  | '2months'
+  | '3months'
+  | '6months'
+  | '9months'
+  | '12months'
+  | '18months'
+  | '24months'
+  | '2026'
+  | '2025'
+  | '2024'
+  | '2023';
 
 const IMAGE_TYPE_OPTIONS: { value: ImageType; label: string }[] = [
   { value: 'both', label: 'Instagram + Catalog' },
@@ -32,11 +64,33 @@ const IMAGE_TYPE_OPTIONS: { value: ImageType; label: string }[] = [
 ];
 
 const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
-  { value: 'all', label: 'All time' },
-  { value: '3months', label: 'Last 3 months' },
-  { value: '6months', label: 'Last 6 months' },
-  { value: '12months', label: 'Last 12 months' },
+  { value: 'all', label: ADVANCED_DATE_ALL },
+  { value: '1months', label: ADVANCED_DATE_1MONTH },
+  { value: '2months', label: ADVANCED_DATE_2MONTHS },
+  { value: '3months', label: ADVANCED_DATE_3MONTHS },
+  { value: '6months', label: ADVANCED_DATE_6MONTHS },
+  { value: '9months', label: ADVANCED_DATE_9MONTHS },
+  { value: '12months', label: ADVANCED_DATE_12MONTHS },
+  { value: '18months', label: ADVANCED_DATE_18MONTHS },
+  { value: '24months', label: ADVANCED_DATE_24MONTHS },
+  { value: '2026', label: ADVANCED_DATE_YEAR_2026 },
+  { value: '2025', label: ADVANCED_DATE_YEAR_2025 },
+  { value: '2024', label: ADVANCED_DATE_YEAR_2024 },
+  { value: '2023', label: ADVANCED_DATE_YEAR_2023 },
 ];
+
+// Translate a ``DateFilter`` enum value into the metadata keys the backend
+// expects. Exported for unit testing.
+export function buildDateMetadata(
+  filter: DateFilter,
+): { last_months?: number; year?: string; date_filter: DateFilter } {
+  const base = { date_filter: filter };
+  if (filter === 'all') return base;
+  const monthsMatch = /^(\d+)months$/.exec(filter);
+  if (monthsMatch) return { ...base, last_months: Number(monthsMatch[1]) };
+  if (/^\d{4}$/.test(filter)) return { ...base, year: filter };
+  return base;
+}
 
 export function AnalyzeTab() {
   const { options, updateOption } = useMatchOptions();
@@ -49,6 +103,41 @@ export function AnalyzeTab() {
   const [isStartingAnalyze, setIsStartingAnalyze] = useState(false);
   const [isStartingDescribe, setIsStartingDescribe] = useState(false);
   const [isStartingScore, setIsStartingScore] = useState(false);
+  // Inline status banner — replaces the jarring window.alert() that used to
+  // be the only feedback. ``tone`` selects the colour; ``message`` is shown
+  // until cleared (either by a later submission or by the auto-dismiss
+  // timeout). ``jobId`` is surfaced so the user can cross-reference the
+  // queue entry immediately without waiting for the socket refresh.
+  const [statusBanner, setStatusBanner] = useState<
+    { tone: 'success' | 'error'; message: string; jobId?: string } | null
+  >(null);
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cross-button synchronous guard: React's ``isStartingX`` flags are set
+  // asynchronously, so two rapid clicks on the *same* button can both see
+  // ``false`` and both fire a POST. A ref-backed guard closes that window
+  // and additionally blocks concurrent clicks across all three submit
+  // buttons — a single batch submission at a time is the contract.
+  const submitInFlightRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+    };
+  }, []);
+
+  const showStatus = useCallback(
+    (tone: 'success' | 'error', message: string, jobId?: string) => {
+      setStatusBanner({ tone, message, jobId });
+      if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+      // Success messages auto-dismiss so they don't pile up; errors stay
+      // until the user clicks Dismiss or triggers another submission.
+      if (tone === 'success') {
+        statusTimerRef.current = setTimeout(() => setStatusBanner(null), 6000);
+      }
+    },
+    [],
+  );
   const [descProviderId, setDescProviderId] = useState<string | null>(null);
   const [descProviderModel, setDescProviderModel] = useState<string | null>(null);
   const [activePerspectiveRows, setActivePerspectiveRows] = useState<
@@ -80,7 +169,7 @@ export function AnalyzeTab() {
   const buildSharedBaseMetadata = useCallback((): Record<string, unknown> => {
     const metadata: Record<string, unknown> = {
       image_type: imageType,
-      date_filter: dateFilter,
+      ...buildDateMetadata(dateFilter),
       max_workers: options.maxWorkers,
     };
     if (batchMinRating !== null) metadata.min_rating = batchMinRating;
@@ -106,55 +195,67 @@ export function AnalyzeTab() {
     };
   }, [buildSharedBaseMetadata, forceDescribe, forceScore]);
 
-  const startAnalyze = useCallback(async () => {
-    setIsStartingAnalyze(true);
-    try {
-      await JobsAPI.create('batch_analyze', buildBatchJobMetadata());
-      alert(ANALYZE_JOB_STARTED);
-    } catch (error) {
-      alert(
-        `${ANALYZE_JOB_FAILED_PREFIX} ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`,
-      );
-    } finally {
-      setIsStartingAnalyze(false);
-    }
-  }, [buildBatchJobMetadata]);
+  // Shared submission core: guards against double-submission (both from React's
+  // async state and from cross-button clicks), runs the POST, shows an inline
+  // status banner, and always clears its in-flight flag so the UI can't get
+  // stuck "disabled forever" if something throws.
+  const runSubmit = useCallback(
+    async (
+      jobType: 'batch_analyze' | 'batch_describe' | 'batch_score',
+      metadata: Record<string, unknown>,
+      successMessage: string,
+      setStarting: (v: boolean) => void,
+    ) => {
+      if (submitInFlightRef.current) return;
+      submitInFlightRef.current = true;
+      setStarting(true);
+      // Clear any prior banner so the user doesn't see a stale success
+      // message while the new submission is still in flight.
+      setStatusBanner(null);
+      try {
+        const job = await JobsAPI.create(jobType, metadata);
+        showStatus('success', successMessage, job.id);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unknown error';
+        showStatus('error', `${ANALYZE_JOB_FAILED_PREFIX} ${msg}`);
+      } finally {
+        setStarting(false);
+        submitInFlightRef.current = false;
+      }
+    },
+    [showStatus],
+  );
 
-  const startDescriptionsOnly = useCallback(async () => {
-    setIsStartingDescribe(true);
-    try {
-      const base = buildSharedBaseMetadata();
-      await JobsAPI.create('batch_describe', { ...base, 'force': forceDescribe });
-      alert(ANALYZE_DESCRIBE_JOB_STARTED);
-    } catch (error) {
-      alert(
-        `${ANALYZE_JOB_FAILED_PREFIX} ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`,
-      );
-    } finally {
-      setIsStartingDescribe(false);
-    }
-  }, [buildSharedBaseMetadata, forceDescribe]);
+  const startAnalyze = useCallback(() => {
+    void runSubmit(
+      'batch_analyze',
+      buildBatchJobMetadata(),
+      ANALYZE_JOB_STARTED,
+      setIsStartingAnalyze,
+    );
+  }, [runSubmit, buildBatchJobMetadata]);
 
-  const startScoringOnly = useCallback(async () => {
-    setIsStartingScore(true);
-    try {
-      const base = buildSharedBaseMetadata();
-      await JobsAPI.create('batch_score', { ...base, 'force': forceScore });
-      alert(ANALYZE_SCORE_JOB_STARTED);
-    } catch (error) {
-      alert(
-        `${ANALYZE_JOB_FAILED_PREFIX} ${
-          error instanceof Error ? error.message : 'Unknown error'
-        }`,
-      );
-    } finally {
-      setIsStartingScore(false);
-    }
-  }, [buildSharedBaseMetadata, forceScore]);
+  const startDescriptionsOnly = useCallback(() => {
+    void runSubmit(
+      'batch_describe',
+      { ...buildSharedBaseMetadata(), force: forceDescribe },
+      ANALYZE_DESCRIBE_JOB_STARTED,
+      setIsStartingDescribe,
+    );
+  }, [runSubmit, buildSharedBaseMetadata, forceDescribe]);
+
+  const startScoringOnly = useCallback(() => {
+    void runSubmit(
+      'batch_score',
+      { ...buildSharedBaseMetadata(), force: forceScore },
+      ANALYZE_SCORE_JOB_STARTED,
+      setIsStartingScore,
+    );
+  }, [runSubmit, buildSharedBaseMetadata, forceScore]);
+
+  // Any in-flight submission disables all submit buttons — prevents a
+  // "while batch_analyze is submitting, click describe-only too" footgun.
+  const isAnySubmitting = isStartingAnalyze || isStartingDescribe || isStartingScore;
 
   return (
     <div>
@@ -331,7 +432,7 @@ export function AnalyzeTab() {
                     size="md"
                     fullWidth
                     onClick={startDescriptionsOnly}
-                    disabled={isStartingDescribe}
+                    disabled={isAnySubmitting}
                   >
                     {isStartingDescribe
                       ? ANALYZE_PRIMARY_BUTTON_STARTING
@@ -342,7 +443,7 @@ export function AnalyzeTab() {
                     size="md"
                     fullWidth
                     onClick={startScoringOnly}
-                    disabled={isStartingScore}
+                    disabled={isAnySubmitting}
                   >
                     {isStartingScore
                       ? ANALYZE_PRIMARY_BUTTON_STARTING
@@ -358,10 +459,39 @@ export function AnalyzeTab() {
                 size="lg"
                 fullWidth
                 onClick={startAnalyze}
-                disabled={isStartingAnalyze}
+                disabled={isAnySubmitting}
               >
                 {isStartingAnalyze ? ANALYZE_PRIMARY_BUTTON_STARTING : ANALYZE_PRIMARY_BUTTON}
               </Button>
+              {statusBanner && (
+                <div
+                  role={statusBanner.tone === 'error' ? 'alert' : 'status'}
+                  aria-live="polite"
+                  data-testid="analyze-status-banner"
+                  data-tone={statusBanner.tone}
+                  className={
+                    statusBanner.tone === 'success'
+                      ? 'flex items-start justify-between gap-3 px-4 py-3 rounded-base border border-green-500/40 bg-green-500/10 text-sm text-text'
+                      : 'flex items-start justify-between gap-3 px-4 py-3 rounded-base border border-red-500/40 bg-red-500/10 text-sm text-text'
+                  }
+                >
+                  <div className="flex-1">
+                    <p>{statusBanner.message}</p>
+                    {statusBanner.jobId && (
+                      <p className="mt-1 text-xs text-text-secondary">
+                        Job id: <span className="font-mono">{statusBanner.jobId.slice(0, 8)}</span>
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStatusBanner(null)}
+                    className="text-text-secondary hover:text-text text-xs underline"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>

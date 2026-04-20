@@ -25,17 +25,23 @@ class TestProviderErrorHierarchy:
         assert issubclass(cls, ProviderError)
 
     def test_should_include_retryable_errors(self):
-        for cls in (RateLimitError, TimeoutError, ConnectionError,
+        # ConnectionError is intentionally NOT_RETRYABLE (see commit 5b0763a):
+        # connection refused / DNS failure is a permanent condition for the
+        # provider, so the dispatcher cascades to the next fallback instead
+        # of burning the retry budget on a dead endpoint.
+        for cls in (RateLimitError, TimeoutError,
                     ModelUnavailableError, ContextLengthError, PayloadTooLargeError):
             assert cls in RETRYABLE_ERRORS
 
     def test_should_exclude_non_retryable_from_retryable_set(self):
         assert AuthenticationError not in RETRYABLE_ERRORS
         assert InvalidRequestError not in RETRYABLE_ERRORS
+        assert ConnectionError not in RETRYABLE_ERRORS
 
     def test_should_include_non_retryable_errors(self):
         assert AuthenticationError in NOT_RETRYABLE_ERRORS
         assert InvalidRequestError in NOT_RETRYABLE_ERRORS
+        assert ConnectionError in NOT_RETRYABLE_ERRORS
 
     def test_should_exclude_retryable_from_non_retryable_set(self):
         assert RateLimitError not in NOT_RETRYABLE_ERRORS

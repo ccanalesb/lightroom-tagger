@@ -10,7 +10,15 @@ import config
 
 if TYPE_CHECKING:
     from jobs.runner import JobRunner
-from database import add_job_log, get_active_jobs, get_job, get_pending_jobs, init_db, update_job_status
+from database import (
+    add_job_log,
+    get_active_jobs,
+    get_job,
+    get_pending_jobs,
+    init_db,
+    make_connection_for_path,
+    update_job_status,
+)
 from flask import Flask
 from flask_cors import CORS
 from flask_socketio import SocketIO
@@ -20,12 +28,41 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 db = None
+_JOBS_DB_PATH: str | None = None
 socketio = None
 job_processor_thread = None
 job_processor_running = False
 _job_runner: JobRunner | None = None
 _running_job_ids: set[str] = set()
 _running_job_ids_lock = threading.Lock()
+
+
+# Processor heartbeat: ``_job_processor`` updates these fields every loop
+# iteration so we can distinguish "processor healthy but waiting for work"
+# from "processor stuck / crashed / never started". The diagnostic endpoint
+# ``/api/jobs/_processor_health`` surfaces these values for the UI and for
+# humans poking the backend with curl during an incident.
+_processor_health: dict[str, object] = {
+    'started_at': None,
+    'last_iteration_at': None,
+    'iterations_total': 0,
+    'current_job_id': None,
+    'current_job_started_at': None,
+    'last_error': None,
+}
+_processor_health_lock = threading.Lock()
+
+
+def get_processor_health_snapshot() -> dict:
+    """Return a defensive copy of the processor heartbeat for API exposure."""
+    with _processor_health_lock:
+        return dict(_processor_health)
+
+
+def _processor_heartbeat(**changes) -> None:
+    """Atomically update one or more heartbeat fields from the processor loop."""
+    with _processor_health_lock:
+        _processor_health.update(changes)
 
 
 def get_job_runner() -> JobRunner | None:
@@ -72,6 +109,11 @@ def create_app():
 
     db_path = os.path.join(os.path.dirname(__file__), config.DATABASE_PATH)
     db = init_db(db_path)
+    # Stash the resolved path on the module so the processor thread can grab
+    # its own thread-local connection rather than sharing ``db`` across
+    # threads. See :func:`database.make_connection_for_path`.
+    global _JOBS_DB_PATH
+    _JOBS_DB_PATH = db_path
     app.db = db
 
     from api import (
@@ -166,19 +208,41 @@ def _recover_orphaned_jobs(db):
 
 def _job_processor():
     """Background thread that processes pending jobs."""
-    global db, socketio, job_processor_running, _job_runner
+    global socketio, job_processor_running, _job_runner
 
     from jobs.handlers import JOB_HANDLERS
     from jobs.runner import JobRunner
 
-    runner = JobRunner(db, emit_progress=lambda job_id, progress, step:
-        socketio.emit('job_updated', get_job(db, job_id)) if socketio else None)
+    # Own connection, owned by this thread. Sharing the Flask-thread ``db``
+    # across the processor + all workers + HTTP handlers was the ultimate
+    # cause of the stall on job 50710bf6 — see the comments in
+    # ``database.py`` and ``runner.log_from_worker``.
+    assert _JOBS_DB_PATH, "Jobs DB path was not set before starting processor"
+    processor_db = make_connection_for_path(_JOBS_DB_PATH)
+
+    runner = JobRunner(
+        processor_db,
+        emit_progress=lambda job_id, progress, step: (
+            socketio.emit('job_updated', get_job(processor_db, job_id))
+            if socketio else None
+        ),
+        db_path=_JOBS_DB_PATH,
+    )
     _job_runner = runner
+
+    _processor_heartbeat(
+        started_at=time.time(),
+        last_iteration_at=time.time(),
+        iterations_total=0,
+        current_job_id=None,
+        current_job_started_at=None,
+        last_error=None,
+    )
 
     while job_processor_running:
         try:
-            # Get pending jobs
-            pending = get_pending_jobs(db)
+            _processor_heartbeat(last_iteration_at=time.time())
+            pending = get_pending_jobs(processor_db)
             for job in pending:
                 job_id = job.get('id', 'unknown')
                 job_type = job.get('type', 'unknown')
@@ -186,16 +250,15 @@ def _job_processor():
 
                 print(f"Processing job {job_id}: type={job_type}, status={job.get('status')}")
 
-                fresh = get_job(db, job_id)
+                fresh = get_job(processor_db, job_id)
                 if not fresh or fresh.get('status') != 'pending':
                     continue
 
-                # Mark as running
                 started = runner.start_job(job_id, job_type, metadata)
                 if not started:
-                    socketio.emit('job_updated', get_job(db, job_id)) if socketio else None
+                    socketio.emit('job_updated', get_job(processor_db, job_id)) if socketio else None
                     continue
-                socketio.emit('job_updated', get_job(db, job_id)) if socketio else None
+                socketio.emit('job_updated', get_job(processor_db, job_id)) if socketio else None
 
                 # Execute handler — guard against duplicate execution if a stale
                 # handler thread from a previous watchdog cycle is still running.
@@ -206,6 +269,10 @@ def _job_processor():
                     _running_job_ids.add(job_id)
 
                 handler = JOB_HANDLERS.get(job_type)
+                _processor_heartbeat(
+                    current_job_id=job_id,
+                    current_job_started_at=time.time(),
+                )
                 try:
                     if handler:
                         try:
@@ -214,29 +281,74 @@ def _job_processor():
                             print(f"Handler error for job {job_id}: {e}")
                             import traceback
                             traceback.print_exc()
-                            row_after = get_job(db, job_id)
+                            row_after = get_job(processor_db, job_id)
                             if row_after and row_after.get('status') == 'running':
                                 runner.fail_job(job_id, str(e))
                     else:
-                        row_after = get_job(db, job_id)
+                        row_after = get_job(processor_db, job_id)
                         if row_after and row_after.get('status') == 'running':
                             runner.fail_job(job_id, f'Unknown job type: {job_type}')
                 finally:
                     with _running_job_ids_lock:
                         _running_job_ids.discard(job_id)
+                    _processor_heartbeat(
+                        current_job_id=None,
+                        current_job_started_at=None,
+                    )
 
-                # Emit update after handler completes
-                socketio.emit('job_updated', get_job(db, job_id)) if socketio else None
+                socketio.emit('job_updated', get_job(processor_db, job_id)) if socketio else None
+
+            # Iteration complete (with or without pending jobs) — counts as a
+            # healthy tick so ``/_processor_health`` can distinguish
+            # "quietly waiting" from "stuck".
+            with _processor_health_lock:
+                _processor_health['iterations_total'] = int(_processor_health.get('iterations_total') or 0) + 1
 
         except BaseException as e:
             import traceback
             print(f"Job processor error: {e}")
             print(traceback.format_exc())
+            _processor_heartbeat(last_error=f'{type(e).__name__}: {e}')
             if isinstance(e, (SystemExit, KeyboardInterrupt)):
                 raise  # let the thread die so the watchdog can restart it
 
         time.sleep(1)  # Check every second
 
+def _refuse_if_port_in_use(host: str, port: int) -> None:
+    """Exit early if another backend is already bound to host:port.
+
+    Running two backends against the same SQLite file produces write-lock
+    contention and intermittent 500s on cancel/retry. This guard prevents
+    that whole failure mode.
+
+    Skipped inside Werkzeug's reloader child (WERKZEUG_RUN_MAIN=true), which
+    re-exec's the app and would otherwise trip the check against itself.
+    """
+    if os.environ.get('WERKZEUG_RUN_MAIN'):
+        return
+
+    import socket
+    probe_host = '127.0.0.1' if host in ('0.0.0.0', '') else host
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        try:
+            s.connect((probe_host, port))
+        except (ConnectionRefusedError, socket.timeout, OSError):
+            return
+
+    print(
+        f"ERROR: Another process is already listening on {probe_host}:{port}.\n"
+        f"       Running two visualizer backends against the same SQLite database\n"
+        f"       causes write-lock contention and breaks job cancel/retry.\n"
+        f"       Stop the other process first:\n"
+        f"         lsof -iTCP:{port} -sTCP:LISTEN -P -n\n"
+        f"         kill <pid>",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
 if __name__ == '__main__':
+    _refuse_if_port_in_use(config.FLASK_HOST, config.FLASK_PORT)
     app = create_app()
     socketio.run(app, host=config.FLASK_HOST, port=config.FLASK_PORT, debug=config.FLASK_DEBUG, allow_unsafe_werkzeug=True)

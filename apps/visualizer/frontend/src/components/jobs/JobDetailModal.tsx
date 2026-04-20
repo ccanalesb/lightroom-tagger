@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   JOB_CONFIG_DATE_WINDOW,
   JOB_CONFIG_METHOD,
@@ -15,8 +15,14 @@ import {
   JOB_DETAILS_LOADING_ARIA,
   JOB_DETAILS_FETCH_ERROR,
   JOB_DETAILS_METADATA,
+  JOB_DETAILS_METADATA_COLLAPSE,
+  JOB_DETAILS_METADATA_SHOW_ALL,
+  JOB_DETAILS_METADATA_TRUNCATED_HEADER,
   JOB_DETAILS_PROGRESS,
   JOB_DETAILS_RESULT,
+  JOB_DETAILS_RESULT_COLLAPSE,
+  JOB_DETAILS_RESULT_SHOW_ALL,
+  JOB_DETAILS_RESULT_TRUNCATED_HEADER,
   JOB_DETAILS_TITLE,
   MODAL_CLOSE,
   STATUS_LABELS,
@@ -105,12 +111,25 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [logsExpanded, setLogsExpanded] = useState(false);
   const [expandingLogs, setExpandingLogs] = useState(false);
+  // Metadata and result JSON payloads can be large (e.g. vision-match jobs
+  // often carry tens of thousands of lines). Mirror the logs pattern: show a
+  // short preview by default and reveal the full payload on demand.
+  const [metadataExpanded, setMetadataExpanded] = useState(false);
+  const [resultExpanded, setResultExpanded] = useState(false);
+  // Mirror ``logsExpanded`` into a ref so the socket handler can read the
+  // current value without resubscribing every time the user toggles expand.
+  const logsExpandedRef = useRef(false);
+  useEffect(() => {
+    logsExpandedRef.current = logsExpanded;
+  }, [logsExpanded]);
   const socket = useSocketStore((state) => state.socket);
 
   useEffect(() => {
     setLocalJob(job);
     setLogsExpanded(false);
     setExpandingLogs(false);
+    setMetadataExpanded(false);
+    setResultExpanded(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job.id]);
 
@@ -147,16 +166,39 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
     };
   }, [job.id]);
 
+  // Close on Escape — expected behaviour for a dialog and pairs naturally with
+  // the backdrop click-to-close already present below.
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
   useEffect(() => {
     if (!socket) return;
 
     socket.emit('subscribe_job', { job_id: job.id });
 
     const handleJobUpdate = (updatedJob: Job) => {
-      if (updatedJob.id === job.id) {
+      if (updatedJob.id !== job.id) return;
+      // The socket payload always carries the FULL log history (the backend
+      // emits ``get_job()`` without a logs_limit). If the user is in the
+      // default tail-view (logs truncated to the last 20), blindly replacing
+      // ``localJob`` would grow the logs list back to every entry and hide
+      // the "Show all" affordance. Preserve the truncated logs here and only
+      // accept the full log list once the user has clicked "Show all".
+      if (logsExpandedRef.current) {
         setLocalJob(updatedJob);
-        onJobUpdate?.(updatedJob);
+      } else {
+        setLocalJob((prev) => ({
+          ...updatedJob,
+          logs: prev.logs,
+          logs_total: updatedJob.logs_total ?? updatedJob.logs?.length ?? prev.logs_total,
+        }));
       }
+      onJobUpdate?.(updatedJob);
     };
 
     socket.on('job_updated', handleJobUpdate);
@@ -168,6 +210,45 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
   }, [socket, job.id, onJobUpdate]);
 
   const displayJob = localJob.id === job.id ? localJob : job;
+
+  // Number of JSON lines to show in the collapsed preview for metadata/result.
+  // 20 comfortably fits the modal without dominating it and matches the
+  // roughly-a-screenful heuristic we use elsewhere for previews.
+  const JSON_PREVIEW_LINES = 20;
+
+  const metadataPreview = useMemo(() => {
+    if (!displayJob.metadata || Object.keys(displayJob.metadata).length === 0) {
+      return null;
+    }
+    const full = JSON.stringify(displayJob.metadata, null, 2);
+    const lines = full.split('\n');
+    const truncated = lines.length > JSON_PREVIEW_LINES;
+    return {
+      full,
+      previewText: truncated
+        ? `${lines.slice(0, JSON_PREVIEW_LINES).join('\n')}\n…`
+        : full,
+      totalLines: lines.length,
+      previewLines: Math.min(lines.length, JSON_PREVIEW_LINES),
+      truncated,
+    };
+  }, [displayJob.metadata]);
+
+  const resultPreview = useMemo(() => {
+    if (!displayJob.result) return null;
+    const full = JSON.stringify(displayJob.result, null, 2);
+    const lines = full.split('\n');
+    const truncated = lines.length > JSON_PREVIEW_LINES;
+    return {
+      full,
+      previewText: truncated
+        ? `${lines.slice(0, JSON_PREVIEW_LINES).join('\n')}\n…`
+        : full,
+      totalLines: lines.length,
+      previewLines: Math.min(lines.length, JSON_PREVIEW_LINES),
+      truncated,
+    };
+  }, [displayJob.result]);
 
   const handleRetry = async () => {
     setRetrying(true);
@@ -218,9 +299,30 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
     );
   };
 
+  // Prevent wheel/touch gestures on the backdrop from scrolling the page
+  // underneath. React's synthetic wheel/touchmove listeners are passive, so
+  // ``preventDefault`` there is a no-op — we attach a non-passive native
+  // listener on the backdrop and cancel events that originate on the backdrop
+  // itself (the inner card uses its own scroll containers).
+  const backdropRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = backdropRef.current;
+    if (!el) return;
+    const handler = (e: Event) => {
+      if (e.target === el) e.preventDefault();
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    el.addEventListener('touchmove', handler, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handler);
+      el.removeEventListener('touchmove', handler);
+    };
+  }, []);
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      ref={backdropRef}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overscroll-contain"
       onClick={onClose}
       role="presentation"
     >
@@ -286,11 +388,31 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
 
             {loading ? (
               <SkeletonSection label={JOB_DETAILS_LOADING_ARIA} />
-            ) : displayJob.metadata && Object.keys(displayJob.metadata).length > 0 ? (
+            ) : metadataPreview ? (
               <div className="rounded-base border border-border p-3">
-                <h4 className="font-medium text-sm mb-2 text-text">{JOB_DETAILS_METADATA}</h4>
-                <pre className="text-xs bg-surface p-2 rounded-base overflow-x-auto text-text border border-border">
-                  {JSON.stringify(displayJob.metadata, null, 2)}
+                <div className="flex flex-row items-center justify-between gap-2 mb-2">
+                  <h4 className="font-medium text-sm text-text">
+                    {metadataPreview.truncated && !metadataExpanded
+                      ? JOB_DETAILS_METADATA_TRUNCATED_HEADER(
+                          metadataPreview.previewLines,
+                          metadataPreview.totalLines,
+                        )
+                      : JOB_DETAILS_METADATA}
+                  </h4>
+                  {metadataPreview.truncated && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setMetadataExpanded((v) => !v)}
+                    >
+                      {metadataExpanded
+                        ? JOB_DETAILS_METADATA_COLLAPSE
+                        : JOB_DETAILS_METADATA_SHOW_ALL(metadataPreview.totalLines)}
+                    </Button>
+                  )}
+                </div>
+                <pre className="text-xs bg-surface p-2 rounded-base max-h-96 overflow-auto whitespace-pre-wrap break-words text-text border border-border">
+                  {metadataExpanded ? metadataPreview.full : metadataPreview.previewText}
                 </pre>
               </div>
             ) : null}
@@ -382,11 +504,31 @@ export function JobDetailModal({ job, onClose, onJobUpdate }: JobDetailModalProp
               </div>
             )}
 
-            {!loading && displayJob.result && (
+            {!loading && resultPreview && (
               <div className="rounded-base border border-border border-success/40 bg-surface p-3">
-                <h4 className="font-medium text-sm mb-2 text-success">{JOB_DETAILS_RESULT}</h4>
-                <pre className="text-xs bg-bg p-2 rounded-base overflow-x-auto text-text border border-border">
-                  {JSON.stringify(displayJob.result, null, 2)}
+                <div className="flex flex-row items-center justify-between gap-2 mb-2">
+                  <h4 className="font-medium text-sm text-success">
+                    {resultPreview.truncated && !resultExpanded
+                      ? JOB_DETAILS_RESULT_TRUNCATED_HEADER(
+                          resultPreview.previewLines,
+                          resultPreview.totalLines,
+                        )
+                      : JOB_DETAILS_RESULT}
+                  </h4>
+                  {resultPreview.truncated && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setResultExpanded((v) => !v)}
+                    >
+                      {resultExpanded
+                        ? JOB_DETAILS_RESULT_COLLAPSE
+                        : JOB_DETAILS_RESULT_SHOW_ALL(resultPreview.totalLines)}
+                    </Button>
+                  )}
+                </div>
+                <pre className="text-xs bg-bg p-2 rounded-base max-h-96 overflow-auto whitespace-pre-wrap break-words text-text border border-border">
+                  {resultExpanded ? resultPreview.full : resultPreview.previewText}
                 </pre>
               </div>
             )}

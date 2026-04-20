@@ -63,7 +63,18 @@ class TestPrimarySuccess:
 class TestFallbackCascade:
     @patch("time.sleep")
     def test_should_cascade_to_next_provider_on_failure(self, mock_sleep):
+        # Configure the primary provider (``ollama``) with exactly one vision
+        # model so the first failure forces the dispatcher to actually cross
+        # provider boundaries. The default ``_mock_registry`` lists the same
+        # ``test-model`` under every provider, which makes the cascade try
+        # ``ollama/test-model`` next — correct behaviour, but not what this
+        # test is exercising.
         registry = _mock_registry()
+        registry.list_models.side_effect = lambda pid: (
+            [{"id": "gemma3:27b", "vision": True, "source": "config"}]
+            if pid == "ollama"
+            else [{"id": "test-model", "vision": True, "source": "config"}]
+        )
         dispatcher = FallbackDispatcher(registry)
 
         call_count = {"n": 0}
@@ -87,7 +98,17 @@ class TestFallbackCascade:
 
     @patch("time.sleep")
     def test_should_try_all_providers_before_raising(self, mock_sleep):
+        # ``ConnectionError`` is NOT_RETRYABLE but still cascades across
+        # providers (see commit 5b0763a — "fall through to the next model
+        # immediately rather than burning retry backoff"). Each provider
+        # advertises exactly one vision model, and the requested primary
+        # model matches the primary provider's listed model, so the cascade
+        # visits each provider exactly once for a total of three
+        # ``get_client`` calls.
         registry = _mock_registry()
+        registry.list_models.side_effect = lambda pid: [
+            {"id": f"{pid}-model", "vision": True, "source": "config"},
+        ]
         dispatcher = FallbackDispatcher(registry)
 
         def fn_factory(client, model):
@@ -98,7 +119,7 @@ class TestFallbackCascade:
                 operation="compare",
                 fn_factory=fn_factory,
                 provider_id="ollama",
-                model="gemma3:27b",
+                model="ollama-model",
             )
         assert registry.get_client.call_count == 3
 

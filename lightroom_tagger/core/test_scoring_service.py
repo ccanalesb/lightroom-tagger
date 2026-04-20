@@ -119,3 +119,51 @@ def test_score_image_persists_row_and_passes_llm_fixer(tmp_path) -> None:
             "prompt_markdown": "Score harshly.",
         },
     )
+
+
+def test_score_image_skips_video_without_calling_provider(tmp_path) -> None:
+    """Video files must short-circuit before the vision dispatcher — otherwise
+    compress_image silently returns the raw bytes and the provider spends
+    minutes retrying, wedging the scoring worker pool."""
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    insert_perspective(
+        conn,
+        slug="video_skip_test",
+        display_name="Video skip test",
+        prompt_markdown="unused",
+        description="",
+    )
+    conn.commit()
+
+    video_path = tmp_path / "2024-06-01_clip.mov"
+    video_path.write_bytes(b"not an image")
+    conn.execute(
+        "INSERT INTO images (key, filepath, date_taken, filename) VALUES (?, ?, ?, ?)",
+        ("2024-06-01_clip", str(video_path), "2024-06-01", "clip.mov"),
+    )
+    conn.commit()
+
+    with (
+        patch("lightroom_tagger.core.scoring_service.FallbackDispatcher") as mock_disp,
+        patch("lightroom_tagger.core.scoring_service.compress_image") as mock_compress,
+    ):
+        status, ok, err = score_image_for_perspective(
+            conn,
+            image_key="2024-06-01_clip",
+            image_type="catalog",
+            perspective_slug="video_skip_test",
+            force=True,
+            provider_id="ollama",
+            model="vision-model",
+            log_callback=None,
+        )
+
+    assert status == "skipped"
+    assert ok is False
+    assert err is not None and "Video file not scorable" in err
+    mock_disp.assert_not_called()
+    mock_compress.assert_not_called()
+    # And nothing was written to image_scores
+    rows = get_current_scores_for_image(conn, "2024-06-01_clip", "catalog")
+    assert rows == []

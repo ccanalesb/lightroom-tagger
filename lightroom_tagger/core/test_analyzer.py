@@ -393,8 +393,20 @@ def test_run_vision_ollama_raises_on_model_not_found():
     mock_response.__enter__ = lambda s: s
     mock_response.__exit__ = MagicMock(return_value=False)
 
+    # Only intercept opens of the two image paths — patching
+    # ``builtins.open`` wholesale breaks unrelated callers like
+    # ``config.load_config`` (which opens ``config.yaml`` via ``open(path)``
+    # with one positional arg, and expects real YAML).
+    real_open = open
+
+    def _fake_open(*args, **kwargs):
+        path = str(args[0]) if args else str(kwargs.get('file', ''))
+        if path.endswith('/a.jpg') or path.endswith('/b.jpg'):
+            return BytesIO(b'\x00' * 10)
+        return real_open(*args, **kwargs)
+
     with patch('urllib.request.urlopen', return_value=mock_response), \
-         patch('builtins.open', side_effect=lambda p, m: BytesIO(b'\x00' * 10)):
+         patch('builtins.open', side_effect=_fake_open):
         try:
             run_vision_ollama('/tmp/a.jpg', '/tmp/b.jpg')
             assert False, "Expected RuntimeError"
@@ -410,8 +422,16 @@ def test_run_vision_ollama_raises_on_connection_error():
 
     from lightroom_tagger.core.analyzer import run_vision_ollama
 
+    real_open = open
+
+    def _fake_open(*args, **kwargs):
+        path = str(args[0]) if args else str(kwargs.get('file', ''))
+        if path.endswith('/a.jpg') or path.endswith('/b.jpg'):
+            return BytesIO(b'\x00' * 10)
+        return real_open(*args, **kwargs)
+
     with patch('urllib.request.urlopen', side_effect=URLError('Connection refused')), \
-         patch('builtins.open', side_effect=lambda p, m: BytesIO(b'\x00' * 10)):
+         patch('builtins.open', side_effect=_fake_open):
         try:
             run_vision_ollama('/tmp/a.jpg', '/tmp/b.jpg')
             assert False, "Expected URLError"

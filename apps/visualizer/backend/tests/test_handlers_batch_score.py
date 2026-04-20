@@ -16,7 +16,7 @@ def _make_runner():
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.path.exists', return_value=True)
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
 def test_batch_score_should_complete_with_zero_units(
     _mock_exists, mock_getenv, mock_config, mock_init_db, _mock_add_log,
 ):
@@ -46,7 +46,7 @@ def test_batch_score_should_complete_with_zero_units(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.path.exists', return_value=True)
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
 def test_batch_score_checkpoint_skips_already_processed_triplets(
     _mock_exists,
     mock_getenv,
@@ -100,7 +100,7 @@ def test_batch_score_checkpoint_skips_already_processed_triplets(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.path.exists', return_value=True)
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
 def test_batch_score_should_call_score_for_each_triplet(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_score, _mock_add_log,
 ):
@@ -138,7 +138,7 @@ def test_batch_score_should_call_score_for_each_triplet(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.path.exists', return_value=True)
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
 @patch('lightroom_tagger.core.database.get_perspective_by_slug')
 def test_batch_score_non_force_never_calls_get_undescribed_catalog_images(
     mock_get_perspective,

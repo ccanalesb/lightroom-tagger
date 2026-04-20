@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.update_job_field')
-@patch('jobs.handlers.os.path.exists', return_value=True)
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
 def test_handle_vision_match_passes_media_key(mock_getenv, mock_exists, mock_update_field,
                                                mock_config, mock_init_db, mock_match, _mock_add_log):
@@ -35,7 +35,7 @@ def test_handle_vision_match_passes_media_key(mock_getenv, mock_exists, mock_upd
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.update_job_field')
-@patch('jobs.handlers.os.path.exists', return_value=True)
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
 def test_handle_vision_match_passes_custom_weights(mock_getenv, mock_exists, mock_update_field,
                                                     mock_config, mock_init_db, mock_match, _mock_add_log):

@@ -27,6 +27,24 @@ from lightroom_tagger.instagram.dump_reader import (
 )
 
 
+def derive_created_at_from_date_folder(date_folder: str | None) -> str | None:
+    """Synthesize an ISO created_at from a Instagram-dump ``date_folder``.
+
+    The dump reader assigns each media file a six-digit ``YYYYMM`` folder
+    (e.g. ``"202603"``). When the JSON metadata does not supply a timestamp we
+    fall back to the first of that month so downstream date-window filters
+    don't silently drop the row. Returns ``None`` if the folder is missing or
+    not in the expected shape — callers should leave created_at unset in that
+    case so the selector's own fallback can still decide what to do.
+    """
+    if not date_folder:
+        return None
+    folder = date_folder.strip()
+    if len(folder) != 6 or not folder.isdigit():
+        return None
+    return f"{folder[:4]}-{folder[4:]}-01T00:00:00"
+
+
 def combine_metadata(posts_meta, archived_meta, other_meta):
     """Combine metadata from all JSON sources (aggregative)."""
     combined = {}
@@ -150,6 +168,15 @@ def import_dump(db, dump_path: str, skip_existing: bool = True, skip_dedup: bool
         if creation_ts and creation_ts in url_lookup:
             record['post_url'] = url_lookup[creation_ts]
             with_urls += 1
+
+        # Fall back to date_folder for created_at when the JSON metadata did not
+        # provide one — this keeps downstream date-window filters from silently
+        # dropping otherwise-valid media. Shape handled by
+        # :func:`derive_created_at_from_date_folder`.
+        if not (record.get('created_at') or '').strip():
+            derived = derive_created_at_from_date_folder(record.get('date_folder'))
+            if derived:
+                record['created_at'] = derived
 
         # Store
         store_instagram_dump_media(db, record)

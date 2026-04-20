@@ -1,22 +1,59 @@
 import { Link } from 'react-router-dom';
 import type { Job } from '../../services/api';
 import {
+  ADVANCED_DATE_12MONTHS,
+  ADVANCED_DATE_18MONTHS,
+  ADVANCED_DATE_1MONTH,
+  ADVANCED_DATE_24MONTHS,
+  ADVANCED_DATE_2MONTHS,
+  ADVANCED_DATE_3MONTHS,
+  ADVANCED_DATE_6MONTHS,
+  ADVANCED_DATE_9MONTHS,
+  ADVANCED_DATE_ALL,
+  ADVANCED_DATE_YEAR_2023,
+  ADVANCED_DATE_YEAR_2024,
+  ADVANCED_DATE_YEAR_2025,
+  ADVANCED_DATE_YEAR_2026,
   DESC_PAGE_BATCH_RUNNING,
   DESC_PAGE_FORCE,
-  DESC_PAGE_FILTER_ALL,
-  DESC_PAGE_FILTER_3M,
-  DESC_PAGE_FILTER_6M,
   DESC_BATCH_JOB_STARTED,
   DESC_BATCH_VIEW_IN_JOBS,
   DESC_BATCH_FAILED_PREFIX,
 } from '../../constants/strings';
 
-type DateFilter = 'all' | '3months' | '6months';
+// ``DateFilter`` mirrors the union in AnalyzeTab so downstream call sites can
+// share the same type + ``buildDateMetadata`` translator. This panel isn't
+// mounted in the current UI but is exported for future reuse — keeping the
+// enum aligned now avoids a second migration later.
+type DateFilter =
+  | 'all'
+  | '1months'
+  | '2months'
+  | '3months'
+  | '6months'
+  | '9months'
+  | '12months'
+  | '18months'
+  | '24months'
+  | '2026'
+  | '2025'
+  | '2024'
+  | '2023';
 
 const DATE_FILTERS: { value: DateFilter; label: string }[] = [
-  { value: 'all', label: DESC_PAGE_FILTER_ALL },
-  { value: '3months', label: DESC_PAGE_FILTER_3M },
-  { value: '6months', label: DESC_PAGE_FILTER_6M },
+  { value: 'all', label: ADVANCED_DATE_ALL },
+  { value: '1months', label: ADVANCED_DATE_1MONTH },
+  { value: '2months', label: ADVANCED_DATE_2MONTHS },
+  { value: '3months', label: ADVANCED_DATE_3MONTHS },
+  { value: '6months', label: ADVANCED_DATE_6MONTHS },
+  { value: '9months', label: ADVANCED_DATE_9MONTHS },
+  { value: '12months', label: ADVANCED_DATE_12MONTHS },
+  { value: '18months', label: ADVANCED_DATE_18MONTHS },
+  { value: '24months', label: ADVANCED_DATE_24MONTHS },
+  { value: '2026', label: ADVANCED_DATE_YEAR_2026 },
+  { value: '2025', label: ADVANCED_DATE_YEAR_2025 },
+  { value: '2024', label: ADVANCED_DATE_YEAR_2024 },
+  { value: '2023', label: ADVANCED_DATE_YEAR_2023 },
 ];
 
 export interface BatchActionPanelProps {

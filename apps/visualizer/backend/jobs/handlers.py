@@ -5,7 +5,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from database import add_job_log, get_job, update_job_field
+from library_db import require_library_db
 
+from lightroom_tagger.core import cancel_scope
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import init_database
 from lightroom_tagger.core.provider_errors import AuthenticationError, InvalidRequestError
@@ -23,6 +25,19 @@ from .checkpoint import (
 _CHECKPOINT_MAX_ENTRIES = 100_000
 
 
+def _resolve_library_db_or_fail(runner, job_id: str) -> str | None:
+    """Return the library DB path, or call ``runner.fail_job`` and return None.
+
+    Centralizes the resolution + failure behaviour so every handler that needs
+    the catalog gets a single, accurate error message when the DB is missing.
+    """
+    try:
+        return require_library_db()
+    except FileNotFoundError as e:
+        runner.fail_job(job_id, str(e), severity='warning')
+        return None
+
+
 def _failure_severity_from_exception(exc: BaseException) -> str:
     if isinstance(exc, (AuthenticationError, InvalidRequestError)):
         return 'warning'
@@ -31,6 +46,184 @@ def _failure_severity_from_exception(exc: BaseException) -> str:
     if isinstance(exc, RuntimeError) and str(exc) == 'Close Lightroom before writing to catalog.':
         return 'critical'
     return 'error'
+
+
+# Legacy date_filter labels (kept for backward compatibility with older clients
+# and checkpoints). Prefer sending ``last_months`` as an int or ``year`` as a
+# four-digit string instead.
+_LEGACY_DATE_FILTER_MONTHS = {'3months': 3, '6months': 6, '12months': 12}
+
+
+def _resolve_date_window(metadata: dict) -> tuple[int | None, str | None]:
+    """Normalize date-range metadata into ``(months, year)``.
+
+    The batch describe/score/analyze handlers used to only recognize the string
+    tokens ``'3months' | '6months' | '12months'`` via a hardcoded map. New
+    clients send the window directly as either ``last_months: int`` or
+    ``year: 'YYYY'`` — matching the richer contract already used by
+    ``handle_vision_match``. This helper accepts both and returns whichever is
+    set, preferring numeric inputs over the legacy ``date_filter`` string.
+
+    Behaviour:
+      * ``last_months`` wins when it is a positive integer.
+      * ``year`` is normalized to a four-digit string (rejecting anything else).
+      * ``date_filter`` is consulted last for backward compatibility with
+        existing dropdowns; unknown values fall through as ``(None, None)``
+        (i.e. ``'all'``).
+
+    Returning a tuple keeps the call sites obvious: callers thread ``months``
+    into existing ``date_taken >= date('now', -N months)`` clauses and ``year``
+    into new ``strftime('%Y', ...) = ?`` clauses.
+    """
+    months: int | None = None
+    year: str | None = None
+
+    raw_last_months = metadata.get('last_months')
+    if isinstance(raw_last_months, bool):
+        pass  # guard against ``True`` being treated as ``1``
+    elif isinstance(raw_last_months, int) and raw_last_months > 0:
+        months = raw_last_months
+    elif isinstance(raw_last_months, str) and raw_last_months.strip().isdigit():
+        n = int(raw_last_months.strip())
+        if n > 0:
+            months = n
+
+    # ``last_months`` has precedence: if both are present, the numeric
+    # window wins. Otherwise ANDing two date conditions produces an
+    # accidentally narrow result set (the intersection of the last N months
+    # AND a specific year).
+    if months is None:
+        raw_year = metadata.get('year')
+        if isinstance(raw_year, int) and 1900 <= raw_year <= 9999:
+            year = str(raw_year)
+        elif (
+            isinstance(raw_year, str)
+            and raw_year.strip().isdigit()
+            and len(raw_year.strip()) == 4
+        ):
+            year = raw_year.strip()
+
+    if months is None and year is None:
+        date_filter = metadata.get('date_filter', 'all')
+        months = _LEGACY_DATE_FILTER_MONTHS.get(date_filter)
+
+    return months, year
+
+
+def _select_catalog_keys(
+    lib_db,
+    *,
+    months: int | None,
+    year: str | None,
+    min_rating: int | None,
+    undescribed_only: bool,
+) -> list[tuple[str, str]]:
+    """Select ``(key, 'catalog')`` tuples matching the given window.
+
+    Consolidates the four near-identical SQL blocks that previously lived in
+    ``handle_batch_describe`` / ``handle_batch_score`` / ``handle_batch_analyze``
+    so the ``year`` window only has to be added in one place.
+
+    ``undescribed_only=True`` joins against ``image_descriptions`` to skip rows
+    that already have a description — matching the semantics of
+    ``get_undescribed_catalog_images``. ``undescribed_only=False`` returns every
+    key in the window (equivalent to the old ``force`` arm).
+    """
+    params: list = []
+    if undescribed_only:
+        sql = (
+            "SELECT i.key AS key FROM images i "
+            "LEFT JOIN image_descriptions d "
+            "  ON i.key = d.image_key AND d.image_type = 'catalog' "
+            "WHERE d.image_key IS NULL"
+        )
+        date_col = "i.date_taken"
+        rating_col = "i.rating"
+        conditions: list[str] = []
+    else:
+        sql = "SELECT key FROM images"
+        date_col = "date_taken"
+        rating_col = "rating"
+        conditions = []
+
+    if months:
+        conditions.append(f"{date_col} >= date('now', ?)")
+        params.append(f'-{months} months')
+    if year is not None:
+        conditions.append(f"strftime('%Y', {date_col}) = ?")
+        params.append(year)
+    if min_rating is not None:
+        conditions.append(f"{rating_col} >= ?")
+        params.append(min_rating)
+
+    if undescribed_only:
+        if conditions:
+            sql += " AND " + " AND ".join(conditions)
+    else:
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+
+    rows = lib_db.execute(sql, tuple(params)).fetchall()
+    return [(r['key'], 'catalog') for r in rows]
+
+
+def _select_instagram_keys(
+    lib_db,
+    *,
+    months: int | None,
+    year: str | None,
+    undescribed_only: bool,
+) -> list[tuple[str, str]]:
+    """Select ``(media_key, 'instagram')`` tuples matching the given window.
+
+    Sibling of :func:`_select_catalog_keys`. Instagram dump media has no
+    ``min_rating`` and uses ``created_at`` as its date column.
+    """
+    params: list = []
+    if undescribed_only:
+        sql = (
+            "SELECT m.media_key AS media_key FROM instagram_dump_media m "
+            "LEFT JOIN image_descriptions d "
+            "  ON m.media_key = d.image_key AND d.image_type = 'instagram' "
+            "WHERE d.image_key IS NULL"
+        )
+        table_alias = "m."
+        conditions: list[str] = []
+    else:
+        sql = "SELECT media_key FROM instagram_dump_media"
+        table_alias = ""
+        conditions = []
+
+    # Fall back to date_folder ("YYYYMM") when created_at is missing — the Instagram
+    # dump importer historically left created_at NULL for media without JSON metadata,
+    # so date windows would silently exclude those rows. This builds a synthetic
+    # "YYYY-MM-01" ISO date from date_folder as the fallback so both filters
+    # (months-window and year) still match.
+    created_col = f"{table_alias}created_at"
+    folder_col = f"{table_alias}date_folder"
+    date_expr = (
+        f"COALESCE(NULLIF({created_col}, ''),"
+        f" CASE WHEN {folder_col} GLOB '[0-9][0-9][0-9][0-9][0-9][0-9]'"
+        f"      THEN substr({folder_col},1,4) || '-' || substr({folder_col},5,2) || '-01'"
+        f"      ELSE NULL END)"
+    )
+
+    if months:
+        conditions.append(f"{date_expr} >= date('now', ?)")
+        params.append(f'-{months} months')
+    if year is not None:
+        conditions.append(f"strftime('%Y', {date_expr}) = ?")
+        params.append(year)
+
+    if undescribed_only:
+        if conditions:
+            sql += " AND " + " AND ".join(conditions)
+    else:
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+
+    rows = lib_db.execute(sql, tuple(params)).fetchall()
+    return [(r['media_key'], 'instagram') for r in rows]
 
 
 def handle_analyze_instagram(runner, job_id: str, metadata: dict):
@@ -69,11 +262,7 @@ def handle_instagram_import(runner, job_id: str, metadata: dict):
             )
             return
 
-        db_path = os.getenv('LIBRARY_DB')
-        if not db_path:
-            db_path = config.db_path or 'library.db'
-        if not os.path.exists(db_path):
-            raise FileNotFoundError(f"Database not found at: {db_path}")
+        db_path = require_library_db()
 
         skip_dedup = bool(metadata.get('skip_dedup', False))
         reimport = bool(metadata.get('reimport', False))
@@ -195,24 +384,14 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 },
             )
 
-        # Use LIBRARY_DB env var if set, otherwise fall back to config
-        import os
         import time
 
         start_time = time.time()
-        db_path = os.getenv('LIBRARY_DB')
-        print(f"[Job {job_id[:8]}] LIBRARY_DB env: {db_path is not None}")
+        db_path = require_library_db()
+        print(f"[Job {job_id[:8]}] Using DB path: {db_path}")
 
         config = load_config()
         print(f"[Job {job_id[:8]}] Config loaded in {time.time() - start_time:.2f}s")
-
-        if not db_path:
-            db_path = config.db_path or 'library.db'
-            print(f"[Job {job_id[:8]}] Using DB path: {db_path}")
-
-        # Check if database exists
-        if not os.path.exists(db_path):
-            raise FileNotFoundError(f"Database not found at: {db_path}")
 
         db = init_database(db_path)
         print(f"[Job {job_id[:8]}] Database opened")
@@ -344,12 +523,8 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
     runner.update_progress(job_id, 10, 'Initializing enrichment...')
 
     config = load_config()
-    db_path = os.getenv('LIBRARY_DB')
-    if not db_path:
-        db_path = config.db_path or 'library.db'
-
-    if not os.path.exists(db_path):
-        runner.fail_job(job_id, f"Library database not found at: {db_path}")
+    db_path = _resolve_library_db_or_fail(runner, job_id)
+    if db_path is None:
         return
 
     db = None
@@ -492,14 +667,8 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
 
     runner.update_progress(job_id, 5, 'Initializing cache preparation...')
 
-    # Use LIBRARY_DB for cache operations, not runner.db
-    db_path = os.getenv('LIBRARY_DB')
-    if not db_path:
-        config = load_config()
-        db_path = config.db_path or 'library.db'
-
-    if not os.path.exists(db_path):
-        runner.fail_job(job_id, f"Library database not found at: {db_path}")
+    db_path = _resolve_library_db_or_fail(runner, job_id)
+    if db_path is None:
         return
 
     lib_db = None
@@ -586,7 +755,10 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
             thread_db = sqlite3.connect(db_path)
             thread_db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=False))
             thread_db.execute("PRAGMA journal_mode=WAL")
-            thread_db.execute("PRAGMA busy_timeout=5000")
+            # Match ``init_database`` — 30s busy_timeout + synchronous=NORMAL
+            # to survive parallel-writer contention on the library DB.
+            thread_db.execute("PRAGMA busy_timeout=30000")
+            thread_db.execute("PRAGMA synchronous=NORMAL")
             try:
                 from lightroom_tagger.core.database import is_vision_cache_valid
 
@@ -732,6 +904,7 @@ def _score_single_image(
 def _diagnose_describe_skip(lib_db, key: str, itype: str, force: bool) -> str:
     """Return a specific reason why describe_*_image returned False."""
     try:
+        from lightroom_tagger.core.analyzer import VIDEO_EXTENSIONS
         from lightroom_tagger.core.database import (
             get_image,
             get_image_description,
@@ -749,6 +922,9 @@ def _diagnose_describe_skip(lib_db, key: str, itype: str, force: bool) -> str:
                 return 'No filepath in catalog record'
             from lightroom_tagger.core.description_service import resolve_filepath
             resolved = resolve_filepath(filepath)
+            ext = os.path.splitext(resolved)[1].lower()
+            if ext in VIDEO_EXTENSIONS:
+                return f'Video file not describable: {os.path.basename(resolved)}'
             if not os.path.exists(resolved):
                 return f'File not found: {resolved}'
             return 'Model returned empty or invalid response'
@@ -758,6 +934,10 @@ def _diagnose_describe_skip(lib_db, key: str, itype: str, force: bool) -> str:
             ig = get_instagram_dump_media(lib_db, key)
             if not ig:
                 return 'Instagram media key not found'
+            filepath = ig.get('file_path') or ''
+            ext = os.path.splitext(filepath)[1].lower()
+            if ext in VIDEO_EXTENSIONS:
+                return f'Video file not describable: {os.path.basename(filepath)}'
             return 'Model returned empty or invalid response'
     except Exception as exc:
         return f'No description generated ({exc})'
@@ -821,11 +1001,8 @@ def handle_single_describe(runner, job_id: str, metadata: dict):
             return
 
         config = load_config()
-        db_path = os.getenv('LIBRARY_DB')
-        if not db_path:
-            db_path = config.db_path or 'library.db'
-        if not os.path.exists(db_path):
-            runner.fail_job(job_id, f"Library database not found at: {db_path}")
+        db_path = _resolve_library_db_or_fail(runner, job_id)
+        if db_path is None:
             return
         lib_db = init_database(db_path)
 
@@ -880,11 +1057,8 @@ def handle_single_score(runner, job_id: str, metadata: dict):
             return
 
         config = load_config()
-        db_path = os.getenv('LIBRARY_DB')
-        if not db_path:
-            db_path = config.db_path or 'library.db'
-        if not os.path.exists(db_path):
-            runner.fail_job(job_id, f"Library database not found at: {db_path}")
+        db_path = _resolve_library_db_or_fail(runner, job_id)
+        if db_path is None:
             return
         lib_db = init_database(db_path)
 
@@ -1148,13 +1322,21 @@ def _run_describe_pass(
 
     if max_workers > 1 and total > 3:
         def process_image_worker(key: str, itype: str):
-            """Worker function with its own DB connection."""
+            """Worker function with its own DB connection.
+
+            Installs a thread-local cancel scope so retry/backoff sleeps and
+            the fallback cascade inside ``_describe_single_image`` observe
+            ``runner.is_cancelled(job_id)``. Without this, a worker thread
+            caught inside a 32s retry sleep wouldn't notice a cancel until
+            the sleep finished.
+            """
             worker_db = init_database(db_path)
             try:
-                status, success, error_msg = _describe_single_image(
-                    worker_db, key, itype, force, desc_provider_id, desc_provider_model,
-                    perspective_slugs,
-                )
+                with cancel_scope.install(lambda: runner.is_cancelled(job_id)):
+                    status, success, error_msg = _describe_single_image(
+                        worker_db, key, itype, force, desc_provider_id, desc_provider_model,
+                        perspective_slugs,
+                    )
                 return (key, status, error_msg)
             finally:
                 worker_db.close()
@@ -1217,6 +1399,10 @@ def _run_describe_pass(
             runner.finalize_cancelled(job_id)
             return
     else:
+        # Cancel scope is installed around the entire handler (see
+        # batch_describe / batch_analyze wrappers) so the per-iteration
+        # ``is_cancelled`` check here still guards entry into each new
+        # item, AND any retry/fallback backoff sleeps below abort early.
         for idx, (key, itype) in enumerate(images_to_describe, 1):
             if runner.is_cancelled(job_id):
                 add_job_log(runner.db, job_id, 'info', f'{log_prefix}Batch describe stopped: cancel requested' if log_prefix else 'Batch describe stopped: cancel requested')
@@ -1291,23 +1477,32 @@ def _run_describe_pass(
 
 def handle_batch_describe(runner, job_id: str, metadata: dict):
     """Generate AI descriptions for catalog and/or Instagram images in bulk."""
+    # Install the cancel scope for the main handler thread so retry/fallback
+    # sleeps inside the sequential describe path observe cancel requests
+    # without any explicit plumbing. The parallel path installs its own
+    # scope per worker thread (see ``process_image_worker`` in
+    # ``_run_describe_pass``) because ThreadPool workers don't inherit
+    # thread-local state from the submitter.
+    with cancel_scope.install(lambda: runner.is_cancelled(job_id)):
+        _handle_batch_describe_inner(runner, job_id, metadata)
+
+
+def _handle_batch_describe_inner(runner, job_id: str, metadata: dict):
     lib_db = None
     old_model_env = os.environ.get('DESCRIPTION_VISION_MODEL')
     try:
         config = load_config()
-        db_path = os.getenv('LIBRARY_DB')
-        if not db_path:
-            db_path = config.db_path or 'library.db'
-        if not os.path.exists(db_path):
-            runner.fail_job(job_id, f"Library database not found at: {db_path}")
+        db_path = _resolve_library_db_or_fail(runner, job_id)
+        if db_path is None:
             return
         lib_db = init_database(db_path)
 
         image_type = metadata.get('image_type', 'both')  # catalog, instagram, both
-        date_filter = metadata.get('date_filter', 'all')  # all, 3months, 6months, 12months
         force = metadata.get('force', False)
 
-        months = {'3months': 3, '6months': 6, '12months': 12}.get(date_filter)
+        # ``last_months`` (int) and ``year`` ('YYYY') now win over the legacy
+        # ``date_filter`` string; see ``_resolve_date_window`` for details.
+        months, year = _resolve_date_window(metadata)
         min_rating_raw = metadata.get('min_rating')
         min_rating = None
         if min_rating_raw is not None:
@@ -1324,20 +1519,18 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
         images_to_describe: list[tuple[str, str]] = []  # (key, type)
 
         if image_type in ('catalog', 'both'):
-            if force:
-                sql = "SELECT key FROM images"
-                conditions: list[str] = []
-                sql_params: list = []
-                if months:
-                    conditions.append("date_taken >= date('now', ?)")
-                    sql_params.append(f'-{months} months')
-                if min_rating is not None:
-                    conditions.append("rating >= ?")
-                    sql_params.append(min_rating)
-                if conditions:
-                    sql += " WHERE " + " AND ".join(conditions)
-                rows = lib_db.execute(sql, tuple(sql_params)).fetchall()
-                images_to_describe += [(r['key'], 'catalog') for r in rows]
+            if force or year is not None:
+                # ``year`` is a new window that the undescribed-only helper
+                # doesn't know about yet, so we run the raw SQL path for both
+                # ``force`` and ``year`` (joining in the description filter
+                # manually when ``force`` is off).
+                images_to_describe += _select_catalog_keys(
+                    lib_db,
+                    months=months,
+                    year=year,
+                    min_rating=min_rating,
+                    undescribed_only=not force,
+                )
             else:
                 images_to_describe += [
                     (img['key'], 'catalog')
@@ -1347,14 +1540,13 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
                 ]
 
         if image_type in ('instagram', 'both'):
-            if force:
-                rows = lib_db.execute("SELECT media_key FROM instagram_dump_media").fetchall()
-                if months:
-                    rows = lib_db.execute(
-                        "SELECT media_key FROM instagram_dump_media WHERE created_at >= date('now', ?)",
-                        (f'-{months} months',),
-                    ).fetchall()
-                images_to_describe += [(r['media_key'], 'instagram') for r in rows]
+            if force or year is not None:
+                images_to_describe += _select_instagram_keys(
+                    lib_db,
+                    months=months,
+                    year=year,
+                    undescribed_only=not force,
+                )
             else:
                 images_to_describe += [
                     (img['media_key'], 'instagram')
@@ -1571,13 +1763,30 @@ def _run_score_pass(
     consecutive_failures = 0
 
     if max_workers > 1 and total > 3:
+        def _worker_log_callback(level: str, msg: str) -> None:
+            # Worker-thread diagnostics (retry notices, repair logs) go
+            # through ``log_from_worker`` so every thread writes via its own
+            # sqlite3 connection. Sharing ``runner.db`` across all workers
+            # was the root cause of the 3h stall on job 50710bf6 — Python's
+            # sqlite3 connection mutex serialized every INSERT, which in
+            # turn starved the main-thread ``as_completed`` coordinator.
+            runner.log_from_worker(
+                job_id, level, f"{log_prefix}{msg}" if log_prefix else msg
+            )
+
         def process_score_worker(key: str, itype: str, slug: str):
+            # Install the cancel scope per worker thread so retry/backoff
+            # sleeps and fallback cascades observe ``runner.is_cancelled``.
+            # See ``process_image_worker`` in ``_run_describe_pass`` for
+            # the matching pattern.
             worker_db = init_database(db_path)
             try:
-                return _score_single_image(
-                    worker_db, key, itype, slug, force,
-                    score_provider_id, score_provider_model, None,
-                )
+                with cancel_scope.install(lambda: runner.is_cancelled(job_id)):
+                    return _score_single_image(
+                        worker_db, key, itype, slug, force,
+                        score_provider_id, score_provider_model,
+                        _worker_log_callback,
+                    )
             finally:
                 worker_db.close()
 
@@ -1734,21 +1943,23 @@ def handle_batch_score(runner, job_id: str, metadata: dict):
     ``failed``; skipped rows (already current, missing file) still advance the checkpoint like
     batch describe.
     """
+    # See ``handle_batch_describe`` for cancel-scope rationale.
+    with cancel_scope.install(lambda: runner.is_cancelled(job_id)):
+        _handle_batch_score_inner(runner, job_id, metadata)
+
+
+def _handle_batch_score_inner(runner, job_id: str, metadata: dict):
     lib_db = None
     try:
         config = load_config()
-        db_path = os.getenv('LIBRARY_DB')
-        if not db_path:
-            db_path = config.db_path or 'library.db'
-        if not os.path.exists(db_path):
-            runner.fail_job(job_id, f"Library database not found at: {db_path}")
+        db_path = _resolve_library_db_or_fail(runner, job_id)
+        if db_path is None:
             return
         lib_db = init_database(db_path)
 
         image_type = metadata.get('image_type', 'both')
-        date_filter = metadata.get('date_filter', 'all')
 
-        months = {'3months': 3, '6months': 6, '12months': 12}.get(date_filter)
+        months, year = _resolve_date_window(metadata)
         min_rating_raw = metadata.get('min_rating')
         min_rating = None
         if min_rating_raw is not None:
@@ -1756,57 +1967,29 @@ def handle_batch_score(runner, job_id: str, metadata: dict):
                 min_rating = int(min_rating_raw)
             except (TypeError, ValueError):
                 min_rating = None
-        force = metadata.get('force', False)
+        # ``handle_batch_score`` always rescans the full candidate set
+        # (scoring isn't gated on missing descriptions the same way describe
+        # is), so ``undescribed_only=False`` matches the previous SQL exactly —
+        # both the ``force`` and non-``force`` arms had identical selection.
 
         images_for_scores: list[tuple[str, str]] = []
 
         if image_type in ('catalog', 'both'):
-            if force:
-                sql = "SELECT key FROM images"
-                conditions: list[str] = []
-                sql_params: list = []
-                if months:
-                    conditions.append("date_taken >= date('now', ?)")
-                    sql_params.append(f'-{months} months')
-                if min_rating is not None:
-                    conditions.append("rating >= ?")
-                    sql_params.append(min_rating)
-                if conditions:
-                    sql += " WHERE " + " AND ".join(conditions)
-                rows = lib_db.execute(sql, tuple(sql_params)).fetchall()
-                images_for_scores += [(r['key'], 'catalog') for r in rows]
-            else:
-                sql = "SELECT key FROM images"
-                conditions = []
-                sql_params = []
-                if months:
-                    conditions.append("date_taken >= date('now', ?)")
-                    sql_params.append(f'-{months} months')
-                if min_rating is not None:
-                    conditions.append("rating >= ?")
-                    sql_params.append(min_rating)
-                if conditions:
-                    sql += " WHERE " + " AND ".join(conditions)
-                rows = lib_db.execute(sql, tuple(sql_params)).fetchall()
-                images_for_scores += [(r['key'], 'catalog') for r in rows]
+            images_for_scores += _select_catalog_keys(
+                lib_db,
+                months=months,
+                year=year,
+                min_rating=min_rating,
+                undescribed_only=False,
+            )
 
         if image_type in ('instagram', 'both'):
-            if force:
-                rows = lib_db.execute("SELECT media_key FROM instagram_dump_media").fetchall()
-                if months:
-                    rows = lib_db.execute(
-                        "SELECT media_key FROM instagram_dump_media WHERE created_at >= date('now', ?)",
-                        (f'-{months} months',),
-                    ).fetchall()
-                images_for_scores += [(r['media_key'], 'instagram') for r in rows]
-            else:
-                rows = lib_db.execute("SELECT media_key FROM instagram_dump_media").fetchall()
-                if months:
-                    rows = lib_db.execute(
-                        "SELECT media_key FROM instagram_dump_media WHERE created_at >= date('now', ?)",
-                        (f'-{months} months',),
-                    ).fetchall()
-                images_for_scores += [(r['media_key'], 'instagram') for r in rows]
+            images_for_scores += _select_instagram_keys(
+                lib_db,
+                months=months,
+                year=year,
+                undescribed_only=False,
+            )
 
         _run_score_pass(
             runner,
@@ -1836,23 +2019,25 @@ def handle_batch_analyze(runner, job_id: str, metadata: dict):
     ``force_score`` in ``metadata`` are normalized into per-stage ``force`` via shallow-merge
     before hitting the helpers' fingerprint + pre-filter logic (D-11).
     """
+    # See ``handle_batch_describe`` for cancel-scope rationale.
+    with cancel_scope.install(lambda: runner.is_cancelled(job_id)):
+        _handle_batch_analyze_inner(runner, job_id, metadata)
+
+
+def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
     lib_db = None
     old_model_env = os.environ.get('DESCRIPTION_VISION_MODEL')
     try:
         config = load_config()
-        db_path = os.getenv('LIBRARY_DB')
-        if not db_path:
-            db_path = config.db_path or 'library.db'
-        if not os.path.exists(db_path):
-            runner.fail_job(job_id, f"Library database not found at: {db_path}")
+        db_path = _resolve_library_db_or_fail(runner, job_id)
+        if db_path is None:
             return
         lib_db = init_database(db_path)
 
         image_type = metadata.get('image_type', 'both')
-        date_filter = metadata.get('date_filter', 'all')
         force = bool(metadata.get('force_describe', False))
 
-        months = {'3months': 3, '6months': 6, '12months': 12}.get(date_filter)
+        months, year = _resolve_date_window(metadata)
         min_rating_raw = metadata.get('min_rating')
         min_rating = None
         if min_rating_raw is not None:
@@ -1869,20 +2054,14 @@ def handle_batch_analyze(runner, job_id: str, metadata: dict):
         shared_selection: list[tuple[str, str]] = []
 
         if image_type in ('catalog', 'both'):
-            if force:
-                sql = "SELECT key FROM images"
-                conditions: list[str] = []
-                sql_params: list = []
-                if months:
-                    conditions.append("date_taken >= date('now', ?)")
-                    sql_params.append(f'-{months} months')
-                if min_rating is not None:
-                    conditions.append("rating >= ?")
-                    sql_params.append(min_rating)
-                if conditions:
-                    sql += " WHERE " + " AND ".join(conditions)
-                rows = lib_db.execute(sql, tuple(sql_params)).fetchall()
-                shared_selection += [(r['key'], 'catalog') for r in rows]
+            if force or year is not None:
+                shared_selection += _select_catalog_keys(
+                    lib_db,
+                    months=months,
+                    year=year,
+                    min_rating=min_rating,
+                    undescribed_only=not force,
+                )
             else:
                 shared_selection += [
                     (img['key'], 'catalog')
@@ -1892,14 +2071,13 @@ def handle_batch_analyze(runner, job_id: str, metadata: dict):
                 ]
 
         if image_type in ('instagram', 'both'):
-            if force:
-                rows = lib_db.execute("SELECT media_key FROM instagram_dump_media").fetchall()
-                if months:
-                    rows = lib_db.execute(
-                        "SELECT media_key FROM instagram_dump_media WHERE created_at >= date('now', ?)",
-                        (f'-{months} months',),
-                    ).fetchall()
-                shared_selection += [(r['media_key'], 'instagram') for r in rows]
+            if force or year is not None:
+                shared_selection += _select_instagram_keys(
+                    lib_db,
+                    months=months,
+                    year=year,
+                    undescribed_only=not force,
+                )
             else:
                 shared_selection += [
                     (img['media_key'], 'instagram')

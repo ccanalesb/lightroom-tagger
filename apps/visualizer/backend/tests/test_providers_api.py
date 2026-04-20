@@ -113,11 +113,22 @@ class TestFallbackOrder:
 
 class TestDefaults:
     def test_should_return_defaults(self, client):
+        """The endpoint returns whatever ``providers.json`` currently ships.
+
+        The concrete provider IDs change over time (e.g. the default
+        description provider migrated from ``ollama`` to ``github_copilot``
+        when Copilot became the preferred host), so this test asserts
+        against the live registry rather than a hardcoded value. The
+        registry itself is covered by ``test_provider_registry.py`` which
+        pins to ``providers.example.json`` for stability.
+        """
         resp = client.get("/api/providers/defaults")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["vision_comparison"]["provider"] == "ollama"
-        assert data["description"]["provider"] == "ollama"
+
+        expected = ProviderRegistry().defaults
+        assert data["vision_comparison"]["provider"] == expected["vision_comparison"]["provider"]
+        assert data["description"]["provider"] == expected["description"]["provider"]
 
     def test_put_defaults_should_update_defaults(self, client):
         from lightroom_tagger.core.provider_registry import ProviderRegistry

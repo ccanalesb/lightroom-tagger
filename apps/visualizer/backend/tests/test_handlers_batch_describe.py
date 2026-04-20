@@ -13,7 +13,7 @@ def _make_runner():
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.path.exists', return_value=True)
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_should_complete_with_zero_images(
     _mock_exists, mock_getenv, mock_config, mock_init_db, _mock_add_log,
 ):
@@ -41,7 +41,7 @@ def test_batch_describe_should_complete_with_zero_images(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.path.exists', return_value=True)
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_should_describe_catalog_images(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_get, mock_describe, _mock_add_log,
 ):
@@ -69,7 +69,7 @@ def test_batch_describe_should_describe_catalog_images(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.path.exists', return_value=True)
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_should_count_failures(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_get, mock_describe, _mock_add_log,
 ):
@@ -95,7 +95,7 @@ def test_batch_describe_should_count_failures(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.path.exists', return_value=True)
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_should_stop_after_consecutive_failures(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_get, mock_describe, mock_add_log,
 ):
@@ -125,7 +125,7 @@ def test_batch_describe_should_stop_after_consecutive_failures(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.path.exists', return_value=True)
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_legacy_vision_model_metadata_does_not_set_env(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_get, _mock_add_log,
 ):
@@ -180,7 +180,7 @@ def test_batch_describe_should_fail_job_on_exception(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.path.exists', return_value=True)
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_passes_months_12_for_12months_date_filter(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_get_undescribed, _mock_add_log,
 ):
@@ -208,7 +208,7 @@ def test_batch_describe_passes_months_12_for_12months_date_filter(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.path.exists', return_value=True)
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_passes_min_rating_for_catalog_selection(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_get_undescribed, _mock_add_log,
 ):

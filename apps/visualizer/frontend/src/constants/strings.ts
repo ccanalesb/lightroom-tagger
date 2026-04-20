@@ -265,7 +265,22 @@ export const JOB_DETAILS_TITLE = 'Job Details'
 export const JOB_DETAILS_PROGRESS = 'Progress'
 export const JOB_DETAILS_CURRENT_STEP = 'Current Step'
 export const JOB_DETAILS_METADATA = 'Metadata'
+// Metadata is truncated to a preview by default (mirrors the logs tail/expand
+// pattern). The header switches to a "(N of M lines)" label and a
+// "Show full metadata" button reveals the complete payload.
+export const JOB_DETAILS_METADATA_TRUNCATED_HEADER = (shown: number, total: number) =>
+  `Metadata (${shown} of ${total} lines)`
+export const JOB_DETAILS_METADATA_SHOW_ALL = (total: number) =>
+  `Show full metadata (${total} lines)`
+export const JOB_DETAILS_METADATA_COLLAPSE = 'Collapse metadata'
 export const JOB_DETAILS_RESULT = 'Result'
+// Result follows the same pattern as metadata — large JSON payloads get a
+// preview by default with an explicit "Show full result" affordance.
+export const JOB_DETAILS_RESULT_TRUNCATED_HEADER = (shown: number, total: number) =>
+  `Result (${shown} of ${total} lines)`
+export const JOB_DETAILS_RESULT_SHOW_ALL = (total: number) =>
+  `Show full result (${total} lines)`
+export const JOB_DETAILS_RESULT_COLLAPSE = 'Collapse result'
 export const JOB_DETAILS_ERROR = 'Error'
 export const JOB_DETAILS_LOGS = 'Logs'
 export const JOB_DETAILS_LOGS_TRUNCATED_HEADER = (shown: number, total: number) =>
@@ -296,9 +311,14 @@ export const JOB_WEIGHT_VISION = 'Vision:'
 export const ADVANCED_OPTIONS_TITLE = 'Advanced Options'
 export const ADVANCED_DATE_FILTER = 'Date filter'
 export const ADVANCED_DATE_ALL = 'All time'
+export const ADVANCED_DATE_1MONTH = 'Last month'
+export const ADVANCED_DATE_2MONTHS = 'Last 2 months'
 export const ADVANCED_DATE_3MONTHS = 'Last 3 months'
 export const ADVANCED_DATE_6MONTHS = 'Last 6 months'
+export const ADVANCED_DATE_9MONTHS = 'Last 9 months'
 export const ADVANCED_DATE_12MONTHS = 'Last 12 months'
+export const ADVANCED_DATE_18MONTHS = 'Last 18 months'
+export const ADVANCED_DATE_24MONTHS = 'Last 24 months'
 export const ADVANCED_DATE_YEAR_2026 = '2026 only'
 export const ADVANCED_DATE_YEAR_2025 = '2025 only'
 export const ADVANCED_DATE_YEAR_2024 = '2024 only'
