@@ -605,9 +605,15 @@ def _backfill_matched_catalog_key_from_validated_matches(conn: sqlite3.Connectio
     pairing onto ``instagram_dump_media.matched_catalog_key`` so the
     Instagram tab "matched" badge reflects on-demand validations too.
 
-    Idempotent — only overwrites rows whose ``matched_catalog_key`` is
-    currently NULL (we never stomp a value written by the bulk matcher).
+    Gated on ``PRAGMA user_version`` (bump: 1 → 2) so the UPDATE runs exactly
+    once per DB file. Still idempotent if it does run: only overwrites rows
+    whose ``matched_catalog_key`` is NULL (we never stomp a value written by
+    the bulk matcher).
     """
+    row = conn.execute("PRAGMA user_version").fetchone()
+    current_uv = int(row["user_version"] if row else 0)
+    if current_uv >= 2:
+        return
     try:
         conn.execute(
             "UPDATE instagram_dump_media "
@@ -625,8 +631,10 @@ def _backfill_matched_catalog_key_from_validated_matches(conn: sqlite3.Connectio
             ")"
         )
     except sqlite3.OperationalError:
-        # `matches` may not exist yet on very fresh DBs — safe to skip.
-        pass
+        # `matches` may not exist yet on very fresh DBs — safe to skip and
+        # leave user_version unchanged so the next init retries.
+        return
+    conn.execute("PRAGMA user_version = 2")
 
 
 def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
@@ -1046,16 +1054,22 @@ def query_catalog_images(
         )
         join_bindings.append(sp)
 
-    date_order = "ASC" if sort_by_date == "oldest" else "DESC"
+    # Date becomes a tiebreaker for score sorts only when the caller asked
+    # for it explicitly; otherwise keep the original `i.key ASC` tiebreaker
+    # so unrelated callers aren't silently re-ordered by date.
+    if sort_by_date is None:
+        date_tiebreaker = "i.key ASC"
+    else:
+        date_order = "ASC" if sort_by_date == "oldest" else "DESC"
+        date_tiebreaker = f"i.date_taken {date_order}, i.key ASC"
+
     if sort_by_score == "desc":
         order_sql = (
-            f"ORDER BY (s.score IS NULL) ASC, s.score DESC, "
-            f"i.date_taken {date_order}, i.key ASC"
+            f"ORDER BY (s.score IS NULL) ASC, s.score DESC, {date_tiebreaker}"
         )
     elif sort_by_score == "asc":
         order_sql = (
-            f"ORDER BY (s.score IS NULL) ASC, s.score ASC, "
-            f"i.date_taken {date_order}, i.key ASC"
+            f"ORDER BY (s.score IS NULL) ASC, s.score ASC, {date_tiebreaker}"
         )
     elif sort_by_date == "oldest":
         order_sql = "ORDER BY i.date_taken ASC, i.key ASC"
@@ -1566,9 +1580,13 @@ def unvalidate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -
         )
         if cursor.rowcount == 0:
             return False
+        # Match the most-recent validated pairing so unvalidate → next
+        # validation → unvalidate is deterministic. Mirrors the selection
+        # used by `_backfill_matched_catalog_key_from_validated_matches`.
         remaining = db.execute(
             "SELECT catalog_key FROM matches "
-            "WHERE insta_key = ? AND validated_at IS NOT NULL LIMIT 1",
+            "WHERE insta_key = ? AND validated_at IS NOT NULL "
+            "ORDER BY validated_at DESC LIMIT 1",
             (insta_key,),
         ).fetchone()
         if remaining:

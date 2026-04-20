@@ -246,10 +246,12 @@ def list_instagram_images(db):
             return error_bad_request('sort_by_date must be newest or oldest')
         sort_reverse = sort_date_raw != 'oldest'
 
-        # Sort by date folder (month). Tiebreak by media_key so rows within
-        # the same month have a deterministic order matching the chosen direction.
+        # Sort by date folder (month). Tiebreak by key (set by
+        # ``_enrich_instagram_media`` from the underlying ``media_key``) so
+        # rows within the same month have a deterministic order matching the
+        # chosen direction.
         enriched_images.sort(
-            key=lambda x: (x.get('instagram_folder') or '', x.get('media_key') or ''),
+            key=lambda x: (x.get('instagram_folder') or '', x.get('key') or ''),
             reverse=sort_reverse,
         )
 
