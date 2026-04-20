@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import type {
   CatalogImage,
   IdentityBestPhotoItem,
-  ImageDetailResponse,
   InstagramImage,
   PostNextCandidate,
   UnpostedCatalogItem,
@@ -10,27 +9,12 @@ import type {
 import {
   fromBestPhotoRow,
   fromCatalogListRow,
-  fromImageDetail,
   fromInstagramRow,
   fromPostNextRow,
   fromUnpostedRow,
 } from '../adapters'
 
 describe('image-view adapters', () => {
-  it('fromImageDetail returns the payload unchanged (detail is already ImageView)', () => {
-    const detail: ImageDetailResponse = {
-      image_type: 'catalog',
-      key: 'abc',
-      filename: 'abc.jpg',
-      identity_aggregate_score: 7.5,
-      identity_perspectives_covered: 2,
-      identity_eligible: true,
-      identity_per_perspective: [],
-      available_score_perspectives: ['street', 'documentary'],
-    }
-    expect(fromImageDetail(detail)).toBe(detail)
-  })
-
   it('fromCatalogListRow does NOT zero identity fields when they are absent', () => {
     const row: CatalogImage = {
       id: 1,

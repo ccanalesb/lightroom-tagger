@@ -6,14 +6,14 @@ import { useMatchOptions } from '../../stores/matchOptionsContext'
 import { useSingleMatch } from '../../hooks/useSingleMatch'
 import { MatchStatusDisplay } from '../instagram/MatchStatusDisplay'
 import { MatchAdvancedOptions } from '../instagram/MatchAdvancedOptions'
+import { formatImageDate } from './formatImageDate'
 import {
-  DATE_ESTIMATED_SUFFIX,
-  DATE_NO_DATE,
   LABEL_CATALOG_MATCH,
   LABEL_DATE,
   LABEL_FILENAME,
   LABEL_FOLDER,
   LABEL_IMAGE_HASH_DISPLAY,
+  LABEL_INSTAGRAM_CAPTION,
   LABEL_SOURCE,
 } from '../../constants/strings'
 
@@ -78,23 +78,11 @@ export function InstagramImageDetailSections({
 
       <div className="space-y-3 pt-4 border-t border-border">
         <MetadataRow label={LABEL_FILENAME} value={image.filename ?? image.key} />
-        {image.instagram_folder ? (
-          <MetadataRow label={LABEL_FOLDER} value={image.instagram_folder} />
-        ) : null}
-        {image.source_folder ? (
-          <MetadataRow label={LABEL_SOURCE} value={image.source_folder} />
-        ) : null}
-        <MetadataRow label={LABEL_DATE} value={formatDate(image)} />
-        {image.image_hash ? (
-          <MetadataRow label={LABEL_IMAGE_HASH_DISPLAY} value={image.image_hash} mono />
-        ) : null}
-        {image.matched_catalog_key ? (
-          <MetadataRow
-            label={LABEL_CATALOG_MATCH}
-            value={image.matched_catalog_key}
-            mono
-          />
-        ) : null}
+        <MetadataRow label={LABEL_FOLDER} value={image.instagram_folder} />
+        <MetadataRow label={LABEL_SOURCE} value={image.source_folder} />
+        <MetadataRow label={LABEL_DATE} value={formatImageDate(image)} />
+        <MetadataRow label={LABEL_IMAGE_HASH_DISPLAY} value={image.image_hash} mono />
+        <MetadataRow label={LABEL_CATALOG_MATCH} value={image.matched_catalog_key} mono />
       </div>
 
       <AIDescriptionSection
@@ -105,18 +93,10 @@ export function InstagramImageDetailSections({
 
       {image.caption ? (
         <div className="p-4 bg-surface rounded-base border border-border">
-          <h3 className="text-sm font-medium text-text mb-2">Instagram Caption</h3>
+          <h3 className="text-sm font-medium text-text mb-2">{LABEL_INSTAGRAM_CAPTION}</h3>
           <p className="text-sm text-text-secondary">{image.caption}</p>
         </div>
       ) : null}
     </div>
   )
-}
-
-function formatDate(image: ImageView): string {
-  if (image.created_at) return new Date(image.created_at).toLocaleString()
-  if (image.date_folder) {
-    return `${image.date_folder.slice(0, 4)}/${image.date_folder.slice(4, 6)} ${DATE_ESTIMATED_SUFFIX}`
-  }
-  return DATE_NO_DATE
 }

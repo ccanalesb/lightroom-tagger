@@ -1,16 +1,18 @@
 export {
   fromBestPhotoRow,
   fromCatalogListRow,
-  fromImageDetail,
   fromInstagramRow,
   fromMatchSide,
   fromPostNextRow,
   fromUnpostedRow,
 } from './adapters'
 export { ImageMetadataBadges } from './ImageMetadataBadges'
-export type { PrimaryScoreSource } from './ImageMetadataBadges'
+export { PrimaryScorePill } from './PrimaryScorePill'
+export type { PrimaryScoreSource } from './PrimaryScorePill'
 export { ImageTile } from './ImageTile'
 export type { ImageTileVariant } from './ImageTile'
 export { ImageDetailModal } from './ImageDetailModal'
+export { ModalCloseButton } from './ModalCloseButton'
 export { CatalogImageDetailSections } from './CatalogImageDetailSections'
 export { InstagramImageDetailSections } from './InstagramImageDetailSections'
+export { formatImageDate } from './formatImageDate'

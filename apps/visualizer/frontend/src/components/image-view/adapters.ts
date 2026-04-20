@@ -8,13 +8,14 @@
  *     leave those fields `undefined` so tiles can render the right pill
  *     (or none) and the modal can authoritatively fill them via the
  *     detail endpoint.
- *   - `fromImageDetail` is the only adapter that expects identity fields
- *     to be populated; list adapters omit them.
+ *   - The `GET /api/images/<type>/<key>` detail endpoint already returns
+ *     the `ImageView` superset (`ImageDetailResponse = ImageView`), so no
+ *     adapter is needed for that path — consumers assign the response
+ *     directly. List adapters below omit identity fields.
  */
 
 import type {
   CatalogImage,
-  ImageDetailResponse,
   ImageView,
   IdentityBestPhotoItem,
   InstagramImage,
@@ -22,11 +23,6 @@ import type {
   PostNextCandidate,
   UnpostedCatalogItem,
 } from '../../services/api'
-
-/** Detail endpoint already returns the `ImageView` superset; passthrough. */
-export function fromImageDetail(row: ImageDetailResponse): ImageView {
-  return row
-}
 
 export function fromCatalogListRow(row: CatalogImage): ImageView {
   return {

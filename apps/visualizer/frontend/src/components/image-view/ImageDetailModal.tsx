@@ -6,7 +6,7 @@ import { IMAGE_DETAILS_TITLE } from '../../constants/strings'
 import { CatalogImageDetailSections } from './CatalogImageDetailSections'
 import { InstagramImageDetailSections } from './InstagramImageDetailSections'
 import { ImageMetadataBadges, type PrimaryScoreSource } from './ImageMetadataBadges'
-import { fromImageDetail } from './adapters'
+import { ModalCloseButton } from './ModalCloseButton'
 
 interface ImageDetailModalProps {
   imageType: 'catalog' | 'instagram'
@@ -74,7 +74,9 @@ export function ImageDetailModal({
       )
         .then((data) => {
           if (signal?.aborted) return
-          setImage(fromImageDetail(data))
+          // `ImageDetailResponse` is a type alias for `ImageView`, so the
+          // detail payload can be assigned directly — no adapter needed.
+          setImage(data)
         })
         .catch((err) => {
           if (signal?.aborted) return
@@ -122,26 +124,7 @@ export function ImageDetailModal({
             <h2 id={titleId} className="text-card-title text-text truncate">
               {IMAGE_DETAILS_TITLE}
             </h2>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close"
-              className="shrink-0 rounded-base border border-border bg-surface/80 p-2 backdrop-blur-sm transition-all hover:bg-surface-hover focus:outline-none focus:ring-2 focus:ring-accent"
-            >
-              <svg
-                className="h-5 w-5 text-text"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
+            <ModalCloseButton onClick={onClose} />
           </div>
 
           <div className="grid gap-6 p-6 md:grid-cols-2">

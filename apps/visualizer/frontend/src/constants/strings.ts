@@ -74,6 +74,12 @@ export const LABEL_SOURCE = 'Source'
 export const LABEL_DATE = 'Date'
 export const LABEL_IMAGE_HASH_DISPLAY = 'Image Hash'
 export const LABEL_CATALOG_MATCH = 'Catalog Match'
+export const LABEL_TITLE = 'Title'
+export const LABEL_PATH = 'Path'
+export const LABEL_DIMENSIONS = 'Dimensions'
+export const LABEL_CAPTION = 'Caption'
+export const LABEL_KEYWORDS = 'Keywords'
+export const LABEL_INSTAGRAM_CAPTION = 'Instagram Caption'
 
 // Status Display
 export const STATUS_LABELS: Record<string, string> = {
