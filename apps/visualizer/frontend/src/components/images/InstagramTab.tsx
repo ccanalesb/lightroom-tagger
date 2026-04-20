@@ -157,14 +157,7 @@ export function InstagramTab() {
                 variant="grid"
                 primaryScoreSource="none"
                 subtitle={image.instagram_folder || image.source_folder || undefined}
-                overlayBadges={
-                  <>
-                    {image.matched_catalog_key ? (
-                      <Badge variant="success">{BADGE_MATCHED}</Badge>
-                    ) : null}
-                    {image.description ? <Badge variant="accent">{BADGE_DESCRIBED}</Badge> : null}
-                  </>
-                }
+                overlayBadges={renderInstagramOverlayBadges(image)}
                 onClick={() => open(image)}
               />
             ))}
@@ -192,5 +185,20 @@ export function InstagramTab() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Overlay badges shown on an Instagram tile:
+ *   - "Matched" when the image has a validated catalog match.
+ *   - "Described" when the image has an AI description.
+ * Both can render together.
+ */
+function renderInstagramOverlayBadges(image: InstagramImage) {
+  return (
+    <>
+      {image.matched_catalog_key ? <Badge variant="success">{BADGE_MATCHED}</Badge> : null}
+      {image.description ? <Badge variant="accent">{BADGE_DESCRIBED}</Badge> : null}
+    </>
   );
 }

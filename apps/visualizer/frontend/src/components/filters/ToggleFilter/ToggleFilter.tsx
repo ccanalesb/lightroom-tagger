@@ -1,30 +1,13 @@
 import { useMemo } from 'react'
 import type { ToggleFilterDescriptor, ToggleOption } from '../types'
 import { CONTROL } from '../styles'
+import { indexOfToken, indexOfValue, tokenForIndex } from './optionTokens'
 
 export type ToggleFilterProps = {
   descriptor: ToggleFilterDescriptor
   value: unknown
   onChange: (value: unknown) => void
   disabled?: boolean
-}
-
-/** Position-based synthetic token used as `<option value>`. Never exposed to
- *  consumers — they declare rows with their real `{ value, label }`, and the
- *  framework handles the string round-trip for the DOM. */
-function tokenForIndex(i: number): string {
-  return `__opt_${i}__`
-}
-
-function indexOfToken(raw: string): number | null {
-  const m = /^__opt_(\d+)__$/.exec(raw)
-  if (!m) return null
-  return Number(m[1])
-}
-
-function indexOfValue(options: ToggleOption[], value: unknown): number {
-  const idx = options.findIndex((o) => o.value === value)
-  return idx >= 0 ? idx : 0
 }
 
 /**

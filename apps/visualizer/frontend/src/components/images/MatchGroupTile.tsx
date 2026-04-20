@@ -21,22 +21,30 @@ export function MatchGroupTile({ group, onOpenReview }: MatchGroupTileProps) {
     { ...initial, instagram_image: group.instagram_image },
     'instagram',
   );
-  const count = group.candidate_count;
   return (
     <ImageTile
       image={instagramView}
       variant="grid"
       primaryScoreSource="none"
-      overlayBadges={
-        group.has_validated ? (
-          <Badge variant="success">{MATCH_VALIDATED}</Badge>
-        ) : (
-          <Badge variant="accent">
-            {count} candidate{count === 1 ? '' : 's'}
-          </Badge>
-        )
-      }
+      overlayBadges={renderOverlayBadge(group)}
       onClick={() => onOpenReview(group, initial)}
     />
+  );
+}
+
+/**
+ * Decide which overlay badge the group tile should show:
+ *   - "Validated" (success) when the group already has a validated match.
+ *   - "N candidate(s)" (accent) otherwise.
+ */
+function renderOverlayBadge(group: MatchGroup) {
+  if (group.has_validated) {
+    return <Badge variant="success">{MATCH_VALIDATED}</Badge>;
+  }
+  const count = group.candidate_count;
+  return (
+    <Badge variant="accent">
+      {count} candidate{count === 1 ? '' : 's'}
+    </Badge>
   );
 }
