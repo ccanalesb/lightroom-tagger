@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ImagesAPI, PerspectivesAPI, type CatalogImage } from '../../services/api';
-import { CatalogImageCard } from '../catalog/CatalogImageCard';
-import { CatalogImageModal } from '../catalog/CatalogImageModal';
+import { ImageDetailModal, ImageTile, fromCatalogListRow } from '../image-view';
 import { Pagination } from '../ui/Pagination';
 import {
   FILTER_ALL_DATES,
@@ -39,25 +38,13 @@ import type { FilterSchema } from '../filters/types';
 
 const LIMIT = 50;
 
-function catalogStubForDeepLink(imageKey: string): CatalogImage {
-  return {
-    id: null,
-    key: imageKey,
-    filename: '',
-    filepath: '',
-    date_taken: '',
-    rating: 0,
-    pick: false,
-    color_label: '',
-    keywords: [],
-    title: '',
-    caption: '',
-    copyright: '',
-    width: 0,
-    height: 0,
-    instagram_posted: false,
-  };
-}
+/** Row-data we need to open the consolidated modal — only type + key are
+ *  required (detail endpoint fills the rest); the full row is kept so the
+ *  header can render instantly while the detail request is in flight. */
+type SelectedCatalogEntry = {
+  key: string;
+  initial?: CatalogImage;
+};
 
 type CatalogTabProps = {
   /** Fires when the posted / not-posted filter changes (for parent UI, e.g. Analytics cross-link). */
@@ -130,7 +117,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
   const [fetching, setFetching] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [catalogFetchSucceeded, setCatalogFetchSucceeded] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<CatalogImage | null>(null);
+  const [selected, setSelected] = useState<SelectedCatalogEntry | null>(null);
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [scorePerspectives, setScorePerspectives] = useState<
     { slug: string; display_name: string }[]
@@ -331,7 +318,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
     const sp = new URLSearchParams(location.search);
     const raw = sp.get('image_key');
     if (!raw) return;
-    setSelectedImage(catalogStubForDeepLink(raw));
+    setSelected({ key: raw });
     sp.delete('image_key');
     const next = sp.toString();
     navigate({ pathname: location.pathname, search: next ? `?${next}` : '' }, { replace: true });
@@ -467,10 +454,12 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
           >
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {images.map((image) => (
-                <CatalogImageCard
+                <ImageTile
                   key={image.id != null ? String(image.id) : image.key}
-                  image={image}
-                  onClick={() => setSelectedImage(image)}
+                  image={fromCatalogListRow(image)}
+                  variant="grid"
+                  primaryScoreSource="catalog"
+                  onClick={() => setSelected({ key: image.key, initial: image })}
                 />
               ))}
             </div>
@@ -482,8 +471,19 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
         </>
       )}
 
-      {selectedImage && (
-        <CatalogImageModal image={selectedImage} onClose={() => setSelectedImage(null)} />
+      {selected && (
+        <ImageDetailModal
+          imageType="catalog"
+          imageKey={selected.key}
+          initialImage={selected.initial ? fromCatalogListRow(selected.initial) : undefined}
+          primaryScoreSource="catalog"
+          scorePerspectiveSlug={
+            typeof filterValues.scorePerspective === 'string' && filterValues.scorePerspective
+              ? filterValues.scorePerspective
+              : undefined
+          }
+          onClose={() => setSelected(null)}
+        />
       )}
     </div>
   );
