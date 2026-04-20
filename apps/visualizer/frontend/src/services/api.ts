@@ -270,6 +270,24 @@ export const ImagesAPI = {
       `/images/catalog${qs ? `?${qs}` : ''}`
     )
   },
+
+  /**
+   * Single-image detail for the consolidated image-view modal. Always fetched
+   * on modal open so tiles can pass just `image_type` + `key` without worrying
+   * about partial list-row data (see consolidate-image-metadata plan).
+   */
+  getImageDetail: (
+    image_type: 'catalog' | 'instagram',
+    image_key: string,
+    params?: { score_perspective?: string },
+  ) => {
+    const qs = params?.score_perspective
+      ? `?score_perspective=${encodeURIComponent(params.score_perspective)}`
+      : ''
+    return request<ImageDetailResponse>(
+      `/images/${image_type}/${encodeURIComponent(image_key)}${qs}`,
+    )
+  },
 }
 
 export const MatchingAPI = {
@@ -751,6 +769,61 @@ export interface CatalogImage {
   catalog_perspective_score?: number | null
   catalog_score_perspective?: string
 }
+
+/**
+ * Superset frontend shape for any image the UI renders (Catalog or Instagram,
+ * list row or detail response). Adapters map API-specific rows into this
+ * single type; fields not available from a given source are left undefined.
+ *
+ * See `.planning/quick/260420-840-consolidate-image-metadata` for the
+ * motivation — list endpoints stay lean, the detail endpoint fills every
+ * field authoritatively when the modal is opened.
+ */
+export interface ImageView {
+  image_type: 'catalog' | 'instagram'
+  key: string
+  id?: number | null
+  filename?: string
+  filepath?: string
+  local_path?: string
+  date_taken?: string
+  created_at?: string
+  rating?: number
+  pick?: boolean
+  color_label?: string
+  keywords?: string[]
+  title?: string
+  caption?: string
+  copyright?: string
+  width?: number
+  height?: number
+  instagram_posted?: boolean
+  instagram_url?: string
+  post_url?: string
+  image_hash?: string
+
+  // AI description fields (same source on both image_types).
+  ai_analyzed?: boolean
+  description_summary?: string | null
+  description_best_perspective?: string | null
+  description_perspectives?: ImageDescription['perspectives'] | null
+
+  // Catalog-perspective score fields (populated only when a specific
+  // perspective slug is requested via `?score_perspective=...`).
+  catalog_perspective_score?: number | null
+  catalog_score_perspective?: string | null
+  /** Every persisted current score perspective for this image; detail-only. */
+  available_score_perspectives?: string[]
+
+  // Identity aggregate fields (catalog-only; always empty for Instagram rows).
+  identity_aggregate_score?: number | null
+  identity_perspectives_covered?: number
+  identity_eligible?: boolean
+  identity_per_perspective?: IdentityPerPerspectiveScore[]
+}
+
+/** Shape returned by `GET /api/images/<image_type>/<image_key>`. */
+export type ImageDetailResponse = ImageView
 
 export interface PerspectiveScore {
   analysis: string
