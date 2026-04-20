@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { Match } from '../../../services/api';
 import {
   MATCH_DETAIL_INSTAGRAM,
@@ -32,6 +32,7 @@ export function MatchImagesSection({
   onCandidateChange,
 }: MatchImagesSectionProps) {
   const [openSide, setOpenSide] = useState<null | 'instagram' | 'catalog'>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const activeIndex = candidates.findIndex(
     (c) =>
@@ -49,14 +50,14 @@ export function MatchImagesSection({
     [activeIndex, total, candidates, onCandidateChange],
   );
 
-  useCandidateKeyboardNav(total > 1, step);
+  useCandidateKeyboardNav(total > 1, containerRef, step);
 
   const instagramView = fromMatchSide(activeMatch, 'instagram');
   const catalogView = fromMatchSide(activeMatch, 'catalog');
 
   return (
     <>
-      <div className="space-y-3">
+      <div ref={containerRef} tabIndex={-1} className="space-y-3 focus:outline-none">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <MatchSideTile
             title={MATCH_DETAIL_INSTAGRAM}

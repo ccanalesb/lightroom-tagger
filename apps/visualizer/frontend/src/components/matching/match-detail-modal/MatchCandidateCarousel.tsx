@@ -1,4 +1,5 @@
 import { MATCH_CANDIDATE_LABEL } from '../../../constants/strings';
+import { CarouselArrowButton } from './CarouselArrowButton';
 
 interface MatchCandidateCarouselProps {
   activeIndex: number;
@@ -22,31 +23,11 @@ export function MatchCandidateCarousel({
       className="flex items-center justify-center gap-3 pt-1"
       aria-label="Candidate carousel"
     >
-      <ArrowButton dir={-1} label="Previous candidate" glyph="‹" onClick={() => onStep(-1)} />
+      <CarouselArrowButton label="Previous candidate" glyph="‹" onClick={() => onStep(-1)} />
       <span className="text-sm text-text-secondary tabular-nums min-w-[7ch] text-center">
         {MATCH_CANDIDATE_LABEL} {activeIndex + 1} of {total}
       </span>
-      <ArrowButton dir={1} label="Next candidate" glyph="›" onClick={() => onStep(1)} />
+      <CarouselArrowButton label="Next candidate" glyph="›" onClick={() => onStep(1)} />
     </div>
-  );
-}
-
-interface ArrowButtonProps {
-  dir: -1 | 1;
-  label: string;
-  glyph: string;
-  onClick: () => void;
-}
-
-function ArrowButton({ label, glyph, onClick }: ArrowButtonProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      className="w-8 h-8 flex items-center justify-center rounded-full border text-lg border-border text-text hover:bg-surface"
-    >
-      {glyph}
-    </button>
   );
 }

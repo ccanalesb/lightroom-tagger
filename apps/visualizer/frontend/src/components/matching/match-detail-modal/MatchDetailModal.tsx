@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MATCHING_RESULTS } from '../../../constants/strings';
 import type { Match, MatchGroup } from '../../../services/api';
 import { MatchingAPI } from '../../../services/api';
@@ -38,10 +38,18 @@ export function MatchDetailModal({
   const [validated, setValidated] = useState(!!match.validated_at);
   const [busy, setBusy] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setValidated(!!match.validated_at);
   }, [match.validated_at]);
+
+  // Move focus into the dialog on mount so keyboard navigation (arrow
+  // keys for the candidate carousel) works immediately, instead of
+  // requiring the user to click inside first.
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
 
   async function handleValidate() {
     setBusy(true);
@@ -90,10 +98,12 @@ export function MatchDetailModal({
         onClick={onClose}
       >
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-label={MATCHING_RESULTS}
-          className="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto"
+          tabIndex={-1}
+          className="bg-white rounded-lg max-w-5xl w-full max-h-[90vh] overflow-y-auto focus:outline-none"
           onClick={(e) => e.stopPropagation()}
         >
           <MatchDetailHeader
