@@ -241,8 +241,17 @@ def list_instagram_images(db):
         # Apply filters
         enriched_images = _filter_by_date(enriched_images, date_folder, date_from, date_to)
 
-        # Sort by date folder descending
-        enriched_images.sort(key=lambda x: x['instagram_folder'] or '', reverse=True)
+        sort_date_raw = (request.args.get('sort_by_date') or '').strip().lower()
+        if sort_date_raw and sort_date_raw not in ('newest', 'oldest'):
+            return error_bad_request('sort_by_date must be newest or oldest')
+        sort_reverse = sort_date_raw != 'oldest'
+
+        # Sort by date folder (month). Tiebreak by media_key so rows within
+        # the same month have a deterministic order matching the chosen direction.
+        enriched_images.sort(
+            key=lambda x: (x.get('instagram_folder') or '', x.get('media_key') or ''),
+            reverse=sort_reverse,
+        )
 
         # Pagination
         limit, offset = _clamp_pagination(
@@ -432,6 +441,13 @@ def list_catalog_images(db):
         if sort_by_score and not score_perspective:
             return error_bad_request('sort_by_score requires score_perspective')
 
+        sort_date_raw = (request.args.get('sort_by_date') or '').strip().lower()
+        sort_by_date = None
+        if sort_date_raw:
+            if sort_date_raw not in ('newest', 'oldest'):
+                return error_bad_request('sort_by_date must be newest or oldest')
+            sort_by_date = sort_date_raw
+
         min_score = None
         if 'min_score' in request.args:
             min_score_raw = request.args.get('min_score')
@@ -468,6 +484,7 @@ def list_catalog_images(db):
                 score_perspective=score_perspective_arg,
                 min_score=min_score,
                 sort_by_score=sort_by_score,
+                sort_by_date=sort_by_date,
                 limit=limit,
                 offset=offset,
             )
@@ -731,13 +748,20 @@ def list_matches(db):
                     best_cat_ts = t
             return best_cat_ts
 
+        sort_date_raw = (request.args.get('sort_by_date') or '').strip().lower()
+        if sort_date_raw and sort_date_raw not in ('newest', 'oldest'):
+            return error_bad_request('sort_by_date must be newest or oldest')
+        # Default behaviour (no param): newest first within each bucket.
+        oldest_first = sort_date_raw == 'oldest'
+
         def _match_group_sort_key(g):
             # Bucket 0 = actionable (unvalidated, not all-rejected tombstone); 1 = reviewed bucket.
             sort_bucket = 1 if (g.get('all_rejected') or g.get('has_validated')) else 0
             photo_ts = _photo_ts_float(g)
             if photo_ts is None:
                 return (sort_bucket, 1, 0.0)
-            return (sort_bucket, 0, -photo_ts)
+            # Invert when sorting ascending within the bucket.
+            return (sort_bucket, 0, photo_ts if oldest_first else -photo_ts)
 
         match_groups.sort(key=_match_group_sort_key)
 

@@ -288,8 +288,16 @@ def rank_best_photos(
     limit: int,
     offset: int,
     min_perspectives: int | None = None,
+    sort_by_date: str | None = None,
 ) -> tuple[list[dict[str, Any]], int, dict[str, Any]]:
-    """Eligible images only, sorted by aggregate_score DESC, date_taken DESC, key ASC."""
+    """Eligible images only, sorted by aggregate_score DESC, date_taken, key ASC.
+
+    ``sort_by_date`` (``newest`` / ``oldest``) only controls the date tiebreaker;
+    score remains the primary sort key.
+    """
+    if sort_by_date is not None and sort_by_date not in ("newest", "oldest"):
+        raise ValueError("sort_by_date must be 'newest' or 'oldest'")
+
     items, meta = compute_image_aggregate_scores(
         conn, min_perspectives=min_perspectives, include_ineligible=False
     )
@@ -303,8 +311,9 @@ def rank_best_photos(
         im = img_meta.get(k, {})
         enriched.append({**i, **im})
 
+    date_reverse = sort_by_date != "oldest"
     enriched.sort(key=lambda r: r["image_key"])
-    enriched.sort(key=lambda r: r.get("date_taken") or "", reverse=True)
+    enriched.sort(key=lambda r: r.get("date_taken") or "", reverse=date_reverse)
     enriched.sort(key=lambda r: r["aggregate_score"], reverse=True)
 
     total = len(enriched)
@@ -438,8 +447,16 @@ def suggest_what_to_post_next(
     offset: int = 0,
     lookback_days_recent: int = 30,
     lookback_days_baseline: int = 90,
+    sort_by_date: str | None = None,
 ) -> dict[str, Any]:
-    """Unposted, coverage-eligible catalog images with heuristic reasons (D-44–D-46)."""
+    """Unposted, coverage-eligible catalog images with heuristic reasons (D-44–D-46).
+
+    ``sort_by_date`` (``newest`` / ``oldest``) only controls the date tiebreaker;
+    aggregate score remains the primary sort key.
+    """
+    if sort_by_date is not None and sort_by_date not in ("newest", "oldest"):
+        raise ValueError("sort_by_date must be 'newest' or 'oldest'")
+
     items, agg_meta = compute_image_aggregate_scores(conn, include_ineligible=False)
     keys = [str(i["image_key"]) for i in items if i.get("eligible")]
     img_meta = _image_meta_map(conn, keys)
@@ -454,8 +471,9 @@ def suggest_what_to_post_next(
             continue
         candidates_full.append({**i, **im})
 
+    date_reverse = sort_by_date != "oldest"
     candidates_full.sort(key=lambda r: r["image_key"])
-    candidates_full.sort(key=lambda r: r.get("date_taken") or "", reverse=True)
+    candidates_full.sort(key=lambda r: r.get("date_taken") or "", reverse=date_reverse)
     candidates_full.sort(key=lambda r: r["aggregate_score"], reverse=True)
 
     unposted_aggs = [float(c["aggregate_score"]) for c in candidates_full]
