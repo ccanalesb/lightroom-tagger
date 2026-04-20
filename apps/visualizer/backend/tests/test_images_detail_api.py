@@ -153,6 +153,13 @@ def test_detail_instagram_has_empty_identity(detail_client):
     assert data["identity_per_perspective"] == []
     assert data["available_score_perspectives"] == []
     assert data["catalog_perspective_score"] is None
+    # Parity with ``_enrich_instagram_media`` so the detail modal renders
+    # the same folder/source fields list tiles would have.
+    assert data["instagram_folder"] == "2024-05"
+    assert data["local_path"] == "/tmp/ig-probe.jpg"
+    assert "source_folder" in data  # may be None for this fake file_path
+    assert data["processed"] is False
+    assert data["matched_catalog_key"] is None
 
 
 def test_detail_404_for_unknown_key(detail_client):

@@ -891,6 +891,13 @@ def _build_instagram_detail(db, image_key):
     out['image_type'] = 'instagram'
     # Normalize to the same ``key`` alias catalog uses.
     out['key'] = row.get('media_key') or image_key
+    # Parity with ``_enrich_instagram_media`` so the detail modal renders
+    # the same folder / source fields the list tiles would have.
+    out['instagram_folder'] = row.get('date_folder') or ''
+    out['source_folder'] = _extract_source_folder(row.get('file_path') or '')
+    out['local_path'] = row.get('file_path') or ''
+    out['processed'] = bool(row.get('processed'))
+    out['matched_catalog_key'] = row.get('matched_catalog_key')
 
     desc_row = get_image_description(db, image_key)
     if desc_row and desc_row.get('image_type') == 'instagram':

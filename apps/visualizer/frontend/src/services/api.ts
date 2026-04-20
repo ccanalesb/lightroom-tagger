@@ -802,6 +802,13 @@ export interface ImageView {
   post_url?: string
   image_hash?: string
 
+  // Instagram-only metadata (present on detail responses for image_type='instagram').
+  instagram_folder?: string
+  date_folder?: string
+  source_folder?: string
+  matched_catalog_key?: string | null
+  processed?: boolean
+
   // AI description fields (same source on both image_types).
   ai_analyzed?: boolean
   description_summary?: string | null
