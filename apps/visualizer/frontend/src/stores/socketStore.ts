@@ -17,11 +17,16 @@ export const useSocketStore = create<SocketState>((set, get) => ({
   connected: false,
   
   connect: () => {
-    const socket = io(WS_URL)
-    
+    if (get().socket) return
+
+    const socket = io(WS_URL, {
+      transports: ['websocket'],
+      reconnection: true,
+    })
+
     socket.on('connect', () => set({ connected: true }))
     socket.on('disconnect', () => set({ connected: false }))
-    
+
     set({ socket })
   },
   

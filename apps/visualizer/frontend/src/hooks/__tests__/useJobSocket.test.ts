@@ -27,11 +27,11 @@ describe('useJobSocket', () => {
     vi.clearAllMocks()
   })
 
-  it('should connect on mount and disconnect on unmount', () => {
+  it('should connect on mount and keep the shared socket alive on unmount', () => {
     const { unmount } = renderHook(() => useJobSocket({}))
     expect(mockConnect).toHaveBeenCalledOnce()
     unmount()
-    expect(mockDisconnect).toHaveBeenCalledOnce()
+    expect(mockDisconnect).not.toHaveBeenCalled()
   })
 
   it('should register job_created and job_updated listeners', () => {

@@ -16,12 +16,10 @@ export function useJobSocket({
   const socket = useSocketStore((s) => s.socket)
   const connected = useSocketStore((s) => s.connected)
   const connect = useSocketStore((s) => s.connect)
-  const disconnect = useSocketStore((s) => s.disconnect)
 
   useEffect(() => {
     connect()
-    return () => disconnect()
-  }, [connect, disconnect])
+  }, [connect])
 
   useEffect(() => {
     if (!socket || !connected) return
