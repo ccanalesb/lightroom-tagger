@@ -209,11 +209,21 @@ export const SystemAPI = {
 }
 
 export const ImagesAPI = {
-  listInstagram: (params?: { limit?: number; offset?: number; date_folder?: string }) => {
+  listInstagram: (params?: {
+    limit?: number
+    offset?: number
+    date_folder?: string
+    date_from?: string
+    date_to?: string
+    sort_by_date?: 'newest' | 'oldest'
+  }) => {
     const searchParams = new URLSearchParams()
     if (params?.limit) searchParams.set('limit', String(params.limit))
     if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
     if (params?.date_folder) searchParams.set('date_folder', params.date_folder)
+    if (params?.date_from) searchParams.set('date_from', params.date_from)
+    if (params?.date_to) searchParams.set('date_to', params.date_to)
+    if (params?.sort_by_date) searchParams.set('sort_by_date', params.sort_by_date)
     return request<{
       total: number;
       images: InstagramImage[];
@@ -240,6 +250,7 @@ export const ImagesAPI = {
     score_perspective?: string
     min_score?: number
     sort_by_score?: 'asc' | 'desc'
+    sort_by_date?: 'newest' | 'oldest'
     limit?: number
     offset?: number
   }) => {
@@ -263,6 +274,7 @@ export const ImagesAPI = {
     if (params?.score_perspective) searchParams.set('score_perspective', params.score_perspective)
     if (params?.min_score !== undefined) searchParams.set('min_score', String(params.min_score))
     if (params?.sort_by_score) searchParams.set('sort_by_score', params.sort_by_score)
+    if (params?.sort_by_date) searchParams.set('sort_by_date', params.sort_by_date)
     if (params?.limit !== undefined) searchParams.set('limit', String(params.limit))
     if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
     const qs = searchParams.toString()
@@ -270,17 +282,44 @@ export const ImagesAPI = {
       `/images/catalog${qs ? `?${qs}` : ''}`
     )
   },
+
+  /**
+   * Single-image detail for the consolidated image-view modal. Always fetched
+   * on modal open so tiles can pass just `image_type` + `key` without worrying
+   * about partial list-row data (see consolidate-image-metadata plan).
+   */
+  getImageDetail: (
+    image_type: 'catalog' | 'instagram',
+    image_key: string,
+    params?: { score_perspective?: string },
+  ) => {
+    const qs = params?.score_perspective
+      ? `?score_perspective=${encodeURIComponent(params.score_perspective)}`
+      : ''
+    return request<ImageDetailResponse>(
+      `/images/${image_type}/${encodeURIComponent(image_key)}${qs}`,
+    )
+  },
 }
 
 export const MatchingAPI = {
-  list: (limit?: number, offset?: number) =>
-    request<{
+  list: (
+    limit?: number,
+    offset?: number,
+    params?: { sort_by_date?: 'newest' | 'oldest' },
+  ) => {
+    const sp = new URLSearchParams()
+    sp.set('limit', String(limit ?? 50))
+    sp.set('offset', String(offset ?? 0))
+    if (params?.sort_by_date) sp.set('sort_by_date', params.sort_by_date)
+    return request<{
       total: number
       total_groups?: number
       total_matches?: number
       match_groups: MatchGroup[]
       matches: Match[]
-    }>(`/images/matches?limit=${limit || 50}&offset=${offset || 0}`),
+    }>(`/images/matches?${sp.toString()}`)
+  },
   validate: (catalogKey: string, instaKey: string) =>
     request<{ validated: boolean }>(
       `/images/matches/${encodeURIComponent(catalogKey)}/${encodeURIComponent(instaKey)}/validate`,
@@ -633,13 +672,19 @@ export interface PostNextSuggestionsResponse {
 }
 
 export const IdentityAPI = {
-  getBestPhotos: (params?: { limit?: number; offset?: number; min_perspectives?: number }) => {
+  getBestPhotos: (params?: {
+    limit?: number
+    offset?: number
+    min_perspectives?: number
+    sort_by_date?: 'newest' | 'oldest'
+  }) => {
     const sp = new URLSearchParams()
     if (params?.limit !== undefined) sp.set('limit', String(params.limit))
     if (params?.offset !== undefined) sp.set('offset', String(params.offset))
     if (params?.min_perspectives !== undefined) {
       sp.set('min_perspectives', String(params.min_perspectives))
     }
+    if (params?.sort_by_date) sp.set('sort_by_date', params.sort_by_date)
     const qs = sp.toString()
     return request<IdentityBestPhotosResponse>(`/identity/best-photos${qs ? `?${qs}` : ''}`)
   },
@@ -651,6 +696,7 @@ export const IdentityAPI = {
     offset?: number
     lookback_days_recent?: number
     lookback_days_baseline?: number
+    sort_by_date?: 'newest' | 'oldest'
   }) => {
     const sp = new URLSearchParams()
     if (params?.limit !== undefined) sp.set('limit', String(params.limit))
@@ -661,6 +707,7 @@ export const IdentityAPI = {
     if (params?.lookback_days_baseline !== undefined) {
       sp.set('lookback_days_baseline', String(params.lookback_days_baseline))
     }
+    if (params?.sort_by_date) sp.set('sort_by_date', params.sort_by_date)
     const qs = sp.toString()
     return request<PostNextSuggestionsResponse>(`/identity/suggestions${qs ? `?${qs}` : ''}`)
   },
@@ -751,6 +798,68 @@ export interface CatalogImage {
   catalog_perspective_score?: number | null
   catalog_score_perspective?: string
 }
+
+/**
+ * Superset frontend shape for any image the UI renders (Catalog or Instagram,
+ * list row or detail response). Adapters map API-specific rows into this
+ * single type; fields not available from a given source are left undefined.
+ *
+ * See `.planning/quick/260420-840-consolidate-image-metadata` for the
+ * motivation — list endpoints stay lean, the detail endpoint fills every
+ * field authoritatively when the modal is opened.
+ */
+export interface ImageView {
+  image_type: 'catalog' | 'instagram'
+  key: string
+  id?: number | null
+  filename?: string
+  filepath?: string
+  local_path?: string
+  date_taken?: string
+  created_at?: string
+  rating?: number
+  pick?: boolean
+  color_label?: string
+  keywords?: string[]
+  title?: string
+  caption?: string
+  copyright?: string
+  width?: number
+  height?: number
+  instagram_posted?: boolean
+  instagram_url?: string
+  post_url?: string
+  image_hash?: string
+
+  // Instagram-only metadata (present on detail responses for image_type='instagram').
+  instagram_folder?: string
+  date_folder?: string
+  source_folder?: string
+  matched_catalog_key?: string | null
+  processed?: boolean
+
+  // AI description fields (same source on both image_types).
+  ai_analyzed?: boolean
+  description_summary?: string | null
+  description_best_perspective?: string | null
+  description_perspectives?: ImageDescription['perspectives'] | null
+
+  // Catalog-perspective score fields (populated only when a specific
+  // perspective slug is requested via `?score_perspective=...`).
+  catalog_perspective_score?: number | null
+  catalog_score_perspective?: string | null
+  /** Every persisted current score perspective for this image; detail-only. */
+  available_score_perspectives?: string[]
+
+  // Identity aggregate fields (catalog-only; always empty for Instagram rows).
+  identity_aggregate_score?: number | null
+  identity_perspectives_covered?: number
+  identity_eligible?: boolean
+  identity_per_perspective?: IdentityPerPerspectiveScore[]
+}
+
+/** Shape returned by `GET /api/images/<image_type>/<image_key>`. */
+export type ImageDetailResponse = ImageView
 
 export interface PerspectiveScore {
   analysis: string

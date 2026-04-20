@@ -1,104 +1,25 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
+import { TileGrid } from '../ui/TileGrid';
 import {
   TAB_MATCHES,
-  MATCH_VALIDATED,
   MATCHES_TAB_EMPTY,
-  MSG_LOADING,
   MATCHES_VALIDATED_DIVIDER_LABEL,
-  MATCH_TOMBSTONE_NO_MATCH_BADGE,
-  MATCH_TOMBSTONE_CARD_ARIA_LABEL,
+  ITEMS_PER_PAGE,
+  FILTER_LABEL_SORT_DATE,
+  FILTER_SORT_DATE_NEWEST,
+  FILTER_SORT_DATE_OLDEST,
+  msgShowingOf,
 } from '../../constants/strings';
+import { SkeletonGrid } from '../ui/page-states';
 import { useMatchGroups } from '../../hooks/useMatchGroups';
 import { MatchDetailModal } from '../matching/match-detail-modal/MatchDetailModal';
 import type { Match, MatchGroup } from '../../services/api';
-
-function pickInitialMatch(group: MatchGroup): Match | undefined {
-  if (group.candidates.length === 0) return undefined;
-  const rank1 = group.candidates.find((c) => c.rank === 1);
-  if (rank1) return rank1;
-  return group.candidates.reduce((best, c) => (c.score > best.score ? c : best));
-}
-
-function ActionableMatchGroupCard({
-  group,
-  onOpenReview,
-}: {
-  group: MatchGroup;
-  onOpenReview: (group: MatchGroup) => void;
-}) {
-  return (
-    <Card padding="md">
-      <CardContent>
-        <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
-          <div className="aspect-square w-full max-w-[120px] shrink-0 bg-surface rounded-base overflow-hidden mx-auto sm:mx-0">
-            <img
-              src={`/api/images/instagram/${encodeURIComponent(group.instagram_key)}/thumbnail`}
-              alt=""
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <div className="flex-1 min-w-0 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-sm text-text break-all">{group.instagram_key}</span>
-              {group.has_validated ? <Badge variant="success">{MATCH_VALIDATED}</Badge> : null}
-            </div>
-            <p className="text-sm text-text-secondary">
-              {group.candidate_count} candidate{group.candidate_count === 1 ? '' : 's'} · best score{' '}
-              {group.best_score.toFixed(2)}
-            </p>
-            <Button type="button" variant="primary" size="sm" onClick={() => onOpenReview(group)}>
-              Review
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function TombstoneMatchGroupCard({ group }: { group: MatchGroup }) {
-  return (
-    <Card padding="md">
-      <CardContent>
-        <div
-          className="flex flex-col sm:flex-row gap-4 sm:items-center"
-          aria-label={MATCH_TOMBSTONE_CARD_ARIA_LABEL}
-        >
-          <div className="aspect-square w-full max-w-[120px] shrink-0 bg-surface rounded-base overflow-hidden mx-auto sm:mx-0">
-            <img
-              src={`/api/images/instagram/${encodeURIComponent(group.instagram_key)}/thumbnail`}
-              alt=""
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <div className="flex-1 min-w-0 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-sm text-text break-all">{group.instagram_key}</span>
-              <Badge variant="error">{MATCH_TOMBSTONE_NO_MATCH_BADGE}</Badge>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ReviewedMatchGroupCard({
-  group,
-  onOpenReview,
-}: {
-  group: MatchGroup;
-  onOpenReview: (group: MatchGroup) => void;
-}) {
-  const isTombstone = Boolean(group.all_rejected) || group.candidate_count === 0;
-  if (isTombstone) {
-    return <TombstoneMatchGroupCard group={group} />;
-  }
-  return <ActionableMatchGroupCard group={group} onOpenReview={onOpenReview} />;
-}
+import { MatchGroupTile } from './MatchGroupTile';
+import { FilterBar } from '../filters/FilterBar';
+import { useFilters } from '../../hooks/useFilters';
+import type { FilterSchema } from '../filters/types';
 
 export function MatchesTab() {
   const { matchGroups, total, fetchGroups, handleValidationChange, handleRejected } = useMatchGroups();
@@ -106,20 +27,41 @@ export function MatchesTab() {
   const [selectedGroup, setSelectedGroup] = useState<MatchGroup | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
 
+  const matchesSchema = useMemo<FilterSchema>(
+    () => [
+      {
+        type: 'select',
+        key: 'sortByDate',
+        label: FILTER_LABEL_SORT_DATE,
+        paramName: 'sort_by_date',
+        defaultValue: 'newest',
+        options: [
+          { value: 'newest', label: FILTER_SORT_DATE_NEWEST },
+          { value: 'oldest', label: FILTER_SORT_DATE_OLDEST },
+        ],
+      },
+    ],
+    [],
+  );
+  const filters = useFilters(matchesSchema);
+  const { values: filterValues } = filters;
+  const sortByDate = filterValues.sortByDate as string | undefined;
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void fetchGroups(100, 0).finally(() => {
+    const params = { sort_by_date: (sortByDate ?? 'newest') as 'newest' | 'oldest' };
+    void fetchGroups(100, 0, params).finally(() => {
       if (!cancelled) setLoading(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [fetchGroups]);
+  }, [fetchGroups, sortByDate]);
 
-  const openReview = useCallback((group: MatchGroup) => {
+  const openReview = useCallback((group: MatchGroup, candidate: Match) => {
     setSelectedGroup(group);
-    setSelectedMatch(pickInitialMatch(group) ?? null);
+    setSelectedMatch(candidate);
   }, []);
 
   const closeModal = useCallback(() => {
@@ -139,31 +81,47 @@ export function MatchesTab() {
         ) ?? null
       : null;
 
-  const unvalidatedGroups = matchGroups.filter((g) => !g.has_validated && !g.all_rejected);
-  const reviewedGroups = matchGroups.filter((g) => g.has_validated || Boolean(g.all_rejected));
+  // Hide groups with no live candidates (all rejected / tombstones).
+  const visibleGroups = matchGroups.filter(
+    (g) => !g.all_rejected && g.candidates.length > 0,
+  );
+  const unvalidatedGroups = visibleGroups.filter((g) => !g.has_validated);
+  const reviewedGroups = visibleGroups.filter((g) => g.has_validated);
   const showValidatedDivider = unvalidatedGroups.length > 0 && reviewedGroups.length > 0;
+
+  const loadMoreParams = {
+    sort_by_date: (sortByDate ?? 'newest') as 'newest' | 'oldest',
+  };
 
   return (
     <div className="space-y-6">
       <h2 className="text-card-title text-text">{TAB_MATCHES}</h2>
+      <FilterBar
+        schema={matchesSchema}
+        filters={filters}
+        summary={
+          <p className="text-sm text-text-secondary">
+            {msgShowingOf(matchGroups.length, total, 'groups')}
+          </p>
+        }
+        disabled={loading}
+      />
 
       {loading ? (
-        <Card padding="lg">
-          <CardContent>
-            <p className="text-sm text-text-secondary text-center py-8">{MSG_LOADING}</p>
-          </CardContent>
-        </Card>
-      ) : matchGroups.length === 0 ? (
+        <SkeletonGrid count={ITEMS_PER_PAGE} />
+      ) : visibleGroups.length === 0 ? (
         <Card padding="lg">
           <CardContent>
             <p className="text-sm text-text-secondary text-center py-8">{MATCHES_TAB_EMPTY}</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {unvalidatedGroups.map((group) => (
-            <ActionableMatchGroupCard key={group.instagram_key} group={group} onOpenReview={openReview} />
-          ))}
+        <>
+          <TileGrid>
+            {unvalidatedGroups.map((group) => (
+              <MatchGroupTile key={group.instagram_key} group={group} onOpenReview={openReview} />
+            ))}
+          </TileGrid>
           {showValidatedDivider ? (
             <div
               className="w-full border-t border-border pt-4 text-center text-xs text-text-secondary"
@@ -172,17 +130,25 @@ export function MatchesTab() {
               {MATCHES_VALIDATED_DIVIDER_LABEL}
             </div>
           ) : null}
-          {reviewedGroups.map((group) => (
-            <ReviewedMatchGroupCard key={group.instagram_key} group={group} onOpenReview={openReview} />
-          ))}
+          {reviewedGroups.length > 0 ? (
+            <TileGrid>
+              {reviewedGroups.map((group) => (
+                <MatchGroupTile key={group.instagram_key} group={group} onOpenReview={openReview} />
+              ))}
+            </TileGrid>
+          ) : null}
           {matchGroups.length < total ? (
             <div className="flex justify-center pt-2">
-              <Button type="button" variant="secondary" onClick={() => fetchGroups(50, matchGroups.length)}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => fetchGroups(50, matchGroups.length, loadMoreParams)}
+              >
                 Load more
               </Button>
             </div>
           ) : null}
-        </div>
+        </>
       )}
 
       {liveGroup && liveGroup.candidates.length > 0 && liveMatch ? (
@@ -192,7 +158,10 @@ export function MatchesTab() {
             matchGroups.find((g) => g.instagram_key === liveGroup.instagram_key) ?? liveGroup
           }
           onClose={closeModal}
-          onValidationChange={handleValidationChange}
+          onValidationChange={(m, validated) => {
+            handleValidationChange(m, validated);
+            if (validated) closeModal();
+          }}
           onRejected={handleRejected}
           onCandidateChange={setSelectedMatch}
         />

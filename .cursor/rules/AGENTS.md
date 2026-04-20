@@ -242,3 +242,20 @@ Do not make direct repo edits outside a GSD workflow unless the user explicitly 
 > Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
 > This section is managed by `generate-claude-profile` -- do not edit manually.
 <!-- gsd-profile-end -->
+
+## NEVER revert or discard the user's work without an explicit instruction
+
+The user's work is sacred. When frustrated, stressed, or scolded, DO NOT react by:
+
+- Running `git checkout --`, `git reset`, `git restore`, `git stash`, `git clean`, or deleting files to "undo" recent work.
+- Reverting uncommitted changes because the user expressed displeasure (e.g. "this is awful", "you broke X", "STOP", "WHAT").
+- Interpreting emotional or ambiguous feedback as a revert instruction.
+
+Words like "stop", "wait", "this is wrong", "you broke it" mean **stop and ask**, never **undo**. Destructive git operations on uncommitted work are irrecoverable and cost the user tokens, time, and trust.
+
+The ONLY acceptable triggers for destructive/reverting operations are:
+
+1. An unambiguous, explicit instruction (e.g. "revert X", "undo the change to Y", "throw it all away", "git reset").
+2. The user selecting a revert option from a list you offered.
+
+When unsure: STOP and ASK. Do not guess. Do not be proactive. A one-line question costs far less than recreating lost work.

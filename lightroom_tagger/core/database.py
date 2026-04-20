@@ -520,6 +520,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
     """)
 
     _migrate_unified_image_keys(conn)
+    _backfill_matched_catalog_key_from_validated_matches(conn)
     seed_perspectives_from_prompts_dir(conn)
     conn.commit()
     return conn
@@ -597,6 +598,43 @@ def _library_db_file_path(conn: sqlite3.Connection) -> str:
     raise RuntimeError(
         "migrate_unified_image_keys: could not resolve main database file path"
     )
+
+
+def _backfill_matched_catalog_key_from_validated_matches(conn: sqlite3.Connection) -> None:
+    """One-time sync: for every validated row in ``matches``, mirror the
+    pairing onto ``instagram_dump_media.matched_catalog_key`` so the
+    Instagram tab "matched" badge reflects on-demand validations too.
+
+    Gated on ``PRAGMA user_version`` (bump: 1 → 2) so the UPDATE runs exactly
+    once per DB file. Still idempotent if it does run: only overwrites rows
+    whose ``matched_catalog_key`` is NULL (we never stomp a value written by
+    the bulk matcher).
+    """
+    row = conn.execute("PRAGMA user_version").fetchone()
+    current_uv = int(row["user_version"] if row else 0)
+    if current_uv >= 2:
+        return
+    try:
+        conn.execute(
+            "UPDATE instagram_dump_media "
+            "SET matched_catalog_key = ("
+            "    SELECT m.catalog_key FROM matches m "
+            "    WHERE m.insta_key = instagram_dump_media.media_key "
+            "      AND m.validated_at IS NOT NULL "
+            "    ORDER BY m.validated_at DESC LIMIT 1"
+            ") "
+            "WHERE matched_catalog_key IS NULL "
+            "  AND EXISTS ("
+            "    SELECT 1 FROM matches m "
+            "    WHERE m.insta_key = instagram_dump_media.media_key "
+            "      AND m.validated_at IS NOT NULL"
+            ")"
+        )
+    except sqlite3.OperationalError:
+        # `matches` may not exist yet on very fresh DBs — safe to skip and
+        # leave user_version unchanged so the next init retries.
+        return
+    conn.execute("PRAGMA user_version = 2")
 
 
 def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
@@ -915,6 +953,7 @@ def query_catalog_images(
     score_perspective: str | None = None,
     min_score: int | None = None,
     sort_by_score: str | None = None,
+    sort_by_date: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[dict], int]:
@@ -929,9 +968,15 @@ def query_catalog_images(
     **sort_by_score** ``asc`` / ``desc`` requires **score_perspective**. Unscored rows
     for that perspective sort after scored rows in both directions (``s.score IS NULL``
     last via SQLite boolean ordering).
+
+    **sort_by_date** ``newest`` / ``oldest`` orders by ``i.date_taken``. When both
+    ``sort_by_score`` and ``sort_by_date`` are set, score wins as the primary key and
+    date is the tiebreaker.
     """
     if sort_by_score is not None and sort_by_score not in ("asc", "desc"):
         raise ValueError("sort_by_score must be 'asc' or 'desc'")
+    if sort_by_date is not None and sort_by_date not in ("newest", "oldest"):
+        raise ValueError("sort_by_date must be 'newest' or 'oldest'")
 
     sp = (score_perspective or "").strip()
     use_score_join = bool(sp)
@@ -1009,12 +1054,27 @@ def query_catalog_images(
         )
         join_bindings.append(sp)
 
-    if sort_by_score == "desc":
-        order_sql = "ORDER BY (s.score IS NULL) ASC, s.score DESC, i.key ASC"
-    elif sort_by_score == "asc":
-        order_sql = "ORDER BY (s.score IS NULL) ASC, s.score ASC, i.key ASC"
+    # Date becomes a tiebreaker for score sorts only when the caller asked
+    # for it explicitly; otherwise keep the original `i.key ASC` tiebreaker
+    # so unrelated callers aren't silently re-ordered by date.
+    if sort_by_date is None:
+        date_tiebreaker = "i.key ASC"
     else:
-        order_sql = "ORDER BY i.date_taken DESC"
+        date_order = "ASC" if sort_by_date == "oldest" else "DESC"
+        date_tiebreaker = f"i.date_taken {date_order}, i.key ASC"
+
+    if sort_by_score == "desc":
+        order_sql = (
+            f"ORDER BY (s.score IS NULL) ASC, s.score DESC, {date_tiebreaker}"
+        )
+    elif sort_by_score == "asc":
+        order_sql = (
+            f"ORDER BY (s.score IS NULL) ASC, s.score ASC, {date_tiebreaker}"
+        )
+    elif sort_by_date == "oldest":
+        order_sql = "ORDER BY i.date_taken ASC, i.key ASC"
+    else:
+        order_sql = "ORDER BY i.date_taken DESC, i.key ASC"
 
     select_cols = (
         "i.*, d.summary AS description_summary, "
@@ -1484,7 +1544,12 @@ def _backfill_instagram_created_at_from_catalog(
 
 
 def validate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bool:
-    """Stamp a match as human-validated."""
+    """Stamp a match as human-validated.
+
+    Also mirrors the pairing onto ``instagram_dump_media.matched_catalog_key``
+    so both matching pipelines (bulk script + on-demand) share one
+    "matched" signal for the Instagram tab badge.
+    """
     with db:
         cursor = db.execute(
             "UPDATE matches SET validated_at = ? WHERE catalog_key = ? AND insta_key = ?",
@@ -1492,18 +1557,51 @@ def validate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> 
         )
         if cursor.rowcount == 0:
             return False
+        db.execute(
+            "UPDATE instagram_dump_media SET matched_catalog_key = ? "
+            "WHERE media_key = ?",
+            (catalog_key, insta_key),
+        )
         _backfill_instagram_created_at_from_catalog(db, catalog_key, insta_key)
     return True
 
 
 def unvalidate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bool:
-    """Remove human validation (undo validate, not reject)."""
-    cursor = db.execute(
-        "UPDATE matches SET validated_at = NULL WHERE catalog_key = ? AND insta_key = ?",
-        (catalog_key, insta_key),
-    )
-    db.commit()
-    return cursor.rowcount > 0
+    """Remove human validation (undo validate, not reject).
+
+    Clears ``instagram_dump_media.matched_catalog_key`` when no other
+    validated match remains for the same insta_key, so the IG tab
+    "matched" badge reflects the current validation state.
+    """
+    with db:
+        cursor = db.execute(
+            "UPDATE matches SET validated_at = NULL WHERE catalog_key = ? AND insta_key = ?",
+            (catalog_key, insta_key),
+        )
+        if cursor.rowcount == 0:
+            return False
+        # Match the most-recent validated pairing so unvalidate → next
+        # validation → unvalidate is deterministic. Mirrors the selection
+        # used by `_backfill_matched_catalog_key_from_validated_matches`.
+        remaining = db.execute(
+            "SELECT catalog_key FROM matches "
+            "WHERE insta_key = ? AND validated_at IS NOT NULL "
+            "ORDER BY validated_at DESC LIMIT 1",
+            (insta_key,),
+        ).fetchone()
+        if remaining:
+            db.execute(
+                "UPDATE instagram_dump_media SET matched_catalog_key = ? "
+                "WHERE media_key = ?",
+                (remaining['catalog_key'], insta_key),
+            )
+        else:
+            db.execute(
+                "UPDATE instagram_dump_media SET matched_catalog_key = NULL "
+                "WHERE media_key = ?",
+                (insta_key,),
+            )
+    return True
 
 
 def reject_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bool:

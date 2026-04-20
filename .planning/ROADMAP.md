@@ -42,6 +42,7 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 - [x] Phase 4.1 (INSERTED 2026-04-17): InstagramTab filter migration — FILTER-02 — completed 2026-04-17
 - [ ] Phase 5: Identity & Insights clarity — IDENT-04, IDENT-05, DASH-02, DASH-03 _(depends on Phase 4)_
 - [ ] Phase 6: Images page visual consistency — UI-01, UI-02, UI-03
+- [ ] Phase 7: React Suspense data layer (no deps) — DATA-01 _(cross-cutting; no roadmap deps)_
 
 ## Progress (v2.1)
 
@@ -54,6 +55,7 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 | 4.1. InstagramTab filter migration | Migrate InstagramTab onto the Phase 4 framework (INSERTED) | FILTER-02 | 3 | ✅ Complete (2026-04-17) |
 | 5. Identity & Insights clarity | Posted/unposted visibility + narrative flow | IDENT-04, IDENT-05, DASH-02, DASH-03 | 4 | Pending |
 | 6. Images page visual consistency | Unify badge + card language on Images page | UI-01, UI-02, UI-03 | 3 | Pending |
+| 7. React Suspense data layer | Replace useEffect+setState fetches with React-only Suspense/ErrorBoundary + module cache, no deps | DATA-01 | 8 | Pending |
 
 ## Phase Details (v2.1)
 
@@ -127,6 +129,24 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 1. Badge primitives (Badge, VisionBadge, StatusBadge, ImageTypeBadge, PerspectiveBadge) consolidated under a consistent API with documented usage guidelines
 2. Images page badges adopt an inline-in-description pattern where appropriate, matching Catalog's scannable style
 3. Matches on the Images page render as cards with affordance consistent with CatalogImageCard
+
+### Phase 7: React Suspense data layer (no deps)
+
+**Goal:** Replace the ~24 hand-rolled `useEffect` + `setState` + API call sites in `apps/visualizer/frontend` with a tiny React-only Suspense data layer (module-level cache + `use(promise)` + `<ErrorBoundary>`), eliminating duplicate requests, unifying loading UI, and centralizing error handling without adding any external dependency.
+
+**Requirements:** DATA-01 (new — see `phases/07-react-suspense-data-layer/CONTEXT.md`)
+
+**Decisions:** Full migration in one phase (no pilot). Manual invalidation via `invalidate(key)`. No TTL/LRU eviction — cache lives for the tab. Page-level `<ErrorBoundary>` + shared `<ErrorState>`. Zero new npm dependencies.
+
+**Success criteria:**
+1. Zero `useEffect` blocks whose sole purpose is data fetching remain in the frontend.
+2. Every page route wraps children in `<ErrorBoundary><Suspense>` with a shared `<SkeletonGrid>` fallback.
+3. `/api/providers/defaults` (and every other endpoint) fires at most once per unique cache key per tab session (verified via backend log audit).
+4. Mutations invalidate cache via `invalidate(key)` / `invalidateAll(prefix)`; no components keep manual `load()`/`refetch()` helpers.
+5. Shared `<ErrorState>` fallback replaces every per-component error text node.
+6. `npx tsc --noEmit`, `npx vitest run`, `npx vite build` all green.
+7. `package.json` dependency count is unchanged (no new runtime deps).
+8. No user-visible regression across Identity, Images (all tabs), Processing, Analytics, Dashboard.
 
 ---
 

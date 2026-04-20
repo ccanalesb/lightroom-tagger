@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import type { CatalogImage, IdentityBestPhotoItem } from '../../services/api'
-import { CatalogImageModal } from '../catalog/CatalogImageModal'
-import { IDENTITY_LABEL_AGGREGATE, IDENTITY_LABEL_PERSPECTIVES_COVERED, MSG_LOADING } from '../../constants/strings'
+import type { IdentityBestPhotoItem } from '../../services/api'
+import { ImageDetailModal, ImageTile, fromBestPhotoRow } from '../image-view'
+import { MSG_LOADING } from '../../constants/strings'
 
 export type TopPhotosStripProps = {
   items: IdentityBestPhotoItem[]
@@ -10,29 +10,8 @@ export type TopPhotosStripProps = {
   emptyMessage: string | null
 }
 
-function bestPhotoToCatalogStub(row: IdentityBestPhotoItem): CatalogImage {
-  return {
-    id: null,
-    key: row.image_key,
-    filename: row.filename,
-    filepath: '',
-    date_taken: row.date_taken,
-    rating: typeof row.rating === 'number' ? row.rating : 0,
-    pick: false,
-    color_label: '',
-    keywords: [],
-    title: '',
-    caption: '',
-    copyright: '',
-    width: 0,
-    height: 0,
-    instagram_posted: Boolean(row.instagram_posted),
-    image_type: (row.image_type as 'catalog' | 'instagram') ?? 'catalog',
-  }
-}
-
 export function TopPhotosStrip({ items, loading, error, emptyMessage }: TopPhotosStripProps) {
-  const [selected, setSelected] = useState<CatalogImage | null>(null)
+  const [selected, setSelected] = useState<IdentityBestPhotoItem | null>(null)
 
   if (loading) {
     return (
@@ -65,44 +44,25 @@ export function TopPhotosStrip({ items, loading, error, emptyMessage }: TopPhoto
   return (
     <>
       <div className="-mx-1 flex gap-3 overflow-x-auto pb-2 pt-1">
-        {items.map((row) => {
-          const dateDisplay = row.date_taken ? new Date(row.date_taken).toLocaleDateString() : '—'
-          return (
-            <div
-              key={row.image_key}
-              className="w-[200px] shrink-0 overflow-hidden rounded-card border border-border bg-bg shadow-card"
-            >
-              <button
-                type="button"
-                onClick={() => setSelected(bestPhotoToCatalogStub(row))}
-                className="block w-full text-left focus:outline-none focus:ring-2 focus:ring-accent focus:ring-inset"
-              >
-                <div className="relative aspect-[4/3] bg-surface">
-                  <img
-                    src={`/api/images/${row.image_type ?? 'catalog'}/${encodeURIComponent(row.image_key)}/thumbnail`}
-                    alt={row.filename}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-              </button>
-              <div className="space-y-1 p-2">
-                <p className="truncate text-xs font-medium text-text">{row.filename}</p>
-                <p className="text-[10px] text-text-tertiary">{dateDisplay}</p>
-                <div className="flex flex-wrap gap-1">
-                  <span className="rounded-base bg-accent-light px-1.5 py-0.5 text-[10px] font-semibold text-accent">
-                    {IDENTITY_LABEL_AGGREGATE}: {row.aggregate_score.toFixed(2)}
-                  </span>
-                  <span className="rounded-full border border-border px-1.5 py-0.5 text-[10px] text-text-secondary">
-                    {IDENTITY_LABEL_PERSPECTIVES_COVERED}: {row.perspectives_covered}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )
-        })}
+        {items.map((row) => (
+          <ImageTile
+            key={row.image_key}
+            image={fromBestPhotoRow(row)}
+            variant="strip"
+            primaryScoreSource="identity"
+            onClick={() => setSelected(row)}
+          />
+        ))}
       </div>
-      {selected ? <CatalogImageModal image={selected} onClose={() => setSelected(null)} /> : null}
+      {selected ? (
+        <ImageDetailModal
+          imageType={(selected.image_type as 'catalog' | 'instagram') ?? 'catalog'}
+          imageKey={selected.image_key}
+          initialImage={fromBestPhotoRow(selected)}
+          primaryScoreSource="identity"
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
     </>
   )
 }

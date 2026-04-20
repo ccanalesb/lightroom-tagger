@@ -1,9 +1,11 @@
+import { TILE_GRID_CLASS } from '../TileGrid';
+
 interface SkeletonGridProps {
   count?: number;
   className?: string;
 }
 
-export function SkeletonGrid({ count = 12, className = 'grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3' }: SkeletonGridProps) {
+export function SkeletonGrid({ count = 12, className = TILE_GRID_CLASS }: SkeletonGridProps) {
   return (
     <div className={className}>
       {Array.from({ length: count }).map((_, i) => (

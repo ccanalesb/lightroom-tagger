@@ -2,13 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AnalyticsAPI,
   ImagesAPI,
-  type CatalogImage,
   type UnpostedCatalogItem,
 } from '../../services/api'
-import { CatalogImageCard } from '../catalog/CatalogImageCard'
-import { CatalogImageModal } from '../catalog/CatalogImageModal'
+import { ImageDetailModal, ImageTile, fromUnpostedRow } from '../image-view'
 import { Card, CardContent } from '../ui/Card'
 import { Pagination } from '../ui/Pagination'
+import { TileGrid } from '../ui/TileGrid'
 import { formatMonth } from '../../utils/date'
 import {
   ANALYTICS_APPLY,
@@ -32,26 +31,6 @@ type AppliedUnpostedFilters = {
   dateTo: string
   minRating: number | ''
   month: string
-}
-
-function unpostedRowToCatalogStub(row: UnpostedCatalogItem): CatalogImage {
-  return {
-    id: null,
-    key: row.key,
-    filename: row.filename,
-    filepath: '',
-    date_taken: row.date_taken,
-    rating: typeof row.rating === 'number' ? row.rating : 0,
-    pick: false,
-    color_label: '',
-    keywords: [],
-    title: '',
-    caption: '',
-    copyright: '',
-    width: 0,
-    height: 0,
-    instagram_posted: false,
-  }
 }
 
 function errMessage(e: unknown): string {
@@ -83,7 +62,7 @@ export function UnpostedCatalogPanel() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selected, setSelected] = useState<CatalogImage | null>(null)
+  const [selected, setSelected] = useState<UnpostedCatalogItem | null>(null)
 
   const [availableMonths, setAvailableMonths] = useState<string[]>([])
 
@@ -262,18 +241,17 @@ export function UnpostedCatalogPanel() {
 
           {!loading && !error && rows.length > 0 ? (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {rows.map((row) => {
-                  const stub = unpostedRowToCatalogStub(row)
-                  return (
-                    <CatalogImageCard
-                      key={row.key}
-                      image={stub}
-                      onClick={() => setSelected(stub)}
-                    />
-                  )
-                })}
-              </div>
+              <TileGrid>
+                {rows.map((row) => (
+                  <ImageTile
+                    key={row.key}
+                    image={fromUnpostedRow(row)}
+                    variant="grid"
+                    primaryScoreSource="identity"
+                    onClick={() => setSelected(row)}
+                  />
+                ))}
+              </TileGrid>
               {totalPages > 1 ? (
                 <Pagination
                   currentPage={page}
@@ -288,7 +266,13 @@ export function UnpostedCatalogPanel() {
       </Card>
 
       {selected ? (
-        <CatalogImageModal image={selected} onClose={() => setSelected(null)} />
+        <ImageDetailModal
+          imageType="catalog"
+          imageKey={selected.key}
+          initialImage={fromUnpostedRow(selected)}
+          primaryScoreSource="identity"
+          onClose={() => setSelected(null)}
+        />
       ) : null}
     </section>
   )

@@ -174,6 +174,75 @@ def compute_image_aggregate_scores(
     return items, meta
 
 
+def compute_single_image_aggregate_scores(
+    conn: sqlite3.Connection,
+    image_key: str,
+) -> dict[str, Any] | None:
+    """Aggregate identity scores for a single catalog image.
+
+    Reuses :data:`_SCORES_BASE_SQL` (``is_current = 1`` AND
+    ``image_type = 'catalog'``) and the active-perspectives / equal-weight
+    rules from :func:`compute_image_aggregate_scores`. Returns a per-image
+    record (``image_key``, ``aggregate_score``, ``perspectives_covered``,
+    ``eligible``, ``per_perspective``) or ``None`` when no current catalog
+    scores exist for ``image_key`` on active perspectives.
+    """
+    active_slugs = _active_perspective_slugs(conn)
+    if not active_slugs:
+        return None
+    slug_set = set(active_slugs)
+    min_used = _default_min_perspectives(len(active_slugs))
+
+    rows = conn.execute(
+        _SCORES_BASE_SQL + "\n        AND s.image_key = ?",
+        (image_key,),
+    ).fetchall()
+
+    perspectives: list[dict[str, Any]] = []
+    for r in rows:
+        slug = str(r["perspective_slug"])
+        if slug not in slug_set:
+            continue
+        perspectives.append(
+            {
+                "perspective_slug": slug,
+                "display_name": r["perspective_display_name"] or slug,
+                "score": int(r["score"]),
+                "rationale": r.get("rationale") or "",
+                "model_used": r.get("model_used") or "",
+                "prompt_version": r.get("prompt_version") or "",
+                "scored_at": r.get("scored_at") or "",
+            }
+        )
+
+    if not perspectives:
+        return None
+
+    n = len(perspectives)
+    agg = sum(p["score"] for p in perspectives) / n
+    per_out: list[dict[str, Any]] = []
+    for p in sorted(perspectives, key=lambda x: x["perspective_slug"]):
+        per_out.append(
+            {
+                "perspective_slug": p["perspective_slug"],
+                "display_name": p["display_name"],
+                "score": p["score"],
+                "prompt_version": p["prompt_version"],
+                "model_used": p["model_used"],
+                "scored_at": p["scored_at"],
+                "rationale_preview": _truncate_rationale(p.get("rationale")),
+            }
+        )
+
+    return {
+        "image_key": str(image_key),
+        "aggregate_score": round(agg, 4),
+        "perspectives_covered": n,
+        "eligible": n >= min_used,
+        "per_perspective": per_out,
+    }
+
+
 def _image_meta_map(conn: sqlite3.Connection, keys: list[str]) -> dict[str, dict[str, Any]]:
     if not keys:
         return {}
@@ -219,8 +288,16 @@ def rank_best_photos(
     limit: int,
     offset: int,
     min_perspectives: int | None = None,
+    sort_by_date: str | None = None,
 ) -> tuple[list[dict[str, Any]], int, dict[str, Any]]:
-    """Eligible images only, sorted by aggregate_score DESC, date_taken DESC, key ASC."""
+    """Eligible images only, sorted by aggregate_score DESC, date_taken, key ASC.
+
+    ``sort_by_date`` (``newest`` / ``oldest``) only controls the date tiebreaker;
+    score remains the primary sort key.
+    """
+    if sort_by_date is not None and sort_by_date not in ("newest", "oldest"):
+        raise ValueError("sort_by_date must be 'newest' or 'oldest'")
+
     items, meta = compute_image_aggregate_scores(
         conn, min_perspectives=min_perspectives, include_ineligible=False
     )
@@ -234,8 +311,9 @@ def rank_best_photos(
         im = img_meta.get(k, {})
         enriched.append({**i, **im})
 
+    date_reverse = sort_by_date != "oldest"
     enriched.sort(key=lambda r: r["image_key"])
-    enriched.sort(key=lambda r: r.get("date_taken") or "", reverse=True)
+    enriched.sort(key=lambda r: r.get("date_taken") or "", reverse=date_reverse)
     enriched.sort(key=lambda r: r["aggregate_score"], reverse=True)
 
     total = len(enriched)
@@ -369,8 +447,16 @@ def suggest_what_to_post_next(
     offset: int = 0,
     lookback_days_recent: int = 30,
     lookback_days_baseline: int = 90,
+    sort_by_date: str | None = None,
 ) -> dict[str, Any]:
-    """Unposted, coverage-eligible catalog images with heuristic reasons (D-44–D-46)."""
+    """Unposted, coverage-eligible catalog images with heuristic reasons (D-44–D-46).
+
+    ``sort_by_date`` (``newest`` / ``oldest``) only controls the date tiebreaker;
+    aggregate score remains the primary sort key.
+    """
+    if sort_by_date is not None and sort_by_date not in ("newest", "oldest"):
+        raise ValueError("sort_by_date must be 'newest' or 'oldest'")
+
     items, agg_meta = compute_image_aggregate_scores(conn, include_ineligible=False)
     keys = [str(i["image_key"]) for i in items if i.get("eligible")]
     img_meta = _image_meta_map(conn, keys)
@@ -385,8 +471,9 @@ def suggest_what_to_post_next(
             continue
         candidates_full.append({**i, **im})
 
+    date_reverse = sort_by_date != "oldest"
     candidates_full.sort(key=lambda r: r["image_key"])
-    candidates_full.sort(key=lambda r: r.get("date_taken") or "", reverse=True)
+    candidates_full.sort(key=lambda r: r.get("date_taken") or "", reverse=date_reverse)
     candidates_full.sort(key=lambda r: r["aggregate_score"], reverse=True)
 
     unposted_aggs = [float(c["aggregate_score"]) for c in candidates_full]

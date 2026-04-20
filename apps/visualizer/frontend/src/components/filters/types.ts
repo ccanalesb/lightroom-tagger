@@ -2,6 +2,10 @@ export type DateRangeValue = { from: string; to: string }
 
 export type SelectOption = { value: string; label: string }
 
+/** A tri-state toggle row. The framework derives `serialize` / `deserialize`
+ *  and the chip label from these rows, so consumers don't hand-wire codecs. */
+export type ToggleOption = { value: boolean | undefined; label: string }
+
 /** Parent gate: when `when` returns false, control is disabled and value is ignored for activeCount / toQueryParams (D-03, D-09). */
 export type EnabledBy = {
   filterKey: string
@@ -21,13 +25,17 @@ type BaseDescriptor = {
 
 export type ToggleFilterDescriptor = BaseDescriptor & {
   type: 'toggle'
-  /** `<select>` rows for the tri-state control (posted / analyzed labels live in schema from strings.ts). */
-  options: SelectOption[]
+  /** Three rows for the tri-state control. Each row carries its own value
+   *  (`undefined | true | false`) and label. The framework derives both the
+   *  `<select>` codec and the chip label from these rows, so consumers don't
+   *  need `serialize` / `deserialize` / `formatValue`. */
+  options: ToggleOption[]
   /** Committed value: undefined = "all", true/false map to the two arms (posted / analyzed). */
   defaultValue?: boolean | undefined
-  /** Map tri-state to/from `<select>` string values (CatalogTab posted/analyzed string tokens). */
-  serialize: (value: unknown) => string
-  deserialize: (raw: string) => unknown
+  /** Optional override for non-standard toggles. The framework default works
+   *  for any tri-state built from `options`. */
+  serialize?: (value: unknown) => string
+  deserialize?: (raw: string) => unknown
 }
 
 export type SelectFilterDescriptor = BaseDescriptor & {

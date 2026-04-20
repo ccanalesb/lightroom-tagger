@@ -89,3 +89,8 @@ config.yaml
 .env
 apps/visualizer/backend/*.crt
 apps/visualizer/backend/*.key
+.codebuddy/*
+.claude/*
+.augment/*
+artifacts/*
+scripts/ui-audit.mjs

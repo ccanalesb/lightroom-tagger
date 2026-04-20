@@ -38,6 +38,15 @@ def _parse_optional_min_perspectives() -> tuple[int | None, ResponseReturnValue 
     return v, None
 
 
+def _parse_sort_by_date() -> tuple[str | None, ResponseReturnValue | None]:
+    raw = (request.args.get("sort_by_date") or "").strip().lower()
+    if not raw:
+        return None, None
+    if raw not in ("newest", "oldest"):
+        return None, error_bad_request("sort_by_date must be newest or oldest")
+    return raw, None
+
+
 @bp.route("/best-photos", methods=["GET"])
 @with_db
 def best_photos(db: sqlite3.Connection) -> ResponseReturnValue:
@@ -50,9 +59,16 @@ def best_photos(db: sqlite3.Connection) -> ResponseReturnValue:
         min_p, err = _parse_optional_min_perspectives()
         if err is not None:
             return err
+        sort_by_date, err2 = _parse_sort_by_date()
+        if err2 is not None:
+            return err2
 
         items, total, meta = rank_best_photos(
-            db, limit=limit, offset=offset, min_perspectives=min_p
+            db,
+            limit=limit,
+            offset=offset,
+            min_perspectives=min_p,
+            sort_by_date=sort_by_date,
         )
         return jsonify({"items": items, "total": total, "meta": meta})
     except Exception:
@@ -84,6 +100,9 @@ def suggestions(db: sqlite3.Connection) -> ResponseReturnValue:
             return error_bad_request("lookback_days_recent must be at least 1")
         if look_base is not None and look_base < 1:
             return error_bad_request("lookback_days_baseline must be at least 1")
+        sort_by_date, err = _parse_sort_by_date()
+        if err is not None:
+            return err
 
         payload = suggest_what_to_post_next(
             db,
@@ -91,6 +110,7 @@ def suggestions(db: sqlite3.Connection) -> ResponseReturnValue:
             offset=offset,
             lookback_days_recent=look_recent if look_recent is not None else 30,
             lookback_days_baseline=look_base if look_base is not None else 90,
+            sort_by_date=sort_by_date,
         )
         return jsonify(
             {

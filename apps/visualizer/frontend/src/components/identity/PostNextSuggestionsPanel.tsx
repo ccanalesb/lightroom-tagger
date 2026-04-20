@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   IdentityAPI,
-  type CatalogImage,
   type PostNextCandidate,
   type PostNextSuggestionsMeta,
 } from '../../services/api'
-import { CatalogImageModal } from '../catalog/CatalogImageModal'
+import { ImageDetailModal, fromPostNextRow } from '../image-view'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import {
@@ -16,33 +15,21 @@ import {
   IDENTITY_REASON_CODE_LABELS,
   IDENTITY_SECTION_POST_NEXT,
   MSG_LOADING,
+  FILTER_LABEL_SORT_DATE,
+  FILTER_SORT_DATE_NEWEST,
+  FILTER_SORT_DATE_OLDEST,
+  FILTER_SORT_DATE_NONE,
+  msgShowingOf,
 } from '../../constants/strings'
+import { FilterBar } from '../filters/FilterBar'
+import { useFilters } from '../../hooks/useFilters'
+import type { FilterSchema } from '../filters/types'
 
 const SUGGESTIONS_LIMIT = 20
 
 function errMessage(e: unknown): string {
   if (e instanceof Error) return e.message
   return String(e)
-}
-
-function candidateToCatalogStub(row: PostNextCandidate): CatalogImage {
-  return {
-    id: null,
-    key: row.image_key,
-    filename: row.filename,
-    filepath: '',
-    date_taken: row.date_taken,
-    rating: typeof row.rating === 'number' ? row.rating : 0,
-    pick: false,
-    color_label: '',
-    keywords: [],
-    title: '',
-    caption: '',
-    copyright: '',
-    width: 0,
-    height: 0,
-    instagram_posted: false,
-  }
 }
 
 function labelForReasonCode(code: string): string {
@@ -58,14 +45,43 @@ export function PostNextSuggestionsPanel() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selected, setSelected] = useState<CatalogImage | null>(null)
+  const [selected, setSelected] = useState<PostNextCandidate | null>(null)
+
+  const postNextSchema = useMemo<FilterSchema>(
+    () => [
+      {
+        type: 'select',
+        key: 'sortByDate',
+        label: FILTER_LABEL_SORT_DATE,
+        paramName: 'sort_by_date',
+        defaultValue: 'none',
+        options: [
+          { value: 'none', label: FILTER_SORT_DATE_NONE },
+          { value: 'newest', label: FILTER_SORT_DATE_NEWEST },
+          { value: 'oldest', label: FILTER_SORT_DATE_OLDEST },
+        ],
+        toParam: (v) => (v === 'none' || v === '' || v === undefined ? undefined : v),
+      },
+    ],
+    [],
+  )
+  const filters = useFilters(postNextSchema)
+  const sortByDate = filters.values.sortByDate as string | undefined
+  const sortParam =
+    sortByDate && sortByDate !== 'none'
+      ? (sortByDate as 'newest' | 'oldest')
+      : undefined
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
     setOffset(0)
-    IdentityAPI.getSuggestions({ limit: SUGGESTIONS_LIMIT, offset: 0 })
+    IdentityAPI.getSuggestions({
+      limit: SUGGESTIONS_LIMIT,
+      offset: 0,
+      sort_by_date: sortParam,
+    })
       .then((res) => {
         if (cancelled) return
         setRows(res.candidates)
@@ -89,7 +105,7 @@ export function PostNextSuggestionsPanel() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [sortParam])
 
   const handleLoadMore = () => {
     if (total === null || offset >= total || loadingMore) return
@@ -98,6 +114,7 @@ export function PostNextSuggestionsPanel() {
     IdentityAPI.getSuggestions({
       limit: SUGGESTIONS_LIMIT,
       offset: offset,
+      sort_by_date: sortParam,
     })
       .then((res) => {
         const seen = new Set(cur.map((r) => r.image_key))
@@ -133,6 +150,18 @@ export function PostNextSuggestionsPanel() {
         </CardHeader>
         <CardContent className="space-y-4 !text-text">
           <p className="text-sm text-text-secondary">{IDENTITY_POST_NEXT_HELP}</p>
+          <FilterBar
+            schema={postNextSchema}
+            filters={filters}
+            summary={
+              !loading && !error && rows.length > 0 && total !== null ? (
+                <p className="text-sm text-text-secondary">
+                  {msgShowingOf(rows.length, total, 'suggestions')}
+                </p>
+              ) : null
+            }
+            disabled={loading}
+          />
 
           {meta?.cadence_note ? (
             <p
@@ -163,11 +192,6 @@ export function PostNextSuggestionsPanel() {
 
           {!loading && !error && rows.length > 0 ? (
             <>
-              {total !== null && total > rows.length ? (
-                <p className="text-sm text-text-secondary" role="status">
-                  Showing {rows.length} of {total}
-                </p>
-              ) : null}
               <ol className="space-y-4">
               {rows.map((row, i) => {
                 const dateDisplay = row.date_taken
@@ -180,7 +204,7 @@ export function PostNextSuggestionsPanel() {
                   >
                     <button
                       type="button"
-                      onClick={() => setSelected(candidateToCatalogStub(row))}
+                      onClick={() => setSelected(row)}
                       className="mx-auto shrink-0 focus:outline-none focus:ring-2 focus:ring-accent sm:mx-0"
                     >
                       <img
@@ -243,7 +267,13 @@ export function PostNextSuggestionsPanel() {
       </Card>
 
       {selected ? (
-        <CatalogImageModal image={selected} onClose={() => setSelected(null)} />
+        <ImageDetailModal
+          imageType={(selected.image_type as 'catalog' | 'instagram') ?? 'catalog'}
+          imageKey={selected.image_key}
+          initialImage={fromPostNextRow(selected)}
+          primaryScoreSource="identity"
+          onClose={() => setSelected(null)}
+        />
       ) : null}
     </section>
   )

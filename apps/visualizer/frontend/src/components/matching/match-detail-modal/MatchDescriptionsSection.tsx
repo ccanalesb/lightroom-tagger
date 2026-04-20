@@ -1,7 +1,7 @@
 import type { Match } from '../../../services/api';
-import { DescriptionPanel } from '../../DescriptionPanel';
+import { AIDescriptionSection } from '../../DescriptionPanel';
 import {
-  DESC_PANEL_TITLE,
+  IMAGE_DETAILS_AI_DESCRIPTION,
   MATCH_DETAIL_INSTAGRAM,
   MATCH_DETAIL_CATALOG,
 } from '../../../constants/strings';
@@ -10,31 +10,24 @@ interface MatchDescriptionsSectionProps {
   match: Match;
 }
 
+/**
+ * Side-by-side AI descriptions for the IG and catalog sides of a match.
+ * Uses the shared `AIDescriptionSection` so the panel, generate button,
+ * and model options look identical to every other image modal.
+ */
 export function MatchDescriptionsSection({ match }: MatchDescriptionsSectionProps) {
-  if (!match.catalog_description && !match.insta_description) {
-    return null;
-  }
-
   return (
-    <div className="grid grid-cols-2 gap-4">
-      {match.insta_description && (
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <h4 className="text-xs font-medium text-gray-500 mb-2">
-            {MATCH_DETAIL_INSTAGRAM} — {DESC_PANEL_TITLE}
-          </h4>
-          <DescriptionPanel description={match.insta_description} />
-        </div>
-      )}
-      {match.catalog_description && (
-        <div
-          className={`bg-gray-50 p-3 rounded-lg ${!match.insta_description ? 'col-span-2' : ''}`}
-        >
-          <h4 className="text-xs font-medium text-gray-500 mb-2">
-            {MATCH_DETAIL_CATALOG} — {DESC_PANEL_TITLE}
-          </h4>
-          <DescriptionPanel description={match.catalog_description} />
-        </div>
-      )}
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <AIDescriptionSection
+        imageKey={match.instagram_key}
+        imageType="instagram"
+        titleOverride={`${MATCH_DETAIL_INSTAGRAM} — ${IMAGE_DETAILS_AI_DESCRIPTION}`}
+      />
+      <AIDescriptionSection
+        imageKey={match.catalog_key}
+        imageType="catalog"
+        titleOverride={`${MATCH_DETAIL_CATALOG} — ${IMAGE_DETAILS_AI_DESCRIPTION}`}
+      />
     </div>
   );
 }

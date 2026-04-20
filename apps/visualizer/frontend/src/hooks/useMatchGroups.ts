@@ -6,8 +6,12 @@ export function useMatchGroups() {
   const [matchGroups, setMatchGroups] = useState<MatchGroup[]>([]);
   const [total, setTotal] = useState(0);
 
-  const fetchGroups = useCallback(async (limit = 100, offset = 0) => {
-    const data = await MatchingAPI.list(limit, offset);
+  const fetchGroups = useCallback(async (
+    limit = 100,
+    offset = 0,
+    params?: { sort_by_date?: 'newest' | 'oldest' },
+  ) => {
+    const data = await MatchingAPI.list(limit, offset, params);
     if (offset === 0) {
       setMatchGroups(data.match_groups ?? []);
       setTotal(data.total_groups ?? data.total);

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { JobsAPI } from '../api'
+import { JobsAPI, ImagesAPI } from '../api'
 
 const fetchMock = vi.fn()
 globalThis.fetch = fetchMock
@@ -120,5 +120,43 @@ describe('JobsAPI', () => {
     })
 
     await expect(JobsAPI.get('nonexistent')).rejects.toThrow('404 Not Found')
+  })
+})
+
+describe('ImagesAPI.getImageDetail', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('calls /images/<type>/<key> with no query when score_perspective omitted', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ image_type: 'catalog', key: 'abc' }),
+    })
+    await ImagesAPI.getImageDetail('catalog', 'abc')
+    const url = fetchMock.mock.calls[0][0] as string
+    expect(url).toMatch(/\/images\/catalog\/abc$/)
+    expect(url).not.toContain('?')
+  })
+
+  it('URL-encodes the image_key and appends score_perspective when provided', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ image_type: 'catalog', key: 'a/b c' }),
+    })
+    await ImagesAPI.getImageDetail('catalog', 'a/b c', { score_perspective: 'street' })
+    const url = fetchMock.mock.calls[0][0] as string
+    expect(url).toContain('/images/catalog/a%2Fb%20c')
+    expect(url).toContain('score_perspective=street')
+  })
+
+  it('uses /images/instagram/<key> for instagram image_type', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ image_type: 'instagram', key: 'ig1' }),
+    })
+    await ImagesAPI.getImageDetail('instagram', 'ig1')
+    const url = fetchMock.mock.calls[0][0] as string
+    expect(url).toMatch(/\/images\/instagram\/ig1$/)
   })
 })

@@ -1,9 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageError, SkeletonGrid } from '../ui/page-states';
-import { ImageDetailsModal } from '../instagram/ImageDetailsModal';
-import { InstagramImageCard } from '../instagram/InstagramImageCard';
+import { ImageDetailModal, ImageTile, fromInstagramRow } from '../image-view';
+import { Badge } from '../ui/Badge';
 import { Pagination } from '../ui/Pagination';
-import { FILTER_ALL_DATES, ITEMS_PER_PAGE } from '../../constants/strings';
+import { TileGrid } from '../ui/TileGrid';
+import {
+  BADGE_DESCRIBED,
+  BADGE_MATCHED,
+  FILTER_ALL_DATES,
+  FILTER_LABEL_SORT_DATE,
+  FILTER_SORT_DATE_NEWEST,
+  FILTER_SORT_DATE_OLDEST,
+  ITEMS_PER_PAGE,
+  msgShowingOf,
+} from '../../constants/strings';
 import { useModal } from '../../hooks/useModal';
 import { useFilters } from '../../hooks/useFilters';
 import { FilterBar } from '../filters/FilterBar';
@@ -42,6 +52,17 @@ export function InstagramTab() {
           })),
         ],
       },
+      {
+        type: 'select',
+        key: 'sortByDate',
+        label: FILTER_LABEL_SORT_DATE,
+        paramName: 'sort_by_date',
+        defaultValue: 'newest',
+        options: [
+          { value: 'newest', label: FILTER_SORT_DATE_NEWEST },
+          { value: 'oldest', label: FILTER_SORT_DATE_OLDEST },
+        ],
+      },
     ],
     [availableMonths],
   );
@@ -49,6 +70,7 @@ export function InstagramTab() {
   const filters = useFilters(instagramSchema);
   const { values: filterValues, toQueryParams } = filters;
   const dateFolder = filterValues.dateFolder as string | undefined;
+  const sortByDate = filterValues.sortByDate as string | undefined;
 
   const fetchImages = useCallback(
     async (newOffset: number) => {
@@ -102,7 +124,7 @@ export function InstagramTab() {
       return;
     }
     fetchImages(0);
-  }, [dateFolder, fetchImages]);
+  }, [dateFolder, sortByDate, fetchImages]);
 
   const handlePageChange = (page: number) => {
     const newOffset = (page - 1) * ITEMS_PER_PAGE;
@@ -116,7 +138,7 @@ export function InstagramTab() {
         filters={filters}
         summary={
           <p className="text-sm text-text-secondary">
-            {total.toLocaleString()} images total
+            {msgShowingOf(images.length, total, 'images')}
           </p>
         }
         disabled={isLoading}
@@ -127,11 +149,19 @@ export function InstagramTab() {
 
       {!isLoading && !error && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <TileGrid>
             {images.map((image) => (
-              <InstagramImageCard key={image.key} image={image} onClick={() => open(image)} />
+              <ImageTile
+                key={image.key}
+                image={fromInstagramRow(image)}
+                variant="grid"
+                primaryScoreSource="none"
+                subtitle={image.instagram_folder || image.source_folder || undefined}
+                overlayBadges={renderInstagramOverlayBadges(image)}
+                onClick={() => open(image)}
+              />
             ))}
-          </div>
+          </TileGrid>
 
           {pagination.total_pages > 1 && (
             <div className="flex justify-center pt-4">
@@ -145,7 +175,30 @@ export function InstagramTab() {
         </>
       )}
 
-      {isOpen && selectedItem && <ImageDetailsModal image={selectedItem} onClose={close} />}
+      {isOpen && selectedItem && (
+        <ImageDetailModal
+          imageType="instagram"
+          imageKey={selectedItem.key}
+          initialImage={fromInstagramRow(selectedItem)}
+          primaryScoreSource="none"
+          onClose={close}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Overlay badges shown on an Instagram tile:
+ *   - "Matched" when the image has a validated catalog match.
+ *   - "Described" when the image has an AI description.
+ * Both can render together.
+ */
+function renderInstagramOverlayBadges(image: InstagramImage) {
+  return (
+    <>
+      {image.matched_catalog_key ? <Badge variant="success">{BADGE_MATCHED}</Badge> : null}
+      {image.description ? <Badge variant="accent">{BADGE_DESCRIBED}</Badge> : null}
+    </>
   );
 }
