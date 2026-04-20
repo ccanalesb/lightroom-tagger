@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   IdentityAPI,
@@ -15,7 +15,15 @@ import {
   IDENTITY_REASON_CODE_LABELS,
   IDENTITY_SECTION_POST_NEXT,
   MSG_LOADING,
+  FILTER_LABEL_SORT_DATE,
+  FILTER_SORT_DATE_NEWEST,
+  FILTER_SORT_DATE_OLDEST,
+  FILTER_SORT_DATE_NONE,
+  msgShowingOf,
 } from '../../constants/strings'
+import { FilterBar } from '../filters/FilterBar'
+import { useFilters } from '../../hooks/useFilters'
+import type { FilterSchema } from '../filters/types'
 
 const SUGGESTIONS_LIMIT = 20
 
@@ -39,12 +47,41 @@ export function PostNextSuggestionsPanel() {
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<PostNextCandidate | null>(null)
 
+  const postNextSchema = useMemo<FilterSchema>(
+    () => [
+      {
+        type: 'select',
+        key: 'sortByDate',
+        label: FILTER_LABEL_SORT_DATE,
+        paramName: 'sort_by_date',
+        defaultValue: 'none',
+        options: [
+          { value: 'none', label: FILTER_SORT_DATE_NONE },
+          { value: 'newest', label: FILTER_SORT_DATE_NEWEST },
+          { value: 'oldest', label: FILTER_SORT_DATE_OLDEST },
+        ],
+        toParam: (v) => (v === 'none' || v === '' || v === undefined ? undefined : v),
+      },
+    ],
+    [],
+  )
+  const filters = useFilters(postNextSchema)
+  const sortByDate = filters.values.sortByDate as string | undefined
+  const sortParam =
+    sortByDate && sortByDate !== 'none'
+      ? (sortByDate as 'newest' | 'oldest')
+      : undefined
+
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
     setOffset(0)
-    IdentityAPI.getSuggestions({ limit: SUGGESTIONS_LIMIT, offset: 0 })
+    IdentityAPI.getSuggestions({
+      limit: SUGGESTIONS_LIMIT,
+      offset: 0,
+      sort_by_date: sortParam,
+    })
       .then((res) => {
         if (cancelled) return
         setRows(res.candidates)
@@ -68,7 +105,7 @@ export function PostNextSuggestionsPanel() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [sortParam])
 
   const handleLoadMore = () => {
     if (total === null || offset >= total || loadingMore) return
@@ -77,6 +114,7 @@ export function PostNextSuggestionsPanel() {
     IdentityAPI.getSuggestions({
       limit: SUGGESTIONS_LIMIT,
       offset: offset,
+      sort_by_date: sortParam,
     })
       .then((res) => {
         const seen = new Set(cur.map((r) => r.image_key))
@@ -112,6 +150,18 @@ export function PostNextSuggestionsPanel() {
         </CardHeader>
         <CardContent className="space-y-4 !text-text">
           <p className="text-sm text-text-secondary">{IDENTITY_POST_NEXT_HELP}</p>
+          <FilterBar
+            schema={postNextSchema}
+            filters={filters}
+            summary={
+              !loading && !error && rows.length > 0 && total !== null ? (
+                <p className="text-sm text-text-secondary">
+                  {msgShowingOf(rows.length, total, 'suggestions')}
+                </p>
+              ) : null
+            }
+            disabled={loading}
+          />
 
           {meta?.cadence_note ? (
             <p
@@ -142,11 +192,6 @@ export function PostNextSuggestionsPanel() {
 
           {!loading && !error && rows.length > 0 ? (
             <>
-              {total !== null && total > rows.length ? (
-                <p className="text-sm text-text-secondary" role="status">
-                  Showing {rows.length} of {total}
-                </p>
-              ) : null}
               <ol className="space-y-4">
               {rows.map((row, i) => {
                 const dateDisplay = row.date_taken

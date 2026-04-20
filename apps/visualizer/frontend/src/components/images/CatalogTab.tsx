@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ImagesAPI, PerspectivesAPI, type CatalogImage } from '../../services/api';
 import { ImageDetailModal, ImageTile, fromCatalogListRow } from '../image-view';
 import { Pagination } from '../ui/Pagination';
+import { TileGrid } from '../ui/TileGrid';
 import {
   FILTER_ALL_DATES,
   CATALOG_FILTER_LABEL_STATUS,
@@ -15,6 +16,9 @@ import {
   CATALOG_FILTER_LABEL_SCORE_PERSPECTIVE,
   CATALOG_FILTER_LABEL_MIN_SCORE,
   CATALOG_FILTER_LABEL_SORT_SCORE,
+  FILTER_LABEL_SORT_DATE,
+  FILTER_SORT_DATE_NEWEST,
+  FILTER_SORT_DATE_OLDEST,
   CATALOG_FILTER_POSTED_ALL,
   CATALOG_FILTER_POSTED,
   CATALOG_FILTER_NOT_POSTED,
@@ -30,6 +34,7 @@ import {
   CATALOG_FILTER_KEYWORD_ARIA,
   CATALOG_FILTER_COLOR_PLACEHOLDER,
   CATALOG_FILTER_COLOR_ARIA,
+  msgShowingOf,
 } from '../../constants/strings';
 import { formatMonth } from '../../utils/date';
 import { useFilters } from '../../hooks/useFilters';
@@ -49,62 +54,6 @@ type SelectedCatalogEntry = {
 type CatalogTabProps = {
   /** Fires when the posted / not-posted filter changes (for parent UI, e.g. Analytics cross-link). */
   onPostedFilterChange?: (posted: boolean | undefined) => void;
-};
-
-const postedSerialize = (value: unknown): string => {
-  if (value === undefined) return 'all';
-  return value === true ? 'posted' : 'not-posted';
-};
-const postedDeserialize = (raw: string): unknown => {
-  if (raw === 'posted') return true;
-  if (raw === 'not-posted') return false;
-  return undefined;
-};
-
-const analyzedSerialize = (value: unknown): string => {
-  if (value === undefined) return 'all';
-  return value === true ? 'analyzed' : 'not_analyzed';
-};
-const analyzedDeserialize = (raw: string): unknown => {
-  if (raw === 'analyzed') return true;
-  if (raw === 'not_analyzed') return false;
-  return undefined;
-};
-
-const formatPostedChip = (value: unknown): string => {
-  if (value === true) return CATALOG_FILTER_POSTED;
-  if (value === false) return CATALOG_FILTER_NOT_POSTED;
-  return CATALOG_FILTER_POSTED_ALL;
-};
-
-const formatAnalyzedChip = (value: unknown): string => {
-  if (value === true) return CATALOG_FILTER_ANALYZED_ONLY;
-  if (value === false) return CATALOG_FILTER_NOT_ANALYZED;
-  return CATALOG_FILTER_ANALYZED_ALL;
-};
-
-const formatMinRatingChip = (value: unknown): string => {
-  if (value === '' || value === undefined || value === null) return CATALOG_FILTER_MIN_RATING_ANY;
-  const n = Number(value);
-  if (!Number.isFinite(n)) return String(value);
-  return '★'.repeat(n);
-};
-
-const formatDateRangeChip = (value: unknown): string => {
-  if (!value || typeof value !== 'object') return '';
-  const v = value as { from?: string; to?: string };
-  const from = typeof v.from === 'string' ? v.from : '';
-  const to = typeof v.to === 'string' ? v.to : '';
-  if (from && to) return `${from} → ${to}`;
-  if (from) return `from ${from}`;
-  if (to) return `to ${to}`;
-  return '';
-};
-
-const formatSortChip = (value: unknown): string => {
-  if (value === 'desc') return CATALOG_FILTER_SORT_HIGH_LOW;
-  if (value === 'asc') return CATALOG_FILTER_SORT_LOW_HIGH;
-  return CATALOG_FILTER_SORT_NONE;
 };
 
 export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
@@ -130,26 +79,20 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
         key: 'posted',
         label: CATALOG_FILTER_LABEL_STATUS,
         options: [
-          { value: 'all', label: CATALOG_FILTER_POSTED_ALL },
-          { value: 'posted', label: CATALOG_FILTER_POSTED },
-          { value: 'not-posted', label: CATALOG_FILTER_NOT_POSTED },
+          { value: undefined, label: CATALOG_FILTER_POSTED_ALL },
+          { value: true, label: CATALOG_FILTER_POSTED },
+          { value: false, label: CATALOG_FILTER_NOT_POSTED },
         ],
-        serialize: postedSerialize,
-        deserialize: postedDeserialize,
-        formatValue: formatPostedChip,
       },
       {
         type: 'toggle',
         key: 'analyzed',
         label: CATALOG_FILTER_LABEL_ANALYZED,
         options: [
-          { value: 'all', label: CATALOG_FILTER_ANALYZED_ALL },
-          { value: 'analyzed', label: CATALOG_FILTER_ANALYZED_ONLY },
-          { value: 'not_analyzed', label: CATALOG_FILTER_NOT_ANALYZED },
+          { value: undefined, label: CATALOG_FILTER_ANALYZED_ALL },
+          { value: true, label: CATALOG_FILTER_ANALYZED_ONLY },
+          { value: false, label: CATALOG_FILTER_NOT_ANALYZED },
         ],
-        serialize: analyzedSerialize,
-        deserialize: analyzedDeserialize,
-        formatValue: formatAnalyzedChip,
       },
       ...(availableMonths.length > 0
         ? ([
@@ -161,8 +104,6 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
                 { value: '', label: FILTER_ALL_DATES },
                 ...availableMonths.map((m) => ({ value: m, label: formatMonth(m) })),
               ],
-              formatValue: (v: unknown) =>
-                typeof v === 'string' && v !== '' ? formatMonth(v) : FILTER_ALL_DATES,
             },
           ] as FilterSchema)
         : []),
@@ -185,14 +126,12 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
           { value: '', label: CATALOG_FILTER_MIN_RATING_ANY },
           ...[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: '★'.repeat(n) })),
         ],
-        formatValue: formatMinRatingChip,
       },
       {
         type: 'dateRange',
         key: 'dateRange',
         label: CATALOG_FILTER_LABEL_DATE_RANGE,
         chipLabel: CATALOG_FILTER_LABEL_DATE_RANGE,
-        formatValue: formatDateRangeChip,
       },
       {
         type: 'search',
@@ -213,11 +152,6 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
           { value: '', label: CATALOG_FILTER_SCORE_ANY },
           ...scorePerspectives.map((p) => ({ value: p.slug, label: p.display_name })),
         ],
-        formatValue: (v) => {
-          if (!v) return CATALOG_FILTER_SCORE_ANY;
-          const match = scorePerspectives.find((p) => p.slug === v);
-          return match ? match.display_name : String(v);
-        },
       },
       {
         type: 'select',
@@ -233,8 +167,6 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
           })),
         ],
         enabledBy: { filterKey: 'scorePerspective', when: (v) => Boolean(v) },
-        formatValue: (v) =>
-          v === '' || v === undefined || v === null ? CATALOG_FILTER_SCORE_ANY : `${v}+`,
       },
       {
         type: 'select',
@@ -249,7 +181,17 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
         ],
         enabledBy: { filterKey: 'scorePerspective', when: (v) => Boolean(v) },
         toParam: (v) => (v === 'none' || v === '' || v === undefined ? undefined : v),
-        formatValue: formatSortChip,
+      },
+      {
+        type: 'select',
+        key: 'sortByDate',
+        label: FILTER_LABEL_SORT_DATE,
+        paramName: 'sort_by_date',
+        defaultValue: 'newest',
+        options: [
+          { value: 'newest', label: FILTER_SORT_DATE_NEWEST },
+          { value: 'oldest', label: FILTER_SORT_DATE_OLDEST },
+        ],
       },
     ];
   }, [availableMonths, scorePerspectives]);
@@ -346,6 +288,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
     filterValues.scorePerspective,
     filterValues.minCatalogScore,
     filterValues.sortByScore,
+    filterValues.sortByDate,
   ]);
 
   // Debounced text parity with legacy lines 255–264: reset page on committed keyword / colorLabel change.
@@ -380,7 +323,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
     if (total === 0 && hasActiveFilters) {
       return 'No images match the filters';
     }
-    return `Showing ${images.length} of ${total.toLocaleString()} images`;
+    return msgShowingOf(images.length, total, 'images');
   })();
 
   // Silence unused-var warning for rawValues destructure — kept for future debug / UAT.
@@ -452,7 +395,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
               fetching ? 'opacity-50 pointer-events-none' : ''
             }`}
           >
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <TileGrid>
               {images.map((image) => (
                 <ImageTile
                   key={image.id != null ? String(image.id) : image.key}
@@ -462,7 +405,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
                   onClick={() => setSelected({ key: image.key, initial: image })}
                 />
               ))}
-            </div>
+            </TileGrid>
           </div>
 
           {totalPages > 1 && (

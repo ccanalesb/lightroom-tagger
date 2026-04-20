@@ -1,26 +1,27 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   IdentityAPI,
   type IdentityBestPhotoItem,
   type IdentityBestPhotosMeta,
 } from '../../services/api'
-import {
-  ImageDetailModal,
-  ImagePerspectiveBreakdown,
-  ImageTile,
-  fromBestPhotoRow,
-} from '../image-view'
+import { ImageDetailModal, ImageTile, fromBestPhotoRow } from '../image-view'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { Pagination } from '../ui/Pagination'
+import { TileGrid } from '../ui/TileGrid'
+import { SkeletonGrid } from '../ui/page-states'
 import {
-  IDENTITY_ACTION_HIDE_BREAKDOWN,
-  IDENTITY_ACTION_SHOW_BREAKDOWN,
   IDENTITY_BEST_PHOTOS_EMPTY_FALLBACK,
   IDENTITY_BEST_PHOTOS_HELP,
   IDENTITY_SECTION_BEST_PHOTOS,
-  MSG_LOADING,
   MSG_SHOWING_RANGE,
+  FILTER_LABEL_SORT_DATE,
+  FILTER_SORT_DATE_NEWEST,
+  FILTER_SORT_DATE_OLDEST,
+  FILTER_SORT_DATE_NONE,
 } from '../../constants/strings'
+import { FilterBar } from '../filters/FilterBar'
+import { useFilters } from '../../hooks/useFilters'
+import type { FilterSchema } from '../filters/types'
 
 const PAGE_SIZE = 24
 
@@ -42,8 +43,28 @@ export function BestPhotosGrid() {
   const [meta, setMeta] = useState<IdentityBestPhotosMeta | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [selected, setSelected] = useState<IdentityBestPhotoItem | null>(null)
+
+  const bestPhotosSchema = useMemo<FilterSchema>(
+    () => [
+      {
+        type: 'select',
+        key: 'sortByDate',
+        label: FILTER_LABEL_SORT_DATE,
+        paramName: 'sort_by_date',
+        defaultValue: 'none',
+        options: [
+          { value: 'none', label: FILTER_SORT_DATE_NONE },
+          { value: 'newest', label: FILTER_SORT_DATE_NEWEST },
+          { value: 'oldest', label: FILTER_SORT_DATE_OLDEST },
+        ],
+        toParam: (v) => (v === 'none' || v === '' || v === undefined ? undefined : v),
+      },
+    ],
+    [],
+  )
+  const filters = useFilters(bestPhotosSchema)
+  const sortByDate = filters.values.sortByDate as string | undefined
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -53,6 +74,10 @@ export function BestPhotosGrid() {
       const data = await IdentityAPI.getBestPhotos({
         limit: PAGE_SIZE,
         offset,
+        sort_by_date:
+          sortByDate && sortByDate !== 'none'
+            ? (sortByDate as 'newest' | 'oldest')
+            : undefined,
       })
       setRows(data.items)
       setTotal(data.total)
@@ -65,11 +90,15 @@ export function BestPhotosGrid() {
     } finally {
       setLoading(false)
     }
-  }, [page])
+  }, [page, sortByDate])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    setPage(1)
+  }, [sortByDate])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const rangeLabel =
@@ -93,21 +122,23 @@ export function BestPhotosGrid() {
         </CardHeader>
         <CardContent className="space-y-4 !text-text">
           <p className="text-sm text-text-secondary">{IDENTITY_BEST_PHOTOS_HELP}</p>
+          <FilterBar
+            schema={bestPhotosSchema}
+            filters={filters}
+            summary={
+              !loading && !error && rangeLabel ? (
+                <p className="text-sm text-text-secondary">{rangeLabel}</p>
+              ) : null
+            }
+            disabled={loading}
+          />
 
-          {loading ? (
-            <p className="text-sm text-text-secondary" role="status" aria-live="polite">
-              {MSG_LOADING}
-            </p>
-          ) : null}
+          {loading ? <SkeletonGrid count={PAGE_SIZE} /> : null}
 
           {error ? (
             <p className="text-sm text-error" role="alert">
               {error}
             </p>
-          ) : null}
-
-          {!loading && !error && rangeLabel ? (
-            <p className="text-sm text-text-secondary">{rangeLabel}</p>
           ) : null}
 
           {!loading && !error && emptyMessage ? (
@@ -118,43 +149,17 @@ export function BestPhotosGrid() {
 
           {!loading && !error && rows.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {rows.map((row) => {
-                  const open = expandedKey === row.image_key
-                  return (
-                    <ImageTile
-                      key={row.image_key}
-                      image={fromBestPhotoRow(row)}
-                      variant="compact"
-                      primaryScoreSource="identity"
-                      onClick={() => setSelected(row)}
-                      footer={
-                        <div className="space-y-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setExpandedKey((k) => (k === row.image_key ? null : row.image_key))
-                            }}
-                            className="text-sm font-medium text-accent hover:underline focus:outline-none focus:ring-2 focus:ring-accent rounded-sm"
-                            aria-expanded={open}
-                          >
-                            {open ? IDENTITY_ACTION_HIDE_BREAKDOWN : IDENTITY_ACTION_SHOW_BREAKDOWN}
-                          </button>
-                          {open ? (
-                            <ImagePerspectiveBreakdown
-                              perspectives={row.per_perspective}
-                              aggregateScore={row.aggregate_score}
-                              perspectivesCovered={row.perspectives_covered}
-                              hideSummary
-                            />
-                          ) : null}
-                        </div>
-                      }
-                    />
-                  )
-                })}
-              </div>
+              <TileGrid>
+                {rows.map((row) => (
+                  <ImageTile
+                    key={row.image_key}
+                    image={fromBestPhotoRow(row)}
+                    variant="compact"
+                    primaryScoreSource="identity"
+                    onClick={() => setSelected(row)}
+                  />
+                ))}
+              </TileGrid>
               {totalPages > 1 ? (
                 <Pagination
                   currentPage={page}

@@ -3,11 +3,16 @@ import { PageError, SkeletonGrid } from '../ui/page-states';
 import { ImageDetailModal, ImageTile, fromInstagramRow } from '../image-view';
 import { Badge } from '../ui/Badge';
 import { Pagination } from '../ui/Pagination';
+import { TileGrid } from '../ui/TileGrid';
 import {
   BADGE_DESCRIBED,
   BADGE_MATCHED,
   FILTER_ALL_DATES,
+  FILTER_LABEL_SORT_DATE,
+  FILTER_SORT_DATE_NEWEST,
+  FILTER_SORT_DATE_OLDEST,
   ITEMS_PER_PAGE,
+  msgShowingOf,
 } from '../../constants/strings';
 import { useModal } from '../../hooks/useModal';
 import { useFilters } from '../../hooks/useFilters';
@@ -47,6 +52,17 @@ export function InstagramTab() {
           })),
         ],
       },
+      {
+        type: 'select',
+        key: 'sortByDate',
+        label: FILTER_LABEL_SORT_DATE,
+        paramName: 'sort_by_date',
+        defaultValue: 'newest',
+        options: [
+          { value: 'newest', label: FILTER_SORT_DATE_NEWEST },
+          { value: 'oldest', label: FILTER_SORT_DATE_OLDEST },
+        ],
+      },
     ],
     [availableMonths],
   );
@@ -54,6 +70,7 @@ export function InstagramTab() {
   const filters = useFilters(instagramSchema);
   const { values: filterValues, toQueryParams } = filters;
   const dateFolder = filterValues.dateFolder as string | undefined;
+  const sortByDate = filterValues.sortByDate as string | undefined;
 
   const fetchImages = useCallback(
     async (newOffset: number) => {
@@ -107,7 +124,7 @@ export function InstagramTab() {
       return;
     }
     fetchImages(0);
-  }, [dateFolder, fetchImages]);
+  }, [dateFolder, sortByDate, fetchImages]);
 
   const handlePageChange = (page: number) => {
     const newOffset = (page - 1) * ITEMS_PER_PAGE;
@@ -121,7 +138,7 @@ export function InstagramTab() {
         filters={filters}
         summary={
           <p className="text-sm text-text-secondary">
-            {total.toLocaleString()} images total
+            {msgShowingOf(images.length, total, 'images')}
           </p>
         }
         disabled={isLoading}
@@ -132,7 +149,7 @@ export function InstagramTab() {
 
       {!isLoading && !error && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <TileGrid>
             {images.map((image) => (
               <ImageTile
                 key={image.key}
@@ -151,7 +168,7 @@ export function InstagramTab() {
                 onClick={() => open(image)}
               />
             ))}
-          </div>
+          </TileGrid>
 
           {pagination.total_pages > 1 && (
             <div className="flex justify-center pt-4">

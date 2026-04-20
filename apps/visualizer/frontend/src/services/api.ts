@@ -209,11 +209,21 @@ export const SystemAPI = {
 }
 
 export const ImagesAPI = {
-  listInstagram: (params?: { limit?: number; offset?: number; date_folder?: string }) => {
+  listInstagram: (params?: {
+    limit?: number
+    offset?: number
+    date_folder?: string
+    date_from?: string
+    date_to?: string
+    sort_by_date?: 'newest' | 'oldest'
+  }) => {
     const searchParams = new URLSearchParams()
     if (params?.limit) searchParams.set('limit', String(params.limit))
     if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
     if (params?.date_folder) searchParams.set('date_folder', params.date_folder)
+    if (params?.date_from) searchParams.set('date_from', params.date_from)
+    if (params?.date_to) searchParams.set('date_to', params.date_to)
+    if (params?.sort_by_date) searchParams.set('sort_by_date', params.sort_by_date)
     return request<{
       total: number;
       images: InstagramImage[];
@@ -240,6 +250,7 @@ export const ImagesAPI = {
     score_perspective?: string
     min_score?: number
     sort_by_score?: 'asc' | 'desc'
+    sort_by_date?: 'newest' | 'oldest'
     limit?: number
     offset?: number
   }) => {
@@ -263,6 +274,7 @@ export const ImagesAPI = {
     if (params?.score_perspective) searchParams.set('score_perspective', params.score_perspective)
     if (params?.min_score !== undefined) searchParams.set('min_score', String(params.min_score))
     if (params?.sort_by_score) searchParams.set('sort_by_score', params.sort_by_score)
+    if (params?.sort_by_date) searchParams.set('sort_by_date', params.sort_by_date)
     if (params?.limit !== undefined) searchParams.set('limit', String(params.limit))
     if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
     const qs = searchParams.toString()
@@ -291,14 +303,23 @@ export const ImagesAPI = {
 }
 
 export const MatchingAPI = {
-  list: (limit?: number, offset?: number) =>
-    request<{
+  list: (
+    limit?: number,
+    offset?: number,
+    params?: { sort_by_date?: 'newest' | 'oldest' },
+  ) => {
+    const sp = new URLSearchParams()
+    sp.set('limit', String(limit ?? 50))
+    sp.set('offset', String(offset ?? 0))
+    if (params?.sort_by_date) sp.set('sort_by_date', params.sort_by_date)
+    return request<{
       total: number
       total_groups?: number
       total_matches?: number
       match_groups: MatchGroup[]
       matches: Match[]
-    }>(`/images/matches?limit=${limit || 50}&offset=${offset || 0}`),
+    }>(`/images/matches?${sp.toString()}`)
+  },
   validate: (catalogKey: string, instaKey: string) =>
     request<{ validated: boolean }>(
       `/images/matches/${encodeURIComponent(catalogKey)}/${encodeURIComponent(instaKey)}/validate`,
@@ -651,13 +672,19 @@ export interface PostNextSuggestionsResponse {
 }
 
 export const IdentityAPI = {
-  getBestPhotos: (params?: { limit?: number; offset?: number; min_perspectives?: number }) => {
+  getBestPhotos: (params?: {
+    limit?: number
+    offset?: number
+    min_perspectives?: number
+    sort_by_date?: 'newest' | 'oldest'
+  }) => {
     const sp = new URLSearchParams()
     if (params?.limit !== undefined) sp.set('limit', String(params.limit))
     if (params?.offset !== undefined) sp.set('offset', String(params.offset))
     if (params?.min_perspectives !== undefined) {
       sp.set('min_perspectives', String(params.min_perspectives))
     }
+    if (params?.sort_by_date) sp.set('sort_by_date', params.sort_by_date)
     const qs = sp.toString()
     return request<IdentityBestPhotosResponse>(`/identity/best-photos${qs ? `?${qs}` : ''}`)
   },
@@ -669,6 +696,7 @@ export const IdentityAPI = {
     offset?: number
     lookback_days_recent?: number
     lookback_days_baseline?: number
+    sort_by_date?: 'newest' | 'oldest'
   }) => {
     const sp = new URLSearchParams()
     if (params?.limit !== undefined) sp.set('limit', String(params.limit))
@@ -679,6 +707,7 @@ export const IdentityAPI = {
     if (params?.lookback_days_baseline !== undefined) {
       sp.set('lookback_days_baseline', String(params.lookback_days_baseline))
     }
+    if (params?.sort_by_date) sp.set('sort_by_date', params.sort_by_date)
     const qs = sp.toString()
     return request<PostNextSuggestionsResponse>(`/identity/suggestions${qs ? `?${qs}` : ''}`)
   },

@@ -175,6 +175,11 @@ export const MSG_CLICK_FOR_DETAILS = 'Click for details'
 export const MSG_PAGE_OF = 'Page {current} of {total}'
 export const MSG_SHOWING_RANGE = 'Showing {start}-{end} of {total}'
 
+/** Shared summary phrasing for paginated grids ("Showing 50 of 12,345 images"). */
+export function msgShowingOf(shown: number, total: number, noun = 'items'): string {
+  return `Showing ${shown.toLocaleString()} of ${total.toLocaleString()} ${noun}`
+}
+
 // Modal
 export const MODAL_TITLE_IMAGE_DETAILS = 'Image Details'
 export const MODAL_CLOSE = 'Close'
@@ -232,6 +237,10 @@ export const CATALOG_FILTER_LABEL_COLOR = 'Color label'
 export const CATALOG_FILTER_LABEL_SCORE_PERSPECTIVE = 'Score perspective'
 export const CATALOG_FILTER_LABEL_MIN_SCORE = 'Min score'
 export const CATALOG_FILTER_LABEL_SORT_SCORE = 'Sort by score'
+export const FILTER_LABEL_SORT_DATE = 'Sort by date'
+export const FILTER_SORT_DATE_NONE = 'None'
+export const FILTER_SORT_DATE_NEWEST = 'Newest first'
+export const FILTER_SORT_DATE_OLDEST = 'Oldest first'
 
 export const CATALOG_FILTER_POSTED_ALL = 'All Images'
 export const CATALOG_FILTER_POSTED = 'Posted'
@@ -426,8 +435,6 @@ export const IDENTITY_BEST_PHOTOS_EMPTY_FALLBACK =
   'No eligible ranked photos yet. Run scoring on more perspectives per image to meet coverage.'
 export const IDENTITY_LABEL_AGGREGATE = 'Aggregate'
 export const IDENTITY_LABEL_PERSPECTIVES_COVERED = 'Perspectives scored'
-export const IDENTITY_ACTION_SHOW_BREAKDOWN = 'Score breakdown'
-export const IDENTITY_ACTION_HIDE_BREAKDOWN = 'Hide breakdown'
 export const IDENTITY_COL_PERSPECTIVE = 'Perspective'
 export const IDENTITY_COL_SCORE = 'Score'
 export const IDENTITY_COL_PROMPT_VERSION = 'Prompt version'
