@@ -150,6 +150,34 @@ export function useFilters(schema: FilterSchema): UseFiltersReturn {
     return m
   }, [schema])
 
+  // When the schema grows (e.g. an async-populated descriptor like `month`
+  // appears only after its options load), seed the new keys with their
+  // defaults. When a key disappears, drop it. Without this, newly added keys
+  // read as `undefined` and the active-state check compares `undefined` to
+  // the descriptor default, spuriously treating the filter as active and
+  // rendering an empty chip.
+  useEffect(() => {
+    const schemaKeys = new Set(schema.map((d) => d.key))
+    const reconcile = (prev: Record<string, unknown>): Record<string, unknown> => {
+      let changed = false
+      const next: Record<string, unknown> = {}
+      for (const d of schema) {
+        if (Object.prototype.hasOwnProperty.call(prev, d.key)) {
+          next[d.key] = prev[d.key]
+        } else {
+          next[d.key] = descriptorDefault(d)
+          changed = true
+        }
+      }
+      for (const k of Object.keys(prev)) {
+        if (!schemaKeys.has(k)) changed = true
+      }
+      return changed ? next : prev
+    }
+    setRawValues(reconcile)
+    setCommittedValues(reconcile)
+  }, [schema])
+
   useEffect(() => {
     return () => {
       for (const k of Object.keys(debounceTimers.current)) {

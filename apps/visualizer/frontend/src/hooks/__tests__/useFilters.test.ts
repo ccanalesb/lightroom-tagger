@@ -3,35 +3,31 @@ import { renderHook, act } from '@testing-library/react'
 import { useFilters } from '../useFilters'
 import type { FilterSchema } from '../../components/filters/types'
 
-const triSerialize = (v: unknown): string =>
-  v === undefined ? 'all' : v === true ? 'true' : 'false'
-const triDeserialize = (raw: string): unknown =>
-  raw === 'all' ? undefined : raw === 'true' ? true : false
-
+/** Exercises the framework-default toggle codec (no serialize/deserialize). */
 const minimalSchema: FilterSchema = [
   {
     type: 'toggle',
     key: 'posted',
     label: 'Status',
     options: [
-      { value: 'all', label: 'All' },
-      { value: 'true', label: 'Posted' },
-      { value: 'false', label: 'Not' },
+      { value: undefined, label: 'All' },
+      { value: true, label: 'Posted' },
+      { value: false, label: 'Not' },
     ],
-    serialize: triSerialize,
-    deserialize: triDeserialize,
   },
   {
     type: 'toggle',
     key: 'analyzed',
     label: 'Analyzed',
     options: [
-      { value: 'all', label: 'All' },
-      { value: 'true', label: 'Analyzed' },
-      { value: 'false', label: 'Not analyzed' },
+      { value: undefined, label: 'All' },
+      { value: true, label: 'Analyzed' },
+      { value: false, label: 'Not analyzed' },
     ],
-    serialize: triSerialize,
-    deserialize: triDeserialize,
+    // Escape hatch: this toggle opts in to a custom codec to prove the
+    // override path still works. All other toggles above rely on defaults.
+    serialize: (v) => (v === undefined ? 'all' : v === true ? 'true' : 'false'),
+    deserialize: (raw) => (raw === 'all' ? undefined : raw === 'true' ? true : false),
   },
   {
     type: 'select',

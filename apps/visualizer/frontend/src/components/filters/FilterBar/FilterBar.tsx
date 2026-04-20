@@ -21,6 +21,69 @@ function chipSourceValue(descriptor: FilterDescriptor, filters: UseFiltersReturn
   return filters.values[descriptor.key]
 }
 
+/** Framework default for date-range chips: `2024-01-01 → 2024-12-31`, or
+ *  one-sided variants. */
+function formatDateRangeValue(value: unknown): string {
+  if (!value || typeof value !== 'object') return ''
+  const v = value as { from?: unknown; to?: unknown }
+  const from = typeof v.from === 'string' ? v.from : ''
+  const to = typeof v.to === 'string' ? v.to : ''
+  if (from && to) return `${from} → ${to}`
+  if (from) return `from ${from}`
+  if (to) return `to ${to}`
+  return ''
+}
+
+/** Derive the chip label from `descriptor.options` by value match. Returns
+ *  `null` when no option matches, so the caller can fall back. */
+function labelFromOptions(
+  options: ReadonlyArray<{ value: unknown; label: string }>,
+  value: unknown,
+): string | null {
+  const match = options.find((o) => o.value === value)
+  return match ? match.label : null
+}
+
+/**
+ * Framework default chip formatter: each filter type knows how to render its
+ * own value without the consumer supplying `formatValue`.
+ *
+ * `descriptor.formatValue` remains available as an escape hatch for schemas
+ * that need custom rendering (e.g. look up a perspective's display name by
+ * slug, which the options list can't express statically).
+ */
+function defaultChipLabel(descriptor: FilterDescriptor, value: unknown): string {
+  switch (descriptor.type) {
+    case 'toggle': {
+      const fromOptions = labelFromOptions(descriptor.options, value)
+      return fromOptions ?? defaultFormatValue(value)
+    }
+    case 'select': {
+      // Empty-string / undefined values represent "no selection" and never
+      // reach the chip row (isActive filters them out), so any mismatch
+      // here is a genuine schema/value drift — fall back to string form.
+      const fromOptions = labelFromOptions(descriptor.options, value)
+      if (fromOptions !== null) return fromOptions
+      // Compare by string too, since <select> values are strings but some
+      // schemas carry numbers in the committed value (numberValue: true).
+      const asString = typeof value === 'number' ? String(value) : null
+      if (asString !== null) {
+        const stringMatch = labelFromOptions(descriptor.options, asString)
+        if (stringMatch !== null) return stringMatch
+      }
+      return defaultFormatValue(value)
+    }
+    case 'dateRange':
+      return formatDateRangeValue(value)
+    case 'search':
+      return defaultFormatValue(value)
+    default: {
+      const _never: never = descriptor
+      return _never
+    }
+  }
+}
+
 export type FilterBarProps = {
   schema: FilterSchema
   filters: UseFiltersReturn
@@ -36,7 +99,7 @@ export function FilterBar({ schema, filters, summary, disabled }: FilterBarProps
           .filter((d) => filters.isActive(d.key))
           .map((d) => {
             const source = chipSourceValue(d, filters)
-            const display = d.formatValue ? d.formatValue(source) : defaultFormatValue(source)
+            const display = d.formatValue ? d.formatValue(source) : defaultChipLabel(d, source)
             const chipLabel = d.chipLabel ?? d.label
             return (
               <FilterChip

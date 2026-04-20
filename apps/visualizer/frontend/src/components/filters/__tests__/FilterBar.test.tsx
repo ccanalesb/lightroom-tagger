@@ -88,4 +88,92 @@ describe('FilterBar', () => {
     fireEvent.click(screen.getByRole('button', { name: /Clear all/i }))
     expect(clearAll).toHaveBeenCalledTimes(1)
   })
+
+  it('auto-derives the chip label from a toggle option without formatValue', () => {
+    const toggleSchema: FilterSchema = [
+      {
+        type: 'toggle',
+        key: 'posted',
+        label: 'Status',
+        options: [
+          { value: undefined, label: 'All Images' },
+          { value: true, label: 'Posted' },
+          { value: false, label: 'Not Posted' },
+        ],
+      },
+    ]
+    const filters = makeFilters({
+      activeCount: 1,
+      values: { posted: false },
+      rawValues: { posted: false },
+      isActive: (k) => k === 'posted',
+    })
+    render(<FilterBar schema={toggleSchema} filters={filters} />)
+    expect(screen.getByText(/Status: Not Posted/i)).toBeInTheDocument()
+  })
+
+  it('auto-derives the chip label from a select option without formatValue', () => {
+    const selectSchema: FilterSchema = [
+      {
+        type: 'select',
+        key: 'sort',
+        label: 'Sort',
+        options: [
+          { value: 'none', label: 'None' },
+          { value: 'desc', label: 'High → Low' },
+          { value: 'asc', label: 'Low → High' },
+        ],
+        defaultValue: 'none',
+      },
+    ]
+    const filters = makeFilters({
+      activeCount: 1,
+      values: { sort: 'desc' },
+      rawValues: { sort: 'desc' },
+      isActive: (k) => k === 'sort',
+    })
+    render(<FilterBar schema={selectSchema} filters={filters} />)
+    expect(screen.getByText(/Sort: High → Low/i)).toBeInTheDocument()
+  })
+
+  it('matches a select option when the committed value is numeric (numberValue)', () => {
+    const selectSchema: FilterSchema = [
+      {
+        type: 'select',
+        key: 'minRating',
+        label: 'Rating',
+        numberValue: true,
+        options: [
+          { value: '', label: 'Any' },
+          { value: '3', label: '★★★' },
+        ],
+      },
+    ]
+    const filters = makeFilters({
+      activeCount: 1,
+      values: { minRating: 3 },
+      rawValues: { minRating: 3 },
+      isActive: (k) => k === 'minRating',
+    })
+    render(<FilterBar schema={selectSchema} filters={filters} />)
+    expect(screen.getByText(/Rating: ★★★/i)).toBeInTheDocument()
+  })
+
+  it('formats a dateRange chip using the framework default', () => {
+    const dateSchema: FilterSchema = [
+      {
+        type: 'dateRange',
+        key: 'dateRange',
+        label: 'Range',
+      },
+    ]
+    const filters = makeFilters({
+      activeCount: 1,
+      values: { dateRange: { from: '2024-01-01', to: '2024-12-31' } },
+      rawValues: { dateRange: { from: '2024-01-01', to: '2024-12-31' } },
+      isActive: (k) => k === 'dateRange',
+    })
+    render(<FilterBar schema={dateSchema} filters={filters} />)
+    expect(screen.getByText(/Range: 2024-01-01 → 2024-12-31/i)).toBeInTheDocument()
+  })
 })
