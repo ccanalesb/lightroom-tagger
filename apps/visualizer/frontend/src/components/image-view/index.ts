@@ -6,3 +6,6 @@ export {
   fromPostNextRow,
   fromUnpostedRow,
 } from './adapters'
+export { ImageMetadataBadges } from './ImageMetadataBadges'
+export type { PrimaryScoreSource } from './ImageMetadataBadges'
+export { ImagePerspectiveBreakdown } from './ImagePerspectiveBreakdown'
