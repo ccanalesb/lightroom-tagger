@@ -9,3 +9,5 @@ export {
 export { ImageMetadataBadges } from './ImageMetadataBadges'
 export type { PrimaryScoreSource } from './ImageMetadataBadges'
 export { ImagePerspectiveBreakdown } from './ImagePerspectiveBreakdown'
+export { ImageTile } from './ImageTile'
+export type { ImageTileVariant } from './ImageTile'
