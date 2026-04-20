@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   IdentityAPI,
-  type CatalogImage,
   type PostNextCandidate,
   type PostNextSuggestionsMeta,
 } from '../../services/api'
-import { CatalogImageModal } from '../catalog/CatalogImageModal'
+import { ImageDetailModal, fromPostNextRow } from '../image-view'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import {
@@ -25,26 +24,6 @@ function errMessage(e: unknown): string {
   return String(e)
 }
 
-function candidateToCatalogStub(row: PostNextCandidate): CatalogImage {
-  return {
-    id: null,
-    key: row.image_key,
-    filename: row.filename,
-    filepath: '',
-    date_taken: row.date_taken,
-    rating: typeof row.rating === 'number' ? row.rating : 0,
-    pick: false,
-    color_label: '',
-    keywords: [],
-    title: '',
-    caption: '',
-    copyright: '',
-    width: 0,
-    height: 0,
-    instagram_posted: false,
-  }
-}
-
 function labelForReasonCode(code: string): string {
   return IDENTITY_REASON_CODE_LABELS[code] ?? code.replace(/_/g, ' ')
 }
@@ -58,7 +37,7 @@ export function PostNextSuggestionsPanel() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selected, setSelected] = useState<CatalogImage | null>(null)
+  const [selected, setSelected] = useState<PostNextCandidate | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -180,7 +159,7 @@ export function PostNextSuggestionsPanel() {
                   >
                     <button
                       type="button"
-                      onClick={() => setSelected(candidateToCatalogStub(row))}
+                      onClick={() => setSelected(row)}
                       className="mx-auto shrink-0 focus:outline-none focus:ring-2 focus:ring-accent sm:mx-0"
                     >
                       <img
@@ -243,7 +222,13 @@ export function PostNextSuggestionsPanel() {
       </Card>
 
       {selected ? (
-        <CatalogImageModal image={selected} onClose={() => setSelected(null)} />
+        <ImageDetailModal
+          imageType={(selected.image_type as 'catalog' | 'instagram') ?? 'catalog'}
+          imageKey={selected.image_key}
+          initialImage={fromPostNextRow(selected)}
+          primaryScoreSource="identity"
+          onClose={() => setSelected(null)}
+        />
       ) : null}
     </section>
   )
