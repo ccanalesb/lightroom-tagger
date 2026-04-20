@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import type { ImageView } from '../../services/api'
 import { ImageMetadataBadges, type PrimaryScoreSource } from './ImageMetadataBadges'
+import { imageTileVariantClasses, type ImageTileVariant } from './imageTileVariants'
 
-export type ImageTileVariant = 'grid' | 'strip' | 'list' | 'compact'
+export type { ImageTileVariant } from './imageTileVariants'
 
 interface ImageTileProps {
   image: ImageView
@@ -37,7 +38,7 @@ export function ImageTile({
   footer,
   className = '',
 }: ImageTileProps) {
-  const classes = variantClasses(variant)
+  const classes = imageTileVariantClasses(variant)
   const imageType = image.image_type
   const dateDisplay = image.date_taken
     ? new Date(image.date_taken).toLocaleDateString()
@@ -48,6 +49,10 @@ export function ImageTile({
   return (
     <div
       className={`group overflow-hidden rounded-card border border-border bg-bg shadow-card transition-all hover:border-border-strong hover:shadow-deep ${classes.root} ${className}`.trim()}
+      data-testid="image-tile"
+      data-image-key={image.key}
+      data-image-type={imageType}
+      data-variant={variant}
     >
       <button
         type="button"
@@ -86,59 +91,4 @@ export function ImageTile({
       </div>
     </div>
   )
-}
-
-interface VariantClasses {
-  root: string
-  button: string
-  thumb: string
-  body: string
-  title: string
-  subtitle: string
-  meta: string
-}
-
-function variantClasses(variant: ImageTileVariant): VariantClasses {
-  switch (variant) {
-    case 'grid':
-      return {
-        root: 'cursor-pointer',
-        button: '',
-        thumb: 'aspect-square',
-        body: 'p-3',
-        title: 'text-sm',
-        subtitle: 'text-xs',
-        meta: 'text-xs',
-      }
-    case 'strip':
-      return {
-        root: 'w-[200px] shrink-0',
-        button: '',
-        thumb: 'aspect-[4/3]',
-        body: 'p-2',
-        title: 'text-xs',
-        subtitle: 'text-[10px]',
-        meta: 'text-[10px]',
-      }
-    case 'list':
-      return {
-        root: 'cursor-pointer',
-        button: '',
-        thumb: 'h-28',
-        body: 'p-3',
-        title: 'text-sm',
-        subtitle: 'text-xs',
-        meta: 'text-xs',
-      }
-    case 'compact':
-      return {
-        root: 'cursor-pointer',
-        button: '',
-        thumb: 'aspect-[4/3]',
-        body: 'p-3',
-        title: 'text-sm',
-        subtitle: 'text-xs',
-        meta: 'text-xs',
-      }
-  }
 }

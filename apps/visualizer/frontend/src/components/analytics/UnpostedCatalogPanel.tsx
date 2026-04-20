@@ -7,6 +7,7 @@ import {
 import { ImageDetailModal, ImageTile, fromUnpostedRow } from '../image-view'
 import { Card, CardContent } from '../ui/Card'
 import { Pagination } from '../ui/Pagination'
+import { TileGrid } from '../ui/TileGrid'
 import { formatMonth } from '../../utils/date'
 import {
   ANALYTICS_APPLY,
@@ -240,7 +241,7 @@ export function UnpostedCatalogPanel() {
 
           {!loading && !error && rows.length > 0 ? (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              <TileGrid>
                 {rows.map((row) => (
                   <ImageTile
                     key={row.key}
@@ -250,7 +251,7 @@ export function UnpostedCatalogPanel() {
                     onClick={() => setSelected(row)}
                   />
                 ))}
-              </div>
+              </TileGrid>
               {totalPages > 1 ? (
                 <Pagination
                   currentPage={page}

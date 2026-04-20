@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ImageView } from '../../services/api'
 import { MetadataRow } from '../ui/MetadataRow'
+import { AIDescriptionSection } from '../DescriptionPanel'
 import { useMatchOptions } from '../../stores/matchOptionsContext'
 import { useSingleMatch } from '../../hooks/useSingleMatch'
 import { MatchStatusDisplay } from '../instagram/MatchStatusDisplay'
@@ -8,7 +9,6 @@ import { MatchAdvancedOptions } from '../instagram/MatchAdvancedOptions'
 import {
   DATE_ESTIMATED_SUFFIX,
   DATE_NO_DATE,
-  IMAGE_DETAILS_AI_DESCRIPTION,
   LABEL_CATALOG_MATCH,
   LABEL_DATE,
   LABEL_FILENAME,
@@ -97,14 +97,11 @@ export function InstagramImageDetailSections({
         ) : null}
       </div>
 
-      {image.description_summary ? (
-        <div className="p-4 bg-surface rounded-base border border-border">
-          <h3 className="text-sm font-medium text-text mb-2">
-            {IMAGE_DETAILS_AI_DESCRIPTION}
-          </h3>
-          <p className="text-sm text-text-secondary">{image.description_summary}</p>
-        </div>
-      ) : null}
+      <AIDescriptionSection
+        imageKey={image.key}
+        imageType="instagram"
+        onDataChanged={onDataChanged}
+      />
 
       {image.caption ? (
         <div className="p-4 bg-surface rounded-base border border-border">

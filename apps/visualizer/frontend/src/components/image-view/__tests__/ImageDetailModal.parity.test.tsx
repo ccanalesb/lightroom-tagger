@@ -116,8 +116,10 @@ async function openFrom(initial: ReturnType<typeof fromCatalogListRow>) {
   await waitFor(() => {
     expect(ImagesAPI.getImageDetail).toHaveBeenCalled()
   })
-  // Breakdown table header is a stable anchor once detail resolves.
-  await waitFor(() => expect(screen.getByText('Perspective')).toBeInTheDocument())
+  // Aggregate pill in the modal header is a stable anchor once detail resolves.
+  await waitFor(() =>
+    expect(screen.getAllByLabelText(/Aggregate score/i).length).toBeGreaterThan(0),
+  )
   return screen.getByRole('dialog')
 }
 
@@ -160,27 +162,4 @@ describe('ImageDetailModal — cross-entry parity', () => {
     expect(bestHeader[0].textContent).toBe(catalogText)
   })
 
-  it('renders the identity per-perspective breakdown consistently across entry points', async () => {
-    const extractPerspectiveRows = (dialog: HTMLElement) =>
-      within(dialog)
-        .getAllByRole('row')
-        .slice(1) // skip header row
-        .map((row) => row.textContent?.replace(/\s+/g, ' ').trim() ?? '')
-
-    let dialog = await openFrom(fromCatalogListRow(CATALOG_ROW))
-    const catalogRows = extractPerspectiveRows(dialog)
-    expect(catalogRows).toHaveLength(2)
-    expect(catalogRows[0]).toContain('Portraits')
-    expect(catalogRows[0]).toContain('8')
-    expect(catalogRows[1]).toContain('Street')
-    expect(catalogRows[1]).toContain('6')
-    cleanup()
-
-    dialog = await openFrom(fromUnpostedRow(UNPOSTED_ROW))
-    expect(extractPerspectiveRows(dialog)).toEqual(catalogRows)
-    cleanup()
-
-    dialog = await openFrom(fromBestPhotoRow(BEST_PHOTO_ROW))
-    expect(extractPerspectiveRows(dialog)).toEqual(catalogRows)
-  })
 })

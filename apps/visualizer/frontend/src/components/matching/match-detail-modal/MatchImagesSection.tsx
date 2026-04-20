@@ -1,69 +1,102 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { Match } from '../../../services/api';
-import { MATCH_DETAIL_INSTAGRAM, MATCH_DETAIL_CATALOG } from '../../../constants/strings';
+import {
+  MATCH_DETAIL_INSTAGRAM,
+  MATCH_DETAIL_CATALOG,
+} from '../../../constants/strings';
+import { ImageDetailModal, fromMatchSide } from '../../image-view';
+import { MatchSideTile } from './MatchSideTile';
+import { MatchCandidateCarousel } from './MatchCandidateCarousel';
+import { useCandidateKeyboardNav } from './useCandidateKeyboardNav';
 
 interface MatchImagesSectionProps {
-  match: Match;
+  /** The full candidate list in stable order (rank 1 first). */
+  candidates: Match[];
+  /** The currently shown candidate (must be in `candidates`). */
+  activeMatch: Match;
+  onCandidateChange: (match: Match) => void;
 }
 
-export function MatchImagesSection({ match }: MatchImagesSectionProps) {
-  const [instaLoaded, setInstaLoaded] = useState(false);
-  const [catalogLoaded, setCatalogLoaded] = useState(false);
+/**
+ * Side-by-side comparison (stacked on mobile): the Instagram image
+ * alongside the currently-selected catalog candidate, with
+ * `‹ N of M ›` carousel controls below. Arrow keys step through
+ * candidates when the modal has focus.
+ *
+ * Each side exposes an "Open full details" affordance that launches
+ * the canonical `ImageDetailModal` on top for full metadata parity.
+ */
+export function MatchImagesSection({
+  candidates,
+  activeMatch,
+  onCandidateChange,
+}: MatchImagesSectionProps) {
+  const [openSide, setOpenSide] = useState<null | 'instagram' | 'catalog'>(null);
 
-  const instaUrl = `/api/images/instagram/${encodeURIComponent(match.instagram_key)}/thumbnail`;
-  const catalogUrl = `/api/images/catalog/${encodeURIComponent(match.catalog_key)}/thumbnail`;
+  const activeIndex = candidates.findIndex(
+    (c) =>
+      c.catalog_key === activeMatch.catalog_key &&
+      c.instagram_key === activeMatch.instagram_key,
+  );
+  const total = candidates.length;
+
+  const step = useCallback(
+    (delta: -1 | 1) => {
+      if (total <= 1) return;
+      const nextIndex = (activeIndex + delta + total) % total;
+      onCandidateChange(candidates[nextIndex]);
+    },
+    [activeIndex, total, candidates, onCandidateChange],
+  );
+
+  useCandidateKeyboardNav(total > 1, step);
+
+  const instagramView = fromMatchSide(activeMatch, 'instagram');
+  const catalogView = fromMatchSide(activeMatch, 'catalog');
 
   return (
-    <div className="grid grid-cols-2 gap-4">
-      <div className="space-y-2">
-        <h4 className="text-sm font-medium text-gray-700">{MATCH_DETAIL_INSTAGRAM}</h4>
-        <div className="relative bg-gray-100 rounded-lg overflow-hidden aspect-square">
-          {!instaLoaded && (
-            <div className="absolute inset-0 bg-gray-200 animate-pulse" />
-          )}
-          <img
-            src={instaUrl}
-            alt={MATCH_DETAIL_INSTAGRAM}
-            className={`w-full h-full object-contain transition-opacity duration-300 ${
-              instaLoaded ? 'opacity-100' : 'opacity-0'
-            }`}
-            onLoad={() => setInstaLoaded(true)}
+    <>
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <MatchSideTile
+            title={MATCH_DETAIL_INSTAGRAM}
+            image={instagramView}
+            primaryScoreSource="none"
+            onOpenFullDetails={() => setOpenSide('instagram')}
+          />
+          <MatchSideTile
+            title={MATCH_DETAIL_CATALOG}
+            image={catalogView}
+            primaryScoreSource="catalog"
+            onOpenFullDetails={() => setOpenSide('catalog')}
           />
         </div>
-        <p className="text-xs text-gray-500 break-all">
-          {match.instagram_image?.filename || match.instagram_key}
-        </p>
-        {match.instagram_image?.description && (
-          <p className="text-xs text-gray-600 line-clamp-3">
-            {match.instagram_image.description}
-          </p>
-        )}
+
+        <MatchCandidateCarousel
+          activeIndex={activeIndex}
+          total={total}
+          onStep={step}
+        />
       </div>
 
-      <div className="space-y-2">
-        <h4 className="text-sm font-medium text-gray-700">{MATCH_DETAIL_CATALOG}</h4>
-        <div className="relative bg-gray-100 rounded-lg overflow-hidden aspect-square">
-          {!catalogLoaded && (
-            <div className="absolute inset-0 bg-gray-200 animate-pulse" />
-          )}
-          <img
-            src={catalogUrl}
-            alt={MATCH_DETAIL_CATALOG}
-            className={`w-full h-full object-contain transition-opacity duration-300 ${
-              catalogLoaded ? 'opacity-100' : 'opacity-0'
-            }`}
-            onLoad={() => setCatalogLoaded(true)}
-          />
-        </div>
-        <p className="text-xs text-gray-500 break-all">
-          {match.catalog_image?.filename || match.catalog_key}
-        </p>
-        {match.catalog_image?.caption && (
-          <p className="text-xs text-gray-600 line-clamp-3">
-            {match.catalog_image.caption}
-          </p>
-        )}
-      </div>
-    </div>
+      {openSide === 'instagram' ? (
+        <ImageDetailModal
+          imageType="instagram"
+          imageKey={activeMatch.instagram_key}
+          initialImage={instagramView}
+          primaryScoreSource="none"
+          onClose={() => setOpenSide(null)}
+        />
+      ) : null}
+      {openSide === 'catalog' ? (
+        <ImageDetailModal
+          imageType="catalog"
+          imageKey={activeMatch.catalog_key}
+          initialImage={catalogView}
+          primaryScoreSource="catalog"
+          onClose={() => setOpenSide(null)}
+        />
+      ) : null}
+    </>
   );
 }

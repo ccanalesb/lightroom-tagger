@@ -114,28 +114,36 @@ export function ImageDetailModal({
         style={{ backgroundColor: 'var(--color-background)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="absolute right-4 top-4 z-10 rounded-base border border-border bg-surface/80 p-2 backdrop-blur-sm transition-all hover:bg-surface-hover focus:outline-none focus:ring-2 focus:ring-accent"
-        >
-          <svg
-            className="h-5 w-5 text-text"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
-
         <div className="min-h-0 flex-1 overflow-y-auto">
+          <div
+            className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-bg px-6 py-4 md:rounded-t-card"
+            style={{ backgroundColor: 'var(--color-background)' }}
+          >
+            <h2 id={titleId} className="text-card-title text-text truncate">
+              {IMAGE_DETAILS_TITLE}
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="shrink-0 rounded-base border border-border bg-surface/80 p-2 backdrop-blur-sm transition-all hover:bg-surface-hover focus:outline-none focus:ring-2 focus:ring-accent"
+            >
+              <svg
+                className="h-5 w-5 text-text"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
           <div className="grid gap-6 p-6 md:grid-cols-2">
             <div className="aspect-square overflow-hidden rounded-base bg-surface">
               <img
@@ -146,17 +154,12 @@ export function ImageDetailModal({
             </div>
 
             <div className="space-y-6">
-              <div>
-                <h2 id={titleId} className="text-card-title mb-2 text-text">
-                  {IMAGE_DETAILS_TITLE}
-                </h2>
-                {image ? (
-                  <ImageMetadataBadges
-                    image={image}
-                    primaryScoreSource={primaryScoreSource}
-                  />
-                ) : null}
-              </div>
+              {image ? (
+                <ImageMetadataBadges
+                  image={image}
+                  primaryScoreSource={primaryScoreSource}
+                />
+              ) : null}
 
               {loading && !image ? (
                 <p
