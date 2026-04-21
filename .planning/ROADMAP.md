@@ -159,7 +159,7 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 **Plans (v2.1 Phase 8):**
 - [x] **Plan 01** (Wave 1): `find_candidates_by_date` LEFT JOIN → `ai_summary`; `compare_descriptions_batch`; unit tests — **complete 2026-04-21**
 - [x] **Plan 02** (Wave 2): `match_dump_media` + two-stage cascade in `score_candidates_with_vision` — **complete 2026-04-21**
-- [ ] **Plan 03** (Wave 3): `skip_undescribed` option + UI
+- [x] **Plan 03** (Wave 3): `skip_undescribed` option + UI — **complete 2026-04-21**
 
 **Success criteria:**
 1. `find_candidates_by_date` returns AI summaries attached to each candidate (`image_descriptions.summary` joined in) — `catalog_img.get('description')` is non-empty for described images
