@@ -7,11 +7,13 @@ from lightroom_tagger.core.database import (
     store_match,
     store_vision_comparison,
 )
+from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.vision_cache import (
     InstagramCache,
     get_cached_phash,
     get_or_create_cached_image,
 )
+from lightroom_tagger.core.vision_client import compare_descriptions_batch
 
 
 def query_by_exif(db, insta_exif: dict, date_window_days: int = 7) -> list[dict]:
@@ -83,6 +85,69 @@ def text_similarity(text1: str, text2: str) -> float:
 BATCH_MAX_TOKENS_ESCALATION = [4096, 32768, 65536]
 
 
+def _compute_desc_scores_for_candidates(
+    insta_image: dict,
+    candidates: list,
+    batch_size: int,
+    desc_weight: float,
+    skip_undescribed: bool,
+    provider_id: str | None,
+    model: str | None,
+    log_callback,
+) -> dict[int, float]:
+    """Map candidate index -> description similarity 0–1 via compare_descriptions_batch."""
+    if desc_weight <= 0:
+        return {}
+
+    from lightroom_tagger.core.analyzer import get_vision_model
+
+    reference_text = (insta_image.get('ai_summary') or '').strip()
+    desc_scores: dict[int, float] = {}
+    if not reference_text:
+        for idx in range(len(candidates)):
+            desc_scores[idx] = 0.0
+        return desc_scores
+
+    registry = ProviderRegistry()
+    actual_provider_id = provider_id or registry.fallback_order[0]
+    client = registry.get_client(actual_provider_id)
+    requested_model = model or get_vision_model()
+
+    for chunk_start in range(0, len(candidates), batch_size):
+        chunk_indices = list(range(chunk_start, min(chunk_start + batch_size, len(candidates))))
+        text_candidates: list[tuple[int, str]] = []
+        for idx in chunk_indices:
+            cand = candidates[idx]
+            summary = (cand.get('ai_summary') or '').strip()
+            if skip_undescribed and not summary:
+                desc_scores[idx] = 0.0
+            else:
+                text_candidates.append((idx, cand.get('ai_summary') or ''))
+        if not text_candidates:
+            continue
+        try:
+            raw_map = compare_descriptions_batch(
+                client,
+                requested_model,
+                reference_text,
+                text_candidates,
+                log_callback=log_callback,
+                max_tokens=4096,
+            )
+        except Exception as e:
+            if log_callback:
+                log_callback('warning', f'[desc_batch] batch failed: {e}')
+            for idx, _ in text_candidates:
+                desc_scores[idx] = 0.0
+            continue
+        for cid, conf in raw_map.items():
+            desc_scores[int(cid)] = max(0.0, min(1.0, float(conf) / 100.0))
+        for idx, _ in text_candidates:
+            desc_scores.setdefault(idx, 0.0)
+
+    return desc_scores
+
+
 def _call_batch_chunk(
     client,
     model: str,
@@ -142,6 +207,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                                  model: str | None = None,
                                  batch_size: int = 10,
                                  batch_threshold: int = 5,
+                                 skip_undescribed: bool = True,
                                  should_cancel: Callable[[], bool] | None = None,
                                  batch_progress_callback: Callable[[int, int], None] | None = None) -> list[dict]:
     """Score candidates including vision comparison (one-by-one).
@@ -154,8 +220,6 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     from lightroom_tagger.core.analyzer import compare_with_vision, get_vision_model, vision_score
     from lightroom_tagger.core.phash import hamming_distance
     from lightroom_tagger.core.provider_errors import InvalidRequestError, PayloadTooLargeError, RateLimitError
-    from lightroom_tagger.core.vision_client import compare_images_batch
-    from lightroom_tagger.core.provider_registry import ProviderRegistry
 
     RATE_LIMIT_ABORT_THRESHOLD = 3
 
@@ -165,11 +229,22 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     rate_limited_count = 0
     insta_filename = _os.path.basename(insta_image.get('local_path', 'unknown'))
 
-    # Compress Instagram image ONCE before candidate loop
+    desc_scores_by_idx = _compute_desc_scores_for_candidates(
+        insta_image,
+        candidates,
+        batch_size,
+        desc_weight,
+        skip_undescribed,
+        provider_id,
+        model,
+        log_callback,
+    )
+
+    # Compress Instagram image ONCE before candidate loop (vision stage only)
     insta_cache = InstagramCache(db)
     insta_path = insta_image.get('local_path')
     compressed_insta = None
-    if insta_path:
+    if vision_weight > 0 and insta_path:
         try:
             compressed_insta = insta_cache.compress_instagram_image(insta_path)
             if log_callback:
@@ -185,6 +260,60 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
     if log_callback:
         log_callback('info', f'[{insta_filename}] Starting vision comparison with {total_candidates} candidates')
+
+    if vision_weight == 0:
+        insta_key = insta_image.get('key')
+        model_label = f"{provider_id}:{model}" if provider_id and model else get_vision_model()
+        for idx, candidate in enumerate(candidates):
+            catalog_key = candidate.get('key')
+            cached_phash = get_cached_phash(db, catalog_key)
+            if cached_phash is not None:
+                phash_dist = hamming_distance(insta_image.get('image_hash', ''), cached_phash)
+                cache_hits += 1
+            else:
+                phash_dist = hamming_distance(insta_image.get('image_hash', ''), candidate.get('image_hash', ''))
+                cache_misses += 1
+            phash_score_val = max(0, 1 - (phash_dist / 16))
+            desc_sim_01 = desc_scores_by_idx.get(idx, 0.0) if desc_weight > 0 else 0.0
+            capt_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
+            desc_sim_display = desc_sim_01 if desc_weight > 0 else capt_sim
+            vision_score_val = 0.0
+            total_score_val = (
+                (phash_weight * phash_score_val)
+                + (desc_weight * desc_sim_01)
+                + (vision_weight * vision_score_val)
+            )
+            results.append({
+                'catalog_key': catalog_key,
+                'insta_key': insta_key,
+                'phash_distance': int(phash_dist),
+                'phash_score': phash_score_val,
+                'desc_similarity': desc_sim_display,
+                'vision_result': 'UNCERTAIN',
+                'vision_score': vision_score_val,
+                'vision_reasoning': '',
+                'total_score': total_score_val,
+                'model_used': model_label,
+                'rate_limited': False,
+            })
+        insta_cache.cleanup()
+        results.sort(key=lambda x: x['total_score'], reverse=True)
+        if log_callback:
+            log_callback('info', f'[{insta_filename}] Cache summary: {cache_hits} pHash hits, {cache_misses} pHash misses')
+            above = [r for r in results if r['total_score'] >= threshold]
+            log_callback('debug', f'[{insta_filename}] {len(results)} results, {len(above)} above threshold ({threshold})')
+            if above:
+                for r in above[:5]:
+                    log_callback('info', f'[{insta_filename}] Above threshold: {r["catalog_key"]} total={r["total_score"]:.4f} vision={r["vision_score"]:.4f}')
+            if results:
+                best = results[0]
+                best_pct = int(best['total_score'] * 100)
+                if best['total_score'] >= threshold:
+                    log_callback('info', f'[{insta_filename}] Comparison complete - Best match: {best["catalog_key"]} ({best_pct}%)')
+                else:
+                    log_callback('info', f'[{insta_filename}] No match found above threshold ({threshold})')
+                    log_callback('debug', f'[{insta_filename}] Best result: {best["catalog_key"]} total={best["total_score"]:.4f} vision={best["vision_score"]:.4f}')
+        return results
 
     # Use batch API if we have enough candidates and batch processing is enabled
     use_batch = (total_candidates >= batch_threshold and batch_size > 1)
@@ -277,26 +406,15 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                     cache_misses += 1
 
                 phash_score_val = max(0, 1 - (phash_dist / 16))
-                desc_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
+                desc_sim_01 = desc_scores_by_idx.get(cid, 0.0) if desc_weight > 0 else 0.0
+                capt_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
+                desc_sim_display = desc_sim_01 if desc_weight > 0 else capt_sim
 
-                insta_hash = insta_image.get('image_hash')
-                cand_hash = cached_phash if cached_phash is not None else candidate.get('image_hash')
-                phash_available = bool(insta_hash) and bool(cand_hash)
-                desc_available = bool((insta_image.get('description') or '').strip()) and bool((candidate.get('description') or '').strip())
-
-                active_weights = {}
-                if phash_available:
-                    active_weights['phash'] = phash_weight
-                if desc_available:
-                    active_weights['desc'] = desc_weight
-                active_weights['vision'] = vision_weight
-
-                weight_sum = sum(active_weights.values()) or 1.0
-                w_phash = active_weights.get('phash', 0) / weight_sum
-                w_desc = active_weights.get('desc', 0) / weight_sum
-                w_vision = active_weights['vision'] / weight_sum
-
-                total_score_val = (w_phash * phash_score_val) + (w_desc * desc_sim) + (w_vision * vision_score_val)
+                total_score_val = (
+                    (phash_weight * phash_score_val)
+                    + (desc_weight * desc_sim_01)
+                    + (vision_weight * vision_score_val)
+                )
 
                 store_vision_comparison(db, catalog_key, insta_key, vision_result, vision_score_val, model_label)
 
@@ -305,7 +423,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                     'insta_key': insta_key,
                     'phash_distance': int(phash_dist),
                     'phash_score': phash_score_val,
-                    'desc_similarity': desc_sim,
+                    'desc_similarity': desc_sim_display,
                     'vision_result': vision_result,
                     'vision_score': vision_score_val,
                     'vision_reasoning': '',
@@ -374,7 +492,8 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         # Sequential fallback
         consecutive_fatal = 0
         FATAL_ABORT_THRESHOLD = 3
-        for idx, candidate in enumerate(candidates, 1):
+        for idx0, candidate in enumerate(candidates):
+            idx = idx0 + 1
             if should_cancel is not None and should_cancel():
                 break
             if consecutive_fatal >= FATAL_ABORT_THRESHOLD:
@@ -396,7 +515,9 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
             phash_score_val = max(0, 1 - (phash_dist / 16))
 
-            desc_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
+            desc_sim_01 = desc_scores_by_idx.get(idx0, 0.0) if desc_weight > 0 else 0.0
+            capt_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
+            desc_sim_display = desc_sim_01 if desc_weight > 0 else capt_sim
 
             # Get or create cached compressed image for catalog
             cached_local_path = None
@@ -432,7 +553,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 vision_result = 'RATE_LIMITED'
                 vision_score_val = 0.0
                 rate_limited_count += 1
-            elif insta_path and local_path:
+            elif vision_weight > 0 and insta_path and local_path:
                 try:
                     vision_data = compare_with_vision(
                         local_path, insta_path,
@@ -483,29 +604,11 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 vision_result = 'UNCERTAIN'
                 vision_score_val = 0.5
 
-            # Redistribute weight from unavailable signals to available ones.
-            # A signal is unavailable when its inputs are missing (None/empty hashes,
-            # empty descriptions), distinct from a genuine low-similarity score.
-            insta_hash = insta_image.get('image_hash')
-            cand_hash = cached_phash if cached_phash is not None else candidate.get('image_hash')
-            phash_available = bool(insta_hash) and bool(cand_hash)
-            desc_available = bool((insta_image.get('description') or '').strip()) and bool((candidate.get('description') or '').strip())
-
-            active_weights = {}
-            if phash_available:
-                active_weights['phash'] = phash_weight
-            if desc_available:
-                active_weights['desc'] = desc_weight
-            active_weights['vision'] = vision_weight
-
-            weight_sum = sum(active_weights.values()) or 1.0
-            w_phash = active_weights.get('phash', 0) / weight_sum
-            w_desc = active_weights.get('desc', 0) / weight_sum
-            w_vision = active_weights['vision'] / weight_sum
-
-            total_score_val = (w_phash * phash_score_val) + \
-                              (w_desc * desc_sim) + \
-                              (w_vision * vision_score_val)
+            total_score_val = (
+                (phash_weight * phash_score_val)
+                + (desc_weight * desc_sim_01)
+                + (vision_weight * vision_score_val)
+            )
 
             if log_callback and vision_result != 'UNCERTAIN':
                 log_callback('debug', f'[{insta_filename}] {catalog_key} → {vision_result} (vision={vision_score_val:.2f}, phash={phash_score_val:.2f}, total={total_score_val:.2f})')
@@ -515,7 +618,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 'insta_key': insta_key,
                 'phash_distance': int(phash_dist),
                 'phash_score': phash_score_val,
-                'desc_similarity': desc_sim,
+                'desc_similarity': desc_sim_display,
                 'vision_result': vision_result,
                 'vision_score': vision_score_val,
                 'vision_reasoning': vision_reasoning,
