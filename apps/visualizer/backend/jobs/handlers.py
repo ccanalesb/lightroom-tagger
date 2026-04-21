@@ -307,6 +307,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             'vision': config.vision_weight or 0.3
         })
         force_descriptions = metadata.get('force_descriptions', False)
+        skip_undescribed = bool(metadata.get('skip_undescribed', True))
         provider_id = metadata.get('provider_id')
         provider_model = metadata.get('provider_model')
         max_workers = int(metadata.get('max_workers', config.matching_workers or 4))
@@ -320,6 +321,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             media_key=metadata.get('media_key'),
             force_reprocess=bool(metadata.get('force_reprocess', False)),
             force_descriptions=bool(force_descriptions),
+            skip_undescribed=skip_undescribed,
             provider_id=provider_id,
             provider_model=provider_model,
             max_workers=max_workers,
@@ -438,6 +440,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 media_key=media_key,
                 force_descriptions=force_descriptions,
                 force_reprocess=force_reprocess,
+                skip_undescribed=skip_undescribed,
                 provider_id=provider_id,
                 provider_model=provider_model,
                 max_workers=max_workers,
