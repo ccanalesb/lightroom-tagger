@@ -76,6 +76,7 @@ The user is a photographer managing work across multiple Lightroom catalogs (per
 ### Current State
 - **v1.0 shipped** (2026-04-11) — 4 phases, 22 requirements: catalog management, jobs, Instagram sync, AI descriptions
 - **v2.0 shipped** (2026-04-15) — 7 phases, 17 requirements: structured scoring, posting analytics, identity/suggestions, insights dashboard
+- **v2.1 Phase 5 complete** (2026-04-21) — Identity & Insights clarity: posted/unposted overlay on BestPhotosGrid, Identity page narrative reorder (fingerprint → best → post next), Dashboard Top Photos Unposted/Posted/All tabs via `useFilters`
 - ~32K LOC across Python backend and React/TypeScript frontend
 - Tech stack: Flask + SQLite (catalog read-only, library DB read-write), React 19 + Vite + Recharts + CodeMirror
 - 4 configurable critique perspectives with photography-theory rubrics
@@ -133,4 +134,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-17 — v2.1 Polish & Consolidate milestone started*
+*Last updated: 2026-04-21 — Phase 5 complete (Identity & Insights clarity)*
