@@ -22,6 +22,7 @@ import {
   IDENTITY_FINGERPRINT_EVIDENCE,
   IDENTITY_FINGERPRINT_LOW_DATA,
   IDENTITY_FINGERPRINT_TOKENS,
+  IDENTITY_INTRO_STYLE_FINGERPRINT,
   IDENTITY_SECTION_STYLE_FINGERPRINT,
   MSG_LOADING,
 } from '../../constants/strings'
@@ -96,6 +97,7 @@ export function StyleFingerprintPanel() {
         <h2 id="identity-fingerprint-heading" className="text-card-title text-text">
           {IDENTITY_SECTION_STYLE_FINGERPRINT}
         </h2>
+        <p className="text-sm text-text-secondary">{IDENTITY_INTRO_STYLE_FINGERPRINT}</p>
         <Card padding="md">
           <CardContent>
             <p className="text-sm text-text-secondary" role="status" aria-live="polite">
@@ -113,6 +115,7 @@ export function StyleFingerprintPanel() {
         <h2 id="identity-fingerprint-heading" className="text-card-title text-text">
           {IDENTITY_SECTION_STYLE_FINGERPRINT}
         </h2>
+        <p className="text-sm text-text-secondary">{IDENTITY_INTRO_STYLE_FINGERPRINT}</p>
         <Card padding="md">
           <CardContent>
             <p className="text-sm text-error" role="alert">
@@ -130,6 +133,7 @@ export function StyleFingerprintPanel() {
         <h2 id="identity-fingerprint-heading" className="text-card-title text-text">
           {IDENTITY_SECTION_STYLE_FINGERPRINT}
         </h2>
+        <p className="text-sm text-text-secondary">{IDENTITY_INTRO_STYLE_FINGERPRINT}</p>
         <Card padding="md">
           <CardContent>
             <p className="text-sm text-text-secondary" role="status">
@@ -146,6 +150,7 @@ export function StyleFingerprintPanel() {
       <h2 id="identity-fingerprint-heading" className="text-card-title text-text">
         {IDENTITY_SECTION_STYLE_FINGERPRINT}
       </h2>
+      <p className="text-sm text-text-secondary">{IDENTITY_INTRO_STYLE_FINGERPRINT}</p>
       <Card padding="md">
         <CardHeader>
           <CardTitle className="text-base">{IDENTITY_FINGERPRINT_CHART_TITLE}</CardTitle>
