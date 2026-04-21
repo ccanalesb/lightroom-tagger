@@ -174,4 +174,21 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 
 ---
 
+## Backlog
+
+### Phase 999.1: Follow-up — Phase 7 incomplete plans (BACKLOG)
+
+**Goal:** Execute the React Suspense data layer plans that were planned but never run
+**Source phase:** 7 (React Suspense data layer)
+**Deferred at:** 2026-04-21 during /gsd-next advancement to Phase 5
+**Plans:**
+- [ ] 7-01: core-primitives (planned, no SUMMARY.md)
+- [ ] 7-02: migrate-identity (planned, no SUMMARY.md)
+- [ ] 7-03: migrate-images (planned, no SUMMARY.md)
+- [ ] 7-04: migrate-processing (planned, no SUMMARY.md)
+- [ ] 7-05: migrate-analytics-dashboard (planned, no SUMMARY.md)
+- [ ] 7-06: invalidation-audit (planned, no SUMMARY.md)
+
+---
+
 *Roadmap created: 2026-04-10 · v1.0 shipped: 2026-04-11 · v2.0 shipped: 2026-04-15 · v2.1 started: 2026-04-17*
