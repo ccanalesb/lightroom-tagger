@@ -613,8 +613,15 @@ def find_candidates_by_date(db, insta_image: dict, days_before: int = 90) -> lis
     window_start = post_date - timedelta(days=days_before)
 
     candidates = []
-    for row in db.execute("SELECT * FROM images").fetchall():
-        img = _deserialize_row(row)
+    sql = (
+        "SELECT i.*, COALESCE(d.summary, '') AS ai_summary "
+        "FROM images i "
+        "LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog'"
+    )
+    for row in db.execute(sql).fetchall():
+        row_dict = dict(row)
+        img = _deserialize_row(row_dict)
+        img["ai_summary"] = str(row_dict.get("ai_summary") or "")
         filepath = img.get('filepath', '')
         if filepath:
             ext = os.path.splitext(filepath)[1].lower()
