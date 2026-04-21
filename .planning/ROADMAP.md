@@ -56,6 +56,7 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 | 5. Identity & Insights clarity | Posted/unposted visibility + narrative flow | IDENT-04, IDENT-05, DASH-02, DASH-03 | 4 | Pending |
 | 6. Images page visual consistency | Unify badge + card language on Images page | UI-01, UI-02, UI-03 | 3 | Pending |
 | 7. React Suspense data layer | Replace useEffect+setState fetches with React-only Suspense/ErrorBoundary + module cache, no deps | DATA-01 | 8 | Pending |
+| 8. Two-stage cascade matching | Fix description signal + cascade scoring (desc→vision) | MATCH-01..04 | 8 | ✅ Complete (2026-04-21) |
 
 ## Phase Details (v2.1)
 
