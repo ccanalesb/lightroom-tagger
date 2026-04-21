@@ -41,21 +41,23 @@ Declared values (multiples of 4). **Use Tailwind numeric spacing only** (e.g. `g
 | 2xl | 48px | (Reserved — use sparingly) |
 | 3xl | 64px | (Reserved) |
 
-**Exceptions:** `ImageTile` thumbnail overlay: `right-2 top-2` (8px) for posted badge (existing pattern). Tab nav uses `px-4 py-2.5` per existing `Tabs` (10px vertical — acceptable; do not change for this phase).
+**Exceptions:** `ImageTile` thumbnail overlay: `right-2 top-2` (8px) for posted badge (existing pattern). Tab nav uses `px-4 py-2` (8px vertical, 4pt step) to match this scale; implement Top Photos tabs with the same padding token.
 
 ---
 
 ## Typography
 
+**Weights (exactly two):** **400** (regular) and **600** (semibold). Do not use `font-medium` (500), `font-bold` (700), or other weights in new UI for this phase.
+
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
-| Body | 14px (`text-sm`) | 400 (regular) | 1.5 (default) |
-| Label | 12px (`text-xs`) | 500–600 (medium) | 1.4 |
-| Heading (section) | 22px (`text-card-title`) | 700 | 1.27 (per theme token) |
-| Display (page title) | 48px (`text-section`) | 700 | 1.0 (per theme token) |
+| Body | 14px (`text-sm`) | 400 | 1.5 (default) |
+| Label | 12px (`text-xs`) | 600 (`font-semibold`) | 1.4 |
+| Heading (section) | 22px (`text-card-title`) | 600 (`font-semibold`) | 1.27 (per theme token) |
+| Display (page title) | 48px (`text-section`) | 600 (`font-semibold`) | 1.0 (per theme token) |
 
-- Section intros use **14px** `text-sm` + `text-text-secondary` (D-03).
-- `Badge` uses **12px** `text-xs` + `font-medium` (existing).
+- Section intros use **14px** `text-sm` at weight **400** + `text-text-secondary` (D-03).
+- `Badge` text: **12px** `text-xs` at weight **600** (align to the Label row; use `font-semibold`, not `font-medium`).
 
 ---
 
@@ -74,7 +76,7 @@ Declared values (multiples of 4). **Use Tailwind numeric spacing only** (e.g. `g
 
 **Posted badge (IDENT-04):** `Badge` `variant="success"` (maps to `text-success` + success-tinted surfaces) — same semantic as `ImageMetadataBadges` “Posted”.
 
-**Light ref (readability only; components must stay theme-token driven):** background ~`#fff` / dark `#191919`, accent ~`#0075de` / dark `#4A9EFF`, success ~`#1aae39` / dark `#3db39a`.
+**Theme reference (readability only; components must stay token-driven):** light — `background`, `surface`, `accent`, `success` (and related vars in `index.css`); dark — same semantic names, dark-scheme values. No raw hex in components.
 
 ---
 
@@ -137,7 +139,7 @@ Declared values (multiples of 4). **Use Tailwind numeric spacing only** (e.g. `g
 
 - Replace single `getBestPhotos({ limit: 8 })` usage with a **tab strip: Unposted | Posted | All**, default **Unposted** — D-06.
 - Fetches: `getBestPhotos({ limit: 8, posted: false })` · `getBestPhotos({ limit: 8, posted: true })` · `getBestPhotos({ limit: 8 })` (omit `posted` for All). All tabs use **8** items unless product later changes (discretion: 8/12 is planner scope).
-- **Visual parity:** tab list matches existing `components/ui/Tabs` nav: `border-b border-border`, buttons `px-4 py-2.5 text-sm font-semibold`, active `border-b-[3px] border-accent text-accent`, inactive `border-transparent text-text opacity-60` with hover per `Tabs.tsx`. Content is the existing horizontal `ImageTile` strip pattern (`-mx-1 flex gap-3 overflow-x-auto` from `TopPhotosStrip`). Implementation may use controlled `Tabs` with three tab contents **or** local `useState` + the same classnames — no visual drift.
+- **Visual parity:** tab list matches `components/ui/Tabs` nav contract: `border-b border-border`, buttons `px-4 py-2 text-sm font-semibold` (weight 600 per Typography), active `border-b-[3px] border-accent text-accent`, inactive `border-transparent text-text opacity-60` with hover per `Tabs.tsx`. If `Tabs.tsx` still uses `py-2.5`, update it to `py-2` for this 4pt-scale contract. Content is the existing horizontal `ImageTile` strip pattern (`-mx-1 flex gap-3 overflow-x-auto` from `TopPhotosStrip`). Implementation may use controlled `Tabs` with three tab contents **or** local `useState` + the same classnames — no visual drift.
 - **Accessibility:** at minimum `role="tablist"` / `role="tab"` / `aria-selected` on the three tab buttons and one associated tabpanel (or a single `role="region"` with `aria-label` = “Top scored photos” if structure differs). **Do not** use `FilterBar` for this control (user chose tabs over filter chips) — D-06.
 - **Loading/empty/error:** per active tab (fetch on tab change or parallel prefetch — planner/executor); each tab shows loading/empty/error states consistent with current `TopPhotosStrip`.
 
