@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Match Instagram dump media against catalog images using cascade filtering."""
 
+import json
 import logging
 import os
 import sys
@@ -17,8 +18,10 @@ from lightroom_tagger.core.description_service import (
     describe_instagram_image,
     describe_matched_image,
 )
+from lightroom_tagger.core.analyzer import get_vision_model
 from lightroom_tagger.core.database import (
     delete_matches_for_insta_key,
+    get_image_description,
     get_instagram_by_date_filter,
     get_rejected_pairs,
     get_unprocessed_dump_media,
@@ -27,10 +30,13 @@ from lightroom_tagger.core.database import (
     init_instagram_dump_table,
     mark_dump_media_attempted,
     mark_dump_media_processed,
+    store_image_description,
     store_match,
     update_instagram_status,
 )
 from lightroom_tagger.core.matcher import find_candidates_by_date, score_candidates_with_vision
+from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.vision_client import generate_description
 from lightroom_tagger.core.path_utils import resolve_catalog_path
 
 
@@ -43,6 +49,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      provider_id: str | None = None,
                      provider_model: str | None = None,
                      max_workers: int = 1,
+                     skip_undescribed: bool = True,
                      *, should_cancel: Callable[[], bool] | None = None,
                      resume_processed_keys: set[str] | None = None,
                      on_media_complete: Callable[[str], None] | None = None,
@@ -64,6 +71,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         log_callback: Optional callback(level, message) for detailed logging
         weights: Optional dict with 'phash', 'description', 'vision' keys for scoring weights
         force_descriptions: If True, regenerate descriptions even when one exists
+        skip_undescribed: If True, candidates without AI summaries get description score 0
+            without inline describe; if False, missing summaries may be generated on the fly
         should_cancel: If set, called before each item; return True to stop early
         resume_processed_keys: If set, skip dump rows whose ``media_key`` is in this set
             (no stats increment for skipped rows).
@@ -152,6 +161,48 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             'description': dump_media.get('caption', ''),
         }
 
+        insta_desc_row = get_image_description(db, dump_media['media_key'])
+        if insta_desc_row and (insta_desc_row.get('summary') or '').strip():
+            dump_image['ai_summary'] = (insta_desc_row.get('summary') or '').strip()
+        else:
+            dump_image['ai_summary'] = ''
+
+        if (
+            not dump_image['ai_summary']
+            and not skip_undescribed
+            and dump_image.get('local_path')
+            and os.path.exists(dump_image['local_path'])
+        ):
+            registry = ProviderRegistry()
+            pid = provider_id or registry.fallback_order[0]
+            client = registry.get_client(pid)
+            model = provider_model or get_vision_model()
+            raw = generate_description(
+                client, model, dump_image['local_path'], log_callback=log_callback,
+            )
+            text = (raw or '').strip()
+            summary = text
+            if text.startswith('{') or text.startswith('['):
+                try:
+                    parsed = json.loads(text)
+                    if isinstance(parsed, dict) and parsed.get('summary'):
+                        summary = str(parsed['summary'])
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            model_label = f'{pid}:{model}' if provider_id else model
+            store_image_description(db, {
+                'image_key': dump_media['media_key'],
+                'image_type': 'instagram',
+                'summary': summary,
+                'composition': {},
+                'perspectives': {},
+                'technical': {},
+                'subjects': [],
+                'best_perspective': '',
+                'model_used': model_label,
+            })
+            dump_image['ai_summary'] = summary
+
         if dump_image['local_path'] and os.path.exists(dump_image['local_path']):
             try:
                 phash = compute_phash(dump_image['local_path'])
@@ -162,12 +213,49 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         vision_candidates = []
         for catalog_img in candidates:
             catalog_path = resolve_catalog_path(catalog_img.get('filepath', ''))
+            ai_summary = catalog_img.get('ai_summary', '')
             candidate = {
                 'key': catalog_img.get('key'),
                 'local_path': catalog_path,
                 'image_hash': catalog_img.get('phash'),
                 'description': catalog_img.get('description', ''),
+                'ai_summary': ai_summary,
             }
+            if (
+                not (candidate.get('ai_summary') or '').strip()
+                and not skip_undescribed
+                and catalog_path
+                and os.path.exists(catalog_path)
+            ):
+                registry = ProviderRegistry()
+                pid = provider_id or registry.fallback_order[0]
+                client = registry.get_client(pid)
+                model = provider_model or get_vision_model()
+                raw = generate_description(
+                    client, model, catalog_path, log_callback=log_callback,
+                )
+                text = (raw or '').strip()
+                summary = text
+                if text.startswith('{') or text.startswith('['):
+                    try:
+                        parsed = json.loads(text)
+                        if isinstance(parsed, dict) and parsed.get('summary'):
+                            summary = str(parsed['summary'])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                model_label = f'{pid}:{model}' if provider_id else model
+                store_image_description(db, {
+                    'image_key': catalog_img.get('key'),
+                    'image_type': 'catalog',
+                    'summary': summary,
+                    'composition': {},
+                    'perspectives': {},
+                    'technical': {},
+                    'subjects': [],
+                    'best_perspective': '',
+                    'model_used': model_label,
+                })
+                candidate['ai_summary'] = summary
             vision_candidates.append(candidate)
 
         def _make_batch_cb(item_idx, item_total):
@@ -187,6 +275,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             model=provider_model,
             batch_size=config.vision_batch_size,
             batch_threshold=config.vision_batch_threshold,
+            skip_undescribed=skip_undescribed,
             should_cancel=should_cancel,
             batch_progress_callback=_make_batch_cb(idx, total),
         )
