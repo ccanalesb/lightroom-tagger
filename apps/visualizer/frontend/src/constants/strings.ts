@@ -137,6 +137,10 @@ export const INSIGHTS_SECTION_SCORES = 'Scores & style'
 export const INSIGHTS_SECTION_POSTING = 'Posting cadence'
 export const INSIGHTS_SECTION_HIGHLIGHTS = 'Top scored photos'
 export const INSIGHTS_SECTION_EXPLORE = 'Explore'
+export const INSIGHTS_TOP_PHOTOS_TAB_UNPOSTED = 'Unposted'
+export const INSIGHTS_TOP_PHOTOS_TAB_POSTED = 'Posted'
+export const INSIGHTS_TOP_PHOTOS_TAB_ALL = 'All'
+export const INSIGHTS_TOP_PHOTOS_REGION_ARIA = 'Top scored photos'
 export const INSIGHTS_POSTING_RANGE_NOTE =
   'Last 12 months, monthly buckets (UTC). Adjust range on the Analytics page.'
 export const INSIGHTS_FOOTER_TIMEZONE =
