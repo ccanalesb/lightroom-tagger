@@ -26,8 +26,25 @@ def test_best_photos_200_shape(identity_client) -> None:
     assert data is not None
     assert "items" in data
     assert "total" in data
+    assert isinstance(data["total"], int)
     assert "meta" in data
     assert data["meta"].get("weighting") == "equal"
+
+
+def test_best_photos_posted_true_200(identity_client) -> None:
+    resp = identity_client.get("/api/identity/best-photos?posted=true")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data is not None
+    assert isinstance(data["total"], int)
+
+
+def test_best_photos_posted_invalid_400(identity_client) -> None:
+    resp = identity_client.get("/api/identity/best-photos?posted=maybe")
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body is not None
+    assert "posted must be true or false" in (body.get("error") or "")
 
 
 def test_style_fingerprint_200_shape(identity_client) -> None:

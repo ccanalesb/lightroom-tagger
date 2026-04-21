@@ -47,6 +47,18 @@ def _parse_sort_by_date() -> tuple[str | None, ResponseReturnValue | None]:
     return raw, None
 
 
+def _parse_optional_posted() -> tuple[bool | None, ResponseReturnValue | None]:
+    raw = request.args.get("posted")
+    if raw is None or str(raw).strip() == "":
+        return None, None
+    key = str(raw).strip().lower()
+    if key in ("true", "1", "yes"):
+        return True, None
+    if key in ("false", "0", "no"):
+        return False, None
+    return None, error_bad_request("posted must be true or false")
+
+
 @bp.route("/best-photos", methods=["GET"])
 @with_db
 def best_photos(db: sqlite3.Connection) -> ResponseReturnValue:
@@ -62,6 +74,9 @@ def best_photos(db: sqlite3.Connection) -> ResponseReturnValue:
         sort_by_date, err2 = _parse_sort_by_date()
         if err2 is not None:
             return err2
+        posted_value, err3 = _parse_optional_posted()
+        if err3 is not None:
+            return err3
 
         items, total, meta = rank_best_photos(
             db,
@@ -69,6 +84,7 @@ def best_photos(db: sqlite3.Connection) -> ResponseReturnValue:
             offset=offset,
             min_perspectives=min_p,
             sort_by_date=sort_by_date,
+            posted=posted_value,
         )
         return jsonify({"items": items, "total": total, "meta": meta})
     except Exception:
