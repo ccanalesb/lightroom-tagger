@@ -5,6 +5,7 @@ import {
   type IdentityBestPhotosMeta,
 } from '../../services/api'
 import { ImageDetailModal, ImageTile, fromBestPhotoRow } from '../image-view'
+import { Badge } from '../ui/Badge'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { Pagination } from '../ui/Pagination'
 import { TileGrid } from '../ui/TileGrid'
@@ -157,6 +158,12 @@ export function BestPhotosGrid() {
                     variant="compact"
                     primaryScoreSource="identity"
                     onClick={() => setSelected(row)}
+                    overlayBadges={
+                      row.instagram_posted ? (
+                        <Badge variant="success">Posted</Badge>
+                      ) : undefined
+                    }
+                    hidePostedMetadataBadge={true}
                   />
                 ))}
               </TileGrid>
