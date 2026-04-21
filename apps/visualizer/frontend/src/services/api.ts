@@ -677,6 +677,7 @@ export const IdentityAPI = {
     offset?: number
     min_perspectives?: number
     sort_by_date?: 'newest' | 'oldest'
+    posted?: boolean
   }) => {
     const sp = new URLSearchParams()
     if (params?.limit !== undefined) sp.set('limit', String(params.limit))
@@ -685,6 +686,7 @@ export const IdentityAPI = {
       sp.set('min_perspectives', String(params.min_perspectives))
     }
     if (params?.sort_by_date) sp.set('sort_by_date', params.sort_by_date)
+    if (params?.posted !== undefined) sp.set('posted', params.posted ? 'true' : 'false')
     const qs = sp.toString()
     return request<IdentityBestPhotosResponse>(`/identity/best-photos${qs ? `?${qs}` : ''}`)
   },
