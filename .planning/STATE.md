@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish & Consolidate
-status: Phase 8 in progress — Plan 01 complete (Wave 1); Plans 02–03 pending
-last_updated: "2026-04-21T12:00:00.000Z"
+status: Phase 8 in progress — Plans 01–02 complete; Plan 03 pending
+last_updated: "2026-04-21T18:00:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 5
   total_plans: 25
-  completed_plans: 19
+  completed_plans: 20
 ---
 
 # Planning state
@@ -22,8 +22,8 @@ progress:
 |-------|--------|
 | Active milestone | v2.1 Polish & Consolidate |
 | Phase | Phase 8 — Two-stage cascade matching |
-| Status | Phase 8 Plan 01 complete — `find_candidates_by_date` LEFT JOIN `ai_summary`; `compare_descriptions_batch` + `test_description_batch.py` (4 tests green) |
-| Last activity | 2026-04-21 — Phase 8 Plan 01 executed (3 atomic commits): matcher JOIN, vision_client text batch, unit tests |
+| Status | Phase 8 Plan 02 complete — `match_dump_media` + `score_candidates_with_vision` two-stage cascade, nominal weights (D-10), `test_matcher.py` +15 tests |
+| Last activity | 2026-04-21 — Phase 8 Plan 02 executed (3 atomic commits): dump AI summaries, matcher cascade + vision guard, matcher tests |
 
 ## Project Reference
 
@@ -65,6 +65,7 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 - **2026-04-17:** Phase 2 context gathered. 4 gray areas discussed (pagination ↔ live updates, log truncation, modal loading UX, page size & refresh semantics). 26 decisions captured in `.planning/phases/02-job-queue-and-processing-ux/02-CONTEXT.md`. Backend: `list_jobs` grows `limit`/`offset` + new `count_jobs` helper + `success_paginated` envelope; `get_job` grows `?logs_limit=N`. Frontend: `ProcessingPage` lifts pagination state, debounced refetch on socket events, hybrid skeleton in `JobDetailModal`, "Show all N logs" expansion, `<Pagination>` wired into `JobQueueTab` (page size 50, reset on filter, Refresh pins page).
 - **2026-04-17:** Phase 1 execution complete. 5 plans / 2 waves / 10 code commits. All automated checks green (13 backend phase tests, 106 frontend tests, lint clean). Pre-existing `test_providers_api.py::TestDefaults` failure noted, unrelated to Phase 1. Verification: 17/17 must-haves passed.
 - **2026-04-17:** Phase 1 planning complete. 5 plans in 2 waves. POLISH-01/02 covered; D-01..D-14 all mapped. Plan-checker passed on iteration 2.
+- **2026-04-21:** Phase 8 Plan 02 executed (Wave 2). **`match_instagram_dump.py`:** `skip_undescribed` parameter; `get_image_description` → `dump_image['ai_summary']`; optional `generate_description` + `store_image_description` for Instagram and catalog when `skip_undescribed=False` and paths exist; `score_candidates_with_vision(..., skip_undescribed=...)`. **`matcher.py`:** `_compute_desc_scores_for_candidates` + top-level `compare_descriptions_batch` import; `score_candidates_with_vision` nominal merge `(phash_weight * phash) + (desc_weight * desc_sim_01) + (vision_weight * vision_score)`; `vision_weight==0` skips compression and all vision API/cache writes; removed `desc_available` / `weight_sum` renormalization. **Tests:** 7 new `test_matcher.py` cases (vision skip, desc skip, SC-7, nominal merge, empty-summary, call order, D-10 no redistribution). Verification: `pytest test_matcher.py` 15 passed; `pytest test_description_batch.py` 4 passed. Artifacts: `08-02-SUMMARY.md`. Commits: `feat(phase-8-02): plumb ai_summary…`, `feat(phase-8-02): two-stage cascade scoring…`, `test(phase-8-02): 7 matcher tests…`.
 - **2026-04-21:** Phase 8 Plan 01 executed (Wave 1). **Matcher:** `find_candidates_by_date` uses `SELECT i.*, COALESCE(d.summary, '') AS ai_summary` with `LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog'`; each candidate gets `img['ai_summary']` after `_deserialize_row` (Lightroom `description` unchanged). **Vision:** `compare_descriptions_batch` added after `compare_images_batch` — text-only user content, same JSON `results` shape, Claude `extra_body`, parse-failure zeros. **Tests:** `test_description_batch.py` (empty, valid parse, parse failure, Claude `extra_body`). Verification: `pytest test_description_batch.py -q` 4 passed; `from lightroom_tagger.core.matcher import find_candidates_by_date` OK. Artifacts: `08-01-SUMMARY.md`. Commits: `feat(phase-8-01): LEFT JOIN…`, `feat(phase-8-01): add compare_descriptions_batch…`, `test(phase-8-01): unit tests…`.
 - **2026-04-21:** Phase 8 planned. 3 PLAN.md files in 3 waves. **Plan 01** (Wave 1): `find_candidates_by_date` LEFT JOIN `image_descriptions` → `ai_summary` on candidates + `compare_descriptions_batch` in `vision_client.py` (text-only mirror of `compare_images_batch`) + `test_description_batch.py`. **Plan 02** (Wave 2): `match_dump_media` loads Instagram AI summary (inline describe if missing), `score_candidates_with_vision` two-stage cascade (description first, vision second), `vision_weight=0` skips all compression/cache/API, nominal weights (no silent redistribution per D-10), removes `desc_available` renormalization — extends `test_matcher.py` with call-order/backward-compat/no-redistribution cases. **Plan 03** (Wave 3): `handle_vision_match` + `fingerprint_vision_match` + `matchOptionsContext` + `AdvancedOptions` + `MatchingTab` for `skipUndescribed` toggle (disabled when `descWeight===0`, default ON). Checker: VERIFICATION PASSED on iteration 2. Coverage: MATCH-01+02 (plan 01), MATCH-03 (plan 02), MATCH-04 (plan 03).
 - **2026-04-17:** Phase 8 added: Two-stage cascade matching — description batch + vision batch with weighted scoring. Fixes broken description signal (missing join), adds `compare_descriptions_batch` text-only API call, two-stage per-batch pipeline (description then vision, merged by weight), `skip_undescribed` option, and UI controls.
