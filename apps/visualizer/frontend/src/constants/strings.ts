@@ -435,6 +435,12 @@ export const IDENTITY_PAGE_SUBTITLE =
 export const IDENTITY_SECTION_BEST_PHOTOS = 'Best photos'
 export const IDENTITY_SECTION_STYLE_FINGERPRINT = 'Style fingerprint'
 export const IDENTITY_SECTION_POST_NEXT = 'What to post next'
+export const IDENTITY_INTRO_STYLE_FINGERPRINT =
+  'Your aggregate scores and rationale patterns across active critique lenses. This is the "shape" of your work before you pick individual shots to share.'
+export const IDENTITY_INTRO_BEST_PHOTOS =
+  'A ranked set of your strongest catalog images—highest equal-weight aggregate first. "Posted" on a tile means that catalog photo already appears on Instagram.'
+export const IDENTITY_INTRO_POST_NEXT =
+  'Unposted candidates the server flags as worth sharing next, with a short reason on each row.'
 export const IDENTITY_BEST_PHOTOS_HELP =
   'Ranked by equal-weight aggregate over active perspectives (server order). Expand a row for per-perspective scores and rubric versions.'
 export const IDENTITY_BEST_PHOTOS_EMPTY_FALLBACK =
