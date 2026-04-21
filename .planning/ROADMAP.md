@@ -117,7 +117,7 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 **Plans (v2.1 Phase 5):**
 - [x] **Plan 01** (Wave 1): Posted filter for best-photos — `rank_best_photos` + `/api/identity/best-photos` + `IdentityAPI.getBestPhotos` — **complete 2026-04-21**
 - [x] **Plan 02** (Wave 2): BestPhotosGrid posted overlay + dedupe metadata Posted chip — **complete 2026-04-21**
-- [ ] **Plan 03** (Wave 3): Identity page order + section intros (IDENT-05) — depends on 01, 02
+- [x] **Plan 03** (Wave 3): Identity page order + section intros (IDENT-05) — depends on 01, 02 — **complete 2026-04-21**
 - [ ] **Plan 04** (Wave 3): Dashboard Top Photos tabs + `useFilters` — depends on 01
 
 **Success criteria:**

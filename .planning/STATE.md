@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish & Consolidate
-status: Phase 5 in progress — Plan 02 complete (BestPhotosGrid Posted overlay + dedupe chip)
-last_updated: "2026-04-21T23:45:00.000Z"
+status: Phase 5 in progress — Plan 03 complete (Identity narrative order + section intros)
+last_updated: "2026-04-21T16:40:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 25
-  completed_plans: 23
+  completed_plans: 24
 ---
 
 # Planning state
@@ -22,8 +22,8 @@ progress:
 |-------|--------|
 | Active milestone | v2.1 Polish & Consolidate |
 | Phase | Phase 5 — Identity & Insights clarity |
-| Status | Plans 01–02 complete — posted API filter + Best Photos Posted overlay (`overlayBadges`, `hidePostedMetadataBadge`); Plans 03–04 pending |
-| Last activity | 2026-04-21 — Phase 5 Plan 02 executed: 3 code commits + `05-02-SUMMARY.md`; STATE/ROADMAP/REQUIREMENTS (IDENT-04) |
+| Status | Plans 01–03 complete — Identity page fingerprint → best photos → post next + UI-SPEC section intros; Plan 04 (Dashboard tabs) pending |
+| Last activity | 2026-04-21 — Phase 5 Plan 03 executed: 5 code commits + `05-03-SUMMARY.md`; STATE/ROADMAP/REQUIREMENTS (IDENT-05) |
 
 ## Project Reference
 
@@ -49,11 +49,13 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 | FILTER-01, 02 | Phase 4 | ✅ Complete (2026-04-17) |
 | FILTER-02 (InstagramTab consumer) | Phase 4.1 | ✅ Complete (2026-04-17) |
 | IDENT-04 | Phase 5 | ✅ Complete (2026-04-21) |
-| IDENT-05, DASH-02, 03 | Phase 5 | Pending |
+| IDENT-05 | Phase 5 | ✅ Complete (2026-04-21) |
+| DASH-02, 03 | Phase 5 | Pending |
 | UI-01, 02, 03 | Phase 6 | Pending |
 
 ## Last update
 
+- **2026-04-21:** Phase 5 Plan 03 executed (`identity-page-narrative-intros`). **`strings.ts`:** `IDENTITY_INTRO_STYLE_FINGERPRINT`, `IDENTITY_INTRO_BEST_PHOTOS`, `IDENTITY_INTRO_POST_NEXT` (05-UI-SPEC copy). **`IdentityPage`:** `StyleFingerprintPanel` → `BestPhotosGrid` → `PostNextSuggestionsPanel`. **`StyleFingerprintPanel`:** intro `<p>` after `h2` in loading, error, empty, and main branches. **`BestPhotosGrid` / `PostNextSuggestionsPanel`:** intro after `h2`, before `Card`; in-card help unchanged. **`IdentityPage.test.tsx`:** `indexOf` order for section headings. Verification: `tsc --noEmit`, `vitest run` 221 passed. Requirement **IDENT-05** marked complete. Artifacts: `05-03-SUMMARY.md`. Commits: `671fec0`, `91ed16f`, `26da956`, `cedf3b1`, `85224f0`.
 - **2026-04-21:** Phase 5 Plan 02 executed (`best-photos-overlay-posted-badge`). **`ImageMetadataBadges`** `hidePostedBadge` + **`ImageTile`** `hidePostedMetadataBadge` suppress the metadata-row Posted chip when the thumbnail overlay shows it. **`BestPhotosGrid`** passes `overlayBadges={<Badge variant="success">Posted</Badge>}` for `instagram_posted` rows and `hidePostedMetadataBadge` on all tiles; **`Badge`** base label class `font-medium` → `font-semibold` (UI-SPEC). **`BestPhotosGrid.test.tsx`** — one posted item yields exactly one “Posted” in the best-photos region. Verification: `tsc --noEmit`, `vitest run` 221 passed. Requirement **IDENT-04** marked complete. Artifacts: `05-02-SUMMARY.md`. Commits: `039c3ac`, `3d99d0c`, `e0a4efc`.
 - **2026-04-17:** Phase 4.1 inserted + executed (user-requested). InstagramTab migrated onto the Phase 4 framework via one `useMemo`d single-descriptor `instagramSchema` (`select` / `dateFolder` → `paramName: 'date_folder'`) + `useFilters` + `<FilterBar>`. Removed `dateFilter` `useState`, `handleFilterChange`, `clearFilter`, the inline `<select>` + Clear button block, and the `FILTER_CLEAR` import. `fetchImages` now spreads `filters.toQueryParams()`. Filter-change → offset-0 parity preserved via `useRef<boolean>(true)` first-run guard + `useEffect` on committed `dateFolder`. Clear-button copy shifts from `FILTER_CLEAR` ("Clear") to `FILTER_CLEAR_ALL` ("Clear all"), matching CatalogTab. Minor UX shift: filter now always renders (even with zero months loaded, "All dates" is the only option) — mirrors CatalogTab's behavior. Added RTL smoke test (2 assertions: baseline `listInstagram` call has no `date_folder`, and the "Date" label renders). Verification: 136/136 frontend tests pass (+2 new), lint clean, `tsc --noEmit` clean. Remaining ad-hoc filter consumers (`MatchesTab`, `DescriptionsTab`, `MatchingTab`, `AnalyticsPage`, `UnpostedCatalogPanel`) stay deferred to SEED-007 full rollout.
 - **2026-04-17:** Phase 4 execution complete. 4 plans / 3 waves / 15 code commits. **Plan 01** extracted `useDebouncedValue` into a shared hook, defined the `FilterSchema` discriminated union (`toggle` / `select` / `dateRange` / `search` + helpers `defaultFormatValue`, `isDescriptorEnabled`, `descriptorDefault`, `DEFAULT_SEARCH_DEBOUNCE_MS`), and added `FILTER_CLEAR_ALL` / `FILTER_CHIP_REMOVE_ARIA` strings. **Plan 02** implemented `useFilters(schema)`: `rawValues` ↔ `committedValues` with `useRef`-debounced search, `applyDependentClears` cascading resets via `enabledBy`, per-descriptor `paramName` / `toParam` + snake_case default + `dateRange` → `date_from` / `date_to` splitting, and `activeCount` / `isActive` using raw values for search descriptors (D-06). **Plan 03** built the UI: `FilterChip` over `ui/Badge` + ghost `ui/Button`, shared `CONTROL` Tailwind class, primitives (`ToggleFilter`, `SelectFilter` with `className` append + `numberValue` coercion, `DateRangeFilter` preserving legacy flex-wrap, `SearchFilter` wrapping `ui/Input` on `rawValue`), and `FilterBar` that consumes `filters: UseFiltersReturn` (not calling `useFilters` itself — D-18) with summary slot + top-right Clear-all + chip strip + inline control row. **Plan 04** big-bang migrated `CatalogTab.tsx`: eleven filter `useState` + ten `handle*` replaced by one `useMemo`d `catalogSchema`, `useFilters(catalogSchema)`, and `<FilterBar>`. `ImagesAPI.listCatalog` receives `filters.toQueryParams()`; `onPostedFilterChange` fires via `useEffect` (D-21); deep link (`image_key`) and month / perspective fetches untouched; pagination reset uses two effects — immediate for non-search values, `useRef`-deferred for committed `keyword` / `colorLabel` (parity with legacy debounce-triggered reset). Added RTL smoke test (`CatalogTab.test.tsx`) and extracted all catalog filter copy to `constants/strings.ts`. Verification: 134/134 frontend tests pass (25 files), lint clean (`--max-warnings 0`), `tsc --noEmit` clean. VERIFICATION.md + 04-SUMMARY.md written. Requirements FILTER-01 and FILTER-02 complete. Phase 5 (depends on 4 via DASH-03) unblocked.
