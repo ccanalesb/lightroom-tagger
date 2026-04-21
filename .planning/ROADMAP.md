@@ -148,6 +148,29 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 7. `package.json` dependency count is unchanged (no new runtime deps).
 8. No user-visible regression across Identity, Images (all tabs), Processing, Analytics, Dashboard.
 
+### Phase 8: Two-stage cascade matching — description batch + vision batch
+
+**Goal:** Fix the broken description signal in `vision_match` and introduce a proper two-stage cascade: for each batch of 20 candidates, run a text-only description comparison first, then a vision image comparison, combine both scores by weight, and surface candidates above threshold. Enables a description-only mode (`vision_weight=0`) as a fast, cheap first pass.
+
+**Requirements:** MATCH-01, MATCH-02, MATCH-03, MATCH-04
+
+**Depends on:** None (backend-only, no frontend dep)
+
+**Plans (v2.1 Phase 8):**
+- [x] **Plan 01** (Wave 1): `find_candidates_by_date` LEFT JOIN → `ai_summary`; `compare_descriptions_batch`; unit tests — **complete 2026-04-21**
+- [ ] **Plan 02** (Wave 2): `match_dump_media` + two-stage cascade in `score_candidates_with_vision`
+- [ ] **Plan 03** (Wave 3): `skip_undescribed` option + UI
+
+**Success criteria:**
+1. `find_candidates_by_date` returns AI summaries attached to each candidate (`image_descriptions.summary` joined in) — `catalog_img.get('description')` is non-empty for described images
+2. New `compare_descriptions_batch` function sends 1 Instagram summary + N catalog summaries in one API call, returns JSON confidence scores per candidate — same shape as `compare_images_batch`
+3. Per batch of 20: description stage runs first (if `desc_weight > 0`), vision stage runs second (if `vision_weight > 0`), scores merged as weighted average
+4. When `vision_weight=0`: pipeline skips all image compression, vision API calls, and vision cache entirely — description-only run completes with zero vision API calls
+5. `skip_undescribed` job option (boolean, default `true`): when `true`, candidates without an AI summary are scored 0 on description stage; when `false`, job auto-describes the candidate inline before scoring
+6. Both `skip_undescribed` values produce correct weighted scores — no division-by-zero, no silent weight redistribution bugs
+7. Existing `vision_weight=1, desc_weight=0` behaviour unchanged (backward-compatible)
+8. UI job launcher exposes `skip_undescribed` toggle and `description` weight slider alongside existing controls
+
 ---
 
 *Roadmap created: 2026-04-10 · v1.0 shipped: 2026-04-11 · v2.0 shipped: 2026-04-15 · v2.1 started: 2026-04-17*
