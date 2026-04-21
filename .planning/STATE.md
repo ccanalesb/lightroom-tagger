@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish & Consolidate
-status: Phase 8 complete — Plans 01–03 complete (two-stage cascade matching)
-last_updated: "2026-04-21T20:00:00.000Z"
+status: Phase 5 in progress — Plan 01 complete (posted filter best-photos API)
+last_updated: "2026-04-21T22:00:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 6
   total_plans: 25
-  completed_plans: 21
+  completed_plans: 22
 ---
 
 # Planning state
@@ -21,9 +21,9 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v2.1 Polish & Consolidate |
-| Phase | Phase 8 — Two-stage cascade matching |
-| Status | Phase 8 complete — Plan 03: `skip_undescribed` in handler, checkpoint fingerprint, Matching tab UI + handler test |
-| Last activity | 2026-04-21 — Phase 8 Plan 03 executed (3 atomic commits + summary/state): job metadata → `match_dump_media`, fingerprint, `skipUndescribed` toggle |
+| Phase | Phase 5 — Identity & Insights clarity |
+| Status | Plan 01 complete — posted filter (`rank_best_photos`, `/api/identity/best-photos`, `IdentityAPI.getBestPhotos`); Plans 02–04 pending |
+| Last activity | 2026-04-21 — Phase 5 Plan 01 executed: 3 code commits + `05-01-SUMMARY.md`, STATE/ROADMAP |
 
 ## Project Reference
 
@@ -67,6 +67,7 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 - **2026-04-17:** Phase 1 planning complete. 5 plans in 2 waves. POLISH-01/02 covered; D-01..D-14 all mapped. Plan-checker passed on iteration 2.
 - **2026-04-21:** Phase 8 Plan 03 executed (Wave 3). **`handlers.py`:** `skip_undescribed` from job metadata (default `true`) → `fingerprint_vision_match` + `match_dump_media`. **`checkpoint.py`:** fingerprint payload includes `skip_undescribed`. **Frontend:** `MatchOptions.skipUndescribed`, Advanced Options **Skip undescribed** checkbox (disabled when `descWeight === 0`), `MatchingTab` sends `skip_undescribed` in `vision_match` metadata. **`test_handlers_single_match.py`:** `test_handle_vision_match_passes_skip_undescribed`. Artifacts: `08-03-SUMMARY.md`. Commits: `feat(phase-8-03): plumb skip_undescribed…`, `feat(phase-8-03): skipUndescribed UI…`, `test(phase-8-03): handler test…`.
 - **2026-04-21:** Phase 8 Plan 02 executed (Wave 2). **`match_instagram_dump.py`:** `skip_undescribed` parameter; `get_image_description` → `dump_image['ai_summary']`; optional `generate_description` + `store_image_description` for Instagram and catalog when `skip_undescribed=False` and paths exist; `score_candidates_with_vision(..., skip_undescribed=...)`. **`matcher.py`:** `_compute_desc_scores_for_candidates` + top-level `compare_descriptions_batch` import; `score_candidates_with_vision` nominal merge `(phash_weight * phash) + (desc_weight * desc_sim_01) + (vision_weight * vision_score)`; `vision_weight==0` skips compression and all vision API/cache writes; removed `desc_available` / `weight_sum` renormalization. **Tests:** 7 new `test_matcher.py` cases (vision skip, desc skip, SC-7, nominal merge, empty-summary, call order, D-10 no redistribution). Verification: `pytest test_matcher.py` 15 passed; `pytest test_description_batch.py` 4 passed. Artifacts: `08-02-SUMMARY.md`. Commits: `feat(phase-8-02): plumb ai_summary…`, `feat(phase-8-02): two-stage cascade scoring…`, `test(phase-8-02): 7 matcher tests…`.
+- **2026-04-21:** Phase 5 Plan 01 executed (Wave 1). **`rank_best_photos`** gains optional `posted: bool | None` — after aggregate sort, filters `enriched` by `instagram_posted` before `total` and pagination — unit test `test_rank_best_photos_filters_by_posted`. **`GET /api/identity/best-photos`:** `_parse_optional_posted()` (`true`/`1`/`yes`, `false`/`0`/`no`, else 400 `posted must be true or false`); tests for `posted=true` and `posted=maybe`. **`IdentityAPI.getBestPhotos`:** `posted?: boolean` → query param when defined. Artifacts: `05-01-SUMMARY.md`. Commits: `200e074`, `19af30f`, `3a6c54e`. DASH-02/DASH-03 UI deferred to Plan 04.
 - **2026-04-21:** Phase 8 Plan 01 executed (Wave 1). **Matcher:** `find_candidates_by_date` uses `SELECT i.*, COALESCE(d.summary, '') AS ai_summary` with `LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog'`; each candidate gets `img['ai_summary']` after `_deserialize_row` (Lightroom `description` unchanged). **Vision:** `compare_descriptions_batch` added after `compare_images_batch` — text-only user content, same JSON `results` shape, Claude `extra_body`, parse-failure zeros. **Tests:** `test_description_batch.py` (empty, valid parse, parse failure, Claude `extra_body`). Verification: `pytest test_description_batch.py -q` 4 passed; `from lightroom_tagger.core.matcher import find_candidates_by_date` OK. Artifacts: `08-01-SUMMARY.md`. Commits: `feat(phase-8-01): LEFT JOIN…`, `feat(phase-8-01): add compare_descriptions_batch…`, `test(phase-8-01): unit tests…`.
 - **2026-04-21:** Phase 8 planned. 3 PLAN.md files in 3 waves. **Plan 01** (Wave 1): `find_candidates_by_date` LEFT JOIN `image_descriptions` → `ai_summary` on candidates + `compare_descriptions_batch` in `vision_client.py` (text-only mirror of `compare_images_batch`) + `test_description_batch.py`. **Plan 02** (Wave 2): `match_dump_media` loads Instagram AI summary (inline describe if missing), `score_candidates_with_vision` two-stage cascade (description first, vision second), `vision_weight=0` skips all compression/cache/API, nominal weights (no silent redistribution per D-10), removes `desc_available` renormalization — extends `test_matcher.py` with call-order/backward-compat/no-redistribution cases. **Plan 03** (Wave 3): `handle_vision_match` + `fingerprint_vision_match` + `matchOptionsContext` + `AdvancedOptions` + `MatchingTab` for `skipUndescribed` toggle (disabled when `descWeight===0`, default ON). Checker: VERIFICATION PASSED on iteration 2. Coverage: MATCH-01+02 (plan 01), MATCH-03 (plan 02), MATCH-04 (plan 03).
 - **2026-04-17:** Phase 8 added: Two-stage cascade matching — description batch + vision batch with weighted scoring. Fixes broken description signal (missing join), adds `compare_descriptions_batch` text-only API call, two-stage per-batch pipeline (description then vision, merged by weight), `skip_undescribed` option, and UI controls.
