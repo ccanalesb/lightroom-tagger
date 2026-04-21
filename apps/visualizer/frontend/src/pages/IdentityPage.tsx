@@ -11,8 +11,8 @@ export function IdentityPage() {
         <p className="text-text-secondary">{IDENTITY_PAGE_SUBTITLE}</p>
       </div>
 
-      <BestPhotosGrid />
       <StyleFingerprintPanel />
+      <BestPhotosGrid />
       <PostNextSuggestionsPanel />
     </div>
   )
