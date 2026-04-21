@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { FilterSchema } from '../components/filters/types'
 import { InsightsKpiRow } from '../components/insights/InsightsKpiRow'
 import { InsightsQuickNav } from '../components/insights/InsightsQuickNav'
 import { MiniPostingFrequencyChart } from '../components/insights/MiniPostingFrequencyChart'
@@ -6,6 +7,7 @@ import { PerspectiveRadarSummary } from '../components/insights/PerspectiveRadar
 import { ScoreDistributionChart } from '../components/insights/ScoreDistributionChart'
 import { TopPhotosStrip } from '../components/insights/TopPhotosStrip'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import { TabNav } from '../components/ui/Tabs'
 import {
   ANALYTICS_EMPTY_NO_POSTS,
   IDENTITY_BEST_PHOTOS_EMPTY_FALLBACK,
@@ -18,7 +20,12 @@ import {
   INSIGHTS_SECTION_HIGHLIGHTS,
   INSIGHTS_SECTION_POSTING,
   INSIGHTS_SECTION_SCORES,
+  INSIGHTS_TOP_PHOTOS_REGION_ARIA,
+  INSIGHTS_TOP_PHOTOS_TAB_ALL,
+  INSIGHTS_TOP_PHOTOS_TAB_POSTED,
+  INSIGHTS_TOP_PHOTOS_TAB_UNPOSTED,
 } from '../constants/strings'
+import { useFilters } from '../hooks/useFilters'
 import {
   AnalyticsAPI,
   IdentityAPI,
@@ -58,8 +65,43 @@ function sumBucketCounts(buckets: PostingFrequencyResponse['buckets']): number {
   return buckets.reduce((acc, b) => acc + b.count, 0)
 }
 
+type TopPhotosTabKey = 'unposted' | 'posted' | 'all'
+
+type TopPhotosBucket = {
+  items: IdentityBestPhotoItem[]
+  total: number
+  meta: IdentityBestPhotosMeta | null
+  loading: boolean
+  error: string | null
+}
+
+function emptyTopPhotosBucket(loading: boolean): TopPhotosBucket {
+  return { items: [], total: 0, meta: null, loading, error: null }
+}
+
 export function DashboardPage() {
   const postingRange = useMemo(() => defaultPostingRange(), [])
+
+  const dashboardTopPhotosSchema = useMemo<FilterSchema>(
+    () => [
+      {
+        type: 'select',
+        key: 'topPhotosPosted',
+        label: INSIGHTS_TOP_PHOTOS_REGION_ARIA,
+        paramName: 'posted',
+        defaultValue: 'unposted',
+        options: [
+          { value: 'unposted', label: INSIGHTS_TOP_PHOTOS_TAB_UNPOSTED },
+          { value: 'posted', label: INSIGHTS_TOP_PHOTOS_TAB_POSTED },
+          { value: 'all', label: INSIGHTS_TOP_PHOTOS_TAB_ALL },
+        ],
+        toParam: (v) => (v === 'unposted' ? false : v === 'posted' ? true : undefined),
+      },
+    ],
+    [],
+  )
+
+  const filters = useFilters(dashboardTopPhotosSchema)
 
   const [stats, setStats] = useState<Stats | null>(null)
   const [errStats, setErrStats] = useState<string | null>(null)
@@ -69,11 +111,11 @@ export function DashboardPage() {
   const [errFingerprint, setErrFingerprint] = useState<string | null>(null)
   const [loadingFingerprint, setLoadingFingerprint] = useState(true)
 
-  const [bestItems, setBestItems] = useState<IdentityBestPhotoItem[]>([])
-  const [bestMeta, setBestMeta] = useState<IdentityBestPhotosMeta | null>(null)
-  const [bestTotal, setBestTotal] = useState(0)
-  const [errBest, setErrBest] = useState<string | null>(null)
-  const [loadingBest, setLoadingBest] = useState(true)
+  const [topPhotosByTab, setTopPhotosByTab] = useState<Record<TopPhotosTabKey, TopPhotosBucket>>(() => ({
+    unposted: emptyTopPhotosBucket(true),
+    posted: emptyTopPhotosBucket(true),
+    all: emptyTopPhotosBucket(true),
+  }))
 
   const [frequency, setFrequency] = useState<PostingFrequencyResponse | null>(null)
   const [errFrequency, setErrFrequency] = useState<string | null>(null)
@@ -88,16 +130,21 @@ export function DashboardPage() {
     async function run() {
       setLoadingStats(true)
       setLoadingFingerprint(true)
-      setLoadingBest(true)
       setLoadingFrequency(true)
       setErrStats(null)
       setErrFingerprint(null)
-      setErrBest(null)
       setErrFrequency(null)
+      setTopPhotosByTab({
+        unposted: emptyTopPhotosBucket(true),
+        posted: emptyTopPhotosBucket(true),
+        all: emptyTopPhotosBucket(true),
+      })
 
       const results = await Promise.allSettled([
         SystemAPI.stats(),
         IdentityAPI.getStyleFingerprint(),
+        IdentityAPI.getBestPhotos({ limit: 8, posted: false }),
+        IdentityAPI.getBestPhotos({ limit: 8, posted: true }),
         IdentityAPI.getBestPhotos({ limit: 8 }),
         AnalyticsAPI.getPostingFrequency({
           date_from: from,
@@ -109,7 +156,7 @@ export function DashboardPage() {
 
       if (cancelled) return
 
-      const [r0, r1, r2, r3, r4] = results
+      const [r0, r1, r2, r3, r4, r5, r6] = results
 
       if (r0.status === 'fulfilled') {
         setStats(r0.value)
@@ -129,30 +176,44 @@ export function DashboardPage() {
       }
       setLoadingFingerprint(false)
 
-      if (r2.status === 'fulfilled') {
-        setBestItems(r2.value.items)
-        setBestTotal(r2.value.total)
-        setBestMeta(r2.value.meta)
-        setErrBest(null)
-      } else {
-        setBestItems([])
-        setBestTotal(0)
-        setBestMeta(null)
-        setErrBest(errMessage(r2.reason))
+      const mapBest = (
+        r: PromiseSettledResult<Awaited<ReturnType<typeof IdentityAPI.getBestPhotos>>>,
+      ): TopPhotosBucket => {
+        if (r.status === 'fulfilled') {
+          return {
+            items: r.value.items,
+            total: r.value.total,
+            meta: r.value.meta,
+            loading: false,
+            error: null,
+          }
+        }
+        return {
+          items: [],
+          total: 0,
+          meta: null,
+          loading: false,
+          error: errMessage(r.reason),
+        }
       }
-      setLoadingBest(false)
 
-      if (r3.status === 'fulfilled') {
-        setFrequency(r3.value)
+      setTopPhotosByTab({
+        unposted: mapBest(r2),
+        posted: mapBest(r3),
+        all: mapBest(r4),
+      })
+
+      if (r5.status === 'fulfilled') {
+        setFrequency(r5.value)
         setErrFrequency(null)
       } else {
         setFrequency(null)
-        setErrFrequency(errMessage(r3.reason))
+        setErrFrequency(errMessage(r5.reason))
       }
       setLoadingFrequency(false)
 
-      if (r4.status === 'fulfilled') {
-        const jobsList = Array.isArray(r4.value?.data) ? r4.value.data : []
+      if (r6.status === 'fulfilled') {
+        const jobsList = Array.isArray(r6.value?.data) ? r6.value.data : []
         const pending = jobsList.filter(
           (job) => job.status === 'pending' || job.status === 'running',
         ).length
@@ -171,9 +232,20 @@ export function DashboardPage() {
   const fpNoScores =
     fingerprint && !errFingerprint && totalScoreCount(fingerprint.per_perspective) === 0
 
+  const rawTopPhotosPosted = filters.values.topPhotosPosted as string | undefined
+  const activeTopPhotosTab: TopPhotosTabKey =
+    rawTopPhotosPosted === 'posted'
+      ? 'posted'
+      : rawTopPhotosPosted === 'all'
+        ? 'all'
+        : 'unposted'
+
+  const activeTopPhotos = topPhotosByTab[activeTopPhotosTab]
   const bestEmptyMessage =
-    !loadingBest && !errBest && bestTotal === 0
-      ? bestMeta?.coverage_note ?? IDENTITY_BEST_PHOTOS_EMPTY_FALLBACK
+    !activeTopPhotos.loading &&
+    !activeTopPhotos.error &&
+    activeTopPhotos.total === 0
+      ? activeTopPhotos.meta?.coverage_note ?? IDENTITY_BEST_PHOTOS_EMPTY_FALLBACK
       : null
 
   const postingBuckets = frequency?.buckets ?? []
@@ -183,7 +255,9 @@ export function DashboardPage() {
   const a11yErrors = [
     errStats && `Stats: ${errStats}`,
     errFingerprint && `Style fingerprint: ${errFingerprint}`,
-    errBest && `Best photos: ${errBest}`,
+    topPhotosByTab.unposted.error && `Best photos (unposted): ${topPhotosByTab.unposted.error}`,
+    topPhotosByTab.posted.error && `Best photos (posted): ${topPhotosByTab.posted.error}`,
+    topPhotosByTab.all.error && `Best photos (all): ${topPhotosByTab.all.error}`,
     errFrequency && `Posting frequency: ${errFrequency}`,
   ]
     .filter(Boolean)
@@ -283,12 +357,23 @@ export function DashboardPage() {
         </h2>
         <Card padding="md">
           <CardContent className="!text-text">
-            <TopPhotosStrip
-              items={bestItems}
-              loading={loadingBest}
-              error={errBest}
-              emptyMessage={bestEmptyMessage}
-            />
+            <div role="region" aria-label={INSIGHTS_TOP_PHOTOS_REGION_ARIA}>
+              <TabNav
+                tabs={[
+                  { id: 'unposted', label: INSIGHTS_TOP_PHOTOS_TAB_UNPOSTED },
+                  { id: 'posted', label: INSIGHTS_TOP_PHOTOS_TAB_POSTED },
+                  { id: 'all', label: INSIGHTS_TOP_PHOTOS_TAB_ALL },
+                ]}
+                activeTab={activeTopPhotosTab}
+                onTabChange={(id) => filters.setValue('topPhotosPosted', id)}
+              />
+              <TopPhotosStrip
+                items={activeTopPhotos.items}
+                loading={activeTopPhotos.loading}
+                error={activeTopPhotos.error}
+                emptyMessage={bestEmptyMessage}
+              />
+            </div>
           </CardContent>
         </Card>
       </section>
