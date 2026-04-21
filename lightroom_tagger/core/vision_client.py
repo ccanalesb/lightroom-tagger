@@ -315,6 +315,117 @@ def compare_images_batch(
         return {cid: 0.0 for cid, _ in candidates}
 
 
+def compare_descriptions_batch(
+    client: openai_sdk.OpenAI,
+    model: str,
+    reference_text: str,
+    candidates: list[tuple[int, str]],
+    log_callback: LogCallback = None,
+    max_tokens: int = 4096,
+) -> dict[int, float]:
+    """
+    Compare one reference text against N candidate summaries in a single API call.
+
+    Text-only: no images are sent. Output shape matches :func:`compare_images_batch`.
+    """
+    import json
+
+    if not candidates:
+        return {}
+
+    candidate_info = "\n".join(
+        [f"Candidate {cid}:\n{text}" for cid, text in candidates]
+    )
+
+    batch_prompt = (
+        "CRITICAL: You MUST respond with ONLY valid JSON. No explanations, no prose, ONLY JSON.\n\n"
+        "Task: Rate text semantic similarity between the reference summary and each candidate summary.\n"
+        "For each candidate, output how well the candidate summary matches the reference in meaning "
+        "(subject, scene, intent), not wording overlap.\n\n"
+        f"Reference summary:\n{reference_text}\n\n"
+        f"Candidate summaries:\n{candidate_info}\n\n"
+        "REQUIRED OUTPUT FORMAT (copy this structure exactly):\n"
+        '{"results": [{"id": 1, "confidence": 85}, {"id": 2, "confidence": 10}, ...]}\n\n'
+        "Rules:\n"
+        "- confidence: 0-100, where 0=completely unrelated, 100=essentially the same content\n"
+        "- Include ALL candidate IDs in results\n\n"
+        "RESPOND WITH ONLY THE JSON OBJECT. DO NOT ADD ANY OTHER TEXT."
+    )
+
+    content_parts: list[dict[str, Any]] = [
+        {"type": "text", "text": batch_prompt},
+    ]
+
+    kwargs: dict[str, Any] = {}
+    if "claude" in model.lower():
+        kwargs["extra_body"] = {"reasoning_effort": "none"}
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=cast(
+                Any,
+                [
+                    {
+                        "role": "system",
+                        "content": "You are a JSON-only API. You respond exclusively with valid JSON. Never include explanations or prose.",
+                    },
+                    {
+                        "role": "user",
+                        "content": content_parts,
+                    },
+                ],
+            ),
+            max_tokens=max_tokens,
+            temperature=0.1,
+            **kwargs,
+        )
+    except Exception as exc:
+        raise _map_openai_error(
+            exc, provider=getattr(client, "_provider_id", None), model=model
+        ) from exc
+
+    raw = response.choices[0].message.content or "{}"
+
+    if log_callback:
+        log_callback("debug", f"[desc_batch] Raw response length: {len(raw)} chars")
+        log_callback("debug", f"[desc_batch] Raw response (first 500 chars): {raw[:500]}")
+        if len(raw) > 500:
+            log_callback("debug", f"[desc_batch] Raw response (last 200 chars): ...{raw[-200:]}")
+
+    try:
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+
+        parsed = json.loads(raw)
+        results_list = parsed.get("results", [])
+
+        if log_callback:
+            log_callback("debug", f"[desc_batch] Parsed JSON: results_list={results_list}")
+
+        result_map: dict[int, float] = {}
+        for item in results_list:
+            cid = item.get("id")
+            conf = item.get("confidence", 0)
+            if cid is not None:
+                result_map[cid] = float(conf)
+
+        if log_callback:
+            log_callback(
+                "debug",
+                f"[desc_batch] reference vs {len(candidates)} candidates -> {len(result_map)} results",
+            )
+
+        return result_map
+
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        if log_callback:
+            log_callback("warning", f"[desc_batch] JSON parse error: {e}, raw={raw[:100]}")
+        return {cid: 0.0 for cid, _ in candidates}
+
+
 def generate_description(
     client: openai_sdk.OpenAI,
     model: str,
