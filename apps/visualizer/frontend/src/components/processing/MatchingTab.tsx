@@ -49,6 +49,7 @@ export function MatchingTab() {
           vision: options.visionWeight,
         },
         max_workers: options.maxWorkers,
+        skip_undescribed: options.skipUndescribed,
         ...(options.providerId ? { provider_id: options.providerId } : {}),
         ...(options.providerModel ? { provider_model: options.providerModel } : {}),
       };
@@ -110,6 +111,7 @@ export function MatchingTab() {
               onVisionWeightChange={(v) => updateOption('visionWeight', v)}
               maxWorkers={options.maxWorkers}
               onMaxWorkersChange={(v) => updateOption('maxWorkers', v)}
+              onSkipUndescribedChange={(v) => updateOption('skipUndescribed', v)}
               weightsError={weightsError}
               onReset={resetOptions}
             />

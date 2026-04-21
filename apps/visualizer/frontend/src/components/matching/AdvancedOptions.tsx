@@ -32,6 +32,8 @@ interface AdvancedOptionsProps {
   onVisionWeightChange: (value: number) => void;
   maxWorkers: number;
   onMaxWorkersChange: (value: number) => void;
+  skipUndescribed: boolean;
+  onSkipUndescribedChange: (value: boolean) => void;
   weightsError: string | null;
   onReset: () => void;
 }
@@ -52,6 +54,8 @@ export function AdvancedOptions({
   onVisionWeightChange,
   maxWorkers,
   onMaxWorkersChange,
+  skipUndescribed,
+  onSkipUndescribedChange,
   weightsError,
   onReset,
 }: AdvancedOptionsProps) {
@@ -115,6 +119,24 @@ export function AdvancedOptions({
                 value={descWeight}
                 onChange={onDescWeightChange}
               />
+              <div
+                className={
+                  descWeight === 0
+                    ? 'opacity-50 cursor-not-allowed'
+                    : ''
+                }
+              >
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300"
+                    checked={skipUndescribed}
+                    disabled={descWeight === 0}
+                    onChange={(e) => onSkipUndescribedChange(e.target.checked)}
+                  />
+                  Skip undescribed
+                </label>
+              </div>
               <WeightSlider
                 label={ADVANCED_WEIGHT_VISION}
                 value={visionWeight}

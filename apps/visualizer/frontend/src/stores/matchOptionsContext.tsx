@@ -11,6 +11,7 @@ interface MatchOptions {
   descWeight: number;
   visionWeight: number;
   maxWorkers: number;
+  skipUndescribed: boolean;
 }
 
 const DEFAULT_OPTIONS: MatchOptions = {
@@ -21,6 +22,7 @@ const DEFAULT_OPTIONS: MatchOptions = {
   descWeight: 0,
   visionWeight: 1,
   maxWorkers: 4,
+  skipUndescribed: true,
 };
 
 interface MatchOptionsContextValue {
@@ -60,6 +62,7 @@ export function MatchOptionsProvider({ children }: { children: ReactNode }) {
       providerId: prev.providerId,
       providerModel: prev.providerModel,
       maxWorkers: prev.maxWorkers,
+      skipUndescribed: true,
     }));
   }, []);
 
