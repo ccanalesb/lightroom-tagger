@@ -39,11 +39,13 @@ describe('DashboardPage', () => {
       evidence: {},
       meta: {},
     })
-    vi.spyOn(IdentityAPI, 'getBestPhotos').mockResolvedValue({
-      items: [],
-      total: 0,
-      meta: {},
-    })
+    vi.spyOn(IdentityAPI, 'getBestPhotos').mockImplementation(() =>
+      Promise.resolve({
+        items: [],
+        total: 0,
+        meta: {},
+      }),
+    )
     vi.spyOn(AnalyticsAPI, 'getPostingFrequency').mockResolvedValue({
       buckets: [{ bucket_start: '2025-01-01', count: 1 }],
       meta: { timezone_assumption: 'UTC' },
@@ -72,6 +74,18 @@ describe('DashboardPage', () => {
         screen.getByRole('heading', { level: 2, name: INSIGHTS_SECTION_SCORES }),
       ).toBeInTheDocument()
     })
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Unposted' })).toBeInTheDocument()
+    })
+    expect(screen.getByRole('tab', { name: 'Posted' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'All' })).toBeInTheDocument()
+    expect(IdentityAPI.getBestPhotos).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 8, posted: false }),
+    )
+    expect(IdentityAPI.getBestPhotos).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 8, posted: true }),
+    )
+    expect(IdentityAPI.getBestPhotos).toHaveBeenCalledWith({ limit: 8 })
     expect(
       screen.getByRole('heading', { level: 2, name: INSIGHTS_SECTION_HIGHLIGHTS }),
     ).toBeInTheDocument()
