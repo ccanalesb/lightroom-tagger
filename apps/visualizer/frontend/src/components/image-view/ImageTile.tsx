@@ -17,6 +17,8 @@ interface ImageTileProps {
   overlayBadges?: ReactNode
   /** Content rendered below the metadata row (e.g. post-next reason bullets). */
   footer?: ReactNode
+  /** When true, hides the metadata-row "Posted" chip (e.g. when using overlayBadges). */
+  hidePostedMetadataBadge?: boolean
   className?: string
 }
 
@@ -36,6 +38,7 @@ export function ImageTile({
   subtitle,
   overlayBadges,
   footer,
+  hidePostedMetadataBadge = false,
   className = '',
 }: ImageTileProps) {
   const classes = imageTileVariantClasses(variant)
@@ -86,6 +89,7 @@ export function ImageTile({
         <ImageMetadataBadges
           image={image}
           primaryScoreSource={primaryScoreSource}
+          hidePostedBadge={hidePostedMetadataBadge}
         />
         {footer}
       </div>

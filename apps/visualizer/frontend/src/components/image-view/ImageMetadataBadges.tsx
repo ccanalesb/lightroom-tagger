@@ -10,6 +10,8 @@ interface ImageMetadataBadgesProps {
   /** When true, renders without the primary score pill (e.g. modal header
    *  where the breakdown below already owns the aggregate). */
   hidePrimaryScore?: boolean
+  /** When true, omits the green "Posted" chip (e.g. when shown as overlay on the thumbnail). */
+  hidePostedBadge?: boolean
   className?: string
 }
 
@@ -24,13 +26,15 @@ export function ImageMetadataBadges({
   image,
   primaryScoreSource,
   hidePrimaryScore = false,
+  hidePostedBadge = false,
   className = '',
 }: ImageMetadataBadgesProps) {
   const showPrimary = !hidePrimaryScore && primaryScoreSource !== 'none'
+  const showPostedChip = image.instagram_posted && !hidePostedBadge
 
   return (
     <div className={`flex items-center gap-2 flex-wrap ${className}`.trim()}>
-      {image.instagram_posted ? <Badge variant="success">Posted</Badge> : null}
+      {showPostedChip ? <Badge variant="success">Posted</Badge> : null}
       {typeof image.rating === 'number' && image.rating > 0 ? (
         <Badge variant="accent">{image.rating}★</Badge>
       ) : null}
