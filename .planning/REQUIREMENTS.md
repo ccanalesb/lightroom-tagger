@@ -34,8 +34,8 @@
 
 ### Insights dashboard
 
-- [ ] **DASH-02**: User sees Insights "Top Scored Photos" split into two labeled sections — Top unposted (primary, prominent) and Top already posted (secondary) _(SEED-009 Piece A; implementation: unified **Unposted | Posted | All** tab control on the dashboard supersedes the original two-section layout)_
-- [ ] **DASH-03**: User can filter the Top Photos strip by posted status (tri-state: posted / unposted / all) using the shared filter framework _(SEED-009 Piece B; depends on FILTER-01, FILTER-02)_
+- [x] **DASH-02**: User sees Insights "Top Scored Photos" split into two labeled sections — Top unposted (primary, prominent) and Top already posted (secondary) _(SEED-009 Piece A; implementation: unified **Unposted | Posted | All** tab control on the dashboard supersedes the original two-section layout)_ — completed 2026-04-21 (Phase 5 Plan 04)
+- [x] **DASH-03**: User can filter the Top Photos strip by posted status (tri-state: posted / unposted / all) using the shared filter framework _(SEED-009 Piece B; depends on FILTER-01, FILTER-02)_ — completed 2026-04-21 (Phase 5 Plan 04)
 
 ### Images page visual consistency
 
@@ -83,8 +83,8 @@ These requirements were considered but deferred to a later milestone.
 | FILTER-02 | Phase 4 | Pending |
 | IDENT-04 | Phase 5 | Complete |
 | IDENT-05 | Phase 5 | Complete |
-| DASH-02 | Phase 5 | Pending |
-| DASH-03 | Phase 5 | Pending |
+| DASH-02 | Phase 5 | Complete |
+| DASH-03 | Phase 5 | Complete |
 | UI-01 | Phase 6 | Pending |
 | UI-02 | Phase 6 | Pending |
 | UI-03 | Phase 6 | Pending |

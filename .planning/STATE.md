@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish & Consolidate
-status: Phase 5 in progress — Plan 03 complete (Identity narrative order + section intros)
-last_updated: "2026-04-21T16:40:00.000Z"
+status: Phase 5 complete — Plan 04 executed (Dashboard Top Photos tabs + useFilters)
+last_updated: "2026-04-21T16:45:00.000Z"
 progress:
   total_phases: 8
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 25
-  completed_plans: 24
+  completed_plans: 25
 ---
 
 # Planning state
 
 **Project:** Lightroom Tagger & Analyzer
-**Roadmap:** [.planning/ROADMAP.md](./ROADMAP.md) (v2.1 — Phase 1 complete)
+**Roadmap:** [.planning/ROADMAP.md](./ROADMAP.md) (v2.1 — Phase 5 complete)
 
 ## Current focus
 
@@ -22,8 +22,8 @@ progress:
 |-------|--------|
 | Active milestone | v2.1 Polish & Consolidate |
 | Phase | Phase 5 — Identity & Insights clarity |
-| Status | Plans 01–03 complete — Identity page fingerprint → best photos → post next + UI-SPEC section intros; Plan 04 (Dashboard tabs) pending |
-| Last activity | 2026-04-21 — Phase 5 Plan 03 executed: 5 code commits + `05-03-SUMMARY.md`; STATE/ROADMAP/REQUIREMENTS (IDENT-05) |
+| Status | Phase 5 complete — IDENT-04/05 + DASH-02/03; ready for Phase 6 |
+| Last activity | 2026-04-21 — Phase 5 Plan 04 executed: 4 code commits + `05-04-SUMMARY.md`; STATE/ROADMAP/REQUIREMENTS (DASH-02, DASH-03) |
 
 ## Project Reference
 
@@ -50,11 +50,12 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 | FILTER-02 (InstagramTab consumer) | Phase 4.1 | ✅ Complete (2026-04-17) |
 | IDENT-04 | Phase 5 | ✅ Complete (2026-04-21) |
 | IDENT-05 | Phase 5 | ✅ Complete (2026-04-21) |
-| DASH-02, 03 | Phase 5 | Pending |
+| DASH-02, 03 | Phase 5 | ✅ Complete (2026-04-21) |
 | UI-01, 02, 03 | Phase 6 | Pending |
 
 ## Last update
 
+- **2026-04-21:** Phase 5 Plan 04 executed (`dashboard-top-photos-tabs-filters`). **`Tabs.tsx`:** extracted **`TabNav`** (`py-2`, `role="tablist"` / `role="tab"` / `aria-selected`); **`Tabs`** composes `TabNav` unchanged content gap. **`strings.ts`:** `INSIGHTS_TOP_PHOTOS_TAB_*`, `INSIGHTS_TOP_PHOTOS_REGION_ARIA`. **`DashboardPage`:** `useFilters(dashboardTopPhotosSchema)` with `topPhotosPosted` + `toParam` tri-state; parallel `getBestPhotos` with `posted: false` / `posted: true` / omitted `posted`; `TabNav` + `role="region"` + `TopPhotosStrip` per active bucket; a11y errors list each tab’s fetch failure. **`DashboardPage.test.tsx`:** tab roles + mockImplementation + call assertions. Verification: `tsc --noEmit`, `vitest run` 221 passed. Requirements **DASH-02**, **DASH-03** marked complete. Artifacts: `05-04-SUMMARY.md`. Commits: `9fdecad`, `92bcffd`, `724c54d`, `5b16e12`.
 - **2026-04-21:** Phase 5 Plan 03 executed (`identity-page-narrative-intros`). **`strings.ts`:** `IDENTITY_INTRO_STYLE_FINGERPRINT`, `IDENTITY_INTRO_BEST_PHOTOS`, `IDENTITY_INTRO_POST_NEXT` (05-UI-SPEC copy). **`IdentityPage`:** `StyleFingerprintPanel` → `BestPhotosGrid` → `PostNextSuggestionsPanel`. **`StyleFingerprintPanel`:** intro `<p>` after `h2` in loading, error, empty, and main branches. **`BestPhotosGrid` / `PostNextSuggestionsPanel`:** intro after `h2`, before `Card`; in-card help unchanged. **`IdentityPage.test.tsx`:** `indexOf` order for section headings. Verification: `tsc --noEmit`, `vitest run` 221 passed. Requirement **IDENT-05** marked complete. Artifacts: `05-03-SUMMARY.md`. Commits: `671fec0`, `91ed16f`, `26da956`, `cedf3b1`, `85224f0`.
 - **2026-04-21:** Phase 5 Plan 02 executed (`best-photos-overlay-posted-badge`). **`ImageMetadataBadges`** `hidePostedBadge` + **`ImageTile`** `hidePostedMetadataBadge` suppress the metadata-row Posted chip when the thumbnail overlay shows it. **`BestPhotosGrid`** passes `overlayBadges={<Badge variant="success">Posted</Badge>}` for `instagram_posted` rows and `hidePostedMetadataBadge` on all tiles; **`Badge`** base label class `font-medium` → `font-semibold` (UI-SPEC). **`BestPhotosGrid.test.tsx`** — one posted item yields exactly one “Posted” in the best-photos region. Verification: `tsc --noEmit`, `vitest run` 221 passed. Requirement **IDENT-04** marked complete. Artifacts: `05-02-SUMMARY.md`. Commits: `039c3ac`, `3d99d0c`, `e0a4efc`.
 - **2026-04-17:** Phase 4.1 inserted + executed (user-requested). InstagramTab migrated onto the Phase 4 framework via one `useMemo`d single-descriptor `instagramSchema` (`select` / `dateFolder` → `paramName: 'date_folder'`) + `useFilters` + `<FilterBar>`. Removed `dateFilter` `useState`, `handleFilterChange`, `clearFilter`, the inline `<select>` + Clear button block, and the `FILTER_CLEAR` import. `fetchImages` now spreads `filters.toQueryParams()`. Filter-change → offset-0 parity preserved via `useRef<boolean>(true)` first-run guard + `useEffect` on committed `dateFolder`. Clear-button copy shifts from `FILTER_CLEAR` ("Clear") to `FILTER_CLEAR_ALL` ("Clear all"), matching CatalogTab. Minor UX shift: filter now always renders (even with zero months loaded, "All dates" is the only option) — mirrors CatalogTab's behavior. Added RTL smoke test (2 assertions: baseline `listInstagram` call has no `date_folder`, and the "Date" label renders). Verification: 136/136 frontend tests pass (+2 new), lint clean, `tsc --noEmit` clean. Remaining ad-hoc filter consumers (`MatchesTab`, `DescriptionsTab`, `MatchingTab`, `AnalyticsPage`, `UnpostedCatalogPanel`) stay deferred to SEED-007 full rollout.

@@ -40,7 +40,7 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 - [x] Phase 3: Unified Analyze job — JOB-06 — completed 2026-04-17
 - [x] Phase 4: Reusable filter framework — FILTER-01, FILTER-02 — completed 2026-04-17
 - [x] Phase 4.1 (INSERTED 2026-04-17): InstagramTab filter migration — FILTER-02 — completed 2026-04-17
-- [ ] Phase 5: Identity & Insights clarity — IDENT-04, IDENT-05, DASH-02, DASH-03 _(depends on Phase 4)_
+- [x] Phase 5: Identity & Insights clarity — IDENT-04, IDENT-05, DASH-02, DASH-03 _(depends on Phase 4)_ — completed 2026-04-21
 - [ ] Phase 6: Images page visual consistency — UI-01, UI-02, UI-03
 - [ ] Phase 7: React Suspense data layer (no deps) — DATA-01 _(cross-cutting; no roadmap deps)_
 
@@ -53,7 +53,7 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 | 3. Unified Analyze job | One default flow for full AI analysis | JOB-06 | 3 | ✅ Complete (2026-04-17) |
 | 4. Reusable filter framework | Declarative filter foundation (proved by CatalogTab) | FILTER-01, FILTER-02 | 4 | ✅ Complete (2026-04-17) |
 | 4.1. InstagramTab filter migration | Migrate InstagramTab onto the Phase 4 framework (INSERTED) | FILTER-02 | 3 | ✅ Complete (2026-04-17) |
-| 5. Identity & Insights clarity | Posted/unposted visibility + narrative flow | IDENT-04, IDENT-05, DASH-02, DASH-03 | 4 | In progress (2/4 plans — 2026-04-21) |
+| 5. Identity & Insights clarity | Posted/unposted visibility + narrative flow | IDENT-04, IDENT-05, DASH-02, DASH-03 | 4 | ✅ Complete (2026-04-21) |
 | 6. Images page visual consistency | Unify badge + card language on Images page | UI-01, UI-02, UI-03 | 3 | Pending |
 | 7. React Suspense data layer | Replace useEffect+setState fetches with React-only Suspense/ErrorBoundary + module cache, no deps | DATA-01 | 8 | Pending |
 | 8. Two-stage cascade matching | Fix description signal + cascade scoring (desc→vision) | MATCH-01..04 | 8 | ✅ Complete (2026-04-21) |
@@ -118,13 +118,13 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 - [x] **Plan 01** (Wave 1): Posted filter for best-photos — `rank_best_photos` + `/api/identity/best-photos` + `IdentityAPI.getBestPhotos` — **complete 2026-04-21**
 - [x] **Plan 02** (Wave 2): BestPhotosGrid posted overlay + dedupe metadata Posted chip — **complete 2026-04-21**
 - [x] **Plan 03** (Wave 3): Identity page order + section intros (IDENT-05) — depends on 01, 02 — **complete 2026-04-21**
-- [ ] **Plan 04** (Wave 3): Dashboard Top Photos tabs + `useFilters` — depends on 01
+- [x] **Plan 04** (Wave 3): Dashboard Top Photos tabs + `useFilters` — depends on 01 — **complete 2026-04-21**
 
 **Success criteria:**
 1. BestPhotosGrid cards show posted vs unposted status visually at a glance
 2. Identity page presents a narrative flow from fingerprint → best work → post next, with differentiated card treatments for Best Photos vs Post Next Suggestions
-3. Insights Top Scored Photos splits into two labeled sections — Top unposted (primary, prominent) and Top already posted (secondary)
-4. Top Photos strip exposes a tri-state posted filter built on the shared filter framework from Phase 4
+3. Insights Top Scored Photos surfaces unposted vs posted vs all via the **Unposted | Posted | All** tab control (default Unposted), satisfying the DASH-02 intent without a two-section split
+4. Top Photos strip exposes a tri-state posted filter built on the shared filter framework from Phase 4 (`useFilters` + schema key `topPhotosPosted`, no `FilterBar`)
 
 ### Phase 6: Images page visual consistency
 
