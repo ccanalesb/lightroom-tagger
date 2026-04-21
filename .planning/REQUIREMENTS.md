@@ -29,7 +29,7 @@
 
 ### Identity page clarity
 
-- [ ] **IDENT-04**: User sees posted vs unposted status visually on every BestPhotosGrid card _(SEED-003)_
+- [x] **IDENT-04**: User sees posted vs unposted status visually on every BestPhotosGrid card _(SEED-003)_ — completed 2026-04-21 (Phase 5 Plan 02)
 - [ ] **IDENT-05**: Identity page presents a clear narrative flow from style fingerprint → best work → what to post next, with section intros and differentiated card treatments for Best Photos vs Post Next Suggestions _(SEED-003)_
 
 ### Insights dashboard
@@ -81,7 +81,7 @@ These requirements were considered but deferred to a later milestone.
 | JOB-06 | Phase 3 | Pending |
 | FILTER-01 | Phase 4 | Pending |
 | FILTER-02 | Phase 4 | Pending |
-| IDENT-04 | Phase 5 | Pending |
+| IDENT-04 | Phase 5 | Complete |
 | IDENT-05 | Phase 5 | Pending |
 | DASH-02 | Phase 5 | Pending |
 | DASH-03 | Phase 5 | Pending |
