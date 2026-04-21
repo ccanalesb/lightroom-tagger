@@ -306,3 +306,266 @@ class TestFindCandidatesByDate:
         assert 'img2' in keys
         assert 'vid1' not in keys
         assert 'vid2' not in keys
+
+
+def test_vision_weight_zero_skips_compare_images_and_compression():
+    """vision_weight=0 must not call compare_images_batch or compress_instagram_image."""
+    mock_db = Mock()
+    insta_image = {
+        'key': 'insta_test',
+        'image_hash': 'a' * 16,
+        'description': 'x',
+        'local_path': '/tmp/insta.jpg',
+        'ai_summary': 'reference summary text',
+    }
+    candidates = [
+        {
+            'key': 'cat1',
+            'image_hash': 'a' * 16,
+            'description': 'y',
+            'local_path': '/tmp/c1.jpg',
+            'ai_summary': 'candidate summary',
+        },
+    ]
+    with patch('lightroom_tagger.core.vision_client.compare_images_batch') as mock_compare_images, \
+         patch('lightroom_tagger.core.matcher.compare_descriptions_batch', return_value={0: 80.0}), \
+         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_ic, \
+         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
+         patch('lightroom_tagger.core.phash.hamming_distance', return_value=0), \
+         patch('os.path.exists', return_value=True):
+        compress = MagicMock()
+        mock_ic.return_value.compress_instagram_image = compress
+        mock_ic.return_value.cleanup.return_value = None
+        score_candidates_with_vision(
+            mock_db, insta_image, candidates,
+            phash_weight=0.4, desc_weight=0.3, vision_weight=0.0,
+            batch_threshold=1,
+            batch_size=10,
+        )
+    mock_compare_images.assert_not_called()
+    compress.assert_not_called()
+
+
+def test_desc_weight_zero_skips_compare_descriptions_batch():
+    """desc_weight=0 must not call compare_descriptions_batch."""
+    mock_db = Mock()
+    insta_image = {
+        'key': 'insta_test',
+        'image_hash': 'a' * 16,
+        'description': 'sunset',
+        'local_path': '/tmp/insta.jpg',
+        'ai_summary': 'ref',
+    }
+    candidates = [
+        {'key': 'cat1', 'image_hash': 'a' * 16, 'description': 'sunset', 'local_path': '/tmp/local1.jpg', 'ai_summary': 'x'},
+    ]
+    with patch('lightroom_tagger.core.matcher.compare_descriptions_batch') as mock_desc, \
+         patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=None), \
+         patch('lightroom_tagger.core.analyzer.compare_with_vision',
+               return_value={'confidence': 100, 'verdict': 'SAME', 'reasoning': ''}), \
+         patch('lightroom_tagger.core.analyzer.vision_score', return_value=1.0), \
+         patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
+         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
+         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
+         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
+         patch('lightroom_tagger.core.phash.hamming_distance', return_value=0):
+        mock_insta_cache.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
+        mock_insta_cache.return_value.cleanup.return_value = None
+        score_candidates_with_vision(
+            mock_db, insta_image, candidates,
+            phash_weight=0.0, desc_weight=0.0, vision_weight=1.0,
+        )
+    mock_desc.assert_not_called()
+
+
+def test_backward_compat_phash_zero_desc_zero_vision_only_total():
+    """phash=0, desc=0, vision=1: total_score equals vision_score_val (SC-7)."""
+    mock_db = Mock()
+    insta_image = {
+        'key': 'insta_test',
+        'image_hash': 'a' * 16,
+        'description': 'sunset',
+        'local_path': '/tmp/insta.jpg',
+    }
+    candidates = [
+        {'key': 'cat1', 'image_hash': 'a' * 16, 'description': 'sunset', 'local_path': '/tmp/local1.jpg'},
+    ]
+    with patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=None), \
+         patch('lightroom_tagger.core.analyzer.compare_with_vision',
+               return_value={'confidence': 85, 'verdict': 'SAME', 'reasoning': ''}), \
+         patch('lightroom_tagger.core.analyzer.vision_score', return_value=0.85), \
+         patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
+         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
+         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
+         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
+         patch('lightroom_tagger.core.phash.hamming_distance', return_value=0):
+        mock_insta_cache.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
+        mock_insta_cache.return_value.cleanup.return_value = None
+        results = score_candidates_with_vision(
+            mock_db, insta_image, candidates,
+            phash_weight=0.0, desc_weight=0.0, vision_weight=1.0,
+        )
+    assert len(results) == 1
+    assert abs(results[0]['total_score'] - results[0]['vision_score']) < 1e-9
+
+
+def test_nominal_weighted_merge_all_ones():
+    """Weights 0.4/0.3/0.3 with phash/desc/vision contributions 1.0 yield total 1.0."""
+    mock_db = Mock()
+    insta_image = {
+        'key': 'insta_test',
+        'image_hash': 'a' * 16,
+        'description': 'a',
+        'local_path': '/tmp/insta.jpg',
+        'ai_summary': 'ref',
+    }
+    candidates = [
+        {'key': 'cat1', 'image_hash': 'a' * 16, 'description': 'b', 'local_path': '/tmp/local1.jpg', 'ai_summary': 'cand'},
+    ]
+    with patch('lightroom_tagger.core.matcher.compare_descriptions_batch', return_value={0: 100.0}), \
+         patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=None), \
+         patch('lightroom_tagger.core.analyzer.compare_with_vision',
+               return_value={'confidence': 100, 'verdict': 'SAME', 'reasoning': ''}), \
+         patch('lightroom_tagger.core.analyzer.vision_score', return_value=1.0), \
+         patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
+         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
+         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
+         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
+         patch('lightroom_tagger.core.phash.hamming_distance', return_value=0):
+        mock_insta_cache.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
+        mock_insta_cache.return_value.cleanup.return_value = None
+        results = score_candidates_with_vision(
+            mock_db, insta_image, candidates,
+            phash_weight=0.4, desc_weight=0.3, vision_weight=0.3,
+        )
+    assert len(results) == 1
+    assert abs(results[0]['total_score'] - 1.0) < 1e-9
+
+
+def test_skip_undescribed_true_empty_summaries_no_desc_batch_call():
+    """Empty ai_summary with skip_undescribed=True: no compare_descriptions_batch payload."""
+    mock_db = Mock()
+    insta_image = {
+        'key': 'insta_test',
+        'image_hash': 'a' * 16,
+        'description': 'cap',
+        'local_path': '/tmp/insta.jpg',
+        'ai_summary': 'instagram has summary',
+    }
+    candidates = [
+        {'key': 'cat1', 'image_hash': 'a' * 16, 'description': 'd', 'local_path': '/tmp/c1.jpg', 'ai_summary': ''},
+    ]
+    with patch('lightroom_tagger.core.matcher.compare_descriptions_batch') as mock_desc, \
+         patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=None), \
+         patch('lightroom_tagger.core.analyzer.compare_with_vision',
+               return_value={'confidence': 50, 'verdict': 'UNCERTAIN', 'reasoning': ''}), \
+         patch('lightroom_tagger.core.analyzer.vision_score', return_value=0.5), \
+         patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
+         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
+         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
+         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
+         patch('lightroom_tagger.core.phash.hamming_distance', return_value=0), \
+         patch('os.path.exists', return_value=True):
+        mock_insta_cache.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
+        mock_insta_cache.return_value.cleanup.return_value = None
+        results = score_candidates_with_vision(
+            mock_db, insta_image, candidates,
+            phash_weight=0.0, desc_weight=0.3, vision_weight=0.7,
+            skip_undescribed=True,
+        )
+    mock_desc.assert_not_called()
+    assert results[0]['desc_similarity'] == 0.0
+
+
+def test_description_batch_runs_before_vision_batch():
+    """Per chunk, compare_descriptions_batch is invoked before compare_images_batch (SC-3)."""
+    mock_db = Mock()
+    insta_image = {
+        'key': 'insta_test',
+        'image_hash': 'a' * 16,
+        'description': 'c',
+        'local_path': '/tmp/insta.jpg',
+        'ai_summary': 'ref summary for batch',
+    }
+    candidates = [
+        {'key': 'c0', 'image_hash': 'a' * 16, 'description': 'd', 'local_path': '/tmp/p0.jpg', 'ai_summary': 's0'},
+        {'key': 'c1', 'image_hash': 'a' * 16, 'description': 'd', 'local_path': '/tmp/p1.jpg', 'ai_summary': 's1'},
+    ]
+    order = []
+
+    def desc_side_effect(*args, **kwargs):
+        order.append('desc')
+        return {0: 90.0, 1: 90.0}
+
+    def vision_side_effect(client, model, ref, cands, log_callback=None, max_tokens=4096):
+        order.append('vision')
+        return {cid: 80.0 for cid, _ in cands}
+
+    with patch('lightroom_tagger.core.matcher.compare_descriptions_batch', side_effect=desc_side_effect), \
+         patch('lightroom_tagger.core.vision_client.compare_images_batch', side_effect=vision_side_effect), \
+         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
+         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value='/tmp/small.jpg'), \
+         patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
+         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_ic, \
+         patch('lightroom_tagger.core.provider_registry.ProviderRegistry') as mock_reg, \
+         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='m'), \
+         patch('lightroom_tagger.core.phash.hamming_distance', return_value=0), \
+         patch('os.path.exists', return_value=True):
+        mock_ic.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
+        mock_ic.return_value.cleanup.return_value = None
+        mock_reg.return_value.fallback_order = ['ollama']
+        mock_reg.return_value.get_client.return_value = Mock()
+        score_candidates_with_vision(
+            mock_db, insta_image, candidates,
+            phash_weight=0.2, desc_weight=0.3, vision_weight=0.5,
+            batch_size=10,
+            batch_threshold=1,
+            provider_id='ollama',
+            model='m',
+        )
+    assert order[0] == 'desc'
+    assert order[1] == 'vision'
+
+
+def test_all_empty_ai_summary_skip_no_redistribution():
+    """All candidates lack ai_summary; desc batch skipped; nominal 0.3/0.7 merge (D-10)."""
+    mock_db = Mock()
+    insta_image = {
+        'key': 'insta_test',
+        'image_hash': 'a' * 16,
+        'description': 'c',
+        'local_path': '/tmp/insta.jpg',
+        'ai_summary': 'ref',
+    }
+    candidates = [
+        {'key': 'c0', 'image_hash': 'a' * 16, 'description': 'd', 'local_path': '/tmp/p0.jpg', 'ai_summary': ''},
+        {'key': 'c1', 'image_hash': 'a' * 16, 'description': 'd', 'local_path': '/tmp/p1.jpg', 'ai_summary': ''},
+        {'key': 'c2', 'image_hash': 'a' * 16, 'description': 'd', 'local_path': '/tmp/p2.jpg', 'ai_summary': ''},
+    ]
+    with patch('lightroom_tagger.core.matcher.compare_descriptions_batch') as mock_desc, \
+         patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=None), \
+         patch('lightroom_tagger.core.analyzer.compare_with_vision',
+               return_value={'confidence': 100, 'verdict': 'SAME', 'reasoning': ''}), \
+         patch('lightroom_tagger.core.analyzer.vision_score', return_value=1.0), \
+         patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
+         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
+         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
+         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
+         patch('lightroom_tagger.core.phash.hamming_distance', return_value=0), \
+         patch('os.path.exists', return_value=True):
+        mock_insta_cache.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
+        mock_insta_cache.return_value.cleanup.return_value = None
+        results = score_candidates_with_vision(
+            mock_db, insta_image, candidates,
+            phash_weight=0.0, desc_weight=0.3, vision_weight=0.7,
+            skip_undescribed=True,
+        )
+    mock_desc.assert_not_called()
+    assert len(results) == 3
+    for r in results:
+        assert abs(r['total_score'] - 0.7 * r['vision_score']) < 1e-9
