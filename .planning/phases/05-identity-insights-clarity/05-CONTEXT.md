@@ -4,11 +4,15 @@
 **Status:** Ready for planning
 
 <domain>
+## Errata (read before Wave sequencing)
+
+Research and Plan 01 found a gap: the API must gain **`posted` query support** (backend + client typings) in **Wave 1 (Plan 01)**. Downstream work assumes that filter exists. This phase is **not** purely frontend-only despite the original boundary note below — treat Plan 01 as required for `posted` filtering.
+
 ## Phase Boundary
 
 Surface posted/unposted status on BestPhotosGrid cards (IDENT-04), reorder the Identity page for a fingerprint → best work → post next narrative flow with section intros (IDENT-05), and replace the Dashboard Top Photos area with a tabbed Unposted / Posted / All view that covers both DASH-02 and DASH-03 in a single unified control.
 
-This phase is **frontend-only** — `IdentityBestPhotoItem` already carries `instagram_posted: boolean`, the filter framework is in place from Phase 4, and the backend `/api/identity/best-photos` endpoint already accepts a `posted` boolean param. No backend changes needed.
+~~This phase is **frontend-only** — the backend `/api/identity/best-photos` endpoint already accepts a `posted` boolean param. No backend changes needed.~~ **SUPERSEDED by Errata above.** Plan 01 (Wave 1) adds `posted` support to the backend and TypeScript client before any Dashboard tab work.
 
 </domain>
 

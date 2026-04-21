@@ -34,7 +34,7 @@
 
 ### Insights dashboard
 
-- [ ] **DASH-02**: User sees Insights "Top Scored Photos" split into two labeled sections — Top unposted (primary, prominent) and Top already posted (secondary) _(SEED-009 Piece A)_
+- [ ] **DASH-02**: User sees Insights "Top Scored Photos" split into two labeled sections — Top unposted (primary, prominent) and Top already posted (secondary) _(SEED-009 Piece A; implementation: unified **Unposted | Posted | All** tab control on the dashboard supersedes the original two-section layout)_
 - [ ] **DASH-03**: User can filter the Top Photos strip by posted status (tri-state: posted / unposted / all) using the shared filter framework _(SEED-009 Piece B; depends on FILTER-01, FILTER-02)_
 
 ### Images page visual consistency
