@@ -46,7 +46,7 @@ describe('IdentityPage', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders page title and section headings', async () => {
+  it('renders page title and section headings in narrative order', async () => {
     render(
       <MemoryRouter>
         <IdentityPage />
@@ -55,14 +55,22 @@ describe('IdentityPage', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: IDENTITY_PAGE_TITLE })).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { level: 2, name: IDENTITY_SECTION_BEST_PHOTOS }),
+      screen.getByRole('heading', { level: 2, name: IDENTITY_SECTION_STYLE_FINGERPRINT }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { level: 2, name: IDENTITY_SECTION_STYLE_FINGERPRINT }),
+      screen.getByRole('heading', { level: 2, name: IDENTITY_SECTION_BEST_PHOTOS }),
     ).toBeInTheDocument()
     expect(
       screen.getByRole('heading', { level: 2, name: IDENTITY_SECTION_POST_NEXT }),
     ).toBeInTheDocument()
+
+    const body = document.body.innerHTML
+    expect(
+      body.indexOf(IDENTITY_SECTION_STYLE_FINGERPRINT) < body.indexOf(IDENTITY_SECTION_BEST_PHOTOS),
+    ).toBe(true)
+    expect(
+      body.indexOf(IDENTITY_SECTION_BEST_PHOTOS) < body.indexOf(IDENTITY_SECTION_POST_NEXT),
+    ).toBe(true)
   })
 
   it('shows empty-state copy when APIs return no data', async () => {
