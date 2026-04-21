@@ -10,6 +10,7 @@ import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import {
   IDENTITY_ACTION_OPEN_CATALOG,
+  IDENTITY_INTRO_POST_NEXT,
   IDENTITY_POST_NEXT_EMPTY_FALLBACK,
   IDENTITY_POST_NEXT_HELP,
   IDENTITY_REASON_CODE_LABELS,
@@ -144,6 +145,7 @@ export function PostNextSuggestionsPanel() {
       <h2 id="identity-post-next-heading" className="text-card-title text-text">
         {IDENTITY_SECTION_POST_NEXT}
       </h2>
+      <p className="text-sm text-text-secondary">{IDENTITY_INTRO_POST_NEXT}</p>
       <Card padding="md">
         <CardHeader>
           <CardTitle className="text-base sr-only">{IDENTITY_SECTION_POST_NEXT}</CardTitle>

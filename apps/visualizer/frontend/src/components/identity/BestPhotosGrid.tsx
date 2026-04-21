@@ -13,6 +13,7 @@ import { SkeletonGrid } from '../ui/page-states'
 import {
   IDENTITY_BEST_PHOTOS_EMPTY_FALLBACK,
   IDENTITY_BEST_PHOTOS_HELP,
+  IDENTITY_INTRO_BEST_PHOTOS,
   IDENTITY_SECTION_BEST_PHOTOS,
   MSG_SHOWING_RANGE,
   FILTER_LABEL_SORT_DATE,
@@ -117,6 +118,7 @@ export function BestPhotosGrid() {
       <h2 id="identity-best-photos-heading" className="text-card-title text-text">
         {IDENTITY_SECTION_BEST_PHOTOS}
       </h2>
+      <p className="text-sm text-text-secondary">{IDENTITY_INTRO_BEST_PHOTOS}</p>
       <Card padding="md">
         <CardHeader>
           <CardTitle className="text-base sr-only">{IDENTITY_SECTION_BEST_PHOTOS}</CardTitle>
