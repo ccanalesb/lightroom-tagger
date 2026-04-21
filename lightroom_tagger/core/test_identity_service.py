@@ -109,6 +109,59 @@ def test_rank_best_photos_orders_by_aggregate_and_excludes_low_coverage(tmp_path
     assert page[0]["aggregate_score"] > page[1]["aggregate_score"]
 
 
+def test_rank_best_photos_filters_by_posted(tmp_path) -> None:
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    slugs = _active_slugs(conn)
+    assert len(slugs) >= 2
+    s0, s1 = slugs[0], slugs[1]
+
+    k_posted = store_image(
+        conn,
+        {
+            "date_taken": "2024-01-10",
+            "filename": "posted.jpg",
+            "rating": 5,
+            "instagram_posted": True,
+        },
+    )
+    k_unposted = store_image(
+        conn,
+        {
+            "date_taken": "2024-01-11",
+            "filename": "unposted.jpg",
+            "rating": 5,
+            "instagram_posted": False,
+        },
+    )
+
+    _add_score(conn, k_posted, s0, 8)
+    _add_score(conn, k_posted, s1, 8)
+    _add_score(conn, k_unposted, s0, 7)
+    _add_score(conn, k_unposted, s1, 7)
+    conn.commit()
+
+    page_true, total_true, _ = rank_best_photos(
+        conn, limit=10, offset=0, min_perspectives=2, posted=True
+    )
+    assert total_true == 1
+    assert len(page_true) == 1
+    assert page_true[0]["instagram_posted"] is True
+
+    page_false, total_false, _ = rank_best_photos(
+        conn, limit=10, offset=0, min_perspectives=2, posted=False
+    )
+    assert total_false == 1
+    assert len(page_false) == 1
+    assert page_false[0]["instagram_posted"] is False
+
+    page_all, total_all, _ = rank_best_photos(
+        conn, limit=10, offset=0, min_perspectives=2, posted=None
+    )
+    assert total_all == 2
+    assert len(page_all) == 2
+
+
 def test_style_fingerprint_mean_and_rationale_tokens(tmp_path) -> None:
     db_path = tmp_path / "library.db"
     conn = init_database(str(db_path))

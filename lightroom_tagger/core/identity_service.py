@@ -289,6 +289,7 @@ def rank_best_photos(
     offset: int,
     min_perspectives: int | None = None,
     sort_by_date: str | None = None,
+    posted: bool | None = None,
 ) -> tuple[list[dict[str, Any]], int, dict[str, Any]]:
     """Eligible images only, sorted by aggregate_score DESC, date_taken, key ASC.
 
@@ -315,6 +316,11 @@ def rank_best_photos(
     enriched.sort(key=lambda r: r["image_key"])
     enriched.sort(key=lambda r: r.get("date_taken") or "", reverse=date_reverse)
     enriched.sort(key=lambda r: r["aggregate_score"], reverse=True)
+
+    if posted is True:
+        enriched = [r for r in enriched if bool(r.get("instagram_posted")) is True]
+    elif posted is False:
+        enriched = [r for r in enriched if bool(r.get("instagram_posted")) is False]
 
     total = len(enriched)
     page = enriched[offset : offset + limit]
