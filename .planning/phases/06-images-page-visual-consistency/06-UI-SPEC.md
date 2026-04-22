@@ -1,7 +1,7 @@
 ---
 phase: 6
 slug: images-page-visual-consistency
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-04-22
