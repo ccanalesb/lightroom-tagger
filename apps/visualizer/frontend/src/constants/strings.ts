@@ -567,6 +567,11 @@ export const MATCH_DETAIL_UNVALIDATE_FIRST = 'Un-validate first to reject'
 
 export const MATCH_VALIDATE = 'Validate'
 export const MATCH_VALIDATED = 'Validated'
+
+export function msgMatchGroupCandidates(count: number): string {
+  return `${count} candidate${count === 1 ? '' : 's'}`
+}
+
 export const MATCH_REJECT = 'Reject'
 export const MATCH_REJECT_TITLE = 'Reject this match?'
 export const MATCH_REJECT_BODY = 'This will remove the match and blocklist this pairing. The Instagram image will be free to match other catalog candidates.'
