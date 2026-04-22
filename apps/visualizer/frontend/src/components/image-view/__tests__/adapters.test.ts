@@ -129,7 +129,44 @@ describe('image-view adapters', () => {
     const out = fromInstagramRow(row)
     expect(out.image_type).toBe('instagram')
     expect(out.description_summary).toBe('ai-desc')
+    expect(out.ai_analyzed).toBe(true)
     expect(out.identity_aggregate_score).toBeUndefined()
     expect(out.catalog_perspective_score).toBeUndefined()
+  })
+
+  it('fromInstagramRow sets ai_analyzed true when description is non-empty after trim', () => {
+    const base: Omit<InstagramImage, 'description'> = {
+      key: 'ig-2',
+      local_path: '/tmp/x.jpg',
+      filename: 'x.jpg',
+      instagram_folder: '2024-05',
+      source_folder: 'posts',
+      date_folder: '202405',
+      crawled_at: '',
+      image_index: 1,
+      total_in_post: 1,
+      caption: '',
+    }
+    const out = fromInstagramRow({ ...base, description: '  hello  ' })
+    expect(out.ai_analyzed).toBe(true)
+    expect(out.description_summary).toBe('  hello  ')
+  })
+
+  it('fromInstagramRow sets ai_analyzed false when description is missing or blank', () => {
+    const base: Omit<InstagramImage, 'description'> = {
+      key: 'ig-3',
+      local_path: '/tmp/y.jpg',
+      filename: 'y.jpg',
+      instagram_folder: '2024-05',
+      source_folder: 'posts',
+      date_folder: '202405',
+      crawled_at: '',
+      image_index: 1,
+      total_in_post: 1,
+      caption: '',
+    }
+    expect(fromInstagramRow({ ...base }).ai_analyzed).toBe(false)
+    expect(fromInstagramRow({ ...base, description: '' }).ai_analyzed).toBe(false)
+    expect(fromInstagramRow({ ...base, description: '   ' }).ai_analyzed).toBe(false)
   })
 })

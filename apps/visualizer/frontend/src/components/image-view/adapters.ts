@@ -106,6 +106,8 @@ export function fromInstagramRow(row: InstagramImage): ImageView {
     post_url: row.post_url,
     caption: row.caption,
     description_summary: row.description ?? null,
+    ai_analyzed:
+      typeof row.description === 'string' && row.description.trim().length > 0,
     image_hash: row.image_hash,
     // No identity / catalog score fields for Instagram rows.
   }
