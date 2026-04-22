@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { IdentityBestPhotoItem } from '../../services/api'
 import { ImageDetailModal, ImageTile, fromBestPhotoRow } from '../image-view'
+import { PerspectiveBadge } from '../ui/badges'
+import { pickDominantPerspective } from '../identity/pickDominantPerspective'
 import { MSG_LOADING } from '../../constants/strings'
 
 export type TopPhotosStripProps = {
@@ -44,15 +46,27 @@ export function TopPhotosStrip({ items, loading, error, emptyMessage }: TopPhoto
   return (
     <>
       <div className="-mx-1 flex gap-3 overflow-x-auto pb-2 pt-1">
-        {items.map((row) => (
-          <ImageTile
-            key={row.image_key}
-            image={fromBestPhotoRow(row)}
-            variant="strip"
-            primaryScoreSource="identity"
-            onClick={() => setSelected(row)}
-          />
-        ))}
+        {items.map((row) => {
+          const dom = pickDominantPerspective(row.per_perspective)
+          return (
+            <ImageTile
+              key={row.image_key}
+              image={fromBestPhotoRow(row)}
+              variant="strip"
+              primaryScoreSource="identity"
+              onClick={() => setSelected(row)}
+              footer={
+                dom ? (
+                  <PerspectiveBadge
+                    perspectiveSlug={dom.perspective_slug}
+                    score={dom.score}
+                    displayName={dom.display_name}
+                  />
+                ) : null
+              }
+            />
+          )
+        })}
       </div>
       {selected ? (
         <ImageDetailModal
