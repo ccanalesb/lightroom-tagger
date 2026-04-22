@@ -1,3 +1,8 @@
+/**
+ * Base pill badge for short labels, counts, and status chips across the visualizer
+ * (grids, filters, job cards, KPI rows). Prefer specialized badges
+ * (`VisionBadge`, `StatusBadge`, etc.) when semantics are fixed.
+ */
 import { ReactNode } from 'react';
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'accent';

@@ -1,3 +1,8 @@
+/**
+ * Numeric score pill (1–10 scale) for image tiles, catalog breakdowns, and
+ * headers. Colors follow `descriptionScoreColor` thresholds; use when showing a
+ * raw score rather than a categorical badge.
+ */
 import { descriptionScoreColor } from '../../../utils/scoreColorClasses'
 
 interface ScorePillProps {
@@ -10,12 +15,6 @@ interface ScorePillProps {
   className?: string
 }
 
-/**
- * Score pill used across image tiles, breakdowns, and modal headers.
- *
- * Reuses `descriptionScoreColor` so color thresholds (7+ green, 5–6 yellow,
- * <5 red) stay consistent with the existing description panel atoms.
- */
 export function ScorePill({ score, label, className = '' }: ScorePillProps) {
   const hasScore = typeof score === 'number' && Number.isFinite(score)
   const display = hasScore ? score.toFixed(score % 1 === 0 ? 0 : 1) : '—'

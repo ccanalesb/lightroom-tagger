@@ -1,5 +1,6 @@
 export { Badge } from './Badge'
 export { ImageTypeBadge } from './ImageTypeBadge'
+export { PerspectiveBadge } from './PerspectiveBadge'
 export { ScorePill } from './ScorePill'
 export { StatusBadge } from './StatusBadge'
 export { VisionBadge } from './VisionBadge'
