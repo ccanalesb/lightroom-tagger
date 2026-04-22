@@ -22,8 +22,8 @@ export function MatchGroupTile({ group, onOpenReview }: MatchGroupTileProps) {
     'instagram',
   );
 
-  const overlay = (
-    <>
+  const footer = (
+    <div className="flex flex-wrap items-center gap-2">
       {group.has_validated ? (
         <Badge variant="success">{MATCH_VALIDATED}</Badge>
       ) : (
@@ -32,21 +32,19 @@ export function MatchGroupTile({ group, onOpenReview }: MatchGroupTileProps) {
       {typeof group.best_score === 'number' && (
         <ScorePill score={group.best_score} label="match" />
       )}
-    </>
+      {group.has_validated && (
+        <p className="w-full truncate text-xs text-text-secondary">
+          {initial.catalog_image?.filename ?? initial.catalog_key}
+        </p>
+      )}
+    </div>
   );
-
-  const footer = group.has_validated ? (
-    <p className="text-xs text-text-secondary truncate">
-      {initial.catalog_image?.filename ?? initial.catalog_key}
-    </p>
-  ) : null;
 
   return (
     <ImageTile
       image={instagramView}
       variant="grid"
       primaryScoreSource="none"
-      overlayBadges={overlay}
       footer={footer}
       onClick={() => onOpenReview(group, initial)}
     />
