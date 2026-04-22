@@ -3,6 +3,7 @@ import type {
   CatalogImage,
   IdentityBestPhotoItem,
   InstagramImage,
+  Match,
   PostNextCandidate,
   UnpostedCatalogItem,
 } from '../../../services/api'
@@ -10,6 +11,7 @@ import {
   fromBestPhotoRow,
   fromCatalogListRow,
   fromInstagramRow,
+  fromMatchSide,
   fromPostNextRow,
   fromUnpostedRow,
 } from '../adapters'
@@ -168,5 +170,31 @@ describe('image-view adapters', () => {
     expect(fromInstagramRow({ ...base }).ai_analyzed).toBe(false)
     expect(fromInstagramRow({ ...base, description: '' }).ai_analyzed).toBe(false)
     expect(fromInstagramRow({ ...base, description: '   ' }).ai_analyzed).toBe(false)
+  })
+
+  it('fromMatchSide instagram uses fromInstagramRow so ai_analyzed follows description', () => {
+    const embedded: InstagramImage = {
+      key: 'ig-m',
+      local_path: '/tmp/m.jpg',
+      filename: 'm.jpg',
+      instagram_folder: '2024-05',
+      source_folder: 'posts',
+      date_folder: '202405',
+      crawled_at: '',
+      image_index: 1,
+      total_in_post: 1,
+      caption: '',
+      description: 'match list description',
+    }
+    const match: Match = {
+      instagram_key: 'ig-m',
+      catalog_key: 'cat-1',
+      score: 0.9,
+      instagram_image: embedded,
+    }
+    const out = fromMatchSide(match, 'instagram')
+    expect(out.image_type).toBe('instagram')
+    expect(out.ai_analyzed).toBe(true)
+    expect(out.description_summary).toBe('match list description')
   })
 })
