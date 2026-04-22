@@ -1,6 +1,6 @@
 import { Badge } from '../ui/badges';
 import { ImageTile, fromMatchSide } from '../image-view';
-import { MATCH_VALIDATED } from '../../constants/strings';
+import { MATCH_VALIDATED, msgMatchGroupCandidates } from '../../constants/strings';
 import type { Match, MatchGroup } from '../../services/api';
 import { pickInitialMatch } from './pickInitialMatch';
 
@@ -10,9 +10,9 @@ interface MatchGroupTileProps {
 }
 
 /**
- * List tile for a match group: renders the Instagram image only,
- * with an overlay badge indicating validation state or the number
- * of candidates. Clicking opens the match review modal.
+ * List tile for a match group: Instagram thumbnail with Catalog-style card
+ * shell; validation state and catalog filename (when validated) or candidate
+ * count (when not) appear in the footer metadata row — not on the thumbnail.
  */
 export function MatchGroupTile({ group, onOpenReview }: MatchGroupTileProps) {
   const initial = pickInitialMatch(group);
@@ -21,30 +21,25 @@ export function MatchGroupTile({ group, onOpenReview }: MatchGroupTileProps) {
     { ...initial, instagram_image: group.instagram_image },
     'instagram',
   );
+  const footer = group.has_validated ? (
+    <div className="flex flex-wrap items-center gap-2 justify-between">
+      <p className="text-xs text-text-secondary truncate max-w-full">
+        {initial.catalog_image?.filename ?? initial.catalog_key}
+      </p>
+      <Badge variant="success">{MATCH_VALIDATED}</Badge>
+    </div>
+  ) : (
+    <p className="text-xs text-text-secondary">
+      {msgMatchGroupCandidates(group.candidate_count)}
+    </p>
+  );
   return (
     <ImageTile
       image={instagramView}
       variant="grid"
       primaryScoreSource="none"
-      overlayBadges={renderOverlayBadge(group)}
+      footer={footer}
       onClick={() => onOpenReview(group, initial)}
     />
-  );
-}
-
-/**
- * Decide which overlay badge the group tile should show:
- *   - "Validated" (success) when the group already has a validated match.
- *   - "N candidate(s)" (accent) otherwise.
- */
-function renderOverlayBadge(group: MatchGroup) {
-  if (group.has_validated) {
-    return <Badge variant="success">{MATCH_VALIDATED}</Badge>;
-  }
-  const count = group.candidate_count;
-  return (
-    <Badge variant="accent">
-      {count} candidate{count === 1 ? '' : 's'}
-    </Badge>
   );
 }
