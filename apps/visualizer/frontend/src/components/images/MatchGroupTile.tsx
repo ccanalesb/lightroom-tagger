@@ -1,4 +1,4 @@
-import { Badge } from '../ui/badges';
+import { Badge, ScorePill } from '../ui/badges';
 import { ImageTile, fromMatchSide } from '../image-view';
 import { MATCH_VALIDATED, msgMatchGroupCandidates } from '../../constants/strings';
 import type { Match, MatchGroup } from '../../services/api';
@@ -21,17 +21,24 @@ export function MatchGroupTile({ group, onOpenReview }: MatchGroupTileProps) {
     { ...initial, instagram_image: group.instagram_image },
     'instagram',
   );
-  const footer = group.has_validated ? (
+  const footer = (
     <div className="flex flex-wrap items-center gap-2 justify-between">
-      <p className="text-xs text-text-secondary truncate max-w-full">
-        {initial.catalog_image?.filename ?? initial.catalog_key}
-      </p>
-      <Badge variant="success">{MATCH_VALIDATED}</Badge>
+      {group.has_validated ? (
+        <>
+          <p className="text-xs text-text-secondary truncate min-w-0">
+            {initial.catalog_image?.filename ?? initial.catalog_key}
+          </p>
+          <Badge variant="success">{MATCH_VALIDATED}</Badge>
+        </>
+      ) : (
+        <p className="text-xs text-text-secondary">
+          {msgMatchGroupCandidates(group.candidate_count)}
+        </p>
+      )}
+      {typeof group.best_score === 'number' && (
+        <ScorePill score={group.best_score} label="match" />
+      )}
     </div>
-  ) : (
-    <p className="text-xs text-text-secondary">
-      {msgMatchGroupCandidates(group.candidate_count)}
-    </p>
   );
   return (
     <ImageTile

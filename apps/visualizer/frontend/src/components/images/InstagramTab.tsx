@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageError, SkeletonGrid } from '../ui/page-states';
 import { ImageDetailModal, ImageTile, fromInstagramRow } from '../image-view';
-import { Badge } from '../ui/badges';
 import { Pagination } from '../ui/Pagination';
 import { TileGrid } from '../ui/TileGrid';
 import {
-  BADGE_MATCHED,
   FILTER_ALL_DATES,
   FILTER_LABEL_SORT_DATE,
   FILTER_SORT_DATE_NEWEST,
@@ -156,7 +154,6 @@ export function InstagramTab() {
                 variant="grid"
                 primaryScoreSource="none"
                 subtitle={image.instagram_folder || image.source_folder || undefined}
-                overlayBadges={renderInstagramOverlayBadges(image)}
                 onClick={() => open(image)}
               />
             ))}
@@ -187,15 +184,3 @@ export function InstagramTab() {
   );
 }
 
-/**
- * Overlay badges on an Instagram tile: "Matched" when the image has a
- * validated catalog match. AI/description state is shown via ImageMetadataBadges
- * (AI chip), not duplicated here.
- */
-function renderInstagramOverlayBadges(image: InstagramImage) {
-  return (
-    <>
-      {image.matched_catalog_key ? <Badge variant="success">{BADGE_MATCHED}</Badge> : null}
-    </>
-  );
-}
