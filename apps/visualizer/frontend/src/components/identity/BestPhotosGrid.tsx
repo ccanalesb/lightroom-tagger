@@ -5,7 +5,8 @@ import {
   type IdentityBestPhotosMeta,
 } from '../../services/api'
 import { ImageDetailModal, ImageTile, fromBestPhotoRow } from '../image-view'
-import { Badge } from '../ui/badges'
+import { Badge, PerspectiveBadge } from '../ui/badges'
+import { pickDominantPerspective } from './pickDominantPerspective'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { Pagination } from '../ui/Pagination'
 import { TileGrid } from '../ui/TileGrid'
@@ -153,21 +154,33 @@ export function BestPhotosGrid() {
           {!loading && !error && rows.length > 0 ? (
             <>
               <TileGrid>
-                {rows.map((row) => (
-                  <ImageTile
-                    key={row.image_key}
-                    image={fromBestPhotoRow(row)}
-                    variant="compact"
-                    primaryScoreSource="identity"
-                    onClick={() => setSelected(row)}
-                    overlayBadges={
-                      row.instagram_posted ? (
-                        <Badge variant="success">Posted</Badge>
-                      ) : undefined
-                    }
-                    hidePostedMetadataBadge={true}
-                  />
-                ))}
+                {rows.map((row) => {
+                  const dom = pickDominantPerspective(row.per_perspective)
+                  return (
+                    <ImageTile
+                      key={row.image_key}
+                      image={fromBestPhotoRow(row)}
+                      variant="compact"
+                      primaryScoreSource="identity"
+                      onClick={() => setSelected(row)}
+                      overlayBadges={
+                        row.instagram_posted ? (
+                          <Badge variant="success">Posted</Badge>
+                        ) : undefined
+                      }
+                      hidePostedMetadataBadge={true}
+                      footer={
+                        dom ? (
+                          <PerspectiveBadge
+                            perspectiveSlug={dom.perspective_slug}
+                            score={dom.score}
+                            displayName={dom.display_name}
+                          />
+                        ) : null
+                      }
+                    />
+                  )
+                })}
               </TileGrid>
               {totalPages > 1 ? (
                 <Pagination
