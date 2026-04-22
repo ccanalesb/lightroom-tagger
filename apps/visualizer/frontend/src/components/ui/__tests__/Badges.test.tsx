@@ -32,11 +32,12 @@ describe('StatusBadge', () => {
 
   it('should apply appropriate color classes', () => {
     const { container } = render(<StatusBadge status="failed" />)
-    expect(container.firstElementChild!.className).toContain('bg-red')
+    expect(container.firstElementChild!.className).toMatch(/bg-red-50|text-error/)
   })
 
   it('should render with border when requested', () => {
     const { container } = render(<StatusBadge status="running" withBorder />)
+    expect(container.firstElementChild!.className).toContain('border-2')
     expect(container.firstElementChild!.className).toContain('border-blue')
   })
 })
@@ -47,19 +48,19 @@ describe('VisionBadge', () => {
     expect(screen.getByText('SAME')).toBeTruthy()
   })
 
-  it('should apply green for SAME', () => {
+  it('should apply success styling for SAME', () => {
     const { container } = render(<VisionBadge result="SAME" />)
-    expect(container.firstElementChild!.className).toContain('bg-green')
+    expect(container.firstElementChild!.className).toMatch(/bg-green-50|text-success/)
   })
 
-  it('should apply red for DIFFERENT', () => {
+  it('should apply error styling for DIFFERENT', () => {
     const { container } = render(<VisionBadge result="DIFFERENT" />)
-    expect(container.firstElementChild!.className).toContain('bg-red')
+    expect(container.firstElementChild!.className).toMatch(/bg-red-50|text-error/)
   })
 
   it('should default to UNCERTAIN styling for undefined', () => {
     const { container } = render(<VisionBadge result={undefined} />)
     expect(screen.getByText('UNCERTAIN')).toBeTruthy()
-    expect(container.firstElementChild!.className).toContain('bg-yellow')
+    expect(container.firstElementChild!.className).toMatch(/bg-orange-50|text-warning/)
   })
 })
