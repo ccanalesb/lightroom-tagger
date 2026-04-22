@@ -49,4 +49,14 @@ describe('BestPhotosGrid', () => {
       expect(posted.length).toBe(1)
     })
   })
+
+  it('shows dominant perspective label and score from per_perspective in the tile footer', async () => {
+    render(<BestPhotosGrid />)
+
+    const section = await screen.findByRole('region', { name: IDENTITY_SECTION_BEST_PHOTOS })
+
+    await waitFor(() => {
+      expect(within(section).getByText('Street 9')).toBeInTheDocument()
+    })
+  })
 })
