@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageError, SkeletonGrid } from '../ui/page-states';
 import { ImageDetailModal, ImageTile, fromInstagramRow } from '../image-view';
-import { Badge } from '../ui/badges';
+import { Badge, ScorePill } from '../ui/badges';
 import { Pagination } from '../ui/Pagination';
 import { TileGrid } from '../ui/TileGrid';
 import {
@@ -158,7 +158,12 @@ export function InstagramTab() {
                 subtitle={image.instagram_folder || image.source_folder || undefined}
                 footer={
                   image.matched_catalog_key ? (
-                    <Badge variant="success">{BADGE_MATCHED}</Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="success">{BADGE_MATCHED}</Badge>
+                      {typeof image.match_score === 'number' && (
+                        <ScorePill score={image.match_score} label="match" />
+                      )}
+                    </div>
                   ) : null
                 }
                 onClick={() => open(image)}

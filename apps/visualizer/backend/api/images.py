@@ -217,9 +217,14 @@ def list_instagram_images(db):
         media_items = db.execute("SELECT * FROM instagram_dump_media").fetchall()
 
         model_lookup = {}
+        score_lookup = {}
         try:
-            for row in db.execute("SELECT insta_key, model_used FROM matches").fetchall():
+            for row in db.execute("SELECT insta_key, model_used, total_score, score FROM matches").fetchall():
                 model_lookup[row['insta_key']] = row['model_used']
+                raw = row.get('total_score') or row.get('score') or 0
+                key = row['insta_key']
+                if raw and (key not in score_lookup or raw > score_lookup[key]):
+                    score_lookup[key] = float(raw)
         except sqlite3.OperationalError:
             pass
 
@@ -232,6 +237,10 @@ def list_instagram_images(db):
             pass
 
         enriched_images = _enrich_instagram_media(media_items, model_lookup, desc_lookup)
+
+        for img in enriched_images:
+            best = score_lookup.get(img.get('key'))
+            img['match_score'] = best if best else None
 
         # Get filter parameters
         date_from = request.args.get('date_from', '')

@@ -761,6 +761,7 @@ export interface InstagramImage {
   processed?: boolean
   matched_catalog_key?: string
   matched_model?: string
+  match_score?: number
   exif_data?: {
     latitude?: number
     longitude?: number
