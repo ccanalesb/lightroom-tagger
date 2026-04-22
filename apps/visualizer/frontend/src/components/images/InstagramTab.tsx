@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PageError, SkeletonGrid } from '../ui/page-states';
 import { ImageDetailModal, ImageTile, fromInstagramRow } from '../image-view';
-import { Badge, ScorePill } from '../ui/badges';
+import { Badge } from '../ui/badges';
 import { Pagination } from '../ui/Pagination';
 import { TileGrid } from '../ui/TileGrid';
 import {
@@ -161,7 +161,7 @@ export function InstagramTab() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="success">{BADGE_MATCHED}</Badge>
                       {typeof image.match_score === 'number' && (
-                        <ScorePill score={image.match_score} label="match" />
+                        <Badge variant="default">{Math.round(image.match_score * 100)}%</Badge>
                       )}
                     </div>
                   ) : null

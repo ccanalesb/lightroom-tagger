@@ -1,4 +1,4 @@
-import { Badge, ScorePill } from '../ui/badges';
+import { Badge } from '../ui/badges';
 import { ImageTile, fromMatchSide } from '../image-view';
 import { MATCH_VALIDATED, msgMatchGroupCandidates } from '../../constants/strings';
 import type { Match, MatchGroup } from '../../services/api';
@@ -30,7 +30,7 @@ export function MatchGroupTile({ group, onOpenReview }: MatchGroupTileProps) {
         <Badge variant="accent">{msgMatchGroupCandidates(group.candidate_count)}</Badge>
       )}
       {typeof group.best_score === 'number' && (
-        <ScorePill score={group.best_score} label="match" />
+        <Badge variant="default">{Math.round(group.best_score * 100)}%</Badge>
       )}
       {group.has_validated && (
         <p className="w-full truncate text-xs text-text-secondary">
