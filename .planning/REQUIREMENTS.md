@@ -39,9 +39,9 @@
 
 ### Images page visual consistency
 
-- [ ] **UI-01**: Badge primitives (Badge, VisionBadge, StatusBadge, ImageTypeBadge, PerspectiveBadge) are consolidated under a consistent API and documented usage guidelines _(SEED-008)_
-- [ ] **UI-02**: Images page badges adopt an inline-in-description pattern where appropriate, matching Catalog's scannable style _(SEED-008)_
-- [ ] **UI-03**: Matches on the Images page render as cards consistent with Catalog's card affordance _(SEED-008)_
+- [x] **UI-01**: Badge primitives (Badge, VisionBadge, StatusBadge, ImageTypeBadge, PerspectiveBadge) are consolidated under a consistent API and documented usage guidelines _(SEED-008)_ — completed 2026-04-22 (Phase 6 Plans 01, 04)
+- [x] **UI-02**: Images page badges adopt an inline-in-description pattern where appropriate, matching Catalog's scannable style _(SEED-008)_ — completed 2026-04-22 (Phase 6 Plan 02)
+- [x] **UI-03**: Matches on the Images page render as cards consistent with Catalog's card affordance _(SEED-008)_ — completed 2026-04-22 (Phase 6 Plan 03)
 
 ---
 
@@ -85,9 +85,9 @@ These requirements were considered but deferred to a later milestone.
 | IDENT-05 | Phase 5 | Complete |
 | DASH-02 | Phase 5 | Complete |
 | DASH-03 | Phase 5 | Complete |
-| UI-01 | Phase 6 | Pending |
-| UI-02 | Phase 6 | Pending |
-| UI-03 | Phase 6 | Pending |
+| UI-01 | Phase 6 | Complete |
+| UI-02 | Phase 6 | Complete |
+| UI-03 | Phase 6 | Complete |
 
 **Total:** 15 requirements across 6 phases.
 

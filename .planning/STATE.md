@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish & Consolidate
-status: Phase 5 complete — Plan 04 executed (Dashboard Top Photos tabs + useFilters)
-last_updated: "2026-04-21T16:45:00.000Z"
+status: Phase 6 complete — 4 plans executed (badge barrel, Instagram adapter, MatchGroupTile, PerspectiveBadge)
+last_updated: "2026-04-22T17:50:00.000Z"
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 25
-  completed_plans: 25
+  completed_plans: 29
 ---
 
 # Planning state
@@ -21,9 +21,9 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v2.1 Polish & Consolidate |
-| Phase | Phase 5 — Identity & Insights clarity |
-| Status | Phase 5 complete — IDENT-04/05 + DASH-02/03; ready for Phase 6 |
-| Last activity | 2026-04-21 — Phase 5 Plan 04 executed: 4 code commits + `05-04-SUMMARY.md`; STATE/ROADMAP/REQUIREMENTS (DASH-02, DASH-03) |
+| Phase | Phase 6 — Images page visual consistency |
+| Status | Phase 6 complete — UI-01/02/03; ready for Phase 7 |
+| Last activity | 2026-04-22 — Phase 6 executed: 4 plans / 4 waves / 16+ commits; badge barrel, Instagram adapter, MatchGroupTile footer, PerspectiveBadge on Best Photos & Dashboard |
 
 ## Project Reference
 
@@ -51,7 +51,7 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 | IDENT-04 | Phase 5 | ✅ Complete (2026-04-21) |
 | IDENT-05 | Phase 5 | ✅ Complete (2026-04-21) |
 | DASH-02, 03 | Phase 5 | ✅ Complete (2026-04-21) |
-| UI-01, 02, 03 | Phase 6 | Pending |
+| UI-01, 02, 03 | Phase 6 | ✅ Complete (2026-04-22) |
 
 ## Last update
 

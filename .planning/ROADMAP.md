@@ -41,7 +41,7 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 - [x] Phase 4: Reusable filter framework — FILTER-01, FILTER-02 — completed 2026-04-17
 - [x] Phase 4.1 (INSERTED 2026-04-17): InstagramTab filter migration — FILTER-02 — completed 2026-04-17
 - [x] Phase 5: Identity & Insights clarity — IDENT-04, IDENT-05, DASH-02, DASH-03 _(depends on Phase 4)_ — completed 2026-04-21
-- [ ] Phase 6: Images page visual consistency — UI-01, UI-02, UI-03
+- [x] Phase 6: Images page visual consistency — UI-01, UI-02, UI-03 — completed 2026-04-22
 - [ ] Phase 7: React Suspense data layer (no deps) — DATA-01 _(cross-cutting; no roadmap deps)_
 
 ## Progress (v2.1)
@@ -54,7 +54,7 @@ Phase numbering was reset for v2.1. The phases below are v2.1 Phase 1–6, not a
 | 4. Reusable filter framework | Declarative filter foundation (proved by CatalogTab) | FILTER-01, FILTER-02 | 4 | ✅ Complete (2026-04-17) |
 | 4.1. InstagramTab filter migration | Migrate InstagramTab onto the Phase 4 framework (INSERTED) | FILTER-02 | 3 | ✅ Complete (2026-04-17) |
 | 5. Identity & Insights clarity | Posted/unposted visibility + narrative flow | IDENT-04, IDENT-05, DASH-02, DASH-03 | 4 | ✅ Complete (2026-04-21) |
-| 6. Images page visual consistency | Unify badge + card language on Images page | UI-01, UI-02, UI-03 | 3 | Pending |
+| 6. Images page visual consistency | Unify badge + card language on Images page | UI-01, UI-02, UI-03 | 3 | ✅ Complete (2026-04-22) |
 | 7. React Suspense data layer | Replace useEffect+setState fetches with React-only Suspense/ErrorBoundary + module cache, no deps | DATA-01 | 8 | Pending |
 | 8. Two-stage cascade matching | Fix description signal + cascade scoring (desc→vision) | MATCH-01..04 | 8 | ✅ Complete (2026-04-21) |
 
