@@ -54,9 +54,11 @@ Exceptions: **none** beyond existing `ImageTile` variant padding (`p-2` strip vs
 
 ## Typography
 
+**Font weights (this phase):** exactly **two** — **400** (regular) and **600** (semibold). Do not use `font-medium` (500) on type roles below.
+
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
-| Body (tile title) | **14px** (`text-sm`) | 500 (`font-medium`) | normal |
+| Body (tile title) | **14px** (`text-sm`) | 600 (`font-semibold`) | normal |
 | Label (subtitle, date, metadata line) | **12px** (`text-xs` / `text-[10px]` strip) | 400 | normal |
 | Badge / chip | **12px** (`text-xs` on `<Badge>`) | 600 (`font-semibold`) | single-line chips |
 | Display | *n/a this phase* | — | — |
@@ -94,6 +96,12 @@ Map by **`perspective_slug`** (case-normalized; unknown slugs use **default** `B
 | **default / other** | Base `variant="default"` (`bg-surface text-text-secondary border-border`) | Extensibility (RESEARCH: API may return additional slugs) |
 
 **Note:** `!` may be used **only** where needed to override `variantClasses` if `PerspectiveBadge` is implemented as `<Badge variant="default" className={map[slug]} />`. Prefer a **single implementation** (wrapper + token map) so contrast stays consistent.
+
+---
+
+## Visuals
+
+**Images page (Instagram, Catalog, Matches tabs):** Primary anchor: the tile thumbnail + title band on the grid.
 
 ---
 
