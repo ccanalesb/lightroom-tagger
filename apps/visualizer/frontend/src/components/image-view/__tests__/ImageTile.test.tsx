@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { ImageView } from '../../../services/api'
 import { ImageTile } from '../ImageTile'
-import { Badge } from '../../ui/Badge'
+import { Badge } from '../../ui/badges'
 
 function baseImage(overrides: Partial<ImageView> = {}): ImageView {
   return {

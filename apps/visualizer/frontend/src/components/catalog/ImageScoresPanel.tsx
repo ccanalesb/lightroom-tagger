@@ -9,7 +9,7 @@ import {
 } from '../../constants/strings';
 import type { ImageScoreRow } from '../../services/api';
 import { ScoresAPI } from '../../services/api';
-import { Badge } from '../ui/Badge';
+import { Badge } from '../ui/badges';
 
 export interface ImageScoresPanelProps {
   imageKey: string;

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { Stats } from '../../services/api'
-import { Badge } from '../ui/Badge'
+import { Badge } from '../ui/badges'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import {
   DASHBOARD_CATALOG_IMAGES,

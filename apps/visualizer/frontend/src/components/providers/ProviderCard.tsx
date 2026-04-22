@@ -5,7 +5,7 @@ import {
   PROVIDER_MODELS_HEADING,
   PROVIDER_NO_MODELS,
 } from '../../constants/strings';
-import { Badge } from '../ui/Badge';
+import { Badge } from '../ui/badges';
 import { ModelList } from './ModelList';
 import { AddModelForm } from './AddModelForm';
 

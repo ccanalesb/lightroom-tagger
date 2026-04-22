@@ -1,6 +1,6 @@
 import type { ImageView } from '../../services/api'
 import { DESCRIPTION_PERSPECTIVE_LABELS } from '../DescriptionPanel/perspectiveLabels'
-import { ScorePill } from '../ui/badges/ScorePill'
+import { ScorePill } from '../ui/badges'
 import { IDENTITY_LABEL_AGGREGATE } from '../../constants/strings'
 
 /**

@@ -1,5 +1,5 @@
 import type { ImageView } from '../../services/api'
-import { Badge } from '../ui/Badge'
+import { Badge } from '../ui/badges'
 import { PrimaryScorePill, type PrimaryScoreSource } from './PrimaryScorePill'
 
 export type { PrimaryScoreSource }

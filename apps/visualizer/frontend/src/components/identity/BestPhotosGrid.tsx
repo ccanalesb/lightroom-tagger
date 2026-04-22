@@ -5,7 +5,7 @@ import {
   type IdentityBestPhotosMeta,
 } from '../../services/api'
 import { ImageDetailModal, ImageTile, fromBestPhotoRow } from '../image-view'
-import { Badge } from '../ui/Badge'
+import { Badge } from '../ui/badges'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import { Pagination } from '../ui/Pagination'
 import { TileGrid } from '../ui/TileGrid'

@@ -1,6 +1,6 @@
 import type { ImageView } from '../../services/api'
 import { AIDescriptionSection } from '../DescriptionPanel'
-import { Badge } from '../ui/Badge'
+import { Badge } from '../ui/badges'
 import { MetadataRow } from '../ui/MetadataRow'
 import {
   DATE_NO_DATE,

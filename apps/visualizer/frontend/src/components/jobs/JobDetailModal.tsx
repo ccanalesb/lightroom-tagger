@@ -31,7 +31,7 @@ import { JobsAPI } from '../../services/api';
 import { useSocketStore } from '../../stores/socketStore';
 import type { Job } from '../../types/job';
 import { formatDateTime } from '../../utils/date';
-import { Badge } from '../ui/Badge';
+import { Badge } from '../ui/badges';
 import { Button } from '../ui/Button';
 import { Card, CardTitle } from '../ui/Card';
 

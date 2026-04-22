@@ -1,3 +1,4 @@
+export { Badge } from './Badge'
 export { ImageTypeBadge } from './ImageTypeBadge'
 export { ScorePill } from './ScorePill'
 export { StatusBadge } from './StatusBadge'

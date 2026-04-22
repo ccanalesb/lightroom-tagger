@@ -1,4 +1,4 @@
-import { Badge } from '../ui/Badge';
+import { Badge } from '../ui/badges';
 import { ImageTile, fromMatchSide } from '../image-view';
 import { MATCH_VALIDATED } from '../../constants/strings';
 import type { Match, MatchGroup } from '../../services/api';

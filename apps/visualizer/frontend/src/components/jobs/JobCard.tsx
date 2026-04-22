@@ -1,7 +1,7 @@
 import type { Job } from '../../types/job'
 import { ERROR_SEVERITY_LABELS } from '../../constants/strings'
 import { formatDateTime } from '../../utils/date'
-import { Badge } from '../ui/Badge'
+import { Badge } from '../ui/badges'
 import { StatusBadge } from '../ui/badges'
 
 interface JobCardProps {

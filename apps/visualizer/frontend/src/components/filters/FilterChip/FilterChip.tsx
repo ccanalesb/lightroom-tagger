@@ -1,4 +1,4 @@
-import { Badge } from '../../ui/Badge/Badge'
+import { Badge } from '../../ui/badges'
 import { Button } from '../../ui/Button/Button'
 
 export type FilterChipProps = {

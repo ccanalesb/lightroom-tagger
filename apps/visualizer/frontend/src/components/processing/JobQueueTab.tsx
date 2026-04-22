@@ -3,7 +3,7 @@ import type { MouseEvent } from 'react';
 import { JobsAPI } from '../../services/api';
 import type { Job } from '../../types/job';
 import { JobDetailModal } from '../jobs/JobDetailModal';
-import { Badge } from '../ui/Badge';
+import { Badge } from '../ui/badges';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Pagination } from '../ui/Pagination';
