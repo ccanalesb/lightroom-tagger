@@ -5,7 +5,6 @@ import { Badge } from '../ui/badges';
 import { Pagination } from '../ui/Pagination';
 import { TileGrid } from '../ui/TileGrid';
 import {
-  BADGE_DESCRIBED,
   BADGE_MATCHED,
   FILTER_ALL_DATES,
   FILTER_LABEL_SORT_DATE,
@@ -189,16 +188,14 @@ export function InstagramTab() {
 }
 
 /**
- * Overlay badges shown on an Instagram tile:
- *   - "Matched" when the image has a validated catalog match.
- *   - "Described" when the image has an AI description.
- * Both can render together.
+ * Overlay badges on an Instagram tile: "Matched" when the image has a
+ * validated catalog match. AI/description state is shown via ImageMetadataBadges
+ * (AI chip), not duplicated here.
  */
 function renderInstagramOverlayBadges(image: InstagramImage) {
   return (
     <>
       {image.matched_catalog_key ? <Badge variant="success">{BADGE_MATCHED}</Badge> : null}
-      {image.description ? <Badge variant="accent">{BADGE_DESCRIBED}</Badge> : null}
     </>
   );
 }
