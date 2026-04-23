@@ -1,6 +1,8 @@
+import { Suspense } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { InstagramTab } from '../InstagramTab'
+import { deleteMatching } from '../../../data/cache'
 
 const listInstagramMock = vi.fn()
 const getInstagramMonthsMock = vi.fn()
@@ -14,6 +16,7 @@ vi.mock('../../../services/api', () => ({
 
 describe('InstagramTab', () => {
   beforeEach(() => {
+    deleteMatching(() => true)
     vi.clearAllMocks()
     listInstagramMock.mockResolvedValue({
       images: [],
@@ -24,7 +27,11 @@ describe('InstagramTab', () => {
   })
 
   it('calls listInstagram with pagination defaults and no date_folder at baseline', async () => {
-    render(<InstagramTab />)
+    render(
+      <Suspense fallback={null}>
+        <InstagramTab />
+      </Suspense>,
+    )
 
     await waitFor(() => {
       expect(listInstagramMock).toHaveBeenCalled()
@@ -36,7 +43,11 @@ describe('InstagramTab', () => {
   })
 
   it('renders the Date filter label once schema mounts', async () => {
-    render(<InstagramTab />)
+    render(
+      <Suspense fallback={null}>
+        <InstagramTab />
+      </Suspense>,
+    )
     await waitFor(() => {
       expect(screen.getAllByText('Date').length).toBeGreaterThan(0)
     })

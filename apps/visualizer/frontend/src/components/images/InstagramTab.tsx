@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PageError, SkeletonGrid } from '../ui/page-states';
+import { useEffect, useMemo, useState } from 'react';
 import { ImageDetailModal, ImageTile, fromInstagramRow } from '../image-view';
 import { Badge } from '../ui/badges';
 import { Pagination } from '../ui/Pagination';
@@ -20,18 +19,16 @@ import type { FilterSchema } from '../filters/types';
 import type { InstagramImage } from '../../services/api';
 import { ImagesAPI } from '../../services/api';
 import { formatMonth } from '../../utils/date';
+import { useQuery } from '../../data';
+import { stableSerializeRecord } from '../../utils/stableQueryKey';
 
 export function InstagramTab() {
-  const [images, setImages] = useState<InstagramImage[]>([]);
-  const [total, setTotal] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState({
-    current_page: 1,
-    total_pages: 1,
-    has_more: false,
-  });
-  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [page, setPage] = useState(1);
+
+  const monthsPayload = useQuery(['images.instagram', 'months'] as const, () =>
+    ImagesAPI.getInstagramMonths(),
+  );
+  const availableMonths = monthsPayload.months;
 
   const { isOpen, selectedItem, open, close } = useModal<InstagramImage>();
 
@@ -71,63 +68,31 @@ export function InstagramTab() {
   const dateFolder = filterValues.dateFolder as string | undefined;
   const sortByDate = filterValues.sortByDate as string | undefined;
 
-  const fetchImages = useCallback(
-    async (newOffset: number) => {
-      setIsLoading(true);
-      try {
-        const params = {
-          ...toQueryParams(),
-          limit: ITEMS_PER_PAGE,
-          offset: newOffset,
-        };
-        const data = await ImagesAPI.listInstagram(params);
-        setImages(data.images);
-        setTotal(data.total);
-        setPagination(data.pagination);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [toQueryParams],
+  const listParams = useMemo(
+    () => ({
+      ...toQueryParams(),
+      limit: ITEMS_PER_PAGE,
+      offset: (page - 1) * ITEMS_PER_PAGE,
+    }),
+    [page, toQueryParams, dateFolder, sortByDate],
   );
 
-  useEffect(() => {
-    const initialize = async () => {
-      setIsLoading(true);
-      try {
-        const [monthsData, firstPageData] = await Promise.all([
-          ImagesAPI.getInstagramMonths(),
-          ImagesAPI.listInstagram({ limit: ITEMS_PER_PAGE, offset: 0 }),
-        ]);
-        setAvailableMonths(monthsData.months);
-        setImages(firstPageData.images);
-        setTotal(firstPageData.total);
-        setPagination(firstPageData.pagination);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    initialize();
-  }, []);
+  const listKey = useMemo(
+    () => ['images.instagram', 'list', stableSerializeRecord(listParams)] as const,
+    [listParams],
+  );
 
-  const firstRun = useRef(true);
-  useEffect(() => {
-    if (firstRun.current) {
-      firstRun.current = false;
-      return;
-    }
-    fetchImages(0);
-  }, [dateFolder, sortByDate, fetchImages]);
+  const listData = useQuery(listKey, () => ImagesAPI.listInstagram(listParams));
+  const images = listData.images;
+  const total = listData.total;
+  const pagination = listData.pagination;
 
-  const handlePageChange = (page: number) => {
-    const newOffset = (page - 1) * ITEMS_PER_PAGE;
-    fetchImages(newOffset);
+  useEffect(() => {
+    setPage(1);
+  }, [dateFolder, sortByDate]);
+
+  const handlePageChange = (nextPage: number) => {
+    setPage(nextPage);
   };
 
   return (
@@ -140,47 +105,40 @@ export function InstagramTab() {
             {msgShowingOf(images.length, total, 'images')}
           </p>
         }
-        disabled={isLoading}
+        disabled={false}
       />
 
-      {error && <PageError message={error} />}
-      {isLoading && <SkeletonGrid count={ITEMS_PER_PAGE} />}
+      <TileGrid>
+        {images.map((image) => (
+          <ImageTile
+            key={image.key}
+            image={fromInstagramRow(image)}
+            variant="grid"
+            primaryScoreSource="none"
+            subtitle={image.instagram_folder || image.source_folder || undefined}
+            footer={
+              image.matched_catalog_key ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="success">{BADGE_MATCHED}</Badge>
+                  {typeof image.match_score === 'number' && (
+                    <Badge variant="default">{Math.round(image.match_score * 100)}%</Badge>
+                  )}
+                </div>
+              ) : null
+            }
+            onClick={() => open(image)}
+          />
+        ))}
+      </TileGrid>
 
-      {!isLoading && !error && (
-        <>
-          <TileGrid>
-            {images.map((image) => (
-              <ImageTile
-                key={image.key}
-                image={fromInstagramRow(image)}
-                variant="grid"
-                primaryScoreSource="none"
-                subtitle={image.instagram_folder || image.source_folder || undefined}
-                footer={
-                  image.matched_catalog_key ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="success">{BADGE_MATCHED}</Badge>
-                      {typeof image.match_score === 'number' && (
-                        <Badge variant="default">{Math.round(image.match_score * 100)}%</Badge>
-                      )}
-                    </div>
-                  ) : null
-                }
-                onClick={() => open(image)}
-              />
-            ))}
-          </TileGrid>
-
-          {pagination.total_pages > 1 && (
-            <div className="flex justify-center pt-4">
-              <Pagination
-                currentPage={pagination.current_page}
-                totalPages={pagination.total_pages}
-                onPageChange={handlePageChange}
-              />
-            </div>
-          )}
-        </>
+      {pagination.total_pages > 1 && (
+        <div className="flex justify-center pt-4">
+          <Pagination
+            currentPage={pagination.current_page}
+            totalPages={pagination.total_pages}
+            onPageChange={handlePageChange}
+          />
+        </div>
       )}
 
       {isOpen && selectedItem && (
@@ -195,4 +153,3 @@ export function InstagramTab() {
     </div>
   );
 }
-
