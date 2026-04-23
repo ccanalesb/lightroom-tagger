@@ -1,60 +1,51 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useReducer } from 'react'
+import { invalidateAll, useQuery } from '../data'
 import { ProvidersAPI, type Provider, type ProviderModel } from '../services/api'
 
+async function fetchProviderBundle(): Promise<{
+  providers: Provider[]
+  fallbackOrder: string[]
+}> {
+  const [providerList, fallback] = await Promise.all([
+    ProvidersAPI.list(),
+    ProvidersAPI.getFallbackOrder(),
+  ])
+  return { providers: providerList, fallbackOrder: fallback.order }
+}
+
 export function useProviders() {
-  const [providers, setProviders] = useState<Provider[]>([])
-  const [fallbackOrder, setFallbackOrder] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [rev, bump] = useReducer((n: number) => n + 1, 0)
+  const bundle = useQuery(['providers.list', 'hook', rev] as const, fetchProviderBundle)
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [providerList, fallback] = await Promise.all([
-        ProvidersAPI.list(),
-        ProvidersAPI.getFallbackOrder(),
-      ])
-      setProviders(providerList)
-      setFallbackOrder(fallback.order)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load providers')
-    } finally {
-      setLoading(false)
-    }
+  const refresh = useCallback(() => {
+    invalidateAll(['providers.list'])
+    bump()
   }, [])
-
-  useEffect(() => { refresh() }, [refresh])
 
   const updateFallbackOrder = useCallback(async (order: string[]) => {
     await ProvidersAPI.updateFallbackOrder(order)
-    await refresh()
-  }, [refresh])
+    invalidateAll(['providers.list'])
+    bump()
+  }, [])
 
-  return { providers, fallbackOrder, loading, error, refresh, updateFallbackOrder }
+  return {
+    providers: bundle.providers,
+    fallbackOrder: bundle.fallbackOrder,
+    loading: false,
+    error: null,
+    refresh,
+    updateFallbackOrder,
+  }
 }
 
 export function useProviderModels(providerId: string | null) {
-  const [models, setModels] = useState<ProviderModel[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const models = useQuery(
+    ['providers.models', providerId] as const,
+    async (): Promise<ProviderModel[]> => {
+      if (!providerId) return []
+      return ProvidersAPI.listModels(providerId)
+    },
+  )
 
-  useEffect(() => {
-    if (!providerId) {
-      setModels([])
-      setError(null)
-      return
-    }
-    setLoading(true)
-    setError(null)
-    ProvidersAPI.listModels(providerId)
-      .then(setModels)
-      .catch((err) => {
-        setModels([])
-        setError(err instanceof Error ? err.message : 'Failed to load models')
-      })
-      .finally(() => setLoading(false))
-  }, [providerId])
-
-  return { models, loading, error }
+  return { models, loading: false, error: null }
 }
