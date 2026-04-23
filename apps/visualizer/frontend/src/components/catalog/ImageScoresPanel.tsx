@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   SCORES_EMPTY_HINT,
   SCORES_LOADING,
@@ -9,6 +9,7 @@ import {
 } from '../../constants/strings';
 import type { ImageScoreRow } from '../../services/api';
 import { ScoresAPI } from '../../services/api';
+import { ErrorBoundary, ErrorState, useQuery } from '../../data';
 import { Badge } from '../ui/badges';
 
 export interface ImageScoresPanelProps {
@@ -38,15 +39,18 @@ function uniqueCurrentBySlug(rows: ImageScoreRow[]): ImageScoreRow[] {
   return [...map.values()].sort((a, b) => a.perspective_slug.localeCompare(b.perspective_slug));
 }
 
-export default function ImageScoresPanel({
+function ImageScoresPanelLoaded({
   imageKey,
   imageType = 'catalog',
   reloadToken = 0,
   perspectiveLabels,
 }: ImageScoresPanelProps) {
-  const [current, setCurrent] = useState<ImageScoreRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const payload = useQuery(
+    ['scores', 'current', imageKey, imageType, reloadToken] as const,
+    () => ScoresAPI.getCurrent(imageKey, { image_type: imageType }),
+  );
+  const current = payload.current ?? [];
+
   const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(() => new Set());
   const [historyBySlug, setHistoryBySlug] = useState<Record<string, ImageScoreRow[]>>({});
   const [historyLoading, setHistoryLoading] = useState<Record<string, boolean>>({});
@@ -63,40 +67,7 @@ export default function ImageScoresPanel({
     setHistoryLoading({});
     setHistoryError({});
     prevExpandedRef.current = new Set();
-  }, [imageKey, imageType]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    ScoresAPI.getCurrent(imageKey, { image_type: imageType })
-      .then((data) => {
-        if (!cancelled) {
-          setCurrent(data.current ?? []);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(String(err));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
   }, [imageKey, imageType, reloadToken]);
-
-  useEffect(() => {
-    setExpandedSlugs(new Set());
-    setHistoryBySlug({});
-    setHistoryLoading({});
-    setHistoryError({});
-    prevExpandedRef.current = new Set();
-  }, [reloadToken]);
 
   const fetchHistoryFor = useCallback(
     async (slug: string) => {
@@ -136,14 +107,6 @@ export default function ImageScoresPanel({
       return next;
     });
   }, []);
-
-  if (loading) {
-    return <p className="text-sm text-text-tertiary">{SCORES_LOADING}</p>;
-  }
-
-  if (error) {
-    return <p className="text-sm text-error">{error}</p>;
-  }
 
   if (rows.length === 0) {
     return <p className="text-sm text-text-secondary">{SCORES_EMPTY_HINT}</p>;
@@ -229,5 +192,21 @@ export default function ImageScoresPanel({
         );
       })}
     </div>
+  );
+}
+
+export default function ImageScoresPanel(props: ImageScoresPanelProps) {
+  return (
+    <ErrorBoundary
+      fallback={({ error, reset }) => (
+        <ErrorState error={error} reset={reset} title="Could not load scores" />
+      )}
+    >
+      <Suspense
+        fallback={<p className="text-sm text-text-tertiary">{SCORES_LOADING}</p>}
+      >
+        <ImageScoresPanelLoaded {...props} />
+      </Suspense>
+    </ErrorBoundary>
   );
 }

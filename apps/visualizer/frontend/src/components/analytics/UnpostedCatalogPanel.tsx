@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import {
   AnalyticsAPI,
   ImagesAPI,
@@ -23,6 +23,7 @@ import {
   MSG_LOADING,
   MSG_SHOWING_RANGE,
 } from '../../constants/strings'
+import { ErrorBoundary, ErrorState, useQuery } from '../../data'
 
 const PAGE_SIZE = 50
 
@@ -44,7 +45,59 @@ function formatShowingRange(start: number, end: number, total: number): string {
     .replace('{total}', String(total))
 }
 
-export function UnpostedCatalogPanel() {
+type UnpostedPanelData = {
+  months: string[]
+  rows: UnpostedCatalogItem[]
+  total: number
+  error: string | null
+}
+
+async function fetchUnpostedPanelData(
+  applied: AppliedUnpostedFilters,
+  page: number,
+): Promise<UnpostedPanelData> {
+  const [monthsRes, catalogResult] = await Promise.all([
+    ImagesAPI.getCatalogMonths(),
+    (async (): Promise<Pick<UnpostedPanelData, 'rows' | 'total' | 'error'>> => {
+      if (applied.dateFrom && applied.dateTo && applied.dateFrom > applied.dateTo) {
+        return {
+          error: 'Start date must be on or before end date.',
+          rows: [],
+          total: 0,
+        }
+      }
+      const offset = (page - 1) * PAGE_SIZE
+      try {
+        const data = await AnalyticsAPI.getUnpostedCatalog({
+          ...(applied.dateFrom ? { date_from: applied.dateFrom } : {}),
+          ...(applied.dateTo ? { date_to: applied.dateTo } : {}),
+          ...(applied.minRating !== '' ? { min_rating: applied.minRating } : {}),
+          ...(applied.month ? { month: applied.month } : {}),
+          limit: PAGE_SIZE,
+          offset,
+        })
+        return { error: null, rows: data.images, total: data.total }
+      } catch (e) {
+        return { error: errMessage(e), rows: [], total: 0 }
+      }
+    })(),
+  ])
+
+  return {
+    months: monthsRes.months,
+    rows: catalogResult.rows,
+    total: catalogResult.total,
+    error: catalogResult.error,
+  }
+}
+
+const unpostedSuspenseFallback = (
+  <p className="text-sm text-text-secondary" role="status" aria-live="polite">
+    {MSG_LOADING}
+  </p>
+)
+
+function UnpostedCatalogPanelInner() {
   const initialApplied = useMemo<AppliedUnpostedFilters>(
     () => ({ dateFrom: '', dateTo: '', minRating: '', month: '' }),
     [],
@@ -57,56 +110,22 @@ export function UnpostedCatalogPanel() {
 
   const [applied, setApplied] = useState<AppliedUnpostedFilters>(initialApplied)
   const [page, setPage] = useState(1)
-
-  const [rows, setRows] = useState<UnpostedCatalogItem[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<UnpostedCatalogItem | null>(null)
 
-  const [availableMonths, setAvailableMonths] = useState<string[]>([])
+  const data = useQuery(
+    [
+      'analytics',
+      'unposted',
+      applied.dateFrom,
+      applied.dateTo,
+      applied.minRating,
+      applied.month,
+      page,
+    ] as const,
+    () => fetchUnpostedPanelData(applied, page),
+  )
 
-  useEffect(() => {
-    ImagesAPI.getCatalogMonths()
-      .then((data) => setAvailableMonths(data.months))
-      .catch(() => {})
-  }, [])
-
-  const load = useCallback(async () => {
-    if (applied.dateFrom && applied.dateTo && applied.dateFrom > applied.dateTo) {
-      setError('Start date must be on or before end date.')
-      setRows([])
-      setTotal(0)
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-    const offset = (page - 1) * PAGE_SIZE
-    try {
-      const data = await AnalyticsAPI.getUnpostedCatalog({
-        ...(applied.dateFrom ? { date_from: applied.dateFrom } : {}),
-        ...(applied.dateTo ? { date_to: applied.dateTo } : {}),
-        ...(applied.minRating !== '' ? { min_rating: applied.minRating } : {}),
-        ...(applied.month ? { month: applied.month } : {}),
-        limit: PAGE_SIZE,
-        offset,
-      })
-      setRows(data.images)
-      setTotal(data.total)
-    } catch (e) {
-      setError(errMessage(e))
-      setRows([])
-      setTotal(0)
-    } finally {
-      setLoading(false)
-    }
-  }, [applied, page])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+  const { months: availableMonths, rows, total, error } = data
 
   const handleApply = () => {
     setApplied({
@@ -217,29 +236,23 @@ export function UnpostedCatalogPanel() {
             </button>
           </div>
 
-          {loading ? (
-            <p className="text-sm text-text-secondary" role="status" aria-live="polite">
-              {MSG_LOADING}
-            </p>
-          ) : null}
-
           {error ? (
             <p className="text-sm text-error" role="alert">
               {error}
             </p>
           ) : null}
 
-          {!loading && !error && rangeLabel ? (
+          {!error && rangeLabel ? (
             <p className="text-sm text-text-secondary">{rangeLabel}</p>
           ) : null}
 
-          {!loading && !error && emptyMessage ? (
+          {!error && emptyMessage ? (
             <p className="text-sm text-text-secondary" role="status">
               {emptyMessage}
             </p>
           ) : null}
 
-          {!loading && !error && rows.length > 0 ? (
+          {!error && rows.length > 0 ? (
             <>
               <TileGrid>
                 {rows.map((row) => (
@@ -257,7 +270,6 @@ export function UnpostedCatalogPanel() {
                   currentPage={page}
                   totalPages={totalPages}
                   onPageChange={setPage}
-                  disabled={loading}
                 />
               ) : null}
             </>
@@ -275,5 +287,19 @@ export function UnpostedCatalogPanel() {
         />
       ) : null}
     </section>
+  )
+}
+
+export function UnpostedCatalogPanel() {
+  return (
+    <ErrorBoundary
+      fallback={({ error, reset }) => (
+        <ErrorState error={error} reset={reset} title="Could not load unposted catalog" />
+      )}
+    >
+      <Suspense fallback={unpostedSuspenseFallback}>
+        <UnpostedCatalogPanelInner />
+      </Suspense>
+    </ErrorBoundary>
   )
 }
