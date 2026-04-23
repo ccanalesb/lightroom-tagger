@@ -21,14 +21,18 @@ from lightroom_tagger.core.catalog_nl_filter import (
     parse_catalog_nl_filter_from_llm,
 )
 from lightroom_tagger.core.database import (
+    build_description_fts_query,
     get_image,
     get_image_description,
     get_instagram_dump_media,
     query_catalog_images,
+    query_catalog_images_by_keys,
     reject_match,
     unvalidate_match,
     validate_match,
 )
+from lightroom_tagger.core.embedding_service import embed_query_to_vec_blob
+from lightroom_tagger.core.semantic_search import run_semantic_hybrid_search
 from lightroom_tagger.core.identity_service import (
     compute_single_image_aggregate_scores,
 )
@@ -617,6 +621,72 @@ def nl_search_images(db):
             'filters': filters.model_dump(exclude_none=True),
             'total': total,
             'images': images,
+        })
+    except Exception as e:
+        return error_server_error(str(e))
+
+
+@bp.route('/semantic-search', methods=['POST'])
+@with_db
+def semantic_search_images(db):
+    """Hybrid FTS + embedding search with RRF; same catalog row shape as NL search + score / why_matched / thumbnail_url."""
+    try:
+        body = request.get_json(silent=True)
+        if not body or not isinstance(body, dict):
+            return error_bad_request('JSON body required')
+
+        query = body.get('query')
+        if query is None or not str(query).strip():
+            return error_bad_request('query must be non-empty')
+
+        qstrip = str(query).strip()
+        if len(qstrip) < 2:
+            return error_bad_request('query must be at least 2 characters')
+
+        limit, offset = _clamp_pagination(body.get('limit', 50), body.get('offset', 0))
+
+        score_perspective_arg = None
+        if 'score_perspective' in body and body.get('score_perspective') is not None:
+            sp = str(body.get('score_perspective') or '').strip()
+            if sp:
+                if not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(sp):
+                    return error_bad_request('invalid score_perspective slug')
+                score_perspective_arg = sp
+
+        match_str, fts_err = build_description_fts_query(qstrip)
+        if fts_err is not None:
+            return error_bad_request(fts_err)
+        if match_str is None:
+            return error_bad_request('query must contain at least one searchable term')
+
+        blob = embed_query_to_vec_blob(qstrip)
+        rows, total, meta = run_semantic_hybrid_search(
+            db,
+            user_query=qstrip,
+            fts_match=match_str,
+            query_vec_blob=blob,
+            limit=limit,
+            offset=offset,
+        )
+
+        keys = [r.image_key for r in rows]
+        catalog_rows = query_catalog_images_by_keys(db, keys, score_perspective=score_perspective_arg)
+        images = _rows_to_catalog_api_images(catalog_rows, score_perspective_arg)
+
+        for i, sem_row in enumerate(rows):
+            images[i]['score'] = float(sem_row.rrf_score)
+            images[i]['why_matched'] = sem_row.why_matched
+            images[i]['thumbnail_url'] = f"/api/images/catalog/{sem_row.image_key}/thumbnail"
+
+        return jsonify({
+            'total': total,
+            'images': images,
+            'metadata': {
+                'missing_embeddings_count': meta.missing_embeddings_count,
+                'semantic_index_empty': meta.semantic_index_empty,
+                'rrf_k': meta.rrf_k,
+                'fts_no_match': meta.fts_no_match,
+            },
         })
     except Exception as e:
         return error_server_error(str(e))
