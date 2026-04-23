@@ -56,6 +56,23 @@ class TestDatabase(unittest.TestCase):
         self.assertIsNotNone(row)
         self.assertEqual(get_image_count(self.db), 0)
 
+    def test_init_database_sqlite_vec_image_text_embeddings(self):
+        """sqlite-vec loads and vec0 table exists after init_database (Phase 3 NLS-03)."""
+        row = self.db.execute("SELECT vec_version() AS v").fetchone()
+        self.assertIsNotNone(row)
+        v = row["v"]
+        self.assertIsNotNone(v)
+        self.assertIsInstance(v, str)
+        sql_row = self.db.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'image_text_embeddings'"
+        ).fetchone()
+        self.assertIsNotNone(sql_row)
+        sql = sql_row["sql"] or ""
+        self.assertIn("vec0", sql)
+        self.assertIn("float[768]", sql)
+        uv = self.db.execute("PRAGMA user_version").fetchone()
+        self.assertEqual(int(uv["user_version"]), 4)
+
     def test_generate_key(self):
         """Test key generation."""
         record = {'date_taken': '2024-01-15', 'filename': 'photo.jpg'}
