@@ -220,12 +220,20 @@ def _job_processor():
     assert _JOBS_DB_PATH, "Jobs DB path was not set before starting processor"
     processor_db = make_connection_for_path(_JOBS_DB_PATH)
 
+    _progress_last_emit: dict[str, float] = {}
+    _PROGRESS_THROTTLE_S = 1.0
+
+    def _throttled_emit_progress(job_id: str, progress: int, step: str) -> None:
+        if not socketio:
+            return
+        now = time.time()
+        if now - _progress_last_emit.get(job_id, 0) >= _PROGRESS_THROTTLE_S:
+            _progress_last_emit[job_id] = now
+            socketio.emit('job_updated', get_job(processor_db, job_id))
+
     runner = JobRunner(
         processor_db,
-        emit_progress=lambda job_id, progress, step: (
-            socketio.emit('job_updated', get_job(processor_db, job_id))
-            if socketio else None
-        ),
+        emit_progress=_throttled_emit_progress,
         db_path=_JOBS_DB_PATH,
     )
     _job_runner = runner
