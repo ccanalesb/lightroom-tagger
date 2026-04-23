@@ -884,6 +884,56 @@ class TestImageDescriptions(unittest.TestCase):
         self.assertIsNotNone(r2)
         self.assertEqual(r2["has_repetition"], 0)
 
+    def test_store_image_description_fts_for_catalog_with_visual_fields(self):
+        key = "2024-06-01_fts1.jpg"
+        store_image_description(self.db, {
+            "image_key": key, "image_type": "catalog",
+            "summary": "red  boat", "subjects": ["lake", "dock"],
+            "dominant_colors": ["#ff0000"], "mood_tags": ["calm"],
+            "has_repetition": 0, "model_used": "m",
+        })
+        r = self.db.execute(
+            "SELECT dominant_colors, mood_tags, has_repetition, description_search_document "
+            "FROM image_descriptions WHERE image_key = ?",
+            (key,),
+        ).fetchone()
+        self.assertIsNotNone(r)
+        self.assertIn("#ff0000", r["dominant_colors"])
+        self.assertIn("calm", r["mood_tags"])
+        self.assertEqual(r["has_repetition"], 0)
+        doc = r["description_search_document"]
+        self.assertIsNotNone(doc)
+        self.assertIn("red boat", doc)
+        self.assertIn("lake", doc)
+        self.assertIn("dock", doc)
+        m = self.db.execute(
+            "SELECT 1 FROM image_descriptions_fts "
+            "WHERE image_descriptions_fts MATCH 'boat AND lake' AND rowid = ("
+            "  SELECT rowid FROM image_descriptions WHERE image_key = ?"
+            ")",
+            (key,),
+        ).fetchone()
+        self.assertIsNotNone(m)
+
+    def test_store_image_description_fts_cleared_for_non_catalog(self):
+        key = "ig-fts-1"
+        store_image_description(self.db, {
+            "image_key": key, "image_type": "instagram",
+            "summary": "should not be indexed in fts",
+            "model_used": "m",
+        })
+        d = self.db.execute(
+            "SELECT description_search_document, rowid FROM image_descriptions WHERE image_key = ?",
+            (key,),
+        ).fetchone()
+        self.assertIsNotNone(d)
+        self.assertIsNone(d["description_search_document"])
+        n = self.db.execute(
+            "SELECT COUNT(*) AS n FROM image_descriptions_fts WHERE rowid = ?",
+            (d["rowid"],),
+        ).fetchone()["n"]
+        self.assertEqual(n, 0)
+
 
 def test_store_match_with_rank(tmp_path):
     """store_match persists rank column."""
