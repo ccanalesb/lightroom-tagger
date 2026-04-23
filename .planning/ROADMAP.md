@@ -86,6 +86,8 @@
 
 #### Phase 3 — Semantic search & results
 
+**Plan progress:** 03-01 **complete** (2026-04-23) — `sqlite-vec==0.1.9` + `sentence-transformers>=3.0.0`; `init_database` loads extension; `image_text_embeddings` `vec0` (768 cosine + `image_key`); `PRAGMA user_version` 4; pytest smoke. Next: **03-02**.
+
 **Requirements:** NLS-03, NLS-04
 
 - `batch_text_embed` (or equivalent) job stores text vectors keyed for hybrid use with FTS; coverage/progress visible when index is building.
@@ -134,7 +136,7 @@
 |-------|------|--------------|------------------------|--------|
 | 1 | Visual tags & keyword search | VIS-01, NLS-02 | 4 | ✅ Complete (2026-04-23) |
 | 2 | NL filters | NLS-01 | 3 | ✅ Complete (2026-04-23) |
-| 3 | Semantic search & results | NLS-03, NLS-04 | 4 | Pending |
+| 3 | Semantic search & results | NLS-03, NLS-04 | 4 | 🚧 In progress (03-01 done, 2026-04-23) |
 | 4 | Stack detection | STACK-01, STACK-02 | 4 | Pending |
 | 5 | Image embed & search chat | SIM-01, NLS-05 | 4 | Pending |
 | 6 | Similarity & stack UI | SIM-02, STACK-03 | 3 | Pending |
