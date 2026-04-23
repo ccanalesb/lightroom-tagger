@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useMemo } from 'react'
 import type { FilterSchema } from '../components/filters/types'
 import { InsightsKpiRow } from '../components/insights/InsightsKpiRow'
 import { InsightsQuickNav } from '../components/insights/InsightsQuickNav'
@@ -25,6 +25,7 @@ import {
   INSIGHTS_TOP_PHOTOS_TAB_POSTED,
   INSIGHTS_TOP_PHOTOS_TAB_UNPOSTED,
 } from '../constants/strings'
+import { ErrorBoundary, ErrorState, useQuery } from '../data'
 import { useFilters } from '../hooks/useFilters'
 import {
   AnalyticsAPI,
@@ -75,11 +76,112 @@ type TopPhotosBucket = {
   error: string | null
 }
 
-function emptyTopPhotosBucket(loading: boolean): TopPhotosBucket {
-  return { items: [], total: 0, meta: null, loading, error: null }
+type DashboardBundle = {
+  stats: Stats | null
+  errStats: string | null
+  fingerprint: StyleFingerprintResponse | null
+  errFingerprint: string | null
+  topPhotosByTab: Record<TopPhotosTabKey, TopPhotosBucket>
+  frequency: PostingFrequencyResponse | null
+  errFrequency: string | null
+  activeJobs: number
 }
 
-export function DashboardPage() {
+async function fetchDashboardBundle(postingRange: { from: string; to: string }): Promise<DashboardBundle> {
+  const { from, to } = postingRange
+
+  const results = await Promise.allSettled([
+    SystemAPI.stats(),
+    IdentityAPI.getStyleFingerprint(),
+    IdentityAPI.getBestPhotos({ limit: 8, posted: false }),
+    IdentityAPI.getBestPhotos({ limit: 8, posted: true }),
+    IdentityAPI.getBestPhotos({ limit: 8 }),
+    AnalyticsAPI.getPostingFrequency({
+      date_from: from,
+      date_to: to,
+      granularity: 'month',
+    }),
+    JobsAPI.list(),
+  ])
+
+  const [r0, r1, r2, r3, r4, r5, r6] = results
+
+  let stats: Stats | null = null
+  let errStats: string | null = null
+  if (r0.status === 'fulfilled') {
+    stats = r0.value
+  } else {
+    errStats = errMessage(r0.reason)
+  }
+
+  let fingerprint: StyleFingerprintResponse | null = null
+  let errFingerprint: string | null = null
+  if (r1.status === 'fulfilled') {
+    fingerprint = r1.value
+  } else {
+    errFingerprint = errMessage(r1.reason)
+  }
+
+  const mapBest = (
+    r: PromiseSettledResult<Awaited<ReturnType<typeof IdentityAPI.getBestPhotos>>>,
+  ): TopPhotosBucket => {
+    if (r.status === 'fulfilled') {
+      return {
+        items: r.value.items,
+        total: r.value.total,
+        meta: r.value.meta,
+        loading: false,
+        error: null,
+      }
+    }
+    return {
+      items: [],
+      total: 0,
+      meta: null,
+      loading: false,
+      error: errMessage(r.reason),
+    }
+  }
+
+  const topPhotosByTab: Record<TopPhotosTabKey, TopPhotosBucket> = {
+    unposted: mapBest(r2),
+    posted: mapBest(r3),
+    all: mapBest(r4),
+  }
+
+  let frequency: PostingFrequencyResponse | null = null
+  let errFrequency: string | null = null
+  if (r5.status === 'fulfilled') {
+    frequency = r5.value
+  } else {
+    errFrequency = errMessage(r5.reason)
+  }
+
+  let activeJobs = 0
+  if (r6.status === 'fulfilled') {
+    const jobsList = Array.isArray(r6.value?.data) ? r6.value.data : []
+    activeJobs = jobsList.filter((job) => job.status === 'pending' || job.status === 'running').length
+  }
+
+  return {
+    stats,
+    errStats,
+    fingerprint,
+    errFingerprint,
+    topPhotosByTab,
+    frequency,
+    errFrequency,
+    activeJobs,
+  }
+}
+
+const dashboardSuspenseFallback = (
+  <div className="rounded-card border border-border bg-surface p-8 text-center text-sm text-text-secondary">
+    Loading…
+  </div>
+)
+
+function DashboardPageInner() {
   const postingRange = useMemo(() => defaultPostingRange(), [])
 
   const dashboardTopPhotosSchema = useMemo<FilterSchema>(
@@ -103,131 +205,25 @@ export function DashboardPage() {
 
   const filters = useFilters(dashboardTopPhotosSchema)
 
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [errStats, setErrStats] = useState<string | null>(null)
-  const [loadingStats, setLoadingStats] = useState(true)
+  const bundle = useQuery(
+    ['dashboard', postingRange.from, postingRange.to] as const,
+    () => fetchDashboardBundle(postingRange),
+  )
 
-  const [fingerprint, setFingerprint] = useState<StyleFingerprintResponse | null>(null)
-  const [errFingerprint, setErrFingerprint] = useState<string | null>(null)
-  const [loadingFingerprint, setLoadingFingerprint] = useState(true)
+  const {
+    stats,
+    errStats,
+    fingerprint,
+    errFingerprint,
+    topPhotosByTab,
+    frequency,
+    errFrequency,
+    activeJobs,
+  } = bundle
 
-  const [topPhotosByTab, setTopPhotosByTab] = useState<Record<TopPhotosTabKey, TopPhotosBucket>>(() => ({
-    unposted: emptyTopPhotosBucket(true),
-    posted: emptyTopPhotosBucket(true),
-    all: emptyTopPhotosBucket(true),
-  }))
-
-  const [frequency, setFrequency] = useState<PostingFrequencyResponse | null>(null)
-  const [errFrequency, setErrFrequency] = useState<string | null>(null)
-  const [loadingFrequency, setLoadingFrequency] = useState(true)
-
-  const [activeJobs, setActiveJobs] = useState(0)
-
-  useEffect(() => {
-    let cancelled = false
-    const { from, to } = postingRange
-
-    async function run() {
-      setLoadingStats(true)
-      setLoadingFingerprint(true)
-      setLoadingFrequency(true)
-      setErrStats(null)
-      setErrFingerprint(null)
-      setErrFrequency(null)
-      setTopPhotosByTab({
-        unposted: emptyTopPhotosBucket(true),
-        posted: emptyTopPhotosBucket(true),
-        all: emptyTopPhotosBucket(true),
-      })
-
-      const results = await Promise.allSettled([
-        SystemAPI.stats(),
-        IdentityAPI.getStyleFingerprint(),
-        IdentityAPI.getBestPhotos({ limit: 8, posted: false }),
-        IdentityAPI.getBestPhotos({ limit: 8, posted: true }),
-        IdentityAPI.getBestPhotos({ limit: 8 }),
-        AnalyticsAPI.getPostingFrequency({
-          date_from: from,
-          date_to: to,
-          granularity: 'month',
-        }),
-        JobsAPI.list(),
-      ])
-
-      if (cancelled) return
-
-      const [r0, r1, r2, r3, r4, r5, r6] = results
-
-      if (r0.status === 'fulfilled') {
-        setStats(r0.value)
-        setErrStats(null)
-      } else {
-        setStats(null)
-        setErrStats(errMessage(r0.reason))
-      }
-      setLoadingStats(false)
-
-      if (r1.status === 'fulfilled') {
-        setFingerprint(r1.value)
-        setErrFingerprint(null)
-      } else {
-        setFingerprint(null)
-        setErrFingerprint(errMessage(r1.reason))
-      }
-      setLoadingFingerprint(false)
-
-      const mapBest = (
-        r: PromiseSettledResult<Awaited<ReturnType<typeof IdentityAPI.getBestPhotos>>>,
-      ): TopPhotosBucket => {
-        if (r.status === 'fulfilled') {
-          return {
-            items: r.value.items,
-            total: r.value.total,
-            meta: r.value.meta,
-            loading: false,
-            error: null,
-          }
-        }
-        return {
-          items: [],
-          total: 0,
-          meta: null,
-          loading: false,
-          error: errMessage(r.reason),
-        }
-      }
-
-      setTopPhotosByTab({
-        unposted: mapBest(r2),
-        posted: mapBest(r3),
-        all: mapBest(r4),
-      })
-
-      if (r5.status === 'fulfilled') {
-        setFrequency(r5.value)
-        setErrFrequency(null)
-      } else {
-        setFrequency(null)
-        setErrFrequency(errMessage(r5.reason))
-      }
-      setLoadingFrequency(false)
-
-      if (r6.status === 'fulfilled') {
-        const jobsList = Array.isArray(r6.value?.data) ? r6.value.data : []
-        const pending = jobsList.filter(
-          (job) => job.status === 'pending' || job.status === 'running',
-        ).length
-        setActiveJobs(pending)
-      } else {
-        setActiveJobs(0)
-      }
-    }
-
-    void run()
-    return () => {
-      cancelled = true
-    }
-  }, [postingRange])
+  const loadingStats = false
+  const loadingFingerprint = false
+  const loadingFrequency = false
 
   const fpNoScores =
     fingerprint && !errFingerprint && totalScoreCount(fingerprint.per_perspective) === 0
@@ -250,7 +246,7 @@ export function DashboardPage() {
 
   const postingBuckets = frequency?.buckets ?? []
   const postingTotal = sumBucketCounts(postingBuckets)
-  const showPostingEmpty = !loadingFrequency && !errFrequency && postingTotal === 0
+  const showPostingEmpty = !errFrequency && postingTotal === 0
 
   const a11yErrors = [
     errStats && `Stats: ${errStats}`,
@@ -389,5 +385,19 @@ export function DashboardPage() {
         <p>{INSIGHTS_FOOTER_TIMEZONE}</p>
       </footer>
     </div>
+  )
+}
+
+export function DashboardPage() {
+  return (
+    <ErrorBoundary
+      fallback={({ error, reset }) => (
+        <ErrorState error={error} reset={reset} title="Could not load dashboard" />
+      )}
+    >
+      <Suspense fallback={dashboardSuspenseFallback}>
+        <DashboardPageInner />
+      </Suspense>
+    </ErrorBoundary>
   )
 }
