@@ -30,3 +30,14 @@ export function deleteMatching(predicate: (key: string) => boolean): void {
     store.delete(k)
   }
 }
+
+export function patchMatching(
+  predicate: (key: string) => boolean,
+  updater: (value: unknown) => unknown,
+): void {
+  for (const [k, entry] of store.entries()) {
+    if (predicate(k) && entry.status === 'fulfilled') {
+      entry.value = updater(entry.value)
+    }
+  }
+}
