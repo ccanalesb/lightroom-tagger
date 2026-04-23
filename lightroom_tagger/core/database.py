@@ -7,6 +7,7 @@ import shutil
 import sqlite3
 import threading
 import time
+from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -1316,6 +1317,58 @@ def query_catalog_images(
         select_params,
     ).fetchall()
     return [_deserialize_row(r) for r in rows], total_count
+
+
+def query_catalog_images_by_keys(
+    db: sqlite3.Connection,
+    keys: Sequence[str],
+    *,
+    score_perspective: str | None = None,
+) -> list[dict]:
+    """Load catalog rows for ``keys`` with the same columns/joins as :func:`query_catalog_images`.
+
+    Preserves **input order** via ``ORDER BY CASE i.key WHEN …``. Empty ``keys`` → ``[]``.
+    """
+    if not keys:
+        return []
+    key_list = [str(k) for k in keys]
+    sp = (score_perspective or "").strip()
+    use_score_join = bool(sp)
+
+    ph = ",".join("?" * len(key_list))
+    case_when = " ".join(
+        f"WHEN ? THEN {i}" for i in range(len(key_list))
+    )
+    order_sql = f"ORDER BY CASE i.key {case_when} END"
+
+    select_cols = (
+        "i.*, d.summary AS description_summary, "
+        "d.best_perspective AS description_best_perspective, "
+        "d.perspectives AS description_perspectives_json"
+    )
+    if use_score_join:
+        select_cols += ", s.score AS catalog_perspective_score"
+
+    join_sql = (
+        "FROM images i "
+        "LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog' "
+    )
+    join_bindings: list = []
+    if use_score_join:
+        join_sql += (
+            "LEFT JOIN image_scores s ON s.image_key = i.key "
+            "AND s.image_type = 'catalog' AND s.perspective_slug = ? AND s.is_current = 1 "
+        )
+        join_bindings.append(sp)
+
+    where_sql = f"WHERE i.key IN ({ph})"
+    params = join_bindings + key_list + key_list
+
+    rows = db.execute(
+        f"SELECT {select_cols} {join_sql} {where_sql} {order_sql}",
+        params,
+    ).fetchall()
+    return [_deserialize_row(r) for r in rows]
 
 
 def get_images_without_hash(db: sqlite3.Connection) -> list[dict]:
