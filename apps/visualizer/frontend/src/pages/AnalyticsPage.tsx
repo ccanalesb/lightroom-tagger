@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import { CaptionHashtagPanel } from '../components/analytics/CaptionHashtagPanel'
 import { UnpostedCatalogPanel } from '../components/analytics/UnpostedCatalogPanel'
 import { PostingFrequencyChart } from '../components/analytics/PostingFrequencyChart'
@@ -20,6 +20,7 @@ import {
   ANALYTICS_TIMEZONE_DISCLAIMER,
   ANALYTICS_EMPTY_NO_POSTS,
 } from '../constants/strings'
+import { ErrorBoundary, ErrorState, useQuery } from '../data'
 import {
   AnalyticsAPI,
   type AnalyticsGranularity,
@@ -49,104 +50,70 @@ function errMessage(e: unknown): string {
   return String(e)
 }
 
-export function AnalyticsPage() {
-  const initial = useMemo(() => {
-    const r = defaultRange()
-    return { ...r, granularity: 'day' as AnalyticsGranularity }
-  }, [])
+type AnalyticsBundle = {
+  frequency: PostingFrequencyResponse | null
+  heatmap: PostingHeatmapResponse | null
+  captions: CaptionStatsResponse | null
+  errFreq: string | null
+  errHeat: string | null
+  errCap: string | null
+}
 
-  const [dateFrom, setDateFrom] = useState(initial.from)
-  const [dateTo, setDateTo] = useState(initial.to)
-  const [granularity, setGranularity] = useState<AnalyticsGranularity>(initial.granularity)
-  const [applied, setApplied] = useState<AppliedFilters>(initial)
-
-  const [loading, setLoading] = useState(true)
-  const [frequency, setFrequency] = useState<PostingFrequencyResponse | null>(null)
-  const [heatmap, setHeatmap] = useState<PostingHeatmapResponse | null>(null)
-  const [captions, setCaptions] = useState<CaptionStatsResponse | null>(null)
-  const [errFreq, setErrFreq] = useState<string | null>(null)
-  const [errHeat, setErrHeat] = useState<string | null>(null)
-  const [errCap, setErrCap] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    const filters = applied
-
-    async function run() {
-      setLoading(true)
-      setErrFreq(null)
-      setErrHeat(null)
-      setErrCap(null)
-
-      if (filters.from > filters.to) {
-        const msg = 'Start date must be on or before end date.'
-        if (cancelled) return
-        setErrFreq(msg)
-        setErrHeat(msg)
-        setErrCap(msg)
-        setFrequency(null)
-        setHeatmap(null)
-        setCaptions(null)
-        setLoading(false)
-        return
-      }
-
-      const results = await Promise.allSettled([
-        AnalyticsAPI.getPostingFrequency({
-          date_from: filters.from,
-          date_to: filters.to,
-          granularity: filters.granularity,
-        }),
-        AnalyticsAPI.getPostingHeatmap({
-          date_from: filters.from,
-          date_to: filters.to,
-        }),
-        AnalyticsAPI.getCaptionStats({
-          date_from: filters.from,
-          date_to: filters.to,
-        }),
-      ])
-
-      if (cancelled) return
-
-      const [r0, r1, r2] = results
-
-      if (r0.status === 'fulfilled') {
-        setFrequency(r0.value)
-        setErrFreq(null)
-      } else {
-        setFrequency(null)
-        setErrFreq(errMessage(r0.reason))
-      }
-
-      if (r1.status === 'fulfilled') {
-        setHeatmap(r1.value)
-        setErrHeat(null)
-      } else {
-        setHeatmap(null)
-        setErrHeat(errMessage(r1.reason))
-      }
-
-      if (r2.status === 'fulfilled') {
-        setCaptions(r2.value)
-        setErrCap(null)
-      } else {
-        setCaptions(null)
-        setErrCap(errMessage(r2.reason))
-      }
-
-      setLoading(false)
+async function fetchAnalyticsBundle(filters: AppliedFilters): Promise<AnalyticsBundle> {
+  if (filters.from > filters.to) {
+    const msg = 'Start date must be on or before end date.'
+    return {
+      frequency: null,
+      heatmap: null,
+      captions: null,
+      errFreq: msg,
+      errHeat: msg,
+      errCap: msg,
     }
-
-    void run()
-    return () => {
-      cancelled = true
-    }
-  }, [applied])
-
-  const handleApply = () => {
-    setApplied({ from: dateFrom, to: dateTo, granularity })
   }
+
+  const results = await Promise.allSettled([
+    AnalyticsAPI.getPostingFrequency({
+      date_from: filters.from,
+      date_to: filters.to,
+      granularity: filters.granularity,
+    }),
+    AnalyticsAPI.getPostingHeatmap({
+      date_from: filters.from,
+      date_to: filters.to,
+    }),
+    AnalyticsAPI.getCaptionStats({
+      date_from: filters.from,
+      date_to: filters.to,
+    }),
+  ])
+
+  const [r0, r1, r2] = results
+
+  return {
+    frequency: r0.status === 'fulfilled' ? r0.value : null,
+    heatmap: r1.status === 'fulfilled' ? r1.value : null,
+    captions: r2.status === 'fulfilled' ? r2.value : null,
+    errFreq: r0.status === 'fulfilled' ? null : errMessage(r0.reason),
+    errHeat: r1.status === 'fulfilled' ? null : errMessage(r1.reason),
+    errCap: r2.status === 'fulfilled' ? null : errMessage(r2.reason),
+  }
+}
+
+const analyticsSuspenseFallback = (
+  <div className="rounded-card border border-border bg-surface p-8 text-center text-sm text-text-secondary">
+    Loading…
+  </div>
+)
+
+function AnalyticsCharts({ applied }: { applied: AppliedFilters }) {
+  const bundle = useQuery(
+    ['analytics', applied.from, applied.to, applied.granularity] as const,
+    () => fetchAnalyticsBundle(applied),
+  )
+
+  const { frequency, heatmap, captions, errFreq, errHeat, errCap } = bundle
+  const loading = false
 
   const a11yErrors = [
     errFreq && `Posting frequency: ${errFreq}`,
@@ -157,12 +124,76 @@ export function AnalyticsPage() {
     .join(' ')
 
   const showEmptyHint =
-    !loading &&
     captions &&
     captions.post_count === 0 &&
     !errFreq &&
     !errHeat &&
     !errCap
+
+  return (
+    <>
+      {a11yErrors ? (
+        <p className="sr-only" role="status" aria-live="polite">
+          {a11yErrors}
+        </p>
+      ) : null}
+
+      {showEmptyHint ? (
+        <div
+          className="rounded-card border border-dashed border-border bg-surface px-4 py-3 text-sm text-text-secondary"
+          role="status"
+        >
+          {ANALYTICS_EMPTY_NO_POSTS}
+        </div>
+      ) : null}
+
+      <section className="space-y-3" aria-labelledby="analytics-frequency-heading">
+        <h2 id="analytics-frequency-heading" className="text-card-title text-text">
+          {ANALYTICS_SECTION_FREQUENCY}
+        </h2>
+        <Card padding="md">
+          <CardContent className="!text-text">
+            <PostingFrequencyChart
+              buckets={frequency?.buckets ?? []}
+              meta={frequency?.meta ?? null}
+              loading={loading}
+              error={errFreq}
+            />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="space-y-3" aria-labelledby="analytics-heatmap-heading">
+        <h2 id="analytics-heatmap-heading" className="text-card-title text-text">
+          {ANALYTICS_SECTION_HEATMAP}
+        </h2>
+        <Card padding="md">
+          <CardContent className="!text-text">
+            <PostingHeatmap
+              cells={heatmap?.cells ?? []}
+              meta={heatmap?.meta ?? null}
+              loading={loading}
+              error={errHeat}
+            />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="space-y-3" aria-labelledby="analytics-caption-heading">
+        <h2 id="analytics-caption-heading" className="text-card-title text-text">
+          {ANALYTICS_SECTION_CAPTIONS}
+        </h2>
+        <CaptionHashtagPanel stats={captions} loading={loading} error={errCap} />
+      </section>
+    </>
+  )
+}
+
+function AnalyticsTimezoneFooter({ applied }: { applied: AppliedFilters }) {
+  const { frequency, heatmap, captions } = useQuery(
+    ['analytics', applied.from, applied.to, applied.granularity] as const,
+    () => fetchAnalyticsBundle(applied),
+  )
 
   const footerPieces = useMemo(() => {
     const tz =
@@ -173,6 +204,46 @@ export function AnalyticsPage() {
     const capScope = captions?.meta?.timestamp_scope
     return { tz, note, capScope }
   }, [frequency, heatmap, captions])
+
+  return (
+    <footer className="border-t border-border pt-6 text-xs text-text-tertiary space-y-2">
+      <p>{ANALYTICS_TIMEZONE_DISCLAIMER}</p>
+      {footerPieces.tz ? (
+        <p>
+          <span className="font-medium text-text-secondary">Timezone assumption: </span>
+          {footerPieces.tz}
+        </p>
+      ) : null}
+      {footerPieces.note ? (
+        <p>
+          <span className="font-medium text-text-secondary">Heatmap: </span>
+          {footerPieces.note}
+        </p>
+      ) : null}
+      {footerPieces.capScope ? (
+        <p>
+          <span className="font-medium text-text-secondary">Caption scope: </span>
+          {footerPieces.capScope}
+        </p>
+      ) : null}
+    </footer>
+  )
+}
+
+function AnalyticsPageShell() {
+  const initial = useMemo(() => {
+    const r = defaultRange()
+    return { ...r, granularity: 'day' as AnalyticsGranularity }
+  }, [])
+
+  const [dateFrom, setDateFrom] = useState(initial.from)
+  const [dateTo, setDateTo] = useState(initial.to)
+  const [granularity, setGranularity] = useState<AnalyticsGranularity>(initial.granularity)
+  const [applied, setApplied] = useState<AppliedFilters>(initial)
+
+  const handleApply = () => {
+    setApplied({ from: dateFrom, to: dateTo, granularity })
+  }
 
   return (
     <div className="space-y-8">
@@ -237,83 +308,27 @@ export function AnalyticsPage() {
         </CardContent>
       </Card>
 
-      {a11yErrors ? (
-        <p className="sr-only" role="status" aria-live="polite">
-          {a11yErrors}
-        </p>
-      ) : null}
-
-      {showEmptyHint ? (
-        <div
-          className="rounded-card border border-dashed border-border bg-surface px-4 py-3 text-sm text-text-secondary"
-          role="status"
-        >
-          {ANALYTICS_EMPTY_NO_POSTS}
-        </div>
-      ) : null}
-
-      <section className="space-y-3" aria-labelledby="analytics-frequency-heading">
-        <h2 id="analytics-frequency-heading" className="text-card-title text-text">
-          {ANALYTICS_SECTION_FREQUENCY}
-        </h2>
-        <Card padding="md">
-          <CardContent className="!text-text">
-            <PostingFrequencyChart
-              buckets={frequency?.buckets ?? []}
-              meta={frequency?.meta ?? null}
-              loading={loading}
-              error={errFreq}
-            />
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="space-y-3" aria-labelledby="analytics-heatmap-heading">
-        <h2 id="analytics-heatmap-heading" className="text-card-title text-text">
-          {ANALYTICS_SECTION_HEATMAP}
-        </h2>
-        <Card padding="md">
-          <CardContent className="!text-text">
-            <PostingHeatmap
-              cells={heatmap?.cells ?? []}
-              meta={heatmap?.meta ?? null}
-              loading={loading}
-              error={errHeat}
-            />
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="space-y-3" aria-labelledby="analytics-caption-heading">
-        <h2 id="analytics-caption-heading" className="text-card-title text-text">
-          {ANALYTICS_SECTION_CAPTIONS}
-        </h2>
-        <CaptionHashtagPanel stats={captions} loading={loading} error={errCap} />
-      </section>
+      <Suspense fallback={analyticsSuspenseFallback}>
+        <AnalyticsCharts applied={applied} />
+      </Suspense>
 
       <UnpostedCatalogPanel />
 
-      <footer className="border-t border-border pt-6 text-xs text-text-tertiary space-y-2">
-        <p>{ANALYTICS_TIMEZONE_DISCLAIMER}</p>
-        {footerPieces.tz ? (
-          <p>
-            <span className="font-medium text-text-secondary">Timezone assumption: </span>
-            {footerPieces.tz}
-          </p>
-        ) : null}
-        {footerPieces.note ? (
-          <p>
-            <span className="font-medium text-text-secondary">Heatmap: </span>
-            {footerPieces.note}
-          </p>
-        ) : null}
-        {footerPieces.capScope ? (
-          <p>
-            <span className="font-medium text-text-secondary">Caption scope: </span>
-            {footerPieces.capScope}
-          </p>
-        ) : null}
-      </footer>
+      <Suspense fallback={null}>
+        <AnalyticsTimezoneFooter applied={applied} />
+      </Suspense>
     </div>
+  )
+}
+
+export function AnalyticsPage() {
+  return (
+    <ErrorBoundary
+      fallback={({ error, reset }) => (
+        <ErrorState error={error} reset={reset} title="Could not load analytics" />
+      )}
+    >
+      <AnalyticsPageShell />
+    </ErrorBoundary>
   )
 }
