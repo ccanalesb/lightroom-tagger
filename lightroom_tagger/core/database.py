@@ -605,6 +605,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
     _migrate_unified_image_keys(conn)
     _backfill_matched_catalog_key_from_validated_matches(conn)
     _migrate_image_descriptions_fts(conn)
+    _migrate_image_text_embeddings_vec0(conn)
     seed_perspectives_from_prompts_dir(conn)
     conn.commit()
     return conn
@@ -766,6 +767,27 @@ def _migrate_image_descriptions_fts(conn: sqlite3.Connection) -> None:
     except sqlite3.OperationalError:
         return
     conn.execute("PRAGMA user_version = 3")
+
+
+def _migrate_image_text_embeddings_vec0(conn: sqlite3.Connection) -> None:
+    """Create sqlite-vec vec0 table for catalog text embeddings (user_version 3 → 4)."""
+    row = conn.execute("PRAGMA user_version").fetchone()
+    current_uv = int(row["user_version"] if row else 0)
+    if current_uv >= 4:
+        return
+    try:
+        conn.execute("DROP TABLE IF EXISTS image_text_embeddings")
+        conn.execute(
+            """
+            CREATE VIRTUAL TABLE image_text_embeddings USING vec0(
+              embedding float[768] distance_metric=cosine,
+              image_key TEXT
+            );
+            """
+        )
+    except sqlite3.OperationalError:
+        return
+    conn.execute("PRAGMA user_version = 4")
 
 
 def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
