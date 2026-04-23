@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, Tab } from '../components/ui/Tabs';
 import { InstagramTab } from '../components/images/InstagramTab';
 import { CatalogTab } from '../components/images/CatalogTab';
 import { MatchesTab } from '../components/images/MatchesTab';
+import { SkeletonGrid } from '../components/ui/page-states';
+import { ErrorBoundary, ErrorState, invalidateAll } from '../data';
 import {
   IMAGES_OPEN_POSTING_ANALYTICS,
   TAB_INSTAGRAM,
@@ -21,6 +23,8 @@ function tabIdFromSearch(search: string): ImagesTabId {
   }
   return 'instagram';
 }
+
+const tabSuspenseFallback = <SkeletonGrid count={12} />;
 
 export function ImagesPage() {
   const location = useLocation();
@@ -44,7 +48,27 @@ export function ImagesPage() {
   };
 
   const tabs: Tab[] = [
-    { id: 'instagram', label: TAB_INSTAGRAM, content: <InstagramTab /> },
+    {
+      id: 'instagram',
+      label: TAB_INSTAGRAM,
+      content: (
+        <ErrorBoundary
+          fallback={({ error, reset }) => (
+            <ErrorState
+              error={error}
+              reset={() => {
+                invalidateAll(['images.instagram']);
+                reset();
+              }}
+            />
+          )}
+        >
+          <Suspense fallback={tabSuspenseFallback}>
+            <InstagramTab />
+          </Suspense>
+        </ErrorBoundary>
+      ),
+    },
     {
       id: 'catalog',
       label: TAB_CATALOG,
@@ -62,11 +86,46 @@ export function ImagesPage() {
               Gap list with date, rating, and month filters lives on the Analytics page.
             </p>
           ) : null}
-          <CatalogTab onPostedFilterChange={setCatalogPostedFilter} />
+          <ErrorBoundary
+            fallback={({ error, reset }) => (
+              <ErrorState
+                error={error}
+                reset={() => {
+                  invalidateAll(['images.catalog']);
+                  invalidateAll(['perspectives']);
+                  reset();
+                }}
+              />
+            )}
+          >
+            <Suspense fallback={tabSuspenseFallback}>
+              <CatalogTab onPostedFilterChange={setCatalogPostedFilter} />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       ),
     },
-    { id: 'matches', label: TAB_MATCHES, content: <MatchesTab /> },
+    {
+      id: 'matches',
+      label: TAB_MATCHES,
+      content: (
+        <ErrorBoundary
+          fallback={({ error, reset }) => (
+            <ErrorState
+              error={error}
+              reset={() => {
+                invalidateAll(['matching.groups']);
+                reset();
+              }}
+            />
+          )}
+        >
+          <Suspense fallback={tabSuspenseFallback}>
+            <MatchesTab />
+          </Suspense>
+        </ErrorBoundary>
+      ),
+    },
   ];
 
   return (
