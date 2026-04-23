@@ -15,6 +15,7 @@ from utils.responses import (
     success_paginated,
 )
 
+from lightroom_tagger.core import nl_catalog_search
 from lightroom_tagger.core.catalog_nl_filter import (
     catalog_nl_filter_to_query_kwargs,
     parse_catalog_nl_filter_from_llm,
@@ -31,7 +32,6 @@ from lightroom_tagger.core.database import (
 from lightroom_tagger.core.identity_service import (
     compute_single_image_aggregate_scores,
 )
-from lightroom_tagger.core import nl_catalog_search
 from lightroom_tagger.core.structured_output import StructuredOutputError
 
 _CATALOG_SCORE_PERSPECTIVE_SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
