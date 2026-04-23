@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { TileGrid } from '../ui/TileGrid';
@@ -6,26 +6,27 @@ import {
   TAB_MATCHES,
   MATCHES_TAB_EMPTY,
   MATCHES_VALIDATED_DIVIDER_LABEL,
-  ITEMS_PER_PAGE,
   FILTER_LABEL_SORT_DATE,
   FILTER_SORT_DATE_NEWEST,
   FILTER_SORT_DATE_OLDEST,
   msgShowingOf,
 } from '../../constants/strings';
-import { SkeletonGrid } from '../ui/page-states';
-import { useMatchGroups } from '../../hooks/useMatchGroups';
+import { appendMatchGroupsPage, useMatchGroupMutations } from '../../hooks/matchGroupMutations';
 import { MatchDetailModal } from '../matching/match-detail-modal/MatchDetailModal';
 import type { Match, MatchGroup } from '../../services/api';
+import { MatchingAPI } from '../../services/api';
 import { MatchGroupTile } from './MatchGroupTile';
 import { FilterBar } from '../filters/FilterBar';
 import { useFilters } from '../../hooks/useFilters';
 import type { FilterSchema } from '../filters/types';
+import { useQuery } from '../../data';
 
 export function MatchesTab() {
-  const { matchGroups, total, fetchGroups, handleValidationChange, handleRejected } = useMatchGroups();
-  const [loading, setLoading] = useState(true);
+  const [matchGroups, setMatchGroups] = useState<MatchGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<MatchGroup | null>(null);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+
+  const { handleValidationChange, handleRejected } = useMatchGroupMutations(setMatchGroups);
 
   const matchesSchema = useMemo<FilterSchema>(
     () => [
@@ -46,18 +47,18 @@ export function MatchesTab() {
   const filters = useFilters(matchesSchema);
   const { values: filterValues } = filters;
   const sortByDate = filterValues.sortByDate as string | undefined;
+  const sortParam = (sortByDate ?? 'newest') as 'newest' | 'oldest';
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    const params = { sort_by_date: (sortByDate ?? 'newest') as 'newest' | 'oldest' };
-    void fetchGroups(100, 0, params).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchGroups, sortByDate]);
+  const listData = useQuery(
+    ['matching.groups', sortParam] as const,
+    () => MatchingAPI.list(100, 0, { sort_by_date: sortParam }),
+  );
+
+  const total = listData.total_groups ?? listData.total;
+
+  useLayoutEffect(() => {
+    setMatchGroups(listData.match_groups ?? []);
+  }, [listData]);
 
   const openReview = useCallback((group: MatchGroup, candidate: Match) => {
     setSelectedGroup(group);
@@ -81,7 +82,6 @@ export function MatchesTab() {
         ) ?? null
       : null;
 
-  // Hide groups with no live candidates (all rejected / tombstones).
   const visibleGroups = matchGroups.filter(
     (g) => !g.all_rejected && g.candidates.length > 0,
   );
@@ -89,9 +89,10 @@ export function MatchesTab() {
   const reviewedGroups = visibleGroups.filter((g) => g.has_validated);
   const showValidatedDivider = unvalidatedGroups.length > 0 && reviewedGroups.length > 0;
 
-  const loadMoreParams = {
-    sort_by_date: (sortByDate ?? 'newest') as 'newest' | 'oldest',
-  };
+  const loadMore = useCallback(async () => {
+    const data = await MatchingAPI.list(50, matchGroups.length, { sort_by_date: sortParam });
+    setMatchGroups((prev) => appendMatchGroupsPage(prev, data.match_groups));
+  }, [matchGroups.length, sortParam]);
 
   return (
     <div className="space-y-6">
@@ -104,12 +105,10 @@ export function MatchesTab() {
             {msgShowingOf(matchGroups.length, total, 'groups')}
           </p>
         }
-        disabled={loading}
+        disabled={false}
       />
 
-      {loading ? (
-        <SkeletonGrid count={ITEMS_PER_PAGE} />
-      ) : visibleGroups.length === 0 ? (
+      {visibleGroups.length === 0 ? (
         <Card padding="lg">
           <CardContent>
             <p className="text-sm text-text-secondary text-center py-8">{MATCHES_TAB_EMPTY}</p>
@@ -139,11 +138,7 @@ export function MatchesTab() {
           ) : null}
           {matchGroups.length < total ? (
             <div className="flex justify-center pt-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => fetchGroups(50, matchGroups.length, loadMoreParams)}
-              >
+              <Button type="button" variant="secondary" onClick={() => void loadMore()}>
                 Load more
               </Button>
             </div>
