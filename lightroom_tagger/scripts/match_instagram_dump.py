@@ -32,7 +32,6 @@ from lightroom_tagger.core.database import (
     mark_dump_media_processed,
     store_image_description,
     store_match,
-    update_instagram_status,
 )
 from lightroom_tagger.core.matcher import find_candidates_by_date, score_candidates_with_vision
 from lightroom_tagger.core.provider_registry import ProviderRegistry
@@ -303,8 +302,6 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                 vision_result=best_match.get('vision_result'),
                 vision_score=best_match.get('vision_score')
             )
-
-            update_instagram_status(db, matched_catalog_key, posted=True)
 
             stats['matched'] += 1
             matches_found.append(best_match)

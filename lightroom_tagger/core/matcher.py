@@ -283,6 +283,8 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 + (desc_weight * desc_sim_01)
                 + (vision_weight * vision_score_val)
             )
+            if batch_progress_callback:
+                batch_progress_callback(idx + 1, total_candidates)
             results.append({
                 'catalog_key': catalog_key,
                 'insta_key': insta_key,
@@ -719,7 +721,8 @@ def find_candidates_by_date(db, insta_image: dict, days_before: int = 90) -> lis
     sql = (
         "SELECT i.*, COALESCE(d.summary, '') AS ai_summary "
         "FROM images i "
-        "LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog'"
+        "LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog' "
+        "WHERE i.instagram_posted = 0"
     )
     for row in db.execute(sql).fetchall():
         row_dict = dict(row)

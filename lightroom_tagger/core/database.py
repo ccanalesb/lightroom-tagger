@@ -1548,7 +1548,8 @@ def validate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> 
 
     Also mirrors the pairing onto ``instagram_dump_media.matched_catalog_key``
     so both matching pipelines (bulk script + on-demand) share one
-    "matched" signal for the Instagram tab badge.
+    "matched" signal for the Instagram tab badge, and marks the catalog
+    image as posted to Instagram.
     """
     with db:
         cursor = db.execute(
@@ -1561,6 +1562,10 @@ def validate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> 
             "UPDATE instagram_dump_media SET matched_catalog_key = ? "
             "WHERE media_key = ?",
             (catalog_key, insta_key),
+        )
+        db.execute(
+            "UPDATE images SET instagram_posted = 1 WHERE key = ?",
+            (catalog_key,),
         )
         _backfill_instagram_created_at_from_catalog(db, catalog_key, insta_key)
     return True
@@ -1601,6 +1606,16 @@ def unvalidate_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -
                 "WHERE media_key = ?",
                 (insta_key,),
             )
+        # Clear instagram_posted if no validated match still references this catalog image
+        still_validated = db.execute(
+            "SELECT 1 FROM matches WHERE catalog_key = ? AND validated_at IS NOT NULL LIMIT 1",
+            (catalog_key,),
+        ).fetchone()
+        if not still_validated:
+            db.execute(
+                "UPDATE images SET instagram_posted = 0 WHERE key = ?",
+                (catalog_key,),
+            )
     return True
 
 
@@ -1624,11 +1639,12 @@ def reject_match(db: sqlite3.Connection, catalog_key: str, insta_key: str) -> bo
         "WHERE media_key = ?",
         (insta_key,),
     )
-    # Reset instagram_posted on the catalog image if no other matches reference it
-    remaining = db.execute(
-        "SELECT 1 FROM matches WHERE catalog_key = ? LIMIT 1", (catalog_key,)
+    # Reset instagram_posted only if no validated match still references this catalog image
+    still_validated = db.execute(
+        "SELECT 1 FROM matches WHERE catalog_key = ? AND validated_at IS NOT NULL LIMIT 1",
+        (catalog_key,),
     ).fetchone()
-    if not remaining:
+    if not still_validated:
         db.execute(
             "UPDATE images SET instagram_posted = 0 WHERE key = ?",
             (catalog_key,),
