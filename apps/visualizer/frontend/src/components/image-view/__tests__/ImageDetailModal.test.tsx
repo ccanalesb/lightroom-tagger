@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import type { ImageDetailResponse } from '../../../services/api'
+import { deleteMatching } from '../../../data/cache'
 
 vi.mock('../CatalogImageDetailSections', () => ({
   CatalogImageDetailSections: ({
@@ -41,6 +42,7 @@ function buildDetail(overrides: Partial<ImageDetailResponse> = {}): ImageDetailR
 
 describe('ImageDetailModal', () => {
   beforeEach(() => {
+    deleteMatching(() => true)
     vi.restoreAllMocks()
   })
 
@@ -130,8 +132,7 @@ describe('ImageDetailModal', () => {
         onClose={() => {}}
       />,
     )
-    const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('boom')
+    expect(await screen.findByText('boom')).toBeInTheDocument()
   })
 
   it('uses initialImage so header renders before detail resolves', async () => {

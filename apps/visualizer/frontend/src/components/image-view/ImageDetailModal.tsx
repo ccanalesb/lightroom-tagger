@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ImageView } from '../../services/api'
 import { ImagesAPI } from '../../services/api'
 import { useBodyScrollLock, useFocusTrap } from '../../hooks'
@@ -7,6 +7,7 @@ import { CatalogImageDetailSections } from './CatalogImageDetailSections'
 import { InstagramImageDetailSections } from './InstagramImageDetailSections'
 import { ImageMetadataBadges, type PrimaryScoreSource } from './ImageMetadataBadges'
 import { ModalCloseButton } from './ModalCloseButton'
+import { ErrorBoundary, ErrorState, invalidate, invalidateAll, useQuery } from '../../data'
 
 interface ImageDetailModalProps {
   imageType: 'catalog' | 'instagram'
@@ -20,6 +21,91 @@ interface ImageDetailModalProps {
    *  so the header pill shows the same slug the tile used. */
   scorePerspectiveSlug?: string
   onClose: () => void
+}
+
+function ImageDetailModalFallback({
+  initialImage,
+  imageKey,
+  imageType,
+  primaryScoreSource,
+}: {
+  initialImage?: ImageView
+  imageKey: string
+  imageType: 'catalog' | 'instagram'
+  primaryScoreSource: PrimaryScoreSource
+}) {
+  return (
+    <div className="grid gap-6 p-6 md:grid-cols-2">
+      <div className="aspect-square overflow-hidden rounded-base bg-surface">
+        <img
+          src={`/api/images/${imageType}/${encodeURIComponent(imageKey)}/thumbnail`}
+          alt={initialImage?.filename ?? imageKey}
+          className="h-full w-full object-contain"
+        />
+      </div>
+
+      <div className="space-y-6">
+        {initialImage ? (
+          <ImageMetadataBadges image={initialImage} primaryScoreSource={primaryScoreSource} />
+        ) : null}
+
+        <p className="text-sm text-text-tertiary" role="status" aria-live="polite">
+          Loading image details…
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function ImageDetailModalBody({
+  imageType,
+  imageKey,
+  primaryScoreSource,
+  scorePerspectiveSlug,
+}: Omit<ImageDetailModalProps, 'initialImage' | 'onClose'>) {
+  const detailKey = [
+    'images.detail',
+    imageType,
+    imageKey,
+    scorePerspectiveSlug ?? '',
+  ] as const
+
+  const image = useQuery(detailKey, () =>
+    ImagesAPI.getImageDetail(
+      imageType,
+      imageKey,
+      scorePerspectiveSlug ? { score_perspective: scorePerspectiveSlug } : undefined,
+    ),
+  )
+
+  const [, bump] = useState(0)
+  const handleDataChanged = useCallback(() => {
+    invalidate(detailKey)
+    bump((n) => n + 1)
+  }, [detailKey])
+
+  return (
+    <div className="grid gap-6 p-6 md:grid-cols-2">
+      <div className="aspect-square overflow-hidden rounded-base bg-surface">
+        <img
+          src={`/api/images/${imageType}/${encodeURIComponent(imageKey)}/thumbnail`}
+          alt={image?.filename ?? imageKey}
+          className="h-full w-full object-contain"
+        />
+      </div>
+
+      <div className="space-y-6">
+        <ImageMetadataBadges image={image} primaryScoreSource={primaryScoreSource} />
+
+        {image.image_type === 'catalog' ? (
+          <CatalogImageDetailSections image={image} onDataChanged={handleDataChanged} />
+        ) : null}
+        {image.image_type === 'instagram' ? (
+          <InstagramImageDetailSections image={image} onDataChanged={handleDataChanged} />
+        ) : null}
+      </div>
+    </div>
+  )
 }
 
 /**
@@ -46,9 +132,6 @@ export function ImageDetailModal({
   scorePerspectiveSlug,
   onClose,
 }: ImageDetailModalProps) {
-  const [image, setImage] = useState<ImageView | null>(initialImage ?? null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleId = `image-detail-modal-title-${imageKey.replace(/[^a-zA-Z0-9_-]/g, '_')}`
 
@@ -62,43 +145,6 @@ export function ImageDetailModal({
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
   }, [onClose])
-
-  const fetchDetail = useCallback(
-    (signal?: AbortSignal) => {
-      setLoading(true)
-      setError(null)
-      return ImagesAPI.getImageDetail(
-        imageType,
-        imageKey,
-        scorePerspectiveSlug ? { score_perspective: scorePerspectiveSlug } : undefined,
-      )
-        .then((data) => {
-          if (signal?.aborted) return
-          // `ImageDetailResponse` is a type alias for `ImageView`, so the
-          // detail payload can be assigned directly — no adapter needed.
-          setImage(data)
-        })
-        .catch((err) => {
-          if (signal?.aborted) return
-          setError(String(err))
-        })
-        .finally(() => {
-          if (signal?.aborted) return
-          setLoading(false)
-        })
-    },
-    [imageType, imageKey, scorePerspectiveSlug],
-  )
-
-  useEffect(() => {
-    const controller = new AbortController()
-    void fetchDetail(controller.signal)
-    return () => controller.abort()
-  }, [fetchDetail])
-
-  const handleDataChanged = useCallback(() => {
-    void fetchDetail()
-  }, [fetchDetail])
 
   return (
     <div
@@ -127,52 +173,38 @@ export function ImageDetailModal({
             <ModalCloseButton onClick={onClose} />
           </div>
 
-          <div className="grid gap-6 p-6 md:grid-cols-2">
-            <div className="aspect-square overflow-hidden rounded-base bg-surface">
-              <img
-                src={`/api/images/${imageType}/${encodeURIComponent(imageKey)}/thumbnail`}
-                alt={image?.filename ?? imageKey}
-                className="h-full w-full object-contain"
-              />
-            </div>
-
-            <div className="space-y-6">
-              {image ? (
-                <ImageMetadataBadges
-                  image={image}
+          <ErrorBoundary
+            resetKeys={[imageType, imageKey, scorePerspectiveSlug ?? '']}
+            fallback={({ error, reset }) => (
+              <div className="p-6">
+                <ErrorState
+                  error={error}
+                  reset={() => {
+                    invalidateAll(['images.detail', imageType, imageKey])
+                    reset()
+                  }}
+                />
+              </div>
+            )}
+          >
+            <Suspense
+              fallback={
+                <ImageDetailModalFallback
+                  initialImage={initialImage}
+                  imageKey={imageKey}
+                  imageType={imageType}
                   primaryScoreSource={primaryScoreSource}
                 />
-              ) : null}
-
-              {loading && !image ? (
-                <p
-                  className="text-sm text-text-tertiary"
-                  role="status"
-                  aria-live="polite"
-                >
-                  Loading image details…
-                </p>
-              ) : null}
-              {error ? (
-                <p className="text-sm text-error" role="alert">
-                  {error}
-                </p>
-              ) : null}
-
-              {image && image.image_type === 'catalog' ? (
-                <CatalogImageDetailSections
-                  image={image}
-                  onDataChanged={handleDataChanged}
-                />
-              ) : null}
-              {image && image.image_type === 'instagram' ? (
-                <InstagramImageDetailSections
-                  image={image}
-                  onDataChanged={handleDataChanged}
-                />
-              ) : null}
-            </div>
-          </div>
+              }
+            >
+              <ImageDetailModalBody
+                imageType={imageType}
+                imageKey={imageKey}
+                primaryScoreSource={primaryScoreSource}
+                scorePerspectiveSlug={scorePerspectiveSlug}
+              />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       </div>
     </div>
