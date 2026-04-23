@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { BestPhotosGrid } from './BestPhotosGrid'
 import { IdentityAPI } from '../../services/api'
+import { invalidateAll } from '../../data'
 import { IDENTITY_SECTION_BEST_PHOTOS } from '../../constants/strings'
 
 const postedBestPhotoItem = {
@@ -28,6 +29,7 @@ const postedBestPhotoItem = {
 
 describe('BestPhotosGrid', () => {
   beforeEach(() => {
+    invalidateAll(['identity'])
     vi.spyOn(IdentityAPI, 'getBestPhotos').mockResolvedValue({
       items: [postedBestPhotoItem],
       total: 1,

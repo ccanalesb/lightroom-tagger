@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { IdentityPage } from './IdentityPage'
 import { IdentityAPI } from '../services/api'
+import { invalidateAll } from '../data'
 import {
   IDENTITY_BEST_PHOTOS_EMPTY_FALLBACK,
   IDENTITY_FINGERPRINT_EMPTY,
@@ -15,6 +16,7 @@ import {
 
 describe('IdentityPage', () => {
   beforeEach(() => {
+    invalidateAll(['identity'])
     vi.spyOn(IdentityAPI, 'getBestPhotos').mockResolvedValue({
       items: [],
       total: 0,
@@ -55,13 +57,13 @@ describe('IdentityPage', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: IDENTITY_PAGE_TITLE })).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { level: 2, name: IDENTITY_SECTION_STYLE_FINGERPRINT }),
+      await screen.findByRole('heading', { level: 2, name: IDENTITY_SECTION_STYLE_FINGERPRINT }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { level: 2, name: IDENTITY_SECTION_BEST_PHOTOS }),
+      await screen.findByRole('heading', { level: 2, name: IDENTITY_SECTION_BEST_PHOTOS }),
     ).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { level: 2, name: IDENTITY_SECTION_POST_NEXT }),
+      await screen.findByRole('heading', { level: 2, name: IDENTITY_SECTION_POST_NEXT }),
     ).toBeInTheDocument()
 
     const body = document.body.innerHTML
