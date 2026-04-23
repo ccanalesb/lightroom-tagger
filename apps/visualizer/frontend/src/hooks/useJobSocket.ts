@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { invalidate, invalidateAll } from '../data'
 import { useSocketStore } from '../stores/socketStore'
 import type { Job } from '../types/job'
 
@@ -12,10 +13,19 @@ export function useJobSocket({
   onJobCreated,
   onJobUpdated,
   onJobsRecovered,
-}: UseJobSocketOptions) {
+}: UseJobSocketOptions = {}) {
   const socket = useSocketStore((s) => s.socket)
   const connected = useSocketStore((s) => s.connected)
   const connect = useSocketStore((s) => s.connect)
+  const [jobListRevision, setJobListRevision] = useState(0)
+  const [healthRevision, setHealthRevision] = useState(0)
+
+  const refreshJobList = useCallback(() => {
+    invalidateAll(['jobs.list'])
+    invalidateAll(['jobs.health'])
+    setJobListRevision((n) => n + 1)
+    setHealthRevision((n) => n + 1)
+  }, [])
 
   useEffect(() => {
     connect()
@@ -24,16 +34,41 @@ export function useJobSocket({
   useEffect(() => {
     if (!socket || !connected) return
 
-    if (onJobCreated) socket.on('job_created', onJobCreated)
-    if (onJobUpdated) socket.on('job_updated', onJobUpdated)
-    if (onJobsRecovered) socket.on('jobs_recovered', onJobsRecovered)
+    const handleJobCreated = (job: Job) => {
+      invalidateAll(['jobs.list'])
+      invalidateAll(['jobs.health'])
+      setJobListRevision((n) => n + 1)
+      setHealthRevision((n) => n + 1)
+      onJobCreated?.(job)
+    }
+
+    const handleJobUpdated = (job: Job) => {
+      invalidateAll(['jobs.list'])
+      invalidate(['jobs.detail', job.id])
+      invalidateAll(['jobs.health'])
+      setJobListRevision((n) => n + 1)
+      setHealthRevision((n) => n + 1)
+      onJobUpdated?.(job)
+    }
+
+    const handleJobsRecovered = (payload: { job_ids: string[] }) => {
+      invalidateAll(['jobs.list'])
+      invalidateAll(['jobs.health'])
+      setJobListRevision((n) => n + 1)
+      setHealthRevision((n) => n + 1)
+      onJobsRecovered?.(payload)
+    }
+
+    socket.on('job_created', handleJobCreated)
+    socket.on('job_updated', handleJobUpdated)
+    if (onJobsRecovered) socket.on('jobs_recovered', handleJobsRecovered)
 
     return () => {
-      if (onJobCreated) socket.off('job_created', onJobCreated)
-      if (onJobUpdated) socket.off('job_updated', onJobUpdated)
-      if (onJobsRecovered) socket.off('jobs_recovered', onJobsRecovered)
+      socket.off('job_created', handleJobCreated)
+      socket.off('job_updated', handleJobUpdated)
+      if (onJobsRecovered) socket.off('jobs_recovered', handleJobsRecovered)
     }
   }, [socket, connected, onJobCreated, onJobUpdated, onJobsRecovered])
 
-  return { connected, socket }
+  return { connected, socket, jobListRevision, healthRevision, refreshJobList }
 }
