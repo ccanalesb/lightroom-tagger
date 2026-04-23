@@ -1061,6 +1061,17 @@ def search_by_instagram_posted(db: sqlite3.Connection, posted: bool = True) -> l
     return [_deserialize_row(r) for r in rows]
 
 
+def _non_empty_str_list_for_json_array_filter(values: list[str] | None) -> list[str] | None:
+    """Strip elements, drop blank entries; return None if no filter should apply.
+
+    A list of only whitespace is treated as no filter, matching "empty list" semantics.
+    """
+    if values is None or len(values) == 0:
+        return None
+    out = [str(v).strip() for v in values if v is not None and str(v).strip()]
+    return out or None
+
+
 def query_catalog_images(
     db: sqlite3.Connection,
     *,
@@ -1077,6 +1088,8 @@ def query_catalog_images(
     sort_by_score: str | None = None,
     sort_by_date: str | None = None,
     description_search: str | None = None,
+    dominant_colors: list[str] | None = None,
+    mood_tags: list[str] | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[dict], int]:
@@ -1099,6 +1112,12 @@ def query_catalog_images(
     **sort_by_date** ``newest`` / ``oldest`` orders by ``i.date_taken``. When both
     ``sort_by_score`` and ``sort_by_date`` are set, score wins as the primary key and
     date is the tiebreaker.
+
+    **dominant_colors** / **mood_tags** — optional lists of strings; if non-empty
+    (after dropping blank elements), a row must have at least one token from the
+    list present as a JSON array element in ``image_descriptions.dominant_colors`` /
+    ``mood_tags`` (catalog join row ``d``). Filters use SQLite ``json_each`` with
+    bound parameters; invalid or non-array JSON in the column is excluded.
     """
     if sort_by_score is not None and sort_by_score not in ("asc", "desc"):
         raise ValueError("sort_by_score must be 'asc' or 'desc'")
@@ -1181,6 +1200,34 @@ def query_catalog_images(
                 ")"
             )
             bindings.append(match_str)
+
+    dc_tokens = _non_empty_str_list_for_json_array_filter(dominant_colors)
+    if dc_tokens:
+        dc_ph = ",".join("?" * len(dc_tokens))
+        clauses.append(
+            "("
+            "d.dominant_colors IS NOT NULL AND json_type(d.dominant_colors) = 'array' "
+            "AND EXISTS ("
+            "SELECT 1 FROM json_each(d.dominant_colors) AS jde "
+            f"WHERE jde.value IN ({dc_ph})"
+            ")"
+            ")"
+        )
+        bindings.extend(dc_tokens)
+
+    mt_tokens = _non_empty_str_list_for_json_array_filter(mood_tags)
+    if mt_tokens:
+        mt_ph = ",".join("?" * len(mt_tokens))
+        clauses.append(
+            "("
+            "d.mood_tags IS NOT NULL AND json_type(d.mood_tags) = 'array' "
+            "AND EXISTS ("
+            "SELECT 1 FROM json_each(d.mood_tags) AS jme "
+            f"WHERE jme.value IN ({mt_ph})"
+            ")"
+            ")"
+        )
+        bindings.extend(mt_tokens)
 
     where_sql = "WHERE " + " AND ".join(clauses)
     join_sql = (
