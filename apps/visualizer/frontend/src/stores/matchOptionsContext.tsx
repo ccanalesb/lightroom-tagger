@@ -1,7 +1,8 @@
-import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import { createContext, useContext, useLayoutEffect, useState, useCallback, useMemo, Suspense } from 'react';
 import type { ReactNode } from 'react';
 import { ProvidersAPI } from '../services/api';
 import { ADVANCED_WEIGHTS_MUST_SUM } from '../constants/strings';
+import { useQuery } from '../data';
 
 interface MatchOptions {
   providerId: string | null;
@@ -34,23 +35,20 @@ interface MatchOptionsContextValue {
 
 const MatchOptionsContext = createContext<MatchOptionsContextValue | null>(null);
 
-export function MatchOptionsProvider({ children }: { children: ReactNode }) {
+function MatchOptionsProviderImpl({ children }: { children: ReactNode }) {
+  const defaultsPayload = useQuery(['providers.defaults'] as const, () => ProvidersAPI.getDefaults());
   const [options, setOptions] = useState<MatchOptions>({ ...DEFAULT_OPTIONS });
 
-  useEffect(() => {
-    ProvidersAPI.getDefaults()
-      .then((defaults) => {
-        const visionComparison = defaults.vision_comparison;
-        if (visionComparison?.provider) {
-          setOptions((prev) => ({
-            ...prev,
-            providerId: visionComparison.provider,
-            providerModel: visionComparison.model ?? null,
-          }));
-        }
-      })
-      .catch(console.error);
-  }, []);
+  useLayoutEffect(() => {
+    const visionComparison = defaultsPayload.vision_comparison;
+    if (visionComparison?.provider) {
+      setOptions((prev) => ({
+        ...prev,
+        providerId: visionComparison.provider,
+        providerModel: visionComparison.model ?? null,
+      }));
+    }
+  }, [defaultsPayload]);
 
   const updateOption = useCallback(<K extends keyof MatchOptions>(key: K, value: MatchOptions[K]) => {
     setOptions((prev) => ({ ...prev, [key]: value }));
@@ -82,6 +80,14 @@ export function MatchOptionsProvider({ children }: { children: ReactNode }) {
     <MatchOptionsContext.Provider value={value}>
       {children}
     </MatchOptionsContext.Provider>
+  );
+}
+
+export function MatchOptionsProvider({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={null}>
+      <MatchOptionsProviderImpl>{children}</MatchOptionsProviderImpl>
+    </Suspense>
   );
 }
 
