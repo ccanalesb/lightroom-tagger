@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Suspense } from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 
+import { deleteMatching } from '../../../data/cache';
 import { AnalyzeTab } from '../AnalyzeTab';
 
 // Minimal MatchOptions provider the component expects. We stub it directly
@@ -37,8 +39,17 @@ vi.mock('../../../services/api', () => ({
   },
 }));
 
+function renderAnalyzeTab() {
+  return render(
+    <Suspense fallback={null}>
+      <AnalyzeTab />
+    </Suspense>,
+  );
+}
+
 describe('AnalyzeTab submit UX (fix #1)', () => {
   beforeEach(() => {
+    deleteMatching(() => true);
     mockCreate.mockReset();
     mockListPerspectives.mockReset();
     mockGetDefaults.mockReset();
@@ -51,7 +62,7 @@ describe('AnalyzeTab submit UX (fix #1)', () => {
   it('shows an inline success banner (not an alert) after submission', async () => {
     mockCreate.mockResolvedValue({ id: 'abc12345-job', type: 'batch_analyze' });
 
-    render(<AnalyzeTab />);
+    renderAnalyzeTab();
 
     // Wait for the mounted async effects (perspectives + provider defaults)
     // to settle so React doesn't complain about act() wrapping.
@@ -68,7 +79,7 @@ describe('AnalyzeTab submit UX (fix #1)', () => {
   it('shows an inline error banner when the POST fails', async () => {
     mockCreate.mockRejectedValue(new Error('boom'));
 
-    render(<AnalyzeTab />);
+    renderAnalyzeTab();
     await screen.findByText(/Street/);
 
     fireEvent.click(screen.getByRole('button', { name: /^Analyze/i }));
@@ -87,7 +98,7 @@ describe('AnalyzeTab submit UX (fix #1)', () => {
       () => new Promise((resolve) => { resolveCreate = resolve; }),
     );
 
-    render(<AnalyzeTab />);
+    renderAnalyzeTab();
     await screen.findByText(/Street/);
 
     const primary = screen.getByRole('button', { name: /^Analyze/i });
@@ -110,7 +121,7 @@ describe('AnalyzeTab submit UX (fix #1)', () => {
       () => new Promise((resolve) => { resolveCreate = resolve; }),
     );
 
-    render(<AnalyzeTab />);
+    renderAnalyzeTab();
     await screen.findByText(/Street/);
 
     // Open the advanced panel *before* submitting so the side buttons exist

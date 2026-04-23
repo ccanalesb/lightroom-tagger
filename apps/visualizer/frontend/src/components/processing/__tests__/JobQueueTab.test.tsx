@@ -37,13 +37,12 @@ describe('JobQueueTab pagination', () => {
     render(
       <JobQueueTab
         jobs={makeJobs(10)}
-        setJobs={vi.fn()}
-        jobsLoading={false}
         connected={true}
         onRefreshJobs={vi.fn()}
+        onInvalidateJobList={vi.fn()}
         pagination={{ offset: 0, limit: 50, total: 10 }}
         onOffsetChange={vi.fn()}
-      />
+      />,
     );
     expect(screen.queryByLabelText('Previous page')).toBeNull();
     expect(screen.queryByLabelText('Next page')).toBeNull();
@@ -53,13 +52,12 @@ describe('JobQueueTab pagination', () => {
     render(
       <JobQueueTab
         jobs={makeJobs(50)}
-        setJobs={vi.fn()}
-        jobsLoading={false}
         connected={true}
         onRefreshJobs={vi.fn()}
+        onInvalidateJobList={vi.fn()}
         pagination={{ offset: 0, limit: 50, total: 175 }}
         onOffsetChange={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByLabelText('Next page')).toBeTruthy();
     expect(screen.getByText(/Showing 1–50 of 175/)).toBeTruthy();
@@ -70,13 +68,12 @@ describe('JobQueueTab pagination', () => {
     render(
       <JobQueueTab
         jobs={makeJobs(50)}
-        setJobs={vi.fn()}
-        jobsLoading={false}
         connected={true}
         onRefreshJobs={vi.fn()}
+        onInvalidateJobList={vi.fn()}
         pagination={{ offset: 0, limit: 50, total: 175 }}
         onOffsetChange={onOffsetChange}
-      />
+      />,
     );
     fireEvent.click(screen.getByLabelText('Next page'));
     expect(onOffsetChange).toHaveBeenCalledWith(50);
@@ -86,13 +83,12 @@ describe('JobQueueTab pagination', () => {
     render(
       <JobQueueTab
         jobs={makeJobs(50, 50)}
-        setJobs={vi.fn()}
-        jobsLoading={false}
         connected={true}
         onRefreshJobs={vi.fn()}
+        onInvalidateJobList={vi.fn()}
         pagination={{ offset: 50, limit: 50, total: 175 }}
         onOffsetChange={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText(/Showing 51–100 of 175/)).toBeTruthy();
   });

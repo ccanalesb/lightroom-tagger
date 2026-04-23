@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { ComponentProps } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
+import { deleteMatching } from '../../../data/cache';
 import { JobsHealthBanner } from '../JobsHealthBanner';
 
 const mockHealth = vi.fn();
@@ -10,8 +12,13 @@ vi.mock('../../../services/api', () => ({
   },
 }));
 
+function renderBanner(props: ComponentProps<typeof JobsHealthBanner> = {}) {
+  return render(<JobsHealthBanner pollIntervalMs={0} {...props} />);
+}
+
 describe('JobsHealthBanner', () => {
   beforeEach(() => {
+    deleteMatching(() => true);
     mockHealth.mockReset();
   });
 
@@ -22,7 +29,7 @@ describe('JobsHealthBanner', () => {
       catalog_available: true,
     });
 
-    const { container } = render(<JobsHealthBanner pollIntervalMs={0} />);
+    const { container } = renderBanner();
     await waitFor(() => expect(mockHealth).toHaveBeenCalled());
     expect(container.textContent).toBe('');
   });
@@ -39,7 +46,7 @@ describe('JobsHealthBanner', () => {
       catalog_available: false,
     });
 
-    render(<JobsHealthBanner pollIntervalMs={0} />);
+    renderBanner();
     const banner = await screen.findByTestId('jobs-health-banner-unavailable');
     expect(banner).toBeTruthy();
     expect(banner.textContent).toContain('Catalog unavailable');
@@ -52,7 +59,7 @@ describe('JobsHealthBanner', () => {
   it('renders an error banner when the health endpoint itself fails', async () => {
     mockHealth.mockRejectedValue(new Error('network down'));
 
-    render(<JobsHealthBanner pollIntervalMs={0} />);
+    renderBanner();
     const banner = await screen.findByTestId('jobs-health-banner-error');
     expect(banner.textContent).toContain('network down');
   });

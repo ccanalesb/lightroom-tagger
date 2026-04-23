@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { deleteMatching } from '../../../data/cache';
 import { JobDetailModal } from '../JobDetailModal';
 import type { Job } from '../../../types/job';
 
@@ -14,6 +15,7 @@ vi.mock('../../../services/api', () => ({
 vi.mock('../../../stores/socketStore', () => ({
   useSocketStore: () => null,
 }));
+
 
 function makeJob(overrides: Partial<Job> = {}): Job {
   return {
@@ -36,13 +38,14 @@ function makeJob(overrides: Partial<Job> = {}): Job {
 
 describe('JobDetailModal', () => {
   beforeEach(() => {
+    deleteMatching(() => true);
     mockGet.mockReset();
   });
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders identity row (id, type, status) immediately from the list-row job, even while loading', () => {
+  it('renders identity row (id, type, status) immediately from the list-row job, even while loading', async () => {
     mockGet.mockImplementation(() => new Promise<Job>(() => {}));
     const job = makeJob({ id: 'abc-123', type: 'matching', status: 'running' });
     render(<JobDetailModal job={job} onClose={() => {}} />);
@@ -54,7 +57,7 @@ describe('JobDetailModal', () => {
   it('shows a skeleton for heavy sections while the initial fetch is in flight', async () => {
     let resolveFetch: (value: Job) => void = () => {};
     mockGet.mockImplementationOnce(
-      () => new Promise<Job>((resolve) => { resolveFetch = resolve; })
+      () => new Promise<Job>((resolve) => { resolveFetch = resolve; }),
     );
     render(<JobDetailModal job={makeJob()} onClose={() => {}} />);
     expect(screen.getAllByLabelText(/loading job details/i).length).toBeGreaterThan(0);
