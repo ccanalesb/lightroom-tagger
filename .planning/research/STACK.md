@@ -1,92 +1,131 @@
-# Stack Research — v2.0 Structured Critique, Analytics & Insights Dashboard
+# Stack Research — v3.0 Intelligent Discovery
 
-**Domain:** Additions for **structured AI scoring** (numeric rubrics per critique perspective), **photography-theory prompt engineering**, **analytics over Instagram dump timestamps and captions**, **lightweight time-series / pattern summaries**, and an **insights dashboard** in an existing **Flask + SQLite** backend and **React + TypeScript + Tailwind + Vite** frontend. Assumes validated core stack (catalog/jobs/vision matching/Ollama + OpenAI-compatible providers) is unchanged.
-
-**Researched date:** 2026-04-12
-
-**Confidence:** **HIGH** for schema validation + charting + client-side data fetching (versions verified via PyPI and npm registry JSON on this date). **MEDIUM** for optional “smart” time-series tooling (simple SQL/`datetime` often suffices before adding scientific Python). **MEDIUM** for **Instructor** vs. hand-rolled parse/retry (trade-off: convenience vs. dependency surface).
+**Audience:** Requirements and roadmap (v3.0 natural language search, stacking, visual facets, similarity).  
+**Verified:** Library versions checked against PyPI via `pip index versions` on **2026-04-23** (authoritative for “current” in this doc).
 
 ---
 
-## Recommended Stack
+## New Dependencies Required
 
-### Core Technologies
+| library | version | purpose | why not alternatives |
+|--------|---------|---------|----------------------|
+| **sqlite-vec** | **0.1.9** (latest stable on PyPI; pre-releases e.g. 0.1.10a* exist) | Store **dense vectors** (text + image embeddings) in SQLite with KNN search (`vec0` virtual tables + distance functions) | **sqlite-vss**: same author ecosystem but **maintenance effort moved to sqlite-vec**; VSS wraps Faiss → heavier deploy story. **External vector DB** (Pinecone, Qdrant server): ops and sync cost for a single-user / local-first catalog. **pgvector**: forces Postgres alongside existing SQLite — big migration. |
+| **sentence-transformers** | **5.4.1** | **Local text embeddings** for semantic search over descriptions/keywords; batch encoding in jobs | **OpenAI-only embeddings**: fine for cloud but adds cost/latency and ties offline use to API; keep as optional path via existing `openai` stack. **Bare `transformers`**: more plumbing; ST is the standard ergonomic layer. |
+| **torch** | **2.11.0** (pin per platform/CUDA separately) | Backend for ST and CLIP-style image models | **ONNX-only** path: possible later for smaller deploys, but two parallel inference stacks early = overkill. |
+| **open-clip-torch** | **3.3.0** | **Image embeddings** (CLIP-style) for “more like this”; well-supported checkpoints | **Original OpenAI CLIP repo only**: fewer maintained packaging options. **timms** / **timm** + custom heads: more assembly. **sentence-transformers `[image]`**: viable for some multimodal models; open_clip is the common default for “CLIP vec + proven checkpoints”. |
+| **numpy** | **2.4.4** | Vector math, batch stack features, bridge to sqlite-vec blobs | Avoid duplicating with ad-hoc lists; already a transitive dep of ML stack. |
+| **scipy** | **1.17.1** | Distances, linkage, optional graph-free helpers for clustering / validation | Full **RAPIDS** / **cuML**: GPU cluster only, huge dep for burst grouping. |
+| **scikit-learn** | **1.8.0** | **pHash / feature clustering** (e.g. DBSCAN on Hamming or embedded space), optional hierarchy for stacks | **hdbscan** **0.8.42**: only if density-based clustering proves better than time-window + DBSCAN; add when metrics justify, not day one. |
+| **openai** | **2.32.0** | **LLM-to-SQL** and **cloud embeddings** using the same pattern as today’s vision/LLM calls | Already implied by `provider_registry` + vision; pin for structured-output / tool use in query layer. |
 
-| Technology | Version | Purpose | Why recommended |
-|------------|---------|---------|------------------|
-| **Pydantic** | **2.12.5** | Canonical models for critique payloads (per-perspective scores, rationales, tags), API response shapes, and config for “strict” JSON decoding | Gives queryable numeric fields a single source of truth in Python, integrates cleanly with Flask via explicit `model_validate` / `model_dump`, and pairs with the OpenAI Python SDK’s Pydantic-oriented parsing helpers on providers that honor JSON-schema constraints. |
-| **openai** | **2.31.0** (upgrade from loose `>=1.0`) | Chat/vision calls **plus** structured parsing where the endpoint supports schema-constrained JSON | One maintained client for OpenAI-compatible gateways; v2 line documents patterns aligned with structured outputs. Keeps the same integration style as the rest of the repo while unlocking parse-and-validate flows for scoring rubrics. |
-| **Recharts** | **3.8.1** | Line/area (posting cadence), bar (score distributions), composed charts for dashboard cards | Declarative React + SVG charts that fit Tailwind layout without owning a full D3 program; adequate for tens of thousands of points when the **backend pre-aggregates** series. |
-| **TanStack Query (React Query)** | **5.99.0** | Server state for dashboard endpoints: caching, stale-while-revalidate, keyed refetch per catalog / date range / filter set | Avoids ad hoc `useEffect` fetch spaghetti as you add many insight widgets; works with existing REST JSON from Flask and does not require API redesign. |
+**Transitive (do not pin unless resolution forces it):** `transformers`, `huggingface-hub`, `tqdm`, `Pillow` (already in backend requirements for images).
 
-### Supporting Libraries
+**Optional / phase later**
 
-| Library | Version | Purpose | When to use |
-|---------|---------|-----------|-------------|
-| **date-fns** | **4.1.0** | Parse/normalize ISO timestamps from dumps, bucket by local day/hour/DOW for “posting rhythm” views | Always if much date math moves to the browser; keeps timezone and calendar edge cases out of hand-rolled `Date` code. |
-| **Zod** | **4.3.6** (or **3.24.x** if a peer dependency forces it) | Mirror critical API DTOs on the frontend (scores, aggregates) for safe chart input | When you want compile-time-friendly parsing at the UI boundary without generating OpenAPI clients yet. |
-| **instructor** | **1.15.1** | Optional wrapper: Pydantic-centric structured extraction, retries, multi-provider adapters | Pull in if Ollama + multiple OpenAI-shaped hosts need **uniform** retry/validation behavior beyond what you want to maintain by hand. |
-| **json-repair** | **0.59.2** | Best-effort repair of slightly malformed JSON from smaller local models before Pydantic validation | When you stay on models that do not reliably enforce JSON grammar; use behind a metric/log so you can drop it if quality improves. |
-| **pandas** | **2.3.3** (project still `>=3.10`) **or** **3.0.2** (if minimum Python is raised to **≥3.11**) | Notebook/backend ETL for caption token stats, hashtag counts, rolling posting windows | Use when aggregations outgrow readable SQL but **before** reaching for distributed tooling; **3.0.2 requires Python ≥3.11** per PyPI metadata. |
-| **NumPy** | **2.4.4** | Arrays for optional numeric summaries | Typically a **transitive** dependency of pandas; only list explicitly if you add small custom vectorized stats without pandas. |
-
----
-
-## Installation commands
-
-Backend (from repo root; align pins with your chosen installer):
-
-```bash
-uv add "pydantic>=2.12.5" "openai>=2.31.0"
-
-# Optional — structured extraction helpers / salvage parsing
-uv add "instructor>=1.15.1" "json-repair>=0.59.2"
-
-# Optional — heavier analytics (pick ONE pandas line for your Python floor)
-uv add "pandas>=2.3.3,<3"        # if requires-python includes 3.10
-# uv add "pandas>=3.0.2"         # only after requires-python >=3.11
-```
-
-Frontend (`apps/visualizer/frontend`):
-
-```bash
-npm install recharts@^3.8.1 @tanstack/react-query@^5.99.0 date-fns@^4.1.0 zod@^4.3.6
-```
+| library | version | when | why not now |
+|--------|---------|------|-------------|
+| **hdbscan** | 0.8.42 | If pHash clusters are noisy and DBSCAN tuning fails | Extra C++ dependency chain on some platforms. |
+| **sqlparse** | (latest) | If you want **SQL lint/allowlist enforcement** after LLM generation | Can start with strict AST allowlists without it. |
 
 ---
 
-## Alternatives considered
+## SQLite Extensions
 
-| Choice | Alternative | When the alternative wins |
-|--------|-------------|-----------------------------|
-| **Pydantic + OpenAI SDK parsing** | **instructor** everywhere | You want one abstraction across many providers and built-in retry recipes, and accept the extra dependency chain. |
-| **Recharts** | **@tremor/react**, **Apache ECharts** (`echarts-for-react`), **Visx** | Tremor for rapid dashboard UI kits; ECharts for dense interaction/performance at very large series; Visx when you need bespoke photo-centric visuals and already know D3 concepts. |
-| **TanStack Query** | **SWR**, **RTK Query**, hand-rolled fetch | SWR is comparable for many dashboards; RTK Query fits if you centralize on Redux Toolkit (you currently use Zustand, so Query is the lighter fit). |
-| **pandas** | **Polars**, **SQL-only** in SQLite/app DB | Polars when analytics grow large enough to justify another dataframe API; SQL-only when every insight is a well-defined aggregate query and the UI only plots small result sets. |
-| **date-fns** | **Day.js**, **Luxon**, **Temporal polyfills** | Day.js for tiny bundles; Luxon/Temporal when you need first-class timezone and calendar policies beyond what date-fns already covers. |
-| **Zod** | **Valibot**, **TypeScript-only types** | Valibot for smaller bundles; TS-only when you fully trust the server and want zero runtime parse cost (weaker guardrail for evolving Flask JSON). |
+### FTS5 (full-text search)
 
----
+- **Setup:** **No third-party extension.** FTS5 ships with SQLite and is available in Python’s `sqlite3` when linked against a standard build (typical on macOS/Linux/Windows CPython).
+- **Usage:** `CREATE VIRTUAL TABLE ... USING fts5(...)` — index `image_descriptions` text fields (and/or denormalized combined doc), optionally **external content** or **contentless** with manual `INSERT INTO fts(fts, ...)` on row changes.
+- **Why:** Lexical retrieval for keywords and named entities; pairs with semantic search (hybrid ranking: RRF or weighted sum) for “moody cityscapes”-style queries where FTS catches tokens and embeddings catch vibe.
+- **Not needed:** SQLite **FTS3/4** for new work; spellfix1 unless product wants typo tolerance.
 
-## What NOT to use
+### Vector storage (sqlite-vec vs others)
 
-| Avoid | Why | Use instead |
-|-------|-----|-------------|
-| **LangChain / LlamaIndex** (for this milestone) | Your flow is bounded: prompt templates + one vision/text call + validate + persist. Frameworks add indirection, version churn, and harder testing for little gain. | Plain Python string/Jinja templates + Pydantic validation + your existing job runner. |
-| **Prophet, heavy forecasting stacks, or a separate TSDB** | Instagram export analytics here are **exploratory** (cadence, DOW/hour histograms, gaps vs catalog), not sub-minute operational metrics. | SQLite aggregates + optional pandas rolling/groupby; upgrade only if you later prove forecast accuracy is a product requirement. |
-| **Full OpenAPI codegen pipeline** (initially) | Valuable at scale, but easy to over-build before critique JSON and insight endpoints stabilize. | Pydantic models on the server + Zod (optional) on the client, then codegen later if duplication hurts. |
-| **Embedding every image for “style fingerprint”** (as the first implementation) | High GPU/storage cost; overlaps poorly with “on-demand analysis” unless carefully scoped. | Start with **textual** themes from existing critiques + hashtag/caption stats + score clustering; add embeddings only as a deliberate phase with a budget. |
-| **ORM mapped to Adobe `AgLibrary*` tables** | Undocumented, version-sensitive Lightroom schema. | Keep thin SQL for `.lrcat`; store critique scores and analytics in **your** app tables or sidecar DB as already implied by PROJECT.md. |
+| Option | Notes |
+|--------|--------|
+| **sqlite-vec** | **Recommended** for v3: one file with catalog + library data, matches current **WAL + single-file** deployment, KNN in-process, `pip install sqlite-vec` loads extension. |
+| **sqlite-vss** | **Avoid for new work:** maintenance focus shifted to sqlite-vec; Faiss payload = larger binary story. |
+| **In-app numpy brute force** | OK for tiny dev sets; **does not scale** past low tens of thousands of images for interactive search. |
+| **Dedicated vector SaaS** | **Defer** until multi-user or multi-machine sync is a requirement. |
+
+**Caveat:** sqlite-vec is **pre-1.0**; pin versions in requirements and test extension load on target OSes in CI.
 
 ---
 
-## Sources
+## Embedding Strategy
 
-- **PyPI JSON API** (`https://pypi.org/pypi/{package}/json`), retrieved **2026-04-12**: `pydantic` **2.12.5**, `openai` **2.31.0**, `instructor` **1.15.1**, `json-repair` **0.59.2**, `pandas` **3.0.2** (requires Python **≥3.11**), `numpy` **2.4.4**; latest **pandas 2.x** line noted as **2.3.3** for **Python 3.10** compatibility.
-- **npm registry** (`https://registry.npmjs.org/{package}/latest`), retrieved **2026-04-12**: `recharts` **3.8.1**, `@tanstack/react-query` **5.99.0**, `date-fns` **4.1.0**, `zod` **4.3.6**.
-- **`.planning/PROJECT.md`** — v2.0 scope (structured scores, new perspectives, posting/caption analytics, insights dashboard) and constraints (SQLite catalogs, export-based Instagram, on-demand analysis).
-- **`pyproject.toml`** / **`apps/visualizer/frontend/package.json`** — current Python `>=3.10` floor and existing React 19 / Vite 5 / Tailwind 3 baseline for integration assumptions.
+### Text embeddings (semantic natural language search)
+
+- **Role:** Embed user query + embed existing **description/keyword/caption** fields (from `image_descriptions` and related text) into the **same model space** for similarity.
+- **Recommended default — local:** `sentence-transformers` + a **small MTEB-competitive** model (e.g. bge-small / e5-family — **pick one** and lock for the release so dimensions stay stable in DB). Store dimension in schema metadata.
+- **Optional — cloud:** **OpenAI** `text-embedding-3-small` / `large` via existing `openai` client and provider config for users who prefer API-only.
+- **Why separate from image:** Text–text similarity answers “moody cityscapes” from **language**; image vectors answer **visual** “more like this.” Mixing without clear UX confuses ranking.
+
+### Image embeddings (visual similarity)
+
+- **Role:** **open_clip** (or ST multimodal where applicable) → fixed-dim vector per image; stored in sqlite-vec; query = vector of selected image.
+- **Alignment with pHash:** **pHash** stays for **near-duplicate / burst** proximity; **CLIP** handles **semantic** similarity (subject, style) that Hamming distance misses. Use both in product: different entry points (stacking vs “similar looks”).
+
+### LLM-to-SQL (structured query)
+
+- **Not an “embedding library”:** Use **chat completion** via `ProviderRegistry` (Ollama / GitHub Copilot / OpenAI-compatible) with **JSON schema or tool** output, then **validate** SQL against an allowlist (tables/columns/joins).
+- **Why:** Converts natural language to **filters** (`date_taken`, `rating`, `keywords`, new facet columns) combined with FTS + vector subqueries.
 
 ---
 
-*Research scope: NEW v2.0 capabilities only — structured AI output, scoring schemas, analytics computation, dashboard visualization, and critique prompt patterns. Core Flask/React/job/vision stack treated as validated and out of scope for this document.*
+## What NOT to Add
+
+| Avoid | Reason |
+|-------|--------|
+| **Postgres + pgvector** | Valid at scale; v3.0 doubles storage/ops for this app’s validated SQLite-centric design. |
+| **Elasticsearch / OpenSearch** | Powerful FTS + analytics; redundant if FTS5 + embeddings cover search **TAM** for a local catalog. |
+| **sqlite-vss** for greenfield | Superseded by sqlite-vec for new projects per maintainer direction. |
+| **Pinecone / Weaviate / Chroma server** | Another process to ship, secure, and sync; use sqlite-vec until corpus or multi-user sync forces external search. |
+| **faiss-cpu** directly | Unless you abandon sqlite-vec for custom ANN; sqlite-vec already covers in-file KNN. |
+| **Heavy “unified multimodal embedding”** for text+image in one model | Harder to tune; split models match feature ownership (NL search vs visual match). |
+| **AutoGraph / full ORM query builder for LLM SQL** | Risky; narrow, audited SQL templates + allowlists are safer than generic SQLAlchemy-from-LLM. |
+
+---
+
+## Integration Points
+
+### `ProviderRegistry` (`lightroom_tagger/core/provider_registry.py`)
+
+- **LLM-to-SQL:** Add a **query planner** service that obtains a `openai.OpenAI`-compatible client the same way vision does, with a **dedicated model id** (or reuse `defaults` with a new key e.g. `text_query_model`).
+- **Embeddings API path:** If using OpenAI embeddings, same client, different endpoint; optional second provider entry for “embedding-only” base URL.
+- **Local ST / open_clip:** Run **inside batch jobs** (same process as other long-running work), not per HTTP request, to avoid loading models on every API call.
+
+### Job system (batch_describe / batch_score / batch_analyze / vision_match)
+
+- **New or extended jobs:**  
+  - **Index job:** compute text embeddings + image embeddings + FTS row updates when descriptions change.  
+  - **Stack job:** burst detection (time + pHash) + write `image_stacks`; propagate scores to members.  
+- **Checkpointing:** Reuse existing checkpoint patterns so partial library states remain valid after restarts.
+
+### `database.py` / schema migrations
+
+- **FTS5:** New virtual table + triggers or application-level sync from `image_descriptions` / catalog.  
+- **sqlite-vec:** `vec0` table(s) keyed by stable `image_id` / `catalog_images` key; store **model id + dim** in a small `embedding_meta` table or schema version.  
+- **New columns** (facets): `dominant_colors` (JSON), `mood_tags` (JSON or normalized child table), `has_repetition` (INTEGER/BOOLEAN) — **no new ML lib** if values come from structured LLM output at describe time.  
+- **`load_extension`:** Ensure connection init enables extension loading where required for sqlite-vec (platform policy may need `trusted` path — document in ops).
+
+### Flask API
+
+- **New endpoints:** e.g. `POST /api/search/nl`, `GET /api/images/:id/similar`, facet filter query params; implementation composes SQL + FTS + vec KNN; never pass raw LLM SQL to SQLite without validation.
+
+### Frontend (React 19 + Vite + TypeScript)
+
+- **Natural language search:** Search field + optional “interpreted query” preview (chips) + result list; reuse existing filter/page patterns (`react-router-dom`, `zustand`).
+- **Facets:** Multi-select for `mood_tags` / color buckets from API enums; align with `04-reusable-filter-framework` if present.
+- **“More like this”:** Image detail or grid action → call similarity API → gallery strip or navigated list.
+- **No mandatory new UI framework:** Radix/Headless is optional polish; **no** requirement for Next.js for these features.
+- **Client-side embeddings:** **Not recommended** (bundle size + model IP); keep embedding on backend/job.
+
+---
+
+## Version verification note
+
+PyPI “latest” moves continuously. Re-pin before release with:
+
+`pip index versions <package>`
+
+or lockfile export from the chosen environment, and re-run on the release train.

@@ -1,255 +1,81 @@
-# Pitfalls Research
+# Pitfalls Research — v3.0 Intelligent Discovery
 
-**Domain:** Adding structured AI scoring, posting/caption analytics, and insights dashboards to an existing Lightroom + Instagram-dump + on-demand AI critique web app (SQLite catalogs, app DB, batch jobs, React visualizer).  
-**Researched:** 2026-04-12 (additive milestone); foundation items retained from 2026-04-10  
-**Confidence:** HIGH for integration/perf/UX patterns common in LLM+SQLite products; MEDIUM for model-specific JSON quirks — re-validate per provider and pinned model version
-
-## Critical Pitfalls
-
-### Pitfall 1: Treating free-text critique rows as the same “thing” as structured scores
-
-**What goes wrong:** Filters and rankings silently exclude most images; “best photos” lists look empty or random; users lose trust when some cards show scores and others do not.
-
-**Why it happens:** Phase 4 persisted prose descriptions without a strict numeric contract. New UI assumes every analyzed image has `(perspective, dimension) → number`, but older rows only have text or a different JSON shape.
-
-**How to avoid:** Version the analysis payload (`schema_version`, `prompt_version`, `job_type`). Store scores in explicit nullable columns or a normalized child table keyed by `(asset_id, perspective_id, metric_id, run_id)`. Backfill is a **separate** job with clear “partial coverage” UX. Never treat `0` as “missing”; use `NULL` + “not scored yet.”
-
-**Warning signs:** SQL `WHERE composition_score > 0` drops unscored rows; charts show spikes at zero; aggregate “average score” includes defaulted zeros.
-
-**Phase to address:** **Structured scoring schema & migration** (additive tables/columns, backfill job, nullable semantics, UI empty states).
+Research targeted at **this** stack: Flask API + **app SQLite** (WAL, `busy_timeout`, jobs/checkpoints) + **read-only Lightroom catalog SQLite**; cost-sensitive **AI provider registry** (Ollama, Copilot); **multi-worker batch jobs** with resume checkpoints and per-thread DB connections. Phases are **suggested placement** for roadmapping (not yet numbered in `ROADMAP.md`).
 
 ---
 
-### Pitfall 2: LLM “structured JSON” that parses in the lab but fails in production
+## Natural Language Search
 
-**What goes wrong:** Jobs flip to failed or store garbage; intermittent 500s; partial writes leave commentary without scores or vice versa.
-
-**Why it happens:** Ollama and smaller models often wrap JSON in fences, truncate mid-object, use alternate keys (`"Composition"` vs `"composition"`), emit ranges you did not ask for (`8.7/10`), or return arrays where you expected an object. OpenAI-compatible stacks differ on `response_format` / tool-calling support.
-
-**How to avoid:** **Defense in depth:** (1) prompt contract with one worked example and “JSON only, no markdown”; (2) repair pass (strip fences, extract first `{…}` span); (3) **Pydantic validation** with `model_validate_json` after repair; (4) on failure, **one** bounded retry with a “fix your JSON” nudge or a smaller fallback model; (5) persist raw model text on failure for support. Prefer **two-step** flows for brittle models: short JSON-only scoring call, then optional prose call — or tool/function calling where reliably supported.
-
-**Warning signs:** Rising failure rate when users switch models; logs full of `JSONDecodeError`; “successful” jobs with default-filled scores.
-
-**Phase to address:** **LLM output contracts & provider adapters** (parsers, retries, telemetry, golden fixtures per provider).
-
----
-
-### Pitfall 3: Single mega-prompt that outputs scores + long critique + analytics-style judgments
-
-**What goes wrong:** Truncation wrecks JSON; scores drift with creative temperature; latency and token cost spike; hard to test.
-
-**Why it happens:** One request tries to satisfy UI, dashboard aggregates, and narrative flair at once. Models prioritize fluent text and drop numeric rigor.
-
-**How to avoid:** Split responsibilities: **scoring rubric** (low temperature, tight schema, short) vs **narrative critique** (can be warmer). If you must combine, require scores **first** in the schema so truncation loses tail prose, not numbers — still risky. Align with PROJECT.md: on-demand jobs — keep each job’s output bounded.
-
-**Warning signs:** Parsed JSON missing trailing fields; UI shows scores but empty rationale; cost per image jumps after prompt “improvement.”
-
-**Phase to address:** **Prompt library & job design** (split calls, token budgets, per-job metrics).
+| Pitfall | Risk level | Prevention | Phase to address |
+|--------|------------|------------|------------------|
+| **Treating the LLM’s “SQL” as trusted input** — user NL is indirect, but model-produced predicates still reach the query layer; classic SQL injection and unintended reads (e.g. `ATTACH`, pragma tricks) if anything is string-concatenated. | **High** | **Never** execute raw model output. Use a **fixed, versioned allowlist** of tables/columns/joins, parameterized binds only, and optionally validate AST against a grammar. Log rejected generations. | Discovery / requirements; **NL search implementation** |
+| **Hallucinated column or table names** that match *Lightroom* mental models but not your **app schema** (`images.key` vs Lr’s internal IDs, `image_descriptions` JSON columns, etc.). | **High** | Ship a **schema manifest** (or compact JSON) in the LLM system prompt; **retrieval** from actual `PRAGMA table_info` / introspection at build time. Execute only after mapping to allowlisted identifiers. | Schema & indexing foundation; NL search implementation |
+| **Embeddings + FTS5 diverge** — text indexed for BM25 (titles, captions, AI summaries) not updated in the same transaction as the row the user sees; semantic search on vectors vs keyword search on FTS return incompatible result sets. | **Medium** | One **rebuild policy**: triggers or batch “search index sync” job after describe/score; store **index_versions** or `indexed_at` vs `described_at`. Surface “index stale” in UI when they differ. | Schema & foundation; **Jobs & concurrency** |
+| **FTS5 content/external tables** on large joined views — out-of-sync when migrations add columns, or when rebuilding requires exclusive lock. | **Medium** | Prefer **FTS5 external content** with explicit sync job; test migration path on a copy of a 38K-image DB. Document rebuild time. | Schema & indexing foundation |
+| **Embedding storage bloat** — float32 vectors for 10K–100K images × 512–1024 dims → hundreds of MB to GB in app DB, blowing backup size and `VACUUM` pain. | **Medium** | **Dimension budget** in requirements; table normalization (`embedding_id` + blob store or **separate file**/mmap); optional **PQ** or int8 with calibration; **per-model** storage keyed by `model_id`+`dim`. | Schema & indexing foundation; embedding & similarity |
+| **Cold-start UX** — NL search works only after embeddings/FTS exist; users get empty/confusing results. | **Medium** | Degrade gracefully: **keyword-only** or metadata filters until N% indexed; banner “Semantic search: building… (3,421 / 12,000)”. Don’t show fake relevance scores. | NL search implementation; **UX & UAT** |
+| **Cost surprises** — every NL query = LLM + (optional) embed query + heavy SQL. | **Medium** | Cache parsed query plans for identical NL (hash); cap tokens; route simple intent to **structured filters** without LLM. | NL search implementation |
+| **Dual-DB confusion** — NL search must not assume writable Lr catalog; joining app data with Lr in one SQL string is easy to get wrong. | **High** | Explicit **data boundaries** in design: all searchable denormalized copies live in app DB, or use **app-side** two-step query (Lr read → keys → app), never `ATTACH` without threat review. | Discovery; schema foundation |
 
 ---
 
-### Pitfall 4: Schema migration that rewrites hot paths or breaks existing describe jobs
+## Photo Stacking
 
-**What goes wrong:** Deploy breaks in-flight jobs; old workers write incompatible rows; rollback is impossible; `.lrcat` untouched but app DB migrations fail mid-flight.
-
-**Why it happens:** Adding columns with `NOT NULL` defaults, renaming JSON keys consumers expect, or migrating without **expand → dual-write → backfill → contract** steps.
-
-**How to avoid:** Additive migrations only; new columns nullable; feature flags for new job handlers; readers tolerate old and new shapes until backfill completes. Coordinate job payload versioning with deployed API + worker. Test migration on a copy of production-sized `library.db`.
-
-**Warning signs:** `OperationalError: no such column` after deploy; duplicate scoring runs; checksum mismatches between API and DB.
-
-**Phase to address:** **Structured scoring schema & migration** (expand/contract, dual-read, migration tests).
-
----
-
-### Pitfall 5: Analytics computed on every dashboard load from 38K+ row fact tables
-
-**What goes wrong:** Timeouts, UI spinners, SQLite busy errors, whole-server stalls when multiple users refresh (even single-user can hurt if unlucky).
-
-**Why it happens:** Ad-hoc `GROUP BY` over posts × images × scores without indexes; correlated subqueries; loading full time series in one response; ORM-style N+1 from the API layer.
-
-**How to avoid:** Precompute **rollup tables** or nightly/incremental **materialized summaries** (counts by week/hour, caption length buckets, hashtag frequencies). Index foreign keys and filter columns (`posted_at`, `catalog_id`, `perspective_id`). Use **bounded** queries: last N weeks, paginated histograms, server-side downsampling for charts. Run heavy recomputation inside **jobs**, not HTTP handlers.
-
-**Warning signs:** p95 API latency scales with catalog size; `EXPLAIN QUERY PLAN` shows full table scans; WAL grows during browsing.
-
-**Phase to address:** **Analytics computation layer** (rollups, indexes, job-triggered refresh, API limits).
+| Pitfall | Risk level | Prevention | Phase to address |
+|--------|------------|------------|------------------|
+| **pHash-only clustering** merging different scenes (same wall, different people) or splitting true bursts. | **High** | **Two-stage** gating: time window (capture time) **then** pHash; tune on **holdout** sets from *this* catalog. Expose `max_gap_ms` / Hamming **thresholds** as job metadata + **fingerprint in checkpoint** (same pattern as `fingerprint_batch_describe`). | Stacking & clustering; UAT on real bursts |
+| **Too-aggressive time clustering** — `date_taken` ties unrelated shots the same second. | **Medium** | Combine with file sequence / folder if available; require **transitivity checks** (pairwise pHash before merging clusters). | Stacking & clustering |
+| **`capture_time` / `date_taken` NULL or wrong** — stacks become garbage or everything in one “unknown time” bucket. | **High** | Job skips or **singleton stacks** for NULL; metrics dashboard: “% without parseable time”. Don’t overwrite user-visible **rating/pick** from stack heuristics. | Stacking; data quality UAT |
+| **Representative selection** — highest score image might be **unposted Instagram duplicate** or a motion-blurred frame. | **Medium** | Policy table: prefer `pick`/`rating` from `images` row, then score, then sharpness if you add it; **document** tie-breakers. | Stacking; UX |
+| **Score propagation errors** — max/mean/last-writer; **re-running** stack job after a manual score change. | **High** | Define **idempotent** rule: e.g. “representative’s current `image_scores` rows propagate to members as **read-only suggestions** or shadow rows”, not silent overwrite of `is_current=1` unless job flag says so. Align with existing **`image_scores` versioning** (`prompt_version`, `is_current`). | Stacking; scoring integration phase |
+| **Checkpoint scope explosion** — stack merge graph for 38K keys can exceed practical checkpoint size (this codebase already limits checkpoint entry counts). | **Medium** | **Chunk** by time windows; persist only frontier state; avoid storing full cluster maps per image in `jobs.metadata`. | Stacking; jobs hardening |
+| **Existing `phash` on `images`** — reusing import-time hash vs recomputing after rotation/crop jobs (SEED-016) desynchronizes clusters. | **Medium** | Version **`phash_algo_version`** or invalidation on image pipeline change. | Stacking; any image-pipeline change |
 
 ---
 
-### Pitfall 6: Instagram timestamp / timezone semantics breaking “when you post” insights
+## Visual Attribute Tags
 
-**What goes wrong:** Heatmaps shift by hours; daylight-saving edges look like spikes; duplicate posts across timezone assumptions.
-
-**Why it happens:** Exports mix UTC and local strings; DST gaps; user travels; parsing with `datetime` without explicit tz.
-
-**How to avoid:** Normalize to **UTC** at ingest; store original offset string if present; document “display in local browser TZ” vs “stored UTC.” Test fixtures across DST boundaries. Deduplicate on stable export IDs, not `(date, caption)`.
-
-**Warning signs:** Users say “I never post at 3am”; counts change after server TZ change; same post double-counted.
-
-**Phase to address:** **Dump ingest & analytics** (ingest normalization, validation report, time-series tests).
+| Pitfall | Risk level | Prevention | Phase to address |
+|--------|------------|------------|------------------|
+| **Prompt drift** — `mood_tags` and colors vary run-to-run; filters and search vocab become unstable. | **High** | **Enum or controlled vocab** in prompt (“choose from: …”); post-process with **fuzzy map** to canonical tags; store **`prompt_version` / schema_version** next to new fields (mirror `image_scores` pattern). | Describe / visual attributes pipeline |
+| **Backward compatibility** — UI and APIs assume new keys in `image_descriptions` JSON blobs; old rows **omit** `dominant_colors` / `has_repetition`. | **High** | **Optional fields** with defaults; frontend **defensive parsing** (already a pattern for JSON columns); **migration job** “backfill attributes” optional, not blocking read path. | Describe pipeline; frontend contract phase |
+| **Vocabulary explosion** — unconstrained tags → unique tag per image, useless for aggregate analytics. | **Medium** | Enforce max tags, normalize case, **merge** synonyms in a reference table; periodic **cleanup** report. | Visual attributes; analytics |
+| **Double cost** — describe job already heavy; new fields **increase** tokens without caching. | **Medium** | **Structured output** schema (one JSON); optional **separate** cheap pass only when user enables “attribute extraction”. | Describe pipeline; cost review |
+| **Inconsistent with similarity search** — “blue” tag from VLM doesn’t match CLIP’s notion of color. | **Low–Medium** | Document **two modalities**: text tags vs embedding space; don’t require bitwise agreement in UI. | Requirements; UAT |
 
 ---
 
-### Pitfall 7: New scoring job types bolted on without idempotency and pipeline discipline
+## Visual Similarity Search
 
-**What goes wrong:** Double charges (API), duplicate rows, deadlock with describe jobs, cancellation leaving corrupt partials, one stuck job type blocking the queue.
-
-**Why it happens:** Reusing “describe” code paths without a distinct `job_kind`, missing unique constraint on `(asset_id, run_key)`, shared worker pool without fairness.
-
-**How to avoid:** Define **idempotency keys** (asset + perspective set + model + prompt_version). Unique partial indexes or upsert semantics. Separate **queues or weighted fairness** so long vision batches do not starve quick tasks. Cooperative cancellation must roll back or mark partial rows explicitly (align with Phase 2 patterns). Feature-flag new handlers.
-
-**Warning signs:** Retry storms; duplicate score rows; jobs stuck “running” after deploy; user sees interleaved progress for unrelated work.
-
-**Phase to address:** **Jobs & pipeline integration** (job taxonomy, constraints, cancellation, observability).
-
----
-
-### Pitfall 8: Dashboard that surfaces every chart because engineering could
-
-**What goes wrong:** Cognitive overload; users ignore the product; performance suffers; misleading charts drive wrong conclusions.
-
-**Why it happens:** Each stakeholder asks for one more widget; no primary story; charts share inconsistent date ranges or filters.
-
-**How to avoid:** **One primary insight per view** with drill-down. Global date range + catalog scope controls shared via one context. Show **data coverage** (“scores available for 12% of catalog”) next to aggregates. Prefer a small set of battle-tested chart types (Recharts etc.) with accessible defaults. Empty states explain *why* (no dump, no scores, filter too narrow).
-
-**Warning signs:** Support questions about conflicting numbers on two tabs; users ask “which chart is true?”; Lighthouse scores tank.
-
-**Phase to address:** **Insights dashboard UX** (information architecture, shared filter context, loading skeletons).
+| Pitfall | Risk level | Prevention | Phase to address |
+|--------|------------|------------|------------------|
+| **Model lock-in** — embeddings from model A are **incomparable** with model B; re-embedding is mandatory on switch. | **High** | Table **`embedding_model_id` + `dim` + `schema_version`**; queries filter one model; migration = **re-run embed job** with new model key; never mix in one index. | Schema foundation; embedding jobs |
+| **Size vs quality** — small CLIP/edge models miss nuance; large models don’t run on Ollama hardware or blow RAM. | **Medium** | **Hardware profile** in requirements (local vs future GPU); default model documented; **A/B** on sample set with photographer acceptance. | Discovery; embedding jobs |
+| **10K+ images cost** — full-catalog embedding saturates I/O, GPU, and **job queue** (fairness with describe/match). | **High** | **Batch + checkpoint** (existing job patterns); **resume**; **rate limit**; optional “priority: recent N months only”; store **per-image `content_hash` or `analyzed_at` mtime** to skip unchanged. | Embedding & similarity; jobs hardening |
+| **Stale vectors after re-import** — new file replaces `images.key` row or `image_hash` changes; old embedding row still keyed badly. | **High** | **`content_fingerprint`** (hash + size + mtime) on embedding row; **orphan** cleanup job; on key migration, follow **`migrate_unified_image_keys`**-style invariants. | Embedding jobs; catalog sync |
+| **“More like this” on Instagram vs catalog** — two `image_type` families with different pipelines. | **Medium** | Explicit **mode** in API; separate indexes or `WHERE image_type` with consistent model. | API design; embedding |
+| **ANN in SQLite** — no native FAISS in DB; **brute KNN in SQL** is O(n) or use **vector extension** (if ever introduced) / external ANN. | **Medium** | Prototype top-K at 10K; if slow, **sqlite-vec** or on-disk FAISS sidecar; **pre-filter** by date/album to shrink candidate set. | Embedding implementation; perf phase |
 
 ---
 
-### Pitfall 9: Scores presented as objective truth instead of model-relative signals
+## Cross-cutting Risks
 
-**What goes wrong:** Users argue with numbers; reputational harm; churn when model changes “rewrite history.”
+**System-level risks from adding multiple new capabilities at once**
 
-**Why it happens:** UI copies like “quality: 7.2” without model/prompt context; aggregating across incompatible model versions.
+1. **Writer contention (app DB)** — `init_database` already documents WAL **single-writer** behavior; parallel **describe/score** workers + new **FTS updates** + **embedding upserts** + **stack writes** increase “database is locked” probability despite `busy_timeout=30000`. *Mitigation:* serialize heavy writers per subsystem, **smaller transactions**, or **dedicated** “index writer” pass; **extend** `JobsHealthBanner`-style gating for “search index rebuilding”. *Phase:* **Jobs & concurrency hardening** early; re-verify under load in **UAT**.
 
-**How to avoid:** Label scores as **“AI estimate (model X, vY)”**; freeze **ranking cohorts** to a single model version or show version filter. When the model changes, start a new **scoring generation** rather than overwriting silently (or show “upgraded scoring” badge + diff).
+2. **Read-only Lr catalog vs app DB consistency** — anything derived from Lr (keywords, path) for search must tolerate **Lr lock** and **stale** mirror; don't write FTS against Lr. *Mitigation:* app-side **materialized** search rows refreshed by existing prepare/enrich jobs. *Phase:* **Schema + catalog pipeline** design.
 
-**Warning signs:** Side-by-side same image, different scores, no explanation; historical trends jump after deploy.
+3. **Migration safety** — existing installs use **additive** `_migrate_add_column` style; new tables (embeddings, stacks, fts) need **idempotent** `CREATE IF NOT EXISTS`, **backwards-compatible** reads, and a **roll-forward** test on a user DB copy. *Mitigation:* feature flags, **dry-run** migration in CI on fixture DB. *Phase:* **Schema & indexing foundation** (before feature code lands).
 
-**Phase to address:** **Insights dashboard UX** + **LLM output contracts** (version surfacing, cohort rules).
+4. **Checkpoint / metadata size** — new job types must respect **fingerprinting** and **size limits** (see `handlers.py` / checkpoint merge) so job resume stays reliable. *Mitigation:* externalize large graphs to tables, not `jobs.metadata`. *Phase:* each new **job handler** design review.
 
----
+5. **Provider registry & cost** — LLM for NL-to-filter, VLM for attributes, local embed: **central quota** and **failover** (Ollama down → degrade to keyword). *Phase:* **Discovery**; **integration** hardening.
 
-### Pitfall 10: Photographer “identity” and caption analytics leaking wrong-catalog or PII-adjacent data
+6. **API & React 19 data layer** — new endpoints must align with **Suspense/query keys**; partial data (stacks, vectors) can cause **stale cache** if invalidation misses (existing `invalidateAll` patterns). *Mitigation:* explicit query keys and invalidation on job completion. *Phase:* **frontend** per feature + **E2E** UAT.
 
-**What goes wrong:** Client wedding themes appear in personal “voice” summary; exported screenshots of dashboards expose private captions.
-
-**Why it happens:** Cross-catalog aggregates without `catalog_id` scope; dashboards that echo raw captions/hashtags without consideration.
-
-**How to avoid:** Default **strict catalog scope** (per PROJECT.md multi-catalog intent). Cross-catalog identity remains explicit opt-in with clear copy. Truncate or aggregate captions for display; avoid logging full caption text at info level.
-
-**Warning signs:** Stats change when switching catalogs in unintuitive ways; logs contain identifiable captions.
-
-**Phase to address:** **Photographer identity & analytics** (scoping rules, privacy review, API guards).
+7. **Security boundary** — NL search and future “agent” features must not exfiltrate **paths/EXIF** from prompts in logs. *Mitigation:* redact in logs; **allowlisted** query shapes only. *Phase:* **requirements** + code review on NL path.
 
 ---
 
-### Pitfall 11 (foundation): Treating `.lrcat` as a generic SQLite file
-
-**What goes wrong:** Corruption, locks, or Lightroom UI inconsistency after writes.
-
-**Why it happens:** Adobe-specific schema, WAL, long-lived locks — same as always when extending the app.
-
-**How to avoid:** Read-only default; minimal keyword writes; backup `.lrcat` + `-wal`/`-shm`; do not write while Lightroom holds the catalog without a tested strategy.
-
-**Warning signs:** `database is locked`; Lightroom repair dialogs after tool use.
-
-**Phase to address:** **Catalog & SQLite foundation** (ongoing; unchanged by v2 features except avoiding new write surfaces).
-
----
-
-## Technical Debt Patterns
-
-| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
-|----------|-------------------|----------------|-----------------|
-| Storing scores only inside a JSON blob | Faster first ship | Unindexed analytics; fragile queries | Spike only; promote hot fields to columns |
-| `NOT NULL` score columns default `0` | Simple SQL | Fake zeros break analytics and trust | Never for AI-derived scores |
-| Parsing JSON with regex only | Fewer deps | Fragile across models | Never in production hot path |
-| Recomputing all aggregates on each request | No migration | Timeouts at 38K+ | Dev-only tiny datasets |
-| One job type for describe + score + identity | Less code | Unclear retries, huge payloads, failure blast radius | Early prototype; split before scale |
-| Hard-coded chart buckets (e.g., hours) | Quick viz | Wrong for non-local TZ stories | Replace with stored UTC rollup + client TZ |
-| Skipping `model_id` / `prompt_version` on score rows | Smaller rows | Cannot explain or reproduce rankings | Never for persisted scores |
-| Direct `.lrcat` writes without backup job | Faster MVP | Irrecoverable corruption | Never for production writes |
-| Single hard-coded Instagram export path | Quick demo | Breaks other locales | Spike only |
-
-## Integration Gotchas
-
-| Integration | Common Mistake | Correct Approach |
-|-------------|----------------|------------------|
-| Existing describe jobs | Overwriting text when re-run for scores | Separate columns or child records; idempotent merge rules |
-| Job queue | New handler without version gating | Deploy API + worker together; tolerate unknown `job_type` gracefully |
-| Ollama | Assuming JSON mode parity with OpenAI | Capability matrix per model; tests on smallest local model you support |
-| OpenAI / OpenRouter | Ignoring `response_format` failures | Fallback parser path; log provider error taxonomy |
-| SQLite (`library.db`) | Analytics joins without indexes | Index FKs and time dimensions; EXPLAIN before ship |
-| React dashboard | Each tab owns date filter state | Lift catalog + range context; sync to URL for shareability |
-| Instagram dump | Parsing timestamps as naive local | Normalize to UTC at ingest; carry source tz metadata |
-| Socket.IO / progress | Mixing job kinds in one channel without labels | Typed events; UI distinguishes scoring vs describe |
-| Pydantic models | Drift between API schema and DB JSON | Single shared package or codegen; contract tests |
-
-## Performance Traps
-
-| Trap | Symptoms | Prevention | When It Breaks |
-|------|----------|------------|----------------|
-| Full-table scan on scores | Slow filters / “top N” endpoints | Indexes on `(catalog_id, metric, value)` or precomputed ranks | 10k–50k+ rows |
-| Correlated subquery per image | API latency ∝ images | JOIN + GROUP BY or rollup table | Medium catalogs |
-| Serializing large aggregates to JSON | Huge payloads, slow TTFB | Pagination, downsampling, server-side binning | Year-long minute-level series |
-| Opening new DB connection per chart query | CPU churn | Connection pool / single conn per request scope | Concurrent dashboard loads |
-| Writing rollups synchronously after each score | Write amplification | Trigger rollup refresh job; debounce batch updates | High job throughput |
-| Unbounded “caption NLP” in SQL | LIKE `%foo%` scans | Tokenize at ingest; index tokens or use FTS | Large caption tables |
-
-## UX Pitfalls
-
-| Pitfall | User Impact | Better Approach |
-|---------|-------------|-----------------|
-| Scores without model/version context | Mistrust, confusion | Badge + tooltip + filter by scoring generation |
-| Mixing analyzed vs unscored in same average | “Why is my average 4?” | Coverage callout; separate “scored subset” metrics |
-| Heatmaps without sample size | Misread sparse cells | Show counts per bucket; suppress low-N cells |
-| Competing date ranges across tabs | “Numbers don’t match” | Single global range control |
-| Dumping raw LLM “insights” as facts | Overconfidence | Softer copy; cite based on which data subset |
-| No empty state for dashboard | Feels broken | Explain prerequisites (dump, match, score jobs) |
-| Auto-run expensive scoring from dashboard mount | Surprise cost | Explicit actions; show estimates where possible |
-
-## "Looks Done But Isn't" Checklist
-
-- [ ] **Schema:** Old describe rows still readable; new score rows nullable; no silent `0` for missing scores
-- [ ] **Parsing:** Golden tests for JSON output across **each** supported provider + at least two models
-- [ ] **Jobs:** Idempotency verified — retry does not duplicate scores; cancellation leaves no half-linked rows
-- [ ] **Analytics:** `EXPLAIN QUERY PLAN` clean for top dashboards; rollup refresh tested on ≥38K assets
-- [ ] **Time:** DST + UTC ingest fixtures pass; heatmap matches user expectation in another TZ (sanity test)
-- [ ] **UI:** One shared filter context; “coverage %” shown next to aggregates; empty states for each panel
-- [ ] **Ranking:** “Best photos” uses explicit cohort rule (model version + date range + catalog scope)
-- [ ] **Performance:** Cold dashboard load acceptable; no full-catalog scan per refresh
-- [ ] **Regression:** Existing describe / match / keyword flows unchanged in integration tests
-- [ ] **Foundation:** Still true — `.lrcat` read-only except audited keyword writes; backup before write
-
-## Pitfall-to-Phase Mapping
-
-Map the **Prevention track** to your roadmap phase IDs when `ROADMAP.md` is updated for v2.0.
-
-| Pitfall | Prevention track | Verification |
-|---------|------------------|--------------|
-| Free-text vs structured score semantics | Structured scoring schema & migration | Nullable columns; backfill report; UI coverage indicators |
-| LLM JSON parse failures | LLM output contracts & provider adapters | Golden files; failure telemetry; retry bounds |
-| Mega-prompt truncation / cost | Prompt library & job design | Token metrics; split-call tests |
-| Breaking migrations / dual versions | Structured scoring schema & migration | Migration test on copy DB; expand/contract checklist |
-| Heavy ad-hoc aggregates | Analytics computation layer | EXPLAIN plans; load test; rollup freshness job |
-| Timestamp / TZ bugs | Dump ingest & analytics | Fixture tests; user-visible validation summary |
-| Job pipeline interference | Jobs & pipeline integration | Load + cancel tests; unique constraints |
-| Dashboard overload / misleading viz | Insights dashboard UX | UX review; single-story-per-view; sample sizes |
-| Model-relative score trust | Insights UX + LLM contracts | Version labels; cohort filters; history jump detection |
-| Cross-catalog bleed | Photographer identity & analytics | API scoped by `catalog_id`; opt-in cross-catalog rules |
-| `.lrcat` safety (foundation) | Catalog & SQLite foundation | Lock/backup checklist; LR version matrix |
-
-## Sources
-
-- Project intent and v2.0 scope — `.planning/PROJECT.md` (2026-04-11)
-- Prior foundation pitfalls — same file lineage 2026-04-10 (Lightroom SQLite, matching, cost control)
-- Common LLM production patterns — structured output validation, repair passes, provider capability variance (industry practice; re-verify per provider doc)
-- SQLite analytics guidance — indexes, rollups, avoid correlated subqueries at scale (SQLite query planner behavior)
-- Codebase integration notes — `.planning/codebase/INTEGRATIONS.md` (if present)
-
----
-*Pitfalls research for: Lightroom Tagger & Analyzer — additive structured scoring, analytics, and insights on an existing catalog + jobs + AI stack*  
-*Researched: 2026-04-12*
+*Generated for roadmap/requirements. Align suggested phases with `/gsd-new-milestone` v3.0 breakdown when created.*

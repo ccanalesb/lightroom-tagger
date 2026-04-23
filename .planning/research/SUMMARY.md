@@ -1,116 +1,56 @@
-# Research Summary — v2.0 Advanced Critique & Insights
+# Research Summary — v3.0 Intelligent Discovery
 
-**Milestone:** v2.0 Advanced Critique & Insights  
-**Synthesized:** 2026-04-12  
-**Inputs:** `STACK.md`, `FEATURES.md`, `ARCHITECTURE.md`, `PITFALLS.md`, `.planning/PROJECT.md`
+## Stack Additions
 
----
+- **sqlite-vec 0.1.9** — Dense text + image vectors in SQLite, KNN via `vec0` (local-first, one file; pin and test extension load in CI; pre-1.0).
+- **sentence-transformers 5.4.1** — Local MTEB-competitive text embeddings; batch in jobs, not per request.
+- **torch 2.11.0** — Backend for ST and CLIP; pin per platform/CUDA.
+- **open-clip-torch 3.3.0** — CLIP-style image vectors for “more like this.”
+- **numpy 2.4.4** / **scipy 1.17.1** / **scikit-learn 1.8.0** — Vector math, distances, pHash/DBSCAN clustering (optional **hdbscan** later if DBSCAN is noisy).
+- **openai 2.32.0** — LLM for NL→structured plan and optional cloud embeddings; same `ProviderRegistry` pattern as vision.
 
-## Executive Summary
+*FTS5: no extra package (stdlib `sqlite3`).*
 
-The v2.0 milestone extends Lightroom Tagger’s validated foundation—Flask + dual SQLite, background jobs, multi-perspective vision critique, and Instagram dump matching—with **structured numeric rubrics**, **photography-theory-grounded prompts**, **posting and caption analytics** derived from export data (not engagement metrics), and an **insights dashboard** in the existing React visualizer. Research agrees that the core runtime should stay intact: scores and aggregates live in **library.db** alongside `images`, `matches`, `instagram_dump_media`, and `image_descriptions`; job orchestration remains in **visualizer.db**; and all AI outcomes should continue through a **single write funnel** (`store_image_description` or a thin extension) so catalog filters and charts see one consistent truth.
+## NL Search: Recommended Approach
 
-Product and technical research converge on a **bounded** first release: a strict JSON contract per perspective (axes + scores + short rationales + `prompt_version` / rubric identity), **queryable** persisted fields for filter/sort, at least one **new critique perspective** end-to-end, **posting cadence / timing** visualization from matched dump timestamps, and a **thin insights surface** (a few high-signal charts with drill-down to the catalog). Heavier items—full multi-perspective comparison matrices, evidence-linked identity synthesis, explainable “what to post next,” and rich caption NLP—are sequenced **after** scores and aggregates are stable, because they depend on coverage, version cohorts, and trustworthy rollups.
+Ship **LLM-to-structured-filters** first, not executable SQL. The model returns a **JSON object** (date ranges, `mood_tags`, `min_score`, `fts_query`, etc.) that you validate (e.g. Pydantic) and map to **whitelisted** `query_catalog_images` / hybrid parameters—**never** pass raw model-generated SQL to SQLite. Reuse `ProviderRegistry` for chat; include a **schema manifest** (or introspected allowlist) so the model cannot invent Lightroom-shaped column names. This matches injection safety and the existing query helper.
 
-The main risks are **semantic** (mixing legacy prose-only rows with new scores), **operational** (LLM JSON drift, mega-prompts, migration breakage), and **scale** (ad-hoc analytics over tens of thousands of rows, timezone semantics on dumps). Mitigations map cleanly to phased work: versioned payloads, nullable score columns or a normalized score table, defense-in-depth parsing, additive migrations, pre-aggregated or job-refreshed rollups, UTC-normalized ingest, idempotent job keys, and dashboard UX that shows **coverage** and **model/prompt context** rather than implying objective “quality” or unavailable engagement data.
+**Phase 1:** metadata + **FTS5** on denormalized `search_text` (or trigger-maintained FTS) for lexical “street,” names, and caption keywords—fast and explainable. **Phase 2:** **text embeddings** (`sentence-transformers` or OpenAI) over description/keyword text, stored for hybrid ranking (e.g. RRF or weighted fusion with FTS). **Phase 3:** full **semantic** NL once index coverage is acceptable; until then degrade to keyword + filters and show “index building” progress. Simple intents can **skip** the LLM and map straight to filters to control cost.
 
----
+## Photo Stacking: Recommended Approach
 
-## Key Findings
+**Order:** (1) **Burst detection**—sort by `date_taken`, group within a configurable `delta_ms` (use `date_taken` / EXIF; no `capture_time` today). (2) **pHash** within time windows (Hamming + tuning)—avoid pHash-only global clustering, which merges different scenes. (3) **Stack-aware scoring** after stacks exist: propagate to members with a documented rule (e.g. primary only + API inheritance) and align with `image_scores` versioning.
 
-### Recommended Stack
+**Schema:** `image_stacks` (`id`, `stack_type`, `primary_image_key`, metadata JSON for thresholds) and `image_stack_members` (`stack_id`, `image_key`, `role`, `sort_order`); **composite PK `(stack_id, image_key)`**; **recommended `UNIQUE(image_key)`** so each image is in at most one stack for v1. Soft FK to `images.key`. New jobs: e.g. `batch_stack_burst`, `batch_stack_phash` (or one `batch_stack` with `mode`), with **chunked checkpoints** to avoid huge job metadata.
 
-- **Backend:** **Pydantic** (e.g. ≥2.12.5) as the canonical contract for critique payloads and API shapes; **openai** Python SDK upgraded to the v2 line (e.g. ≥2.31.0) for structured parsing where the endpoint supports it. Optional: **instructor** for uniform retry/validation across providers, **json-repair** for salvage parsing on weaker local models, **pandas** when SQL-only aggregates become unwieldy (watch Python floor vs pandas 3.x).
-- **Frontend:** **Recharts** for dashboard charts; **TanStack Query** for caching/refetch of many insight endpoints; **date-fns** for browser-side bucketing when needed; **Zod** (or stay on 3.x if peers require) to validate critical DTOs at the UI boundary.
-- **Explicit non-goals for this milestone:** LangChain/LlamaIndex for this bounded flow; Prophet / separate TSDB for exploratory posting analytics; full OpenAPI codegen until contracts stabilize; image embeddings as the first “style fingerprint” implementation.
+## Visual Attribute Tags: Recommended Approach
 
-### Expected Features
+**Storage:** add nullable columns on **`image_descriptions`**: `dominant_colors` (JSON array), `mood_tags` (JSON array), `has_repetition` (0/1). **Why:** no breaking change for existing JSON consumers; old rows = NULL; serializers default empty. Update **`store_image_description`** and `ON CONFLICT` columns; extend **`DESCRIPTION_PROMPT`** and **`parse_description_response()`** in `analyzer.py` to emit/ normalize these (promote from nested `technical.mood` where present). **Do not** block core description: keep attributes in the same structured pass or a clearly async phase with per-image status.
 
-- **Table stakes:** Scores **with** visible rationales; **consistent rubric and scale** with stored `prompt_version` / `rubric_id`; **perspective-scoped** axes; **re-run / supersede** semantics; catalog **filter & sort** on scores; honest labeling of **posting behavior** (not reach); job/error visibility consistent with existing describe jobs.
-- **Differentiators:** Queryable multi-axis scores plus narrative; theory-grounded rubrics; additional perspectives (color, emotion, series); posting patterns **without** the Instagram API; **catalog ↔ posted** gap analysis via match keys; optional identity and “what to post next” with **evidence** and explainability.
-- **Anti-patterns to avoid:** Single “master quality” score; scores without coverage/confidence awareness; engagement optimization from dumps; mandatory full-catalog scoring; opaque recommenders; vague identity labels without examples.
-- **MVP (v2) vs later:** Launch with schema + persistence + filters, refined prompts, one new perspective, posting timing viz, thin dashboard; defer full perspective sets, caption panels, weighted “best photos,” identity, and suggestions until validation.
+**Facets:** controlled **vocab** in the prompt (or post-map to canonical tags) to avoid tag sprawl; wire into `query_catalog_images` and FilterBar. Optional **backfill** job; failures/retries must not break core describe.
 
-### Architecture Approach
+## Visual Similarity: Recommended Approach
 
-- **Placement:** Extend `analyzer.py` / `vision_client.py` / `description_service.py` / `database.py`; add **`scoring_schema.py`** (validation/coercion), optional **`prompt_templates.py`**, **`insights` service** (pure SQL + Python rollups) and **`api/insights.py`**; **Insights UI** as `/insights` or an expanded dashboard; optional **`insights_cache`** in library.db if rollups are hot.
-- **Patterns:** Hybrid storage—keep rich JSON in existing columns; add **indexed** columns or a **child table** for hot filters; persist **prompt_version** (and optionally schema version) for cohort-safe aggregations; read-only analytics on **library.db**; backfill via jobs mirroring batch describe.
-- **Build order (dependency-respecting):** (1) prompt + schema + tests, (2) library DB migration + `store_image_description`, (3) wire pipeline and jobs, (4) catalog API + UI filters, (5) insights API (posting + score histograms), (6) insights UI + chart deps, (7) higher-level ranking/identity/caption AI on top.
+**Model:** **open-clip** (or API embeddings if product chooses)—image embedding per `images` row, **separate** from text embeddings (different product jobs: NL vs “looks like”). **Storage:** `image_embeddings` (BLOB `float32`, `model_id`, `dim`, `derived_from` for invalidation); use **sqlite-vec** for KNN at scale; architecture doc allows **numpy cosine in batches** at smaller corpus first.
 
-### Critical Pitfalls
+**Jobs:** new type **`batch_embed_image`** (same checkpoint/resume/fairness patterns as `batch_describe`); **content fingerprint** / mtime to skip unchanged and avoid stale rows after re-import. **API:** e.g. `GET /api/images/<key>/similar` loading the seed vector then KNN, with optional pre-filter (date, folder). **Cold start:** show progress or “best effort” with lower threshold; don’t mix **model A** and **model B** vectors—key rows by `model_id` + `dim` and re-embed on model change.
 
-1. **Treating legacy free-text rows like full structured scores** → nullable semantics, backfill jobs, explicit “not scored” UX; never use `0` for missing.
-2. **Fragile LLM JSON in production** → repair pass, Pydantic validation, bounded retries, golden tests per provider/model; consider split scoring vs narrative calls.
-3. **Mega-prompts** → truncation and cost; split responsibilities and keep scoring tight.
-4. **Breaking migrations / dual worker versions** → additive columns, dual-read, expand/contract, test on copy DBs.
-5. **Heavy aggregates on every dashboard load** → indexes, bounded queries, rollup tables, heavy work in jobs not HTTP handlers.
-6. **Instagram timestamp / timezone bugs** → normalize to UTC at ingest; document display policy; dedupe on stable IDs.
-7. **New job types without idempotency** → keys on asset + perspective set + model + `prompt_version`; fairness/cancellation aligned with Phase 2.
-8. **Dashboard sprawl** → one primary story per view, shared filter context, coverage indicators, strong empty states.
-9. **Scores sold as objective truth** → label model + prompt version; cohort filters; avoid silent overwrites across generations.
-10. **Cross-catalog / PII-adjacent leakage** in identity and caption surfaces → strict `catalog_id` scope; truncate/aggregate captions in UI; careful logging.
-11. **Foundation:** `.lrcat` remains read-only by default; avoid widening `image_key` / `image_type` consistency gaps when extending `image_descriptions`.
+## Build Order (Critical Path)
 
----
+1. **Schema + migrations** — `image_descriptions` facet columns, `image_stacks` / `image_stack_members`, `image_text_embeddings`, `image_embeddings` (+ optional `embedding_meta`); idempotent, additive migrations.
+2. **Describe pipeline (visual attributes)** — prompt, parse, `store`, API; unblocks facets without stacks/embeddings.
+3. **FTS5 + `search_text`** — one column updated in `store_image_description` + backfill; before NL that assumes keyword search over descriptions.
+4. **Text embedding job** — `batch_text_embed` (or equivalent); depends on stable text fields.
+5. **NL search** — LLM → validated filter object + hybrid query using FTS + text vectors; `POST /api/search` (or similar) reusing list shapes.
+6. **Image embed job + similar API** — can parallel (5) after (1) if staffed; needs `image_embeddings` + optional sqlite-vec path.
+7. **Stack jobs + stack-aware scoring** — can parallel (5)–(6) after (1); scoring policy lands after stacks are populated.
 
-## Implications for Roadmap
+**Tight “full Intelligent Discovery” UI path:** **1 → 2 → 3 → 4 → 5**; **6** and **7** in parallel after **1** (7’s scoring pass depends on stacks + existing score pipeline).
 
-### Suggested phases (with rationale)
+## Watch Out For (Top 5)
 
-| Phase theme | Rationale |
-|-------------|-----------|
-| **Structured scoring schema & migration** | Unlocks every filter, ranking, and chart; prevents silent exclusion of legacy rows; implements nullable score semantics and backfill path. |
-| **LLM output contracts & provider adapters** | Addresses parse failures, retries, and telemetry; golden fixtures per provider reduce production surprises. |
-| **Prompt library & job design** | Mitigates mega-prompt truncation/cost; enables rubric versioning and optional split calls (scores vs prose). |
-| **Catalog API & UI: score filters/sort** | Delivers user-visible value from persisted scores; validates indexing and query paths early. |
-| **Analytics computation layer** | Indexes, rollups, and job-triggered refresh avoid dashboard-time full scans at 38k+ rows. |
-| **Dump ingest & posting analytics** | UTC normalization, validation reports, and time-series tests underpin trustworthy heatmaps/histograms. |
-| **Jobs & pipeline integration** | Idempotency, job taxonomy, and cancellation for new work types without starving or corrupting existing queues. |
-| **Insights API + dashboard UX** | Small set of chart endpoints + Recharts/Query UI; shared scope/range; drill-down to catalog. |
-| **v2.x follow-ons** | Caption/hashtag panels, weighted “best photos,” evidence-linked identity, explainable “what to post next,” full perspective comparison UI—each depends on stable scores + aggregates. |
-
-### Phase ordering rationale
-
-**Data contract and persistence before visualization:** The architecture research ordering and pitfall mapping both require **schema + validation + write path** before relying on aggregates or UI rankings. **Analytics infrastructure** (indexes/rollups) should land **before or alongside** the first heavy dashboard, not after timeouts appear. **Posting analytics** depend on ingest correctness (timezone, dedupe), so normalization work belongs **before** or **in parallel** with chart endpoints that consume timestamps. **Identity and recommendations** need minimum coverage and explicit scoping—appropriately **late** in the milestone after core scoring and posting views work.
-
-### Research flags
-
-- **Re-validate per environment:** OpenAI-compatible `response_format` / JSON-mode behavior differs by host and model; maintain a small capability matrix and tests on the smallest supported local model.
-- **Schema strategy open:** Flat columns vs normalized `image_critique_scores` vs hybrid—pick based on filter patterns and perspective cardinality; watch existing `image_descriptions` key/`image_type` caveats in codebase concerns.
-- **Optional dependencies:** Instructor vs hand-rolled parse/retry; pandas vs SQL-only—revisit when aggregate complexity or Python minimum version changes.
-- **Product confidence:** Feature prioritization assumes DAM/BI-style expectations but **lacks cited primary user research**—treat table-stakes list as hypothesis to validate in UAT.
-
----
-
-## Confidence Assessment
-
-| Research output | Confidence | Notes |
-|-----------------|------------|--------|
-| Stack (core: Pydantic, OpenAI SDK v2, Recharts, TanStack Query) | **HIGH** | Versions cross-checked via PyPI/npm registry JSON (2026-04-12). |
-| Stack (optional: Instructor, pandas 3.x vs 2.x, json-repair) | **MEDIUM** | Trade-offs on dependency surface and Python floor. |
-| Features (landscape, MVP vs v2.x, anti-features) | **MEDIUM** | Strong alignment with PROJECT.md; no primary user interviews cited. |
-| Architecture (integration points, dual-DB, build order) | **HIGH** (integration) / **MEDIUM** (exact schema) | Repo paths and roles verified; SQLite shape is product-dependent. |
-| Pitfalls (LLM JSON, migrations, analytics perf, TZ, jobs, UX trust) | **HIGH** (patterns) / **MEDIUM** (model-specific quirks) | Re-verify per pinned model and provider. |
-
----
-
-## Gaps to Address
-
-- **Primary user research:** Quantitative usage and interviews not cited in feature research—validate rubric usefulness and dashboard stories with real workflows.
-- **Final persistence shape:** Choose flat vs normalized vs hybrid score storage after catalog filter/sort requirements are fixed; add migration tests on production-sized `library.db` copies.
-- **Provider/model matrix:** Document JSON reliability and context limits for each supported endpoint; expand golden parser fixtures as new models ship.
-- **Timezone policy UX:** Confirm whether posting charts are “export UTC” vs “user local” and reflect that consistently in labels and docs.
-- **Cross-catalog rules:** PROJECT.md defers multi-catalog switching; identity and analytics phases need explicit opt-in and API guards when that lands.
-
----
-
-## Sources
-
-- **Internal:** `.planning/research/STACK.md`, `FEATURES.md`, `ARCHITECTURE.md`, `PITFALLS.md` (all dated 2026-04-12); `.planning/PROJECT.md` (v2.0 goals and constraints, updated 2026-04-11).
-- **Registries:** PyPI JSON API and npm registry (package versions as cited in STACK.md).
-- **Codebase references (architecture/pitfalls):** `lightroom_tagger/core/database.py`, `analyzer.py`, `description_service.py`, `vision_client.py`; `apps/visualizer/backend/api/*`, `jobs/handlers.py`; `.planning/codebase/ARCHITECTURE.md`, `CONCERNS.md`.
-- **Industry practice:** Structured LLM output validation, SQLite analytics patterns (indexes, rollups, avoiding correlated subqueries)—re-verify against current provider documentation.
-
----
-
-*Unified summary for milestone planning; see sibling research files for depth and citations.*
+1. **Executing LLM “SQL”** — Treat as **untrusted**; use structured filters, parameterized queries, and allowlists only. Log rejections. Prevents injection and `ATTACH`/pragma abuse.
+2. **Schema hallucination & catalog boundaries** — Model invents Lr-isms or conflates read-only Lr DB with app DB. Denormalize searchable fields in the **app** DB; never merge writable and Lr in one ad hoc SQL string without a reviewed design.
+3. **pHash- or time-only stacking mistakes** — Use **time window then pHash**; handle **NULL / bad `date_taken`** (skip or singletons); version or invalidate pHash if the image pipeline changes—otherwise clusters drift.
+4. **Embedding model lock-in and staleness** — Store **`model_id` + `dim`**; one model per query; re-embed on change; use **fingerprints** so imports/replacements do not leave orphan vectors.
+5. **Writer contention and index drift** — Single-writer pressure grows with describe + FTS + embed + stack writes; keep transactions small, one rebuild policy for FTS vs vectors vs `described_at`, and surface **“index stale”** in UI when jobs lag.
