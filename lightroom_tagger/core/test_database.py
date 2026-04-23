@@ -862,6 +862,28 @@ class TestImageDescriptions(unittest.TestCase):
         self.assertIn('2024-01-16_b.jpg', keys)
         self.assertNotIn('2024-01-15_a.jpg', keys)
 
+    def test_store_image_description_persists_has_repetition_stringly(self):
+        store_image_description(self.db, {
+            "image_key": "hr-true", "image_type": "catalog",
+            "summary": "s", "model_used": "m", "has_repetition": "true",
+        })
+        r = self.db.execute(
+            "SELECT has_repetition FROM image_descriptions WHERE image_key = ?",
+            ("hr-true",),
+        ).fetchone()
+        self.assertIsNotNone(r)
+        self.assertEqual(r["has_repetition"], 1)
+        store_image_description(self.db, {
+            "image_key": "hr-false", "image_type": "catalog",
+            "summary": "s", "model_used": "m", "has_repetition": "false",
+        })
+        r2 = self.db.execute(
+            "SELECT has_repetition FROM image_descriptions WHERE image_key = ?",
+            ("hr-false",),
+        ).fetchone()
+        self.assertIsNotNone(r2)
+        self.assertEqual(r2["has_repetition"], 0)
+
 
 def test_store_match_with_rank(tmp_path):
     """store_match persists rank column."""

@@ -247,6 +247,24 @@ def build_description_search_document(summary: str, subjects_json_or_obj: object
     return f"{part} {joined}"
 
 
+def _coerce_has_repetition(value) -> int | None:
+    if value is None:
+        return None
+    if value in (True, 1, "1", "true", "yes"):
+        return 1
+    if value in (False, 0, "0", "false", "no"):
+        return 0
+    return 0
+
+
+def _visual_attr_json(value) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, (list, dict)):
+        return _serialize_json(value)
+    return None
+
+
 def _perspective_seed_description(markdown: str) -> str:
     """First body line for ``perspectives.description`` when seeding from disk."""
     lines = markdown.splitlines()
@@ -474,17 +492,14 @@ def init_database(db_path: str) -> sqlite3.Connection:
             subjects TEXT DEFAULT '[]',
             best_perspective TEXT DEFAULT '',
             model_used TEXT DEFAULT '',
-            described_at TEXT
+            described_at TEXT,
+            dominant_colors TEXT,
+            mood_tags TEXT,
+            has_repetition INTEGER,
+            description_search_document TEXT
         );
 
         CREATE INDEX IF NOT EXISTS idx_desc_image_type ON image_descriptions(image_type);
-
-        CREATE VIRTUAL TABLE IF NOT EXISTS image_descriptions_fts USING fts5(
-            description_search_document,
-            tokenize='porter unicode61',
-            content='image_descriptions',
-            content_rowid='rowid'
-        );
 
         CREATE TABLE IF NOT EXISTS perspectives (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -671,12 +686,21 @@ def _backfill_matched_catalog_key_from_validated_matches(conn: sqlite3.Connectio
 
 
 def _migrate_image_descriptions_fts(conn: sqlite3.Connection) -> None:
-    """Backfill description_search_document and rebuild FTS5 (D-05). Runs once (user_version 2 → 3)."""
+    """Backfill description_search_document, add standalone FTS5, and index existing rows (D-05). Runs once (user_version 2 → 3)."""
     row = conn.execute("PRAGMA user_version").fetchone()
     current_uv = int(row["user_version"] if row else 0)
     if current_uv >= 3:
         return
     try:
+        conn.execute("DROP TABLE IF EXISTS image_descriptions_fts")
+        conn.execute(
+            """
+            CREATE VIRTUAL TABLE image_descriptions_fts USING fts5(
+                description_search_document,
+                tokenize='porter unicode61'
+            )
+            """
+        )
         rows = conn.execute(
             "SELECT image_key, summary, subjects FROM image_descriptions "
             "WHERE description_search_document IS NULL AND image_type = 'catalog'"
@@ -691,10 +715,18 @@ def _migrate_image_descriptions_fts(conn: sqlite3.Connection) -> None:
                 "WHERE image_key = ?",
                 (doc if doc else None, r["image_key"]),
             )
-        # D-05: one-shot FTS rebuild from external content after backfilling text.
-        conn.execute(
-            "INSERT INTO image_descriptions_fts(image_descriptions_fts) VALUES('rebuild')"
-        )
+        # D-05: index all catalog search documents (no external `rebuild` — standalone table).
+        inserted = conn.execute(
+            "SELECT rowid, description_search_document FROM image_descriptions "
+            "WHERE image_type = 'catalog' AND description_search_document IS NOT NULL "
+            "AND TRIM(description_search_document) != ''"
+        ).fetchall()
+        for ins in inserted:
+            conn.execute(
+                "INSERT INTO image_descriptions_fts(rowid, description_search_document) "
+                "VALUES(?, ?)",
+                (ins["rowid"], ins["description_search_document"]),
+            )
     except sqlite3.OperationalError:
         return
     conn.execute("PRAGMA user_version = 3")
@@ -1872,21 +1904,36 @@ def store_image_description(db: sqlite3.Connection, record: dict) -> str:
         raise ValueError("image_key is required")
 
     record['described_at'] = datetime.now().isoformat()
+    image_type = record.get("image_type", "")
+    dominant_colors = _visual_attr_json(record.get("dominant_colors"))
+    mood_tags = _visual_attr_json(record.get("mood_tags"))
+    has_repetition = _coerce_has_repetition(record.get("has_repetition"))
+    if image_type == "catalog":
+        description_search_document = build_description_search_document(
+            record.get("summary", ""),
+            record.get("subjects", []),
+        )
+    else:
+        description_search_document = None
 
     with library_write(db):
         db.execute("""
             INSERT INTO image_descriptions
                 (image_key, image_type, summary, composition, perspectives,
-                 technical, subjects, best_perspective, model_used, described_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 technical, subjects, best_perspective, model_used, described_at,
+                 dominant_colors, mood_tags, has_repetition, description_search_document)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(image_key) DO UPDATE SET
                 image_type=excluded.image_type, summary=excluded.summary,
                 composition=excluded.composition, perspectives=excluded.perspectives,
                 technical=excluded.technical, subjects=excluded.subjects,
                 best_perspective=excluded.best_perspective, model_used=excluded.model_used,
-                described_at=excluded.described_at
+                described_at=excluded.described_at,
+                dominant_colors=excluded.dominant_colors, mood_tags=excluded.mood_tags,
+                has_repetition=excluded.has_repetition,
+                description_search_document=excluded.description_search_document
         """, (
-            image_key, record.get('image_type', ''),
+            image_key, image_type,
             record.get('summary', ''),
             _serialize_json(record.get('composition', {})),
             _serialize_json(record.get('perspectives', {})),
@@ -1895,7 +1942,22 @@ def store_image_description(db: sqlite3.Connection, record: dict) -> str:
             record.get('best_perspective', ''),
             record.get('model_used', ''),
             record['described_at'],
+            dominant_colors, mood_tags, has_repetition, description_search_document,
         ))
+        row = db.execute(
+            "SELECT rowid FROM image_descriptions WHERE image_key = ?",
+            (image_key,),
+        ).fetchone()
+        if row is not None:
+            rowid = row["rowid"]
+            db.execute("DELETE FROM image_descriptions_fts WHERE rowid = ?", (rowid,))
+            doc = description_search_document
+            if image_type == "catalog" and doc and str(doc).strip():
+                db.execute(
+                    "INSERT INTO image_descriptions_fts(rowid, description_search_document) "
+                    "VALUES(?, ?)",
+                    (rowid, doc),
+                )
     return image_key
 
 
