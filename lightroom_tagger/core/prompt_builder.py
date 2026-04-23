@@ -14,7 +14,9 @@ _TECHNICAL_BLOCK = """## Technical Analysis
 - **Dominant colors**: Up to 5 hex codes
 - **Mood**: One word (contemplative, energetic, melancholic, joyful, tense, serene, dramatic, mysterious, flat, dull, chaotic, intimate, raw, quiet)
 - **Lighting**: (natural_front, natural_side, natural_back, golden_hour, blue_hour, overcast, artificial, mixed, low_light, high_key, low_key)
-- **Time of day** if discernible: (dawn, morning, midday, afternoon, golden_hour, blue_hour, night, unknown)"""
+- **Time of day** if discernible: (dawn, morning, midday, afternoon, golden_hour, blue_hour, night, unknown)
+
+**Indexing fields (also at JSON root, see format below):** Top-level `dominant_colors`, `mood_tags`, and `has_repetition` take precedence for database indexing; keep `technical.dominant_colors` and `technical.mood` consistent with them when possible."""
 
 
 def build_description_user_prompt(
@@ -71,6 +73,9 @@ def build_description_user_prompt(
     json_template = f"""## Required JSON format (respond with ONLY this JSON, no other text):
 {{
   "summary": "1-2 sentence objective description of the image content",
+  "dominant_colors": ["#RRGGBB", "#RRGGBB"],
+  "mood_tags": ["tag", "tag2"],
+  "has_repetition": false,
   "composition": {{
     "layers": ["foreground: <description>", "midground: <description>", "background: <description>"],
     "techniques": ["technique1", "technique2"],
@@ -89,7 +94,12 @@ def build_description_user_prompt(
   }},
   "subjects": ["subject1", "subject2"],
   "best_perspective": "{best_alternatives}"
-}}"""
+}}
+
+**Root visual fields (required keys, use empty arrays or false if unknown):**
+- `dominant_colors`: the 2–5 most salient colors as hex strings (`#RRGGBB`).
+- `mood_tags`: short evocative tags (e.g. melancholic, tense) — not a paragraph.
+- `has_repetition`: `true` if obvious repeating patterns, textures, or motifs; else `false`."""
 
     parts.append(json_template)
     return "\n\n".join(parts)
