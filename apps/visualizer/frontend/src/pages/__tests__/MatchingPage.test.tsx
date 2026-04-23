@@ -4,9 +4,11 @@ import { MemoryRouter } from "react-router-dom";
 import { MatchingTab } from "../../components/processing/MatchingTab";
 import { MatchOptionsProvider } from "../../stores/matchOptionsContext";
 import { fetchMock, mockApiResponses } from "../../__test-utils__/mockApiResponses";
+import { deleteMatching } from "../../data/cache";
 
 describe("MatchingTab provider selection", () => {
   beforeEach(() => {
+    deleteMatching(() => true);
     vi.clearAllMocks();
     globalThis.fetch = fetchMock;
   });
