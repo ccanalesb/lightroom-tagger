@@ -1074,10 +1074,15 @@ def query_catalog_images(
     min_score: int | None = None,
     sort_by_score: str | None = None,
     sort_by_date: str | None = None,
+    description_search: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[dict], int]:
     """List catalog images with AND-combined filters, SQL pagination, and total count.
+
+    **description_search** — optional FTS5 match over ``image_descriptions`` for
+    ``image_type='catalog'`` only. Invalid short queries raise ``ValueError`` with message
+    ``description_search must be at least 2 characters`` (map to HTTP 400 in the API).
 
     Optional **score_perspective** enables a ``LEFT JOIN`` on ``image_scores`` for the
     current row (``is_current=1``, ``image_type='catalog'``) for that slug.
@@ -1160,6 +1165,20 @@ def query_catalog_images(
     if min_score is not None:
         clauses.append("s.score IS NOT NULL AND s.score >= ?")
         bindings.append(min_score)
+
+    if (description_search or "").strip():
+        match_str, fts_err = build_description_fts_query(description_search)
+        if fts_err:
+            raise ValueError(fts_err)
+        if match_str is not None:
+            clauses.append(
+                "i.key IN ("
+                "SELECT d2.image_key FROM image_descriptions d2 "
+                "INNER JOIN image_descriptions_fts f ON f.rowid = d2.rowid "
+                "WHERE d2.image_type = 'catalog' AND f MATCH ?"
+                ")"
+            )
+            bindings.append(match_str)
 
     where_sql = "WHERE " + " AND ".join(clauses)
     join_sql = (
