@@ -31,7 +31,7 @@ from lightroom_tagger.core.database import (
 from lightroom_tagger.core.identity_service import (
     compute_single_image_aggregate_scores,
 )
-from lightroom_tagger.core.nl_catalog_search import run_nl_catalog_filter_llm
+from lightroom_tagger.core import nl_catalog_search
 from lightroom_tagger.core.structured_output import StructuredOutputError
 
 _CATALOG_SCORE_PERSPECTIVE_SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
@@ -591,7 +591,7 @@ def nl_search_images(db):
         limit, offset = _clamp_pagination(body.get('limit', 50), body.get('offset', 0))
 
         try:
-            raw = run_nl_catalog_filter_llm(
+            raw = nl_catalog_search.run_nl_catalog_filter_llm(
                 str(query).strip(),
                 provider_id=body.get('provider_id'),
                 model=body.get('model'),
