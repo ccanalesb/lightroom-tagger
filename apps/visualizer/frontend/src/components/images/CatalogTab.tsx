@@ -33,6 +33,9 @@ import {
   CATALOG_FILTER_SORT_LOW_HIGH,
   CATALOG_FILTER_KEYWORD_PLACEHOLDER,
   CATALOG_FILTER_KEYWORD_ARIA,
+  FILTER_DESCRIPTION_SEARCH_LABEL,
+  FILTER_DESCRIPTION_SEARCH_PLACEHOLDER,
+  FILTER_DESCRIPTION_SEARCH_ARIA,
   CATALOG_FILTER_COLOR_PLACEHOLDER,
   CATALOG_FILTER_COLOR_ARIA,
   msgShowingOf,
@@ -120,6 +123,16 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
         placeholder: CATALOG_FILTER_KEYWORD_PLACEHOLDER,
         ariaLabel: CATALOG_FILTER_KEYWORD_ARIA,
         className: 'h-9 min-w-[8rem] w-36',
+      },
+      {
+        type: 'search',
+        key: 'descriptionSearch',
+        label: FILTER_DESCRIPTION_SEARCH_LABEL,
+        paramName: 'description_search',
+        debounceMs: 350,
+        placeholder: FILTER_DESCRIPTION_SEARCH_PLACEHOLDER,
+        ariaLabel: FILTER_DESCRIPTION_SEARCH_ARIA,
+        className: 'h-9 min-w-[10rem] w-44',
       },
       {
         type: 'select',
@@ -221,6 +234,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
       filterValues.analyzed,
       filterValues.month,
       filterValues.keyword,
+      filterValues.descriptionSearch,
       filterValues.minRating,
       filterValues.colorLabel,
       filterValues.scorePerspective,
@@ -275,16 +289,19 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
   // Debounced text parity with legacy lines 255–264: reset page on committed keyword / colorLabel change.
   const prevKeyword = useRef(filterValues.keyword);
   const prevColor = useRef(filterValues.colorLabel);
+  const prevDescriptionSearch = useRef(filterValues.descriptionSearch);
   useEffect(() => {
     if (
       prevKeyword.current !== filterValues.keyword ||
-      prevColor.current !== filterValues.colorLabel
+      prevColor.current !== filterValues.colorLabel ||
+      prevDescriptionSearch.current !== filterValues.descriptionSearch
     ) {
       prevKeyword.current = filterValues.keyword;
       prevColor.current = filterValues.colorLabel;
+      prevDescriptionSearch.current = filterValues.descriptionSearch;
       setPage(1);
     }
-  }, [filterValues.keyword, filterValues.colorLabel]);
+  }, [filterValues.keyword, filterValues.colorLabel, filterValues.descriptionSearch]);
 
   const hasActiveFilters = activeCount > 0;
 

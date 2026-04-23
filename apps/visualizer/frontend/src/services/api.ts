@@ -285,6 +285,8 @@ export const ImagesAPI = {
     date_from?: string
     date_to?: string
     color_label?: string
+    /** AI description text (FTS); separate from Lightroom ``keyword`` filter. */
+    description_search?: string
     score_perspective?: string
     min_score?: number
     sort_by_score?: 'asc' | 'desc'
@@ -309,6 +311,9 @@ export const ImagesAPI = {
     if (params?.date_from) searchParams.set('date_from', params.date_from)
     if (params?.date_to) searchParams.set('date_to', params.date_to)
     if (params?.color_label) searchParams.set('color_label', params.color_label)
+    if (params?.description_search) {
+      searchParams.set('description_search', params.description_search)
+    }
     if (params?.score_perspective) searchParams.set('score_perspective', params.score_perspective)
     if (params?.min_score !== undefined) searchParams.set('min_score', String(params.min_score))
     if (params?.sort_by_score) searchParams.set('sort_by_score', params.sort_by_score)

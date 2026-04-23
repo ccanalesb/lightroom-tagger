@@ -1,9 +1,12 @@
-import { Suspense } from 'react'
+import { Suspense, act } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { CatalogTab } from '../CatalogTab'
-import { CATALOG_FILTER_LABEL_KEYWORD } from '../../../constants/strings'
+import {
+  CATALOG_FILTER_LABEL_KEYWORD,
+  FILTER_DESCRIPTION_SEARCH_ARIA,
+} from '../../../constants/strings'
 import { deleteMatching } from '../../../data/cache'
 
 const listCatalogMock = vi.fn()
@@ -53,5 +56,35 @@ describe('CatalogTab', () => {
     expect(firstCall).not.toHaveProperty('posted')
     expect(firstCall).not.toHaveProperty('analyzed')
     expect(firstCall).not.toHaveProperty('keyword')
+  })
+
+  it('sends description_search in listCatalog after debounce when description search is committed', async () => {
+    render(
+      <MemoryRouter>
+        <Suspense fallback={null}>
+          <CatalogTab />
+        </Suspense>
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getAllByText(CATALOG_FILTER_LABEL_KEYWORD).length).toBeGreaterThan(0)
+    })
+    listCatalogMock.mockClear()
+
+    vi.useFakeTimers()
+    const input = screen.getByLabelText(FILTER_DESCRIPTION_SEARCH_ARIA)
+    act(() => {
+      fireEvent.change(input, { target: { value: 'sunset' } })
+    })
+    act(() => {
+      vi.advanceTimersByTime(350)
+    })
+
+    const withDesc = listCatalogMock.mock.calls.find(
+      (call) => (call[0] as Record<string, unknown>)?.description_search === 'sunset',
+    )
+    expect(withDesc).toBeDefined()
+    vi.useRealTimers()
   })
 })

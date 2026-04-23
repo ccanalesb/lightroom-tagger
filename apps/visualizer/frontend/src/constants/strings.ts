@@ -268,6 +268,10 @@ export const CATALOG_FILTER_SORT_LOW_HIGH = 'Low → High'
 
 export const CATALOG_FILTER_KEYWORD_PLACEHOLDER = 'Search…'
 export const CATALOG_FILTER_KEYWORD_ARIA = 'Keyword search'
+export const FILTER_DESCRIPTION_SEARCH_LABEL = 'Description search'
+export const FILTER_DESCRIPTION_SEARCH_PLACEHOLDER = 'Search AI description…'
+export const FILTER_DESCRIPTION_SEARCH_ARIA =
+  'Search AI-generated description (summary and subjects), not Lightroom keywords'
 export const CATALOG_FILTER_COLOR_PLACEHOLDER = 'e.g. Red'
 export const CATALOG_FILTER_COLOR_ARIA = 'Color label'
 
