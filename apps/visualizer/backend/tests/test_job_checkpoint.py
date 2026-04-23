@@ -8,6 +8,7 @@ from jobs.checkpoint import (
     CHECKPOINT_VERSION,
     fingerprint_batch_describe,
     fingerprint_batch_score,
+    fingerprint_batch_text_embed,
 )
 from jobs.runner import JobRunner
 
@@ -35,6 +36,23 @@ def test_fingerprint_batch_describe_stable_and_force_sensitive() -> None:
     )
     meta_ps = {**meta, "perspective_slugs": ["street", "documentary"]}
     assert fingerprint_batch_describe(meta_ps, pairs) != a
+
+
+def test_fingerprint_batch_text_embed_stable_and_force_sensitive() -> None:
+    meta = {
+        "image_type": "catalog",
+        "date_filter": "all",
+        "force": False,
+        "min_rating": None,
+    }
+    pairs = [("k2", "catalog"), ("k1", "catalog")]
+    a = fingerprint_batch_text_embed(meta, pairs)
+    b = fingerprint_batch_text_embed(dict(meta), list(pairs))
+    assert a == b
+    perm = [("k1", "catalog"), ("k2", "catalog")]
+    assert fingerprint_batch_text_embed(meta, perm) == a
+    meta_force = {**meta, "force": True}
+    assert fingerprint_batch_text_embed(meta_force, pairs) != a
 
 
 def test_fingerprint_batch_score_force_and_triples_and_slug_order() -> None:
