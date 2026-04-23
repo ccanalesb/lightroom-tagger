@@ -76,6 +76,9 @@ Identify:
 ## Required JSON format (respond with ONLY this JSON, no other text):
 {
   "summary": "1-2 sentence objective description of the image content",
+  "dominant_colors": [],
+  "mood_tags": [],
+  "has_repetition": false,
   "composition": {
     "layers": ["foreground: <description>", "midground: <description>", "background: <description>"],
     "techniques": ["technique1", "technique2"],
@@ -109,6 +112,9 @@ Identify:
 
 _DESCRIPTION_FALLBACK: dict[str, Any] = {
     'summary': '',
+    'dominant_colors': [],
+    'mood_tags': [],
+    'has_repetition': False,
     'composition': {},
     'perspectives': {},
     'technical': {},
