@@ -673,10 +673,13 @@ def semantic_search_images(db):
         catalog_rows = query_catalog_images_by_keys(db, keys, score_perspective=score_perspective_arg)
         images = _rows_to_catalog_api_images(catalog_rows, score_perspective_arg)
 
-        for i, sem_row in enumerate(rows):
-            images[i]['score'] = float(sem_row.rrf_score)
-            images[i]['why_matched'] = sem_row.why_matched
-            images[i]['thumbnail_url'] = f"/api/images/catalog/{sem_row.image_key}/thumbnail"
+        sem_by_key = {r.image_key: r for r in rows}
+        for img in images:
+            sem_row = sem_by_key.get(img['key'])
+            if sem_row is not None:
+                img['score'] = float(sem_row.rrf_score)
+                img['why_matched'] = sem_row.why_matched
+                img['thumbnail_url'] = f"/api/images/catalog/{sem_row.image_key}/thumbnail"
 
         return jsonify({
             'total': total,
