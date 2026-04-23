@@ -58,7 +58,7 @@
 | Phase | Name | Focus |
 |-------|------|--------|
 | 1 | [Visual tags & keyword search](#phase-1--visual-tags--keyword-search) | VIS-01, NLS-02 |
-| 2 | [Facets & NL filters](#phase-2--facets--nl-filters) | VIS-02, NLS-01 |
+| 2 | [NL filters](#phase-2--nl-filters) | NLS-01 |
 | 3 | [Semantic search & results](#phase-3--semantic-search--results) | NLS-03, NLS-04 |
 | 4 | [Stack detection](#phase-4--stack-detection) | STACK-01, STACK-02 |
 | 5 | [Image embed & search chat](#phase-5--image-embed--search-chat) | SIM-01, NLS-05 |
@@ -74,12 +74,11 @@
 - API and catalog list path support keyword/phrase search over description text (filter or dedicated search parameter) with tests proving no raw SQL from user input.
 - Re-describe and storage flows preserve existing description consumers; null-safe serialization for pre-migration rows.
 
-#### Phase 2 — Facets & NL filters
+#### Phase 2 — NL filters
 
-**Requirements:** VIS-02, NLS-01
+**Requirements:** NLS-01
 
-- `FilterBar` (or catalog filters) expose color and mood facets backed by stored VIS-01 fields and query support in `query_catalog_images`.
-- Natural-language input is translated to a **validated** Pydantic filter object (allowlisted fields only); invalid shapes rejected with clear errors.
+- Natural-language input is translated to a **validated** Pydantic filter object (allowlisted fields only, including `dominant_colors` and `mood_tags` from VIS-01); invalid shapes rejected with clear errors.
 - End-to-end path from NL box → filters → result list without executing model-generated SQL.
 - Simple intents may bypass the LLM where documented; provider/registry alignment with existing app patterns.
 
@@ -132,7 +131,7 @@
 | Phase | Goal | Requirements | Success criteria count | Status |
 |-------|------|--------------|------------------------|--------|
 | 1 | Visual tags & keyword search | VIS-01, NLS-02 | 4 | ✅ Complete (2026-04-23) |
-| 2 | Facets & NL filters | VIS-02, NLS-01 | 4 | Pending |
+| 2 | NL filters | NLS-01 | 3 | Pending |
 | 3 | Semantic search & results | NLS-03, NLS-04 | 4 | Pending |
 | 4 | Stack detection | STACK-01, STACK-02 | 4 | Pending |
 | 5 | Image embed & search chat | SIM-01, NLS-05 | 4 | Pending |

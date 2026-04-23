@@ -30,7 +30,6 @@
 ### Visual Attribute Tags
 
 - [ ] **VIS-01**: Describe pipeline extracts dominant_colors, mood_tags, and has_repetition as structured fields alongside existing description output
-- [ ] **VIS-02**: Catalog filter bar surfaces color and mood facets for filtering
 
 ### Visual Similarity Search
 
@@ -79,11 +78,10 @@
 | STACK-04 | 7 | Pending |
 | STACK-05 | 7 | Pending |
 | VIS-01 | 1 | Pending |
-| VIS-02 | 2 | Pending |
 | SIM-01 | 5 | Pending |
 | SIM-02 | 6 | Pending |
 
-**Total:** 15 requirements across 4 categories.
+**Total:** 14 requirements across 4 categories.
 
 ---
 
@@ -94,8 +92,6 @@
 - **STACK-04** depends on **STACK-01** and **STACK-02** (stacks must exist before matching can use representatives)
 - **STACK-03** depends on **STACK-01** (at minimum burst stacks needed for Best Photos view)
 - **SIM-02** depends on **SIM-01** (embeddings must be generated before similarity queries work)
-- **VIS-02** depends on **VIS-01** (attributes must be extracted before filter facets can be wired)
-
 ## Implementation Guidance (non-requirement)
 
 - LLM-to-SQL: The LLM must return a **validated filter object** (Pydantic), not executable SQL. Allowlisted query parameters only. Reuse existing `ProviderRegistry` pattern.
