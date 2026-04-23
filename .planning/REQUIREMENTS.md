@@ -14,8 +14,8 @@
 
 - [x] **NLS-01**: User can type a natural language query and get catalog results mapped from structured filters — LLM returns a validated filter object (date ranges, scores, posted status, keywords), never raw SQL *(API: `POST /api/images/nl-search`, 2026-04-23; natural-language **UI** in NLS-05)*
 - [ ] **NLS-02**: User can search description text with keywords and get matching catalog photos
-- [ ] **NLS-03**: Semantic search understands abstract queries ("moody cityscapes", "feeling of solitude") using text embeddings
-- [ ] **NLS-04**: Search results show thumbnails, scores, and a brief "why matched" explanation per result
+- [x] **NLS-03**: Semantic search understands abstract queries ("moody cityscapes", "feeling of solitude") using text embeddings
+- [x] **NLS-04**: Search results show thumbnails, scores, and a brief "why matched" explanation per result
 - [ ] **NLS-05**: Search is accessible as a chat-like panel with conversation history on one side and a results grid on the other; each message refines the active result set
 - [ ] **NLS-06**: User can pin a catalog photo inside the chat panel to trigger visual similarity search ("find more like this")
 
@@ -68,8 +68,8 @@
 |--------|-------|--------|
 | NLS-01 | 2 | Complete (2026-04-23) — API + validation |
 | NLS-02 | 1 | Pending |
-| NLS-03 | 3 | Pending |
-| NLS-04 | 3 | Pending |
+| NLS-03 | 3 | ✅ Complete (2026-04-23) |
+| NLS-04 | 3 | ✅ Complete (2026-04-23) |
 | NLS-05 | 5 | Pending |
 | NLS-06 | 7 | Pending |
 | STACK-01 | 4 | Pending |
