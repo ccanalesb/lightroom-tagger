@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish & Consolidate
-status: Phase 6 complete — 4 plans executed (badge barrel, Instagram adapter, MatchGroupTile, PerspectiveBadge)
-last_updated: "2026-04-22T17:50:00.000Z"
+status: Phase 7 complete — 6 plans executed (src/data/ cache+query+useQuery+invalidate+ErrorBoundary+ErrorState; Identity, Images, Processing, Analytics/Dashboard migrated; invalidation audit)
+last_updated: "2026-04-23T09:30:00.000Z"
 progress:
   total_phases: 8
   completed_phases: 8
-  total_plans: 25
-  completed_plans: 29
+  total_plans: 31
+  completed_plans: 35
 ---
 
 # Planning state
@@ -21,9 +21,9 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v2.1 Polish & Consolidate |
-| Phase | Phase 6 — Images page visual consistency |
-| Status | Phase 6 complete — UI-01/02/03; ready for Phase 7 |
-| Last activity | 2026-04-22 — Phase 6 executed: 4 plans / 4 waves / 16+ commits; badge barrel, Instagram adapter, MatchGroupTile footer, PerspectiveBadge on Best Photos & Dashboard |
+| Phase | Phase 7 — React Suspense data layer |
+| Status | Phase 7 complete — DATA-01; all v2.1 phases complete |
+| Last activity | 2026-04-23 — Phase 7 executed: 6 plans / 6 waves; src/data/ primitives + full app migration (Identity, Images, Processing, Analytics, Dashboard) + invalidation audit; 248 tests / tsc / vite build all green |
 
 ## Project Reference
 
@@ -52,9 +52,11 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 | IDENT-05 | Phase 5 | ✅ Complete (2026-04-21) |
 | DASH-02, 03 | Phase 5 | ✅ Complete (2026-04-21) |
 | UI-01, 02, 03 | Phase 6 | ✅ Complete (2026-04-22) |
+| DATA-01 | Phase 7 | ✅ Complete (2026-04-23) |
 
 ## Last update
 
+- **2026-04-23:** Phase 7 executed: 6 plans / 6 waves. **`src/data/`:** `cache.ts` (Map-based entry store), `query.ts` (Suspense throw-promise), `useQuery`, `invalidate`/`invalidateAll`, `ErrorBoundary` (class component, no deps), `ErrorState` (shared fallback) + 13 unit tests. **Identity page:** BestPhotosGrid, StyleFingerprintPanel, PostNextSuggestionsPanel migrated to `useQuery`; IdentityPage wrapped per-section in ErrorBoundary+Suspense. **Images page:** CatalogTab, InstagramTab, MatchesTab, ImageDetailModal, AIDescriptionSection, matchOptionsContext migrated; new `stableQueryKey.ts` util. **Processing page:** useJobSocket wires `invalidateAll`/`invalidate` on socket events; ProcessingPage tabs + JobDetailModal migrated. **Analytics/Dashboard:** AnalyticsPage, DashboardPage, UnpostedCatalogPanel, ImageScoresPanel, useProviders migrated. **Invalidation audit:** 16 mutation methods in `api.ts` now call `invalidate`/`invalidateAll`; no manual `load()` calls remain; invalidation table in CONTEXT.md. Verification: `tsc --noEmit` clean, `vitest run` 248 passed (45 files), `vite build` clean. Requirement **DATA-01** complete. Artifacts: `07-01` through `07-06` SUMMARY.md.
 - **2026-04-21:** Phase 5 Plan 04 executed (`dashboard-top-photos-tabs-filters`). **`Tabs.tsx`:** extracted **`TabNav`** (`py-2`, `role="tablist"` / `role="tab"` / `aria-selected`); **`Tabs`** composes `TabNav` unchanged content gap. **`strings.ts`:** `INSIGHTS_TOP_PHOTOS_TAB_*`, `INSIGHTS_TOP_PHOTOS_REGION_ARIA`. **`DashboardPage`:** `useFilters(dashboardTopPhotosSchema)` with `topPhotosPosted` + `toParam` tri-state; parallel `getBestPhotos` with `posted: false` / `posted: true` / omitted `posted`; `TabNav` + `role="region"` + `TopPhotosStrip` per active bucket; a11y errors list each tab’s fetch failure. **`DashboardPage.test.tsx`:** tab roles + mockImplementation + call assertions. Verification: `tsc --noEmit`, `vitest run` 221 passed. Requirements **DASH-02**, **DASH-03** marked complete. Artifacts: `05-04-SUMMARY.md`. Commits: `9fdecad`, `92bcffd`, `724c54d`, `5b16e12`.
 - **2026-04-21:** Phase 5 Plan 03 executed (`identity-page-narrative-intros`). **`strings.ts`:** `IDENTITY_INTRO_STYLE_FINGERPRINT`, `IDENTITY_INTRO_BEST_PHOTOS`, `IDENTITY_INTRO_POST_NEXT` (05-UI-SPEC copy). **`IdentityPage`:** `StyleFingerprintPanel` → `BestPhotosGrid` → `PostNextSuggestionsPanel`. **`StyleFingerprintPanel`:** intro `<p>` after `h2` in loading, error, empty, and main branches. **`BestPhotosGrid` / `PostNextSuggestionsPanel`:** intro after `h2`, before `Card`; in-card help unchanged. **`IdentityPage.test.tsx`:** `indexOf` order for section headings. Verification: `tsc --noEmit`, `vitest run` 221 passed. Requirement **IDENT-05** marked complete. Artifacts: `05-03-SUMMARY.md`. Commits: `671fec0`, `91ed16f`, `26da956`, `cedf3b1`, `85224f0`.
 - **2026-04-21:** Phase 5 Plan 02 executed (`best-photos-overlay-posted-badge`). **`ImageMetadataBadges`** `hidePostedBadge` + **`ImageTile`** `hidePostedMetadataBadge` suppress the metadata-row Posted chip when the thumbnail overlay shows it. **`BestPhotosGrid`** passes `overlayBadges={<Badge variant="success">Posted</Badge>}` for `instagram_posted` rows and `hidePostedMetadataBadge` on all tiles; **`Badge`** base label class `font-medium` → `font-semibold` (UI-SPEC). **`BestPhotosGrid.test.tsx`** — one posted item yields exactly one “Posted” in the best-photos region. Verification: `tsc --noEmit`, `vitest run` 221 passed. Requirement **IDENT-04** marked complete. Artifacts: `05-02-SUMMARY.md`. Commits: `039c3ac`, `3d99d0c`, `e0a4efc`.
