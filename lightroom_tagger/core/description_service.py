@@ -147,6 +147,37 @@ def _store_structured(
     structured: dict,
     model_used: str | None = None,
 ) -> None:
+    technical = structured.get('technical')
+    if not isinstance(technical, dict):
+        technical = {}
+
+    raw_dc = structured.get('dominant_colors')
+    if isinstance(raw_dc, list) and len(raw_dc) > 0:
+        dc: list | None = raw_dc
+    else:
+        tc = technical.get('dominant_colors')
+        dc = tc if isinstance(tc, list) else None
+
+    raw_mt = structured.get('mood_tags')
+    if isinstance(raw_mt, list):
+        mt: list | None = raw_mt
+    else:
+        mt = None
+    if mt is None:
+        mood = technical.get('mood')
+        if isinstance(mood, str) and mood.strip():
+            mt = [mood.strip()]
+
+    hr_raw = structured.get('has_repetition')
+    if hr_raw is None:
+        hr = None
+    elif isinstance(hr_raw, bool):
+        hr = hr_raw
+    elif isinstance(hr_raw, int) and hr_raw in (0, 1):
+        hr = hr_raw
+    else:
+        hr = hr_raw
+
     store_image_description(db, {
         'image_key': image_key,
         'image_type': image_type,
@@ -157,4 +188,7 @@ def _store_structured(
         'subjects': structured.get('subjects', []),
         'best_perspective': structured.get('best_perspective', ''),
         'model_used': model_used or get_description_model(),
+        'dominant_colors': dc,
+        'mood_tags': mt,
+        'has_repetition': hr,
     })

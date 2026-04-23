@@ -1969,7 +1969,14 @@ def get_image_description(db: sqlite3.Connection, image_key: str) -> dict | None
     if not row:
         return None
     row = dict(row)
-    for col in ('composition', 'perspectives', 'technical', 'subjects'):
+    for col in (
+        'composition',
+        'perspectives',
+        'technical',
+        'subjects',
+        'dominant_colors',
+        'mood_tags',
+    ):
         val = row.get(col)
         if isinstance(val, str):
             try:
