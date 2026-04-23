@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Defining requirements
-last_updated: "2026-04-23T14:30:00.000Z"
+status: Phase 1 ready — roadmap defined
+last_updated: "2026-04-23T16:00:00.000Z"
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -14,23 +14,23 @@ progress:
 # Planning state
 
 **Project:** Lightroom Tagger & Analyzer
-**Roadmap:** [.planning/ROADMAP.md](./ROADMAP.md) (v2.1 — Phase 5 complete)
+**Roadmap:** [.planning/ROADMAP.md](./ROADMAP.md) (v3.0 — Phase 1 next)
 
 ## Current focus
 
 | Field | Value |
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
-| Phase | Not started (defining requirements) |
-| Status | Defining requirements |
-| Last activity | 2026-04-23 — v3.0 started: NL search + photo stacking + visual attribute tags + visual similarity |
+| Phase | Phase 1 — Visual tags & keyword search |
+| Status | Ready to plan |
+| Last activity | 2026-04-23 — v3.0 seven-phase roadmap defined (REQUIREMENTS traceability, ROADMAP) |
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
-**Current focus:** v2.1 complete — planning v3.0 (run `/gsd-new-milestone` to define next milestone).
+**Current focus:** v3.0 Phase 1 — implement VIS-01 + NLS-02 (visual tags, FTS/keyword); see ROADMAP.md.
 
 ## Deferred Items
 

@@ -5,7 +5,7 @@
 - ✅ **v1.0 MVP** — Phases 1–4 (shipped 2026-04-11) · [archive](./milestones/v1.0-ROADMAP.md)
 - ✅ **v2.0 Advanced Critique & Insights** — Phases 5–11 (shipped 2026-04-15) · [archive](./milestones/v2.0-ROADMAP.md)
 - ✅ **v2.1 Polish & Consolidate** — 9 phases (shipped 2026-04-23) · [archive](./milestones/v2.1-ROADMAP.md)
-- 📋 **v3.0** — TBD (not yet defined)
+- 🚧 **v3.0 Intelligent Discovery** — 7 phases (in progress) — [roadmap below](#v3-0-intelligent-discovery)
 
 ## Phases
 
@@ -47,23 +47,98 @@
 
 </details>
 
-### 📋 v3.0 — Not yet defined
+### 🚧 v3.0 Intelligent Discovery
 
-Run `/gsd-new-milestone` to define the next milestone.
+<a id="v3-0-intelligent-discovery"></a>
 
-**Seeds available for v3.0 scoping:**
-- SEED-005: Natural language photo search over catalog
-- SEED-006: Photo stacking / clustering for burst captures
-- SEED-010: Persist tab and filter state in-memory across navigation
-- SEED-011: Adopt CVA for Tailwind variant composition
-- SEED-012: Skeleton loading + reusable image-grid primitive
-- SEED-014: Unified vision match + describe in single batch call
-- SEED-016: Rotate catalog images in match card and catalog views
-- SEED-017 / SEED-020: Backend DRY/KISS refactor
-- SEED-018: Visual attribute search (color, repetition, abstract concepts)
-- SEED-019: Per-image differentiated reasoning for "What to Post Next"
-- SEED-007 (partial): Migrate remaining filter consumers (MatchesTab, DescriptionsTab, MatchingTab, AnalyticsPage)
+**Goal:** Turn the catalog from a passive archive into a queryable, visually-aware library you can explore by meaning, mood, and similarity.
+
+**Build order (research-aligned):** schema + visual attributes on descriptions → keyword/FTS → LLM-to-filters + facets → text embeddings + semantic “why matched” → stack detection jobs → image embeddings + chat search UI → visual similarity + stack surfaces → stack-aware match/edit + pin-to-similar in chat.
+
+| Phase | Name | Focus |
+|-------|------|--------|
+| 1 | [Visual tags & keyword search](#phase-1--visual-tags--keyword-search) | VIS-01, NLS-02 |
+| 2 | [Facets & NL filters](#phase-2--facets--nl-filters) | VIS-02, NLS-01 |
+| 3 | [Semantic search & results](#phase-3--semantic-search--results) | NLS-03, NLS-04 |
+| 4 | [Stack detection](#phase-4--stack-detection) | STACK-01, STACK-02 |
+| 5 | [Image embed & search chat](#phase-5--image-embed--search-chat) | SIM-01, NLS-05 |
+| 6 | [Similarity & stack UI](#phase-6--similarity--stack-ui) | SIM-02, STACK-03 |
+| 7 | [Stacks in matching & pin similarity](#phase-7--stacks-in-matching--pin-similarity) | STACK-04, STACK-05, NLS-06 |
+
+#### Phase 1 — Visual tags & keyword search
+
+**Requirements:** VIS-01, NLS-02
+
+- Additive schema and storage for `dominant_colors`, `mood_tags`, and `has_repetition` on `image_descriptions` with describe-time extraction and backfill path for new describes.
+- Denormalized `search_text` (or equivalent) maintained on describe/store; **FTS5** index for lexical search over description and keyword text.
+- API and catalog list path support keyword/phrase search over description text (filter or dedicated search parameter) with tests proving no raw SQL from user input.
+- Re-describe and storage flows preserve existing description consumers; null-safe serialization for pre-migration rows.
+
+#### Phase 2 — Facets & NL filters
+
+**Requirements:** VIS-02, NLS-01
+
+- `FilterBar` (or catalog filters) expose color and mood facets backed by stored VIS-01 fields and query support in `query_catalog_images`.
+- Natural-language input is translated to a **validated** Pydantic filter object (allowlisted fields only); invalid shapes rejected with clear errors.
+- End-to-end path from NL box → filters → result list without executing model-generated SQL.
+- Simple intents may bypass the LLM where documented; provider/registry alignment with existing app patterns.
+
+#### Phase 3 — Semantic search & results
+
+**Requirements:** NLS-03, NLS-04
+
+- `batch_text_embed` (or equivalent) job stores text vectors keyed for hybrid use with FTS; coverage/progress visible when index is building.
+- Semantic queries return ranked catalog results; hybrid ranking (e.g. RRF or weighted fusion) documented and test-covered for deterministic inputs.
+- Result rows show thumbnails, scores, and a short “why matched” string per item (source: FTS, embedding, filter facet, or combination).
+- Degradation path when embeddings missing (keyword + filters only) is explicit in UI or response metadata.
+
+#### Phase 4 — Stack detection
+
+**Requirements:** STACK-01, STACK-02
+
+- Schema: `image_stacks` + `image_stack_members` with `UNIQUE(image_key)`; migrations idempotent.
+- Job groups burst sequences by `date_taken` within configurable `delta_ms` with checkpointed progress.
+- Second pass clusters time-separated near-duplicates via pHash (Hamming threshold configurable); bad/null `date_taken` handled without corrupting groups.
+- Observable job lifecycle for stack jobs consistent with existing job UX.
+
+#### Phase 5 — Image embed & search chat
+
+**Requirements:** SIM-01, NLS-05
+
+- `batch_embed_image` (or equivalent) stores float vectors with `model_id` + `dim` (and invalidation/fingerprint rules per research); sqlite-vec or approved fallback for storage/KNN prep.
+- Image embedding job uses checkpointing, cancellation, and progress reporting consistent with existing batch job patterns; skips unchanged images when fingerprints match.
+- Chat-like layout: conversation thread on one side, results grid on the other; each turn refines the active result set using the Phase 1–3 search stack.
+- Empty, loading, and error states for the panel; no dependency on visual similarity for basic chat search (pin comes in Phase 7).
+
+#### Phase 6 — Similarity & stack UI
+
+**Requirements:** SIM-02, STACK-03
+
+- `GET` (or equivalent) **similar** API: seed image → KNN/ANN results with optional pre-filters; never mixes vectors from different `model_id`/dims.
+- Catalog and Best Photos show stack **representative** with member count; expand/collapse to browse members without breaking existing list performance budgets.
+- “More like this” entry point from catalog (and wiring for chat pin in Phase 7) is reachable in the UI with consistent card/grid patterns.
+
+#### Phase 7 — Stacks in matching & pin similarity
+
+**Requirements:** STACK-04, STACK-05, NLS-06
+
+- Instagram matching compares dump media to **stack representatives** only; match association applies to the full stack per contract.
+- User can split, merge, and change representative with persistence and safe defaults for edge cases.
+- NLS-05 chat panel supports **pin** active catalog image → triggers visual similarity (uses SIM-01/SIM-02); result set updates in the grid.
+- End-to-end tests or integration checks for representative-only matching vs member expansion.
+
+#### Progress (v3.0)
+
+| Phase | Goal | Requirements | Success criteria count | Status |
+|-------|------|--------------|------------------------|--------|
+| 1 | Visual tags & keyword search | VIS-01, NLS-02 | 4 | Pending |
+| 2 | Facets & NL filters | VIS-02, NLS-01 | 4 | Pending |
+| 3 | Semantic search & results | NLS-03, NLS-04 | 4 | Pending |
+| 4 | Stack detection | STACK-01, STACK-02 | 4 | Pending |
+| 5 | Image embed & search chat | SIM-01, NLS-05 | 4 | Pending |
+| 6 | Similarity & stack UI | SIM-02, STACK-03 | 3 | Pending |
+| 7 | Stacks in matching & pin similarity | STACK-04, STACK-05, NLS-06 | 4 | Pending |
 
 ---
 
-*Roadmap created: 2026-04-10 · v1.0 shipped: 2026-04-11 · v2.0 shipped: 2026-04-15 · v2.1 shipped: 2026-04-23*
+*Roadmap created: 2026-04-10 · v1.0 shipped: 2026-04-11 · v2.0 shipped: 2026-04-15 · v2.1 shipped: 2026-04-23 · v3.0 roadmap: 2026-04-23*

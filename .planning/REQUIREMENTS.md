@@ -3,7 +3,7 @@
 **Goal:** Turn the catalog from a passive archive into a queryable, visually-aware library you can explore by meaning, mood, and similarity.
 
 **Started:** 2026-04-23
-**Status:** Defining requirements
+**Status:** Roadmap defined
 **Seeds incorporated:** SEED-005, SEED-006, SEED-018
 
 ---
@@ -67,21 +67,21 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| NLS-01 | TBD | Pending |
-| NLS-02 | TBD | Pending |
-| NLS-03 | TBD | Pending |
-| NLS-04 | TBD | Pending |
-| NLS-05 | TBD | Pending |
-| NLS-06 | TBD | Pending |
-| STACK-01 | TBD | Pending |
-| STACK-02 | TBD | Pending |
-| STACK-03 | TBD | Pending |
-| STACK-04 | TBD | Pending |
-| STACK-05 | TBD | Pending |
-| VIS-01 | TBD | Pending |
-| VIS-02 | TBD | Pending |
-| SIM-01 | TBD | Pending |
-| SIM-02 | TBD | Pending |
+| NLS-01 | 2 | Pending |
+| NLS-02 | 1 | Pending |
+| NLS-03 | 3 | Pending |
+| NLS-04 | 3 | Pending |
+| NLS-05 | 5 | Pending |
+| NLS-06 | 7 | Pending |
+| STACK-01 | 4 | Pending |
+| STACK-02 | 4 | Pending |
+| STACK-03 | 6 | Pending |
+| STACK-04 | 7 | Pending |
+| STACK-05 | 7 | Pending |
+| VIS-01 | 1 | Pending |
+| VIS-02 | 2 | Pending |
+| SIM-01 | 5 | Pending |
+| SIM-02 | 6 | Pending |
 
 **Total:** 15 requirements across 4 categories.
 
