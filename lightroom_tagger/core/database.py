@@ -10,6 +10,8 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import sqlite_vec
+
 # ---------------------------------------------------------------------------
 # Single-writer discipline for ``library.db``
 # ---------------------------------------------------------------------------
@@ -200,6 +202,12 @@ def _dict_factory(cursor, row):
     return dict(zip(fields, row))
 
 
+def _ensure_sqlite_vec_loaded(conn: sqlite3.Connection) -> None:
+    conn.enable_load_extension(True)
+    sqlite_vec.load(conn)
+    conn.enable_load_extension(False)
+
+
 def _deserialize_row(row: dict) -> dict:
     """Deserialize JSON columns in a row."""
     if not row:
@@ -376,6 +384,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
     os.makedirs(os.path.dirname(db_path) if os.path.dirname(db_path) else '.', exist_ok=True)
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = _dict_factory
+    _ensure_sqlite_vec_loaded(conn)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     # WAL allows only one writer at a time — every other writer blocks on
