@@ -1,181 +1,285 @@
-import CodeMirror from '@uiw/react-codemirror'
-import { markdown } from '@codemirror/lang-markdown'
-import { useCallback, useEffect, useState } from 'react'
-import { Modal } from '../modal/Modal'
-import { Badge } from '../ui/badges'
-import { Button } from '../ui/Button'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
-import { NAV_PERSPECTIVES_HELP } from '../../constants/strings'
-import {
-  PerspectivesAPI,
-  type PerspectiveDetail,
-  type PerspectiveSummary,
-} from '../../services/api'
+import CodeMirror from '@uiw/react-codemirror';
+import { markdown } from '@codemirror/lang-markdown';
+import { Suspense, useCallback, useEffect, useState } from 'react';
+import { ErrorBoundary, ErrorState, invalidateAll, useQuery } from '../../data';
+import { Modal } from '../modal/Modal';
+import { Badge } from '../ui/badges';
+import { Button } from '../ui/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
+import { NAV_PERSPECTIVES_HELP } from '../../constants/strings';
+import { PerspectivesAPI, type PerspectiveSummary } from '../../services/api';
 
 const NEW_TEMPLATE = `# Perspective
 
 Add instructions for this critique lens. Include theory basis and scoring anchors as needed.
-`
+`;
 
 function slugifyDisplay(slug: string): string {
   return slug
     .split('_')
     .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : ''))
-    .join(' ')
+    .join(' ');
 }
 
-export function PerspectivesTab() {
-  const [rows, setRows] = useState<PerspectiveSummary[]>([])
-  const [selectedSlug, setSelectedSlug] = useState<string | null>(null)
-  const [detail, setDetail] = useState<PerspectiveDetail | null>(null)
-  const [displayName, setDisplayName] = useState('')
-  const [description, setDescription] = useState('')
-  const [promptMarkdown, setPromptMarkdown] = useState('')
-  const [loadingList, setLoadingList] = useState(true)
-  const [loadingDetail, setLoadingDetail] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [addOpen, setAddOpen] = useState(false)
-  const [newSlug, setNewSlug] = useState('')
-  const [newDisplayName, setNewDisplayName] = useState('')
-  const [newBody, setNewBody] = useState(NEW_TEMPLATE)
+function PerspectivesListPanel({
+  rows,
+  selectedSlug,
+  onSelect,
+  onToggleActive,
+  onRefresh,
+  onAdd,
+}: {
+  rows: PerspectiveSummary[];
+  selectedSlug: string | null;
+  onSelect: (slug: string) => void;
+  onToggleActive: (row: PerspectiveSummary, next: boolean) => void;
+  onRefresh: () => void;
+  onAdd: () => void;
+}) {
+  return (
+    <div className="w-full lg:w-72 shrink-0 space-y-3">
+      <div className="flex gap-2">
+        <Button type="button" variant="primary" size="sm" onClick={onAdd}>
+          Add perspective
+        </Button>
+        <Button type="button" variant="secondary" size="sm" onClick={onRefresh}>
+          Refresh
+        </Button>
+      </div>
+      <div className="border border-border rounded-base divide-y divide-border max-h-[480px] overflow-y-auto bg-bg">
+        {rows.length === 0 ? (
+          <p className="p-3 text-sm text-text-secondary">No perspectives</p>
+        ) : (
+          rows.map((row) => (
+            <div
+              key={row.slug}
+              className={`p-3 cursor-pointer hover:bg-surface transition-colors ${
+                selectedSlug === row.slug ? 'bg-surface border-l-2 border-l-accent' : ''
+              }`}
+              onClick={() => onSelect(row.slug)}
+              onKeyDown={(ev) => {
+                if (ev.key === 'Enter' || ev.key === ' ') {
+                  ev.preventDefault();
+                  onSelect(row.slug);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-medium text-text">{row.slug}</div>
+                  <div className="text-xs text-text-secondary mt-0.5">{row.display_name}</div>
+                </div>
+                <Badge variant={row.active ? 'success' : 'default'}>
+                  {row.active ? 'Active' : 'Inactive'}
+                </Badge>
+              </div>
+              <label
+                className="mt-2 flex items-center gap-2 text-sm text-text cursor-pointer"
+                onClick={(ev) => ev.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={row.active}
+                  onChange={(ev) => void onToggleActive(row, ev.target.checked)}
+                  className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
+                />
+                <span>Active</span>
+              </label>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
 
-  const loadList = useCallback(async () => {
-    setLoadingList(true)
-    setError(null)
-    try {
-      const list = await PerspectivesAPI.list()
-      setRows(list)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load perspectives')
-    } finally {
-      setLoadingList(false)
-    }
-  }, [])
+function PerspectiveEditorBody({
+  slug,
+  onListRefresh,
+  onDeleted,
+  onError,
+  saving,
+  setSaving,
+}: {
+  slug: string;
+  onListRefresh: () => void;
+  onDeleted: () => void;
+  onError: (msg: string | null) => void;
+  saving: boolean;
+  setSaving: (v: boolean) => void;
+}) {
+  const [detailRev, setDetailRev] = useState(0);
+  const detail = useQuery(
+    ['perspectives.detail', slug, detailRev] as const,
+    () => PerspectivesAPI.get(slug),
+  );
+
+  const [displayName, setDisplayName] = useState(detail.display_name);
+  const [description, setDescription] = useState(detail.description);
+  const [promptMarkdown, setPromptMarkdown] = useState(detail.prompt_markdown);
 
   useEffect(() => {
-    void loadList()
-  }, [loadList])
+    setDisplayName(detail.display_name);
+    setDescription(detail.description);
+    setPromptMarkdown(detail.prompt_markdown);
+  }, [detail]);
 
-  const loadDetail = useCallback(async (slug: string) => {
-    setLoadingDetail(true)
-    setError(null)
-    try {
-      const d = await PerspectivesAPI.get(slug)
-      setDetail(d)
-      setDisplayName(d.display_name)
-      setDescription(d.description)
-      setPromptMarkdown(d.prompt_markdown)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load perspective')
-      setDetail(null)
-    } finally {
-      setLoadingDetail(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (selectedSlug) void loadDetail(selectedSlug)
-    else {
-      setDetail(null)
-      setDisplayName('')
-      setDescription('')
-      setPromptMarkdown('')
-    }
-  }, [selectedSlug, loadDetail])
-
-  async function handleToggleActive(row: PerspectiveSummary, next: boolean) {
-    setError(null)
-    try {
-      await PerspectivesAPI.update(row.slug, { active: next })
-      await loadList()
-      if (selectedSlug === row.slug && detail) {
-        setDetail({ ...detail, active: next })
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update active flag')
-    }
-  }
+  const bumpDetail = useCallback(() => {
+    invalidateAll(['perspectives.detail']);
+    setDetailRev((n) => n + 1);
+  }, []);
 
   async function handleSave() {
-    if (!selectedSlug) return
-    setSaving(true)
-    setError(null)
+    setSaving(true);
+    onError(null);
     try {
-      const updated = await PerspectivesAPI.update(selectedSlug, {
+      await PerspectivesAPI.update(slug, {
         display_name: displayName,
         description,
         prompt_markdown: promptMarkdown,
-      })
-      setDetail(updated)
-      await loadList()
+      });
+      onListRefresh();
+      bumpDetail();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed')
+      onError(e instanceof Error ? e.message : 'Save failed');
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
   async function handleResetDefault() {
-    if (!selectedSlug) return
-    if (!window.confirm('Replace editor content from the default markdown file on disk?')) return
-    setSaving(true)
-    setError(null)
+    if (!window.confirm('Replace editor content from the default markdown file on disk?')) return;
+    setSaving(true);
+    onError(null);
     try {
-      const updated = await PerspectivesAPI.resetDefault(selectedSlug)
-      setDetail(updated)
-      setPromptMarkdown(updated.prompt_markdown)
-      await loadList()
+      const updated = await PerspectivesAPI.resetDefault(slug);
+      setPromptMarkdown(updated.prompt_markdown);
+      onListRefresh();
+      bumpDetail();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Reset failed')
+      onError(e instanceof Error ? e.message : 'Reset failed');
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
   async function handleDelete() {
-    if (!selectedSlug || !detail) return
-    if (!window.confirm(`Delete perspective "${selectedSlug}"? This cannot be undone.`)) return
-    setSaving(true)
-    setError(null)
+    if (!window.confirm(`Delete perspective "${slug}"? This cannot be undone.`)) return;
+    setSaving(true);
+    onError(null);
     try {
-      await PerspectivesAPI.remove(selectedSlug)
-      setSelectedSlug(null)
-      await loadList()
+      await PerspectivesAPI.remove(slug);
+      onDeleted();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed')
+      onError(e instanceof Error ? e.message : 'Delete failed');
     } finally {
-      setSaving(false)
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium text-text mb-1">Display name</label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            className="w-full px-3 py-2 rounded-base border border-border bg-bg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-text mb-1">Description</label>
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full px-3 py-2 rounded-base border border-border bg-bg text-text focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+        </div>
+      </div>
+      <div>
+        <span className="block text-sm font-medium text-text mb-1">Prompt (markdown)</span>
+        <CodeMirror
+          value={promptMarkdown}
+          height="min(50vh, 420px)"
+          className="w-full border border-border rounded-base overflow-hidden text-sm"
+          extensions={[markdown()]}
+          onChange={(v) => setPromptMarkdown(v)}
+        />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="primary" onClick={() => void handleSave()} disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+        <Button type="button" variant="secondary" onClick={() => void handleResetDefault()} disabled={saving}>
+          Reset to default
+        </Button>
+        <Button type="button" variant="danger" onClick={() => void handleDelete()} disabled={saving}>
+          Delete
+        </Button>
+      </div>
+    </>
+  );
+}
+
+function PerspectivesTabInner() {
+  const [listRev, setListRev] = useState(0);
+  const rows = useQuery(['perspectives.list', listRev] as const, () => PerspectivesAPI.list());
+
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [newSlug, setNewSlug] = useState('');
+  const [newDisplayName, setNewDisplayName] = useState('');
+  const [newBody, setNewBody] = useState(NEW_TEMPLATE);
+
+  const refreshList = useCallback(() => {
+    invalidateAll(['perspectives.list']);
+    setListRev((n) => n + 1);
+  }, []);
+
+  async function handleToggleActive(row: PerspectiveSummary, next: boolean) {
+    setError(null);
+    try {
+      await PerspectivesAPI.update(row.slug, { active: next });
+      refreshList();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update active flag');
     }
   }
 
   async function handleCreatePerspective() {
-    const slugRe = /^[a-z][a-z0-9_]{0,63}$/
+    const slugRe = /^[a-z][a-z0-9_]{0,63}$/;
     if (!slugRe.test(newSlug.trim())) {
-      setError('Slug must match [a-z][a-z0-9_]{0,63}')
-      return
+      setError('Slug must match [a-z][a-z0-9_]{0,63}');
+      return;
     }
-    const slug = newSlug.trim()
-    const dn = newDisplayName.trim() || slugifyDisplay(slug)
-    setSaving(true)
-    setError(null)
+    const slug = newSlug.trim();
+    const dn = newDisplayName.trim() || slugifyDisplay(slug);
+    setSaving(true);
+    setError(null);
     try {
       await PerspectivesAPI.create({
         slug,
         display_name: dn,
         prompt_markdown: newBody,
         active: true,
-      })
-      setAddOpen(false)
-      setNewSlug('')
-      setNewDisplayName('')
-      setNewBody(NEW_TEMPLATE)
-      await loadList()
-      setSelectedSlug(slug)
+      });
+      setAddOpen(false);
+      setNewSlug('');
+      setNewDisplayName('');
+      setNewBody(NEW_TEMPLATE);
+      refreshList();
+      setSelectedSlug(slug);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Create failed')
+      setError(e instanceof Error ? e.message : 'Create failed');
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
@@ -193,118 +297,45 @@ export function PerspectivesTab() {
             </div>
           )}
           <div className="flex flex-col lg:flex-row gap-6">
-            <div className="w-full lg:w-72 shrink-0 space-y-3">
-              <div className="flex gap-2">
-                <Button type="button" variant="primary" size="sm" onClick={() => setAddOpen(true)}>
-                  Add perspective
-                </Button>
-                <Button type="button" variant="secondary" size="sm" onClick={() => void loadList()}>
-                  Refresh
-                </Button>
-              </div>
-              <div className="border border-border rounded-base divide-y divide-border max-h-[480px] overflow-y-auto bg-bg">
-                {loadingList ? (
-                  <p className="p-3 text-sm text-text-secondary">Loading…</p>
-                ) : rows.length === 0 ? (
-                  <p className="p-3 text-sm text-text-secondary">No perspectives</p>
-                ) : (
-                  rows.map((row) => (
-                    <div
-                      key={row.slug}
-                      className={`p-3 cursor-pointer hover:bg-surface transition-colors ${
-                        selectedSlug === row.slug ? 'bg-surface border-l-2 border-l-accent' : ''
-                      }`}
-                      onClick={() => setSelectedSlug(row.slug)}
-                      onKeyDown={(ev) => {
-                        if (ev.key === 'Enter' || ev.key === ' ') {
-                          ev.preventDefault()
-                          setSelectedSlug(row.slug)
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="font-medium text-text">{row.slug}</div>
-                          <div className="text-xs text-text-secondary mt-0.5">{row.display_name}</div>
-                        </div>
-                        <Badge variant={row.active ? 'success' : 'default'}>
-                          {row.active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </div>
-                      <label
-                        className="mt-2 flex items-center gap-2 text-sm text-text cursor-pointer"
-                        onClick={(ev) => ev.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={row.active}
-                          onChange={(ev) => void handleToggleActive(row, ev.target.checked)}
-                          className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
-                        />
-                        <span>Active</span>
-                      </label>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+            <PerspectivesListPanel
+              rows={rows}
+              selectedSlug={selectedSlug}
+              onSelect={setSelectedSlug}
+              onToggleActive={handleToggleActive}
+              onRefresh={refreshList}
+              onAdd={() => setAddOpen(true)}
+            />
 
             <div className="flex-1 min-w-0 space-y-4">
               {!selectedSlug ? (
                 <p className="text-sm text-text-secondary">Select a perspective to edit.</p>
-              ) : loadingDetail ? (
-                <p className="text-sm text-text-secondary">Loading editor…</p>
               ) : (
-                <>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-sm font-medium text-text mb-1">Display name</label>
-                      <input
-                        type="text"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        className="w-full px-3 py-2 rounded-base border border-border bg-bg text-text focus:outline-none focus:ring-2 focus:ring-accent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-text mb-1">Description</label>
-                      <input
-                        type="text"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        className="w-full px-3 py-2 rounded-base border border-border bg-bg text-text focus:outline-none focus:ring-2 focus:ring-accent"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <span className="block text-sm font-medium text-text mb-1">Prompt (markdown)</span>
-                    <CodeMirror
-                      value={promptMarkdown}
-                      height="min(50vh, 420px)"
-                      className="w-full border border-border rounded-base overflow-hidden text-sm"
-                      extensions={[markdown()]}
-                      onChange={(v) => setPromptMarkdown(v)}
+                <ErrorBoundary
+                  resetKeys={[selectedSlug]}
+                  fallback={({ error: err, reset }) => (
+                    <ErrorState
+                      error={err}
+                      reset={() => {
+                        invalidateAll(['perspectives.detail']);
+                        reset();
+                      }}
                     />
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" variant="primary" onClick={() => void handleSave()} disabled={saving}>
-                      {saving ? 'Saving…' : 'Save'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => void handleResetDefault()}
-                      disabled={saving}
-                    >
-                      Reset to default
-                    </Button>
-                    <Button type="button" variant="danger" onClick={() => void handleDelete()} disabled={saving}>
-                      Delete
-                    </Button>
-                  </div>
-                </>
+                  )}
+                >
+                  <Suspense fallback={<p className="text-sm text-text-secondary">Loading editor…</p>}>
+                    <PerspectiveEditorBody
+                      slug={selectedSlug}
+                      onListRefresh={refreshList}
+                      onDeleted={() => {
+                        refreshList();
+                        setSelectedSlug(null);
+                      }}
+                      onError={setError}
+                      saving={saving}
+                      setSaving={setSaving}
+                    />
+                  </Suspense>
+                </ErrorBoundary>
               )}
             </div>
           </div>
@@ -348,7 +379,12 @@ export function PerspectivesTab() {
               <Button type="button" variant="ghost" onClick={() => setAddOpen(false)}>
                 Cancel
               </Button>
-              <Button type="button" variant="primary" onClick={() => void handleCreatePerspective()} disabled={saving}>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => void handleCreatePerspective()}
+                disabled={saving}
+              >
                 Create
               </Button>
             </div>
@@ -356,5 +392,25 @@ export function PerspectivesTab() {
         </Modal>
       )}
     </div>
-  )
+  );
+}
+
+export function PerspectivesTab() {
+  return (
+    <ErrorBoundary
+      fallback={({ error, reset }) => (
+        <ErrorState
+          error={error}
+          reset={() => {
+            invalidateAll(['perspectives']);
+            reset();
+          }}
+        />
+      )}
+    >
+      <Suspense fallback={<p className="text-sm text-text-secondary p-6">Loading perspectives…</p>}>
+        <PerspectivesTabInner />
+      </Suspense>
+    </ErrorBoundary>
+  );
 }

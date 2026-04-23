@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useQuery } from '../../data';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { WorkerSlider } from '../matching/WorkerSlider';
@@ -92,7 +93,12 @@ export function buildDateMetadata(
   return base;
 }
 
-export function AnalyzeTab() {
+export interface AnalyzeTabProps {
+  onJobEnqueued?: () => void;
+}
+
+export function AnalyzeTab(props: AnalyzeTabProps = {}) {
+  const { onJobEnqueued } = props;
   const { options, updateOption } = useMatchOptions();
   const [imageType, setImageType] = useState<ImageType>('both');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
@@ -145,26 +151,26 @@ export function AnalyzeTab() {
   >([]);
   const [selectedPerspectiveSlugs, setSelectedPerspectiveSlugs] = useState<string[]>([]);
 
-  useEffect(() => {
-    PerspectivesAPI.list({ active_only: true })
-      .then((rows) => {
-        const sorted = [...rows].sort((a, b) => a.slug.localeCompare(b.slug));
-        setActivePerspectiveRows(sorted.map((r) => ({ slug: r.slug, display_name: r.display_name })));
-        setSelectedPerspectiveSlugs(sorted.map((r) => r.slug));
-      })
-      .catch(console.error);
-  }, []);
+  const perspectives = useQuery(['perspectives', 'list', 'active'] as const, () =>
+    PerspectivesAPI.list({ active_only: true }),
+  );
+
+  const defaults = useQuery(['providers.defaults'] as const, () => ProvidersAPI.getDefaults());
 
   useEffect(() => {
-    ProvidersAPI.getDefaults()
-      .then(defaults => {
-        if (defaults.description?.provider) {
-          setDescProviderId(defaults.description.provider);
-          setDescProviderModel(defaults.description.model ?? null);
-        }
-      })
-      .catch(console.error);
-  }, []);
+    const sorted = [...perspectives].sort((a, b) => a.slug.localeCompare(b.slug));
+    setActivePerspectiveRows(sorted.map((r) => ({ slug: r.slug, display_name: r.display_name })));
+    setSelectedPerspectiveSlugs((prev) =>
+      prev.length > 0 ? prev : sorted.map((r) => r.slug),
+    );
+  }, [perspectives]);
+
+  useEffect(() => {
+    if (defaults.description?.provider) {
+      setDescProviderId(defaults.description.provider);
+      setDescProviderModel(defaults.description.model ?? null);
+    }
+  }, [defaults]);
 
   const buildSharedBaseMetadata = useCallback((): Record<string, unknown> => {
     const metadata: Record<string, unknown> = {
@@ -215,6 +221,7 @@ export function AnalyzeTab() {
       try {
         const job = await JobsAPI.create(jobType, metadata);
         showStatus('success', successMessage, job.id);
+        onJobEnqueued?.();
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Unknown error';
         showStatus('error', `${ANALYZE_JOB_FAILED_PREFIX} ${msg}`);
@@ -223,7 +230,7 @@ export function AnalyzeTab() {
         submitInFlightRef.current = false;
       }
     },
-    [showStatus],
+    [showStatus, onJobEnqueued],
   );
 
   const startAnalyze = useCallback(() => {

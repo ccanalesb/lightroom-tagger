@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useState } from 'react';
+import { invalidateAll, useQuery } from '../../data';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/badges';
@@ -12,73 +13,44 @@ interface CacheStats {
   cache_dir: string;
 }
 
-export function CatalogCacheTab() {
-  const [stats, setStats] = useState<CacheStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+async function fetchCacheStats(): Promise<CacheStats> {
+  const response = await fetch('/api/cache/status');
+  const data = (await response.json()) as CacheStats & { error?: string };
+  if (data.error) {
+    throw new Error(data.error);
+  }
+  return data;
+}
+
+export interface CatalogCacheTabProps {
+  onJobEnqueued?: () => void;
+}
+
+export function CatalogCacheTab({ onJobEnqueued }: CatalogCacheTabProps) {
+  const [listRev, setListRev] = useState(0);
+  const stats = useQuery(['catalog.cache.stats', listRev] as const, fetchCacheStats);
   const [isRebuilding, setIsRebuilding] = useState(false);
 
-  const loadStats = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/cache/status');
-      const data = await response.json();
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setStats(data);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load cache stats');
-    } finally {
-      setLoading(false);
-    }
+  const refreshStats = useCallback(() => {
+    invalidateAll(['catalog.cache.stats']);
+    setListRev((n) => n + 1);
   }, []);
-
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
 
   const handleRebuildCache = useCallback(async () => {
     setIsRebuilding(true);
     try {
       await JobsAPI.create('prepare_catalog', {});
       alert('Catalog cache rebuild started! Check Job Queue tab to monitor progress.');
+      onJobEnqueued?.();
     } catch (err) {
       alert(`Failed to start rebuild: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsRebuilding(false);
     }
-  }, []);
+  }, [onJobEnqueued]);
 
-  if (loading) {
-    return (
-      <Card padding="lg">
-        <div className="text-center py-8 text-text-secondary">Loading cache stats...</div>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card padding="lg">
-        <div className="text-center py-8 text-error">Error: {error}</div>
-      </Card>
-    );
-  }
-
-  if (!stats) {
-    return (
-      <Card padding="lg">
-        <div className="text-center py-8 text-text-secondary">No cache data available</div>
-      </Card>
-    );
-  }
-
-  const cachePercentage = stats.total_images > 0
-    ? Math.round((stats.cached_images / stats.total_images) * 100)
-    : 0;
+  const cachePercentage =
+    stats.total_images > 0 ? Math.round((stats.cached_images / stats.total_images) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -156,7 +128,7 @@ export function CatalogCacheTab() {
             >
               {isRebuilding ? 'Starting Rebuild...' : 'Rebuild Catalog Cache'}
             </Button>
-            <Button variant="secondary" size="md" fullWidth onClick={loadStats}>
+            <Button variant="secondary" size="md" fullWidth onClick={refreshStats}>
               Refresh Stats
             </Button>
           </div>

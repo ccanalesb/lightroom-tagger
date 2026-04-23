@@ -1,60 +1,34 @@
-import { useEffect, useState } from 'react';
-import { JobsAPI, type JobsHealth } from '../../services/api';
+import { Suspense, useEffect, useState } from 'react';
+import { ErrorBoundary, invalidateAll, useQuery } from '../../data';
+import { JobsAPI } from '../../services/api';
 
 export interface JobsHealthBannerProps {
   /** Polling interval in ms. Defaults to 30s. Set to 0 to disable polling. */
   pollIntervalMs?: number;
+  /** Bumps when job socket events invalidate health; include in the query key so the banner refetches. */
+  cacheRevision?: number;
 }
 
-/**
- * Surface backend catalog-availability problems on the Processing page.
- *
- * Polls ``/api/jobs/health`` and renders an error banner when the Lightroom
- * catalog SQLite mirror is missing/misconfigured. This warns the user *before*
- * they enqueue a job that will either fail immediately or deadlock the queue.
- */
-export function JobsHealthBanner({ pollIntervalMs = 30_000 }: JobsHealthBannerProps) {
-  const [health, setHealth] = useState<JobsHealth | null>(null);
-  const [error, setError] = useState<string | null>(null);
+function JobsHealthBannerBody({
+  pollIntervalMs,
+  cacheRevision = 0,
+}: Required<Pick<JobsHealthBannerProps, 'pollIntervalMs'>> &
+  Pick<JobsHealthBannerProps, 'cacheRevision'>) {
+  const [pollTick, setPollTick] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const next = await JobsAPI.health();
-        if (cancelled) return;
-        setHealth(next);
-        setError(null);
-      } catch (err) {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Failed to load job health');
-      }
-    };
-    void load();
-    if (pollIntervalMs <= 0) {
-      return () => {
-        cancelled = true;
-      };
-    }
-    const timer = setInterval(() => void load(), pollIntervalMs);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
+    if (pollIntervalMs <= 0) return;
+    const timer = window.setInterval(() => {
+      invalidateAll(['jobs.health']);
+      setPollTick((n) => n + 1);
+    }, pollIntervalMs);
+    return () => window.clearInterval(timer);
   }, [pollIntervalMs]);
 
-  if (error) {
-    return (
-      <div
-        className="mb-4 rounded-card border border-error bg-error/10 p-4 text-sm text-text"
-        role="alert"
-        data-testid="jobs-health-banner-error"
-      >
-        <strong className="font-semibold">Could not reach job health endpoint.</strong>{' '}
-        <span className="text-text-secondary">{error}</span>
-      </div>
-    );
-  }
+  const health = useQuery(
+    ['jobs.health', pollTick, cacheRevision] as const,
+    () => JobsAPI.health(),
+  );
 
   if (!health || health.catalog_available) {
     return null;
@@ -81,5 +55,38 @@ export function JobsHealthBanner({ pollIntervalMs = 30_000 }: JobsHealthBannerPr
         Blocked job types: {health.jobs_requiring_catalog.join(', ')}
       </p>
     </div>
+  );
+}
+
+function JobsHealthErrorBanner({ error }: { error: Error }) {
+  return (
+    <div
+      className="mb-4 rounded-card border border-error bg-error/10 p-4 text-sm text-text"
+      role="alert"
+      data-testid="jobs-health-banner-error"
+    >
+      <strong className="font-semibold">Could not reach job health endpoint.</strong>{' '}
+      <span className="text-text-secondary">{error.message}</span>
+    </div>
+  );
+}
+
+/**
+ * Surface backend catalog-availability problems on the Processing page.
+ *
+ * Polls ``/api/jobs/health`` and renders an error banner when the Lightroom
+ * catalog SQLite mirror is missing/misconfigured. This warns the user *before*
+ * they enqueue a job that will either fail immediately or deadlock the queue.
+ */
+export function JobsHealthBanner({ pollIntervalMs = 30_000, cacheRevision = 0 }: JobsHealthBannerProps) {
+  return (
+    <ErrorBoundary
+      resetKeys={[pollIntervalMs, cacheRevision]}
+      fallback={({ error }) => <JobsHealthErrorBanner error={error} />}
+    >
+      <Suspense fallback={null}>
+        <JobsHealthBannerBody pollIntervalMs={pollIntervalMs} cacheRevision={cacheRevision} />
+      </Suspense>
+    </ErrorBoundary>
   );
 }

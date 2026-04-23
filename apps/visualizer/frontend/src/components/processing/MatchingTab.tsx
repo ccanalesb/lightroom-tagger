@@ -27,7 +27,12 @@ const DATE_FILTERS = [
   { value: '2023', label: ADVANCED_DATE_YEAR_2023 },
 ] as const;
 
-export function MatchingTab() {
+export interface MatchingTabProps {
+  onJobEnqueued?: () => void;
+}
+
+export function MatchingTab(props: MatchingTabProps = {}) {
+  const { onJobEnqueued } = props;
   const [dateFilter, setDateFilter] = useState<(typeof DATE_FILTERS)[number]['value']>('all');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
@@ -63,13 +68,14 @@ export function MatchingTab() {
       else if (dateFilter === '2023') metadata.year = '2023';
 
       await JobsAPI.create('vision_match', metadata);
+      onJobEnqueued?.();
       alert('Vision matching job started! Check Job Queue tab to monitor progress.');
     } catch (error) {
       alert(`Failed to start job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsStarting(false);
     }
-  }, [dateFilter, options, weightsError]);
+  }, [dateFilter, options, weightsError, onJobEnqueued]);
 
   return (
     <div>

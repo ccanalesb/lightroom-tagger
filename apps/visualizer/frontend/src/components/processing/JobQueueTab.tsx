@@ -1,4 +1,4 @@
-import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useState, useEffect } from 'react';
 import type { MouseEvent } from 'react';
 import { JobsAPI } from '../../services/api';
 import type { Job } from '../../types/job';
@@ -37,20 +37,18 @@ export interface JobQueueTabPagination {
 
 export interface JobQueueTabProps {
   jobs: Job[];
-  setJobs: Dispatch<SetStateAction<Job[]>>;
-  jobsLoading: boolean;
   connected: boolean;
   onRefreshJobs: () => void | Promise<void>;
+  onInvalidateJobList: () => void;
   pagination: JobQueueTabPagination;
   onOffsetChange: (offset: number) => void;
 }
 
 export function JobQueueTab({
   jobs,
-  setJobs,
-  jobsLoading,
   connected,
   onRefreshJobs,
+  onInvalidateJobList,
   pagination,
   onOffsetChange,
 }: JobQueueTabProps) {
@@ -74,9 +72,7 @@ export function JobQueueTab({
     setCancellingId(jobId);
     try {
       await JobsAPI.cancel(jobId);
-      setJobs((prev) =>
-        prev.map((j) => (j.id === jobId ? { ...j, status: 'cancelled' as const } : j)),
-      );
+      onInvalidateJobList();
     } catch (err) {
       alert(`Failed to cancel job: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
@@ -88,8 +84,8 @@ export function JobQueueTab({
     e.stopPropagation();
     setRetryingId(jobId);
     try {
-      const updated = await JobsAPI.retry(jobId);
-      setJobs((prev) => prev.map((j) => (j.id === jobId ? updated : j)));
+      await JobsAPI.retry(jobId);
+      onInvalidateJobList();
     } catch (err) {
       alert(`Failed to retry job: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
@@ -125,11 +121,7 @@ export function JobQueueTab({
         </Button>
       </div>
 
-      {jobsLoading ? (
-        <Card padding="lg">
-          <div className="text-center py-8 text-text-secondary">Loading jobs...</div>
-        </Card>
-      ) : jobs.length === 0 ? (
+      {jobs.length === 0 ? (
         <Card padding="lg">
           <div className="text-center py-12">
             <svg
@@ -239,7 +231,7 @@ export function JobQueueTab({
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={handlePageChange}
-                disabled={jobsLoading}
+                disabled={false}
               />
             </div>
           )}
