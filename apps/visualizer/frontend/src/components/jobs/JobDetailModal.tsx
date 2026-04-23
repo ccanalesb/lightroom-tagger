@@ -27,7 +27,7 @@ import {
   MODAL_CLOSE,
   STATUS_LABELS,
 } from '../../constants/strings';
-import { ErrorBoundary, invalidate, useQuery } from '../../data';
+import { ErrorBoundary, useQuery } from '../../data';
 import { JobsAPI } from '../../services/api';
 import { useSocketStore } from '../../stores/socketStore';
 import type { Job } from '../../types/job';
@@ -290,7 +290,6 @@ function JobDetailModalBody({ job, onClose, onJobUpdate }: JobDetailModalProps) 
     try {
       const updated = await JobsAPI.retry(displayJob.id);
       setLocalJob(updated);
-      invalidate(['jobs.detail', displayJob.id]);
       onJobUpdate?.(updated);
     } catch (err) {
       console.error('Retry failed:', err);

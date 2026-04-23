@@ -1,3 +1,4 @@
+import { invalidate, invalidateAll } from '../data'
 import { Job } from '../types/job'
 import { API_DEFAULT_URL } from '../constants/strings'
 
@@ -79,32 +80,43 @@ export const PerspectivesAPI = {
   get: (slug: string) =>
     request<PerspectiveDetail>(`/perspectives/${encodeURIComponent(slug)}`),
 
-  create: (body: {
+  create: async (body: {
     slug: string
     display_name: string
     prompt_markdown: string
     description?: string
     active?: boolean
-  }) =>
-    request<PerspectiveDetail>('/perspectives/', {
+  }) => {
+    const result = await request<PerspectiveDetail>('/perspectives/', {
       method: 'POST',
       body: JSON.stringify(body),
-    }),
+    })
+    invalidateAll(['perspectives'])
+    return result
+  },
 
-  update: (slug: string, body: Record<string, unknown>) =>
-    request<PerspectiveDetail>(`/perspectives/${encodeURIComponent(slug)}`, {
+  update: async (slug: string, body: Record<string, unknown>) => {
+    const result = await request<PerspectiveDetail>(`/perspectives/${encodeURIComponent(slug)}`, {
       method: 'PUT',
       body: JSON.stringify(body),
-    }),
+    })
+    invalidateAll(['perspectives'])
+    return result
+  },
 
-  remove: (slug: string) =>
-    requestVoid(`/perspectives/${encodeURIComponent(slug)}`, { method: 'DELETE' }),
+  remove: async (slug: string) => {
+    await requestVoid(`/perspectives/${encodeURIComponent(slug)}`, { method: 'DELETE' })
+    invalidateAll(['perspectives'])
+  },
 
-  resetDefault: (slug: string) =>
-    request<PerspectiveDetail>(
+  resetDefault: async (slug: string) => {
+    const result = await request<PerspectiveDetail>(
       `/perspectives/${encodeURIComponent(slug)}/reset-default`,
       { method: 'POST' },
-    ),
+    )
+    invalidateAll(['perspectives'])
+    return result
+  },
 }
 
 export interface JobsListResponse {
@@ -137,20 +149,32 @@ export const JobsAPI = {
   },
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  create: (type: string, metadata?: Record<string, any>) =>
-    request<Job>('/jobs/', {
+  create: async (type: string, metadata?: Record<string, any>) => {
+    const job = await request<Job>('/jobs/', {
       method: 'POST',
       body: JSON.stringify({ type, metadata }),
-    }),
+    })
+    invalidateAll(['jobs.list'])
+    invalidateAll(['jobs.health'])
+    return job
+  },
 
   getActive: () =>
     request<Job[]>('/jobs/active'),
 
-  cancel: (id: string) =>
-    request<void>(`/jobs/${id}`, { method: 'DELETE' }),
+  cancel: async (id: string) => {
+    await requestVoid(`/jobs/${id}`, { method: 'DELETE' })
+    invalidateAll(['jobs.list'])
+    invalidateAll(['jobs.health'])
+  },
 
-  retry: (id: string) =>
-    request<Job>(`/jobs/${id}/retry`, { method: 'POST' }),
+  retry: async (id: string) => {
+    const job = await request<Job>(`/jobs/${id}/retry`, { method: 'POST' })
+    invalidateAll(['jobs.list'])
+    invalidate(['jobs.detail', id])
+    invalidateAll(['jobs.health'])
+    return job
+  },
 
   health: () =>
     request<JobsHealth>('/jobs/health'),
@@ -171,11 +195,18 @@ export const ConfigAPI = {
   getCatalog: () =>
     request<{ catalog_path: string; resolved_path: string; exists: boolean }>('/config/catalog'),
 
-  putCatalog: (catalogPath: string) =>
-    request<{ catalog_path: string; ok: boolean }>('/config/catalog', {
+  putCatalog: async (catalogPath: string) => {
+    const result = await request<{ catalog_path: string; ok: boolean }>('/config/catalog', {
       method: 'PUT',
       body: JSON.stringify({ catalog_path: catalogPath }),
-    }),
+    })
+    invalidateAll(['images.catalog'])
+    invalidateAll(['catalog.cache.stats'])
+    invalidateAll(['jobs.health'])
+    invalidateAll(['dashboard'])
+    invalidateAll(['analytics'])
+    return result
+  },
 
   getInstagramDump: () =>
     request<{
@@ -184,11 +215,18 @@ export const ConfigAPI = {
       exists: boolean
     }>('/config/instagram-dump'),
 
-  putInstagramDump: (instagramDumpPath: string) =>
-    request<{ instagram_dump_path: string; ok: boolean }>('/config/instagram-dump', {
-      method: 'PUT',
-      body: JSON.stringify({ instagram_dump_path: instagramDumpPath }),
-    }),
+  putInstagramDump: async (instagramDumpPath: string) => {
+    const result = await request<{ instagram_dump_path: string; ok: boolean }>(
+      '/config/instagram-dump',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ instagram_dump_path: instagramDumpPath }),
+      },
+    )
+    invalidateAll(['images.instagram'])
+    invalidateAll(['jobs.health'])
+    return result
+  },
 }
 
 export const SystemAPI = {
@@ -320,16 +358,30 @@ export const MatchingAPI = {
       matches: Match[]
     }>(`/images/matches?${sp.toString()}`)
   },
-  validate: (catalogKey: string, instaKey: string) =>
-    request<{ validated: boolean }>(
+  validate: async (catalogKey: string, instaKey: string) => {
+    const result = await request<{ validated: boolean }>(
       `/images/matches/${encodeURIComponent(catalogKey)}/${encodeURIComponent(instaKey)}/validate`,
       { method: 'PATCH' },
-    ),
-  reject: (catalogKey: string, instaKey: string) =>
-    request<{ rejected: boolean }>(
+    )
+    invalidateAll(['matching.groups'])
+    invalidateAll(['images.instagram'])
+    invalidateAll(['images.catalog'])
+    invalidateAll(['images.detail'])
+    invalidateAll(['dashboard'])
+    return result
+  },
+  reject: async (catalogKey: string, instaKey: string) => {
+    const result = await request<{ rejected: boolean }>(
       `/images/matches/${encodeURIComponent(catalogKey)}/${encodeURIComponent(instaKey)}/reject`,
       { method: 'PATCH' },
-    ),
+    )
+    invalidateAll(['matching.groups'])
+    invalidateAll(['images.instagram'])
+    invalidateAll(['images.catalog'])
+    invalidateAll(['images.detail'])
+    invalidateAll(['dashboard'])
+    return result
+  },
 }
 
 export interface DescriptionItem {
@@ -367,15 +419,15 @@ export const DescriptionsAPI = {
       `/descriptions/?${sp.toString()}`
     )
   },
-  generate: (
+  generate: async (
     imageKey: string,
     imageType: string,
     force = false,
     model?: string,
     providerId?: string,
     providerModel?: string,
-  ) =>
-    request<{ generated: boolean; description: ImageDescription | null }>(
+  ) => {
+    const result = await request<{ generated: boolean; description: ImageDescription | null }>(
       `/descriptions/${encodeURIComponent(imageKey)}/generate`,
       {
         method: 'POST',
@@ -387,7 +439,11 @@ export const DescriptionsAPI = {
           ...(providerModel && { provider_model: providerModel }),
         }),
       },
-    ),
+    )
+    invalidate(['descriptions', imageKey])
+    invalidateAll(['images.detail', imageType, imageKey])
+    return result
+  },
 }
 
 export type DescriptionListResult = Awaited<ReturnType<typeof DescriptionsAPI.list>>
@@ -971,32 +1027,48 @@ export const ProvidersAPI = {
     request<{ order: string[] }>('/providers/fallback-order'),
   getDefaults: () =>
     request<ProviderDefaults>('/providers/defaults'),
-  updateFallbackOrder: (order: string[]) =>
-    request<{ order: string[] }>('/providers/fallback-order', {
+  updateFallbackOrder: async (order: string[]) => {
+    const result = await request<{ order: string[] }>('/providers/fallback-order', {
       method: 'PUT',
       body: JSON.stringify({ order }),
-    }),
-  updateDefaults: (defaults: Partial<ProviderDefaults>) =>
-    request<ProviderDefaults>('/providers/defaults', {
+    })
+    invalidateAll(['providers.list'])
+    return result
+  },
+  updateDefaults: async (defaults: Partial<ProviderDefaults>) => {
+    const result = await request<ProviderDefaults>('/providers/defaults', {
       method: 'PUT',
       body: JSON.stringify(defaults),
-    }),
-  addModel: (
+    })
+    invalidateAll(['providers.list'])
+    invalidate(['providers.defaults'])
+    return result
+  },
+  addModel: async (
     providerId: string,
     model: { id: string; name: string; vision: boolean },
-  ) =>
-    request<ProviderModel>(`/providers/${providerId}/models`, {
+  ) => {
+    const result = await request<ProviderModel>(`/providers/${providerId}/models`, {
       method: 'POST',
       body: JSON.stringify(model),
-    }),
-  removeModel: (providerId: string, modelId: string) =>
-    request<{ deleted: boolean }>(
+    })
+    invalidateAll(['providers.list'])
+    return result
+  },
+  removeModel: async (providerId: string, modelId: string) => {
+    const result = await request<{ deleted: boolean }>(
       `/providers/${providerId}/models/${encodeURIComponent(modelId)}`,
       { method: 'DELETE' },
-    ),
-  reorderModels: (providerId: string, order: string[]) =>
-    request<{ success: boolean }>(`/providers/${providerId}/models/order`, {
+    )
+    invalidateAll(['providers.list'])
+    return result
+  },
+  reorderModels: async (providerId: string, order: string[]) => {
+    const result = await request<{ success: boolean }>(`/providers/${providerId}/models/order`, {
       method: 'PUT',
       body: JSON.stringify({ order }),
-    }),
+    })
+    invalidateAll(['providers.list'])
+    return result
+  },
 }

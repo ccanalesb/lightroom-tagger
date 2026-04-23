@@ -24,7 +24,6 @@ export function useProviders() {
 
   const updateFallbackOrder = useCallback(async (order: string[]) => {
     await ProvidersAPI.updateFallbackOrder(order)
-    invalidateAll(['providers.list'])
     bump()
   }, [])
 

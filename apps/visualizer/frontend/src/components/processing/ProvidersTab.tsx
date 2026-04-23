@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { invalidateAll, useQuery } from '../../data';
+import { useQuery } from '../../data';
 import { ProvidersAPI, type ProviderModel } from '../../services/api';
 import { ProviderCard, FallbackOrderPanel } from '../providers';
 import { Card } from '../ui/Card';
@@ -40,11 +40,6 @@ export function ProvidersTab() {
       setDescriptionModel(block.model ?? null);
     }
   }, [bundle.defaults]);
-
-  const refreshBundle = useCallback(() => {
-    invalidateAll(['providers.list']);
-    setBundleRev((n) => n + 1);
-  }, []);
 
   const refreshModelsForProvider = useCallback(async (providerId: string) => {
     const models = await ProvidersAPI.listModels(providerId);
@@ -136,13 +131,10 @@ export function ProvidersTab() {
     [modelCache, refreshModelsForProvider],
   );
 
-  const updateFallbackOrder = useCallback(
-    async (order: string[]) => {
-      await ProvidersAPI.updateFallbackOrder(order);
-      refreshBundle();
-    },
-    [refreshBundle],
-  );
+  const updateFallbackOrder = useCallback(async (order: string[]) => {
+    await ProvidersAPI.updateFallbackOrder(order);
+    setBundleRev((n) => n + 1);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -208,7 +200,7 @@ export function ProvidersTab() {
                 .then(() => {
                   setDefaultsSaveMsg('Saved');
                   window.setTimeout(() => setDefaultsSaveMsg(null), 2000);
-                  invalidateAll(['providers.defaults']);
+                  setBundleRev((n) => n + 1);
                 })
                 .catch(console.error);
             }}

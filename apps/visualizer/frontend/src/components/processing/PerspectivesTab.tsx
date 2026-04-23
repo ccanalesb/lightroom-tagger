@@ -97,24 +97,18 @@ function PerspectivesListPanel({
 
 function PerspectiveEditorBody({
   slug,
-  onListRefresh,
   onDeleted,
   onError,
   saving,
   setSaving,
 }: {
   slug: string;
-  onListRefresh: () => void;
   onDeleted: () => void;
   onError: (msg: string | null) => void;
   saving: boolean;
   setSaving: (v: boolean) => void;
 }) {
-  const [detailRev, setDetailRev] = useState(0);
-  const detail = useQuery(
-    ['perspectives.detail', slug, detailRev] as const,
-    () => PerspectivesAPI.get(slug),
-  );
+  const detail = useQuery(['perspectives.detail', slug] as const, () => PerspectivesAPI.get(slug));
 
   const [displayName, setDisplayName] = useState(detail.display_name);
   const [description, setDescription] = useState(detail.description);
@@ -126,11 +120,6 @@ function PerspectiveEditorBody({
     setPromptMarkdown(detail.prompt_markdown);
   }, [detail]);
 
-  const bumpDetail = useCallback(() => {
-    invalidateAll(['perspectives.detail']);
-    setDetailRev((n) => n + 1);
-  }, []);
-
   async function handleSave() {
     setSaving(true);
     onError(null);
@@ -140,8 +129,6 @@ function PerspectiveEditorBody({
         description,
         prompt_markdown: promptMarkdown,
       });
-      onListRefresh();
-      bumpDetail();
     } catch (e) {
       onError(e instanceof Error ? e.message : 'Save failed');
     } finally {
@@ -156,8 +143,6 @@ function PerspectiveEditorBody({
     try {
       const updated = await PerspectivesAPI.resetDefault(slug);
       setPromptMarkdown(updated.prompt_markdown);
-      onListRefresh();
-      bumpDetail();
     } catch (e) {
       onError(e instanceof Error ? e.message : 'Reset failed');
     } finally {
@@ -247,7 +232,7 @@ function PerspectivesTabInner() {
     setError(null);
     try {
       await PerspectivesAPI.update(row.slug, { active: next });
-      refreshList();
+      setListRev((n) => n + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update active flag');
     }
@@ -274,7 +259,7 @@ function PerspectivesTabInner() {
       setNewSlug('');
       setNewDisplayName('');
       setNewBody(NEW_TEMPLATE);
-      refreshList();
+      setListRev((n) => n + 1);
       setSelectedSlug(slug);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Create failed');
@@ -325,10 +310,9 @@ function PerspectivesTabInner() {
                   <Suspense fallback={<p className="text-sm text-text-secondary">Loading editor…</p>}>
                     <PerspectiveEditorBody
                       slug={selectedSlug}
-                      onListRefresh={refreshList}
                       onDeleted={() => {
-                        refreshList();
                         setSelectedSlug(null);
+                        setListRev((n) => n + 1);
                       }}
                       onError={setError}
                       saving={saving}
