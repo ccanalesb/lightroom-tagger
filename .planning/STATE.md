@@ -22,8 +22,8 @@ progress:
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
 | Phase | Phase 1 — Visual tags & keyword search |
-| Status | Ready to plan |
-| Last activity | 2026-04-23 — v3.0 seven-phase roadmap defined (REQUIREMENTS traceability, ROADMAP) |
+| Status | Context gathered — ready to plan |
+| Last activity | 2026-04-23 — Phase 1 context gathered (FTS5 keyword search + visual tags) |
 
 ## Project Reference
 
