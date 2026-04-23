@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Phase 1 ready — roadmap defined
-last_updated: "2026-04-23T16:00:00.000Z"
+status: Phase 1 planned — ready to execute
+last_updated: "2026-04-23T18:00:00.000Z"
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 0
+  total_plans: 4
   completed_plans: 0
 ---
 
@@ -22,8 +22,8 @@ progress:
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
 | Phase | Phase 1 — Visual tags & keyword search |
-| Status | Context gathered — ready to plan |
-| Last activity | 2026-04-23 — Phase 1 context gathered (FTS5 keyword search + visual tags) |
+| Status | Planned — 4 plans across 4 waves, ready to execute |
+| Last activity | 2026-04-23 — Phase 1 planned (VIS-01 + NLS-02: schema/FTS, describe pipeline, API/frontend, backfill job) |
 
 ## Project Reference
 
