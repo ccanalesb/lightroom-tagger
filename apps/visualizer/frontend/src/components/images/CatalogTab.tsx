@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ImagesAPI, PerspectivesAPI, type CatalogImage } from '../../services/api';
 import { ImageDetailModal, ImageTile, fromCatalogListRow } from '../image-view';
 import { Pagination } from '../ui/Pagination';
 import { TileGrid } from '../ui/TileGrid';
+import { useQuery } from '../../data';
 import {
   FILTER_ALL_DATES,
   CATALOG_FILTER_LABEL_STATUS,
@@ -40,6 +41,7 @@ import { formatMonth } from '../../utils/date';
 import { useFilters } from '../../hooks/useFilters';
 import { FilterBar } from '../filters/FilterBar';
 import type { FilterSchema } from '../filters/types';
+import { stableSerializeRecord } from '../../utils/stableQueryKey';
 
 const LIMIT = 50;
 
@@ -59,18 +61,21 @@ type CatalogTabProps = {
 export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [images, setImages] = useState<CatalogImage[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [initialLoad, setInitialLoad] = useState(true);
-  const [fetching, setFetching] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [catalogFetchSucceeded, setCatalogFetchSucceeded] = useState(false);
   const [selected, setSelected] = useState<SelectedCatalogEntry | null>(null);
-  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
-  const [scorePerspectives, setScorePerspectives] = useState<
-    { slug: string; display_name: string }[]
-  >([]);
+
+  const monthsPayload = useQuery(['images.catalog', 'months'] as const, () =>
+    ImagesAPI.getCatalogMonths(),
+  );
+  const availableMonths = monthsPayload.months;
+
+  const perspectivesRows = useQuery(['perspectives', 'list', 'active'] as const, () =>
+    PerspectivesAPI.list({ active_only: true }),
+  );
+  const scorePerspectives = useMemo(() => {
+    const sorted = [...perspectivesRows].sort((a, b) => a.slug.localeCompare(b.slug));
+    return sorted.map((r) => ({ slug: r.slug, display_name: r.display_name }));
+  }, [perspectivesRows]);
 
   const catalogSchema = useMemo<FilterSchema>(() => {
     return [
@@ -199,62 +204,42 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
   const filters = useFilters(catalogSchema);
   const { values: filterValues, rawValues: filterRawValues, toQueryParams, activeCount } = filters;
 
-  const fetchId = useRef(0);
+  const dateRangeValue = filterValues.dateRange as { from?: string; to?: string } | undefined;
+  const dateRangeFrom = dateRangeValue?.from ?? '';
+  const dateRangeTo = dateRangeValue?.to ?? '';
 
-  const loadImages = useCallback(async () => {
-    const id = ++fetchId.current;
-    try {
-      setFetching(true);
-      setLoadError(null);
-      const offset = (page - 1) * LIMIT;
-      const data = await ImagesAPI.listCatalog({
-        ...toQueryParams(),
-        limit: LIMIT,
-        offset,
-      });
-      if (id !== fetchId.current) return;
-      setImages(data.images);
-      setTotal(data.total);
-      setCatalogFetchSucceeded(true);
-    } catch (err) {
-      if (id !== fetchId.current) return;
-      console.error('Failed to load catalog images:', err);
-      const message = err instanceof Error ? err.message : 'Failed to load catalog images';
-      setLoadError(message);
-      setImages([]);
-      setTotal(0);
-    } finally {
-      if (id === fetchId.current) {
-        setFetching(false);
-        setInitialLoad(false);
-      }
-    }
-  }, [page, toQueryParams]);
+  const listParams = useMemo(
+    () => ({
+      ...toQueryParams(),
+      limit: LIMIT,
+      offset: (page - 1) * LIMIT,
+    }),
+    [
+      page,
+      toQueryParams,
+      filterValues.posted,
+      filterValues.analyzed,
+      filterValues.month,
+      filterValues.keyword,
+      filterValues.minRating,
+      filterValues.colorLabel,
+      filterValues.scorePerspective,
+      filterValues.minCatalogScore,
+      filterValues.sortByScore,
+      filterValues.sortByDate,
+      dateRangeFrom,
+      dateRangeTo,
+    ],
+  );
 
-  useEffect(() => {
-    const fetchMonths = async () => {
-      try {
-        const data = await ImagesAPI.getCatalogMonths();
-        setAvailableMonths(data.months);
-      } catch (err) {
-        console.error('Failed to load months:', err);
-      }
-    };
-    fetchMonths();
-  }, []);
+  const listQueryKey = useMemo(
+    () => ['images.catalog', 'list', stableSerializeRecord(listParams)] as const,
+    [listParams],
+  );
 
-  useEffect(() => {
-    PerspectivesAPI.list({ active_only: true })
-      .then((rows) => {
-        const sorted = [...rows].sort((a, b) => a.slug.localeCompare(b.slug));
-        setScorePerspectives(sorted.map((r) => ({ slug: r.slug, display_name: r.display_name })));
-      })
-      .catch((err) => console.error('Failed to load perspectives:', err));
-  }, []);
-
-  useEffect(() => {
-    loadImages();
-  }, [loadImages]);
+  const catalogPage = useQuery(listQueryKey, () => ImagesAPI.listCatalog(listParams));
+  const images = catalogPage.images;
+  const total = catalogPage.total;
 
   useEffect(() => {
     const sp = new URLSearchParams(location.search);
@@ -270,10 +255,6 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
   useEffect(() => {
     onPostedFilterChange?.(postedCommitted);
   }, [postedCommitted, onPostedFilterChange]);
-
-  const dateRangeValue = filterValues.dateRange as { from?: string; to?: string } | undefined;
-  const dateRangeFrom = dateRangeValue?.from ?? '';
-  const dateRangeTo = dateRangeValue?.to ?? '';
 
   // D-10: non-search filter changes reset page to 1 immediately.
   useEffect(() => {
@@ -306,20 +287,12 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
   }, [filterValues.keyword, filterValues.colorLabel]);
 
   const hasActiveFilters = activeCount > 0;
-  const loading = initialLoad;
 
-  const noFiltersAndEmptyDb =
-    catalogFetchSucceeded && !loadError && total === 0 && !hasActiveFilters;
+  const noFiltersAndEmptyDb = total === 0 && !hasActiveFilters;
 
   const totalPages = Math.ceil(total / LIMIT);
 
   const summaryText = (() => {
-    if (loading && !loadError) {
-      return 'Loading catalog images…';
-    }
-    if (loadError) {
-      return 'Could not load the catalog list.';
-    }
     if (total === 0 && hasActiveFilters) {
       return 'No images match the filters';
     }
@@ -335,22 +308,10 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
         schema={catalogSchema}
         filters={filters}
         summary={<p className="text-sm text-text-secondary">{summaryText}</p>}
-        disabled={loading}
+        disabled={false}
       />
 
-      {loading ? (
-        <div className="text-center py-12">
-          <p className="text-text-secondary">Loading catalog images…</p>
-        </div>
-      ) : loadError ? (
-        <div className="rounded-base border border-border bg-surface px-4 py-6 text-center">
-          <h3 className="text-sm font-medium text-text">Catalog list failed</h3>
-          <p className="mt-2 text-sm text-text-secondary">{loadError}</p>
-          <p className="mt-3 text-xs text-text-tertiary">
-            Check the catalog path above, then adjust filters or reload the page to retry.
-          </p>
-        </div>
-      ) : noFiltersAndEmptyDb ? (
+      {noFiltersAndEmptyDb ? (
         <div className="text-center py-12">
           <svg
             className="mx-auto h-12 w-12 text-text-tertiary"
@@ -390,11 +351,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
         </div>
       ) : (
         <>
-          <div
-            className={`relative transition-opacity duration-150 ${
-              fetching ? 'opacity-50 pointer-events-none' : ''
-            }`}
-          >
+          <div className="relative transition-opacity duration-150">
             <TileGrid>
               {images.map((image) => (
                 <ImageTile
