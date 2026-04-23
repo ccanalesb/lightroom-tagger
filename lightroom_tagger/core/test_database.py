@@ -4,6 +4,7 @@ import unittest
 
 from lightroom_tagger.core.database import (
     batch_update_hashes,
+    build_description_fts_query,
     clear_all,
     delete_image,
     generate_key,
@@ -933,6 +934,35 @@ class TestImageDescriptions(unittest.TestCase):
             (d["rowid"],),
         ).fetchone()["n"]
         self.assertEqual(n, 0)
+
+
+class TestBuildDescriptionFtsQuery(unittest.TestCase):
+    """``build_description_fts_query`` — AND tokens, NLS-02 sanitization."""
+
+    def test_build_description_fts_query_strips_sqlish_input(self):
+        match, err = build_description_fts_query("hello'; DROP TABLE--")
+        self.assertIsNone(err)
+        self.assertIsNotNone(match)
+        self.assertNotIn(";", match)
+        self.assertNotIn("'", match)
+        self.assertIn("hello", match)
+        self.assertIn("DROP", match)
+        self.assertIn("TABLE", match)
+
+    def test_build_description_fts_query_rejects_too_short(self):
+        m, err = build_description_fts_query("a")
+        self.assertIsNone(m)
+        self.assertEqual(err, "description_search must be at least 2 characters")
+
+    def test_build_description_fts_query_none_or_blank_no_match(self):
+        self.assertEqual(build_description_fts_query(None), (None, None))
+        self.assertEqual(build_description_fts_query(""), (None, None))
+        self.assertEqual(build_description_fts_query("   "), (None, None))
+
+    def test_build_description_fts_query_only_punctuation_yields_no_fts(self):
+        m, err = build_description_fts_query("++")
+        self.assertIsNone(err)
+        self.assertIsNone(m)
 
 
 def test_store_match_with_rank(tmp_path):

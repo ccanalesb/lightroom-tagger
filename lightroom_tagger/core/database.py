@@ -247,6 +247,31 @@ def build_description_search_document(summary: str, subjects_json_or_obj: object
     return f"{part} {joined}"
 
 
+def build_description_fts_query(raw: str | None) -> tuple[str | None, str | None]:
+    """Build an FTS5 ``MATCH`` string (AND-joined tokens) for ``description_search`` (NLS-02, D-11–D-13).
+
+    Returns ``(match_str, err)`` where *match_str* is suitable as the sole bound parameter to
+    ``... MATCH ?``, or ``None`` when no FTS filter should be applied. *err* is ``None`` unless
+    the caller should return HTTP 400 with body ``err`` (short-query rule, D-12).
+
+    Tokenization: maximal ASCII alphanumeric runs (``[A-Za-z0-9]+`` on the stripped input) so
+    punctuation and SQL/FTS metacharacters never appear in the match string. Tokens shorter
+    than 2 characters are dropped. If no tokens remain, no FTS filter applies (D-13).
+    """
+    if raw is None:
+        return (None, None)
+    s = raw.strip()
+    if not s:
+        return (None, None)
+    if len(s) < 2:
+        return (None, "description_search must be at least 2 characters")
+    tokens = re.findall(r"[A-Za-z0-9]+", s)
+    words = [t for t in tokens if len(t) >= 2]
+    if not words:
+        return (None, None)
+    return (" AND ".join(words), None)
+
+
 def _coerce_has_repetition(value) -> int | None:
     if value is None:
         return None
