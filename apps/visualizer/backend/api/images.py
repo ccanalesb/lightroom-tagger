@@ -6,6 +6,7 @@ from collections import OrderedDict
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request, send_file
+from pydantic import ValidationError
 from utils.db import with_db
 from utils.responses import (
     error_bad_request,
@@ -14,6 +15,10 @@ from utils.responses import (
     success_paginated,
 )
 
+from lightroom_tagger.core.catalog_nl_filter import (
+    catalog_nl_filter_to_query_kwargs,
+    parse_catalog_nl_filter_from_llm,
+)
 from lightroom_tagger.core.database import (
     get_image,
     get_image_description,
@@ -26,6 +31,8 @@ from lightroom_tagger.core.database import (
 from lightroom_tagger.core.identity_service import (
     compute_single_image_aggregate_scores,
 )
+from lightroom_tagger.core.nl_catalog_search import run_nl_catalog_filter_llm
+from lightroom_tagger.core.structured_output import StructuredOutputError
 
 _CATALOG_SCORE_PERSPECTIVE_SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
@@ -201,6 +208,47 @@ def _clamp_pagination(limit, offset, default_limit=50):
             offset = 0
     offset = max(0, offset)
     return limit, offset
+
+
+def _rows_to_catalog_api_images(rows, score_perspective_arg: str | None) -> list[dict]:
+    """Transform ``query_catalog_images`` rows to API image dicts (catalog list + NL search)."""
+    score_join_active = bool(score_perspective_arg)
+    images: list[dict] = []
+    for row in rows:
+        out = dict(row)
+        desc_summary = out.pop('description_summary', None)
+        desc_best = out.pop('description_best_perspective', None)
+        desc_perspectives_json = out.pop('description_perspectives_json', None)
+
+        if score_join_active:
+            cps = out.pop('catalog_perspective_score', None)
+            out['catalog_perspective_score'] = int(cps) if cps is not None else None
+            out['catalog_score_perspective'] = score_perspective_arg
+
+        ai_analyzed = desc_summary is not None
+        out['ai_analyzed'] = ai_analyzed
+        if ai_analyzed:
+            out['description_summary'] = desc_summary or ''
+            out['description_best_perspective'] = desc_best or ''
+            if desc_perspectives_json:
+                try:
+                    out['description_perspectives'] = json.loads(desc_perspectives_json)
+                except (json.JSONDecodeError, TypeError):
+                    out['description_perspectives'] = {}
+            else:
+                out['description_perspectives'] = {}
+        else:
+            out['description_summary'] = None
+            out['description_best_perspective'] = None
+            out['description_perspectives'] = None
+
+        rid = out.get('id')
+        if rid is not None and str(rid).strip().isdigit():
+            out['id'] = int(rid)
+        else:
+            out['id'] = None
+        images.append(out)
+    return images
 
 
 def _filter_by_date(images, date_folder, date_from, date_to):
@@ -517,45 +565,56 @@ def list_catalog_images(db):
         except ValueError as err:
             return error_bad_request(str(err))
 
-        score_join_active = bool(score_perspective_arg)
-
-        images = []
-        for row in rows:
-            out = dict(row)
-            desc_summary = out.pop('description_summary', None)
-            desc_best = out.pop('description_best_perspective', None)
-            desc_perspectives_json = out.pop('description_perspectives_json', None)
-
-            if score_join_active:
-                cps = out.pop('catalog_perspective_score', None)
-                out['catalog_perspective_score'] = int(cps) if cps is not None else None
-                out['catalog_score_perspective'] = score_perspective_arg
-
-            ai_analyzed = desc_summary is not None
-            out['ai_analyzed'] = ai_analyzed
-            if ai_analyzed:
-                out['description_summary'] = desc_summary or ''
-                out['description_best_perspective'] = desc_best or ''
-                if desc_perspectives_json:
-                    try:
-                        out['description_perspectives'] = json.loads(desc_perspectives_json)
-                    except (json.JSONDecodeError, TypeError):
-                        out['description_perspectives'] = {}
-                else:
-                    out['description_perspectives'] = {}
-            else:
-                out['description_summary'] = None
-                out['description_best_perspective'] = None
-                out['description_perspectives'] = None
-
-            rid = out.get('id')
-            if rid is not None and str(rid).strip().isdigit():
-                out['id'] = int(rid)
-            else:
-                out['id'] = None
-            images.append(out)
+        images = _rows_to_catalog_api_images(rows, score_perspective_arg)
 
         return jsonify({
+            'total': total,
+            'images': images,
+        })
+    except Exception as e:
+        return error_server_error(str(e))
+
+
+@bp.route('/nl-search', methods=['POST'])
+@with_db
+def nl_search_images(db):
+    """Natural language → LLM filter JSON → same row shape as GET /api/images/catalog."""
+    try:
+        body = request.get_json(silent=True)
+        if not body or not isinstance(body, dict):
+            return error_bad_request('JSON body required')
+
+        query = (body.get('query') or '')
+        if not str(query).strip():
+            return error_bad_request('query must be non-empty')
+
+        limit, offset = _clamp_pagination(body.get('limit', 50), body.get('offset', 0))
+
+        try:
+            raw = run_nl_catalog_filter_llm(
+                str(query).strip(),
+                provider_id=body.get('provider_id'),
+                model=body.get('model'),
+                log_callback=None,
+            )
+            filters = parse_catalog_nl_filter_from_llm(raw)
+        except (json.JSONDecodeError, ValidationError, StructuredOutputError) as exc:
+            return error_bad_request(f'NL filter: {exc}')
+
+        qkwargs = catalog_nl_filter_to_query_kwargs(filters)
+        qkwargs['limit'] = limit
+        qkwargs['offset'] = offset
+
+        score_perspective_arg = (filters.score_perspective or '').strip() or None
+
+        try:
+            rows, total = query_catalog_images(db, **qkwargs)
+        except ValueError as err:
+            return error_bad_request(str(err))
+
+        images = _rows_to_catalog_api_images(rows, score_perspective_arg)
+        return jsonify({
+            'filters': filters.model_dump(exclude_none=True),
             'total': total,
             'images': images,
         })
