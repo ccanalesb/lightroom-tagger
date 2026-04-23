@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { UnpostedCatalogPanel } from './UnpostedCatalogPanel'
+import { invalidateAll } from '../../data'
 import { AnalyticsAPI, ImagesAPI } from '../../services/api'
 import {
   ANALYTICS_NOT_POSTED_EMPTY_ALL_POSTED,
@@ -16,6 +17,7 @@ const emptyPagination = {
 
 describe('UnpostedCatalogPanel', () => {
   beforeEach(() => {
+    invalidateAll(['analytics'])
     vi.spyOn(ImagesAPI, 'getCatalogMonths').mockResolvedValue({ months: [] })
   })
 

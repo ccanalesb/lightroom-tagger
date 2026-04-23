@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import { Suspense } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 import { DashboardPage } from './DashboardPage'
+import { invalidateAll } from '../data'
 import {
   AnalyticsAPI,
   IdentityAPI,
@@ -18,6 +20,7 @@ import {
 
 describe('DashboardPage', () => {
   beforeEach(() => {
+    invalidateAll(['dashboard'])
     vi.spyOn(SystemAPI, 'stats').mockResolvedValue({
       catalog_images: 1,
       instagram_images: 2,
@@ -64,11 +67,15 @@ describe('DashboardPage', () => {
   it('renders insights title and section headings', async () => {
     render(
       <MemoryRouter>
-        <DashboardPage />
+        <Suspense fallback={null}>
+          <DashboardPage />
+        </Suspense>
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('heading', { level: 1, name: INSIGHTS_PAGE_TITLE })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { level: 1, name: INSIGHTS_PAGE_TITLE }),
+    ).toBeInTheDocument()
     await waitFor(() => {
       expect(
         screen.getByRole('heading', { level: 2, name: INSIGHTS_SECTION_SCORES }),
