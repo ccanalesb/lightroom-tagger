@@ -204,7 +204,14 @@ def score_image_for_perspective(
             dispatcher = FallbackDispatcher(registry)
             if model is None:
                 models = registry.list_models(provider_id)
-                use_model = models[0]["id"] if models else "gemma3:27b"
+                if not models:
+                    from lightroom_tagger.core.provider_errors import ModelUnavailableError
+                    raise ModelUnavailableError(
+                        f"No models available for provider '{provider_id}' — check provider config",
+                        provider=provider_id,
+                        model=None,
+                    )
+                use_model = models[0]["id"]
             else:
                 use_model = model
 

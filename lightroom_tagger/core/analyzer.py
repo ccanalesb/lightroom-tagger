@@ -364,7 +364,14 @@ def _describe_image_via_provider(path: str, provider_id: str,
 
     if model is None:
         models = registry.list_models(provider_id)
-        model = models[0]["id"] if models else "gemma3:27b"
+        if not models:
+            from lightroom_tagger.core.provider_errors import ModelUnavailableError
+            raise ModelUnavailableError(
+                f"No models available for provider '{provider_id}' — check provider config",
+                provider=provider_id,
+                model=None,
+            )
+        model = models[0]["id"]
 
     temp_files: list[str] = []
     viewable = get_viewable_path(path)
@@ -573,7 +580,14 @@ def _compare_via_provider(local_path: str, insta_path: str,
 
     if model is None:
         models = registry.list_models(provider_id)
-        model = models[0]["id"] if models else "gemma3:27b"
+        if not models:
+            from lightroom_tagger.core.provider_errors import ModelUnavailableError
+            raise ModelUnavailableError(
+                f"No models available for provider '{provider_id}' — check provider config",
+                provider=provider_id,
+                model=None,
+            )
+        model = models[0]["id"]
 
     def fn_factory(client, mdl):
         from lightroom_tagger.core.provider_errors import InvalidRequestError
