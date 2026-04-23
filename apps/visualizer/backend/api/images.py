@@ -31,7 +31,14 @@ _CATALOG_SCORE_PERSPECTIVE_SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 bp = Blueprint('images', __name__)
 
-_DESC_JSON_COLS = ('composition', 'perspectives', 'technical', 'subjects')
+_DESC_JSON_COLS = (
+    'composition',
+    'perspectives',
+    'technical',
+    'subjects',
+    'dominant_colors',
+    'mood_tags',
+)
 
 
 def _deserialize_description(row: dict) -> dict:

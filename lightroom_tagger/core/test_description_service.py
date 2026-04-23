@@ -208,7 +208,6 @@ class TestMatchDumpMediaDescriptions:
         mock_describe.return_value = True
 
         with patch('lightroom_tagger.scripts.match_instagram_dump.mark_dump_media_processed'), \
-             patch('lightroom_tagger.scripts.match_instagram_dump.update_instagram_status'), \
              patch('lightroom_tagger.scripts.match_instagram_dump.init_instagram_dump_table'), \
              patch('lightroom_tagger.scripts.match_instagram_dump.init_catalog_table'):
             stats, matches = match_dump_media(db)
@@ -233,7 +232,6 @@ class TestMatchDumpMediaDescriptions:
         mock_describe.return_value = True
 
         with patch('lightroom_tagger.scripts.match_instagram_dump.mark_dump_media_processed'), \
-             patch('lightroom_tagger.scripts.match_instagram_dump.update_instagram_status'), \
              patch('lightroom_tagger.scripts.match_instagram_dump.init_instagram_dump_table'), \
              patch('lightroom_tagger.scripts.match_instagram_dump.init_catalog_table'):
             stats, matches = match_dump_media(db, force_descriptions=True)
@@ -258,7 +256,6 @@ class TestMatchDumpMediaDescriptions:
         mock_describe.side_effect = RuntimeError('model down')
 
         with patch('lightroom_tagger.scripts.match_instagram_dump.mark_dump_media_processed'), \
-             patch('lightroom_tagger.scripts.match_instagram_dump.update_instagram_status'), \
              patch('lightroom_tagger.scripts.match_instagram_dump.init_instagram_dump_table'), \
              patch('lightroom_tagger.scripts.match_instagram_dump.init_catalog_table'), \
              patch.object(match_instagram_dump.logger, 'warning') as mock_warn:
@@ -266,3 +263,75 @@ class TestMatchDumpMediaDescriptions:
 
         mock_warn.assert_called_once()
         assert 'CAT3' in mock_warn.call_args[0][0]
+
+
+class TestStoreStructuredVisualMapping:
+    """_store_structured fallbacks and persistence for VIS-01 columns."""
+
+    def test_mood_fallback_from_technical_mood_without_mood_tags(self, tmp_path):
+        from lightroom_tagger.core.description_service import _store_structured
+
+        db = _make_db(tmp_path)
+        filepath = str(tmp_path / 'photo.jpg')
+        open(filepath, 'w').close()
+        catalog_key = store_image(db, {'filepath': filepath, 'filename': 'photo.jpg'})
+
+        structured = {
+            'summary': 'A scene',
+            'composition': {},
+            'perspectives': {},
+            'technical': {'mood': 'gloomy'},
+            'subjects': [],
+            'best_perspective': 'street',
+        }
+        _store_structured(db, catalog_key, 'catalog', structured, 'test-model')
+
+        desc = get_image_description(db, catalog_key)
+        assert desc['mood_tags'] == ['gloomy']
+
+    def test_dominant_colors_fallback_from_technical(self, tmp_path):
+        from lightroom_tagger.core.description_service import _store_structured
+
+        db = _make_db(tmp_path)
+        filepath = str(tmp_path / 'photo.jpg')
+        open(filepath, 'w').close()
+        catalog_key = store_image(db, {'filepath': filepath, 'filename': 'photo.jpg'})
+
+        structured = {
+            'summary': 'Colors',
+            'composition': {},
+            'perspectives': {},
+            'technical': {'dominant_colors': ['#aabbcc']},
+            'subjects': [],
+            'best_perspective': 'street',
+        }
+        _store_structured(db, catalog_key, 'catalog', structured, 'test-model')
+
+        desc = get_image_description(db, catalog_key)
+        assert desc['dominant_colors'] == ['#aabbcc']
+
+    def test_root_dominant_colors_mood_tags_has_repetition_round_trip(self, tmp_path):
+        from lightroom_tagger.core.description_service import _store_structured
+
+        db = _make_db(tmp_path)
+        filepath = str(tmp_path / 'photo.jpg')
+        open(filepath, 'w').close()
+        catalog_key = store_image(db, {'filepath': filepath, 'filename': 'photo.jpg'})
+
+        structured = {
+            'summary': 'Full visual row',
+            'composition': {},
+            'perspectives': {},
+            'technical': {},
+            'subjects': ['x'],
+            'best_perspective': 'street',
+            'dominant_colors': ['#112233', '#445566'],
+            'mood_tags': ['calm', 'cool'],
+            'has_repetition': True,
+        }
+        _store_structured(db, catalog_key, 'catalog', structured, 'm9')
+
+        desc = get_image_description(db, catalog_key)
+        assert desc['dominant_colors'] == ['#112233', '#445566']
+        assert desc['mood_tags'] == ['calm', 'cool']
+        assert desc['has_repetition'] == 1

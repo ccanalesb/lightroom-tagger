@@ -199,6 +199,9 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                 'subjects': [],
                 'best_perspective': '',
                 'model_used': model_label,
+                'dominant_colors': None,
+                'mood_tags': None,
+                'has_repetition': None,
             })
             dump_image['ai_summary'] = summary
 
@@ -253,6 +256,9 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                     'subjects': [],
                     'best_perspective': '',
                     'model_used': model_label,
+                    'dominant_colors': None,
+                    'mood_tags': None,
+                    'has_repetition': None,
                 })
                 candidate['ai_summary'] = summary
             vision_candidates.append(candidate)
