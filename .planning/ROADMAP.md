@@ -131,7 +131,7 @@
 
 | Phase | Goal | Requirements | Success criteria count | Status |
 |-------|------|--------------|------------------------|--------|
-| 1 | Visual tags & keyword search | VIS-01, NLS-02 | 4 | Pending |
+| 1 | Visual tags & keyword search | VIS-01, NLS-02 | 4 | ✅ Complete (2026-04-23) |
 | 2 | Facets & NL filters | VIS-02, NLS-01 | 4 | Pending |
 | 3 | Semantic search & results | NLS-03, NLS-04 | 4 | Pending |
 | 4 | Stack detection | STACK-01, STACK-02 | 4 | Pending |

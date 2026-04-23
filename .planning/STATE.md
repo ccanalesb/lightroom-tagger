@@ -2,35 +2,35 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Phase 1 planned — ready to execute
-last_updated: "2026-04-23T18:00:00.000Z"
+status: Phase 1 complete — Phase 2 next
+last_updated: "2026-04-23T22:00:00.000Z"
 progress:
   total_phases: 7
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 0
+  completed_plans: 4
 ---
 
 # Planning state
 
 **Project:** Lightroom Tagger & Analyzer
-**Roadmap:** [.planning/ROADMAP.md](./ROADMAP.md) (v3.0 — Phase 1 next)
+**Roadmap:** [.planning/ROADMAP.md](./ROADMAP.md) (v3.0 — Phase 2 next)
 
 ## Current focus
 
 | Field | Value |
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
-| Phase | Phase 1 — Visual tags & keyword search |
-| Status | Plan **01-01** complete — next: remaining Phase 1 plans per ROADMAP |
-| Last activity | 2026-04-23 — **01-01** executed: schema, `description_search_document`, standalone FTS5 in `store_image_description` (SUMMARY: `01-01-SUMMARY.md`) |
+| Phase | Phase 2 — Facets & NL filters (next) |
+| Status | Phase 1 complete (2026-04-23) — all 4 plans executed, verified, 73 backend + 7 frontend tests passing |
+| Last activity | 2026-04-23 — Phase 1 complete: visual tags schema, FTS5, describe prompt, `description_search` API + CatalogTab, backfill AnalyzeTab (VIS-01, NLS-02) |
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
-**Current focus:** v3.0 Phase 1 — implement VIS-01 + NLS-02 (visual tags, FTS/keyword); see ROADMAP.md.
+**Current focus:** v3.0 Phase 2 — Facets & NL filters (VIS-02, NLS-01); see ROADMAP.md.
 
 ## Deferred Items
 
@@ -46,6 +46,7 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 - **v1.0 shipped** (2026-04-11) — Phases 1–4, 22 requirements
 - **v2.0 shipped** (2026-04-15) — Phases 5–11, 17 requirements. Archived to [milestones/v2.0-ROADMAP.md](./milestones/v2.0-ROADMAP.md) and [milestones/v2.0-REQUIREMENTS.md](./milestones/v2.0-REQUIREMENTS.md).
 - **v2.1 Phase 1 complete** (2026-04-17) — Matching & review polish. Backend two-bucket sort with tombstone serialization (D-08/09/11), validate-transaction created_at backfill (D-12), frontend string constants + MatchGroup.all_rejected (D-14), MatchDetailModal locked reject flow (D-01..D-07), MatchesTab tombstone cards + validated divider.
+- **v3.0 Phase 1 complete** (2026-04-23) — Visual tags & keyword search (VIS-01, NLS-02). Standalone FTS5 on `image_descriptions`, visual tag columns (`dominant_colors`, `mood_tags`, `has_repetition`, `description_search_document`), describe prompt extended, `_store_structured` fallbacks, `GET /api/images/catalog?description_search=` end-to-end, CatalogTab search filter, backfill AnalyzeTab checkbox. 73 backend + 7 frontend tests.
 
 ## Traceability
 
@@ -57,6 +58,8 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 | JOB-06 | Phase 3 | ✅ Complete (2026-04-17) |
 | FILTER-01, 02 | Phase 4 | ✅ Complete (2026-04-17) |
 | FILTER-02 (InstagramTab consumer) | Phase 4.1 | ✅ Complete (2026-04-17) |
+| VIS-01 | Phase 1 (v3.0) | ✅ Complete (2026-04-23) |
+| NLS-02 | Phase 1 (v3.0) | ✅ Complete (2026-04-23) |
 | IDENT-04 | Phase 5 | ✅ Complete (2026-04-21) |
 | IDENT-05 | Phase 5 | ✅ Complete (2026-04-21) |
 | DASH-02, 03 | Phase 5 | ✅ Complete (2026-04-21) |
