@@ -76,6 +76,8 @@
 
 #### Phase 2 — NL filters
 
+**Plan progress:** 02-01 **complete** (2026-04-23) — Pydantic `CatalogNlFilter` + `query_catalog_images` array filters + tests. **02-02** next (NL `POST` endpoint).
+
 **Requirements:** NLS-01
 
 - Natural-language input is translated to a **validated** Pydantic filter object (allowlisted fields only, including `dominant_colors` and `mood_tags` from VIS-01); invalid shapes rejected with clear errors.
@@ -131,7 +133,7 @@
 | Phase | Goal | Requirements | Success criteria count | Status |
 |-------|------|--------------|------------------------|--------|
 | 1 | Visual tags & keyword search | VIS-01, NLS-02 | 4 | ✅ Complete (2026-04-23) |
-| 2 | NL filters | NLS-01 | 3 | Pending |
+| 2 | NL filters | NLS-01 | 3 | In progress (02-01 done 2026-04-23) |
 | 3 | Semantic search & results | NLS-03, NLS-04 | 4 | Pending |
 | 4 | Stack detection | STACK-01, STACK-02 | 4 | Pending |
 | 5 | Image embed & search chat | SIM-01, NLS-05 | 4 | Pending |

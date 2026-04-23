@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Phase 1 complete — Phase 2 next
-last_updated: "2026-04-23T22:00:00.000Z"
+status: Phase 2 in progress (02-01 complete)
+last_updated: "2026-04-23T23:59:00.000Z"
 progress:
   total_phases: 7
   completed_phases: 1
@@ -21,16 +21,16 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
-| Phase | Phase 2 — Facets & NL filters (next) |
-| Status | Phase 1 complete (2026-04-23) — all 4 plans executed, verified, 73 backend + 7 frontend tests passing |
-| Last activity | 2026-04-23 — Phase 1 complete: visual tags schema, FTS5, describe prompt, `description_search` API + CatalogTab, backfill AnalyzeTab (VIS-01, NLS-02) |
+| Phase | Phase 2 — Facets & NL filters |
+| Status | 02-01 complete (2026-04-23): Pydantic `CatalogNlFilter`, `query_catalog_images` + `json_each` for `dominant_colors` / `mood_tags`, `test_database_nl_filter_arrays` — next: 02-02 NL HTTP endpoint |
+| Last activity | 2026-04-23 — Plan 02-01 executed: NLS-01 data layer; unblocks 02-02 |
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
-**Current focus:** v3.0 Phase 2 — Facets & NL filters (VIS-02, NLS-01); see ROADMAP.md.
+**Current focus:** v3.0 Phase 2 — NL filters (NLS-01); 02-01 data layer shipped, 02-02 endpoint next; see ROADMAP.md.
 
 ## Deferred Items
 
@@ -68,6 +68,7 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 
 ## Last update
 
+- **2026-04-23:** Phase 2 plan **02-01** executed: `lightroom_tagger/core/catalog_nl_filter.py` (`CatalogNlFilter`, `parse_catalog_nl_filter_from_llm`, `catalog_nl_filter_to_query_kwargs`); `query_catalog_images` gains `dominant_colors` / `mood_tags` with SQLite `json_each` + bound `IN`; `test_database_nl_filter_arrays.py` (3 pytest). Artifact: `02-01-SUMMARY.md`. `git log --grep=02-01` lists feat/test/refactor/docs commits.
 - **2026-04-23:** Phase 7 executed: 6 plans / 6 waves. **`src/data/`:** `cache.ts` (Map-based entry store), `query.ts` (Suspense throw-promise), `useQuery`, `invalidate`/`invalidateAll`, `ErrorBoundary` (class component, no deps), `ErrorState` (shared fallback) + 13 unit tests. **Identity page:** BestPhotosGrid, StyleFingerprintPanel, PostNextSuggestionsPanel migrated to `useQuery`; IdentityPage wrapped per-section in ErrorBoundary+Suspense. **Images page:** CatalogTab, InstagramTab, MatchesTab, ImageDetailModal, AIDescriptionSection, matchOptionsContext migrated; new `stableQueryKey.ts` util. **Processing page:** useJobSocket wires `invalidateAll`/`invalidate` on socket events; ProcessingPage tabs + JobDetailModal migrated. **Analytics/Dashboard:** AnalyticsPage, DashboardPage, UnpostedCatalogPanel, ImageScoresPanel, useProviders migrated. **Invalidation audit:** 16 mutation methods in `api.ts` now call `invalidate`/`invalidateAll`; no manual `load()` calls remain; invalidation table in CONTEXT.md. Verification: `tsc --noEmit` clean, `vitest run` 248 passed (45 files), `vite build` clean. Requirement **DATA-01** complete. Artifacts: `07-01` through `07-06` SUMMARY.md.
 - **2026-04-21:** Phase 5 Plan 04 executed (`dashboard-top-photos-tabs-filters`). **`Tabs.tsx`:** extracted **`TabNav`** (`py-2`, `role="tablist"` / `role="tab"` / `aria-selected`); **`Tabs`** composes `TabNav` unchanged content gap. **`strings.ts`:** `INSIGHTS_TOP_PHOTOS_TAB_*`, `INSIGHTS_TOP_PHOTOS_REGION_ARIA`. **`DashboardPage`:** `useFilters(dashboardTopPhotosSchema)` with `topPhotosPosted` + `toParam` tri-state; parallel `getBestPhotos` with `posted: false` / `posted: true` / omitted `posted`; `TabNav` + `role="region"` + `TopPhotosStrip` per active bucket; a11y errors list each tab’s fetch failure. **`DashboardPage.test.tsx`:** tab roles + mockImplementation + call assertions. Verification: `tsc --noEmit`, `vitest run` 221 passed. Requirements **DASH-02**, **DASH-03** marked complete. Artifacts: `05-04-SUMMARY.md`. Commits: `9fdecad`, `92bcffd`, `724c54d`, `5b16e12`.
 - **2026-04-21:** Phase 5 Plan 03 executed (`identity-page-narrative-intros`). **`strings.ts`:** `IDENTITY_INTRO_STYLE_FINGERPRINT`, `IDENTITY_INTRO_BEST_PHOTOS`, `IDENTITY_INTRO_POST_NEXT` (05-UI-SPEC copy). **`IdentityPage`:** `StyleFingerprintPanel` → `BestPhotosGrid` → `PostNextSuggestionsPanel`. **`StyleFingerprintPanel`:** intro `<p>` after `h2` in loading, error, empty, and main branches. **`BestPhotosGrid` / `PostNextSuggestionsPanel`:** intro after `h2`, before `Card`; in-card help unchanged. **`IdentityPage.test.tsx`:** `indexOf` order for section headings. Verification: `tsc --noEmit`, `vitest run` 221 passed. Requirement **IDENT-05** marked complete. Artifacts: `05-03-SUMMARY.md`. Commits: `671fec0`, `91ed16f`, `26da956`, `cedf3b1`, `85224f0`.
