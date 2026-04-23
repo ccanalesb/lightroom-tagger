@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import type { ImageDescription } from '../../services/api'
 import { DescriptionsAPI, JobsAPI, ProvidersAPI } from '../../services/api'
 import type { Job } from '../../types/job'
@@ -8,6 +8,7 @@ import { GenerateButton } from '../ui/description-atoms/GenerateButton'
 import { ProviderModelSelect } from '../ui/ProviderModelSelect'
 import { Spinner } from '../ui/Spinner'
 import { IMAGE_DETAILS_AI_DESCRIPTION } from '../../constants/strings'
+import { invalidate, useQuery } from '../../data'
 
 interface AIDescriptionSectionProps {
   imageKey: string
@@ -20,61 +21,40 @@ interface AIDescriptionSectionProps {
   onDataChanged?: () => void
 }
 
-/**
- * Single source of truth for "AI description" rendering inside every
- * image modal (catalog, instagram, match sides, identity/best, unposted,
- * top-scored, post-next). Renders the full `DescriptionPanel` plus the
- * Generate button + optional model options.
- */
-export function AIDescriptionSection({
+function AIDescriptionSectionLoaded({
   imageKey,
   imageType,
   titleOverride,
   onDataChanged,
 }: AIDescriptionSectionProps) {
-  const [description, setDescription] = useState<ImageDescription | null>(null)
-  const [loading, setLoading] = useState(false)
+  const defaults = useQuery(['providers.defaults'] as const, () => ProvidersAPI.getDefaults())
+  const descPayload = useQuery(['descriptions', imageKey] as const, () =>
+    DescriptionsAPI.get(imageKey),
+  )
+  const initialDescription = descPayload.description
+
+  const [description, setDescription] = useState<ImageDescription | null>(initialDescription)
   const [error, setError] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
   const [pendingJobId, setPendingJobId] = useState<string | null>(null)
   const [providerId, setProviderId] = useState<string | null>(null)
   const [modelId, setModelId] = useState<string | null>(null)
   const [showModelOptions, setShowModelOptions] = useState(false)
+  const [, bump] = useState(0)
 
   useEffect(() => {
-    ProvidersAPI.getDefaults()
-      .then((defaults) => {
-        const d = defaults.description
-        if (d?.provider) setProviderId(d.provider)
-        if (d?.model) setModelId(d.model)
-      })
-      .catch(() => {})
-  }, [])
+    setDescription(initialDescription)
+  }, [initialDescription])
 
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    setDescription(null)
-    DescriptionsAPI.get(imageKey)
-      .then((data) => {
-        if (!cancelled) setDescription(data.description)
-      })
-      .catch((err) => {
-        if (!cancelled) setError(String(err))
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [imageKey])
+    const d = defaults.description
+    if (d?.provider) setProviderId((p) => p ?? d.provider)
+    if (d?.model) setModelId((m) => m ?? d.model)
+  }, [defaults])
 
   const refreshDescription = useCallback(() => {
-    DescriptionsAPI.get(imageKey)
-      .then((data) => setDescription(data.description))
-      .catch(() => {})
+    invalidate(['descriptions', imageKey])
+    bump((n) => n + 1)
   }, [imageKey])
 
   useJobSocket({
@@ -122,9 +102,6 @@ export function AIDescriptionSection({
       <h3 className="text-sm font-medium text-text mb-2">
         {titleOverride ?? IMAGE_DETAILS_AI_DESCRIPTION}
       </h3>
-      {loading ? (
-        <p className="text-sm text-text-tertiary">Loading description…</p>
-      ) : null}
       {error ? <p className="text-sm text-error">{error}</p> : null}
       {generating ? (
         <div className="flex items-center gap-2 py-2">
@@ -161,5 +138,28 @@ export function AIDescriptionSection({
         />
       ) : null}
     </div>
+  )
+}
+
+/**
+ * Single source of truth for "AI description" rendering inside every
+ * image modal (catalog, instagram, match sides, identity/best, unposted,
+ * top-scored, post-next). Renders the full `DescriptionPanel` plus the
+ * Generate button + optional model options.
+ */
+export function AIDescriptionSection(props: AIDescriptionSectionProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-4 bg-surface rounded-base border border-border">
+          <h3 className="text-sm font-medium text-text mb-2">
+            {props.titleOverride ?? IMAGE_DETAILS_AI_DESCRIPTION}
+          </h3>
+          <p className="text-sm text-text-tertiary">Loading description…</p>
+        </div>
+      }
+    >
+      <AIDescriptionSectionLoaded {...props} />
+    </Suspense>
   )
 }
