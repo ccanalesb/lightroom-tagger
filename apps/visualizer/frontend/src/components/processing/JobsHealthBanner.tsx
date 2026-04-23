@@ -5,15 +5,11 @@ import { JobsAPI } from '../../services/api';
 export interface JobsHealthBannerProps {
   /** Polling interval in ms. Defaults to 30s. Set to 0 to disable polling. */
   pollIntervalMs?: number;
-  /** Bumps when job socket events invalidate health; include in the query key so the banner refetches. */
-  cacheRevision?: number;
 }
 
 function JobsHealthBannerBody({
   pollIntervalMs,
-  cacheRevision = 0,
-}: Required<Pick<JobsHealthBannerProps, 'pollIntervalMs'>> &
-  Pick<JobsHealthBannerProps, 'cacheRevision'>) {
+}: Required<Pick<JobsHealthBannerProps, 'pollIntervalMs'>>) {
   const [pollTick, setPollTick] = useState(0);
 
   useEffect(() => {
@@ -26,7 +22,7 @@ function JobsHealthBannerBody({
   }, [pollIntervalMs]);
 
   const health = useQuery(
-    ['jobs.health', pollTick, cacheRevision] as const,
+    ['jobs.health', pollTick] as const,
     () => JobsAPI.health(),
   );
 
@@ -78,14 +74,14 @@ function JobsHealthErrorBanner({ error }: { error: Error }) {
  * catalog SQLite mirror is missing/misconfigured. This warns the user *before*
  * they enqueue a job that will either fail immediately or deadlock the queue.
  */
-export function JobsHealthBanner({ pollIntervalMs = 30_000, cacheRevision = 0 }: JobsHealthBannerProps) {
+export function JobsHealthBanner({ pollIntervalMs = 30_000 }: JobsHealthBannerProps) {
   return (
     <ErrorBoundary
-      resetKeys={[pollIntervalMs, cacheRevision]}
+      resetKeys={[pollIntervalMs]}
       fallback={({ error }) => <JobsHealthErrorBanner error={error} />}
     >
       <Suspense fallback={null}>
-        <JobsHealthBannerBody pollIntervalMs={pollIntervalMs} cacheRevision={cacheRevision} />
+        <JobsHealthBannerBody pollIntervalMs={pollIntervalMs} />
       </Suspense>
     </ErrorBoundary>
   );

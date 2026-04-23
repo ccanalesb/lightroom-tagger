@@ -56,16 +56,14 @@ const tabSuspenseFallback = (
 
 function JobQueueTabWithData({
   connected,
-  jobListRevision,
   refreshJobList,
 }: {
   connected: boolean;
-  jobListRevision: number;
   refreshJobList: () => void;
 }) {
   const [jobsOffset, setJobsOffset] = useState(0);
   const listResponse = useQuery(
-    ['jobs.list', { limit: PAGE_SIZE, offset: jobsOffset, rev: jobListRevision }] as const,
+    ['jobs.list', { limit: PAGE_SIZE, offset: jobsOffset }] as const,
     () => JobsAPI.list({ limit: PAGE_SIZE, offset: jobsOffset }),
   );
 
@@ -95,9 +93,12 @@ export function ProcessingPage() {
 
   const [jobsRecoveredBanner, setJobsRecoveredBanner] = useState<string | null>(null);
 
-  const { connected, jobListRevision, healthRevision, refreshJobList } = useJobSocket({
+  const { connected, jobListRevision, refreshJobList } = useJobSocket({
     onJobsRecovered: () => setJobsRecoveredBanner(JOBS_RECOVERED_BANNER),
   });
+  // jobListRevision drives ProcessingPage re-renders so JobQueueTabWithData
+  // re-renders after invalidateAll(['jobs.list']) clears the cache.
+  void jobListRevision;
 
   const handleTabChange = (id: string) => {
     if (!PROCESSING_TAB_IDS.includes(id as ProcessingTabId)) return;
@@ -199,7 +200,6 @@ export function ProcessingPage() {
           <Suspense fallback={tabSuspenseFallback}>
             <JobQueueTabWithData
               connected={connected}
-              jobListRevision={jobListRevision}
               refreshJobList={refreshJobList}
             />
           </Suspense>
@@ -239,7 +239,7 @@ export function ProcessingPage() {
         </p>
       </div>
 
-      <JobsHealthBanner cacheRevision={healthRevision} />
+      <JobsHealthBanner />
 
       {jobsRecoveredBanner ? (
         <div

@@ -18,13 +18,10 @@ export function useJobSocket({
   const connected = useSocketStore((s) => s.connected)
   const connect = useSocketStore((s) => s.connect)
   const [jobListRevision, setJobListRevision] = useState(0)
-  const [healthRevision, setHealthRevision] = useState(0)
 
   const refreshJobList = useCallback(() => {
     invalidateAll(['jobs.list'])
-    invalidateAll(['jobs.health'])
     setJobListRevision((n) => n + 1)
-    setHealthRevision((n) => n + 1)
   }, [])
 
   useEffect(() => {
@@ -36,26 +33,20 @@ export function useJobSocket({
 
     const handleJobCreated = (job: Job) => {
       invalidateAll(['jobs.list'])
-      invalidateAll(['jobs.health'])
       setJobListRevision((n) => n + 1)
-      setHealthRevision((n) => n + 1)
       onJobCreated?.(job)
     }
 
     const handleJobUpdated = (job: Job) => {
       invalidateAll(['jobs.list'])
       invalidate(['jobs.detail', job.id])
-      invalidateAll(['jobs.health'])
       setJobListRevision((n) => n + 1)
-      setHealthRevision((n) => n + 1)
       onJobUpdated?.(job)
     }
 
     const handleJobsRecovered = (payload: { job_ids: string[] }) => {
       invalidateAll(['jobs.list'])
-      invalidateAll(['jobs.health'])
       setJobListRevision((n) => n + 1)
-      setHealthRevision((n) => n + 1)
       onJobsRecovered?.(payload)
     }
 
@@ -70,5 +61,5 @@ export function useJobSocket({
     }
   }, [socket, connected, onJobCreated, onJobUpdated, onJobsRecovered])
 
-  return { connected, socket, jobListRevision, healthRevision, refreshJobList }
+  return { connected, socket, jobListRevision, refreshJobList }
 }

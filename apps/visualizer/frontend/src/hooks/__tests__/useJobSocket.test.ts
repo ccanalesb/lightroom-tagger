@@ -79,6 +79,5 @@ describe('useJobSocket', () => {
     const { result } = renderHook(() => useJobSocket({}));
     expect(typeof result.current.refreshJobList).toBe('function');
     expect(result.current.jobListRevision).toBe(0);
-    expect(result.current.healthRevision).toBe(0);
   });
 });
