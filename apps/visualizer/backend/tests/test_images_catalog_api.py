@@ -6,6 +6,7 @@ import pytest
 
 from app import create_app
 from lightroom_tagger.core.database import (
+    build_description_fts_query,
     init_database,
     store_image,
     store_image_description,
@@ -76,6 +77,76 @@ def catalog_analyzed_client(tmp_path, monkeypatch):
     monkeypatch.setattr("utils.db.LIBRARY_DB", db_path)
     app = create_app()
     return app.test_client(), image_key
+
+
+@pytest.fixture
+def catalog_description_search_client(tmp_path, monkeypatch):
+    """Catalog image with FTS text ``golden hour skyline`` (summary + empty subjects)."""
+    db_path = str(tmp_path / "library.db")
+    conn = init_database(db_path)
+    image_key = store_image(
+        conn,
+        {
+            "date_taken": "2024-04-20",
+            "filename": "skyline.jpg",
+            "rating": 4,
+            "id": "sky-1",
+        },
+    )
+    store_image_description(
+        conn,
+        {
+            "image_key": image_key,
+            "image_type": "catalog",
+            "summary": "golden hour skyline",
+            "subjects": [],
+            "best_perspective": "city",
+            "perspectives": {},
+            "composition": {},
+            "technical": {},
+            "model_used": "test",
+            "described_at": "2024-04-20T12:00:00",
+        },
+    )
+    conn.close()
+    monkeypatch.setattr("utils.db.LIBRARY_DB", db_path)
+    app = create_app()
+    return app.test_client(), image_key
+
+
+@pytest.fixture
+def catalog_injection_empty_client(tmp_path, monkeypatch):
+    """One catalog image with description that cannot match ``hello AND OR``."""
+    db_path = str(tmp_path / "library.db")
+    conn = init_database(db_path)
+    store_image(
+        conn,
+        {
+            "date_taken": "2024-05-01",
+            "filename": "cats.jpg",
+            "rating": 3,
+            "id": "c1",
+        },
+    )
+    store_image_description(
+        conn,
+        {
+            "image_key": "2024-05-01_cats.jpg",
+            "image_type": "catalog",
+            "summary": "only quiet cats napping",
+            "subjects": [],
+            "best_perspective": "street",
+            "perspectives": {},
+            "composition": {},
+            "technical": {},
+            "model_used": "test",
+            "described_at": "2024-05-01T10:00:00",
+        },
+    )
+    conn.close()
+    monkeypatch.setattr("utils.db.LIBRARY_DB", db_path)
+    app = create_app()
+    return app.test_client()
 
 
 def test_catalog_analyzed_filter_and_embedded_description(catalog_analyzed_client):
@@ -256,3 +327,46 @@ def test_catalog_legacy_image_descriptions_missing_visual_columns_returns_200(
     data = resp.get_json()
     assert data["total"] == 1
     assert data["images"][0]["description_summary"] == "legacy summary"
+
+
+def test_catalog_description_search_finds_by_summary(
+    catalog_description_search_client,
+):
+    client, image_key = catalog_description_search_client
+    resp = client.get("/api/images/catalog?description_search=skyline")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    keys = {img["key"] for img in data["images"]}
+    assert image_key in keys
+    assert data["total"] >= 1
+
+
+def test_catalog_omit_description_search_same_count_as_baseline(
+    catalog_description_search_client,
+):
+    client, _ = catalog_description_search_client
+    a = client.get("/api/images/catalog")
+    b = client.get("/api/images/catalog?description_search=")
+    assert a.status_code == 200
+    assert b.status_code == 200
+    assert a.get_json()["total"] == b.get_json()["total"]
+
+
+def test_catalog_description_search_too_short_returns_400(catalog_client):
+    resp = catalog_client.get("/api/images/catalog?description_search=a")
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert "description_search must be at least 2 characters" in str(body.get("error", ""))
+
+
+def test_catalog_injection_description_search_200_and_empty(
+    catalog_injection_empty_client,
+):
+    m, _ = build_description_fts_query("hello'--OR--1=1")
+    assert m == '"hello" AND "OR"'
+    client = catalog_injection_empty_client
+    resp = client.get("/api/images/catalog?description_search=hello%27--OR--1%3D1")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["total"] == 0
+    assert data["images"] == []

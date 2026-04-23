@@ -445,6 +445,13 @@ def list_catalog_images(db):
         date_to = request.args.get('date_to', '')
         color_label = request.args.get('color_label', '')
 
+        description_search_raw = request.args.get('description_search')
+        if description_search_raw is not None and description_search_raw.strip() == '':
+            description_search_raw = None
+        description_search = (
+            description_search_raw.strip() if description_search_raw is not None else None
+        )
+
         score_perspective = (request.args.get('score_perspective') or '').strip()
         if score_perspective and not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(score_perspective):
             return error_bad_request('invalid score_perspective slug')
@@ -503,6 +510,7 @@ def list_catalog_images(db):
                 min_score=min_score,
                 sort_by_score=sort_by_score,
                 sort_by_date=sort_by_date,
+                description_search=description_search,
                 limit=limit,
                 offset=offset,
             )

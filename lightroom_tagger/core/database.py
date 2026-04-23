@@ -269,7 +269,9 @@ def build_description_fts_query(raw: str | None) -> tuple[str | None, str | None
     words = [t for t in tokens if len(t) >= 2]
     if not words:
         return (None, None)
-    return (" AND ".join(words), None)
+    # Double-quote each term so FTS5 reserved tokens (e.g. OR, AND, NOT) are literals.
+    quoted = ('"' + t.replace('"', '""') + '"' for t in words)
+    return (" AND ".join(quoted), None)
 
 
 def _coerce_has_repetition(value) -> int | None:
@@ -1174,8 +1176,8 @@ def query_catalog_images(
             clauses.append(
                 "i.key IN ("
                 "SELECT d2.image_key FROM image_descriptions d2 "
-                "INNER JOIN image_descriptions_fts f ON f.rowid = d2.rowid "
-                "WHERE d2.image_type = 'catalog' AND f MATCH ?"
+                "INNER JOIN image_descriptions_fts ON image_descriptions_fts.rowid = d2.rowid "
+                "WHERE d2.image_type = 'catalog' AND image_descriptions_fts MATCH ?"
                 ")"
             )
             bindings.append(match_str)
