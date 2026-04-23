@@ -22,8 +22,8 @@ progress:
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
 | Phase | Phase 1 — Visual tags & keyword search |
-| Status | Planned — 4 plans across 4 waves, ready to execute |
-| Last activity | 2026-04-23 — Phase 1 planned (VIS-01 + NLS-02: schema/FTS, describe pipeline, API/frontend, backfill job) |
+| Status | Plan **01-01** complete — next: remaining Phase 1 plans per ROADMAP |
+| Last activity | 2026-04-23 — **01-01** executed: schema, `description_search_document`, standalone FTS5 in `store_image_description` (SUMMARY: `01-01-SUMMARY.md`) |
 
 ## Project Reference
 
