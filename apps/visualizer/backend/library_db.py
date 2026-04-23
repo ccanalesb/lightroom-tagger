@@ -43,6 +43,7 @@ JOB_TYPES_REQUIRING_CATALOG: frozenset[str] = frozenset(
         'batch_describe',
         'batch_score',
         'batch_analyze',
+        'batch_text_embed',
         'single_describe',
         'single_score',
         'instagram_import',
