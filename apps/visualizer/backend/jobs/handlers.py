@@ -167,6 +167,44 @@ def _select_catalog_keys(
     return [(r['key'], 'catalog') for r in rows]
 
 
+def _select_catalog_keys_missing_visual_tags(
+    lib_db,
+    *,
+    months: int | None,
+    year: str | None,
+    min_rating: int | None,
+) -> list[tuple[str, str]]:
+    """Catalog images that already have a description row with ``dominant_colors IS NULL``.
+
+    Used for user-initiated backfill of visual tags (D-18). Respects the same
+    date and rating window as :func:`_select_catalog_keys`.
+    """
+    params: list = []
+    sql = (
+        "SELECT i.key AS key FROM images i "
+        "WHERE EXISTS ("
+        "  SELECT 1 FROM image_descriptions d "
+        "  WHERE d.image_key = i.key AND d.image_type = 'catalog' AND d.dominant_colors IS NULL"
+        ")"
+    )
+    date_col = "i.date_taken"
+    rating_col = "i.rating"
+    conditions: list[str] = []
+    if months:
+        conditions.append(f"{date_col} >= date('now', ?)")
+        params.append(f'-{months} months')
+    if year is not None:
+        conditions.append(f"strftime('%Y', {date_col}) = ?")
+        params.append(year)
+    if min_rating is not None:
+        conditions.append(f"{rating_col} >= ?")
+        params.append(min_rating)
+    if conditions:
+        sql += " AND " + " AND ".join(conditions)
+    rows = lib_db.execute(sql, tuple(params)).fetchall()
+    return [(r['key'], 'catalog') for r in rows]
+
+
 def _select_instagram_keys(
     lib_db,
     *,
@@ -1189,6 +1227,8 @@ def _run_describe_pass(
     image_type = metadata.get('image_type', 'both')
     date_filter = metadata.get('date_filter', 'all')
     force = metadata.get('force', False)
+    backfill_visual_tags = bool(metadata.get('backfill_visual_tags', False))
+    describe_force = bool(force) or backfill_visual_tags
     desc_provider_id = metadata.get('provider_id')
     desc_provider_model = metadata.get('provider_model')
     max_workers = int(metadata.get('max_workers', 4))
@@ -1246,7 +1286,7 @@ def _run_describe_pass(
         (k, t) for k, t in images_to_describe if pair_label(k, t) not in processed_pairs
     ]
 
-    if not force and images_to_describe:
+    if not backfill_visual_tags and not force and images_to_describe:
         already_described: set[str] = set()
         rows_desc = lib_db.execute(
             "SELECT image_key FROM image_descriptions"
@@ -1337,7 +1377,7 @@ def _run_describe_pass(
             try:
                 with cancel_scope.install(lambda: runner.is_cancelled(job_id)):
                     status, success, error_msg = _describe_single_image(
-                        worker_db, key, itype, force, desc_provider_id, desc_provider_model,
+                        worker_db, key, itype, describe_force, desc_provider_id, desc_provider_model,
                         perspective_slugs,
                     )
                 return (key, status, error_msg)
@@ -1421,7 +1461,7 @@ def _run_describe_pass(
             )
 
             status, success, error_msg = _describe_single_image(
-                lib_db, key, itype, force, desc_provider_id, desc_provider_model,
+                lib_db, key, itype, describe_force, desc_provider_id, desc_provider_model,
                 perspective_slugs,
             )
 
@@ -1519,10 +1559,20 @@ def _handle_batch_describe_inner(runner, job_id: str, metadata: dict):
             get_undescribed_instagram_images,
         )
 
+        backfill_visual_tags = bool(metadata.get('backfill_visual_tags', False))
+
         images_to_describe: list[tuple[str, str]] = []  # (key, type)
 
         if image_type in ('catalog', 'both'):
-            if force or year is not None:
+            if backfill_visual_tags:
+                # Catalog only for this mode (D-18); re-describe rows missing visual tags.
+                images_to_describe += _select_catalog_keys_missing_visual_tags(
+                    lib_db,
+                    months=months,
+                    year=year,
+                    min_rating=min_rating,
+                )
+            elif force or year is not None:
                 # ``year`` is a new window that the undescribed-only helper
                 # doesn't know about yet, so we run the raw SQL path for both
                 # ``force`` and ``year`` (joining in the description filter
@@ -1555,6 +1605,15 @@ def _handle_batch_describe_inner(runner, job_id: str, metadata: dict):
                     (img['media_key'], 'instagram')
                     for img in get_undescribed_instagram_images(lib_db, months=months)
                 ]
+
+        if backfill_visual_tags and not images_to_describe:
+            add_job_log(
+                runner.db,
+                job_id,
+                'info',
+                'Backfill visual tags: no images matched the current scope '
+                '(no catalog rows with missing color/mood data in the date/rating window, or no work selected).',
+            )
 
         _run_describe_pass(
             runner,
@@ -2054,10 +2113,19 @@ def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
             get_undescribed_instagram_images,
         )
 
+        backfill_visual_tags = bool(metadata.get('backfill_visual_tags', False))
+
         shared_selection: list[tuple[str, str]] = []
 
         if image_type in ('catalog', 'both'):
-            if force or year is not None:
+            if backfill_visual_tags:
+                shared_selection += _select_catalog_keys_missing_visual_tags(
+                    lib_db,
+                    months=months,
+                    year=year,
+                    min_rating=min_rating,
+                )
+            elif force or year is not None:
                 shared_selection += _select_catalog_keys(
                     lib_db,
                     months=months,
@@ -2086,6 +2154,15 @@ def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
                     (img['media_key'], 'instagram')
                     for img in get_undescribed_instagram_images(lib_db, months=months)
                 ]
+
+        if backfill_visual_tags and not shared_selection:
+            add_job_log(
+                runner.db,
+                job_id,
+                'info',
+                'Backfill visual tags: no images matched the current scope '
+                '(no catalog rows with missing color/mood data in the date/rating window, or no work selected).',
+            )
 
         metadata_for_describe = {**metadata, 'force': bool(metadata.get('force_describe', False))}
         metadata_for_score = {**metadata, 'force': bool(metadata.get('force_score', False))}
