@@ -124,3 +124,27 @@ Wrapped at page level:
 - Websocket event → `invalidate(key)` bridge.
 - Route-level prefetching.
 - Suspense-aware mutations (optimistic UI).
+
+## Invalidation Table (Plan 06)
+
+**Placement rule:** Mutations call `invalidate()` / `invalidateAll()` at the API layer inside the mutation method (see `apps/visualizer/frontend/src/services/api.ts`). Socket-driven updates (`useJobSocket`) and error-boundary resets still call invalidation where appropriate. `JobsAPI.create('single_describe', …)` does **not** invalidate description or image-detail caches on enqueue (generation is async; completion is handled via `useJobSocket` / `AIDescriptionSection.refreshDescription`).
+
+| Mutation | API method | Invalidates |
+|----------|------------|-------------|
+| Create perspective | `PerspectivesAPI.create` | `invalidateAll(['perspectives'])` |
+| Update perspective | `PerspectivesAPI.update` | `invalidateAll(['perspectives'])` |
+| Delete perspective | `PerspectivesAPI.remove` | `invalidateAll(['perspectives'])` |
+| Reset perspective to default file | `PerspectivesAPI.resetDefault` | `invalidateAll(['perspectives'])` |
+| Enqueue job | `JobsAPI.create` | `invalidateAll(['jobs.list'])`, `invalidateAll(['jobs.health'])` |
+| Cancel job | `JobsAPI.cancel` | `invalidateAll(['jobs.list'])`, `invalidateAll(['jobs.health'])` |
+| Retry job | `JobsAPI.retry` | `invalidateAll(['jobs.list'])`, `invalidate(['jobs.detail', id])`, `invalidateAll(['jobs.health'])` |
+| Save catalog path | `ConfigAPI.putCatalog` | `invalidateAll(['images.catalog'])`, `invalidateAll(['catalog.cache.stats'])`, `invalidateAll(['jobs.health'])`, `invalidateAll(['dashboard'])`, `invalidateAll(['analytics'])` |
+| Save Instagram dump path | `ConfigAPI.putInstagramDump` | `invalidateAll(['images.instagram'])`, `invalidateAll(['jobs.health'])` |
+| Validate match | `MatchingAPI.validate` | `invalidateAll(['matching.groups'])`, `invalidateAll(['images.instagram'])`, `invalidateAll(['images.catalog'])`, `invalidateAll(['images.detail'])`, `invalidateAll(['dashboard'])` |
+| Reject match | `MatchingAPI.reject` | Same as validate |
+| Generate description (sync HTTP) | `DescriptionsAPI.generate` | `invalidate(['descriptions', imageKey])`, `invalidateAll(['images.detail', imageType, imageKey])` |
+| Update provider fallback order | `ProvidersAPI.updateFallbackOrder` | `invalidateAll(['providers.list'])` |
+| Update provider defaults | `ProvidersAPI.updateDefaults` | `invalidateAll(['providers.list'])`, `invalidate(['providers.defaults'])` |
+| Add custom provider model | `ProvidersAPI.addModel` | `invalidateAll(['providers.list'])` |
+| Remove provider model | `ProvidersAPI.removeModel` | `invalidateAll(['providers.list'])` |
+| Reorder models within provider | `ProvidersAPI.reorderModels` | `invalidateAll(['providers.list'])` |
