@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Phase 3 in progress (03-03 complete; next 03-04)
-last_updated: "2026-04-23T18:30:00.000Z"
+status: Phase 3 in progress (03-04 complete; next 03-05)
+last_updated: "2026-04-23T20:00:00.000Z"
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 12
-  completed_plans: 9
+  completed_plans: 10
 ---
 
 # Planning state
@@ -22,15 +22,15 @@ progress:
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
 | Phase | Phase 3 — Semantic search & results |
-| Status | 03-03 complete (2026-04-23): `batch_text_embed` job (checkpoint, batched embed, vec0 upsert); artifact `03-03-SUMMARY.md` — next: **03-04** |
-| Last activity | 2026-04-23 — Plan 03-03 executed: NLS-03 text-embed job handler; `03-03-SUMMARY.md` |
+| Status | 03-04 complete (2026-04-23): semantic hybrid search (RRF, FTS+KNN, why_matched, `query_catalog_images_by_keys`); artifact `03-04-SUMMARY.md` — next: **03-05** |
+| Last activity | 2026-04-23 — Plan 03-04 executed: `semantic_search.py` + DB helper; `03-04-SUMMARY.md` |
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
-**Current focus:** v3.0 Phase 3 — plan 03-03 done (`batch_text_embed`); see `03-03-SUMMARY.md` and ROADMAP.md; next **03-04**.
+**Current focus:** v3.0 Phase 3 — plan 03-04 done (hybrid search); see `03-04-SUMMARY.md` and ROADMAP.md; next **03-05**.
 
 ## Deferred Items
 
@@ -68,7 +68,8 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 
 ## Last update
 
-- **2026-04-23:** Phase 3 plan **03-03** executed: `fingerprint_batch_text_embed`; DB helpers `count_catalog_images_missing_text_embedding`, `list_catalog_keys_needing_text_embedding`, `list_catalog_keys_for_text_embed_force`, `upsert_image_text_embedding`; `batch_text_embed` in `JOB_TYPES_REQUIRING_CATALOG` and `JOB_HANDLERS` with checkpoint resume and 5–100% progress. Commits: `8251767`, `af2f0de`, `1e3a63a`, `947b981`, `84f8813`. Artifact: `03-03-SUMMARY.md`. Next: **03-04**.
+- **2026-04-23:** Phase 3 plan **03-04** executed: `lightroom_tagger/core/semantic_search.py` — RRF (`RRF_K=60`), `fts_ranked_catalog_keys` / `knn_embedded_catalog_keys`, `run_semantic_hybrid_search` (D-08 early return `fts_no_match`, D-09 post-filter, FTS-only when vec empty), `SemanticSearchMeta` / `SemanticSearchRow`; `query_catalog_images_by_keys` in `database.py`. Commits: `4362191`, `e1488c0`, `092426a`, `525627e`. Artifact: `03-04-SUMMARY.md`. Next: **03-05**.
+- **2026-04-23:** Phase 3 plan **03-03** executed: `fingerprint_batch_text_embed`; DB helpers `count_catalog_images_missing_text_embedding`, `list_catalog_keys_needing_text_embedding`, `list_catalog_keys_for_text_embed_force`, `upsert_image_text_embedding`; `batch_text_embed` in `JOB_TYPES_REQUIRING_CATALOG` and `JOB_HANDLERS` with checkpoint resume and 5–100% progress. Commits: `8251767`, `af2f0de`, `1e3a63a`, `947b981`, `84f8813`. Artifact: `03-03-SUMMARY.md`. Next (at time): **03-04**.
 - **2026-04-23:** Phase 3 plan **03-02** executed: `lightroom_tagger/core/embedding_service.py` — `TEXT_EMBED_MODEL_ID` / `TEXT_EMBED_DIM`, lazy `_get_model()`, `embed_texts` / `embed_query_text` / `numpy_to_vec_blob` / `embed_query_to_vec_blob` (+ `embed_text_to_vec_blob` alias), `sqlite_vec.serialize_float32`; `test_embedding_service.py` (mocked `encode`, blob length). Commits: `515855e`, `e70123e`. Artifact: `03-02-SUMMARY.md`.
 - **2026-04-23:** Phase 3 plan **03-01** executed: root deps `sqlite-vec==0.1.9`, `sentence-transformers>=3.0.0` + `uv.lock`; `init_database` calls `_ensure_sqlite_vec_loaded`; `_migrate_image_text_embeddings_vec0` (`image_text_embeddings` vec0 768 cosine, `user_version` 3→4); `test_init_database_sqlite_vec_image_text_embeddings`. Commits: `3221ff1`, `fe665ff`, `214c25e`, `cfe16c2`. Artifact: `03-01-SUMMARY.md`. Next: **03-02**.
 - **2026-04-23:** Phase 2 plan **02-02** executed: `lightroom_tagger/core/nl_catalog_search.py` (`run_nl_catalog_filter_llm`, `operation="nl_filter"`); `POST /api/images/nl-search` in `api/images.py` (`_rows_to_catalog_api_images`); `test_images_nl_search_api.py` (4 pytest). Artifact: `02-02-SUMMARY.md`. Commits: `feat(02-02)…`, `test(02-02)…`, `refactor(02-02)…` (module import for patchable LLM).
