@@ -5,6 +5,7 @@ import {
   type PostNextCandidate,
   type PostNextSuggestionsMeta,
 } from '../../services/api'
+import { useQuery } from '../../data'
 import { ImageDetailModal, fromPostNextRow } from '../image-view'
 import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
@@ -15,7 +16,6 @@ import {
   IDENTITY_POST_NEXT_HELP,
   IDENTITY_REASON_CODE_LABELS,
   IDENTITY_SECTION_POST_NEXT,
-  MSG_LOADING,
   FILTER_LABEL_SORT_DATE,
   FILTER_SORT_DATE_NEWEST,
   FILTER_SORT_DATE_OLDEST,
@@ -38,14 +38,12 @@ function labelForReasonCode(code: string): string {
 }
 
 export function PostNextSuggestionsPanel() {
-  const [rows, setRows] = useState<PostNextCandidate[]>([])
-  const [total, setTotal] = useState<number | null>(null)
-  const [offset, setOffset] = useState(0)
-  const [meta, setMeta] = useState<PostNextSuggestionsMeta | null>(null)
-  const [emptyState, setEmptyState] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
+  const [extra, setExtra] = useState<{ sortKey: string; rows: PostNextCandidate[] }>({
+    sortKey: '',
+    rows: [],
+  })
   const [selected, setSelected] = useState<PostNextCandidate | null>(null)
 
   const postNextSchema = useMemo<FilterSchema>(
@@ -73,72 +71,55 @@ export function PostNextSuggestionsPanel() {
       ? (sortByDate as 'newest' | 'oldest')
       : undefined
 
+  const sortKey = sortParam ?? 'none'
+  const initial = useQuery(
+    ['identity', 'post-next', sortParam ?? null] as const,
+    () =>
+      IdentityAPI.getSuggestions({
+        limit: SUGGESTIONS_LIMIT,
+        offset: 0,
+        sort_by_date: sortParam,
+      }),
+  )
+
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    setError(null)
-    setOffset(0)
-    IdentityAPI.getSuggestions({
-      limit: SUGGESTIONS_LIMIT,
-      offset: 0,
-      sort_by_date: sortParam,
-    })
-      .then((res) => {
-        if (cancelled) return
-        setRows(res.candidates)
-        setTotal(res.total)
-        setOffset(res.candidates.length)
-        setMeta(res.meta)
-        setEmptyState(res.empty_state)
-      })
-      .catch((e) => {
-        if (cancelled) return
-        setError(errMessage(e))
-        setRows([])
-        setTotal(null)
-        setOffset(0)
-        setMeta(null)
-        setEmptyState(null)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [sortParam])
+    setExtra({ sortKey, rows: [] })
+    setLoadMoreError(null)
+  }, [sortKey])
+
+  const appended = extra.sortKey === sortKey ? extra.rows : []
+  const rows = [...initial.candidates, ...appended]
+  const total = initial.total
+  const meta: PostNextSuggestionsMeta | undefined = initial.meta
+  const emptyState = initial.empty_state
 
   const handleLoadMore = () => {
-    if (total === null || offset >= total || loadingMore) return
+    if (loadingMore || rows.length >= total) return
     setLoadingMore(true)
-    const cur = rows
+    setLoadMoreError(null)
     IdentityAPI.getSuggestions({
       limit: SUGGESTIONS_LIMIT,
-      offset: offset,
+      offset: rows.length,
       sort_by_date: sortParam,
     })
       .then((res) => {
-        const seen = new Set(cur.map((r) => r.image_key))
-        const extra = res.candidates.filter((c) => !seen.has(c.image_key))
-        const next = [...cur, ...extra]
-        setRows(next)
-        setTotal(res.total)
-        setOffset(next.length)
-        setMeta(res.meta)
-        setEmptyState(res.empty_state)
+        setExtra((prev) => {
+          if (prev.sortKey !== sortKey) return prev
+          const merged = [...initial.candidates, ...prev.rows]
+          const seen = new Set(merged.map((r) => r.image_key))
+          const more = res.candidates.filter((c) => !seen.has(c.image_key))
+          return { sortKey, rows: [...prev.rows, ...more] }
+        })
       })
       .catch((e) => {
-        setError(errMessage(e))
+        setLoadMoreError(errMessage(e))
       })
       .finally(() => {
         setLoadingMore(false)
       })
   }
 
-  const emptyMessage =
-    !loading && !error && rows.length === 0
-      ? emptyState ?? IDENTITY_POST_NEXT_EMPTY_FALLBACK
-      : null
+  const emptyMessage = rows.length === 0 ? emptyState ?? IDENTITY_POST_NEXT_EMPTY_FALLBACK : null
 
   return (
     <section className="space-y-3" aria-labelledby="identity-post-next-heading">
@@ -156,13 +137,13 @@ export function PostNextSuggestionsPanel() {
             schema={postNextSchema}
             filters={filters}
             summary={
-              !loading && !error && rows.length > 0 && total !== null ? (
+              rows.length > 0 ? (
                 <p className="text-sm text-text-secondary">
                   {msgShowingOf(rows.length, total, 'suggestions')}
                 </p>
               ) : null
             }
-            disabled={loading}
+            disabled={false}
           />
 
           {meta?.cadence_note ? (
@@ -174,25 +155,19 @@ export function PostNextSuggestionsPanel() {
             </p>
           ) : null}
 
-          {loading ? (
-            <p className="text-sm text-text-secondary" role="status" aria-live="polite">
-              {MSG_LOADING}
-            </p>
-          ) : null}
-
-          {error ? (
+          {loadMoreError ? (
             <p className="text-sm text-error" role="alert">
-              {error}
+              {loadMoreError}
             </p>
           ) : null}
 
-          {!loading && !error && emptyMessage ? (
+          {emptyMessage ? (
             <p className="text-sm text-text-secondary" role="status">
               {emptyMessage}
             </p>
           ) : null}
 
-          {!loading && !error && rows.length > 0 ? (
+          {rows.length > 0 ? (
             <>
               <ol className="space-y-4">
               {rows.map((row, i) => {
