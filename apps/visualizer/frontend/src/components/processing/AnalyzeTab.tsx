@@ -29,6 +29,7 @@ import {
   ANALYZE_DESCRIBE_JOB_STARTED,
   ANALYZE_FORCE_DESCRIBE_LABEL,
   ANALYZE_FORCE_SCORE_LABEL,
+  ANALYZE_BACKFILL_VISUAL_TAGS_LABEL,
   ANALYZE_JOB_FAILED_PREFIX,
   ANALYZE_JOB_STARTED,
   ANALYZE_PRIMARY_BUTTON,
@@ -105,6 +106,7 @@ export function AnalyzeTab(props: AnalyzeTabProps = {}) {
   const [batchMinRating, setBatchMinRating] = useState<number | null>(null);
   const [forceDescribe, setForceDescribe] = useState(false);
   const [forceScore, setForceScore] = useState(false);
+  const [backfillVisualTags, setBackfillVisualTags] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isStartingAnalyze, setIsStartingAnalyze] = useState(false);
   const [isStartingDescribe, setIsStartingDescribe] = useState(false);
@@ -198,8 +200,9 @@ export function AnalyzeTab(props: AnalyzeTabProps = {}) {
       ...buildSharedBaseMetadata(),
       force_describe: forceDescribe,
       force_score: forceScore,
+      backfill_visual_tags: backfillVisualTags,
     };
-  }, [buildSharedBaseMetadata, forceDescribe, forceScore]);
+  }, [buildSharedBaseMetadata, forceDescribe, forceScore, backfillVisualTags]);
 
   // Shared submission core: guards against double-submission (both from React's
   // async state and from cross-button clicks), runs the POST, shows an inline
@@ -245,11 +248,15 @@ export function AnalyzeTab(props: AnalyzeTabProps = {}) {
   const startDescriptionsOnly = useCallback(() => {
     void runSubmit(
       'batch_describe',
-      { ...buildSharedBaseMetadata(), force: forceDescribe },
+      {
+        ...buildSharedBaseMetadata(),
+        force: forceDescribe,
+        backfill_visual_tags: backfillVisualTags,
+      },
       ANALYZE_DESCRIBE_JOB_STARTED,
       setIsStartingDescribe,
     );
-  }, [runSubmit, buildSharedBaseMetadata, forceDescribe]);
+  }, [runSubmit, buildSharedBaseMetadata, forceDescribe, backfillVisualTags]);
 
   const startScoringOnly = useCallback(() => {
     void runSubmit(
@@ -429,6 +436,22 @@ export function AnalyzeTab(props: AnalyzeTabProps = {}) {
                   }}
                 />
                 <WorkerSlider value={options.maxWorkers} onChange={(v) => updateOption('maxWorkers', v)} />
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="backfill-visual-tags"
+                    checked={backfillVisualTags}
+                    onChange={(e) => setBackfillVisualTags(e.target.checked)}
+                    className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
+                  />
+                  <label
+                    htmlFor="backfill-visual-tags"
+                    className="text-sm text-text cursor-pointer"
+                  >
+                    {ANALYZE_BACKFILL_VISUAL_TAGS_LABEL}
+                  </label>
+                </div>
 
                 <div className="pt-4 border-t border-border space-y-3">
                   <h3 className="text-sm font-semibold text-text">

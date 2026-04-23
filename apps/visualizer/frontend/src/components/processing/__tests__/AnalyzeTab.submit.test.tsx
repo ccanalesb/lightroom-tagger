@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 
 import { deleteMatching } from '../../../data/cache';
 import { AnalyzeTab } from '../AnalyzeTab';
+import { ANALYZE_BACKFILL_VISUAL_TAGS_LABEL } from '../../../constants/strings';
 
 // Minimal MatchOptions provider the component expects. We stub it directly
 // rather than mounting the real provider so the test stays focused on the
@@ -143,5 +144,22 @@ describe('AnalyzeTab submit UX (fix #1)', () => {
     await act(async () => {
       resolveCreate({ id: 'first-job' });
     });
+  });
+
+  it('sends backfill_visual_tags in metadata when the Advanced backfill checkbox is checked', async () => {
+    mockCreate.mockResolvedValue({ id: 'backfill-job', type: 'batch_describe' });
+
+    renderAnalyzeTab();
+    await screen.findByText(/Street/);
+
+    fireEvent.click(screen.getByRole('button', { name: /Advanced options/i }));
+    const backfill = await screen.findByRole('checkbox', { name: ANALYZE_BACKFILL_VISUAL_TAGS_LABEL });
+    fireEvent.click(backfill);
+    const describeOnly = await screen.findByRole('button', { name: /Generate Descriptions only/i });
+    fireEvent.click(describeOnly);
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    const [, batchMeta] = mockCreate.mock.calls[0] as [string, Record<string, unknown>];
+    expect(batchMeta).toMatchObject({ backfill_visual_tags: true });
   });
 });

@@ -656,6 +656,8 @@ export const ANALYZE_ADVANCED_DESCRIBE_ONLY = 'Generate Descriptions only'
 export const ANALYZE_ADVANCED_SCORE_ONLY = 'Run scoring only'
 export const ANALYZE_FORCE_DESCRIBE_LABEL = 'Force regenerate descriptions'
 export const ANALYZE_FORCE_SCORE_LABEL = 'Force regenerate scores'
+export const ANALYZE_BACKFILL_VISUAL_TAGS_LABEL =
+  'Backfill visual tags (re-describe images with missing color/mood data)'
 export const ANALYZE_JOB_STARTED =
   'Analyze job started! Check Job Queue tab to monitor progress.'
 export const ANALYZE_DESCRIBE_JOB_STARTED =
