@@ -80,7 +80,7 @@
 
 - Natural-language input is translated to a **validated** Pydantic filter object (allowlisted fields only, including `dominant_colors` and `mood_tags` from VIS-01); invalid shapes rejected with clear errors.
 - End-to-end path from NL box → filters → result list without executing model-generated SQL.
-- Simple intents may bypass the LLM where documented; provider/registry alignment with existing app patterns.
+- LLM is always called — no bypass logic; provider/registry alignment via existing `FallbackDispatcher` + `complete_chat_text` pattern.
 
 #### Phase 3 — Semantic search & results
 

@@ -19,7 +19,7 @@ No new frontend UI — the Phase 5 chat panel (NLS-05) will consume this endpoin
 
 ### Endpoint shape
 - **D-01:** New endpoint — `POST /api/images/nl-search` (or similar) — accepts `{"query": "..."}` body.
-- **D-02:** Response returns **both** the derived filter object AND the catalog results, so Phase 5 can show "I interpreted your query as: posted=false, mood=moody, min_score=7". Shape: `{"filters": {...}, "results": [...], "total": N}`.
+- **D-02:** Response returns **both** the derived filter object AND the catalog results, so Phase 5 can show "I interpreted your query as: posted=false, mood=moody, min_score=7". Shape: `{"filters": {...}, "images": [...], "total": N}` — the row list key is `images`, matching `GET /api/images/catalog`.
 - **D-03:** No frontend changes in this phase — endpoint only.
 
 ### LLM call
