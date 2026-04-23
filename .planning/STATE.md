@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish & Consolidate
-status: Phase 7 complete — 6 plans executed (src/data/ cache+query+useQuery+invalidate+ErrorBoundary+ErrorState; Identity, Images, Processing, Analytics/Dashboard migrated; invalidation audit)
-last_updated: "2026-04-23T09:30:00.000Z"
+status: COMPLETE — milestone archived 2026-04-23
+last_updated: "2026-04-23T14:00:00.000Z"
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 31
+  total_phases: 9
+  completed_phases: 9
+  total_plans: 35
   completed_plans: 35
 ---
 
@@ -20,17 +20,26 @@ progress:
 
 | Field | Value |
 |-------|--------|
-| Active milestone | v2.1 Polish & Consolidate |
-| Phase | Phase 7 — React Suspense data layer |
-| Status | Phase 7 complete — DATA-01; all v2.1 phases complete |
-| Last activity | 2026-04-23 — Phase 7 executed: 6 plans / 6 waves; src/data/ primitives + full app migration (Identity, Images, Processing, Analytics, Dashboard) + invalidation audit; 248 tests / tsc / vite build all green |
+| Active milestone | — (v2.1 complete, v3.0 not yet started) |
+| Phase | — |
+| Status | v2.1 milestone archived · Ready for `/gsd-new-milestone` |
+| Last activity | 2026-04-23 — v2.1 milestone closed: 9 phases / 35 plans / 20 requirements · archived to milestones/v2.1-ROADMAP.md |
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-17)
+See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
-**Current focus:** v2.1 — Polish & consolidate v2.0's shipped surface before net-new capability in v3.0.
+**Current focus:** v2.1 complete — planning v3.0 (run `/gsd-new-milestone` to define next milestone).
+
+## Deferred Items
+
+Items acknowledged and deferred at milestone close on 2026-04-23:
+
+| Category | Item | Status |
+|----------|------|--------|
+| quick_task | 260420-840-consolidate-image-metadata | missing |
+| seed | SEED-001 through SEED-020 (20 dormant seeds) | dormant |
 
 ## Accumulated Context
 

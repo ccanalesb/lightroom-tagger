@@ -8,18 +8,11 @@ A web application that connects your Lightroom catalog with Instagram to track w
 
 Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
 
-## Current Milestone: v2.1 Polish & Consolidate
+## Current State: v2.1 Shipped — Planning v3.0
 
-**Goal:** Tighten v2.0's shipped surface — remove UX friction, fix inconsistencies, consolidate redundant workflows, and lay reusable filter foundations — before net-new capability in v3.0.
+**v2.1 shipped 2026-04-23.** All 20 requirements complete across 9 phases.
 
-**Target features:**
-- Matching & review flow polish (keep modal open after reject, sort unvalidated first)
-- Job queue & processing UX (modal loading UX, pagination, unified "Analyze" job)
-- Identity & Insights clarity (posted badges, narrative flow, posted/unposted split)
-- Images page visual consistency (badge/card unification)
-- Reusable filter framework (foundation for badge/card unification and posted/unposted split)
-
-**Seeds incorporated:** SEED-001, SEED-002, SEED-003, SEED-004, SEED-007, SEED-008, SEED-009, SEED-013, SEED-015
+See `milestones/v2.1-ROADMAP.md` for full archive. Next: `/gsd-new-milestone` to define v3.0.
 
 ## Requirements
 
@@ -50,6 +43,15 @@ Know which catalog images are posted on Instagram and get structured artistic cr
 - ✓ Insights dashboard with KPI row, score distributions, posting cadence, quick-nav — v2.0
 - ✓ Job checkpoint persistence surviving backend restarts — v2.0
 - ✓ Orphaned job auto-recovery on startup — v2.0
+- ✓ Match review flow: modal stays open after reject, unvalidated-first sort — v2.1 (POLISH-01, POLISH-02)
+- ✓ Job queue UX: skeleton loading, log truncation/expansion, paginated queue — v2.1 (JOB-03..05)
+- ✓ Unified Analyze job (describe → score) with advanced separate-stage option — v2.1 (JOB-06)
+- ✓ Reusable `useFilters` hook + `<FilterBar>` — CatalogTab + InstagramTab migrated — v2.1 (FILTER-01, FILTER-02)
+- ✓ Posted/unposted visibility on BestPhotosGrid and Dashboard Top Photos — v2.1 (IDENT-04, DASH-02, DASH-03)
+- ✓ Identity page narrative flow: fingerprint → best → post next with section intros — v2.1 (IDENT-05)
+- ✓ Images page badge and match card visual consistency — v2.1 (UI-01..03)
+- ✓ React Suspense data layer: zero useEffect fetches, module-level cache, no new deps — v2.1 (DATA-01)
+- ✓ Two-stage cascade matching: description + vision weighted scoring, skip_undescribed — v2.1 (MATCH-01..04)
 
 ### Deferred (future)
 
@@ -76,13 +78,15 @@ The user is a photographer managing work across multiple Lightroom catalogs (per
 ### Current State
 - **v1.0 shipped** (2026-04-11) — 4 phases, 22 requirements: catalog management, jobs, Instagram sync, AI descriptions
 - **v2.0 shipped** (2026-04-15) — 7 phases, 17 requirements: structured scoring, posting analytics, identity/suggestions, insights dashboard
-- **v2.1 Phase 5 complete** (2026-04-21) — Identity & Insights clarity: posted/unposted overlay on BestPhotosGrid, Identity page narrative reorder (fingerprint → best → post next), Dashboard Top Photos Unposted/Posted/All tabs via `useFilters`
-- ~32K LOC across Python backend and React/TypeScript frontend
+- **v2.1 shipped** (2026-04-23) — 9 phases, 20 requirements: matching polish, job queue UX, filter framework, identity clarity, badge/card consistency, React Suspense data layer, two-stage cascade matching
+- ~38K LOC across Python backend and React/TypeScript frontend (405 files changed in v2.1)
 - Tech stack: Flask + SQLite (catalog read-only, library DB read-write), React 19 + Vite + Recharts + CodeMirror
 - 4 configurable critique perspectives with photography-theory rubrics
 - Pydantic-validated structured output with deterministic + LLM JSON repair
 - Job checkpointing and orphan recovery for crash resilience
-- No known tech debt or open blockers
+- React Suspense data layer: module-level cache, useQuery, invalidate/invalidateAll, ErrorBoundary — zero new npm deps
+- Reusable filter framework: `useFilters(schema)` + `<FilterBar>` — CatalogTab + InstagramTab migrated; remaining tabs deferred v3.0
+- Pre-existing `test_providers_api.py::TestDefaults` backend test failure (provider default drift, unrelated to v2.1)
 
 ### Instagram Dump Format
 User provides Instagram export dumps containing images, captions, timestamps, and EXIF. App matches these to Lightroom catalog entries by comparing images, then writes keywords back to the SQLite catalog file. Instagram exports do NOT include per-post engagement metrics — analytics are derived from posting patterns and AI scores only.
@@ -115,6 +119,12 @@ Critique comes from defined perspectives (street photographer, documentary, publ
 | Parallel API composition for dashboard | Avoids monolithic endpoint; fast SQLite queries | ✓ Good — D-52 confirmed; no measured latency issue |
 | Score supersede semantics | Re-run with new rubric preserves history | ✓ Good — version history UI lets users compare |
 | Checkpoint-based job resilience | Long batch jobs must survive restarts | ✓ Good — orphan recovery on startup works |
+| `useFilters` internal debounce + live rawValue | Simpler API; chips need live values during typing | ✓ Good — CatalogTab migration clean (D-18 preserved) |
+| `FilterBar` receives `filters: UseFiltersReturn` (no hook call) | Avoids double-hook anti-pattern | ✓ Good — clean container/presenter split |
+| Phase 7: module-level cache (no Context API) | Simpler invalidation, no provider wrapping | ✓ Good — invalidation audit required no component changes |
+| Phase 7: class component ErrorBoundary (no dep) | React class boundaries are the only standard option | ✓ Good — zero new deps preserved |
+| Two-stage cascade: no weight redistribution | Explicit weights; `vision_weight=0` = no vision, not rebalance | ✓ Good — D-10 test confirmed; no silent bugs |
+| Phase 8 added mid-v2.1 | Description signal was broken; fix required for correct matching | ✓ Good — added without disrupting completed phases |
 
 ## Evolution
 
@@ -134,4 +144,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-21 — Phase 5 complete (Identity & Insights clarity)*
+*Last updated: 2026-04-23 — v2.1 milestone complete (Polish & Consolidate)*
