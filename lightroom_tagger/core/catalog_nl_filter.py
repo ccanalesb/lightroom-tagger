@@ -59,11 +59,10 @@ class CatalogNlFilter(BaseModel):
 
     @model_validator(mode="after")
     def _validate_score_perspective(self) -> Self:
-        if self.min_score is not None or self.sort_by_score is not None:
-            if self.score_perspective is None:
-                raise ValueError(
-                    "score_perspective is required when min_score or sort_by_score is set"
-                )
+        if (self.min_score is not None or self.sort_by_score is not None) and self.score_perspective is None:
+            raise ValueError(
+                "score_perspective is required when min_score or sort_by_score is set"
+            )
         if self.score_perspective is not None:
             sp = self.score_perspective.strip()
             if not sp:
