@@ -27,6 +27,12 @@ def test_fingerprint_batch_describe_stable_and_force_sensitive() -> None:
     assert a == b
     meta_force = {**meta, "force": True}
     assert fingerprint_batch_describe(meta_force, pairs) != a
+    meta_backfill = {**meta, "backfill_visual_tags": True}
+    assert fingerprint_batch_describe(meta_backfill, pairs) != a
+    assert (
+        fingerprint_batch_describe({**meta, "backfill_visual_tags": True}, pairs)
+        == fingerprint_batch_describe(dict(meta_backfill), list(pairs))
+    )
     meta_ps = {**meta, "perspective_slugs": ["street", "documentary"]}
     assert fingerprint_batch_describe(meta_ps, pairs) != a
 

@@ -53,6 +53,7 @@ def fingerprint_batch_describe(
     else:
         perspective_slugs_fp = None
     payload = {
+        "backfill_visual_tags": bool(metadata.get("backfill_visual_tags", False)),
         "date_filter": metadata.get("date_filter", "all"),
         "force": bool(metadata.get("force", False)),
         "image_type": metadata.get("image_type", "both"),
