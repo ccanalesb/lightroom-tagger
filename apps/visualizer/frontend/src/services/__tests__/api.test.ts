@@ -1,11 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { JobsAPI, ImagesAPI } from '../api'
+import { deleteMatching } from '../../data/cache'
+import { query } from '../../data/query'
+import { JobsAPI, ImagesAPI, MatchingAPI, DescriptionsAPI } from '../api'
 
 const fetchMock = vi.fn()
 globalThis.fetch = fetchMock
 
+function catchThrown(fn: () => void): unknown {
+  try {
+    fn()
+    return undefined
+  } catch (e) {
+    return e
+  }
+}
+
 describe('JobsAPI', () => {
   beforeEach(() => {
+    deleteMatching(() => true)
     vi.clearAllMocks()
   })
 
@@ -125,6 +137,7 @@ describe('JobsAPI', () => {
 
 describe('ImagesAPI.getImageDetail', () => {
   beforeEach(() => {
+    deleteMatching(() => true)
     vi.clearAllMocks()
   })
 
@@ -158,5 +171,102 @@ describe('ImagesAPI.getImageDetail', () => {
     await ImagesAPI.getImageDetail('instagram', 'ig1')
     const url = fetchMock.mock.calls[0][0] as string
     expect(url).toMatch(/\/images\/instagram\/ig1$/)
+  })
+})
+
+describe('mutation invalidation (cache)', () => {
+  beforeEach(() => {
+    deleteMatching(() => true)
+    vi.clearAllMocks()
+  })
+
+  it('MatchingAPI.validate clears matching.groups query so list refetches', async () => {
+    const listPayload = {
+      total: 0,
+      total_groups: 0,
+      match_groups: [] as unknown[],
+      matches: [] as unknown[],
+    }
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => listPayload,
+    })
+    const listFetcher = () => MatchingAPI.list(100, 0, { sort_by_date: 'newest' })
+    const p1 = catchThrown(() => query(['matching.groups', 'newest'], listFetcher)) as Promise<unknown>
+    await p1
+    expect(query(['matching.groups', 'newest'], listFetcher)).toEqual(listPayload)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ validated: true }),
+    })
+    await MatchingAPI.validate('ck', 'ik')
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => listPayload,
+    })
+    const p2 = catchThrown(() => query(['matching.groups', 'newest'], listFetcher)) as Promise<unknown>
+    await p2
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('MatchingAPI.reject clears matching.groups query so list refetches', async () => {
+    const listPayload = {
+      total: 0,
+      total_groups: 0,
+      match_groups: [] as unknown[],
+      matches: [] as unknown[],
+    }
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => listPayload,
+    })
+    const listFetcher = () => MatchingAPI.list(50, 0, { sort_by_date: 'oldest' })
+    const p1 = catchThrown(() => query(['matching.groups', 'oldest'], listFetcher)) as Promise<unknown>
+    await p1
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ rejected: true }),
+    })
+    await MatchingAPI.reject('c1', 'i1')
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => listPayload,
+    })
+    const p2 = catchThrown(() => query(['matching.groups', 'oldest'], listFetcher)) as Promise<unknown>
+    await p2
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('DescriptionsAPI.generate clears descriptions query for that image key', async () => {
+    const imageKey = 'img-42'
+    const getPayload = { description: { summary: 'x' } }
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => getPayload,
+    })
+    const fetcher = () => DescriptionsAPI.get(imageKey)
+    const p1 = catchThrown(() => query(['descriptions', imageKey], fetcher)) as Promise<unknown>
+    await p1
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ generated: true, description: null }),
+    })
+    await DescriptionsAPI.generate(imageKey, 'catalog')
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => getPayload,
+    })
+    const p2 = catchThrown(() => query(['descriptions', imageKey], fetcher)) as Promise<unknown>
+    await p2
+    expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 })
