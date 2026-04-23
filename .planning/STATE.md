@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: Polish & Consolidate
-status: COMPLETE — milestone archived 2026-04-23
-last_updated: "2026-04-23T14:00:00.000Z"
+milestone: v3.0
+milestone_name: Intelligent Discovery
+status: Defining requirements
+last_updated: "2026-04-23T14:30:00.000Z"
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 35
-  completed_plans: 35
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Planning state
@@ -20,10 +20,10 @@ progress:
 
 | Field | Value |
 |-------|--------|
-| Active milestone | — (v2.1 complete, v3.0 not yet started) |
-| Phase | — |
-| Status | v2.1 milestone archived · Ready for `/gsd-new-milestone` |
-| Last activity | 2026-04-23 — v2.1 milestone closed: 9 phases / 35 plans / 20 requirements · archived to milestones/v2.1-ROADMAP.md |
+| Active milestone | v3.0 Intelligent Discovery |
+| Phase | Not started (defining requirements) |
+| Status | Defining requirements |
+| Last activity | 2026-04-23 — v3.0 started: NL search + photo stacking + visual attribute tags + visual similarity |
 
 ## Project Reference
 
