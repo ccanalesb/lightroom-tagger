@@ -2,6 +2,7 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 import shutil
 import sqlite3
 import threading
@@ -224,6 +225,26 @@ def _serialize_json(value) -> str | None:
     if isinstance(value, str):
         return value
     return json.dumps(value)
+
+
+def build_description_search_document(summary: str, subjects_json_or_obj: object) -> str:
+    """Build normalized full-text for summary + subjects (D-06)."""
+    part = re.sub(r"\s+", " ", (summary or "").strip())
+    if isinstance(subjects_json_or_obj, str):
+        try:
+            subj = json.loads(subjects_json_or_obj)
+        except (json.JSONDecodeError, TypeError):
+            subj = []
+    elif isinstance(subjects_json_or_obj, list):
+        subj = subjects_json_or_obj
+    else:
+        subj = []
+    joined = " ".join(s for s in subj if isinstance(s, str))
+    if not joined:
+        return part
+    if not part:
+        return joined
+    return f"{part} {joined}"
 
 
 def _perspective_seed_description(markdown: str) -> str:
@@ -458,6 +479,13 @@ def init_database(db_path: str) -> sqlite3.Connection:
 
         CREATE INDEX IF NOT EXISTS idx_desc_image_type ON image_descriptions(image_type);
 
+        CREATE VIRTUAL TABLE IF NOT EXISTS image_descriptions_fts USING fts5(
+            description_search_document,
+            tokenize='porter unicode61',
+            content='image_descriptions',
+            content_rowid='rowid'
+        );
+
         CREATE TABLE IF NOT EXISTS perspectives (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             slug TEXT NOT NULL UNIQUE,
@@ -501,6 +529,10 @@ def init_database(db_path: str) -> sqlite3.Connection:
     _migrate_add_column(conn, 'matches', 'validated_at', 'TEXT')
     _migrate_add_column(conn, 'matches', 'rank', 'INTEGER DEFAULT 1')
     _migrate_add_column(conn, 'matches', 'vision_reasoning', 'TEXT')
+    _migrate_add_column(conn, 'image_descriptions', 'dominant_colors', 'TEXT')
+    _migrate_add_column(conn, 'image_descriptions', 'mood_tags', 'TEXT')
+    _migrate_add_column(conn, 'image_descriptions', 'has_repetition', 'INTEGER')
+    _migrate_add_column(conn, 'image_descriptions', 'description_search_document', 'TEXT')
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_dump_media_processed_attempted "
         "ON instagram_dump_media(processed, last_attempted_at)"
@@ -521,6 +553,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
 
     _migrate_unified_image_keys(conn)
     _backfill_matched_catalog_key_from_validated_matches(conn)
+    _migrate_image_descriptions_fts(conn)
     seed_perspectives_from_prompts_dir(conn)
     conn.commit()
     return conn
@@ -635,6 +668,36 @@ def _backfill_matched_catalog_key_from_validated_matches(conn: sqlite3.Connectio
         # leave user_version unchanged so the next init retries.
         return
     conn.execute("PRAGMA user_version = 2")
+
+
+def _migrate_image_descriptions_fts(conn: sqlite3.Connection) -> None:
+    """Backfill description_search_document and rebuild FTS5 (D-05). Runs once (user_version 2 → 3)."""
+    row = conn.execute("PRAGMA user_version").fetchone()
+    current_uv = int(row["user_version"] if row else 0)
+    if current_uv >= 3:
+        return
+    try:
+        rows = conn.execute(
+            "SELECT image_key, summary, subjects FROM image_descriptions "
+            "WHERE description_search_document IS NULL AND image_type = 'catalog'"
+        ).fetchall()
+        for r in rows:
+            doc = build_description_search_document(
+                r.get("summary") or "",
+                r.get("subjects") if r.get("subjects") is not None else "[]",
+            )
+            conn.execute(
+                "UPDATE image_descriptions SET description_search_document = ? "
+                "WHERE image_key = ?",
+                (doc if doc else None, r["image_key"]),
+            )
+        # D-05: one-shot FTS rebuild from external content after backfilling text.
+        conn.execute(
+            "INSERT INTO image_descriptions_fts(image_descriptions_fts) VALUES('rebuild')"
+        )
+    except sqlite3.OperationalError:
+        return
+    conn.execute("PRAGMA user_version = 3")
 
 
 def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
