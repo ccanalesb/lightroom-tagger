@@ -2804,7 +2804,7 @@ def _handle_batch_stack_detect_inner(runner, job_id: str, metadata: dict) -> Non
             with library_write(lib_db):
                 cur = lib_db.execute(
                     'INSERT INTO image_stacks (representative_key, stack_size, user_modified) '
-                    'VALUES (?, ?, 0)',
+                    'VALUES (?, ?, ?)',
                     (rep, n, 0),
                 )
                 stack_id = int(cur.lastrowid)
