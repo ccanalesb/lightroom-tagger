@@ -2,6 +2,8 @@ import os
 import tempfile
 import unittest
 
+import sqlite_vec
+
 from lightroom_tagger.core.database import (
     batch_update_hashes,
     build_description_fts_query,
@@ -19,6 +21,7 @@ from lightroom_tagger.core.database import (
     init_database,
     init_image_descriptions_table,
     init_vision_comparisons_table,
+    library_write,
     migrate_unified_image_keys,
     query_catalog_images,
     store_image,
@@ -28,6 +31,7 @@ from lightroom_tagger.core.database import (
     store_vision_comparison,
     update_image_hash,
     update_instagram_status,
+    upsert_image_clip_embedding,
 )
 
 
@@ -79,6 +83,29 @@ class TestDatabase(unittest.TestCase):
         self.assertIn("float[512]", clip_sql)
         uv = self.db.execute("PRAGMA user_version").fetchone()
         self.assertEqual(int(uv["user_version"]), 5)
+
+    def test_init_database_image_clip_embedding_roundtrip(self):
+        """CLIP vec0 row round-trip via library_write and upsert (Phase 5 SIM-01)."""
+        uv = self.db.execute("PRAGMA user_version").fetchone()
+        self.assertEqual(int(uv["user_version"]), 5)
+        key = store_image(
+            self.db,
+            {
+                "date_taken": "2024-01-15",
+                "filename": "clip_rt.jpg",
+                "filepath": "/tmp/clip_rt.jpg",
+            },
+        )
+        blob = sqlite_vec.serialize_float32([0.0] * 512)
+        self.assertEqual(len(blob), 2048)
+        with library_write(self.db):
+            upsert_image_clip_embedding(self.db, key, blob)
+        row = self.db.execute(
+            "SELECT embedding FROM image_clip_embeddings WHERE image_key = ?",
+            (key,),
+        ).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(len(row["embedding"]), 2048)
 
     def test_generate_key(self):
         """Test key generation."""
