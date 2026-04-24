@@ -1,0 +1,79 @@
+---
+description: During gsd-execute-phase verify_phase_goal, live-validate every new API endpoint and LLM integration before marking the phase passed
+alwaysApply: false
+---
+
+# GSD Live Validation — Mandatory Before Phase Passes
+
+During `verify_phase_goal` in `gsd-execute-phase`, reading code and SUMMARY.md files is not sufficient. Any phase that adds or modifies backend API routes or LLM integrations **must pass live validation** before the phase can be marked `passed`.
+
+## Required checks by change type
+
+### Backend API endpoints (new or modified routes)
+
+For every route added or changed, run a real `curl` call against the running server and verify:
+- HTTP status is 2xx
+- Response JSON has the expected shape (at minimum, required top-level keys exist)
+- No empty results where data is expected (test with a known-good query)
+
+```bash
+# Check backend is up first
+curl -sf http://localhost:5001/api/jobs/ > /dev/null || echo "BACKEND DOWN — start it before validating"
+
+# Example for a new endpoint
+curl -s http://localhost:5001/api/your-endpoint | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert 'expected_key' in d, f'Missing key: {d}'
+print('PASS')
+"
+```
+
+### LLM / NL filter integrations
+
+Send a real query through the full chain and verify the response is non-empty and uses the right search path:
+
+```bash
+curl -s http://localhost:5001/api/images/chat-search \
+  -H "Content-Type: application/json" \
+  -d '{"message":"<representative query>","messages":[],"limit":5}' | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+assert d.get('total', 0) > 0, f'Zero results — check NL filter prompt or fallback: {d}'
+assert d.get('search_mode') in ('nl_filter', 'semantic'), f'Unexpected mode: {d}'
+print('PASS — mode:', d['search_mode'], 'total:', d['total'])
+"
+```
+
+### TypeScript / frontend changes
+
+```bash
+cd apps/visualizer/frontend && npx tsc --noEmit
+```
+
+Must exit 0. No exceptions.
+
+### New API client methods
+
+If a new method is added to `services/api.ts`, verify the backend endpoint it calls is reachable and returns valid JSON (use curl, see above).
+
+## Failure handling
+
+If any live check fails:
+
+1. **Do not mark the phase `passed`** — set status to `human_needed` or `gaps_found`
+2. Diagnose: check backend logs (`tail /tmp/backend.log`), verify DB state, inspect the prompt/filter logic
+3. Fix the issue, re-run the check, then proceed
+4. Document the failure and fix in the phase's VERIFICATION.md
+
+## What this rule replaces / supplements
+
+The existing `verify_phase_goal` step reads plan files and summaries. This rule adds the requirement that **the system actually works at runtime**, not just that the code was written. Both checks are required — code review + live validation.
+
+## Scope
+
+Apply this rule whenever a phase touches:
+- `apps/visualizer/backend/api/`
+- `lightroom_tagger/core/`
+- `apps/visualizer/frontend/src/services/api.ts`
+- Any LLM prompt string or NL filter logic
