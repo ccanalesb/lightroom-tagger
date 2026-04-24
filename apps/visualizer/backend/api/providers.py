@@ -52,19 +52,37 @@ def defaults():
 
 @bp.route("/models/description", methods=["GET"])
 def all_description_models():
-    """Flat list of all models across all providers, for the NL/description task selector."""
+    """Flat list of all models across all providers, for the NL/description task selector.
+
+    For providers with no statically configured models (e.g. oMLX), attempts a live
+    /v1/models discovery with a short timeout so the selector still includes them when
+    they are running.
+    """
     registry = _get_registry()
     result = []
     for provider in registry.list_providers():
         pid = provider["id"]
         models_list = registry.list_models(pid)
+
+        if not models_list:
+            try:
+                client = registry.get_client(pid)
+                discovered = list(client.models.list(timeout=2.0))
+                models_list = [
+                    {"id": m.id, "name": m.id, "source": "discovered"}
+                    for m in discovered
+                ]
+            except Exception:
+                pass
+
         for m in models_list:
             result.append({
                 "provider_id": pid,
                 "provider_name": provider["name"],
                 "model_id": m["id"],
-                "model_name": m["name"],
+                "model_name": m.get("name", m["id"]),
             })
+
     defaults = registry.defaults.get("description", {}) or {}
     return jsonify({
         "models": result,
