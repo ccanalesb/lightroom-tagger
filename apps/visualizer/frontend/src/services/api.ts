@@ -1113,6 +1113,19 @@ export interface ProviderModel {
   source: 'config' | 'discovered' | 'user'
 }
 
+export interface DescriptionModel {
+  provider_id: string
+  provider_name: string
+  model_id: string
+  model_name: string
+}
+
+export interface DescriptionModelsResponse {
+  models: DescriptionModel[]
+  default_provider: string | null
+  default_model: string | null
+}
+
 export interface ProviderDefaults {
   vision_comparison: { provider: string; model: string | null }
   description: { provider: string; model: string | null }
@@ -1120,6 +1133,8 @@ export interface ProviderDefaults {
 
 export const ProvidersAPI = {
   list: () => request<Provider[]>('/providers/'),
+  listDescriptionModels: () =>
+    request<DescriptionModelsResponse>('/providers/models/description'),
   health: (providerId: string) =>
     request<{ reachable: boolean; error?: string }>(
       `/providers/${encodeURIComponent(providerId)}/health`,

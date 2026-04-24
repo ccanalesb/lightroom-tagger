@@ -50,6 +50,29 @@ def defaults():
     return jsonify(registry.defaults)
 
 
+@bp.route("/models/description", methods=["GET"])
+def all_description_models():
+    """Flat list of all models across all providers, for the NL/description task selector."""
+    registry = _get_registry()
+    result = []
+    for provider in registry.list_providers():
+        pid = provider["id"]
+        models_list = registry.list_models(pid)
+        for m in models_list:
+            result.append({
+                "provider_id": pid,
+                "provider_name": provider["name"],
+                "model_id": m["id"],
+                "model_name": m["name"],
+            })
+    defaults = registry.defaults.get("description", {}) or {}
+    return jsonify({
+        "models": result,
+        "default_provider": defaults.get("provider"),
+        "default_model": defaults.get("model"),
+    })
+
+
 @bp.route("/<provider_id>/health", methods=["GET"])
 def provider_health(provider_id: str):
     registry = _get_registry()

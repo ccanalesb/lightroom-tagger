@@ -1,10 +1,18 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { ImageDetailModal, ImageTile, fromCatalogListRow } from '../components/image-view'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { TileGrid } from '../components/ui/TileGrid'
 import { SkeletonGrid } from '../components/ui/page-states'
-import { ImagesAPI, type CatalogImage, type ChatSearchResultImage } from '../services/api'
+import {
+  ImagesAPI,
+  ProvidersAPI,
+  type CatalogImage,
+  type ChatSearchResultImage,
+  type DescriptionModel,
+} from '../services/api'
+
+const MODEL_STORAGE_KEY = 'search:selected_model'
 
 type Message = {
   role: 'user' | 'assistant'
@@ -15,6 +23,10 @@ type Message = {
 
 type SelectedImage = { key: string; initial?: CatalogImage }
 
+function modelKey(m: DescriptionModel) {
+  return `${m.provider_id}::${m.model_id}`
+}
+
 export function SearchPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -22,6 +34,36 @@ export function SearchPage() {
   const [errorText, setErrorText] = useState<string | null>(null)
   const [currentImages, setCurrentImages] = useState<ChatSearchResultImage[]>([])
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null)
+
+  const [availableModels, setAvailableModels] = useState<DescriptionModel[]>([])
+  const [selectedModelKey, setSelectedModelKey] = useState<string>(
+    () => localStorage.getItem(MODEL_STORAGE_KEY) ?? '',
+  )
+
+  useEffect(() => {
+    ProvidersAPI.listDescriptionModels()
+      .then(({ models, default_provider, default_model }) => {
+        setAvailableModels(models)
+        setSelectedModelKey((prev) => {
+          if (prev && models.some((m) => modelKey(m) === prev)) return prev
+          if (default_provider && default_model) {
+            const key = `${default_provider}::${default_model}`
+            if (models.some((m) => modelKey(m) === key)) return key
+          }
+          return models.length > 0 ? modelKey(models[0]) : ''
+        })
+      })
+      .catch(() => {
+        // non-fatal — selector stays empty, backend uses its own default
+      })
+  }, [])
+
+  const handleModelChange = (key: string) => {
+    setSelectedModelKey(key)
+    localStorage.setItem(MODEL_STORAGE_KEY, key)
+  }
+
+  const resolvedModel = availableModels.find((m) => modelKey(m) === selectedModelKey)
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -39,7 +81,12 @@ export function SearchPage() {
     setMessages((prev) => [...prev, { role: 'user', content: trimmed }])
 
     try {
-      const data = await ImagesAPI.chatSearch({ message: trimmed, messages: prior, limit: 50 })
+      const data = await ImagesAPI.chatSearch({
+        message: trimmed,
+        messages: prior,
+        limit: 50,
+        model: resolvedModel?.model_id,
+      })
       setCurrentImages(data.images)
       setMessages((prev) => [
         ...prev,
@@ -88,6 +135,25 @@ export function SearchPage() {
               onSubmit={handleSubmit}
               className="mt-auto flex flex-col gap-2 pt-2 border-t border-border shrink-0"
             >
+              {availableModels.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <label htmlFor="model-select" className="text-xs text-text-secondary whitespace-nowrap">
+                    Model
+                  </label>
+                  <select
+                    id="model-select"
+                    value={selectedModelKey}
+                    onChange={(e) => handleModelChange(e.target.value)}
+                    className="flex-1 rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    {availableModels.map((m) => (
+                      <option key={modelKey(m)} value={modelKey(m)}>
+                        {m.model_name} ({m.provider_name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <label htmlFor="search-chat-input" className="sr-only">
                 Message
               </label>
