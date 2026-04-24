@@ -7,12 +7,14 @@ import {
   NAV_IDENTITY,
   NAV_IMAGES,
   NAV_PROCESSING,
+  NAV_SEARCH,
 } from '../constants/strings';
 
 export function Layout() {
   const navItems = [
     { to: '/', label: NAV_INSIGHTS, exact: true },
     { to: '/images', label: NAV_IMAGES },
+    { to: '/search', label: NAV_SEARCH },
     { to: '/analytics', label: NAV_ANALYTICS },
     { to: '/identity', label: NAV_IDENTITY },
     { to: '/processing', label: NAV_PROCESSING },
