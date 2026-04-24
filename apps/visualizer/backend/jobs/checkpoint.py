@@ -29,6 +29,10 @@ their own slice of ``metadata`` (the analyze handler normalizes ``force_describe
 **batch_text_embed** — ``job_type``, ``fingerprint``, ``processed_pairs`` (``"key|catalog"`` strings),
 ``total_at_start`` (same semantics as ``batch_describe``).
 
+**batch_embed_image** — ``job_type: 'batch_embed_image'``, ``fingerprint``, ``processed_pairs`` (sorted list of
+catalog ``image_key`` strings — the same strings that appear in the fingerprint's ``pairs`` array),
+``total_at_start``, ``checkpoint_version: 1``.
+
 **batch_stack_detect** — ``job_type``, ``fingerprint``, ``processed_image_keys`` (catalog ``images.key``
 values, sorted on persist), ``total_at_start`` (int), ``checkpoint_version: 1``. Fingerprint includes
 ``delta_ms`` (resolved ms), ``force_mode`` (``incremental`` | ``full`` | ``preserve_edited``), and
@@ -41,6 +45,7 @@ import hashlib
 import json
 from typing import Any
 
+from lightroom_tagger.core.clip_embedding_service import CLIP_EMBED_DIM, CLIP_EMBED_MODEL_ID
 from lightroom_tagger.core.embedding_service import TEXT_EMBED_DIM, TEXT_EMBED_MODEL_ID
 
 CHECKPOINT_VERSION: int = 1
@@ -93,6 +98,30 @@ def fingerprint_batch_text_embed(
         "date_filter": metadata.get("date_filter", "all"),
         "embedding_dim": TEXT_EMBED_DIM,
         "embedding_model_id": TEXT_EMBED_MODEL_ID,
+        "force": bool(metadata.get("force", False)),
+        "image_type": str(metadata.get("image_type", "catalog")),
+        "min_rating": min_rating,
+        "pairs": pairs,
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def fingerprint_batch_embed_image(
+    metadata: dict[str, Any], ordered_keys: list[str]
+) -> str:
+    """SHA-256 hex of canonical JSON for batch_embed_image inputs and ordered key list."""
+    min_rating_raw = metadata.get("min_rating")
+    min_rating: int | None
+    try:
+        min_rating = int(min_rating_raw) if min_rating_raw is not None else None
+    except (TypeError, ValueError):
+        min_rating = None
+    pairs = sorted(ordered_keys)
+    payload = {
+        "date_filter": metadata.get("date_filter", "all"),
+        "embedding_dim": CLIP_EMBED_DIM,
+        "embedding_model_id": CLIP_EMBED_MODEL_ID,
         "force": bool(metadata.get("force", False)),
         "image_type": str(metadata.get("image_type", "catalog")),
         "min_rating": min_rating,
