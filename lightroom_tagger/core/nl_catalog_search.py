@@ -27,9 +27,10 @@ Do not include any other keys. Field meanings:
 - sort_by_score: "asc" or "desc" (requires score_perspective)
 - sort_by_date: "newest" or "oldest"
 - description_search: free-text search on AI-generated image descriptions — use this for ANY query about visual content, subjects, scenes, actions, gestures, objects, mood, or composition
-- dominant_colors, mood_tags: JSON arrays of strings
+- dominant_colors: JSON array of hex color codes (e.g. ["#ff0000","#c62828"]) extracted from images — ONLY use when the user provides an explicit hex code; do NOT use for color names like "red" or "blue" since the DB stores hex values, not names
+- mood_tags: JSON array of mood strings (e.g. ["melancholic","energetic"]) — only use when the user explicitly mentions mood
 
-IMPORTANT: When the user asks about what is visually in photos (people, objects, actions, scenes, lighting, etc.) always use description_search, not keyword.
+IMPORTANT: When the user asks about what is visually in photos (people, objects, actions, scenes, lighting, colours by name, etc.) always use description_search, not keyword or dominant_colors.
 """
 
 
