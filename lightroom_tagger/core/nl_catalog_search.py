@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
+import sqlite3
 from collections.abc import Callable
 
 from lightroom_tagger.core.fallback import FallbackDispatcher
 from lightroom_tagger.core.provider_errors import ModelUnavailableError
 from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.search_tools import ALL_TOOLS, execute_tool
 from lightroom_tagger.core.vision_client import complete_chat_messages, complete_chat_text
 
 LogCallback = Callable[[str, str], None] | None
@@ -170,3 +173,139 @@ def run_nl_catalog_filter_llm_multi_turn(
         log_callback=log_callback,
     )
     return raw
+
+
+def _messages_for_openai_tool_loop(messages: list[dict]) -> list[dict]:
+    """Build an OpenAI Chat Completions message list with tool turns preserved."""
+    out: list[dict] = []
+    for m in messages:
+        if not isinstance(m, dict):
+            continue
+        role_raw = str(m.get("role", "")).strip().lower()
+        if role_raw == "system":
+            c = m.get("content")
+            if c is not None and str(c).strip():
+                out.append({"role": "system", "content": str(c)})
+            continue
+        if role_raw == "user":
+            content = m.get("content", "")
+            if not str(content).strip():
+                continue
+            out.append({"role": "user", "content": str(content)})
+            continue
+        if role_raw == "assistant":
+            item: dict = {"role": "assistant"}
+            if m.get("content") is not None:
+                item["content"] = m.get("content")
+            tcs = m.get("tool_calls")
+            if tcs:
+                item["tool_calls"] = tcs
+            if "content" not in item and not tcs:
+                continue
+            if "content" not in item and tcs is not None:
+                item["content"] = None
+            out.append(item)
+            continue
+        if role_raw == "tool":
+            tcid = m.get("tool_call_id")
+            if not tcid:
+                continue
+            out.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": str(tcid),
+                    "content": m.get("content", "") if m.get("content") is not None else "",
+                }
+            )
+    return out
+
+
+def run_tool_calling_search(
+    messages: list[dict],
+    *,
+    provider_id: str | None = None,
+    model: str | None = None,
+    db: sqlite3.Connection,
+    log_callback: LogCallback = None,
+    max_tool_rounds: int = 5,
+) -> tuple[str, list[dict]]:
+    """Run multi-turn tool-calling search loop.
+
+    Returns (assistant_text, updated_messages_with_tool_turns).
+    The returned messages list includes tool_call and tool_result turns
+    so the frontend can persist them for multi-turn continuity.
+    """
+    registry = ProviderRegistry()
+    desc_defaults = registry.defaults.get("description", {}) or {}
+    resolved_provider = provider_id or desc_defaults.get("provider")
+    if not resolved_provider:
+        raise ModelUnavailableError(
+            "No provider configured for tool-calling search",
+            provider=None,
+            model=None,
+        )
+    resolved_model = model or desc_defaults.get("model")
+    if not resolved_model:
+        models = registry.list_models(resolved_provider)
+        if not models:
+            raise ModelUnavailableError(
+                f"No models for provider {resolved_provider!r}",
+                provider=resolved_provider,
+                model=None,
+            )
+        resolved_model = models[0]["id"]
+
+    client = registry.get_client(resolved_provider)
+    conv = _messages_for_openai_tool_loop(messages)
+    if not any(m.get("role") == "user" for m in conv):
+        raise ValueError("tool-calling search requires at least one user message")
+    updated_messages: list[dict] = list(messages)
+
+    for _round in range(max_tool_rounds):
+        response = client.chat.completions.create(
+            model=resolved_model,
+            messages=conv,
+            tools=ALL_TOOLS,
+            tool_choice="auto",
+        )
+        msg = response.choices[0].message
+
+        if not msg.tool_calls:
+            text = (msg.content or "") if msg.content is not None else ""
+            updated_messages.append({"role": "assistant", "content": text})
+            return text, updated_messages
+
+        tool_calls_payload = [
+            {
+                "id": tc.id,
+                "type": "function",
+                "function": {"name": tc.function.name, "arguments": tc.function.arguments or ""},
+            }
+            for tc in msg.tool_calls
+        ]
+        asst_tool = {
+            "role": "assistant",
+            "content": msg.content,
+            "tool_calls": tool_calls_payload,
+        }
+        conv.append(asst_tool)
+        updated_messages.append(asst_tool)
+
+        for tc in msg.tool_calls:
+            try:
+                args = json.loads(tc.function.arguments or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            if not isinstance(args, dict):
+                args = {}
+            result = execute_tool(tc.function.name, args, db)
+            result_str = json.dumps(result)
+
+            tool_msg = {"role": "tool", "tool_call_id": tc.id, "content": result_str}
+            conv.append(tool_msg)
+            updated_messages.append(tool_msg)
+
+            if log_callback:
+                log_callback("tool_result", f"{tc.function.name}: {result_str[:200]}")
+
+    return "", updated_messages
