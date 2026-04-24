@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Phase 4 complete (04-04 done; all stack-detection plans shipped)
-last_updated: "2026-04-24T00:00:00.000Z"
+status: Phase 5 in progress (05-01 complete — CLIP vec0 + DB helpers)
+last_updated: "2026-04-24T15:47:26.000Z"
 progress:
   total_phases: 7
   completed_phases: 4
-  total_plans: 16
-  completed_plans: 16
+  total_plans: 22
+  completed_plans: 17
 ---
 
 # Planning state
@@ -21,16 +21,16 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
-| Phase | Phase 4 — Stack detection |
-| Status | **04-04 complete** (2026-04-24): schema + config/API/UI + handler + tests; VERIFICATION passed 15/15 — **Phase 4 (04-01..04-04) all plans complete** |
-| Last activity | 2026-04-24 — Plan 04-04 executed: `test_handlers_batch_stack_detect.py`, config API tests, checkpoint fingerprint tests; 56 backend tests pass |
+| Phase | Phase 5 — Image embed & search chat |
+| Status | **05-01 complete** (2026-04-24): `image_clip_embeddings` vec0 (512-cosine, `user_version` 5), upsert + list helpers, round-trip test — see `05-01-SUMMARY.md` |
+| Last activity | 2026-04-24 — Plan 05-01 executed: CLIP sqlite-vec migration and DB helpers (`4cc06f4`..`b1dbfe9`); next: 05-02 |
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
-**Current focus:** v3.0 Phase 4 — **complete** (STACK-01 burst detection + schema + config + tests); see `04-04-SUMMARY.md` and ROADMAP.md; next: **Phase 5** (image embed & search chat).
+**Current focus:** v3.0 Phase 5 — **in progress** (05-01 `image_clip_embeddings` + helpers shipped); next plans **05-02**..`05-06` per ROADMAP.
 
 ## Deferred Items
 
