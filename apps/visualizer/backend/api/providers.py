@@ -75,7 +75,12 @@ def all_description_models():
             except Exception:
                 pass
 
+        seen = set()
         for m in models_list:
+            key = (pid, m["id"])
+            if key in seen:
+                continue
+            seen.add(key)
             result.append({
                 "provider_id": pid,
                 "provider_name": provider["name"],
