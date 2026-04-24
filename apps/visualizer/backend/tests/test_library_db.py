@@ -15,6 +15,7 @@ def test_jobs_requiring_catalog_is_frozen_and_non_empty():
     assert isinstance(JOB_TYPES_REQUIRING_CATALOG, frozenset)
     assert 'batch_describe' in JOB_TYPES_REQUIRING_CATALOG
     assert 'batch_text_embed' in JOB_TYPES_REQUIRING_CATALOG
+    assert 'batch_stack_detect' in JOB_TYPES_REQUIRING_CATALOG
     assert 'vision_match' in JOB_TYPES_REQUIRING_CATALOG
 
 

@@ -216,6 +216,7 @@ def test_health_reports_library_db_status(client, tmp_path, monkeypatch):
     assert body['library_db']['exists'] is True
     assert 'batch_describe' in body['jobs_requiring_catalog']
     assert 'batch_text_embed' in body['jobs_requiring_catalog']
+    assert 'batch_stack_detect' in body['jobs_requiring_catalog']
     assert body['jobs_requiring_catalog'] == sorted(body['jobs_requiring_catalog'])
 
 
