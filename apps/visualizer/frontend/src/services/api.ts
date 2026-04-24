@@ -1118,6 +1118,7 @@ export interface DescriptionModel {
   provider_name: string
   model_id: string
   model_name: string
+  tool_calling: boolean
 }
 
 export interface DescriptionModelsResponse {

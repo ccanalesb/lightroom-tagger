@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { ImageDetailModal, ImageTile, fromCatalogListRow } from '../components/image-view'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -14,6 +14,37 @@ import {
 
 const PROVIDER_STORAGE_KEY = 'search:selected_provider'
 const MODEL_STORAGE_KEY = 'search:selected_model'
+
+function resolveChatModelSelection(
+  models: DescriptionModel[],
+  defaultProvider: string | null,
+  defaultModel: string | null,
+): { provider: string; model: string } {
+  const chat = models.filter((m) => m.tool_calling)
+  if (chat.length === 0) {
+    return { provider: '', model: '' }
+  }
+  const prevP = localStorage.getItem(PROVIDER_STORAGE_KEY) ?? ''
+  const prevM = localStorage.getItem(MODEL_STORAGE_KEY) ?? ''
+  let provider =
+    prevP && chat.some((m) => m.provider_id === prevP)
+      ? prevP
+      : defaultProvider && chat.some((m) => m.provider_id === defaultProvider)
+        ? defaultProvider
+        : (chat[0]?.provider_id ?? '')
+  let forProvider = chat.filter((m) => m.provider_id === provider)
+  if (forProvider.length === 0) {
+    provider = chat[0]!.provider_id
+    forProvider = chat.filter((m) => m.provider_id === provider)
+  }
+  const model =
+    prevM && forProvider.some((m) => m.model_id === prevM)
+      ? prevM
+      : defaultModel && forProvider.some((m) => m.model_id === defaultModel)
+        ? defaultModel
+        : (forProvider[0]?.model_id ?? '')
+  return { provider, model }
+}
 
 type Message = {
   role: 'user' | 'assistant'
@@ -34,6 +65,7 @@ export function SearchPage() {
   const threadRef = useRef<HTMLDivElement>(null)
 
   const [allModels, setAllModels] = useState<DescriptionModel[]>([])
+  const [descriptionModelsLoadFinished, setDescriptionModelsLoadFinished] = useState(false)
   const [selectedProvider, setSelectedProvider] = useState<string>(
     () => localStorage.getItem(PROVIDER_STORAGE_KEY) ?? '',
   )
@@ -41,21 +73,58 @@ export function SearchPage() {
     () => localStorage.getItem(MODEL_STORAGE_KEY) ?? '',
   )
 
+  const chatModels = useMemo(
+    () => allModels.filter((m) => m.tool_calling),
+    [allModels],
+  )
+  const chatProviders = useMemo(
+    () =>
+      Array.from(new Map(chatModels.map((m) => [m.provider_id, m.provider_name])).entries()).map(
+        ([id, name]) => ({ id, name }),
+      ),
+    [chatModels],
+  )
+
   useEffect(() => {
+    let cancelled = false
     ProvidersAPI.listDescriptionModels()
       .then(({ models, default_provider, default_model }) => {
+        if (cancelled) return
         setAllModels(models)
-        setSelectedProvider((prev) => {
-          if (prev && models.some((m) => m.provider_id === prev)) return prev
-          return default_provider ?? models[0]?.provider_id ?? ''
-        })
-        setSelectedModelId((prev) => {
-          if (prev && models.some((m) => m.model_id === prev)) return prev
-          return default_model ?? models[0]?.model_id ?? ''
-        })
+        const { provider, model } = resolveChatModelSelection(models, default_provider, default_model)
+        setSelectedProvider(provider)
+        setSelectedModelId(model)
+        if (provider) localStorage.setItem(PROVIDER_STORAGE_KEY, provider)
+        if (model) localStorage.setItem(MODEL_STORAGE_KEY, model)
       })
       .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setDescriptionModelsLoadFinished(true)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
+
+  useEffect(() => {
+    if (!descriptionModelsLoadFinished) return
+    if (chatModels.length === 0) return
+    if (chatProviders.some((p) => p.id === selectedProvider)) return
+    const first = chatProviders[0]
+    if (!first) return
+    setSelectedProvider(first.id)
+    localStorage.setItem(PROVIDER_STORAGE_KEY, first.id)
+    const m = chatModels.find((c) => c.provider_id === first.id)
+    if (m) {
+      setSelectedModelId(m.model_id)
+      localStorage.setItem(MODEL_STORAGE_KEY, m.model_id)
+    }
+  }, [
+    descriptionModelsLoadFinished,
+    chatModels,
+    chatProviders,
+    selectedProvider,
+  ])
 
   // Scroll thread to bottom on new messages
   useEffect(() => {
@@ -64,20 +133,19 @@ export function SearchPage() {
     }
   }, [messages])
 
-  const providers = Array.from(
-    new Map(allModels.map((m) => [m.provider_id, m.provider_name])).entries(),
-  ).map(([id, name]) => ({ id, name }))
+  const modelsForProvider = chatModels.filter((m) => m.provider_id === selectedProvider)
 
-  const modelsForProvider = allModels.filter((m) => m.provider_id === selectedProvider)
-
-  const resolvedModel = allModels.find(
+  const resolvedModel = chatModels.find(
     (m) => m.provider_id === selectedProvider && m.model_id === selectedModelId,
   )
+
+  const noToolCapableModels =
+    descriptionModelsLoadFinished && chatModels.length === 0
 
   const handleProviderChange = (pid: string) => {
     setSelectedProvider(pid)
     localStorage.setItem(PROVIDER_STORAGE_KEY, pid)
-    const first = allModels.find((m) => m.provider_id === pid)
+    const first = chatModels.find((m) => m.provider_id === pid)
     if (first) {
       setSelectedModelId(first.model_id)
       localStorage.setItem(MODEL_STORAGE_KEY, first.model_id)
@@ -99,6 +167,7 @@ export function SearchPage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    if (noToolCapableModels) return
     const trimmed = input.trim()
     if (!trimmed || status === 'loading') return
 
@@ -193,7 +262,12 @@ export function SearchPage() {
             className="mt-2 flex flex-col gap-1.5 pt-2 border-t border-border shrink-0"
           >
             {/* Provider + Model selectors — wrap on narrow containers */}
-            {providers.length > 0 && (
+            {noToolCapableModels ? (
+              <p className="text-xs text-text-secondary" role="status">
+                No tool-capable models configured
+              </p>
+            ) : null}
+            {chatProviders.length > 0 && !noToolCapableModels ? (
               <div className="flex flex-wrap gap-1.5">
                 <div className="flex items-center gap-1 min-w-[120px] flex-1">
                   <label htmlFor="provider-select" className="text-xs text-text-secondary whitespace-nowrap shrink-0">
@@ -203,10 +277,10 @@ export function SearchPage() {
                     id="provider-select"
                     value={selectedProvider}
                     onChange={(e) => handleProviderChange(e.target.value)}
-                    title={providers.find((p) => p.id === selectedProvider)?.name ?? ''}
+                    title={chatProviders.find((p) => p.id === selectedProvider)?.name ?? ''}
                     className={selectClass}
                   >
-                    {providers.map((p) => (
+                    {chatProviders.map((p) => (
                       <option key={p.id} value={p.id} title={p.name}>
                         {p.name}
                       </option>
@@ -232,7 +306,7 @@ export function SearchPage() {
                   </select>
                 </div>
               </div>
-            )}
+            ) : null}
 
             <label htmlFor="search-chat-input" className="sr-only">Message</label>
             <div className="flex gap-2 items-center">
@@ -244,14 +318,20 @@ export function SearchPage() {
                 fullWidth
                 className="flex-1 min-w-0"
                 autoComplete="off"
-                disabled={status === 'loading'}
-                placeholder="Ask about your library…"
+                disabled={status === 'loading' || noToolCapableModels}
+                title={noToolCapableModels ? 'No tool-capable models configured' : undefined}
+                placeholder={
+                  noToolCapableModels
+                    ? 'No tool-capable models configured'
+                    : 'Ask about your library…'
+                }
               />
               <Button
                 type="submit"
                 variant="primary"
                 size="md"
-                disabled={status === 'loading'}
+                disabled={status === 'loading' || noToolCapableModels}
+                title={noToolCapableModels ? 'No tool-capable models configured' : undefined}
               >
                 {status === 'loading' ? '…' : 'Send'}
               </Button>

@@ -44,6 +44,7 @@ class ProviderRegistry:
                 "id": provider_id,
                 "name": provider_config["name"],
                 "available": self._is_available(provider_id, provider_config),
+                "tool_calling": bool(provider_config.get("tool_calling", False)),
             })
         return result
 

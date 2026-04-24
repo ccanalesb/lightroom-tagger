@@ -54,6 +54,9 @@ def defaults():
 def all_description_models():
     """Flat list of all models across all providers, for the NL/description task selector.
 
+    Each model entry includes ``tool_calling`` from the provider's ``providers.json``
+    config (function-calling / tools support).
+
     For providers with no statically configured models (e.g. oMLX), attempts a live
     /v1/models discovery with a short timeout so the selector still includes them when
     they are running.
@@ -86,6 +89,7 @@ def all_description_models():
                 "provider_name": provider["name"],
                 "model_id": m["id"],
                 "model_name": m.get("name", m["id"]),
+                "tool_calling": bool(provider.get("tool_calling", False)),
             })
 
     defaults = registry.defaults.get("description", {}) or {}
