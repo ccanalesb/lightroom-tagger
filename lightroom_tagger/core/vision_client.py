@@ -506,6 +506,48 @@ def complete_chat_text(
     return response.choices[0].message.content or ""
 
 
+def complete_chat_messages(
+    client: openai_sdk.OpenAI,
+    model: str,
+    *,
+    system: str,
+    messages: list[dict[str, str]],
+    max_tokens: int = 1024,
+    temperature: float = 0.0,
+) -> str:
+    """Multi-turn text chat: ``messages`` are OpenAI-style user/assistant turns (no system in-list)."""
+    kwargs: dict[str, Any] = {}
+    if "claude" in model.lower():
+        kwargs["extra_body"] = {"reasoning_effort": "none"}
+
+    api_messages: list[Any] = [{"role": "system", "content": system}]
+    for m in messages:
+        if not isinstance(m, dict):
+            continue
+        role = str(m.get("role", "")).strip()
+        if role not in ("user", "assistant"):
+            continue
+        content = str(m.get("content", "")).strip()
+        if not content:
+            continue
+        api_messages.append({"role": role, "content": content})
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=cast(Any, api_messages),
+            max_tokens=max_tokens,
+            temperature=temperature,
+            **kwargs,
+        )
+    except Exception as exc:
+        raise _map_openai_error(
+            exc, provider=getattr(client, "_provider_id", None), model=model
+        ) from exc
+
+    return response.choices[0].message.content or ""
+
+
 def make_score_json_llm_fixer(
     complete_text_fn: Callable[..., str],
     **kwargs: Any,
