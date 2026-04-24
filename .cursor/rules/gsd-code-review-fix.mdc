@@ -1,6 +1,6 @@
 ---
 description: After gsd-execute-phase, treat medium+ code review findings as blocking — fix inline before closing the phase
-alwaysApply: true
+alwaysApply: false
 ---
 
 # GSD Code Review: Fix Medium+ Issues Inline

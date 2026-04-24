@@ -1,6 +1,9 @@
 ---
 description: Check if the backend is running before and after backend changes; restart it if it was live
-alwaysApply: true
+globs:
+  - "apps/visualizer/backend/**"
+  - "lightroom_tagger/**"
+alwaysApply: false
 ---
 
 # Backend Lifecycle — Check Before, Restart After
