@@ -8,6 +8,7 @@ import {
   ImagesAPI,
   ProvidersAPI,
   type CatalogImage,
+  type ChatSearchMessage,
   type ChatSearchResultImage,
   type DescriptionModel,
 } from '../services/api'
@@ -55,8 +56,12 @@ type Message = {
 
 type SelectedImage = { key: string; initial?: CatalogImage }
 
+type ChatSearchMode = Message['search_mode']
+
 export function SearchPage() {
   const [messages, setMessages] = useState<Message[]>([])
+  const [apiHistory, setApiHistory] = useState<ChatSearchMessage[]>([])
+  const [lastSearchMode, setLastSearchMode] = useState<ChatSearchMode | null>(null)
   const [input, setInput] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorText, setErrorText] = useState<string | null>(null)
@@ -159,6 +164,8 @@ export function SearchPage() {
 
   const handleClear = () => {
     setMessages([])
+    setApiHistory([])
+    setLastSearchMode(null)
     setCurrentImages([])
     setErrorText(null)
     setStatus('idle')
@@ -171,12 +178,6 @@ export function SearchPage() {
     const trimmed = input.trim()
     if (!trimmed || status === 'loading') return
 
-    const prior = messages
-      .filter((m): m is Message & { role: 'user' | 'assistant' } =>
-        m.role === 'user' || m.role === 'assistant',
-      )
-      .map((m) => ({ role: m.role, content: m.content }))
-
     setErrorText(null)
     setStatus('loading')
     setMessages((prev) => [...prev, { role: 'user', content: trimmed }])
@@ -184,20 +185,30 @@ export function SearchPage() {
     try {
       const data = await ImagesAPI.chatSearch({
         message: trimmed,
-        messages: prior,
+        messages: apiHistory,
         limit: 50,
         provider_id: resolvedModel?.provider_id,
         model: resolvedModel?.model_id,
       })
+      const assistantText =
+        data.assistant_message ?? `Found ${data.total} result(s) (${data.search_mode}).`
       setCurrentImages(data.images)
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: `Found ${data.total} result(s) (${data.search_mode}).`,
+          content: assistantText,
           search_mode: data.search_mode,
         },
       ])
+      const fullHistory: ChatSearchMessage[] =
+        data.messages ?? [
+          ...apiHistory,
+          { role: 'user', content: trimmed },
+          { role: 'assistant', content: assistantText },
+        ]
+      setApiHistory(fullHistory)
+      setLastSearchMode(data.search_mode)
       setInput('')
       setStatus('idle')
     } catch (err) {
@@ -306,6 +317,11 @@ export function SearchPage() {
                   </select>
                 </div>
               </div>
+            ) : null}
+            {lastSearchMode === 'tool_calling' ? (
+              <p className="text-xs text-text-secondary" role="status">
+                ⚡ Tool calling
+              </p>
             ) : null}
 
             <label htmlFor="search-chat-input" className="sr-only">Message</label>

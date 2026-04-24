@@ -934,9 +934,17 @@ export interface CatalogImage {
   catalog_score_perspective?: string
 }
 
+/** OpenAI-style chat messages for tool-calling search (request + response). */
+export type ChatSearchMessage = {
+  role: string
+  content: string | null
+  tool_calls?: unknown[]
+  tool_call_id?: string
+}
+
 export type ChatSearchRequest = {
   message: string
-  messages?: Array<{ role: string; content: string }>
+  messages?: ChatSearchMessage[]
   limit?: number
   offset?: number
   provider_id?: string
@@ -959,12 +967,7 @@ export type ChatSearchResponse = {
   images: ChatSearchResultImage[]
   filters?: Record<string, unknown> | null
   metadata?: Record<string, unknown> | null
-  messages?: Array<{
-    role: string
-    content: string | null
-    tool_calls?: unknown[]
-    tool_call_id?: string
-  }>
+  messages?: ChatSearchMessage[]
   assistant_message?: string
 }
 
