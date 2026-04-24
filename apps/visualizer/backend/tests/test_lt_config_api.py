@@ -128,3 +128,51 @@ def test_put_instagram_dump_persists(monkeypatch, client, tmp_path):
     get = client.get("/api/config/instagram-dump")
     assert get.status_code == 200
     assert get.get_json()["instagram_dump_path"] == str(dump_dir.resolve())
+
+
+def test_get_stack_detection_default_from_fresh_yaml(monkeypatch, client, tmp_path):
+    """Fresh temp config.yaml uses load_config default for stack_burst_delta_ms (2000)."""
+    yaml_path = tmp_path / "config.yaml"
+    yaml_path.write_text("catalog_path: /tmp/placeholder.lrcat\n", encoding="utf-8")
+    monkeypatch.setattr(lt_config_mod, "LT_CONFIG_YAML", str(yaml_path.resolve()))
+
+    response = client.get("/api/config/stack-detection")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert set(data.keys()) == {"stack_burst_delta_ms"}
+    assert data["stack_burst_delta_ms"] == 2000
+
+
+def test_put_stack_detection_updates_yaml_and_get(monkeypatch, client, tmp_path):
+    yaml_path = tmp_path / "config.yaml"
+    yaml_path.write_text("catalog_path: /tmp/placeholder.lrcat\n", encoding="utf-8")
+    monkeypatch.setattr(lt_config_mod, "LT_CONFIG_YAML", str(yaml_path.resolve()))
+
+    put = client.put(
+        "/api/config/stack-detection",
+        json={"stack_burst_delta_ms": 3000},
+    )
+    assert put.status_code == 200
+    body = put.get_json()
+    assert body["ok"] is True
+    assert body["stack_burst_delta_ms"] == 3000
+
+    get = client.get("/api/config/stack-detection")
+    assert get.status_code == 200
+    assert get.get_json()["stack_burst_delta_ms"] == 3000
+
+
+@pytest.mark.parametrize("bad_ms", [0, -1])
+def test_put_stack_detection_rejects_non_positive_ms(
+    bad_ms, monkeypatch, client, tmp_path
+):
+    yaml_path = tmp_path / "config.yaml"
+    yaml_path.write_text("catalog_path: /tmp/placeholder.lrcat\n", encoding="utf-8")
+    monkeypatch.setattr(lt_config_mod, "LT_CONFIG_YAML", str(yaml_path.resolve()))
+
+    resp = client.put(
+        "/api/config/stack-detection",
+        json={"stack_burst_delta_ms": bad_ms},
+    )
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
