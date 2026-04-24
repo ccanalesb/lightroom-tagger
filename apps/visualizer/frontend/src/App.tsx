@@ -5,6 +5,7 @@ import { AnalyticsPage } from './pages/AnalyticsPage'
 import { IdentityPage } from './pages/IdentityPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { ImagesPage } from './pages/ImagesPage'
+import { SearchPage } from './pages/SearchPage'
 import { ProcessingPage } from './pages/ProcessingPage'
 import { MatchOptionsProvider } from './stores/matchOptionsContext'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -18,6 +19,7 @@ function App() {
             <Route path="/" element={<Layout />}>
               <Route index element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
               <Route path="images" element={<ErrorBoundary><ImagesPage /></ErrorBoundary>} />
+              <Route path="search" element={<ErrorBoundary><SearchPage /></ErrorBoundary>} />
               <Route path="analytics" element={<ErrorBoundary><AnalyticsPage /></ErrorBoundary>} />
               <Route path="identity" element={<ErrorBoundary><IdentityPage /></ErrorBoundary>} />
               <Route path="processing" element={<ErrorBoundary><ProcessingPage /></ErrorBoundary>} />
