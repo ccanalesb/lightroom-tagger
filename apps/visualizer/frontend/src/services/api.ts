@@ -1,4 +1,4 @@
-import { invalidate, invalidateAll } from '../data'
+import { invalidate, invalidateAll, patchMatching } from '../data'
 import { Job } from '../types/job'
 import { API_DEFAULT_URL } from '../constants/strings'
 
@@ -164,14 +164,15 @@ export const JobsAPI = {
 
   cancel: async (id: string) => {
     await requestVoid(`/jobs/${id}`, { method: 'DELETE' })
-    invalidateAll(['jobs.list'])
+    // jobs.list is patched in-place via the job_updated socket event so we
+    // don't invalidate here (that would wipe the cache and trigger Suspense).
     invalidateAll(['jobs.health'])
   },
 
   retry: async (id: string) => {
     const job = await request<Job>(`/jobs/${id}/retry`, { method: 'POST' })
-    invalidateAll(['jobs.list'])
-    invalidate(['jobs.detail', id])
+    // jobs.list patched via socket; detail is updated via setLocalJob in the
+    // modal — invalidating the detail cache would cause a Suspense flash there.
     invalidateAll(['jobs.health'])
     return job
   },
@@ -224,6 +225,21 @@ export const ConfigAPI = {
       },
     )
     invalidateAll(['images.instagram'])
+    invalidateAll(['jobs.health'])
+    return result
+  },
+
+  getStackDetection: () =>
+    request<{ stack_burst_delta_ms: number }>('/config/stack-detection'),
+
+  putStackDetection: async (stackBurstDeltaMs: number) => {
+    const result = await request<{ stack_burst_delta_ms: number; ok: boolean }>(
+      '/config/stack-detection',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ stack_burst_delta_ms: stackBurstDeltaMs }),
+      },
+    )
     invalidateAll(['jobs.health'])
     return result
   },
@@ -368,7 +384,29 @@ export const MatchingAPI = {
       `/images/matches/${encodeURIComponent(catalogKey)}/${encodeURIComponent(instaKey)}/validate`,
       { method: 'PATCH' },
     )
-    invalidateAll(['matching.groups'])
+    // Patch cache in-place so Suspense is not triggered in the currently-mounted
+    // MatchesTab. The component also applies an optimistic update via setMatchGroups.
+    // The cache is invalidated on unmount so the next visit fetches fresh data.
+    const matchesPrefix = JSON.stringify(['matching.groups']).slice(0, -1)
+    patchMatching(
+      (k) => k.startsWith(matchesPrefix),
+      (raw) => {
+        const resp = raw as { match_groups?: MatchGroup[] }
+        if (!resp?.match_groups) return raw
+        return {
+          ...resp,
+          match_groups: resp.match_groups.map((group) => {
+            if (group.instagram_key !== instaKey) return group
+            const candidates = group.candidates.map((c) =>
+              c.catalog_key === catalogKey && c.instagram_key === instaKey
+                ? { ...c, validated_at: new Date().toISOString() }
+                : c,
+            )
+            return { ...group, candidates, has_validated: candidates.some((c) => !!c.validated_at) }
+          }),
+        }
+      },
+    )
     invalidateAll(['images.instagram'])
     invalidateAll(['images.catalog'])
     invalidateAll(['images.detail'])
@@ -380,7 +418,34 @@ export const MatchingAPI = {
       `/images/matches/${encodeURIComponent(catalogKey)}/${encodeURIComponent(instaKey)}/reject`,
       { method: 'PATCH' },
     )
-    invalidateAll(['matching.groups'])
+    // Patch cache in-place — same rationale as validate above.
+    const matchesPrefix = JSON.stringify(['matching.groups']).slice(0, -1)
+    patchMatching(
+      (k) => k.startsWith(matchesPrefix),
+      (raw) => {
+        const resp = raw as { match_groups?: MatchGroup[] }
+        if (!resp?.match_groups) return raw
+        return {
+          ...resp,
+          match_groups: resp.match_groups.flatMap((group) => {
+            if (group.instagram_key !== instaKey) return [group]
+            const remaining = group.candidates.filter(
+              (c) => !(c.catalog_key === catalogKey && c.instagram_key === instaKey),
+            )
+            if (remaining.length === 0) {
+              return [{ ...group, candidates: [], candidate_count: 0, best_score: 0, has_validated: false, all_rejected: true }]
+            }
+            return [{
+              ...group,
+              candidates: remaining,
+              candidate_count: remaining.length,
+              best_score: Math.max(...remaining.map((c) => c.score)),
+              has_validated: remaining.some((c) => !!c.validated_at),
+            }]
+          }),
+        }
+      },
+    )
     invalidateAll(['images.instagram'])
     invalidateAll(['images.catalog'])
     invalidateAll(['images.detail'])

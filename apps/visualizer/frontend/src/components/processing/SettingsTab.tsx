@@ -1,5 +1,6 @@
 import { CatalogSettingsPanel } from '../images/CatalogSettingsPanel';
 import { InstagramDumpSettingsPanel } from '../images/InstagramDumpSettingsPanel';
+import { StackDetectionSettingsPanel } from './StackDetectionSettingsPanel';
 
 export function SettingsTab() {
   return (
@@ -13,6 +14,7 @@ export function SettingsTab() {
 
       <CatalogSettingsPanel />
       <InstagramDumpSettingsPanel />
+      <StackDetectionSettingsPanel />
     </div>
   );
 }
