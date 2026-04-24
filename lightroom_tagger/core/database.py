@@ -2373,6 +2373,76 @@ def upsert_image_clip_embedding(
     )
 
 
+def _list_catalog_keys_clip_embed_sql_params(
+    *,
+    require_missing_embedding: bool,
+    months: int | None,
+    year: str | None,
+    min_rating: int | None,
+) -> tuple[str, tuple]:
+    parts: list[str] = [
+        "i.filepath IS NOT NULL AND TRIM(COALESCE(i.filepath, '')) != ''",
+    ]
+    params: list = []
+    if require_missing_embedding:
+        parts.append(
+            "NOT EXISTS (SELECT 1 FROM image_clip_embeddings e WHERE e.image_key = i.key)"
+        )
+    if months is not None:
+        parts.append("i.date_taken >= date('now', ?)")
+        params.append(f"-{months} months")
+    if year is not None:
+        parts.append("strftime('%Y', i.date_taken) = ?")
+        params.append(year)
+    if min_rating is not None:
+        parts.append("i.rating >= ?")
+        params.append(min_rating)
+    where = " AND ".join(parts)
+    sql = f"""
+        SELECT i.key AS key
+        FROM images i
+        WHERE {where}
+        ORDER BY i.key ASC
+    """
+    return sql, tuple(params)
+
+
+def list_catalog_keys_needing_clip_embedding(
+    conn: sqlite3.Connection,
+    *,
+    months: int | None,
+    year: str | None,
+    min_rating: int | None,
+) -> list[str]:
+    """Catalog keys with a usable file path in the date/rating window, missing CLIP vec0 rows."""
+    sql, params = _list_catalog_keys_clip_embed_sql_params(
+        require_missing_embedding=True,
+        months=months,
+        year=year,
+        min_rating=min_rating,
+    )
+    rows = conn.execute(sql, params).fetchall()
+    return [r["key"] for r in rows]
+
+
+def list_catalog_keys_for_clip_embed_force(
+    conn: sqlite3.Connection,
+    *,
+    months: int | None,
+    year: str | None,
+    min_rating: int | None,
+) -> list[str]:
+    """All catalog keys with a usable file path in the window, including keys in ``image_clip_embeddings``."""
+    sql, params = _list_catalog_keys_clip_embed_sql_params(
+        require_missing_embedding=False,
+        months=months,
+        year=year,
+        min_rating=min_rating,
+    )
+    rows = conn.execute(sql, params).fetchall()
+    return [r["key"] for r in rows]
+
+
 def get_all_images_with_descriptions(db: sqlite3.Connection,
                                      image_type: str = None,
                                      described_only: bool = False,
