@@ -607,6 +607,8 @@ def init_database(db_path: str) -> sqlite3.Connection:
     _backfill_matched_catalog_key_from_validated_matches(conn)
     _migrate_image_descriptions_fts(conn)
     _migrate_image_text_embeddings_vec0(conn)
+    # Stack members reference `images` by key at insert time; `images` is created above.
+    _migrate_image_stacks(conn)
     seed_perspectives_from_prompts_dir(conn)
     conn.commit()
     return conn
@@ -789,6 +791,36 @@ def _migrate_image_text_embeddings_vec0(conn: sqlite3.Connection) -> None:
     except sqlite3.OperationalError:
         return
     conn.execute("PRAGMA user_version = 4")
+
+
+# Stack mutations from batch jobs must use library_write(context manager).
+def _migrate_image_stacks(conn: sqlite3.Connection) -> None:
+    """Idempotent stack tables; core ``images`` must exist (satisfied by init)."""
+    # Runs after _migrate_image_text_embeddings_vec0; no user_version — IF NOT EXISTS only.
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS image_stacks (
+            stack_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            representative_key TEXT NOT NULL,
+            stack_size INTEGER NOT NULL DEFAULT 0,
+            user_modified INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_image_stacks_representative
+            ON image_stacks(representative_key);
+
+        CREATE TABLE IF NOT EXISTS image_stack_members (
+            stack_id INTEGER NOT NULL
+                REFERENCES image_stacks(stack_id) ON DELETE CASCADE,
+            image_key TEXT NOT NULL,
+            PRIMARY KEY (stack_id, image_key)
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_image_stack_members_image_key
+            ON image_stack_members(image_key);
+        """
+    )
 
 
 def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
