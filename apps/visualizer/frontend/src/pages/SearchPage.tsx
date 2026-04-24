@@ -12,6 +12,7 @@ import {
   type DescriptionModel,
 } from '../services/api'
 
+const PROVIDER_STORAGE_KEY = 'search:selected_provider'
 const MODEL_STORAGE_KEY = 'search:selected_model'
 
 type Message = {
@@ -23,10 +24,6 @@ type Message = {
 
 type SelectedImage = { key: string; initial?: CatalogImage }
 
-function modelKey(m: DescriptionModel) {
-  return `${m.provider_id}::${m.model_id}`
-}
-
 export function SearchPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -35,35 +32,58 @@ export function SearchPage() {
   const [currentImages, setCurrentImages] = useState<ChatSearchResultImage[]>([])
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null)
 
-  const [availableModels, setAvailableModels] = useState<DescriptionModel[]>([])
-  const [selectedModelKey, setSelectedModelKey] = useState<string>(
+  const [allModels, setAllModels] = useState<DescriptionModel[]>([])
+  const [selectedProvider, setSelectedProvider] = useState<string>(
+    () => localStorage.getItem(PROVIDER_STORAGE_KEY) ?? '',
+  )
+  const [selectedModelId, setSelectedModelId] = useState<string>(
     () => localStorage.getItem(MODEL_STORAGE_KEY) ?? '',
   )
 
   useEffect(() => {
     ProvidersAPI.listDescriptionModels()
       .then(({ models, default_provider, default_model }) => {
-        setAvailableModels(models)
-        setSelectedModelKey((prev) => {
-          if (prev && models.some((m) => modelKey(m) === prev)) return prev
-          if (default_provider && default_model) {
-            const key = `${default_provider}::${default_model}`
-            if (models.some((m) => modelKey(m) === key)) return key
-          }
-          return models.length > 0 ? modelKey(models[0]) : ''
+        setAllModels(models)
+
+        setSelectedProvider((prev) => {
+          if (prev && models.some((m) => m.provider_id === prev)) return prev
+          return default_provider ?? models[0]?.provider_id ?? ''
+        })
+
+        setSelectedModelId((prev) => {
+          if (prev && models.some((m) => m.model_id === prev)) return prev
+          return default_model ?? models[0]?.model_id ?? ''
         })
       })
       .catch(() => {
-        // non-fatal — selector stays empty, backend uses its own default
+        // non-fatal — selectors stay empty, backend uses its own default
       })
   }, [])
 
-  const handleModelChange = (key: string) => {
-    setSelectedModelKey(key)
-    localStorage.setItem(MODEL_STORAGE_KEY, key)
+  const providers = Array.from(
+    new Map(allModels.map((m) => [m.provider_id, m.provider_name])).entries(),
+  ).map(([id, name]) => ({ id, name }))
+
+  const modelsForProvider = allModels.filter((m) => m.provider_id === selectedProvider)
+
+  const handleProviderChange = (pid: string) => {
+    setSelectedProvider(pid)
+    localStorage.setItem(PROVIDER_STORAGE_KEY, pid)
+    const first = allModels.find((m) => m.provider_id === pid)
+    if (first) {
+      setSelectedModelId(first.model_id)
+      localStorage.setItem(MODEL_STORAGE_KEY, first.model_id)
+    }
   }
 
-  const resolvedModel = availableModels.find((m) => modelKey(m) === selectedModelKey)
+  const handleModelChange = (mid: string) => {
+    setSelectedModelId(mid)
+    localStorage.setItem(MODEL_STORAGE_KEY, mid)
+  }
+
+  const resolvedModel = allModels.find(
+    (m) => m.provider_id === selectedProvider && m.model_id === selectedModelId,
+  )
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -135,23 +155,42 @@ export function SearchPage() {
               onSubmit={handleSubmit}
               className="mt-auto flex flex-col gap-2 pt-2 border-t border-border shrink-0"
             >
-              {availableModels.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <label htmlFor="model-select" className="text-xs text-text-secondary whitespace-nowrap">
-                    Model
-                  </label>
-                  <select
-                    id="model-select"
-                    value={selectedModelKey}
-                    onChange={(e) => handleModelChange(e.target.value)}
-                    className="flex-1 rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-primary"
-                  >
-                    {availableModels.map((m) => (
-                      <option key={modelKey(m)} value={modelKey(m)}>
-                        {m.model_name} ({m.provider_name})
-                      </option>
-                    ))}
-                  </select>
+              {providers.length > 0 && (
+                <div className="flex gap-2">
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <label htmlFor="provider-select" className="text-xs text-text-secondary whitespace-nowrap">
+                      Provider
+                    </label>
+                    <select
+                      id="provider-select"
+                      value={selectedProvider}
+                      onChange={(e) => handleProviderChange(e.target.value)}
+                      className="flex-1 min-w-0 rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      {providers.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <label htmlFor="model-select" className="text-xs text-text-secondary whitespace-nowrap">
+                      Model
+                    </label>
+                    <select
+                      id="model-select"
+                      value={selectedModelId}
+                      onChange={(e) => handleModelChange(e.target.value)}
+                      className="flex-1 min-w-0 rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      {modelsForProvider.map((m) => (
+                        <option key={m.model_id} value={m.model_id}>
+                          {m.model_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
               <label htmlFor="search-chat-input" className="sr-only">
