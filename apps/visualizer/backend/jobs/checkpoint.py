@@ -28,6 +28,11 @@ their own slice of ``metadata`` (the analyze handler normalizes ``force_describe
 
 **batch_text_embed** — ``job_type``, ``fingerprint``, ``processed_pairs`` (``"key|catalog"`` strings),
 ``total_at_start`` (same semantics as ``batch_describe``).
+
+**batch_stack_detect** — ``job_type``, ``fingerprint``, ``processed_image_keys`` (catalog ``images.key``
+values, sorted on persist), ``total_at_start`` (int), ``checkpoint_version: 1``. Fingerprint includes
+``delta_ms`` (resolved ms), ``force_mode`` (``incremental`` | ``full`` | ``preserve_edited``), and
+``keys`` (sorted work-list at job start, before checkpoint resume filtering).
 """
 
 from __future__ import annotations
@@ -92,6 +97,30 @@ def fingerprint_batch_text_embed(
         "image_type": str(metadata.get("image_type", "catalog")),
         "min_rating": min_rating,
         "pairs": pairs,
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def fingerprint_batch_stack_detect(
+    metadata: dict[str, Any],
+    image_keys: list[str],
+    *,
+    resolved_delta_ms: int,
+    force_mode: str,
+) -> str:
+    """SHA-256 hex of canonical JSON for stack detect run identity (work list + delta + force).
+
+    ``image_keys`` is the **initial** work list (entirety before resume filtering);
+    ``sorted(image_keys)`` is stored in the payload as ``keys``.
+    ``force_mode`` is ``incremental``, ``full``, or ``preserve_edited`` (caller must normalize per job contract).
+    """
+    _ = metadata  # Reserved for future fingerprint fields (e.g. filters) without breaking callers
+    keys_sorted = sorted(image_keys)
+    payload: dict[str, Any] = {
+        "delta_ms": int(resolved_delta_ms),
+        "force_mode": str(force_mode),
+        "keys": keys_sorted,
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
