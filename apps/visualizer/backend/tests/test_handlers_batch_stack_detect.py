@@ -6,6 +6,10 @@ from unittest.mock import MagicMock, patch
 
 from lightroom_tagger.core.database import init_database, store_image
 
+from database import create_job, get_job, init_db, update_job_field
+from jobs.checkpoint import CHECKPOINT_VERSION, fingerprint_batch_stack_detect
+from jobs.runner import JobRunner
+
 
 def _make_runner() -> MagicMock:
     runner = MagicMock()
@@ -260,5 +264,67 @@ def test_handle_batch_stack_detect_force_rebuild_recreates(
         n_m = lib.execute("SELECT COUNT(*) AS c FROM image_stack_members").fetchone()
         assert int(n_st["c"]) == 1
         assert int(n_m["c"]) == 3
+    finally:
+        lib.close()
+
+
+@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.load_config")
+def test_handle_batch_stack_detect_checkpoint_resume_second_burst(
+    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+) -> None:
+    """batch_stack_detect checkpoint resume: v1 processed keys skip first burst; one stack for rest."""
+    from jobs.handlers import handle_batch_stack_detect
+
+    jobs_path = tmp_path / "jobs.db"
+    lib_path = tmp_path / "library.db"
+    jdb = init_db(str(jobs_path))
+    job_id = create_job(jdb, "batch_stack_detect", {})
+    conn = init_database(str(lib_path))
+    base = "2024-01-15T10:00:00+00:00"
+    t2 = "2024-01-15T10:00:00.500000+00:00"
+    t3 = "2024-01-15T10:00:10+00:00"
+    t4 = "2024-01-15T10:00:10.500000+00:00"
+    k1 = store_image(conn, {"date_taken": base, "filename": "a1.jpg", "rating": 1})
+    k2 = store_image(conn, {"date_taken": t2, "filename": "a2.jpg", "rating": 1})
+    k3 = store_image(conn, {"date_taken": t3, "filename": "b1.jpg", "rating": 1})
+    k4 = store_image(conn, {"date_taken": t4, "filename": "b2.jpg", "rating": 1})
+    conn.close()
+    monkeypatch.setenv("LIBRARY_DB", str(lib_path))
+    mock_load_config.return_value = MagicMock(
+        db_path=str(lib_path), stack_burst_delta_ms=2000
+    )
+
+    all_keys = sorted([k1, k2, k3, k4])
+    fp = fingerprint_batch_stack_detect(
+        {},
+        all_keys,
+        resolved_delta_ms=2000,
+        force_mode="incremental",
+    )
+    row = get_job(jdb, job_id)
+    assert row is not None
+    meta = dict(row.get("metadata") or {})
+    meta["checkpoint"] = {
+        "checkpoint_version": CHECKPOINT_VERSION,
+        "job_type": "batch_stack_detect",
+        "fingerprint": fp,
+        "processed_image_keys": sorted([k1, k2]),
+        "total_at_start": 4,
+    }
+    update_job_field(jdb, job_id, "metadata", meta)
+
+    runner = JobRunner(jdb)
+    handle_batch_stack_detect(runner, job_id, {"delta_ms": 2000})
+    jdb.close()
+
+    lib = init_database(str(lib_path))
+    try:
+        n_st = int(lib.execute("SELECT COUNT(*) AS c FROM image_stacks").fetchone()["c"])
+        n_m = int(
+            lib.execute("SELECT COUNT(*) AS c FROM image_stack_members").fetchone()["c"]
+        )
+        assert n_st == 1
+        assert n_m == 2
     finally:
         lib.close()
