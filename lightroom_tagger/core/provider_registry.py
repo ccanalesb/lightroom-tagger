@@ -15,6 +15,18 @@ import openai
 _CONFIG_PATH = Path(__file__).parent / "providers.json"
 _EXAMPLE_PATH = Path(__file__).parent / "providers.example.json"
 
+# Lazy probe cache: provider_id → bool (process-lifetime, shared across instances)
+_tool_calling_probe_cache: dict[str, bool] = {}
+
+_PROBE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "noop",
+        "description": "No-op capability probe.",
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+}
+
 
 class ProviderRegistry:
     """Central registry of vision/LLM providers and their models."""
@@ -44,9 +56,21 @@ class ProviderRegistry:
                 "id": provider_id,
                 "name": provider_config["name"],
                 "available": self._is_available(provider_id, provider_config),
-                "tool_calling": bool(provider_config.get("tool_calling", False)),
+                "tool_calling": self._resolve_tool_calling(provider_id, provider_config),
             })
         return result
+
+    def probe_tool_calling(self, provider_id: str) -> bool:
+        """Lazily probe whether a provider supports function calling.
+
+        Result is cached for the process lifetime. If ``tool_calling`` is
+        explicitly set in providers.json that value is returned immediately
+        without making any network call.
+        """
+        if provider_id not in self._providers:
+            raise KeyError(provider_id)
+        provider_config = self._providers[provider_id]
+        return self._resolve_tool_calling(provider_id, provider_config)
 
     def list_models(self, provider_id: str) -> list[dict]:
         if provider_id not in self._providers:
@@ -179,6 +203,40 @@ class ProviderRegistry:
         self._providers[provider_id]["model_order"] = model_order + tail
         self._save_config()
         return True
+
+    def _resolve_tool_calling(self, provider_id: str, provider_config: dict) -> bool:
+        """Return tool-calling capability: explicit config wins, else lazy probe."""
+        if "tool_calling" in provider_config:
+            return bool(provider_config["tool_calling"])
+        if provider_id in _tool_calling_probe_cache:
+            return _tool_calling_probe_cache[provider_id]
+        result = self._probe_tool_calling(provider_id, provider_config)
+        _tool_calling_probe_cache[provider_id] = result
+        return result
+
+    def _probe_tool_calling(self, provider_id: str, provider_config: dict) -> bool:
+        """Make a minimal tool-calling API request to detect support.
+
+        Uses the first configured model (or a safe fallback). Times out after
+        5 s and treats any error as non-capable (False).
+        """
+        models = provider_config.get("models", [])
+        if not models:
+            return False
+        probe_model = models[0]["id"]
+        try:
+            client = self.get_client(provider_id)
+            client.chat.completions.create(
+                model=probe_model,
+                messages=[{"role": "user", "content": "hi"}],
+                tools=[_PROBE_TOOL],
+                tool_choice="auto",
+                max_tokens=1,
+                timeout=5.0,
+            )
+            return True
+        except Exception:
+            return False
 
     def _save_config(self) -> None:
         with open(self._config_path, "w", encoding="utf-8") as f:
