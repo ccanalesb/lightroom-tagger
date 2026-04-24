@@ -11,27 +11,38 @@ from lightroom_tagger.core.vision_client import complete_chat_messages, complete
 
 LogCallback = Callable[[str, str], None] | None
 
-NL_CATALOG_FILTER_SYSTEM_PROMPT = """You are a filter translator for a Lightroom photo catalog search API.
+_NL_CATALOG_FILTER_SYSTEM_PROMPT_TEMPLATE = """You are a filter translator for a Lightroom photo catalog search API.
 Return only a single JSON object with no markdown fences and no text before or after the JSON.
 
 The object may use only these field names (omit any you do not need; use null only where a field is explicitly unused — prefer omitting keys):
-posted, month, keyword, min_rating, date_from, date_to, score_perspective, min_score, sort_by_score, sort_by_date, description_search, dominant_colors, mood_tags.
+posted, month, min_rating, date_from, date_to, score_perspective, min_score, sort_by_score, sort_by_date, description_search, dominant_colors, mood_tags.
 
 Do not include any other keys. Field meanings:
 - posted: boolean, filter images marked posted/unposted to Instagram
 - month: YYYYmm string
-- keyword: exact Lightroom metadata keyword tag (e.g. "wedding", "portrait") — only use when the user refers to a specific tagged category, NOT for visual content descriptions
 - date_from, date_to: date strings as needed
-- min_rating, min_score: integers; min_score 1–10 and requires score_perspective when set
-- score_perspective: lowercase slug [a-z][a-z0-9_]* for score-based filters
+- min_rating: integer star rating filter (1–5)
+- min_score: integer 1–10; always pair with score_perspective when used
+- score_perspective: one of the available scoring perspectives — VALID VALUES: {score_perspective_slugs}; pick the closest match to the user's intent (e.g. "street" for street photography, "documentary" for reportage)
 - sort_by_score: "asc" or "desc" (requires score_perspective)
 - sort_by_date: "newest" or "oldest"
-- description_search: free-text search on AI-generated image descriptions — use this for ANY query about visual content, subjects, scenes, actions, gestures, objects, mood, or composition
+- description_search: free-text search on AI-generated image descriptions — use this for ANY query about visual content, subjects, scenes, actions, gestures, objects, mood, colour names, or composition
 - dominant_colors: JSON array of hex color codes (e.g. ["#ff0000","#c62828"]) extracted from images — ONLY use when the user provides an explicit hex code; do NOT use for color names like "red" or "blue" since the DB stores hex values, not names
 - mood_tags: JSON array of mood strings (e.g. ["melancholic","energetic"]) — only use when the user explicitly mentions mood
 
-IMPORTANT: When the user asks about what is visually in photos (people, objects, actions, scenes, lighting, colours by name, etc.) always use description_search, not keyword or dominant_colors.
+IMPORTANT: When the user asks about what is visually in photos (people, objects, actions, scenes, lighting, colours by name, etc.) always use description_search, not dominant_colors.
 """
+
+
+def build_nl_catalog_filter_prompt(score_perspective_slugs: list[str] | None = None) -> str:
+    """Build the system prompt with real perspective slugs so the LLM never invents one."""
+    slugs = score_perspective_slugs or []
+    slug_str = ", ".join(f'"{s}"' for s in slugs) if slugs else "(none available — omit score_perspective)"
+    return _NL_CATALOG_FILTER_SYSTEM_PROMPT_TEMPLATE.format(score_perspective_slugs=slug_str)
+
+
+# Backward-compat alias used by tests and any code that imported this directly
+NL_CATALOG_FILTER_SYSTEM_PROMPT = build_nl_catalog_filter_prompt()
 
 
 def _normalize_nl_messages(messages: list[dict]) -> list[dict[str, str]]:
@@ -55,6 +66,7 @@ def run_nl_catalog_filter_llm(
     provider_id: str | None,
     model: str | None,
     log_callback: LogCallback = None,
+    score_perspective_slugs: list[str] | None = None,
 ) -> str:
     """Call the LLM to produce a JSON string matching :class:`CatalogNlFilter` (no bypass)."""
     registry = ProviderRegistry()
@@ -82,11 +94,13 @@ def run_nl_catalog_filter_llm(
             )
         resolved_model = models[0]["id"]
 
+    system_prompt = build_nl_catalog_filter_prompt(score_perspective_slugs)
+
     def fn_factory(client, mdl: str):
         return lambda: complete_chat_text(
             client,
             mdl,
-            system=NL_CATALOG_FILTER_SYSTEM_PROMPT,
+            system=system_prompt,
             user=user_text,
             max_tokens=1024,
             temperature=0.0,
@@ -108,6 +122,7 @@ def run_nl_catalog_filter_llm_multi_turn(
     provider_id: str | None = None,
     model: str | None = None,
     log_callback: LogCallback = None,
+    score_perspective_slugs: list[str] | None = None,
 ) -> str:
     """Call the LLM with conversation history; returns raw JSON string for :class:`CatalogNlFilter`."""
     registry = ProviderRegistry()
@@ -135,11 +150,13 @@ def run_nl_catalog_filter_llm_multi_turn(
             )
         resolved_model = models[0]["id"]
 
+    system_prompt = build_nl_catalog_filter_prompt(score_perspective_slugs)
+
     def fn_factory(client, mdl: str):
         return lambda: complete_chat_messages(
             client,
             mdl,
-            system=NL_CATALOG_FILTER_SYSTEM_PROMPT,
+            system=system_prompt,
             messages=_normalize_nl_messages(messages),
             max_tokens=1024,
             temperature=0.0,

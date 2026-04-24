@@ -749,12 +749,19 @@ def chat_search_images(db):
 
         turns_for_llm = prior + [{'role': 'user', 'content': message_stripped}]
 
+        slug_rows = db.execute(
+            "SELECT DISTINCT perspective_slug FROM image_scores "
+            "WHERE is_current = 1 ORDER BY perspective_slug"
+        ).fetchall()
+        available_slugs = [str(r['perspective_slug']) for r in slug_rows]
+
         try:
             raw = nl_catalog_search.run_nl_catalog_filter_llm_multi_turn(
                 turns_for_llm,
                 provider_id=body.get('provider_id'),
                 model=body.get('model'),
                 log_callback=None,
+                score_perspective_slugs=available_slugs,
             )
             filters = parse_catalog_nl_filter_from_llm(raw)
         except (json.JSONDecodeError, ValidationError, StructuredOutputError) as exc:
