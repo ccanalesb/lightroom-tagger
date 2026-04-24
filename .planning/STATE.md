@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Phase 3 complete (03-06 done; all semantic-search plans shipped)
-last_updated: "2026-04-23T23:59:00.000Z"
+status: Phase 4 complete (04-04 done; all stack-detection plans shipped)
+last_updated: "2026-04-24T00:00:00.000Z"
 progress:
   total_phases: 7
-  completed_phases: 3
-  total_plans: 12
-  completed_plans: 12
+  completed_phases: 4
+  total_plans: 16
+  completed_plans: 16
 ---
 
 # Planning state
@@ -21,16 +21,16 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
-| Phase | Phase 3 — Semantic search & results |
-| Status | **03-06 complete** (2026-04-23): RRF + `batch_text_embed` + semantic-search API tests; artifact `03-06-SUMMARY.md` — **Phase 3 (03-01..03-06) all plans complete** |
-| Last activity | 2026-04-23 — Plan 03-06 executed: `test_semantic_rrf.py`, handler/API tests, catalog job-type assertions |
+| Phase | Phase 4 — Stack detection |
+| Status | **04-04 complete** (2026-04-24): schema + config/API/UI + handler + tests; VERIFICATION passed 15/15 — **Phase 4 (04-01..04-04) all plans complete** |
+| Last activity | 2026-04-24 — Plan 04-04 executed: `test_handlers_batch_stack_detect.py`, config API tests, checkpoint fingerprint tests; 56 backend tests pass |
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
-**Current focus:** v3.0 Phase 3 — **complete** (NLS-03, NLS-04 backend + tests); see `03-06-SUMMARY.md` and ROADMAP.md; next milestone: **Phase 4** (stacks) when scheduled.
+**Current focus:** v3.0 Phase 4 — **complete** (STACK-01 burst detection + schema + config + tests); see `04-04-SUMMARY.md` and ROADMAP.md; next: **Phase 5** (image embed & search chat).
 
 ## Deferred Items
 
@@ -62,6 +62,7 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 | NLS-02 | Phase 1 (v3.0) | ✅ Complete (2026-04-23) |
 | NLS-03 | Phase 3 (v3.0) | ✅ Complete (2026-04-23) |
 | NLS-04 | Phase 3 (v3.0) | ✅ Complete (2026-04-23) |
+| STACK-01 | Phase 4 (v3.0) | ✅ Complete (2026-04-24) |
 | IDENT-04 | Phase 5 | ✅ Complete (2026-04-21) |
 | IDENT-05 | Phase 5 | ✅ Complete (2026-04-21) |
 | DASH-02, 03 | Phase 5 | ✅ Complete (2026-04-21) |
@@ -70,6 +71,7 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 
 ## Last update
 
+- **2026-04-24:** Phase 4 execution complete. 4 plans / 3 waves / 17 code commits + 1 production fix. **Plan 01** (`e79926a`, `201baf9`): `_migrate_image_stacks` in `database.py` — idempotent `image_stacks` + `image_stack_members` DDL with `UNIQUE(image_key)`, `representative_key NOT NULL`, `ON DELETE CASCADE`, `user_modified`/`stack_size` scaffolding. **Plan 02** (`83ab74d`..`67bd744`): `stack_burst_delta_ms: int = 2000` in `Config`/YAML; GET/PUT `/api/config/stack-detection`; `ConfigAPI.getStackDetection`/`putStackDetection`; `StackDetectionSettingsPanel` in `SettingsTab`. **Plan 03** (`bfa3ebc`..`53f4821`): `fingerprint_batch_stack_detect`, `batch_stack_detect` in `JOB_TYPES_REQUIRING_CATALOG`, `handle_batch_stack_detect` with burst grouping, three-tier representative selection, checkpoint v1 resume, `force` full-rebuild, five result keys. **Plan 04** (`d64ca16`..`261acda`): `test_handlers_batch_stack_detect.py` (zero-work, burst, skip, incremental, force, checkpoint resume), config GET/PUT tests, fingerprint stability tests, catalog job-type assertions, INSERT fix. Verification: **56 backend tests pass**, VERIFICATION.md 15/15 passed. Requirement STACK-01 complete.
 - **2026-04-23:** Phase 3 plan **03-06** executed: `lightroom_tagger/core/test_semantic_rrf.py` (RRF k=60 + hybrid matrix a–d); `test_handlers_batch_text_embed.py`; `test_images_semantic_search_api.py`; `batch_text_embed` in `test_library_db.py` / `test_jobs_api.py`. Commits: `762293e`, `3fc1436`, `77d6842`, `2299680`. Full backend pytest **245** passed. Artifact: `03-06-SUMMARY.md`. **Phase 3 all 6 plans complete.**
 - **2026-04-23:** Phase 3 plan **03-05** executed: `apps/visualizer/backend/api/images.py` — `POST /api/images/semantic-search` with `build_description_fts_query` + `embed_query_to_vec_blob` + `run_semantic_hybrid_search`, `_rows_to_catalog_api_images` + per-row `score` / `why_matched` / `thumbnail_url`, `metadata` (`missing_embeddings_count`, `semantic_index_empty`, `rrf_k`, `fts_no_match`). Commit: `e061d25`. Artifact: `03-05-SUMMARY.md`. Next: **03-06**.
 - **2026-04-23:** Phase 3 plan **03-04** executed: `lightroom_tagger/core/semantic_search.py` — RRF (`RRF_K=60`), `fts_ranked_catalog_keys` / `knn_embedded_catalog_keys`, `run_semantic_hybrid_search` (D-08 early return `fts_no_match`, D-09 post-filter, FTS-only when vec empty), `SemanticSearchMeta` / `SemanticSearchRow`; `query_catalog_images_by_keys` in `database.py`. Commits: `4362191`, `e1488c0`, `092426a`, `525627e`. Artifact: `03-04-SUMMARY.md`. Next (at time): **03-05**.
