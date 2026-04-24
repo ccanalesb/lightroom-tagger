@@ -8,6 +8,7 @@ from jobs.checkpoint import (
     CHECKPOINT_VERSION,
     fingerprint_batch_describe,
     fingerprint_batch_score,
+    fingerprint_batch_stack_detect,
     fingerprint_batch_text_embed,
 )
 from jobs.runner import JobRunner
@@ -36,6 +37,40 @@ def test_fingerprint_batch_describe_stable_and_force_sensitive() -> None:
     )
     meta_ps = {**meta, "perspective_slugs": ["street", "documentary"]}
     assert fingerprint_batch_describe(meta_ps, pairs) != a
+
+
+def test_fingerprint_batch_stack_detect_permutation_invariant_and_delta_force_sensitive() -> None:
+    meta: dict = {}
+    keys = ["a", "b"]
+    base = fingerprint_batch_stack_detect(
+        meta, keys, resolved_delta_ms=2000, force_mode="incremental"
+    )
+    assert fingerprint_batch_stack_detect(
+        dict(meta), list(reversed(keys)), resolved_delta_ms=2000, force_mode="incremental"
+    ) == base
+    assert (
+        fingerprint_batch_stack_detect(
+            meta, ["b", "a"], resolved_delta_ms=2000, force_mode="incremental"
+        )
+        == base
+    )
+    assert (
+        fingerprint_batch_stack_detect(
+            meta, keys, resolved_delta_ms=3000, force_mode="incremental"
+        )
+        != base
+    )
+    assert (
+        fingerprint_batch_stack_detect(meta, keys, resolved_delta_ms=2000, force_mode="full")
+        != base
+    )
+    fp_full = fingerprint_batch_stack_detect(
+        meta, keys, resolved_delta_ms=2000, force_mode="full"
+    )
+    fp_preserve = fingerprint_batch_stack_detect(
+        meta, keys, resolved_delta_ms=2000, force_mode="preserve_edited"
+    )
+    assert fp_full != fp_preserve
 
 
 def test_fingerprint_batch_text_embed_stable_and_force_sensitive() -> None:
