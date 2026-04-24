@@ -217,13 +217,25 @@ class ProviderRegistry:
     def _probe_tool_calling(self, provider_id: str, provider_config: dict) -> bool:
         """Make a minimal tool-calling API request to detect support.
 
-        Uses the first configured model (or a safe fallback). Times out after
-        5 s and treats any error as non-capable (False).
+        Uses the first configured model; if none are configured, attempts a
+        live /v1/models discovery first. Times out after 5 s and treats any
+        error as non-capable (False).
         """
         models = provider_config.get("models", [])
-        if not models:
+        probe_model: str | None = models[0]["id"] if models else None
+
+        if not probe_model:
+            try:
+                client = self.get_client(provider_id)
+                discovered = list(client.models.list(timeout=5.0))
+                if discovered:
+                    probe_model = discovered[0].id
+            except Exception:
+                return False
+
+        if not probe_model:
             return False
-        probe_model = models[0]["id"]
+
         try:
             client = self.get_client(provider_id)
             client.chat.completions.create(
