@@ -58,6 +58,7 @@ Know which catalog images are posted on Instagram and get structured artistic cr
 - ✓ Images page badge and match card visual consistency — v2.1 (UI-01..03)
 - ✓ React Suspense data layer: zero useEffect fetches, module-level cache, no new deps — v2.1 (DATA-01)
 - ✓ Two-stage cascade matching: description + vision weighted scoring, skip_undescribed — v2.1 (MATCH-01..04)
+- ✓ Burst shot stacking: `image_stacks` schema, `batch_stack_detect` handler, configurable `stack_burst_delta_ms`, checkpoint resume — v3.0 Phase 4 (STACK-01)
 
 ### Deferred (future)
 
@@ -85,6 +86,7 @@ The user is a photographer managing work across multiple Lightroom catalogs (per
 - **v1.0 shipped** (2026-04-11) — 4 phases, 22 requirements: catalog management, jobs, Instagram sync, AI descriptions
 - **v2.0 shipped** (2026-04-15) — 7 phases, 17 requirements: structured scoring, posting analytics, identity/suggestions, insights dashboard
 - **v2.1 shipped** (2026-04-23) — 9 phases, 20 requirements: matching polish, job queue UX, filter framework, identity clarity, badge/card consistency, React Suspense data layer, two-stage cascade matching
+- **v3.0 Phase 4 complete** (2026-04-24) — Stack detection: `image_stacks`/`image_stack_members` schema, `batch_stack_detect` handler with burst grouping by `date_taken`, configurable `stack_burst_delta_ms`, `StackDetectionSettingsPanel` UI, checkpoint resume. STACK-01 shipped.
 - ~38K LOC across Python backend and React/TypeScript frontend (405 files changed in v2.1)
 - Tech stack: Flask + SQLite (catalog read-only, library DB read-write), React 19 + Vite + Recharts + CodeMirror
 - 4 configurable critique perspectives with photography-theory rubrics
@@ -150,4 +152,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-23 — v3.0 milestone started (Intelligent Discovery)*
+*Last updated: 2026-04-24 — v3.0 Phase 4 complete (stack detection — STACK-01 shipped)*
