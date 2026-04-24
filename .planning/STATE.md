@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Phase 5.1 complete (Search UI polish — clear button, tighter layout, mobile, dropdown truncation)
+status: Phase 5.2 planned (Tool-calling search — replace JSON filter with multi-tool LLM architecture)
 last_updated: "2026-04-24T00:00:00.000Z"
 progress:
   total_phases: 7
@@ -44,6 +44,7 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 ## Roadmap Evolution
 
 - Phase 5.1 added: Search UI polish (clear button, spacing, mobile layout, dropdown overflow) — 2026-04-24
+- Phase 5.2 added: Tool-calling search (multi-tool LLM, capability detection, rich tool results, multi-turn history) — 2026-04-24
 
 ## Accumulated Context
 

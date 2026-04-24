@@ -122,6 +122,29 @@
 - Mobile layout: single-column stacking, selector row wraps gracefully, input doesn't overflow.
 - Provider/model dropdowns handle long names without clipping or layout overflow.
 
+#### Phase 5.2 — Tool-calling search *(inserted 2026-04-24)*
+
+**Goal:** Replace the single-shot JSON filter approach with a multi-tool LLM architecture where the model reasons about intent and calls typed tools — enabling superlatives ("the best"), quantity control, and smarter composition.
+
+**Design decisions (agreed 2026-04-24):**
+- Multiple focused tools (not one monolithic filter object)
+- Capability detection at model-selector time — models that don't support function calling are not shown for chat search
+- Tool results include rich metadata (description, score, rationale, mood_tags, date_taken) bounded by the `limit` the model requests
+- User controls context size by requesting "next 10" etc.; no artificial server-side capping
+- Multi-turn history stores tool calls + results so model retains search context across turns
+
+**Tools to implement:**
+- `search_catalog(description_search?, score_perspective?, sort_by_score?, sort_by_date?, min_score?, min_rating?, limit?)` — main workhorse
+- `get_scoring_perspectives()` — runtime discovery of valid perspective slugs
+- `filter_by_date(date_from?, date_to?, sort_direction?, limit?)` — temporal queries
+
+**Requirements:**
+- Backend executes tool calls from LLM response and feeds results back as tool messages
+- Models without function calling support are filtered from the chat search model selector
+- Tool results return rich image metadata (description, score, rationale, mood_tags, date_taken) up to the model-requested limit
+- Conversation history preserves tool call / tool result turns for multi-turn continuity
+- Fallback path for non-capable models still works via existing JSON approach (for other features)
+
 #### Phase 6 — Similarity & stack UI
 
 **Requirements:** SIM-02, STACK-03
@@ -149,6 +172,7 @@
 | 4 | Stack detection | STACK-01, STACK-02 | 4 | ✅ Complete (2026-04-24; 4/4 plans) |
 | 5 | Image embed & search chat | SIM-01, NLS-05 | 4 | ✅ Complete (2026-04-24; 6/6 plans) |
 | 5.1 | Search UI polish | — | 4 | ✅ Complete (2026-04-24) |
+| 5.2 | Tool-calling search | — | 5 | Pending |
 | 6 | Similarity & stack UI | SIM-02, STACK-03 | 3 | Pending |
 | 7 | Stacks in matching & pin similarity | STACK-04, STACK-05, NLS-06 | 4 | Pending |
 
