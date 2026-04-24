@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useRef, useState } from 'react'
 import { ImageDetailModal, ImageTile, fromCatalogListRow } from '../components/image-view'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
@@ -31,6 +31,7 @@ export function SearchPage() {
   const [errorText, setErrorText] = useState<string | null>(null)
   const [currentImages, setCurrentImages] = useState<ChatSearchResultImage[]>([])
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null)
+  const threadRef = useRef<HTMLDivElement>(null)
 
   const [allModels, setAllModels] = useState<DescriptionModel[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>(
@@ -44,27 +45,34 @@ export function SearchPage() {
     ProvidersAPI.listDescriptionModels()
       .then(({ models, default_provider, default_model }) => {
         setAllModels(models)
-
         setSelectedProvider((prev) => {
           if (prev && models.some((m) => m.provider_id === prev)) return prev
           return default_provider ?? models[0]?.provider_id ?? ''
         })
-
         setSelectedModelId((prev) => {
           if (prev && models.some((m) => m.model_id === prev)) return prev
           return default_model ?? models[0]?.model_id ?? ''
         })
       })
-      .catch(() => {
-        // non-fatal — selectors stay empty, backend uses its own default
-      })
+      .catch(() => {})
   }, [])
+
+  // Scroll thread to bottom on new messages
+  useEffect(() => {
+    if (threadRef.current) {
+      threadRef.current.scrollTop = threadRef.current.scrollHeight
+    }
+  }, [messages])
 
   const providers = Array.from(
     new Map(allModels.map((m) => [m.provider_id, m.provider_name])).entries(),
   ).map(([id, name]) => ({ id, name }))
 
   const modelsForProvider = allModels.filter((m) => m.provider_id === selectedProvider)
+
+  const resolvedModel = allModels.find(
+    (m) => m.provider_id === selectedProvider && m.model_id === selectedModelId,
+  )
 
   const handleProviderChange = (pid: string) => {
     setSelectedProvider(pid)
@@ -81,9 +89,13 @@ export function SearchPage() {
     localStorage.setItem(MODEL_STORAGE_KEY, mid)
   }
 
-  const resolvedModel = allModels.find(
-    (m) => m.provider_id === selectedProvider && m.model_id === selectedModelId,
-  )
+  const handleClear = () => {
+    setMessages([])
+    setCurrentImages([])
+    setErrorText(null)
+    setStatus('idle')
+    setInput('')
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -125,129 +137,161 @@ export function SearchPage() {
     }
   }
 
+  const selectClass =
+    'min-w-0 w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-primary truncate'
+
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-section text-text mb-2">Search</h1>
-        <p className="text-text-secondary">Ask questions in natural language; results update on each message.</p>
+      <div className="mb-3">
+        <h1 className="text-section text-text mb-1">Search</h1>
+        <p className="text-text-secondary text-sm">Ask questions in natural language; results update on each message.</p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-6 h-full min-h-[60vh]">
-        <div className="w-full md:w-2/5 flex flex-col min-h-[320px]">
-            <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
-              {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}
-                >
-                  <div
-                    className={
-                      m.role === 'user'
-                        ? 'max-w-[85%] rounded-lg border border-border bg-surface px-3 py-2 text-sm text-right text-text'
-                        : 'max-w-[85%] rounded-lg border border-border bg-surface px-3 py-2 text-sm text-left text-text'
-                    }
-                  >
-                    {m.content}
-                  </div>
-                </div>
-              ))}
+      <div className="flex flex-col md:flex-row gap-4 min-h-[70vh]">
+        {/* Chat column */}
+        <div className="w-full md:w-2/5 flex flex-col min-h-[280px] md:min-h-0">
+
+          {/* Thread header: clear action */}
+          {messages.length > 0 && (
+            <div className="flex justify-end mb-1">
+              <button
+                type="button"
+                onClick={handleClear}
+                className="text-xs text-text-secondary hover:text-text transition-colors"
+              >
+                Clear
+              </button>
             </div>
-            <form
-              onSubmit={handleSubmit}
-              className="mt-auto flex flex-col gap-2 pt-2 border-t border-border shrink-0"
-            >
-              {providers.length > 0 && (
-                <div className="flex gap-2">
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                    <label htmlFor="provider-select" className="text-xs text-text-secondary whitespace-nowrap">
-                      Provider
-                    </label>
-                    <select
-                      id="provider-select"
-                      value={selectedProvider}
-                      onChange={(e) => handleProviderChange(e.target.value)}
-                      className="flex-1 min-w-0 rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-primary"
-                    >
-                      {providers.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                    <label htmlFor="model-select" className="text-xs text-text-secondary whitespace-nowrap">
-                      Model
-                    </label>
-                    <select
-                      id="model-select"
-                      value={selectedModelId}
-                      onChange={(e) => handleModelChange(e.target.value)}
-                      className="flex-1 min-w-0 rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-primary"
-                    >
-                      {modelsForProvider.map((m) => (
-                        <option key={m.model_id} value={m.model_id}>
-                          {m.model_name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-              <label htmlFor="search-chat-input" className="sr-only">
-                Message
-              </label>
-              <div className="flex gap-2 items-end">
-                <Input
-                  id="search-chat-input"
-                  name="message"
-                  value={input}
-                  onChange={(ev) => setInput(ev.target.value)}
-                  fullWidth
-                  className="flex-1"
-                  autoComplete="off"
-                  disabled={status === 'loading'}
-                  placeholder="Ask about your library…"
-                />
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="md"
-                  disabled={status === 'loading'}
+          )}
+
+          {/* Thread */}
+          <div ref={threadRef} className="flex-1 overflow-y-auto space-y-1.5 min-h-0">
+            {messages.length === 0 && (
+              <p className="text-xs text-text-secondary text-center mt-6">Your conversation will appear here.</p>
+            )}
+            {messages.map((m, i) => (
+              <div
+                key={i}
+                className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}
+              >
+                <div
+                  className={
+                    m.role === 'user'
+                      ? 'max-w-[85%] rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-right text-text'
+                      : 'max-w-[85%] rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-left text-text-secondary'
+                  }
                 >
-                  Send
-                </Button>
+                  {m.content}
+                </div>
               </div>
-              {status === 'error' && errorText != null && errorText !== '' ? (
-                <p role="alert" className="text-red-500 text-sm mt-2">
-                  {errorText}
-                </p>
-              ) : null}
-            </form>
+            ))}
           </div>
 
-          <div className="w-full md:w-3/5">
-            {status === 'loading' ? (
-              <SkeletonGrid count={12} />
-            ) : currentImages.length === 0 && messages.length === 0 ? (
-              <p className="text-center text-text-secondary mt-8">Ask about your photos...</p>
-            ) : status === 'idle' && messages.length > 0 && currentImages.length === 0 ? (
-              <p className="text-center text-gray-500 mt-8">No matches found. Try a different query.</p>
-            ) : (
-              <div className="relative transition-opacity duration-150">
-                <TileGrid>
-                  {currentImages.map((image) => (
-                    <ImageTile
-                      key={image.id != null ? String(image.id) : image.key}
-                      image={fromCatalogListRow(image)}
-                      variant="grid"
-                      primaryScoreSource="catalog"
-                      onClick={() => setSelectedImage({ key: image.key, initial: image })}
-                    />
-                  ))}
-                </TileGrid>
+          {/* Form */}
+          <form
+            onSubmit={handleSubmit}
+            className="mt-2 flex flex-col gap-1.5 pt-2 border-t border-border shrink-0"
+          >
+            {/* Provider + Model selectors — wrap on narrow containers */}
+            {providers.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                <div className="flex items-center gap-1 min-w-[120px] flex-1">
+                  <label htmlFor="provider-select" className="text-xs text-text-secondary whitespace-nowrap shrink-0">
+                    Provider
+                  </label>
+                  <select
+                    id="provider-select"
+                    value={selectedProvider}
+                    onChange={(e) => handleProviderChange(e.target.value)}
+                    title={providers.find((p) => p.id === selectedProvider)?.name ?? ''}
+                    className={selectClass}
+                  >
+                    {providers.map((p) => (
+                      <option key={p.id} value={p.id} title={p.name}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1 min-w-[140px] flex-1">
+                  <label htmlFor="model-select" className="text-xs text-text-secondary whitespace-nowrap shrink-0">
+                    Model
+                  </label>
+                  <select
+                    id="model-select"
+                    value={selectedModelId}
+                    onChange={(e) => handleModelChange(e.target.value)}
+                    title={resolvedModel?.model_name ?? selectedModelId}
+                    className={selectClass}
+                  >
+                    {modelsForProvider.map((m) => (
+                      <option key={m.model_id} value={m.model_id} title={m.model_name}>
+                        {m.model_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
+
+            <label htmlFor="search-chat-input" className="sr-only">Message</label>
+            <div className="flex gap-2 items-center">
+              <Input
+                id="search-chat-input"
+                name="message"
+                value={input}
+                onChange={(ev) => setInput(ev.target.value)}
+                fullWidth
+                className="flex-1 min-w-0"
+                autoComplete="off"
+                disabled={status === 'loading'}
+                placeholder="Ask about your library…"
+              />
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                disabled={status === 'loading'}
+              >
+                {status === 'loading' ? '…' : 'Send'}
+              </Button>
+            </div>
+
+            {status === 'error' && errorText != null && errorText !== '' ? (
+              <p role="alert" className="text-red-500 text-xs mt-1">
+                {errorText}
+              </p>
+            ) : null}
+          </form>
+        </div>
+
+        {/* Results column */}
+        <div className="w-full md:w-3/5">
+          {status === 'loading' ? (
+            <SkeletonGrid count={12} />
+          ) : currentImages.length === 0 && messages.length === 0 ? (
+            <div className="flex items-center justify-center h-full min-h-[200px]">
+              <p className="text-text-secondary text-sm">Ask about your photos to see results here.</p>
+            </div>
+          ) : status === 'idle' && messages.length > 0 && currentImages.length === 0 ? (
+            <div className="flex items-center justify-center h-full min-h-[200px]">
+              <p className="text-gray-500 text-sm">No matches found. Try a different query.</p>
+            </div>
+          ) : (
+            <div className="transition-opacity duration-150">
+              <TileGrid>
+                {currentImages.map((image) => (
+                  <ImageTile
+                    key={image.id != null ? String(image.id) : image.key}
+                    image={fromCatalogListRow(image)}
+                    variant="grid"
+                    primaryScoreSource="catalog"
+                    onClick={() => setSelectedImage({ key: image.key, initial: image })}
+                  />
+                ))}
+              </TileGrid>
+            </div>
+          )}
         </div>
       </div>
 
