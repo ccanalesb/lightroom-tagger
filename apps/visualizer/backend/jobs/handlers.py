@@ -2551,7 +2551,9 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
             )
 
         total_at_start = len(full_list)
-        fp = fingerprint_batch_embed_image(metadata, full_list)
+        fp = fingerprint_batch_embed_image(
+            metadata, full_list, resolved_months=months, resolved_year=year
+        )
 
         processed_pairs: set[str] = set()
         row_job = get_job(runner.db, job_id)
@@ -2615,21 +2617,42 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
             return True
 
         def flush_batch() -> bool:
-            nonlocal embedded
+            nonlocal embedded, failed
             if not buf_keys:
                 return True
-            vecs = encode_images(buf_paths, batch_size=_BATCH_EMBED_IMAGE_SIZE)
+            try:
+                vecs = encode_images(buf_paths, batch_size=_BATCH_EMBED_IMAGE_SIZE)
+            except Exception as enc_err:
+                add_job_log(runner.db, job_id, 'warning',
+                            f'batch encode failed ({enc_err}), retrying one by one')
+                # Fall back to per-image encoding so one bad file doesn't lose the whole batch.
+                import numpy as np
+                vecs_list = []
+                for path, img_key in zip(buf_paths, buf_keys):
+                    try:
+                        row_vec = encode_images([path], batch_size=1)
+                        vecs_list.append(row_vec[0])
+                    except Exception as per_err:
+                        add_job_log(runner.db, job_id, 'warning',
+                                    f'{img_key}: failed to encode ({per_err}), skipping')
+                        vecs_list.append(None)
+                vecs = vecs_list  # type: ignore[assignment]
             for j, img_key in enumerate(buf_keys):
                 if runner.is_cancelled(job_id):
                     return False
-                vec_blob = numpy_to_clip_vec_blob(vecs[j])
-                with library_write(lib_db):
-                    upsert_image_clip_embedding(lib_db, img_key, vec_blob)
-                processed_pairs.add(img_key)
-                embedded += 1
+                vec = vecs[j]
+                if vec is None:
+                    failed += 1
+                    processed_pairs.add(img_key)
+                else:
+                    vec_blob = numpy_to_clip_vec_blob(vec)
+                    with library_write(lib_db):
+                        upsert_image_clip_embedding(lib_db, img_key, vec_blob)
+                    processed_pairs.add(img_key)
+                    embedded += 1
                 if not persist_progress():
                     return False
-                pct = int(5 + (embedded / max(total_at_start, 1)) * 95)
+                pct = int(5 + ((embedded + skipped + failed) / max(total_at_start, 1)) * 95)
                 runner.update_progress(job_id, pct, f'Embedded {embedded}/{total_at_start}')
             buf_keys.clear()
             buf_paths.clear()
@@ -2655,6 +2678,8 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 processed_pairs.add(key)
                 if not persist_progress():
                     return
+                pct = int(5 + ((embedded + skipped) / max(total_at_start, 1)) * 95)
+                runner.update_progress(job_id, pct, f'Embedded {embedded}/{total_at_start} (skipped {skipped})')
                 continue
 
             buf_keys.append(key)

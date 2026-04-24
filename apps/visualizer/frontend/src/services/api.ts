@@ -944,10 +944,19 @@ export type ChatSearchRequest = {
   score_perspective?: string
 }
 
+export type ChatSearchResultImage = CatalogImage & {
+  /** Present on the semantic path — RRF/hybrid score for this result. */
+  score?: number
+  /** Present on the semantic path — short "why matched" explanation. */
+  why_matched?: string
+  /** Present on the semantic path — URL for thumbnail. */
+  thumbnail_url?: string
+}
+
 export type ChatSearchResponse = {
-  search_mode: string
+  search_mode: 'nl_filter' | 'semantic'
   total: number
-  images: CatalogImage[]
+  images: ChatSearchResultImage[]
   filters?: Record<string, unknown>
   metadata?: Record<string, unknown>
 }

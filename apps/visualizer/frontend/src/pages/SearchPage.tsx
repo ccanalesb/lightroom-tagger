@@ -4,13 +4,13 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { TileGrid } from '../components/ui/TileGrid'
 import { SkeletonGrid } from '../components/ui/page-states'
-import { ImagesAPI, type CatalogImage } from '../services/api'
+import { ImagesAPI, type CatalogImage, type ChatSearchResultImage } from '../services/api'
 
 type Message = {
   role: 'user' | 'assistant'
   content: string
-  images?: CatalogImage[]
-  search_mode?: string
+  images?: ChatSearchResultImage[]
+  search_mode?: 'nl_filter' | 'semantic'
 }
 
 type SelectedImage = { key: string; initial?: CatalogImage }
@@ -20,7 +20,7 @@ export function SearchPage() {
   const [input, setInput] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
   const [errorText, setErrorText] = useState<string | null>(null)
-  const [currentImages, setCurrentImages] = useState<CatalogImage[]>([])
+  const [currentImages, setCurrentImages] = useState<ChatSearchResultImage[]>([])
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null)
 
   const handleSubmit = async (e: FormEvent) => {

@@ -108,9 +108,19 @@ def fingerprint_batch_text_embed(
 
 
 def fingerprint_batch_embed_image(
-    metadata: dict[str, Any], ordered_keys: list[str]
+    metadata: dict[str, Any],
+    ordered_keys: list[str],
+    *,
+    resolved_months: int | None = None,
+    resolved_year: str | None = None,
 ) -> str:
-    """SHA-256 hex of canonical JSON for batch_embed_image inputs and ordered key list."""
+    """SHA-256 hex of canonical JSON for batch_embed_image inputs and ordered key list.
+
+    Pass ``resolved_months`` and ``resolved_year`` from ``_resolve_date_window`` so the
+    fingerprint reflects the *effective* date window rather than the raw metadata string,
+    which may represent the same window under multiple spellings (``date_filter='3months'``
+    vs ``last_months=3``).
+    """
     min_rating_raw = metadata.get("min_rating")
     min_rating: int | None
     try:
@@ -119,13 +129,14 @@ def fingerprint_batch_embed_image(
         min_rating = None
     pairs = sorted(ordered_keys)
     payload = {
-        "date_filter": metadata.get("date_filter", "all"),
         "embedding_dim": CLIP_EMBED_DIM,
         "embedding_model_id": CLIP_EMBED_MODEL_ID,
         "force": bool(metadata.get("force", False)),
         "image_type": str(metadata.get("image_type", "catalog")),
         "min_rating": min_rating,
         "pairs": pairs,
+        "resolved_months": resolved_months,
+        "resolved_year": resolved_year,
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
