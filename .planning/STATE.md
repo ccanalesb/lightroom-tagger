@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Phase 5 complete (6/6 plans — CLIP embed schema + service + job + chat-search API + /search UI + tests)
+status: Phase 5.1 complete (Search UI polish — clear button, tighter layout, mobile, dropdown truncation)
 last_updated: "2026-04-24T00:00:00.000Z"
 progress:
   total_phases: 7
