@@ -2362,6 +2362,17 @@ def upsert_image_text_embedding(
     )
 
 
+def upsert_image_clip_embedding(
+    conn: sqlite3.Connection, image_key: str, embedding_blob: bytes
+) -> None:
+    """Replace vec0 row for ``image_key``. Call inside :func:`library_write` only."""
+    conn.execute("DELETE FROM image_clip_embeddings WHERE image_key = ?", (image_key,))
+    conn.execute(
+        "INSERT INTO image_clip_embeddings(embedding, image_key) VALUES (?, ?)",
+        (embedding_blob, image_key),
+    )
+
+
 def get_all_images_with_descriptions(db: sqlite3.Connection,
                                      image_type: str = None,
                                      described_only: bool = False,
