@@ -16,7 +16,7 @@
 - [ ] **NLS-02**: User can search description text with keywords and get matching catalog photos
 - [x] **NLS-03**: Semantic search understands abstract queries ("moody cityscapes", "feeling of solitude") using text embeddings
 - [x] **NLS-04**: Search results show thumbnails, scores, and a brief "why matched" explanation per result
-- [ ] **NLS-05**: Search is accessible as a chat-like panel with conversation history on one side and a results grid on the other; each message refines the active result set
+- [x] **NLS-05**: Search is accessible as a chat-like panel with conversation history on one side and a results grid on the other; each message refines the active result set *(Phase 5 — 2026-04-24)*
 - [ ] **NLS-06**: User can pin a catalog photo inside the chat panel to trigger visual similarity search ("find more like this")
 
 ### Photo Stacking
@@ -33,7 +33,7 @@
 
 ### Visual Similarity Search
 
-- [ ] **SIM-01**: Job generates and stores image embeddings (CLIP-style) for catalog images
+- [x] **SIM-01**: Job generates and stores image embeddings (CLIP-style) for catalog images *(Phase 5 — 2026-04-24)*
 - [ ] **SIM-02**: "More like this" from any catalog photo surfaces visually similar results, accessible from the catalog view and from within the NLS-05 chat panel (NLS-06)
 
 ---
@@ -70,7 +70,7 @@
 | NLS-02 | 1 | Pending |
 | NLS-03 | 3 | ✅ Complete (2026-04-23) |
 | NLS-04 | 3 | ✅ Complete (2026-04-23) |
-| NLS-05 | 5 | Pending |
+| NLS-05 | 5 | ✅ Complete (2026-04-24) |
 | NLS-06 | 7 | Pending |
 | STACK-01 | 4 | ✅ Complete (2026-04-24) |
 | STACK-02 | 4 | Pending |
@@ -78,7 +78,7 @@
 | STACK-04 | 7 | Pending |
 | STACK-05 | 7 | Pending |
 | VIS-01 | 1 | Pending |
-| SIM-01 | 5 | Pending |
+| SIM-01 | 5 | ✅ Complete (2026-04-24) |
 | SIM-02 | 6 | Pending |
 
 **Total:** 14 requirements across 4 categories.

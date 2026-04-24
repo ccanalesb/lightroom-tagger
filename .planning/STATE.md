@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Phase 5 in progress (05-01 complete — CLIP vec0 + DB helpers)
-last_updated: "2026-04-24T15:47:26.000Z"
+status: Phase 5 complete (6/6 plans — CLIP embed schema + service + job + chat-search API + /search UI + tests)
+last_updated: "2026-04-24T00:00:00.000Z"
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 22
-  completed_plans: 17
+  completed_plans: 22
 ---
 
 # Planning state
