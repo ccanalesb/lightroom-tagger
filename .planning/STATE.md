@@ -41,6 +41,10 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 | quick_task | 260420-840-consolidate-image-metadata | missing |
 | seed | SEED-001 through SEED-020 (20 dormant seeds) | dormant |
 
+## Roadmap Evolution
+
+- Phase 5.1 added: Search UI polish (clear button, spacing, mobile layout, dropdown overflow) — 2026-04-24
+
 ## Accumulated Context
 
 - **v1.0 shipped** (2026-04-11) — Phases 1–4, 22 requirements

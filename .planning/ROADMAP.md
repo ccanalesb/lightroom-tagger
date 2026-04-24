@@ -113,6 +113,15 @@
 - Chat-like layout: conversation thread on one side, results grid on the other; each turn refines the active result set using the Phase 1–3 search stack.
 - Empty, loading, and error states for the panel; no dependency on visual similarity for basic chat search (pin comes in Phase 7).
 
+#### Phase 5.1 — Search UI polish *(inserted 2026-04-24)*
+
+**Goal:** Fix four concrete UX issues in the Search page: missing clear button, excessive spacing, broken mobile layout, cut-off provider/model dropdowns.
+
+- Clear button wipes conversation thread and result grid when at least one message exists.
+- Layout density tightened — reduced gaps, better column balance at desktop widths.
+- Mobile layout: single-column stacking, selector row wraps gracefully, input doesn't overflow.
+- Provider/model dropdowns handle long names without clipping or layout overflow.
+
 #### Phase 6 — Similarity & stack UI
 
 **Requirements:** SIM-02, STACK-03
@@ -139,6 +148,7 @@
 | 3 | Semantic search & results | NLS-03, NLS-04 | 4 | ✅ Complete (2026-04-23; 6/6 plans) |
 | 4 | Stack detection | STACK-01, STACK-02 | 4 | ✅ Complete (2026-04-24; 4/4 plans) |
 | 5 | Image embed & search chat | SIM-01, NLS-05 | 4 | ✅ Complete (2026-04-24; 6/6 plans) |
+| 5.1 | Search UI polish | — | 4 | Pending |
 | 6 | Similarity & stack UI | SIM-02, STACK-03 | 3 | Pending |
 | 7 | Stacks in matching & pin similarity | STACK-04, STACK-05, NLS-06 | 4 | Pending |
 
