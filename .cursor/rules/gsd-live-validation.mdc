@@ -7,6 +7,47 @@ alwaysApply: false
 
 During `verify_phase_goal` in `gsd-execute-phase`, reading code and SUMMARY.md files is not sufficient. Any phase that adds or modifies backend API routes or LLM integrations **must pass live validation** before the phase can be marked `passed`.
 
+## Layer 1 — Browser E2E (primary)
+
+Use the browser harness (`~/.cursor/skills/browser-harness/SKILL.md`) to validate the full user-facing flow in the running app. This is the strongest signal — it catches rendering bugs, routing issues, and integration failures that unit tests and curl checks miss.
+
+```bash
+browser-harness <<'PY'
+import base64, time
+
+new_tab("http://localhost:5173/<affected-page>")
+wait_for_load()
+time.sleep(2)
+
+# Interact with the feature (fill inputs, click buttons, change selectors)
+js("""
+  const inp = document.querySelector('#<input-id>');
+  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  nativeInputValueSetter.call(inp, '<test-value>');
+  inp.dispatchEvent(new Event('input', {bubbles:true}));
+""")
+js("document.querySelector('button[type=submit]').click()")
+time.sleep(5)  # wait for async response
+
+# Assert visible outcome
+text = js("document.body.innerText")
+assert "<expected text>" in text, f"Expected text not found: {text[:300]}"
+
+# Screenshot as evidence
+result = cdp("Page.captureScreenshot", format="png")
+with open("/tmp/phase-N-e2e.png", "wb") as f:
+    f.write(base64.b64decode(result["data"]))
+print("PASS — screenshot saved")
+PY
+```
+
+**Required assertions:**
+- Page renders without blank screen or JS error overlay
+- User action produces a visible non-empty result (images, data, confirmation)
+- No error messages visible in DOM after interaction
+
+**Save the screenshot** to `/tmp/phase-{N}-e2e.png` and embed the path in VERIFICATION.md as evidence.
+
 ## Required checks by change type
 
 ### Backend API endpoints (new or modified routes)
