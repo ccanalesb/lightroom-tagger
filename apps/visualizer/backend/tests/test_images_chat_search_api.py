@@ -25,6 +25,16 @@ def chat_search_client(tmp_path, monkeypatch):
     conn.close()
 
     monkeypatch.setattr("utils.db.LIBRARY_DB", db_path)
+
+    import api.images as api_images
+
+    _orig_list = api_images.ProviderRegistry.list_providers
+
+    def _list_providers_nl_only(self):
+        return [{**p, "tool_calling": False} for p in _orig_list(self)]
+
+    monkeypatch.setattr(api_images.ProviderRegistry, "list_providers", _list_providers_nl_only)
+
     app = create_app()
     return app.test_client(), k
 

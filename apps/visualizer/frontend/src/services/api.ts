@@ -954,11 +954,18 @@ export type ChatSearchResultImage = CatalogImage & {
 }
 
 export type ChatSearchResponse = {
-  search_mode: 'nl_filter' | 'semantic'
+  search_mode: 'nl_filter' | 'semantic' | 'tool_calling'
   total: number
   images: ChatSearchResultImage[]
-  filters?: Record<string, unknown>
-  metadata?: Record<string, unknown>
+  filters?: Record<string, unknown> | null
+  metadata?: Record<string, unknown> | null
+  messages?: Array<{
+    role: string
+    content: string | null
+    tool_calls?: unknown[]
+    tool_call_id?: string
+  }>
+  assistant_message?: string
 }
 
 /**

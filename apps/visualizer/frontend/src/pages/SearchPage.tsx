@@ -50,7 +50,7 @@ type Message = {
   role: 'user' | 'assistant'
   content: string
   images?: ChatSearchResultImage[]
-  search_mode?: 'nl_filter' | 'semantic'
+  search_mode?: 'nl_filter' | 'semantic' | 'tool_calling'
 }
 
 type SelectedImage = { key: string; initial?: CatalogImage }

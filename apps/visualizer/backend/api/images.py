@@ -17,6 +17,8 @@ from utils.responses import (
 )
 
 from lightroom_tagger.core import nl_catalog_search
+from lightroom_tagger.core.provider_errors import ModelUnavailableError
+from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.catalog_nl_filter import (
     CatalogNlFilter,
     catalog_nl_filter_to_query_kwargs,
@@ -270,6 +272,58 @@ def _rows_to_catalog_api_images(rows, score_perspective_arg: str | None) -> list
             out['id'] = None
         images.append(out)
     return images
+
+
+def _extract_images_from_tool_messages(
+    messages: list[dict],
+    db: sqlite3.Connection,
+    *,
+    score_perspective_override: str | None = None,
+) -> tuple[list[dict], int]:
+    """Parse the last tool result JSON, re-fetch rows in catalog API shape, ordered like the tool result."""
+    tool_msgs = [
+        m
+        for m in messages
+        if isinstance(m, dict) and str(m.get("role", "")).strip().lower() == "tool"
+    ]
+    if not tool_msgs:
+        return [], 0
+    last = tool_msgs[-1]
+    raw_content = last.get("content")
+    if raw_content is None or not str(raw_content).strip():
+        return [], 0
+    try:
+        payload = json.loads(str(raw_content))
+    except (json.JSONDecodeError, TypeError):
+        return [], 0
+    if not isinstance(payload, dict) or payload.get("error"):
+        return [], 0
+    tool_images = payload.get("images")
+    if not isinstance(tool_images, list):
+        return [], 0
+    total = int(payload.get("total_matched", 0) or 0)
+    keys: list[str] = []
+    sp_from_tool: str | None = None
+    for im in tool_images:
+        if not isinstance(im, dict):
+            continue
+        k = im.get("key")
+        if k is not None and str(k).strip():
+            keys.append(str(k))
+        if sp_from_tool is None and im.get("score_perspective"):
+            spt = str(im["score_perspective"]).strip()
+            if spt:
+                sp_from_tool = spt
+    sp_arg = score_perspective_override if score_perspective_override else sp_from_tool
+    if not keys:
+        return [], total
+    rows = query_catalog_images_by_keys(db, keys, score_perspective=sp_arg)
+    by_key = {r.get("key"): r for r in rows}
+    ordered_rows = [by_key[k] for k in keys if k in by_key]
+    images = _rows_to_catalog_api_images(ordered_rows, sp_arg)
+    for img in images:
+        img["thumbnail_url"] = f"/api/images/catalog/{img['key']}/thumbnail"
+    return images, total
 
 
 def _filter_by_date(images, date_folder, date_from, date_to):
@@ -748,6 +802,45 @@ def chat_search_images(db):
         limit, offset = _clamp_pagination(body.get('limit', 50), body.get('offset', 0))
 
         turns_for_llm = prior + [{'role': 'user', 'content': message_stripped}]
+
+        registry = ProviderRegistry()
+        all_providers = {p['id']: p for p in registry.list_providers()}
+        resolved_provider_id = body.get('provider_id') or registry.defaults.get('description', {}).get('provider')
+        provider_config = all_providers.get(resolved_provider_id, {})
+        use_tool_calling = bool(provider_config.get('tool_calling', False))
+
+        if use_tool_calling:
+            score_perspective_for_tool: str | None = None
+            if 'score_perspective' in body and body.get('score_perspective') is not None:
+                sp = str(body.get('score_perspective') or '').strip()
+                if sp:
+                    if not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(sp):
+                        return error_bad_request('invalid score_perspective slug')
+                    score_perspective_for_tool = sp
+            try:
+                assistant_text, updated_messages = nl_catalog_search.run_tool_calling_search(
+                    turns_for_llm,
+                    provider_id=body.get('provider_id'),
+                    model=body.get('model'),
+                    db=db,
+                    log_callback=None,
+                )
+            except (ModelUnavailableError, ValueError) as exc:
+                return error_bad_request(str(exc))
+            images, total = _extract_images_from_tool_messages(
+                updated_messages,
+                db,
+                score_perspective_override=score_perspective_for_tool,
+            )
+            return jsonify({
+                'search_mode': 'tool_calling',
+                'total': total,
+                'images': images,
+                'filters': None,
+                'metadata': None,
+                'messages': updated_messages,
+                'assistant_message': assistant_text,
+            })
 
         slug_rows = db.execute(
             "SELECT DISTINCT perspective_slug FROM image_scores "
