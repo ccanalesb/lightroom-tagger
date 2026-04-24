@@ -105,6 +105,7 @@ export function SearchPage() {
         message: trimmed,
         messages: prior,
         limit: 50,
+        provider_id: resolvedModel?.provider_id,
         model: resolvedModel?.model_id,
       })
       setCurrentImages(data.images)
