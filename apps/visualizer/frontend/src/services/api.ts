@@ -359,6 +359,12 @@ export const ImagesAPI = {
       `/images/${image_type}/${encodeURIComponent(image_key)}${qs}`,
     )
   },
+
+  chatSearch: (payload: ChatSearchRequest) =>
+    request<ChatSearchResponse>('/images/chat-search', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 }
 
 export const MatchingAPI = {
@@ -926,6 +932,24 @@ export interface CatalogImage {
   /** Present when catalog list was requested with score_perspective. */
   catalog_perspective_score?: number | null
   catalog_score_perspective?: string
+}
+
+export type ChatSearchRequest = {
+  message: string
+  messages?: Array<{ role: string; content: string }>
+  limit?: number
+  offset?: number
+  provider_id?: string
+  model?: string
+  score_perspective?: string
+}
+
+export type ChatSearchResponse = {
+  search_mode: string
+  total: number
+  images: CatalogImage[]
+  filters?: Record<string, unknown>
+  metadata?: Record<string, unknown>
 }
 
 /**
