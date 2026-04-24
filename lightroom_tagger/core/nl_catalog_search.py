@@ -20,13 +20,16 @@ posted, month, keyword, min_rating, date_from, date_to, score_perspective, min_s
 Do not include any other keys. Field meanings:
 - posted: boolean, filter images marked posted/unposted to Instagram
 - month: YYYYmm string
-- keyword, date_from, date_to: strings as needed
+- keyword: exact Lightroom metadata keyword tag (e.g. "wedding", "portrait") — only use when the user refers to a specific tagged category, NOT for visual content descriptions
+- date_from, date_to: date strings as needed
 - min_rating, min_score: integers; min_score 1–10 and requires score_perspective when set
 - score_perspective: lowercase slug [a-z][a-z0-9_]* for score-based filters
 - sort_by_score: "asc" or "desc" (requires score_perspective)
 - sort_by_date: "newest" or "oldest"
-- description_search: free-text for full-text search on descriptions
+- description_search: free-text search on AI-generated image descriptions — use this for ANY query about visual content, subjects, scenes, actions, gestures, objects, mood, or composition
 - dominant_colors, mood_tags: JSON arrays of strings
+
+IMPORTANT: When the user asks about what is visually in photos (people, objects, actions, scenes, lighting, etc.) always use description_search, not keyword.
 """
 
 
