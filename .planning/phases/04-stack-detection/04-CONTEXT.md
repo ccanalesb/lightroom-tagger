@@ -27,9 +27,9 @@ Out of scope:
 
 ### Representative Selection
 - **D-02:** When a stack is created, the representative is chosen via a **three-tier cascade**:
-  1. Highest Lightroom star rating (`images.rating`, non-zero) — uses signal the photographer already set
-  2. Highest AI aggregate score — LEFT JOIN `image_descriptions`; treat NULL as 0 (images not yet scored are skipped gracefully)
-  3. Last by `date_taken` — final deterministic fallback when no ratings and no AI scores exist
+  1. Highest Lightroom star rating (`images.rating`, non-zero)
+  2. Highest AI aggregate score — `AVG(score)` from `image_scores` joined to active `perspectives` for that `image_key`; treat NULL/no-score as 0
+  3. Last by `date_taken` — final deterministic fallback
 - **D-03:** Representative is stored as `representative_key` on `image_stacks`. Must never be null after stack creation.
 
 ### Re-run Semantics
@@ -41,7 +41,7 @@ Out of scope:
 
 ### Configuration
 - **D-06:** `stack_burst_delta_ms: int = 2000` added to the `Config` dataclass in `lightroom_tagger/core/config.py` with a 2000ms default. Persisted in `config.yaml`.
-- **D-07:** Job metadata `delta_ms` overrides the config value for that run when supplied. Handler resolves: `delta_ms = metadata.get("delta_ms") or load_config().stack_burst_delta_ms`.
+- **D-07:** Job metadata `delta_ms` overrides the config value for that run when supplied AND non-zero. Handler resolves: `raw = metadata.get("delta_ms"); resolved = raw if (raw is not None and raw != 0) else load_config().stack_burst_delta_ms`. Passing `delta_ms: 0` is treated as "use config" (same as omitting the key). A resolved value must be `>= 1` or the job fails.
 - **D-08:** A new `StackDetectionSettingsPanel` component is added to `SettingsTab` (in `apps/visualizer/frontend/src/components/processing/SettingsTab.tsx`) — same pattern as `CatalogSettingsPanel` and `InstagramDumpSettingsPanel`. Exposes the persistent `stack_burst_delta_ms` default.
 
 ### Null / Bad date_taken Handling

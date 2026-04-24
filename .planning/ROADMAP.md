@@ -101,7 +101,7 @@
 
 - Schema: `image_stacks` + `image_stack_members` with `UNIQUE(image_key)`; migrations idempotent.
 - Job groups burst sequences by `date_taken` within configurable `delta_ms` with checkpointed progress.
-- Second pass clusters time-separated near-duplicates via pHash (Hamming threshold configurable); bad/null `date_taken` handled without corrupting groups.
+- Second pass clusters time-separated near-duplicates via pHash (Hamming threshold configurable); bad/null `date_taken` handled without corrupting groups. *(STACK-02 pHash clustering: descoped from Phase 4 — dropped per user decision 2026-04-24)*
 - Observable job lifecycle for stack jobs consistent with existing job UX.
 
 #### Phase 5 — Image embed & search chat
