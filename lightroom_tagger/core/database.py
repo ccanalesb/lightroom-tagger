@@ -607,6 +607,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
     _backfill_matched_catalog_key_from_validated_matches(conn)
     _migrate_image_descriptions_fts(conn)
     _migrate_image_text_embeddings_vec0(conn)
+    _migrate_image_clip_embeddings_vec0(conn)
     # Stack members reference `images` by key at insert time; `images` is created above.
     _migrate_image_stacks(conn)
     seed_perspectives_from_prompts_dir(conn)
@@ -791,6 +792,27 @@ def _migrate_image_text_embeddings_vec0(conn: sqlite3.Connection) -> None:
     except sqlite3.OperationalError:
         return
     conn.execute("PRAGMA user_version = 4")
+
+
+def _migrate_image_clip_embeddings_vec0(conn: sqlite3.Connection) -> None:
+    """Create sqlite-vec vec0 table for catalog CLIP embeddings (user_version 4 → 5)."""
+    row = conn.execute("PRAGMA user_version").fetchone()
+    current_uv = int(row["user_version"] if row else 0)
+    if current_uv >= 5:
+        return
+    try:
+        conn.execute("DROP TABLE IF EXISTS image_clip_embeddings")
+        conn.execute(
+            """
+            CREATE VIRTUAL TABLE image_clip_embeddings USING vec0(
+              embedding float[512] distance_metric=cosine,
+              image_key TEXT
+            );
+            """
+        )
+    except sqlite3.OperationalError:
+        return
+    conn.execute("PRAGMA user_version = 5")
 
 
 # Stack mutations from batch jobs must use library_write(context manager).

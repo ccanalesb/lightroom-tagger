@@ -70,8 +70,15 @@ class TestDatabase(unittest.TestCase):
         sql = sql_row["sql"] or ""
         self.assertIn("vec0", sql)
         self.assertIn("float[768]", sql)
+        clip_row = self.db.execute(
+            "SELECT type, name, sql FROM sqlite_master WHERE name = 'image_clip_embeddings'"
+        ).fetchone()
+        self.assertIsNotNone(clip_row)
+        clip_sql = clip_row["sql"] or ""
+        self.assertIn("vec0", clip_sql)
+        self.assertIn("float[512]", clip_sql)
         uv = self.db.execute("PRAGMA user_version").fetchone()
-        self.assertEqual(int(uv["user_version"]), 4)
+        self.assertEqual(int(uv["user_version"]), 5)
 
     def test_generate_key(self):
         """Test key generation."""
