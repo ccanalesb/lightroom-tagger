@@ -6,6 +6,7 @@ from lightroom_tagger.core.config import (
     load_config,
     update_config_yaml_catalog_path,
     update_config_yaml_instagram_dump_path,
+    update_config_yaml_stack_burst_delta_ms,
 )
 from utils.responses import error_bad_request
 
@@ -77,3 +78,23 @@ def put_instagram_dump():
         return error_bad_request("instagram_dump_path must be an existing directory")
     update_config_yaml_instagram_dump_path(LT_CONFIG_YAML, value)
     return jsonify({"instagram_dump_path": value.strip(), "ok": True})
+
+
+@bp.route('/stack-detection', methods=['GET'])
+def get_stack_detection():
+    cfg = load_config(LT_CONFIG_YAML)
+    return jsonify({"stack_burst_delta_ms": int(cfg.stack_burst_delta_ms)})
+
+
+@bp.route('/stack-detection', methods=['PUT'])
+def put_stack_detection():
+    data = request.get_json(silent=True)
+    if data is None or "stack_burst_delta_ms" not in data:
+        return error_bad_request("stack_burst_delta_ms is required")
+    value = data["stack_burst_delta_ms"]
+    if type(value) is not int:
+        return error_bad_request("stack_burst_delta_ms must be an integer")
+    if value < 1:
+        return error_bad_request("stack_burst_delta_ms must be at least 1")
+    update_config_yaml_stack_burst_delta_ms(LT_CONFIG_YAML, value)
+    return jsonify({"stack_burst_delta_ms": value, "ok": True})
