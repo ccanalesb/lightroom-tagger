@@ -2,6 +2,7 @@
 import os
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from pathlib import Path
 
 from database import add_job_log, get_job, update_job_field
@@ -30,12 +31,40 @@ from . import path_setup as _path_setup  # noqa: F401
 from .checkpoint import (
     fingerprint_batch_describe,
     fingerprint_batch_score,
+    fingerprint_batch_stack_detect,
     fingerprint_batch_text_embed,
     fingerprint_catalog_keys,
     fingerprint_vision_match,
 )
 
 _CHECKPOINT_MAX_ENTRIES = 100_000
+
+# SQL fragments to exclude video files from describe queries at the DB level so
+# the processor never wastes a worker slot attempting to describe a .mov/.mp4/etc.
+_CATALOG_NOT_VIDEO_SQL = (
+    "LOWER(i.filepath) NOT LIKE '%.mov' AND "
+    "LOWER(i.filepath) NOT LIKE '%.mp4' AND "
+    "LOWER(i.filepath) NOT LIKE '%.avi' AND "
+    "LOWER(i.filepath) NOT LIKE '%.mkv' AND "
+    "LOWER(i.filepath) NOT LIKE '%.wmv' AND "
+    "LOWER(i.filepath) NOT LIKE '%.m4v' AND "
+    "LOWER(i.filepath) NOT LIKE '%.3gp' AND "
+    "LOWER(i.filepath) NOT LIKE '%.webm' AND "
+    "LOWER(i.filepath) NOT LIKE '%.mts' AND "
+    "LOWER(i.filepath) NOT LIKE '%.m2ts'"
+)
+_INSTAGRAM_NOT_VIDEO_SQL = (
+    "LOWER(m.file_path) NOT LIKE '%.mov' AND "
+    "LOWER(m.file_path) NOT LIKE '%.mp4' AND "
+    "LOWER(m.file_path) NOT LIKE '%.avi' AND "
+    "LOWER(m.file_path) NOT LIKE '%.mkv' AND "
+    "LOWER(m.file_path) NOT LIKE '%.wmv' AND "
+    "LOWER(m.file_path) NOT LIKE '%.m4v' AND "
+    "LOWER(m.file_path) NOT LIKE '%.3gp' AND "
+    "LOWER(m.file_path) NOT LIKE '%.webm' AND "
+    "LOWER(m.file_path) NOT LIKE '%.mts' AND "
+    "LOWER(m.file_path) NOT LIKE '%.m2ts'"
+)
 
 
 def _resolve_library_db_or_fail(runner, job_id: str) -> str | None:
@@ -152,11 +181,14 @@ def _select_catalog_keys(
         )
         date_col = "i.date_taken"
         rating_col = "i.rating"
-        conditions: list[str] = []
+        conditions: list[str] = [_CATALOG_NOT_VIDEO_SQL]
     else:
-        sql = "SELECT key FROM images"
-        date_col = "date_taken"
-        rating_col = "rating"
+        sql = (
+            "SELECT i.key AS key FROM images i "
+            "WHERE " + _CATALOG_NOT_VIDEO_SQL
+        )
+        date_col = "i.date_taken"
+        rating_col = "i.rating"
         conditions = []
 
     if months:
@@ -174,7 +206,7 @@ def _select_catalog_keys(
             sql += " AND " + " AND ".join(conditions)
     else:
         if conditions:
-            sql += " WHERE " + " AND ".join(conditions)
+            sql += " AND " + " AND ".join(conditions)
 
     rows = lib_db.execute(sql, tuple(params)).fetchall()
     return [(r['key'], 'catalog') for r in rows]
@@ -202,7 +234,7 @@ def _select_catalog_keys_missing_visual_tags(
     )
     date_col = "i.date_taken"
     rating_col = "i.rating"
-    conditions: list[str] = []
+    conditions: list[str] = [_CATALOG_NOT_VIDEO_SQL]
     if months:
         conditions.append(f"{date_col} >= date('now', ?)")
         params.append(f'-{months} months')
@@ -239,10 +271,10 @@ def _select_instagram_keys(
             "WHERE d.image_key IS NULL"
         )
         table_alias = "m."
-        conditions: list[str] = []
+        conditions: list[str] = [_INSTAGRAM_NOT_VIDEO_SQL]
     else:
-        sql = "SELECT media_key FROM instagram_dump_media"
-        table_alias = ""
+        sql = "SELECT m.media_key AS media_key FROM instagram_dump_media m WHERE " + _INSTAGRAM_NOT_VIDEO_SQL
+        table_alias = "m."
         conditions = []
 
     # Fall back to date_folder ("YYYYMM") when created_at is missing — the Instagram
@@ -266,12 +298,8 @@ def _select_instagram_keys(
         conditions.append(f"strftime('%Y', {date_expr}) = ?")
         params.append(year)
 
-    if undescribed_only:
-        if conditions:
-            sql += " AND " + " AND ".join(conditions)
-    else:
-        if conditions:
-            sql += " WHERE " + " AND ".join(conditions)
+    if conditions:
+        sql += " AND " + " AND ".join(conditions)
 
     rows = lib_db.execute(sql, tuple(params)).fetchall()
     return [(r['media_key'], 'instagram') for r in rows]
@@ -2463,6 +2491,376 @@ def _handle_batch_text_embed_inner(runner, job_id: str, metadata: dict) -> None:
             lib_db.close()
 
 
+def _normalize_stack_detect_force(metadata: dict) -> str:
+    """Return ``incremental`` | ``full`` | ``preserve_edited`` (CONTEXT D-05).
+
+    Phase 4: ``preserve_edited`` issues the same full DB clear as ``full`` because
+    ``user_modified`` is always 0. Phase 7 (STACK-05) may skip user-edited stacks.
+    """
+    raw = metadata.get('force', False)
+    if raw is True:
+        return 'full'
+    if raw == 'preserve_edited':
+        return 'preserve_edited'
+    return 'incremental'
+
+
+def _parse_date_taken_utc(value: object) -> datetime | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if text.endswith('Z'):
+        text = text[:-1] + '+00:00'
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _build_burst_segments(
+    rows: list[dict],
+    delta_ms: int,
+) -> tuple[list[list[str]], int]:
+    """Return consecutive-time burst segments and a count of rows with bad/missing *date_taken*."""
+    parsed: list[tuple[str, datetime]] = []
+    skipped_no_date = 0
+    for row in rows:
+        key = str(row.get('key') or '')
+        raw_dt = row.get('date_taken')
+        p = _parse_date_taken_utc(raw_dt)
+        if p is None:
+            skipped_no_date += 1
+            continue
+        parsed.append((key, p))
+    if not parsed:
+        return [], skipped_no_date
+    parsed.sort(key=lambda t: (t[1].timestamp(), t[0]))
+    segments: list[list[str]] = []
+    cur: list[str] = [parsed[0][0]]
+    prev_ts = parsed[0][1]
+    for i in range(1, len(parsed)):
+        key, ts = parsed[i]
+        gap_ms = (ts - prev_ts).total_seconds() * 1000.0
+        if gap_ms > float(delta_ms):
+            segments.append(cur)
+            cur = [key]
+        else:
+            cur.append(key)
+        prev_ts = ts
+    segments.append(cur)
+    return segments, skipped_no_date
+
+
+def _select_stack_representative_key(lib_db: sqlite3.Connection, burst_keys: tuple[str, ...]) -> str | None:
+    if not burst_keys:
+        return None
+    ph = ','.join('?' * len(burst_keys))
+    sql = (
+        'SELECT i.key AS k FROM images i '
+        'LEFT JOIN ( '
+        '  SELECT s.image_key AS image_key, AVG(s.score) AS ai_score '
+        '  FROM image_scores s '
+        '  INNER JOIN perspectives p ON p.slug = s.perspective_slug AND p.active = 1 '
+        "  WHERE s.is_current = 1 AND s.image_type = 'catalog' "
+        '  GROUP BY s.image_key '
+        ') agg ON agg.image_key = i.key '
+        f'WHERE i.key IN ({ph}) '
+        'ORDER BY (i.rating > 0) DESC, i.rating DESC, COALESCE(agg.ai_score, 0) DESC, '
+        'i.date_taken DESC, i.key DESC LIMIT 1'
+    )
+    row = lib_db.execute(sql, burst_keys).fetchone()
+    if not row:
+        return None
+    r = row.get('k') if isinstance(row, dict) else row[0]
+    return str(r) if r is not None else None
+
+
+def handle_batch_stack_detect(runner, job_id: str, metadata: dict) -> None:
+    """Group catalog images into burst stacks by *date_taken* gaps (``batch_stack_detect`` job)."""
+    with cancel_scope.install(lambda: runner.is_cancelled(job_id)):
+        _handle_batch_stack_detect_inner(runner, job_id, metadata)
+
+
+def _handle_batch_stack_detect_inner(runner, job_id: str, metadata: dict) -> None:
+    """Burst stacks by ``date_taken``; checkpoint lists keys finished per CONTEXT D-10–D-11.
+
+    **Incremental mode:** the work list is only images not in ``image_stack_members``; gap detection
+    does not consider neighbors that remain stacked from a prior run. Use ``force: true`` for a
+    global re-scan.
+    * ``delta_ms`` in metadata: override config only when the value is not ``None`` and not ``0``
+      (0 is treated as unset, same as omitting the key; CONTEXT D-07).
+    """
+    lib_db: sqlite3.Connection | None = None
+    try:
+        db_path = _resolve_library_db_or_fail(runner, job_id)
+        if db_path is None:
+            return
+        lib_db = init_database(db_path)
+        cfg = load_config()
+        force_mode = _normalize_stack_detect_force(metadata)
+        raw_delta = metadata.get('delta_ms')
+        if raw_delta is not None and raw_delta != 0:
+            try:
+                resolved_delta_ms = int(raw_delta)
+            except (TypeError, ValueError):
+                runner.fail_job(
+                    job_id,
+                    'Invalid delta_ms in metadata (must be integer >= 1)',
+                    severity='warning',
+                )
+                return
+            if resolved_delta_ms < 1:
+                runner.fail_job(
+                    job_id,
+                    'delta_ms override must be >= 1 when non-zero (invalid delta_ms)',
+                    severity='warning',
+                )
+                return
+        else:
+            resolved_delta_ms = int(getattr(cfg, 'stack_burst_delta_ms', 2000))
+            if resolved_delta_ms < 1:
+                resolved_delta_ms = 2000
+
+        images_skipped_already_stacked = 0
+        if force_mode == 'incremental':
+            row_m = lib_db.execute('SELECT COUNT(*) AS c FROM image_stack_members').fetchone()
+            images_skipped_already_stacked = int(
+                (row_m.get('c') if row_m and isinstance(row_m, dict) else 0) or 0
+            )
+
+        if force_mode in ('full', 'preserve_edited'):
+            with library_write(lib_db):
+                lib_db.execute('DELETE FROM image_stacks')
+
+        if force_mode == 'incremental':
+            key_rows = lib_db.execute(
+                'SELECT i.key AS key FROM images i WHERE i.key NOT IN '
+                '(SELECT image_key FROM image_stack_members)'
+            ).fetchall()
+        else:
+            key_rows = lib_db.execute('SELECT key AS key FROM images').fetchall()
+
+        all_keys = sorted(
+            {str(r['key']) for r in key_rows if r and (r.get('key') if isinstance(r, dict) else r[0])}
+        )
+        total_at_start = len(all_keys)
+        initial_sorted_keys = sorted(all_keys)
+        fp = fingerprint_batch_stack_detect(
+            metadata,
+            initial_sorted_keys,
+            resolved_delta_ms=resolved_delta_ms,
+            force_mode=force_mode,
+        )
+
+        processed_image_keys: set[str] = set()
+        row_job = get_job(runner.db, job_id)
+        if row_job:
+            meta_job = row_job.get('metadata') or {}
+            if isinstance(meta_job, dict):
+                chk = meta_job.get('checkpoint')
+                if (
+                    isinstance(chk, dict)
+                    and chk.get('checkpoint_version') == 1
+                    and chk.get('job_type') == 'batch_stack_detect'
+                ):
+                    if chk.get('fingerprint') == fp:
+                        processed_image_keys = set(chk.get('processed_image_keys') or [])
+                    elif chk.get('fingerprint'):
+                        add_job_log(
+                            runner.db,
+                            job_id,
+                            'info',
+                            'checkpoint mismatch: batch_stack_detect fingerprint changed, starting fresh',
+                        )
+
+        if total_at_start == 0:
+            runner.update_progress(job_id, 5, 'No catalog images in stack-detect work list')
+            z = {
+                'stacks_created': 0,
+                'stacks_updated': 0,
+                'images_stacked': 0,
+                'images_skipped_no_date': 0,
+                'images_skipped_already_stacked': int(images_skipped_already_stacked),
+            }
+            add_job_log(
+                runner.db,
+                job_id,
+                'info',
+                f'Stack detection complete: {z}; 0 images skipped (no date_taken)',
+            )
+            runner.clear_checkpoint(job_id)
+            runner.complete_job(job_id, z)
+            return
+
+        runner.update_progress(
+            job_id,
+            5,
+            f'Found {total_at_start} images to scan for stacks',
+        )
+
+        def fetch_rows_for_keys(keys: list[str]) -> list[dict]:
+            if not keys:
+                return []
+            out: list[dict] = []
+            chunk = 500
+            for i in range(0, len(keys), chunk):
+                part = keys[i : i + chunk]
+                ph = ','.join('?' * len(part))
+                q = f'SELECT key, date_taken, rating FROM images WHERE key IN ({ph})'
+                for r in lib_db.execute(q, tuple(part)).fetchall():
+                    out.append(dict(r))
+            return out
+
+        row_dicts = fetch_rows_for_keys(list(all_keys))
+        fetched_by_key = {str(r.get('key')): r for r in row_dicts}
+        for key in all_keys:
+            if key not in fetched_by_key:
+                row_dicts.append({'key': key, 'date_taken': None, 'rating': 0})
+        segments, images_skipped_no_date = _build_burst_segments(row_dicts, resolved_delta_ms)
+
+        keys_with_parsed_date: set[str] = set()
+        for seg in segments:
+            keys_with_parsed_date.update(seg)
+        total_work_units = len(keys_with_parsed_date)
+        if total_work_units == 0:
+            res = {
+                'stacks_created': 0,
+                'stacks_updated': 0,
+                'images_stacked': 0,
+                'images_skipped_no_date': int(images_skipped_no_date),
+                'images_skipped_already_stacked': int(images_skipped_already_stacked),
+            }
+            add_job_log(
+                runner.db,
+                job_id,
+                'info',
+                f'Stack detection complete: {res}; {images_skipped_no_date} images skipped (no date_taken)',
+            )
+            runner.clear_checkpoint(job_id)
+            runner.complete_job(job_id, res)
+            return
+
+        stacks_created = 0
+        stacks_updated = 0
+        images_stacked = 0
+
+        def persist_progress() -> bool:
+            if len(processed_image_keys) > _CHECKPOINT_MAX_ENTRIES:
+                runner.fail_job(
+                    job_id,
+                    'checkpoint too large: exceeds 100000 entries',
+                    severity='error',
+                )
+                return False
+            runner.persist_checkpoint(
+                job_id,
+                {
+                    'job_type': 'batch_stack_detect',
+                    'fingerprint': fp,
+                    'processed_image_keys': sorted(processed_image_keys),
+                    'total_at_start': total_at_start,
+                },
+            )
+            return True
+
+        for segment in segments:
+            if runner.is_cancelled(job_id):
+                runner.finalize_cancelled(job_id)
+                return
+            if not segment:
+                continue
+            if all(k in processed_image_keys for k in segment):
+                continue
+            if len(segment) < 2:
+                processed_image_keys.update(segment)
+                if not persist_progress():
+                    return
+                row_s = get_job(runner.db, job_id)
+                if row_s and row_s.get('status') == 'failed':
+                    return
+                pct = int(5 + (len(processed_image_keys) / max(total_work_units, 1)) * 95)
+                runner.update_progress(
+                    job_id,
+                    min(pct, 100),
+                    f'Processed bursts ({len(processed_image_keys)}/{total_work_units} keys)',
+                )
+                continue
+
+            burst_tuple = tuple(segment)
+            rep = _select_stack_representative_key(lib_db, burst_tuple)
+            if not rep or rep not in segment:
+                runner.fail_job(
+                    job_id,
+                    'Stack representative selection failed (internal error)',
+                    severity='error',
+                )
+                return
+            n = len(segment)
+            with library_write(lib_db):
+                cur = lib_db.execute(
+                    'INSERT INTO image_stacks (representative_key, stack_size, user_modified) '
+                    'VALUES (?, ?, 0)',
+                    (rep, n, 0),
+                )
+                stack_id = int(cur.lastrowid)
+                for mkey in segment:
+                    lib_db.execute(
+                        'INSERT INTO image_stack_members (stack_id, image_key) VALUES (?, ?)',
+                        (stack_id, mkey),
+                    )
+            stacks_created += 1
+            images_stacked += n
+            processed_image_keys.update(segment)
+            if not persist_progress():
+                return
+            row_s2 = get_job(runner.db, job_id)
+            if row_s2 and row_s2.get('status') == 'failed':
+                return
+            if runner.is_cancelled(job_id):
+                runner.finalize_cancelled(job_id)
+                return
+            pct = int(5 + (len(processed_image_keys) / max(total_work_units, 1)) * 95)
+            runner.update_progress(
+                job_id,
+                min(pct, 100),
+                f'Created stack {stacks_created} ({len(processed_image_keys)}/{total_work_units} keys)',
+            )
+
+        if runner.is_cancelled(job_id):
+            runner.finalize_cancelled(job_id)
+            return
+        row_done = get_job(runner.db, job_id)
+        if row_done and row_done.get('status') == 'failed':
+            return
+
+        result = {
+            'stacks_created': int(stacks_created),
+            'stacks_updated': int(stacks_updated),
+            'images_stacked': int(images_stacked),
+            'images_skipped_no_date': int(images_skipped_no_date),
+            'images_skipped_already_stacked': int(images_skipped_already_stacked),
+        }
+        add_job_log(
+            runner.db,
+            job_id,
+            'info',
+            f'Stack detection complete: {result}; {images_skipped_no_date} images skipped (no date_taken)',
+        )
+        runner.clear_checkpoint(job_id)
+        runner.complete_job(job_id, result)
+    except Exception as e:
+        severity = _failure_severity_from_exception(e)
+        runner.fail_job(job_id, str(e), severity=severity)
+    finally:
+        if lib_db:
+            lib_db.close()
+
+
 JOB_HANDLERS = {
     'analyze_instagram': handle_analyze_instagram,
     'instagram_import': handle_instagram_import,
@@ -2474,5 +2872,6 @@ JOB_HANDLERS = {
     'single_score': handle_single_score,
     'batch_score': handle_batch_score,
     'batch_analyze': handle_batch_analyze,
+    'batch_stack_detect': handle_batch_stack_detect,
     'batch_text_embed': handle_batch_text_embed,
 }
