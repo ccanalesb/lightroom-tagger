@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Phase 5.2 planned (Tool-calling search — replace JSON filter with multi-tool LLM architecture)
+status: Phase 5.2 complete (Tool-calling search — multi-tool LLM with capability detection, rich results, multi-turn history)
 last_updated: "2026-04-24T00:00:00.000Z"
 progress:
   total_phases: 7

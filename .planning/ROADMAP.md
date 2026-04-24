@@ -172,7 +172,7 @@
 | 4 | Stack detection | STACK-01, STACK-02 | 4 | ✅ Complete (2026-04-24; 4/4 plans) |
 | 5 | Image embed & search chat | SIM-01, NLS-05 | 4 | ✅ Complete (2026-04-24; 6/6 plans) |
 | 5.1 | Search UI polish | — | 4 | ✅ Complete (2026-04-24) |
-| 5.2 | Tool-calling search | — | 5 | Pending |
+| 5.2 | Tool-calling search | — | 5 | ✅ Complete (2026-04-24) |
 | 6 | Similarity & stack UI | SIM-02, STACK-03 | 3 | Pending |
 | 7 | Stacks in matching & pin similarity | STACK-04, STACK-05, NLS-06 | 4 | Pending |
 
