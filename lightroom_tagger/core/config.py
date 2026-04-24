@@ -21,6 +21,7 @@ class Config:
     instagram_keyword: str = "Posted"
     instagram_dump_path: str = ""
     hash_threshold: int = 5
+    stack_burst_delta_ms: int = 2000
     small_catalog_path: str = ""
     cloudflare_account_id: str = ""
     cloudflare_api_token: str = ""
@@ -89,6 +90,7 @@ def load_config(config_path: str = "config.yaml") -> Config:
         "instagram_keyword": "Posted",
         "instagram_dump_path": "",
         "hash_threshold": 5,
+        "stack_burst_delta_ms": 2000,
         "cloudflare_account_id": "",
         "cloudflare_api_token": "",
         "instagram_session_id": "",
@@ -153,6 +155,32 @@ def update_config_yaml_instagram_dump_path(config_file: str, instagram_dump_path
         data = {}
 
     data["instagram_dump_path"] = stripped
+
+    with open(path, "w") as stream:
+        yaml.safe_dump(
+            data,
+            stream,
+            default_flow_style=False,
+            sort_keys=False,
+            allow_unicode=True,
+        )
+
+
+def update_config_yaml_stack_burst_delta_ms(config_file: str, stack_burst_delta_ms: int) -> None:
+    """Write ``stack_burst_delta_ms`` into ``config_file`` YAML, preserving other keys."""
+    int_value = int(stack_burst_delta_ms)
+    if int_value < 1:
+        raise ValueError("stack_burst_delta_ms must be at least 1")
+
+    path = Path(config_file)
+    if path.exists():
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        data = {}
+
+    data["stack_burst_delta_ms"] = int_value
 
     with open(path, "w") as stream:
         yaml.safe_dump(
