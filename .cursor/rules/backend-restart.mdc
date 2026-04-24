@@ -1,0 +1,46 @@
+---
+description: Check if the backend is running before and after backend changes; restart it if it was live
+alwaysApply: true
+---
+
+# Backend Lifecycle — Check Before, Restart After
+
+The visualizer backend runs on **port 5001** via:
+```bash
+cd /Users/ccanales/projects/lightroom-tagger/apps/visualizer/backend
+/Users/ccanales/projects/lightroom-tagger/.venv/bin/python app.py >> /tmp/backend.log 2>&1 &
+```
+
+## Before making any backend changes
+
+Check whether the backend is currently running:
+```bash
+lsof -iTCP:5001 -sTCP:LISTEN -P -n 2>/dev/null | awk 'NR>1 {print $2}'
+```
+
+Save the result. If a PID is returned, the backend **is live** — note it so you can restart after changes.
+
+## After making backend changes
+
+If the backend was running before your changes, restart it:
+```bash
+# Kill the old process
+lsof -iTCP:5001 -sTCP:LISTEN -P -n 2>/dev/null | awk 'NR>1 {print $2}' | sort -u | xargs kill 2>/dev/null
+sleep 1
+# Start fresh
+cd /Users/ccanales/projects/lightroom-tagger/apps/visualizer/backend
+/Users/ccanales/projects/lightroom-tagger/.venv/bin/python app.py >> /tmp/backend.log 2>&1 &
+echo "Backend restarted (PID $!)"
+```
+
+Then confirm it came up:
+```bash
+sleep 2 && curl -s http://localhost:5001/api/jobs/ | python3 -c "import sys,json; json.load(sys.stdin); print('Backend OK')" 2>/dev/null || echo "Backend not responding yet"
+```
+
+## Rules
+
+- **Never leave the backend dead** after a change session. If it was up when you started, it must be up when you finish.
+- **Never kill the backend** without immediately restarting it (unless the user explicitly asks to stop it).
+- **If the backend was not running** before your changes, leave it stopped — don't start it uninvited.
+- This applies to changes in: `apps/visualizer/backend/`, `lightroom_tagger/core/`, `apps/visualizer/backend/jobs/`, `apps/visualizer/backend/api/`.
