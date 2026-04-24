@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sqlite3
+from typing import Any
 from collections import OrderedDict
 from datetime import datetime
 
@@ -17,6 +18,7 @@ from utils.responses import (
 
 from lightroom_tagger.core import nl_catalog_search
 from lightroom_tagger.core.catalog_nl_filter import (
+    CatalogNlFilter,
     catalog_nl_filter_to_query_kwargs,
     parse_catalog_nl_filter_from_llm,
 )
@@ -212,6 +214,21 @@ def _clamp_pagination(limit, offset, default_limit=50):
             offset = 0
     offset = max(0, offset)
     return limit, offset
+
+
+def _effective_catalog_nl_kwargs(filters: CatalogNlFilter) -> dict[str, Any]:
+    """Drop empty-string / empty-list values so ``{}`` means "no structured filters"."""
+    raw = catalog_nl_filter_to_query_kwargs(filters)
+    out: dict[str, Any] = {}
+    for k, v in raw.items():
+        if v is None:
+            continue
+        if isinstance(v, str) and not v.strip():
+            continue
+        if isinstance(v, list) and len(v) == 0:
+            continue
+        out[k] = v
+    return out
 
 
 def _rows_to_catalog_api_images(rows, score_perspective_arg: str | None) -> list[dict]:
@@ -690,6 +707,133 @@ def semantic_search_images(db):
                 'rrf_k': meta.rrf_k,
                 'fts_no_match': meta.fts_no_match,
             },
+        })
+    except Exception as e:
+        return error_server_error(str(e))
+
+
+@bp.route('/chat-search', methods=['POST'])
+@with_db
+def chat_search_images(db):
+    """Multi-turn NL-first cascade: structured catalog filters or semantic hybrid fallback."""
+    try:
+        body = request.get_json(silent=True)
+        if not body or not isinstance(body, dict):
+            return error_bad_request('JSON body required')
+
+        msg = body.get('message')
+        if msg is None or not str(msg).strip():
+            return error_bad_request('message must be non-empty')
+
+        message_stripped = str(msg).strip()
+
+        if 'messages' in body:
+            raw_history = body.get('messages')
+            if raw_history is None:
+                raw_history = []
+            if not isinstance(raw_history, list):
+                return error_bad_request('messages must be a list')
+        else:
+            raw_history = []
+
+        prior: list[dict] = []
+        for item in raw_history:
+            if not isinstance(item, dict):
+                continue
+            prior.append({
+                'role': item.get('role'),
+                'content': item.get('content'),
+            })
+
+        limit, offset = _clamp_pagination(body.get('limit', 50), body.get('offset', 0))
+
+        turns_for_llm = prior + [{'role': 'user', 'content': message_stripped}]
+
+        try:
+            raw = nl_catalog_search.run_nl_catalog_filter_llm_multi_turn(
+                turns_for_llm,
+                provider_id=body.get('provider_id'),
+                model=body.get('model'),
+                log_callback=None,
+            )
+            filters = parse_catalog_nl_filter_from_llm(raw)
+        except (json.JSONDecodeError, ValidationError, StructuredOutputError) as exc:
+            return error_bad_request(f'NL filter: {exc}')
+
+        kwargs_eff = _effective_catalog_nl_kwargs(filters)
+
+        score_perspective_arg = None
+        if 'score_perspective' in body and body.get('score_perspective') is not None:
+            sp = str(body.get('score_perspective') or '').strip()
+            if sp:
+                if not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(sp):
+                    return error_bad_request('invalid score_perspective slug')
+                score_perspective_arg = sp
+
+        if not kwargs_eff:
+            qstrip = message_stripped
+            if len(qstrip) < 2:
+                return error_bad_request('message must be at least 2 characters for semantic search')
+
+            match_str, fts_err = build_description_fts_query(qstrip)
+            if fts_err is not None:
+                return error_bad_request(fts_err)
+            if match_str is None:
+                return error_bad_request('query must contain at least one searchable term')
+
+            blob = embed_query_to_vec_blob(qstrip)
+            rows, total, meta = run_semantic_hybrid_search(
+                db,
+                user_query=qstrip,
+                fts_match=match_str,
+                query_vec_blob=blob,
+                limit=limit,
+                offset=offset,
+            )
+
+            keys = [r.image_key for r in rows]
+            catalog_rows = query_catalog_images_by_keys(db, keys, score_perspective=score_perspective_arg)
+            images = _rows_to_catalog_api_images(catalog_rows, score_perspective_arg)
+
+            sem_by_key = {r.image_key: r for r in rows}
+            for img in images:
+                sem_row = sem_by_key.get(img['key'])
+                if sem_row is not None:
+                    img['score'] = float(sem_row.rrf_score)
+                    img['why_matched'] = sem_row.why_matched
+                    img['thumbnail_url'] = f"/api/images/catalog/{sem_row.image_key}/thumbnail"
+
+            return jsonify({
+                'search_mode': 'semantic',
+                'total': total,
+                'images': images,
+                'filters': None,
+                'metadata': {
+                    'missing_embeddings_count': meta.missing_embeddings_count,
+                    'semantic_index_empty': meta.semantic_index_empty,
+                    'rrf_k': meta.rrf_k,
+                    'fts_no_match': meta.fts_no_match,
+                },
+            })
+
+        qkwargs = dict(kwargs_eff)
+        qkwargs['limit'] = limit
+        qkwargs['offset'] = offset
+
+        score_perspective_from_filter = (filters.score_perspective or '').strip() or None
+
+        try:
+            rows, total = query_catalog_images(db, **qkwargs)
+        except ValueError as err:
+            return error_bad_request(str(err))
+
+        images = _rows_to_catalog_api_images(rows, score_perspective_from_filter)
+        return jsonify({
+            'search_mode': 'nl_filter',
+            'total': total,
+            'images': images,
+            'filters': filters.model_dump(exclude_none=True),
+            'metadata': None,
         })
     except Exception as e:
         return error_server_error(str(e))
