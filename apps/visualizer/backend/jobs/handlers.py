@@ -10,12 +10,20 @@ from library_db import require_library_db
 
 from lightroom_tagger.core import cancel_scope
 from lightroom_tagger.core.config import load_config
+from lightroom_tagger.core.clip_embedding_service import (
+    CLIP_EMBED_MODEL_ID,
+    encode_images,
+    numpy_to_clip_vec_blob,
+)
 from lightroom_tagger.core.database import (
     build_description_search_document,
     init_database,
     library_write,
+    list_catalog_keys_for_clip_embed_force,
     list_catalog_keys_for_text_embed_force,
+    list_catalog_keys_needing_clip_embedding,
     list_catalog_keys_needing_text_embedding,
+    upsert_image_clip_embedding,
     upsert_image_text_embedding,
 )
 from lightroom_tagger.core.embedding_service import (
@@ -30,6 +38,7 @@ from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
 from . import path_setup as _path_setup  # noqa: F401
 from .checkpoint import (
     fingerprint_batch_describe,
+    fingerprint_batch_embed_image,
     fingerprint_batch_score,
     fingerprint_batch_stack_detect,
     fingerprint_batch_text_embed,
@@ -38,6 +47,7 @@ from .checkpoint import (
 )
 
 _CHECKPOINT_MAX_ENTRIES = 100_000
+_BATCH_EMBED_IMAGE_SIZE = 8
 
 # SQL fragments to exclude video files from describe queries at the DB level so
 # the processor never wastes a worker slot attempting to describe a .mov/.mp4/etc.
@@ -2491,6 +2501,204 @@ def _handle_batch_text_embed_inner(runner, job_id: str, metadata: dict) -> None:
             lib_db.close()
 
 
+def handle_batch_embed_image(runner, job_id: str, metadata: dict) -> None:
+    """Embed catalog images into ``image_clip_embeddings`` (sqlite-vec)."""
+    with cancel_scope.install(lambda: runner.is_cancelled(job_id)):
+        _handle_batch_embed_image_inner(runner, job_id, metadata)
+
+
+def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None:
+    lib_db = None
+    try:
+        image_type = metadata.get('image_type', 'catalog')
+        if image_type != 'catalog':
+            runner.fail_job(
+                job_id,
+                'batch_embed_image only supports catalog images',
+                severity='warning',
+            )
+            return
+
+        db_path = _resolve_library_db_or_fail(runner, job_id)
+        if db_path is None:
+            return
+        lib_db = init_database(db_path)
+
+        add_job_log(
+            runner.db,
+            job_id,
+            'info',
+            f'batch_embed_image: model={CLIP_EMBED_MODEL_ID}',
+        )
+
+        months, year = _resolve_date_window(metadata)
+        min_rating_raw = metadata.get('min_rating')
+        min_rating = None
+        if min_rating_raw is not None:
+            try:
+                min_rating = int(min_rating_raw)
+            except (TypeError, ValueError):
+                min_rating = None
+
+        force = bool(metadata.get('force', False))
+        if force:
+            full_list = list_catalog_keys_for_clip_embed_force(
+                lib_db, months=months, year=year, min_rating=min_rating
+            )
+        else:
+            full_list = list_catalog_keys_needing_clip_embedding(
+                lib_db, months=months, year=year, min_rating=min_rating
+            )
+
+        total_at_start = len(full_list)
+        fp = fingerprint_batch_embed_image(metadata, full_list)
+
+        processed_pairs: set[str] = set()
+        row_job = get_job(runner.db, job_id)
+        if row_job:
+            meta_job = row_job.get('metadata') or {}
+            if isinstance(meta_job, dict):
+                chk = meta_job.get('checkpoint')
+                if (
+                    isinstance(chk, dict)
+                    and chk.get('checkpoint_version') == 1
+                    and chk.get('job_type') == 'batch_embed_image'
+                ):
+                    if chk.get('fingerprint') == fp:
+                        processed_pairs = set(chk.get('processed_pairs') or [])
+                    elif chk.get('fingerprint'):
+                        add_job_log(
+                            runner.db,
+                            job_id,
+                            'info',
+                            'checkpoint mismatch: batch_embed_image fingerprint changed, starting fresh',
+                        )
+
+        remaining = [k for k in full_list if k not in processed_pairs]
+        runner.update_progress(
+            job_id,
+            5,
+            f'Found {total_at_start} images to embed ({len(remaining)} remaining)',
+        )
+
+        if total_at_start == 0:
+            runner.clear_checkpoint(job_id)
+            runner.complete_job(
+                job_id,
+                {'embedded': 0, 'skipped': 0, 'failed': 0, 'total': 0},
+            )
+            return
+
+        embedded = 0
+        skipped = 0
+        failed = 0
+        buf_keys: list[str] = []
+        buf_paths: list[str] = []
+
+        def persist_progress() -> bool:
+            if len(processed_pairs) > _CHECKPOINT_MAX_ENTRIES:
+                runner.fail_job(
+                    job_id,
+                    'checkpoint too large: exceeds 100000 entries',
+                    severity='error',
+                )
+                return False
+            runner.persist_checkpoint(
+                job_id,
+                {
+                    'job_type': 'batch_embed_image',
+                    'fingerprint': fp,
+                    'processed_pairs': sorted(processed_pairs),
+                    'total_at_start': total_at_start,
+                },
+            )
+            return True
+
+        def flush_batch() -> bool:
+            nonlocal embedded
+            if not buf_keys:
+                return True
+            vecs = encode_images(buf_paths, batch_size=_BATCH_EMBED_IMAGE_SIZE)
+            for j, img_key in enumerate(buf_keys):
+                if runner.is_cancelled(job_id):
+                    return False
+                vec_blob = numpy_to_clip_vec_blob(vecs[j])
+                with library_write(lib_db):
+                    upsert_image_clip_embedding(lib_db, img_key, vec_blob)
+                processed_pairs.add(img_key)
+                embedded += 1
+                if not persist_progress():
+                    return False
+                pct = int(5 + (embedded / max(total_at_start, 1)) * 95)
+                runner.update_progress(job_id, pct, f'Embedded {embedded}/{total_at_start}')
+            buf_keys.clear()
+            buf_paths.clear()
+            return True
+
+        for key in remaining:
+            if runner.is_cancelled(job_id):
+                runner.finalize_cancelled(job_id)
+                return
+            row = lib_db.execute(
+                "SELECT filepath FROM images WHERE key = ?",
+                (key,),
+            ).fetchone()
+            filepath = str(row['filepath'] or '').strip() if row else ''
+            if not row or not filepath or not os.path.isfile(filepath):
+                skipped += 1
+                add_job_log(
+                    runner.db,
+                    job_id,
+                    'warning',
+                    f'{key}: skipped image embed (no row, empty path, or file missing on disk)',
+                )
+                processed_pairs.add(key)
+                if not persist_progress():
+                    return
+                continue
+
+            buf_keys.append(key)
+            buf_paths.append(filepath)
+            if len(buf_keys) >= _BATCH_EMBED_IMAGE_SIZE:
+                if not flush_batch():
+                    if runner.is_cancelled(job_id):
+                        runner.finalize_cancelled(job_id)
+                    return
+                row_status = get_job(runner.db, job_id)
+                if row_status and row_status.get('status') == 'failed':
+                    return
+
+        if not flush_batch():
+            if runner.is_cancelled(job_id):
+                runner.finalize_cancelled(job_id)
+            return
+
+        if runner.is_cancelled(job_id):
+            runner.finalize_cancelled(job_id)
+            return
+
+        row_done = get_job(runner.db, job_id)
+        if row_done and row_done.get('status') == 'failed':
+            return
+
+        runner.clear_checkpoint(job_id)
+        runner.complete_job(
+            job_id,
+            {
+                'embedded': embedded,
+                'skipped': skipped,
+                'failed': failed,
+                'total': total_at_start,
+            },
+        )
+    except Exception as e:
+        severity = _failure_severity_from_exception(e)
+        runner.fail_job(job_id, str(e), severity=severity)
+    finally:
+        if lib_db:
+            lib_db.close()
+
+
 def _normalize_stack_detect_force(metadata: dict) -> str:
     """Return ``incremental`` | ``full`` | ``preserve_edited`` (CONTEXT D-05).
 
@@ -2874,4 +3082,5 @@ JOB_HANDLERS = {
     'batch_analyze': handle_batch_analyze,
     'batch_stack_detect': handle_batch_stack_detect,
     'batch_text_embed': handle_batch_text_embed,
+    'batch_embed_image': handle_batch_embed_image,
 }
