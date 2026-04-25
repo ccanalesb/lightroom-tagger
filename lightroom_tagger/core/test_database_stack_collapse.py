@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from lightroom_tagger.core.database import (
     catalog_key_is_primary_grid_row,
     init_database,
+    insert_image_score,
     query_catalog_images,
     store_image,
 )
+from lightroom_tagger.core.identity_service import rank_best_photos
 
 
 def _insert_two_member_stack(
@@ -116,3 +120,66 @@ def test_query_catalog_count_matches_returned_rows_with_solo_and_stack(tmp_path)
     assert solo.get("stack_member_count") is None
     assert solo.get("is_stack_representative") is False
     assert catalog_key_is_primary_grid_row(conn, solo_key) is True
+
+
+def test_rank_best_photos_drops_non_representative_with_higher_score(tmp_path) -> None:
+    """Stack member with higher aggregate than the rep must not appear in the ranked page."""
+    conn = init_database(str(tmp_path / "lib.db"))
+    slug_row = conn.execute(
+        "SELECT slug FROM perspectives WHERE active = 1 ORDER BY slug LIMIT 1"
+    ).fetchone()
+    assert slug_row is not None
+    slug = str(slug_row["slug"])
+    ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+    rep_key = store_image(
+        conn,
+        {
+            "date_taken": "2024-01-01",
+            "filename": "r.jpg",
+            "filepath": "/r.jpg",
+            "id": "1",
+        },
+    )
+    mem_key = store_image(
+        conn,
+        {
+            "date_taken": "2024-01-01",
+            "filename": "m.jpg",
+            "filepath": "/m.jpg",
+            "id": "2",
+        },
+    )
+    _insert_two_member_stack(conn, rep_key, mem_key)
+
+    insert_image_score(
+        conn,
+        {
+            "image_key": rep_key,
+            "image_type": "catalog",
+            "perspective_slug": slug,
+            "score": 1,
+            "scored_at": ts,
+        },
+    )
+    insert_image_score(
+        conn,
+        {
+            "image_key": mem_key,
+            "image_type": "catalog",
+            "perspective_slug": slug,
+            "score": 10,
+            "scored_at": ts,
+        },
+    )
+    conn.commit()
+
+    page, total, _meta = rank_best_photos(conn, limit=20, offset=0)
+    keys = [r["image_key"] for r in page]
+    assert mem_key not in keys
+    assert rep_key in keys
+    assert total == 1
+    rep = next(r for r in page if r["image_key"] == rep_key)
+    assert rep.get("is_stack_representative") is True
+    assert rep.get("stack_member_count") == 2
+    assert rep.get("stack_id") is not None

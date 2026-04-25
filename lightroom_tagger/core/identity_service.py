@@ -282,6 +282,50 @@ def _image_meta_map(conn: sqlite3.Connection, keys: list[str]) -> dict[str, dict
     return out
 
 
+def _stack_non_representative_keys(conn: sqlite3.Connection, keys: list[str]) -> set[str]:
+    """Image keys that are stack members but not the stack representative."""
+    if not keys:
+        return set()
+    placeholders = ",".join("?" * len(keys))
+    rows = conn.execute(
+        f"""
+        SELECT m.image_key FROM image_stack_members m
+        INNER JOIN image_stacks s ON s.stack_id = m.stack_id
+        WHERE m.image_key IN ({placeholders}) AND m.image_key <> s.representative_key
+        """,
+        keys,
+    ).fetchall()
+    return {str(r["image_key"]) for r in rows}
+
+
+def _stack_fields_for_image_keys(
+    conn: sqlite3.Connection, keys: list[str]
+) -> dict[str, dict[str, Any]]:
+    """``stack_id``, ``stack_member_count`` (``image_stacks.stack_size``), ``is_stack_representative``."""
+    if not keys:
+        return {}
+    placeholders = ",".join("?" * len(keys))
+    rows = conn.execute(
+        f"""
+        SELECT m.image_key, s.stack_id, s.representative_key, s.stack_size
+        FROM image_stack_members m
+        INNER JOIN image_stacks s ON s.stack_id = m.stack_id
+        WHERE m.image_key IN ({placeholders})
+        """,
+        keys,
+    ).fetchall()
+    out: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        k = str(r["image_key"])
+        rep = str(r["representative_key"])
+        out[k] = {
+            "stack_id": int(r["stack_id"]),
+            "stack_member_count": int(r["stack_size"]),
+            "is_stack_representative": k == rep,
+        }
+    return out
+
+
 def rank_best_photos(
     conn: sqlite3.Connection,
     *,
@@ -311,6 +355,22 @@ def rank_best_photos(
         k = str(i["image_key"])
         im = img_meta.get(k, {})
         enriched.append({**i, **im})
+
+    ekeys = [str(r["image_key"]) for r in enriched]
+    drop_keys = _stack_non_representative_keys(conn, ekeys)
+    enriched = [r for r in enriched if str(r["image_key"]) not in drop_keys]
+
+    if enriched:
+        skeys = [str(r["image_key"]) for r in enriched]
+        stack_by_key = _stack_fields_for_image_keys(conn, skeys)
+        for r in enriched:
+            k = str(r["image_key"])
+            if k in stack_by_key:
+                r.update(stack_by_key[k])
+            else:
+                r["stack_id"] = None
+                r["stack_member_count"] = None
+                r["is_stack_representative"] = False
 
     date_reverse = sort_by_date != "oldest"
     enriched.sort(key=lambda r: r["image_key"])
