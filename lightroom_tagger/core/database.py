@@ -224,6 +224,8 @@ def _deserialize_row(row: dict) -> dict:
         row['instagram_posted'] = bool(row['instagram_posted'])
     if 'processed' in row:
         row['processed'] = bool(row['processed'])
+    if 'is_stack_representative' in row and row.get('is_stack_representative') is not None:
+        row['is_stack_representative'] = bool(row['is_stack_representative'])
     return row
 
 
@@ -1176,6 +1178,7 @@ def query_catalog_images(
     description_search: str | None = None,
     dominant_colors: list[str] | None = None,
     mood_tags: list[str] | None = None,
+    has_repetition: bool | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[dict], int]:
@@ -1301,6 +1304,11 @@ def query_catalog_images(
         )
         bindings.extend(dc_tokens)
 
+    if has_repetition is True:
+        clauses.append("d.has_repetition = 1")
+    elif has_repetition is False:
+        clauses.append("(d.has_repetition IS NULL OR d.has_repetition = 0)")
+
     mt_tokens = _non_empty_str_list_for_json_array_filter(mood_tags)
     if mt_tokens:
         mt_ph = ",".join("?" * len(mt_tokens))
@@ -1315,6 +1323,8 @@ def query_catalog_images(
         )
         bindings.extend(mt_tokens)
 
+    clauses.append("(m_st.image_key IS NULL OR i.key = st.representative_key)")
+
     where_sql = "WHERE " + " AND ".join(clauses)
     join_sql = (
         "FROM images i "
@@ -1327,6 +1337,10 @@ def query_catalog_images(
             "AND s.image_type = 'catalog' AND s.perspective_slug = ? AND s.is_current = 1 "
         )
         join_bindings.append(sp)
+    join_sql += (
+        "LEFT JOIN image_stack_members AS m_st ON m_st.image_key = i.key "
+        "LEFT JOIN image_stacks AS st ON st.stack_id = m_st.stack_id "
+    )
 
     # Date becomes a tiebreaker for score sorts only when the caller asked
     # for it explicitly; otherwise keep the original `i.key ASC` tiebreaker
@@ -1357,6 +1371,11 @@ def query_catalog_images(
     )
     if use_score_join:
         select_cols += ", s.score AS catalog_perspective_score"
+    select_cols += (
+        ", st.stack_id AS stack_id, st.stack_size AS stack_member_count, "
+        "CASE WHEN st.stack_id IS NOT NULL AND i.key = st.representative_key "
+        "THEN 1 ELSE 0 END AS is_stack_representative"
+    )
 
     count_params = join_bindings + bindings
     count_row = db.execute(
@@ -1402,6 +1421,11 @@ def query_catalog_images_by_keys(
     )
     if use_score_join:
         select_cols += ", s.score AS catalog_perspective_score"
+    select_cols += (
+        ", st.stack_id AS stack_id, st.stack_size AS stack_member_count, "
+        "CASE WHEN st.stack_id IS NOT NULL AND i.key = st.representative_key "
+        "THEN 1 ELSE 0 END AS is_stack_representative"
+    )
 
     join_sql = (
         "FROM images i "
@@ -1414,8 +1438,14 @@ def query_catalog_images_by_keys(
             "AND s.image_type = 'catalog' AND s.perspective_slug = ? AND s.is_current = 1 "
         )
         join_bindings.append(sp)
+    join_sql += (
+        "LEFT JOIN image_stack_members AS m_st ON m_st.image_key = i.key "
+        "LEFT JOIN image_stacks AS st ON st.stack_id = m_st.stack_id "
+    )
 
-    where_sql = f"WHERE i.key IN ({ph})"
+    where_sql = (
+        f"WHERE i.key IN ({ph}) AND (m_st.image_key IS NULL OR i.key = st.representative_key)"
+    )
     params = join_bindings + key_list + key_list
 
     rows = db.execute(
@@ -1423,6 +1453,25 @@ def query_catalog_images_by_keys(
         params,
     ).fetchall()
     return [_deserialize_row(r) for r in rows]
+
+
+def catalog_key_is_primary_grid_row(db: sqlite3.Connection, image_key: str) -> bool:
+    """True for catalog keys that are stack representatives or not in a multi-key stack.
+
+    False when the key is a **non-representative** member of a stack (hidden from
+    the default primary grid, same as :func:`query_catalog_images` collapse).
+    """
+    row = db.execute(
+        """
+        SELECT NOT EXISTS(
+            SELECT 1 FROM image_stack_members m
+            INNER JOIN image_stacks s ON s.stack_id = m.stack_id
+            WHERE m.image_key = ? AND m.image_key <> s.representative_key
+        ) AS ok
+        """,
+        (image_key,),
+    ).fetchone()
+    return bool(row and int(row["ok"]))
 
 
 def get_images_without_hash(db: sqlite3.Connection) -> list[dict]:
@@ -2226,6 +2275,16 @@ def get_undescribed_catalog_images(
         LEFT JOIN image_descriptions d
             ON i.key = d.image_key AND d.image_type = 'catalog'
         WHERE d.image_key IS NULL
+        AND LOWER(i.filepath) NOT LIKE '%.mov'
+        AND LOWER(i.filepath) NOT LIKE '%.mp4'
+        AND LOWER(i.filepath) NOT LIKE '%.avi'
+        AND LOWER(i.filepath) NOT LIKE '%.mkv'
+        AND LOWER(i.filepath) NOT LIKE '%.wmv'
+        AND LOWER(i.filepath) NOT LIKE '%.m4v'
+        AND LOWER(i.filepath) NOT LIKE '%.3gp'
+        AND LOWER(i.filepath) NOT LIKE '%.webm'
+        AND LOWER(i.filepath) NOT LIKE '%.mts'
+        AND LOWER(i.filepath) NOT LIKE '%.m2ts'
     """
     params: list = []
     if months:
@@ -2245,6 +2304,16 @@ def get_undescribed_instagram_images(db: sqlite3.Connection, months: int = None)
         LEFT JOIN image_descriptions d
             ON m.media_key = d.image_key AND d.image_type = 'instagram'
         WHERE d.image_key IS NULL
+        AND LOWER(m.file_path) NOT LIKE '%.mov'
+        AND LOWER(m.file_path) NOT LIKE '%.mp4'
+        AND LOWER(m.file_path) NOT LIKE '%.avi'
+        AND LOWER(m.file_path) NOT LIKE '%.mkv'
+        AND LOWER(m.file_path) NOT LIKE '%.wmv'
+        AND LOWER(m.file_path) NOT LIKE '%.m4v'
+        AND LOWER(m.file_path) NOT LIKE '%.3gp'
+        AND LOWER(m.file_path) NOT LIKE '%.webm'
+        AND LOWER(m.file_path) NOT LIKE '%.mts'
+        AND LOWER(m.file_path) NOT LIKE '%.m2ts'
     """
     params: list = []
     if months:
