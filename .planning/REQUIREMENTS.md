@@ -23,7 +23,7 @@
 
 - [x] **STACK-01**: Job detects burst shots (photos within a configurable time window by date_taken) and groups them into stacks
 - [ ] **STACK-02**: Job clusters visually similar but time-separated photos into stacks using pHash similarity
-- [ ] **STACK-03**: Catalog and Best Photos views show the stack representative with a count badge; user can expand to see all members
+- [x] **STACK-03**: Catalog and Best Photos views show the stack representative with a count badge; user can expand to see all members *(Phase 6 — 2026-04-25)*
 - [ ] **STACK-04**: Stack-aware matching: Instagram matching compares against stack representatives only, then associates the match result with the full stack
 - [ ] **STACK-05**: User can split or merge stacks and change which image is the representative
 
@@ -34,7 +34,7 @@
 ### Visual Similarity Search
 
 - [x] **SIM-01**: Job generates and stores image embeddings (CLIP-style) for catalog images *(Phase 5 — 2026-04-24)*
-- [ ] **SIM-02**: "More like this" from any catalog photo surfaces visually similar results, accessible from the catalog view and from within the NLS-05 chat panel (NLS-06)
+- [x] **SIM-02**: "More like this" from any catalog photo surfaces visually similar results, accessible from the catalog view; chat-panel pin remains scoped to NLS-06 *(Phase 6 — 2026-04-25)*
 
 ---
 
@@ -74,12 +74,12 @@
 | NLS-06 | 7 | Pending |
 | STACK-01 | 4 | ✅ Complete (2026-04-24) |
 | STACK-02 | 4 | Pending |
-| STACK-03 | 6 | Pending |
+| STACK-03 | 6 | ✅ Complete (2026-04-25) |
 | STACK-04 | 7 | Pending |
 | STACK-05 | 7 | Pending |
 | VIS-01 | 1 | Pending |
 | SIM-01 | 5 | ✅ Complete (2026-04-24) |
-| SIM-02 | 6 | Pending |
+| SIM-02 | 6 | ✅ Complete (2026-04-25) |
 
 **Total:** 14 requirements across 4 categories.
 

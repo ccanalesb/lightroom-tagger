@@ -149,14 +149,16 @@
 
 **Requirements:** SIM-02, STACK-03
 
+**Plan progress:** **4/4 complete** (2026-04-25) — 06-01 stack collapse + metadata; 06-02 CLIP-only similarity core; 06-03 similar + stack members API; 06-04 stack expand UI + “More like this” modal. Verification: 9/9 passed.
+
 **Plans:** 4 plans
 
 Plans:
 
-- [ ] 06-01-PLAN.md — DB stack collapse + `rank_best_photos` primary-row filter + `stack_id` / `stack_member_count` / `is_stack_representative` on list rows
-- [ ] 06-02-PLAN.md — `lightroom_tagger/core/clip_similarity.py` CLIP-only KNN + order-preserving catalog filter; unit tests
-- [ ] 06-03-PLAN.md — Flask: `GET /api/images/catalog/<key>/similar`, `GET /api/images/stacks/<id>/members`, stack fields on catalog/best-photos JSON; `test_images_clip_similar_api.py`
-- [ ] 06-04-PLAN.md — Frontend: `ImagesAPI.getCatalogSimilar` + strings, Catalog/Best Photos stack expand, `ImageDetailModal` “More like this” + “Visually similar”
+- [x] 06-01-PLAN.md — DB stack collapse + `rank_best_photos` primary-row filter + `stack_id` / `stack_member_count` / `is_stack_representative` on list rows
+- [x] 06-02-PLAN.md — `lightroom_tagger/core/clip_similarity.py` CLIP-only KNN + order-preserving catalog filter; unit tests
+- [x] 06-03-PLAN.md — Flask: `GET /api/images/catalog/<key>/similar`, `GET /api/images/stacks/<id>/members`, stack fields on catalog/best-photos JSON; `test_images_clip_similar_api.py`
+- [x] 06-04-PLAN.md — Frontend: `ImagesAPI.getCatalogSimilar` + strings, Catalog/Best Photos stack expand, `ImageDetailModal` “More like this” + “Visually similar”
 
 - `GET` (or equivalent) **similar** API: seed image → KNN/ANN results with optional pre-filters; never mixes vectors from different `model_id`/dims.
 - Catalog and Best Photos show stack **representative** with member count; expand/collapse to browse members without breaking existing list performance budgets.
@@ -200,7 +202,7 @@ Plans:
 | 5 | Image embed & search chat | SIM-01, NLS-05 | 4 | ✅ Complete (2026-04-24; 6/6 plans) |
 | 5.1 | Search UI polish | — | 4 | ✅ Complete (2026-04-24) |
 | 5.2 | Tool-calling search | — | 5 | ✅ Complete (2026-04-24) |
-| 6 | Similarity & stack UI | SIM-02, STACK-03 | 3 | Planned (4 plans, 4 waves) |
+| 6 | Similarity & stack UI | SIM-02, STACK-03 | 3 | ✅ Complete (2026-04-25; 4/4 plans) |
 | 7 | Stacks in matching & pin similarity | STACK-04, STACK-05, NLS-06 | 4 | Pending |
 | 8 | Embedding pre-filter for image matching | MATCH-02 | 5 | Planned (2026-04-24) |
 

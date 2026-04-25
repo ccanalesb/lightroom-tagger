@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Ready to execute
-last_updated: "2026-04-25T21:35:08.826Z"
+status: Ready to discuss/plan
+last_updated: "2026-04-25T21:58:00.000Z"
 progress:
   total_phases: 17
-  completed_phases: 13
-  total_plans: 60
-  completed_plans: 59
+  completed_phases: 14
+  total_plans: 64
+  completed_plans: 63
   percent: 98
 ---
 
@@ -22,16 +22,16 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
-| Phase | Phase 6 — Similarity & Stack UI |
-| Status | **UI-SPEC approved** (2026-04-25): `.planning/phases/06-similarity-stack-ui/06-UI-SPEC.md` |
-| Last activity | 2026-04-25 — UI design contract generated and verified; next: `/gsd-plan-phase 6` |
+| Phase | Phase 7 — Stacks in matching & pin similarity |
+| Status | **Ready to discuss/plan** after Phase 6 completion |
+| Last activity | 2026-04-25 — Phase 6 Similarity & Stack UI complete: 4/4 plans, clean review, verification 9/9 passed; next: `/gsd-discuss-phase 7` |
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
-**Current focus:** v3.0 Phase 5 — **in progress** (05-01 `image_clip_embeddings` + helpers shipped); next plans **05-02**..`05-06` per ROADMAP.
+**Current focus:** v3.0 Phase 7 — stacks in matching and pin-to-similarity in chat (Phase 6 shipped SIM-02 and STACK-03).
 
 ## Deferred Items
 
@@ -69,6 +69,8 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 | NLS-03 | Phase 3 (v3.0) | ✅ Complete (2026-04-23) |
 | NLS-04 | Phase 3 (v3.0) | ✅ Complete (2026-04-23) |
 | STACK-01 | Phase 4 (v3.0) | ✅ Complete (2026-04-24) |
+| STACK-03 | Phase 6 (v3.0) | ✅ Complete (2026-04-25) |
+| SIM-02 | Phase 6 (v3.0) | ✅ Complete (2026-04-25) |
 | IDENT-04 | Phase 5 | ✅ Complete (2026-04-21) |
 | IDENT-05 | Phase 5 | ✅ Complete (2026-04-21) |
 | DASH-02, 03 | Phase 5 | ✅ Complete (2026-04-21) |
