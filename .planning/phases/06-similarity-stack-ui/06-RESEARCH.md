@@ -8,7 +8,7 @@
 
 Phase 6 adds two capabilities on top of shipped Phase 4 (burst stacks in `image_stacks` / `image_stack_members`) and Phase 5 (`image_clip_embeddings` vec0, 512-d cosine, `clip-ViT-B-32` via `sentence-transformers`). **SIM-02** needs a seed-image visual similarity path that queries **only** the CLIP table—never `image_text_embeddings` (768-d)—matching locked decision D-05. The backend should follow the same sqlite-vec KNN SQL shape already proven in `knn_embedded_catalog_keys` for text vectors [VERIFIED: `lightroom_tagger/core/semantic_search.py`], swapping the virtual table to `image_clip_embeddings`. Optional catalog pre-filters (posted, month, etc.) are not vec0 metadata columns today [VERIFIED: `database.py` vec0 DDL]; the practical pattern is **over-fetch KNN** then **order-preserving filter** (same spirit as hybrid semantic post-filter in `run_semantic_hybrid_search`) [VERIFIED: `semantic_search.py`]. **STACK-03** requires stack representative + member-count badge + expand/collapse using `ImageTile` overlay/footer slots [VERIFIED: `ImageTile.tsx`]. Catalog rows come from `query_catalog_images`; best photos from `rank_best_photos` / `IdentityAPI.getBestPhotos`. Today both surfaces can show **non-representative** stack members as their own rows if they have scores/list presence; the requirement text favors **one visible tile per stack (representative)**—that implies a **collapse/dedup** step in API or UI that the planner must specify (see Open Questions).
 
-**Primary recommendation:** Add a dedicated `GET` (or `POST` if query params are too large) similar-images route in `api/images.py`, implemented with a small `lightroom_tagger/core/` helper (e.g. `clip_similarity.py`) that loads the seed blob from `image_clip_embeddings`, runs vec KNN, excludes the seed key, applies optional filters while preserving distance order, then reuses `query_catalog_images_by_keys` + `_rows_to_catalog_api_images` for response shape. Extend catalog and best-photos payloads with generic stack fields (`stack_id`, `stack_member_count`, `is_stack_representative`) per D-04, plus one focused members endpoint or lazy fetch to avoid N+1.
+**Primary recommendation:** Add a dedicated `GET` similar-images route in `api/images.py` (locked in **06-03-PLAN**), implemented with `lightroom_tagger/core/clip_similarity.py` ( **06-02-PLAN** ) that loads the seed blob from `image_clip_embeddings`, runs vec KNN, excludes the seed key, applies optional filters while preserving distance order, then reuses `query_catalog_images_by_keys` + `_rows_to_catalog_api_images` for response shape. Extend catalog and best-photos payloads with generic stack fields (`stack_id`, `stack_member_count`, `is_stack_representative`) per D-04, plus one focused members endpoint or lazy fetch to avoid N+1. Stack list-collapse is implemented in the DB layer per **06-01-PLAN** (see **Open Questions (RESOLVED)** below).
 
 <user_constraints>
 ## User Constraints (from CONTEXT.md)
@@ -48,7 +48,7 @@ Phase 6 adds two capabilities on top of shipped Phase 4 (burst stacks in `image_
 | ID | Description | Research Support |
 |----|-------------|------------------|
 | **SIM-02** | "More like this" from any catalog photo; catalog view now; NLS-05 chat panel in requirement text is **NLS-06 (Phase 7)** per CONTEXT D-03 | CLIP vec0 + KNN helper + new images API route; reuse catalog image DTOs; exclude seed from results; degrade when embedding missing |
-| **STACK-03** | Catalog + Best Photos show stack representative with count badge; expand/collapse to browse members without breaking list performance | Join `image_stacks` / `image_stack_members` for metadata; badge via `ImageTile` `overlayBadges`; lazy member fetch; optional list **collapse** so only reps appear as primary rows (see Open Questions) |
+| **STACK-03** | Catalog + Best Photos show stack representative with count badge; expand/collapse to browse members without breaking list performance | Join `image_stacks` / `image_stack_members` for metadata; badge via `ImageTile` `overlayBadges`; lazy member fetch; list **collapse** in SQL so only reps appear as primary rows ( **06-01-PLAN**; see **Open Questions (RESOLVED)** ) |
 </phase_requirements>
 
 ## Project Constraints (from .cursor/rules/)
@@ -253,27 +253,23 @@ similarity = max(0.0, min(1.0, 1.0 - float(distance)))
 
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
-| A1 | Best Photos + Catalog should **collapse** stack members to a single representative row for primary grid display | Open Questions / STACK-03 | Wrong UX or double-counting if members must remain visible as separate rows |
+| A1 | Best Photos + Catalog should **collapse** stack members to a single representative row for primary grid display | **06-01-PLAN** (resolved) / STACK-03 | Wrong UX or double-counting if members must remain visible as separate rows |
 | A2 | Similarity pre-filters can be implemented by post-filtering ordered KNN without a DB migration | Architecture Patterns | Rare edge: need much larger `k` to fill a page under heavy filters |
 
 **If this table is empty of other rows:** Remaining claims were verified from repo or cited docs.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **List collapse semantics for STACK-03**
-   - **What we know:** Requirement text says representative + count + expand; `rank_best_photos` and `query_catalog_images` currently operate per `image_key`, so stack members can appear as separate tiles.
-   - **What's unclear:** Should non-representative members disappear from default catalog/best-photos grids entirely, or stay visible with a "in stack" affordance?
-   - **Recommendation:** Decide in PLAN.md with user-facing pagination rules; if collapsing, implement in SQL (subquery) or API post-process with explicit `total` definition.
+Decisions are locked in phase plans; this section records outcomes for traceability (research → implementation).
 
-2. **SIM-02 vs NLS-06 wording in REQUIREMENTS.md**
-   - **What we know:** SIM-02 mentions chat panel; CONTEXT locks chat pin to Phase 7.
-   - **What's unclear:** Whether to partially satisfy SIM-02 text in Phase 6 with **only** catalog, or add a no-UI API hook.
-   - **Recommendation:** Phase 6 ships catalog UX + reusable API/types; Phase 7 wires SearchPage—document traceability in verification.
+1. **List collapse semantics for STACK-03** → **RESOLVED in 06-01-PLAN**
+   - **Outcome:** Non-representative stack members are **excluded** from default `query_catalog_images` and `rank_best_photos` primary rows via a fixed SQL collapse fragment (`m_st.image_key IS NULL OR i.key = st.representative_key`) and matching best-photos filtering; pagination totals follow primary-row counts. See **06-01-PLAN** tasks and `test_database_stack_collapse.py`. Member browsing uses expand/members API in **06-03-PLAN** / UI **06-04-PLAN**, not separate grid rows.
 
-3. **Similar route shape: GET vs POST**
-   - **What we know:** Many optional filters mirror `query_catalog_images` query params.
-   - **What's unclear:** URL length if all filters are duplicated on similar endpoint.
-   - **Recommendation:** Prefer `GET` with shared param subset; if explosion, `POST` JSON body with Pydantic validation (mirrors semantic-search).
+2. **SIM-02 vs NLS-06 (chat / SearchPage) in REQUIREMENTS wording** → **RESOLVED by CONTEXT D-01–D-03 + plans 06-02..06-04**
+   - **Outcome:** Phase 6 delivers **catalog** “More like this” UI (**06-04-PLAN**), CLIP similar library (**06-02-PLAN**), and HTTP contract (**06-03-PLAN**). Search/chat “pin to image” and NLS-06 are **Phase 7** and explicitly deferred per CONTEXT **Deferred Ideas**; no Phase 6 SearchPage feature work.
+
+3. **Similar route shape: GET vs POST** → **RESOLVED in 06-03-PLAN**
+   - **Outcome:** **`GET /api/images/catalog/<image_key>/similar`** with query params aligned to `list_catalog_images` (pagination + optional filters), `_clamp_pagination`, and tests in `test_images_clip_similar_api.py`. No POST body for the initial ship; if URL length becomes a problem later, a follow-up phase can add POST without changing Phase 6 contracts.
 
 ## Environment Availability
 
