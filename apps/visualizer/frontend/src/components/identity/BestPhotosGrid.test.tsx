@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { BestPhotosGrid } from './BestPhotosGrid'
-import { IdentityAPI } from '../../services/api'
+import { IdentityAPI, ImagesAPI } from '../../services/api'
 import { invalidateAll } from '../../data'
-import { IDENTITY_SECTION_BEST_PHOTOS } from '../../constants/strings'
+import { CATALOG_STACK_SHOW, IDENTITY_SECTION_BEST_PHOTOS } from '../../constants/strings'
 
 const postedBestPhotoItem = {
   image_key: 'k1',
@@ -25,6 +25,9 @@ const postedBestPhotoItem = {
   date_taken: '2024-01-01',
   rating: 5,
   instagram_posted: true,
+  stack_id: 9,
+  stack_member_count: 3,
+  is_stack_representative: true,
 }
 
 describe('BestPhotosGrid', () => {
@@ -35,6 +38,7 @@ describe('BestPhotosGrid', () => {
       total: 1,
       meta: {},
     })
+    vi.spyOn(ImagesAPI, 'getStackMembers').mockResolvedValue({ items: [] })
   })
 
   afterEach(() => {
@@ -59,6 +63,19 @@ describe('BestPhotosGrid', () => {
 
     await waitFor(() => {
       expect(within(section).getByText('Street 9')).toBeInTheDocument()
+    })
+  })
+
+  it('loads stack members when Show stack is activated', async () => {
+    const spy = vi.mocked(ImagesAPI.getStackMembers)
+    render(<BestPhotosGrid />)
+
+    const section = await screen.findByRole('region', { name: IDENTITY_SECTION_BEST_PHOTOS })
+    const btn = await within(section).findByRole('button', { name: CATALOG_STACK_SHOW })
+    btn.click()
+
+    await waitFor(() => {
+      expect(spy).toHaveBeenCalledWith(9)
     })
   })
 })

@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition, type MouseEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ImagesAPI, PerspectivesAPI, type CatalogImage } from '../../services/api';
 import { ImageDetailModal, ImageTile, fromCatalogListRow } from '../image-view';
+import { Button } from '../ui/Button/Button';
+import { Badge } from '../ui/badges';
 import { Pagination } from '../ui/Pagination';
 import { TileGrid } from '../ui/TileGrid';
 import { useQuery } from '../../data';
@@ -39,6 +41,12 @@ import {
   CATALOG_FILTER_COLOR_PLACEHOLDER,
   CATALOG_FILTER_COLOR_ARIA,
   msgShowingOf,
+  CATALOG_STACK_SHOW,
+  CATALOG_STACK_HIDE,
+  CATALOG_STACK_MEMBERS_ERROR,
+  CATALOG_STACK_MEMBERS_LOADING,
+  CATALOG_STACK_MEMBERS_REGION_ARIA,
+  formatStackCountBadge,
 } from '../../constants/strings';
 import { formatMonth } from '../../utils/date';
 import { useFilters } from '../../hooks/useFilters';
@@ -47,6 +55,106 @@ import type { FilterSchema } from '../filters/types';
 import { stableSerializeRecord } from '../../utils/stableQueryKey';
 
 const LIMIT = 50;
+
+function CatalogImageWithStack({
+  image,
+  onSelect,
+}: {
+  image: CatalogImage
+  onSelect: (row: CatalogImage) => void
+}) {
+  const stackId = image.stack_id
+  const count = image.stack_member_count ?? 0
+  const isRep = image.is_stack_representative === true
+  const showStack = isRep && stackId != null && count > 1
+  const regionId = `stack-members-${image.key.replace(/[^a-zA-Z0-9_-]/g, '_')}`
+
+  const [expanded, setExpanded] = useState(false)
+  const [members, setMembers] = useState<CatalogImage[] | undefined>(undefined)
+  const [loadError, setLoadError] = useState<string | undefined>(undefined)
+  const [loading, setLoading] = useState(false)
+
+  const handleToggleStack = (e: MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation()
+    if (!showStack || stackId == null) return
+    if (expanded) {
+      setExpanded(false)
+      return
+    }
+    setExpanded(true)
+    if (members !== undefined) return
+    setLoading(true)
+    setLoadError(undefined)
+    void ImagesAPI.getStackMembers(stackId)
+      .then((res) => setMembers(res.items))
+      .catch(() => setLoadError(CATALOG_STACK_MEMBERS_ERROR))
+      .finally(() => setLoading(false))
+  }
+
+  return (
+    <div className="min-w-0">
+      <ImageTile
+        image={fromCatalogListRow(image)}
+        variant="grid"
+        primaryScoreSource="catalog"
+        onClick={() => onSelect(image)}
+        overlayBadges={
+          showStack ? (
+            <Badge variant="default">{formatStackCountBadge(count)}</Badge>
+          ) : undefined
+        }
+        footer={
+          showStack ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              fullWidth
+              className="min-h-11"
+              aria-expanded={expanded}
+              aria-controls={regionId}
+              onClick={handleToggleStack}
+            >
+              {expanded ? CATALOG_STACK_HIDE : CATALOG_STACK_SHOW}
+            </Button>
+          ) : null
+        }
+      />
+      {showStack && expanded ? (
+        <div
+          id={regionId}
+          role="region"
+          aria-label={CATALOG_STACK_MEMBERS_REGION_ARIA}
+          className="mt-2 rounded-base border border-border bg-surface p-2"
+        >
+          {loading && members === undefined && !loadError ? (
+            <p className="text-xs text-text-secondary">{CATALOG_STACK_MEMBERS_LOADING}</p>
+          ) : null}
+          {loadError ? (
+            <p className="text-sm text-error" role="alert">
+              {CATALOG_STACK_MEMBERS_ERROR}
+            </p>
+          ) : null}
+          {members && !loadError ? (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {members.map((m) => (
+                <div key={m.key} className="w-[7.5rem] shrink-0 min-w-0">
+                  <ImageTile
+                    image={fromCatalogListRow(m)}
+                    variant="strip"
+                    primaryScoreSource="catalog"
+                    onClick={() => onSelect(m)}
+                    className="!w-full max-w-full"
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 /** Row-data we need to open the consolidated modal — only type + key are
  *  required (detail endpoint fills the rest); the full row is kept so the
@@ -65,6 +173,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
   const location = useLocation();
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
+  const [isPending, startTransition] = useTransition();
   const [selected, setSelected] = useState<SelectedCatalogEntry | null>(null);
 
   const monthsPayload = useQuery(['images.catalog', 'months'] as const, () =>
@@ -272,7 +381,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
 
   // D-10: non-search filter changes reset page to 1 immediately.
   useEffect(() => {
-    setPage(1);
+    startTransition(() => setPage(1));
   }, [
     filterValues.posted,
     filterValues.analyzed,
@@ -299,7 +408,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
       prevKeyword.current = filterValues.keyword;
       prevColor.current = filterValues.colorLabel;
       prevDescriptionSearch.current = filterValues.descriptionSearch;
-      setPage(1);
+      startTransition(() => setPage(1));
     }
   }, [filterValues.keyword, filterValues.colorLabel, filterValues.descriptionSearch]);
 
@@ -368,22 +477,24 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
         </div>
       ) : (
         <>
-          <div className="relative transition-opacity duration-150">
+          <div className={`relative transition-opacity duration-150${isPending ? ' opacity-50 pointer-events-none' : ''}`}>
             <TileGrid>
               {images.map((image) => (
-                <ImageTile
+                <CatalogImageWithStack
                   key={image.id != null ? String(image.id) : image.key}
-                  image={fromCatalogListRow(image)}
-                  variant="grid"
-                  primaryScoreSource="catalog"
-                  onClick={() => setSelected({ key: image.key, initial: image })}
+                  image={image}
+                  onSelect={(row) => setSelected({ key: row.key, initial: row })}
                 />
               ))}
             </TileGrid>
           </div>
 
           {totalPages > 1 && (
-            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPageChange={(p) => startTransition(() => setPage(p))}
+            />
           )}
         </>
       )}
