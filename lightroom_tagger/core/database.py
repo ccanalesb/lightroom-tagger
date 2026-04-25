@@ -1160,8 +1160,9 @@ def _non_empty_str_list_for_json_array_filter(values: list[str] | None) -> list[
     return out or None
 
 
-def query_catalog_images(
-    db: sqlite3.Connection,
+def _append_query_catalog_image_filters(
+    clauses: list[str],
+    bindings: list,
     *,
     posted: bool | None = None,
     month: str | None = None,
@@ -1171,63 +1172,17 @@ def query_catalog_images(
     date_to: str | None = None,
     color_label: str | None = None,
     analyzed: bool | None = None,
-    score_perspective: str | None = None,
     min_score: int | None = None,
-    sort_by_score: str | None = None,
-    sort_by_date: str | None = None,
     description_search: str | None = None,
     dominant_colors: list[str] | None = None,
     mood_tags: list[str] | None = None,
     has_repetition: bool | None = None,
-    limit: int = 50,
-    offset: int = 0,
-) -> tuple[list[dict], int]:
-    """List catalog images with AND-combined filters, SQL pagination, and total count.
+) -> None:
+    """Append shared catalog list AND-clauses (incl. stack collapse) to *clauses* / *bindings*.
 
-    **description_search** — optional FTS5 match over ``image_descriptions`` for
-    ``image_type='catalog'`` only. Invalid short queries raise ``ValueError`` with message
-    ``description_search must be at least 2 characters`` (map to HTTP 400 in the API).
-
-    Optional **score_perspective** enables a ``LEFT JOIN`` on ``image_scores`` for the
-    current row (``is_current=1``, ``image_type='catalog'``) for that slug.
-
-    **min_score** (1–10) requires **score_perspective** and keeps only rows with a
-    non-null score ``>= min_score``.
-
-    **sort_by_score** ``asc`` / ``desc`` requires **score_perspective**. Unscored rows
-    for that perspective sort after scored rows in both directions (``s.score IS NULL``
-    last via SQLite boolean ordering).
-
-    **sort_by_date** ``newest`` / ``oldest`` orders by ``i.date_taken``. When both
-    ``sort_by_score`` and ``sort_by_date`` are set, score wins as the primary key and
-    date is the tiebreaker.
-
-    **dominant_colors** / **mood_tags** — optional lists of strings; if non-empty
-    (after dropping blank elements), a row must have at least one token from the
-    list present as a JSON array element in ``image_descriptions.dominant_colors`` /
-    ``mood_tags`` (catalog join row ``d``). Filters use SQLite ``json_each`` with
-    bound parameters; invalid or non-array JSON in the column is excluded.
+    Used by :func:`query_catalog_images` and :func:`filter_order_keys_in_catalog`. The
+    caller must initialize *clauses* (e.g. ``[\"1=1\"]`` or ``i.key IN (...)``) and *bindings*.
     """
-    if sort_by_score is not None and sort_by_score not in ("asc", "desc"):
-        raise ValueError("sort_by_score must be 'asc' or 'desc'")
-    if sort_by_date is not None and sort_by_date not in ("newest", "oldest"):
-        raise ValueError("sort_by_date must be 'newest' or 'oldest'")
-
-    sp = (score_perspective or "").strip()
-    use_score_join = bool(sp)
-
-    if sort_by_score is not None and not use_score_join:
-        raise ValueError("sort_by_score requires score_perspective")
-
-    if min_score is not None and not use_score_join:
-        raise ValueError("min_score requires score_perspective")
-
-    if min_score is not None and not (1 <= min_score <= 10):
-        raise ValueError("min_score must be between 1 and 10")
-
-    clauses: list[str] = ["1=1"]
-    bindings: list = []
-
     if posted is True:
         clauses.append("i.instagram_posted = 1")
     elif posted is False:
@@ -1324,6 +1279,172 @@ def query_catalog_images(
         bindings.extend(mt_tokens)
 
     clauses.append("(m_st.image_key IS NULL OR i.key = st.representative_key)")
+
+
+def filter_order_keys_in_catalog(
+    db: sqlite3.Connection,
+    keys: list[str],
+    *,
+    posted: bool | None = None,
+    month: str | None = None,
+    keyword: str | None = None,
+    min_rating: int | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    color_label: str | None = None,
+    analyzed: bool | None = None,
+    score_perspective: str | None = None,
+    min_score: int | None = None,
+    description_search: str | None = None,
+    dominant_colors: list[str] | None = None,
+    mood_tags: list[str] | None = None,
+    has_repetition: bool | None = None,
+) -> list[str]:
+    """Return members of *keys* that satisfy the same filters as :func:`query_catalog_images`.
+
+    Preserves **input order**. ``sort_by_*`` are not applicable to membership and are
+    omitted. Empty *keys* → ``[]``.
+
+    **min_score** requires **score_perspective** (same rule as :func:`query_catalog_images`).
+    """
+    if not keys:
+        return []
+    sp = (score_perspective or "").strip()
+    use_score_join = bool(sp)
+    if min_score is not None and not use_score_join:
+        raise ValueError("min_score requires score_perspective")
+    if min_score is not None and not (1 <= min_score <= 10):
+        raise ValueError("min_score must be between 1 and 10")
+
+    ph = ",".join("?" * len(keys))
+    clauses: list[str] = [f"i.key IN ({ph})"]
+    bindings: list = list(keys)
+    _append_query_catalog_image_filters(
+        clauses,
+        bindings,
+        posted=posted,
+        month=month,
+        keyword=keyword,
+        min_rating=min_rating,
+        date_from=date_from,
+        date_to=date_to,
+        color_label=color_label,
+        analyzed=analyzed,
+        min_score=min_score,
+        description_search=description_search,
+        dominant_colors=dominant_colors,
+        mood_tags=mood_tags,
+        has_repetition=has_repetition,
+    )
+    where_sql = "WHERE " + " AND ".join(clauses)
+    join_sql = (
+        "FROM images i "
+        "LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog' "
+    )
+    join_bindings: list = []
+    if use_score_join:
+        join_sql += (
+            "LEFT JOIN image_scores s ON s.image_key = i.key "
+            "AND s.image_type = 'catalog' AND s.perspective_slug = ? AND s.is_current = 1 "
+        )
+        join_bindings.append(sp)
+    join_sql += (
+        "LEFT JOIN image_stack_members AS m_st ON m_st.image_key = i.key "
+        "LEFT JOIN image_stacks AS st ON st.stack_id = m_st.stack_id "
+    )
+    params = join_bindings + bindings
+    rows = db.execute(
+        f"SELECT i.key AS image_key {join_sql} {where_sql}",
+        params,
+    ).fetchall()
+    matched = {str(r["image_key"]) for r in rows}
+    return [k for k in keys if k in matched]
+
+
+def query_catalog_images(
+    db: sqlite3.Connection,
+    *,
+    posted: bool | None = None,
+    month: str | None = None,
+    keyword: str | None = None,
+    min_rating: int | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    color_label: str | None = None,
+    analyzed: bool | None = None,
+    score_perspective: str | None = None,
+    min_score: int | None = None,
+    sort_by_score: str | None = None,
+    sort_by_date: str | None = None,
+    description_search: str | None = None,
+    dominant_colors: list[str] | None = None,
+    mood_tags: list[str] | None = None,
+    has_repetition: bool | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[dict], int]:
+    """List catalog images with AND-combined filters, SQL pagination, and total count.
+
+    **description_search** — optional FTS5 match over ``image_descriptions`` for
+    ``image_type='catalog'`` only. Invalid short queries raise ``ValueError`` with message
+    ``description_search must be at least 2 characters`` (map to HTTP 400 in the API).
+
+    Optional **score_perspective** enables a ``LEFT JOIN`` on ``image_scores`` for the
+    current row (``is_current=1``, ``image_type='catalog'``) for that slug.
+
+    **min_score** (1–10) requires **score_perspective** and keeps only rows with a
+    non-null score ``>= min_score``.
+
+    **sort_by_score** ``asc`` / ``desc`` requires **score_perspective**. Unscored rows
+    for that perspective sort after scored rows in both directions (``s.score IS NULL``
+    last via SQLite boolean ordering).
+
+    **sort_by_date** ``newest`` / ``oldest`` orders by ``i.date_taken``. When both
+    ``sort_by_score`` and ``sort_by_date`` are set, score wins as the primary key and
+    date is the tiebreaker.
+
+    **dominant_colors** / **mood_tags** — optional lists of strings; if non-empty
+    (after dropping blank elements), a row must have at least one token from the
+    list present as a JSON array element in ``image_descriptions.dominant_colors`` /
+    ``mood_tags`` (catalog join row ``d``). Filters use SQLite ``json_each`` with
+    bound parameters; invalid or non-array JSON in the column is excluded.
+    """
+    if sort_by_score is not None and sort_by_score not in ("asc", "desc"):
+        raise ValueError("sort_by_score must be 'asc' or 'desc'")
+    if sort_by_date is not None and sort_by_date not in ("newest", "oldest"):
+        raise ValueError("sort_by_date must be 'newest' or 'oldest'")
+
+    sp = (score_perspective or "").strip()
+    use_score_join = bool(sp)
+
+    if sort_by_score is not None and not use_score_join:
+        raise ValueError("sort_by_score requires score_perspective")
+
+    if min_score is not None and not use_score_join:
+        raise ValueError("min_score requires score_perspective")
+
+    if min_score is not None and not (1 <= min_score <= 10):
+        raise ValueError("min_score must be between 1 and 10")
+
+    clauses: list[str] = ["1=1"]
+    bindings: list = []
+    _append_query_catalog_image_filters(
+        clauses,
+        bindings,
+        posted=posted,
+        month=month,
+        keyword=keyword,
+        min_rating=min_rating,
+        date_from=date_from,
+        date_to=date_to,
+        color_label=color_label,
+        analyzed=analyzed,
+        min_score=min_score,
+        description_search=description_search,
+        dominant_colors=dominant_colors,
+        mood_tags=mood_tags,
+        has_repetition=has_repetition,
+    )
 
     where_sql = "WHERE " + " AND ".join(clauses)
     join_sql = (
