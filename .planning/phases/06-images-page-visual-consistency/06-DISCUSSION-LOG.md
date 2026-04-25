@@ -3,71 +3,73 @@
 > **Audit trail only.** Do not use as input to planning, research, or execution agents.
 > Decisions are captured in CONTEXT.md — this log preserves the alternatives considered.
 
-**Date:** 2026-04-21
+**Date:** 2026-04-25
 **Phase:** 06-images-page-visual-consistency
-**Areas discussed:** Badge API consolidation, Inline-in-description pattern, Match card shape, PerspectiveBadge
+**Mode:** auto (`--auto`)
+**Areas discussed:** Badge surface consolidation, Inline metadata chips, Match group tile composition, PerspectiveBadge rollout
 
 ---
 
-## Badge API Consolidation
+## Badge Surface Consolidation
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| A. Structural unification | All badges under one folder, specialized badges wrap `<Badge>` | ✓ |
-| B. Visual token standardization | Keep separate folders, align spacing/border/rounding | Partial ✓ |
-| C. Barrel export only | Single index.ts re-exporting from wherever they live | ✓ (combined with A) |
+| A. Single `ui/badges` home | Keep one canonical badge folder and one barrel export path | ✓ |
+| B. Keep split folders | Continue mixed `ui/Badge` + `ui/badges` imports | |
+| C. New singular folder migration | Introduce a brand-new badge path and migrate all imports | |
 
-**User's choice:** Structural unification + harmonized visual tokens (with intentional size differences preserved) + single barrel export as public API
-**Notes:** "I think I like the barrel export but with structural unification and a little bit of B" — confirmed that "a little bit of B" means conservative harmonization, not forcing everything to identical sizing. Inline JSDoc chosen for documentation over separate markdown file.
+**User's choice:** `[auto]` selected recommended default: A
+**Notes:** Existing code already matches option A (`ui/badges/index.ts` barrel with shared exports), so auto mode locked the current canonical pattern.
 
 ---
 
-## Inline-in-description Pattern (UI-02)
+## Inline Metadata Chips (UI-02)
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| A. Chip row under each item | Badge row beneath image/title in tile view, like ImageMetadataBadges | ✓ |
-| B. Badges woven into prose | Badges inline mid-sentence within description text | |
+| A. Shared `ImageMetadataBadges` row | Keep chips in `ImageTile` body under date, reused by all tile surfaces | ✓ |
+| B. Per-tab custom chip markup | Catalog/Instagram/Matches each own chip rendering | |
+| C. Prose metadata instead of chips | Remove chip row and display textual metadata lines | |
 
-**User's choice:** Option A — chip row beneath image/title
-**Notes:** Applies to all three Images page tabs (Instagram, Catalog, Matches). Same chip set as Best Photos (Posted, rating ★, Pick, AI) — "in all, instagram, catalog and matches, same as best photos."
+**User's choice:** `[auto]` selected recommended default: A
+**Notes:** Auto mode retained dedupe behavior (`hidePostedMetadataBadge`) when overlay badges already carry Posted status.
 
 ---
 
-## Match Card Shape (UI-03)
+## Match Group Tile Composition (UI-03)
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| A. Two-panel card | Instagram thumbnail + Catalog thumbnail side by side | |
-| B. Single image + richer metadata | Instagram image + metadata row below (filename, N candidates, score) | ✓ |
-| C. Card wrapper style only | Keep single-image ImageTile, just match card shell styling | |
+| A. Shared tile shell + footer metadata | Keep `ImageTile` card shell; use footer for count/validated/filename semantics | ✓ |
+| B. Dedicated custom wrapper card | New shell and layout specifically for match groups | |
+| C. Overlay-only semantics | Push all metadata into thumbnail overlays | |
 
-**User's choice:** Option B — single Instagram image + metadata row below
-**Notes:** User requested ASCII diagrams to decide. Unvalidated groups show "N candidates" only in metadata row — no per-candidate drilling. Validated groups show catalog filename.
+**User's choice:** `[auto]` selected recommended default: A
+**Notes:** Current implementation already follows this shape via `MatchGroupTile` + `ImageTile.footer`, so auto mode locked the existing contract.
 
 ---
 
-## PerspectiveBadge
+## PerspectiveBadge Rollout
 
 | Option | Description | Selected |
 |--------|-------------|----------|
-| A. Name only | `[Street]` — label tag | |
-| B. Name + score with color | `[Street 8.2]` in perspective color | ✓ |
-| C. Score only with color | `[8.2]` color-coded, relies on context | |
+| A. Dominant perspective only on approved surfaces | Top-1 perspective (`displayName + score`) in `BestPhotosGrid` and `TopPhotosStrip` | ✓ |
+| B. All perspectives per tile | Render full perspective breakdown on every tile | |
+| C. No perspective badge on tiles | Keep perspective info in detail-only surfaces | |
 
-**User's choice:** Option B — name + score + per-perspective color
-**Notes:** User noted the visual precedent already exists inside the AI description section of the image modal. Initially deferred showing PerspectiveBadge on BestPhotosGrid and TopPhotosStrip to next phase, then pulled it into Phase 6 scope. Top 1 perspective by score shown per tile on both surfaces.
+**User's choice:** `[auto]` selected recommended default: A
+**Notes:** Auto mode followed `06-UI-SPEC.md` lock: dominant-only badge in tile footer with slug-based color mapping.
 
 ---
 
 ## Claude's Discretion
 
-- Unified badge folder name
-- Exact color mapping per perspective
-- Whether PerspectiveBadge appends to ImageMetadataBadges row or renders below it
-- ScorePill migration decision
+- Fine-tuned fallback styling for unknown perspective slugs
+- Preserve score formatting conventions for compact readability
+- Minor spacing adjustments around footer badge row when needed
 
 ## Deferred Ideas
 
-- All 4 perspective scores per tile (top-1 only in Phase 6)
-- PerspectiveBadge on other surfaces beyond BestPhotosGrid and TopPhotosStrip
+- Render all four perspectives per tile (out of scope for this phase)
+- Extend PerspectiveBadge to additional screens/surfaces
+- Benchmark embedding recall todo remains deferred to matching/embedding phases

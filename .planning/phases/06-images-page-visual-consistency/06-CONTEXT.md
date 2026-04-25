@@ -1,43 +1,62 @@
 # Phase 6: Images Page Visual Consistency - Context
 
-**Gathered:** 2026-04-21
+**Gathered:** 2026-04-25 (auto refresh)
 **Status:** Ready for planning
 
 <domain>
 ## Phase Boundary
 
-Unify the visual language on the Images page: consolidate badge primitives under a consistent API (UI-01), adopt an inline chip-row pattern for badges on all Images page tabs (UI-02), and give match group tiles a richer card layout (UI-03). Extends to BestPhotosGrid (Identity) and TopPhotosStrip (Dashboard) for PerspectiveBadge placement — both surfaces in scope.
+Unify visual consistency for Images-related tiles by consolidating badge primitives (UI-01), standardizing inline metadata chip behavior across Images tabs (UI-02), and aligning match-group tile structure with shared card patterns (UI-03), plus the phase-approved PerspectiveBadge rollout on Best Photos and Top Photos surfaces.
 
 </domain>
+
+<spec_lock>
+## Requirements (locked via SPEC.md)
+
+**12 requirements are locked.** See `06-UI-SPEC.md` for full requirements, boundaries, and acceptance criteria.
+
+Downstream agents MUST read `06-UI-SPEC.md` before planning or implementing. Requirements are not duplicated here.
+
+**In scope (from SPEC.md):**
+- UI-01 badge consolidation into a single `ui/badges` surface with unified exports and usage guidance.
+- UI-02 consistent inline metadata chip row behavior for Instagram, Catalog, and Matches tile surfaces.
+- UI-03 match-group tile layout and metadata-row consistency using the shared tile shell.
+- D-11 and D-12 PerspectiveBadge behavior on `BestPhotosGrid` and `TopPhotosStrip`.
+
+**Out of scope (from SPEC.md):**
+- URL-synced filters, CVA migration, shadcn adoption, and full Instagram adapter parity.
+- PerspectiveBadge expansion to other surfaces beyond Best Photos and Top Photos.
+- New capability work outside visual-consistency contracts.
+
+</spec_lock>
 
 <decisions>
 ## Implementation Decisions
 
-### Badge consolidation (UI-01)
-- **D-01:** Structural unification — all badge primitives consolidated under one folder (`ui/badges/` or equivalent). `VisionBadge`, `StatusBadge`, `ImageTypeBadge`, and the new `PerspectiveBadge` all wrap `<Badge>` internally. The `ui/Badge/` and `ui/badges/` split is resolved into a single location.
-- **D-02:** Visual tokens harmonized across all badges — spacing, border, and rounding aligned — but intentional size differences are preserved where they make sense (e.g. `ImageTypeBadge` stays compact at `text-[10px]` since it renders a short CAT/IG label).
-- **D-03:** Single barrel export is the public API for all badge primitives — consumers import from one path, not from `ui/Badge/` vs `ui/badges/` separately.
-- **D-04:** Usage documented via inline JSDoc on each component — when and where to use each badge type.
+### Badge surface consolidation
+- **D-01:** Keep `apps/visualizer/frontend/src/components/ui/badges/` as the single canonical badge location.
+- **D-02:** Route all badge imports through one barrel (`../ui/badges`) instead of split paths.
+- **D-03:** Keep specialized badge wrappers (`PerspectiveBadge`, `StatusBadge`, `VisionBadge`, `ImageTypeBadge`) wrapping the base `Badge` primitive.
+- **D-04:** Keep `ScorePill` as a specialized primitive in the same badge surface and export it from the same barrel.
 
-### Inline chip-row pattern (UI-02)
-- **D-05:** "Inline-in-description" = a chip row beneath the image/title in tile view, consistent with the `ImageMetadataBadges` pattern already used on Catalog tiles and Best Photos grid.
-- **D-06:** Applies to all three Images page tabs: Instagram, Catalog, and Matches.
-- **D-07:** Same chip set as Best Photos — Posted ✓, rating ★, Pick, AI — using the existing `ImageMetadataBadges` component wherever tiles appear on the Images page.
+### Inline metadata chips across Images tabs
+- **D-05:** Keep metadata chips rendered by `ImageMetadataBadges` inside `ImageTile` directly below the date line.
+- **D-06:** Preserve the chip set contract: Posted, rating, Pick, AI, plus `PrimaryScorePill` when applicable.
+- **D-07:** Use `hidePostedMetadataBadge` when `overlayBadges` shows Posted to prevent duplicate status cues.
+- **D-08:** Preserve shared chip-row layout (`flex items-center gap-2 flex-wrap`) for responsive consistency.
 
-### Match card shape (UI-03)
-- **D-08:** `MatchGroupTile` becomes a single Instagram image + metadata row below. The metadata row shows: catalog filename of the best candidate (or "N candidates" when unvalidated), and validation state badge.
-- **D-09:** Card uses the same border/shadow/hover shell as CatalogTab tiles — visual parity with catalog cards.
-- **D-10:** Unvalidated groups show "N candidates" in the metadata row only — no per-candidate metadata drilling. Validated groups show the catalog filename.
+### Match group tile composition
+- **D-09:** Keep `MatchGroupTile` on the shared `ImageTile` shell; no separate wrapper card style.
+- **D-10:** Keep metadata in the `footer` row: unvalidated groups emphasize candidate count (with optional confidence score); validated groups show validated status plus selected catalog filename.
+- **D-11:** Keep review entrypoint behavior through `pickInitialMatch(group)` and `onOpenReview(group, initial)` with no alternate navigation flow.
 
-### PerspectiveBadge (UI-01 + extended scope)
-- **D-11:** `PerspectiveBadge` renders perspective name + score with a color mapped to the perspective (e.g. `[Street 8.2]` in Street's color). Built as a proper primitive wrapping `<Badge>`.
-- **D-12:** `PerspectiveBadge` (top 1 by score — the dominant perspective) appears on tile cards in **both** BestPhotosGrid (Identity page) and TopPhotosStrip (Dashboard). This is in scope for Phase 6. Planner decides exact placement (below the existing chip row, or appended to it).
+### PerspectiveBadge rollout
+- **D-12:** Show dominant perspective only (display name + score, color-mapped by slug) via `PerspectiveBadge` in `ImageTile.footer` on `BestPhotosGrid` and `TopPhotosStrip`.
 
 ### Claude's Discretion
-- Which single folder name to use for the unified badge location (`ui/badges/` vs `ui/badge/` vs `ui/Badge/`)
-- Exact color mapping for `PerspectiveBadge` per perspective (Street, Documentary, Publisher, Color Theory) — pick distinct, accessible colors
-- Whether `PerspectiveBadge` appends to the existing `ImageMetadataBadges` row or renders as a separate row below it on Best Photos / Top Photos tiles
-- Whether `ScorePill` (currently in `ui/badges/`) moves into the consolidated location or stays as a separate primitive
+- Fine-tune neutral fallback styling for unknown perspective slugs while preserving contrast in light/dark modes.
+- Keep score formatting stable (`8` vs `8.2`) as long as it remains consistent with current badge readability.
+- Adjust small spacing around footer badge rows (`mt-0`/`mt-1`) if needed for scanability without changing hierarchy.
 
 </decisions>
 
@@ -46,31 +65,28 @@ Unify the visual language on the Images page: consolidate badge primitives under
 
 **Downstream agents MUST read these before planning or implementing.**
 
-### Badge primitives (current state)
-- `apps/visualizer/frontend/src/components/ui/Badge/Badge.tsx` — base `<Badge>` primitive (rounded-full, border, variants: default/success/warning/error/accent)
-- `apps/visualizer/frontend/src/components/ui/badges/VisionBadge.tsx` — match vision result badge
-- `apps/visualizer/frontend/src/components/ui/badges/StatusBadge.tsx` — job status badge
-- `apps/visualizer/frontend/src/components/ui/badges/ImageTypeBadge.tsx` — CAT/IG type label
-- `apps/visualizer/frontend/src/components/ui/badges/ScorePill.tsx` — score display pill
+### Locked requirements and scope
+- `.planning/phases/06-images-page-visual-consistency/06-UI-SPEC.md` — locked UI contracts D-01..D-12 for this phase.
+- `.planning/REQUIREMENTS.md` — UI-01, UI-02, UI-03 requirement definitions.
+- `.planning/ROADMAP.md` — v2.1 Phase 6 milestone contract and completion intent.
 
-### Image tile and metadata
-- `apps/visualizer/frontend/src/components/image-view/ImageTile.tsx` — unified tile component; `overlayBadges` prop pattern
-- `apps/visualizer/frontend/src/components/image-view/ImageMetadataBadges.tsx` — chip row (Posted, rating, Pick, AI + PrimaryScorePill); target for D-07 extension
-- `apps/visualizer/frontend/src/components/image-view/imageTileVariants.ts` — tile variant classes
+### Badge primitives
+- `apps/visualizer/frontend/src/components/ui/badges/index.ts` — single public export surface.
+- `apps/visualizer/frontend/src/components/ui/badges/Badge.tsx` — base badge primitive and variants.
+- `apps/visualizer/frontend/src/components/ui/badges/PerspectiveBadge.tsx` — perspective slug mapping and score label formatting.
+- `apps/visualizer/frontend/src/components/ui/badges/ScorePill.tsx` — specialized score chip behavior.
 
-### Images page targets (UI-02, UI-03)
-- `apps/visualizer/frontend/src/components/images/MatchGroupTile.tsx` — current single-image tile; target for D-08/D-09/D-10 card rework
-- `apps/visualizer/frontend/src/components/images/MatchesTab.tsx` — MatchGroupTile consumer
-- `apps/visualizer/frontend/src/components/images/CatalogTab.tsx` — reference for card shell style
-- `apps/visualizer/frontend/src/components/images/InstagramTab.tsx` — target for D-06/D-07 chip row
-- `apps/visualizer/frontend/src/pages/ImagesPage.tsx` — Images page root
+### Shared tile and metadata primitives
+- `apps/visualizer/frontend/src/components/image-view/ImageTile.tsx` — canonical tile shell, overlay slot, footer slot, metadata row position.
+- `apps/visualizer/frontend/src/components/image-view/ImageMetadataBadges.tsx` — chip row contract and posted-chip deduping flag.
 
-### Extended scope targets (D-12)
-- `apps/visualizer/frontend/src/components/identity/BestPhotosGrid.tsx` — target for PerspectiveBadge (top 1)
-- `apps/visualizer/frontend/src/components/insights/TopPhotosStrip.tsx` — target for PerspectiveBadge (top 1)
-
-### Requirements
-- `.planning/REQUIREMENTS.md` — UI-01, UI-02, UI-03 definitions
+### Surface integrations
+- `apps/visualizer/frontend/src/components/images/CatalogTab.tsx` — baseline grid tile integration pattern.
+- `apps/visualizer/frontend/src/components/images/InstagramTab.tsx` — Instagram tile usage and footer composition.
+- `apps/visualizer/frontend/src/components/images/MatchGroupTile.tsx` — match tile footer semantics for validated/unvalidated states.
+- `apps/visualizer/frontend/src/components/images/MatchesTab.tsx` — grouped match rendering and review flow.
+- `apps/visualizer/frontend/src/components/identity/BestPhotosGrid.tsx` — PerspectiveBadge footer + posted overlay behavior.
+- `apps/visualizer/frontend/src/components/insights/TopPhotosStrip.tsx` — strip variant PerspectiveBadge footer behavior.
 
 </canonical_refs>
 
@@ -78,44 +94,45 @@ Unify the visual language on the Images page: consolidate badge primitives under
 ## Existing Code Insights
 
 ### Reusable Assets
-- `ImageMetadataBadges` — already renders the Posted/rating/Pick/AI chip row; extend or reuse for D-07 on Instagram and Matches tiles
-- `ImageTile.overlayBadges` — ReactNode overlay slot; MatchGroupTile already uses it for "Validated" / "N candidates" badge
-- `Badge` base component — has full variant system; all specialized badges should wrap this
-- `BestPhotosGrid` — already receives `ImageView` rows with `instagram_posted` and score data; has access to per-perspective scores via existing API response
+- `ImageTile` already centralizes card shell, thumbnail overlay, metadata row, and footer extension points.
+- `ImageMetadataBadges` already owns common chip rendering and hide-posted deduping behavior.
+- `PerspectiveBadge` already maps known perspective slugs to color classes with neutral fallback.
+- `fromBestPhotoRow` / `fromMatchSide` adapters already normalize row shapes for tile rendering.
 
 ### Established Patterns
-- Badge chip rows use `flex items-center gap-2 flex-wrap` (see `ImageMetadataBadges`)
-- Card shell: `rounded-card border border-border bg-bg shadow-card transition-all hover:border-border-strong hover:shadow-deep` (see `ImageTile`)
-- Overlay badges: top-right positioned via `overlayBadges` prop on `ImageTile`
-- All user-visible strings go in `constants/strings.ts`
+- Tile shell consistency is enforced via `ImageTile` variants instead of per-tab custom wrappers.
+- Footer content is the preferred extension point for secondary metadata lines.
+- Badge import hygiene now routes through `../ui/badges` barrel.
+- User-visible copy and labels continue to live in `constants/strings.ts`.
 
 ### Integration Points
-- `MatchGroupTile.tsx` — add metadata row below thumbnail (D-08); adopts card shell (D-09)
-- `InstagramTab` tiles — ensure `ImageMetadataBadges` chip row is present (D-07)
-- `BestPhotosGrid` + `TopPhotosStrip` — add `PerspectiveBadge` for top-1 perspective score (D-12)
-- Badge folder restructure — update all import paths across the codebase after consolidation
+- `MatchGroupTile` remains the central place for validated/unvalidated candidate-row wording and score display.
+- `BestPhotosGrid` and `TopPhotosStrip` remain the only phase-approved PerspectiveBadge surfaces.
+- `CatalogTab` and `InstagramTab` continue inheriting metadata-row behavior from `ImageTile` + `ImageMetadataBadges`.
 
 </code_context>
 
 <specifics>
 ## Specific Ideas
 
-- User confirmed PerspectiveBadge already has a visual precedent inside the AI description section of the image modal — the new primitive should formalize that existing display
-- User explicitly chose chip-row-beneath-tile (Option A) over prose-inline badges
-- Match card is Option B (single image + metadata row below), not a two-panel layout
-- PerspectiveBadge on tile grids shows **top 1 by score only** — not all 4 perspectives
+- Auto run selected recommended defaults for all gray areas using the active `06-UI-SPEC.md` and current codebase shape.
+- Dominant-perspective presentation remains top-1 only, keeping tile density readable.
+- No additional custom visual language was introduced beyond existing badge/tile primitives.
 
 </specifics>
 
 <deferred>
 ## Deferred Ideas
 
-- Showing all 4 perspective scores per tile (top-1 only is in scope for Phase 6; full breakdown deferred)
-- PerspectiveBadge on any other surfaces beyond BestPhotosGrid and TopPhotosStrip
+- Showing all four perspectives per tile (top-1 remains the phase contract).
+- PerspectiveBadge rollout to other pages/surfaces outside Best Photos and Top Photos.
+
+### Reviewed Todos (not folded)
+- `Benchmark DINOv2/CLIP embeddings against user-validated match pairs` (`.planning/todos/pending/benchmark-embedding-recall.md`) — deferred; belongs to embedding/matching phases, not UI consistency scope.
 
 </deferred>
 
 ---
 
 *Phase: 06-images-page-visual-consistency*
-*Context gathered: 2026-04-21*
+*Context gathered: 2026-04-25*

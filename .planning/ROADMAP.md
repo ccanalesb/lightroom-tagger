@@ -162,6 +162,24 @@
 - NLS-05 chat panel supports **pin** active catalog image → triggers visual similarity (uses SIM-01/SIM-02); result set updates in the grid.
 - End-to-end tests or integration checks for representative-only matching vs member expansion.
 
+#### Phase 8 — Embedding pre-filter for image matching *(planned 2026-04-24)*
+
+**Goal:** Reduce LLM comparison calls by 400x+ by introducing a layered pre-filter before LLM judgment runs. LLM is not replaced — it is protected from doing unnecessary work.
+
+**Design decisions (agreed 2026-04-24):**
+- Date window (90 days) is the first filter — cuts effective catalog size before any embedding work
+- DINOv2 (or CLIP/SigLIP — to be validated by benchmark) global embeddings + FAISS KNN as the second filter
+- Top-k is tuned for recall-first (generous, e.g. top-100/200) — missing a true match is worse than extra LLM calls
+- LLM comparison runs only on the shortlisted candidates, not the full catalog
+- Opt-in fallback: when normal path yields zero candidates, user can explicitly trigger a wider search (no date window or extended window); fallback is never automatic
+
+**Requirements:**
+- Benchmark DINOv2/CLIP recall on user-validated match pairs before setting threshold (todo: `benchmark-embedding-recall.md`)
+- Embedding pre-filter reduces LLM calls by at least 10x vs. current baseline on a representative batch
+- Normal path: date window → embedding top-k → LLM shortlist; fallback path is UI-triggered, not automatic
+- Fallback UI surfaces "no matches found within 90 days" with an explicit opt-in to wider search
+- Pipeline is observable — logs/metrics show how many candidates each stage passes through
+
 #### Progress (v3.0)
 
 | Phase | Goal | Requirements | Success criteria count | Status |
@@ -175,6 +193,7 @@
 | 5.2 | Tool-calling search | — | 5 | ✅ Complete (2026-04-24) |
 | 6 | Similarity & stack UI | SIM-02, STACK-03 | 3 | Pending |
 | 7 | Stacks in matching & pin similarity | STACK-04, STACK-05, NLS-06 | 4 | Pending |
+| 8 | Embedding pre-filter for image matching | MATCH-02 | 5 | Planned (2026-04-24) |
 
 ---
 
