@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { MatchGroupTile } from '../MatchGroupTile'
-import { MATCH_VALIDATED } from '../../../constants/strings'
+import { MATCH_VALIDATED, msgMatchGroupCandidates } from '../../../constants/strings'
 import type { CatalogImage, InstagramImage, MatchGroup } from '../../../services/api'
 
 function instagramFixture(overrides: Partial<InstagramImage> = {}): InstagramImage {
@@ -82,7 +82,13 @@ describe('MatchGroupTile', () => {
       has_validated: false,
     }
     render(<MatchGroupTile group={group} onOpenReview={vi.fn()} />)
-    expect(screen.getByText('3 candidates')).toBeInTheDocument()
+    const tile = screen.getByTestId('image-tile')
+    expect(
+      within(tile).getByText(msgMatchGroupCandidates(3)),
+    ).toBeInTheDocument()
     expect(screen.queryByText(secretCatalog)).not.toBeInTheDocument()
+    // D-10 / UI-03: unvalidated metadata row is candidate copy only (no %, no validated badge).
+    expect(within(tile).queryByText(MATCH_VALIDATED)).not.toBeInTheDocument()
+    expect(within(tile).queryByText('80%')).not.toBeInTheDocument()
   })
 })
