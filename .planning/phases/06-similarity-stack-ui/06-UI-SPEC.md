@@ -1,10 +1,11 @@
 ---
 phase: 6
 slug: 06-similarity-stack-ui
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-04-25
+reviewed: 2026-04-25
 ---
 
 # Phase 6 — UI Design Contract
@@ -37,6 +38,7 @@ Declared values (multiples of 4). Use Tailwind numeric spacing (`gap-2`, `p-4`, 
 |-------|-------|-------|
 | xs | 4px | Inline gaps in badge stacks, tight thumb metadata (`gap-1`) |
 | sm | 8px | Overlay cluster (`right-2 top-2`), between stack badge and posted badge, strip gaps (`gap-2`) |
+| sm+ | 12px | Expanded stack strip gutters when `gap-3` gives better thumbnail rhythm |
 | md | 16px | Default card/section padding, grid `gap-4` between tiles |
 | lg | 24px | Section separation, expanded stack strip padding |
 | xl | 32px | Page-level blocks when adding a new “similarity results” region |
@@ -127,6 +129,8 @@ Reusable plumbing: `ImagesAPI` (or equivalent) method callable from Catalog now 
 
 ## Layout & interaction contracts
 
+**Visual hierarchy:** On Catalog and Best Photos tiles, the thumbnail remains primary, posted/stack badges are secondary, and **Show stack** / **Hide stack** is tertiary. In `ImageDetailModal`, the selected image remains primary; the **More like this** action opens **Visually similar** as a secondary section below the current image context.
+
 ### STACK-03 — Catalog & Best Photos
 
 1. **Representative row:** For each catalog/best-photos item with `is_stack_representative === true` and `stack_member_count > 1`, render a **count badge** in `ImageTile` `overlayBadges` (after Posted if both apply: column `gap-1` in overlay) using `Badge` and **{n} in stack** copy.
@@ -175,14 +179,14 @@ Reusable plumbing: `ImagesAPI` (or equivalent) method callable from Catalog now 
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS with non-blocking hierarchy note addressed
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved
 
 ---
 

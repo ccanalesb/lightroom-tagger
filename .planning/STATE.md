@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Phase 5.2 complete (Tool-calling search — multi-tool LLM with capability detection, rich results, multi-turn history)
-last_updated: "2026-04-25T16:13:34.420Z"
+status: Phase 6 UI-SPEC approved (Similarity & Stack UI design contract ready for planning)
+last_updated: "2026-04-25T21:24:00.000Z"
 progress:
   total_phases: 16
   completed_phases: 13
@@ -22,9 +22,9 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
-| Phase | Phase 5 — Image embed & search chat |
-| Status | **05-01 complete** (2026-04-24): `image_clip_embeddings` vec0 (512-cosine, `user_version` 5), upsert + list helpers, round-trip test — see `05-01-SUMMARY.md` |
-| Last activity | 2026-04-24 — Plan 05-01 executed: CLIP sqlite-vec migration and DB helpers (`4cc06f4`..`b1dbfe9`); next: 05-02 |
+| Phase | Phase 6 — Similarity & Stack UI |
+| Status | **UI-SPEC approved** (2026-04-25): `.planning/phases/06-similarity-stack-ui/06-UI-SPEC.md` |
+| Last activity | 2026-04-25 — UI design contract generated and verified; next: `/gsd-plan-phase 6` |
 
 ## Project Reference
 
