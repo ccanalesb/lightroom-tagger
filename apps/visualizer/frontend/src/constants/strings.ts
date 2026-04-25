@@ -276,6 +276,27 @@ export const FILTER_DESCRIPTION_SEARCH_ARIA =
 export const CATALOG_FILTER_COLOR_PLACEHOLDER = 'e.g. Red'
 export const CATALOG_FILTER_COLOR_ARIA = 'Color label'
 
+// Phase 06 — visual similarity & stack (SIM-02, STACK-03)
+export const CATALOG_SIMILAR_MORE_LIKE_THIS = 'More like this'
+export const CATALOG_STACK_SHOW = 'Show stack'
+export const CATALOG_STACK_HIDE = 'Hide stack'
+export const CATALOG_SIMILAR_SECTION_TITLE = 'Visually similar'
+export const CATALOG_SIMILAR_LOADING = 'Finding similar…'
+export const CATALOG_SIMILAR_EMPTY_HEADING = 'No close matches'
+export const CATALOG_SIMILAR_EMPTY_BODY =
+  'No other photos scored high enough in this model’s visual space. Try another photo or re-run the image embedding job if this catalog is new.'
+export const CATALOG_SIMILAR_NO_EMBED_TITLE = 'Visual similarity is unavailable'
+export const CATALOG_SIMILAR_NO_EMBED_BODY =
+  'This photo has no image embedding yet. Run the “Embed images” (or your product name for `batch_embed_image`) job, then try again.'
+export const CATALOG_SIMILAR_FETCH_ERROR = 'Couldn’t load similar photos'
+export const CATALOG_STACK_MEMBERS_ERROR = 'Couldn’t load stack members'
+export const CATALOG_STACK_MEMBERS_LOADING = 'Loading…'
+export const CATALOG_STACK_MEMBERS_REGION_ARIA = 'Stack members'
+
+export function formatStackCountBadge(n: number): string {
+  return `${n} in stack`
+}
+
 // Config
 export const ITEMS_PER_PAGE = 48
 

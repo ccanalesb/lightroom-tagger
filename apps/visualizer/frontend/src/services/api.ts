@@ -245,6 +245,57 @@ export const ConfigAPI = {
   },
 }
 
+/** Query params shared by catalog list and CLIP similar (backend mirrors filters). */
+export type CatalogListQueryParams = {
+  posted?: boolean
+  analyzed?: boolean | null
+  month?: string
+  keyword?: string
+  min_rating?: number
+  date_from?: string
+  date_to?: string
+  color_label?: string
+  description_search?: string
+  score_perspective?: string
+  min_score?: number
+  sort_by_score?: 'asc' | 'desc'
+  sort_by_date?: 'newest' | 'oldest'
+  limit?: number
+  offset?: number
+}
+
+function appendCatalogListSearchParams(
+  searchParams: URLSearchParams,
+  params: CatalogListQueryParams | undefined,
+) {
+  if (!params) return
+  if (params.posted !== undefined) {
+    searchParams.set('posted', params.posted ? 'true' : 'false')
+  }
+  if (params.analyzed === true) {
+    searchParams.set('analyzed', 'true')
+  } else if (params.analyzed === false) {
+    searchParams.set('analyzed', 'false')
+  }
+  if (params.month) searchParams.set('month', params.month)
+  if (params.keyword) searchParams.set('keyword', params.keyword)
+  if (params.min_rating !== undefined) {
+    searchParams.set('min_rating', String(params.min_rating))
+  }
+  if (params.date_from) searchParams.set('date_from', params.date_from)
+  if (params.date_to) searchParams.set('date_to', params.date_to)
+  if (params.color_label) searchParams.set('color_label', params.color_label)
+  if (params.description_search) {
+    searchParams.set('description_search', params.description_search)
+  }
+  if (params.score_perspective) searchParams.set('score_perspective', params.score_perspective)
+  if (params.min_score !== undefined) searchParams.set('min_score', String(params.min_score))
+  if (params.sort_by_score) searchParams.set('sort_by_score', params.sort_by_score)
+  if (params.sort_by_date) searchParams.set('sort_by_date', params.sort_by_date)
+  if (params.limit !== undefined) searchParams.set('limit', String(params.limit))
+  if (params.offset !== undefined) searchParams.set('offset', String(params.offset))
+}
+
 export const SystemAPI = {
   status: () =>
     request<{ status: string }>('/status'),
@@ -292,50 +343,9 @@ export const ImagesAPI = {
     request<{ months: string[] }>('/images/catalog/months'),
 
   /** Catalog browse; use listCatalog(params) with optional filters. */
-  listCatalog: (params?: {
-    posted?: boolean
-    analyzed?: boolean | null
-    month?: string
-    keyword?: string
-    min_rating?: number
-    date_from?: string
-    date_to?: string
-    color_label?: string
-    /** AI description text (FTS); separate from Lightroom ``keyword`` filter. */
-    description_search?: string
-    score_perspective?: string
-    min_score?: number
-    sort_by_score?: 'asc' | 'desc'
-    sort_by_date?: 'newest' | 'oldest'
-    limit?: number
-    offset?: number
-  }) => {
+  listCatalog: (params?: CatalogListQueryParams) => {
     const searchParams = new URLSearchParams()
-    if (params?.posted !== undefined) {
-      searchParams.set('posted', params.posted ? 'true' : 'false')
-    }
-    if (params?.analyzed === true) {
-      searchParams.set('analyzed', 'true')
-    } else if (params?.analyzed === false) {
-      searchParams.set('analyzed', 'false')
-    }
-    if (params?.month) searchParams.set('month', params.month)
-    if (params?.keyword) searchParams.set('keyword', params.keyword)
-    if (params?.min_rating !== undefined) {
-      searchParams.set('min_rating', String(params.min_rating))
-    }
-    if (params?.date_from) searchParams.set('date_from', params.date_from)
-    if (params?.date_to) searchParams.set('date_to', params.date_to)
-    if (params?.color_label) searchParams.set('color_label', params.color_label)
-    if (params?.description_search) {
-      searchParams.set('description_search', params.description_search)
-    }
-    if (params?.score_perspective) searchParams.set('score_perspective', params.score_perspective)
-    if (params?.min_score !== undefined) searchParams.set('min_score', String(params.min_score))
-    if (params?.sort_by_score) searchParams.set('sort_by_score', params.sort_by_score)
-    if (params?.sort_by_date) searchParams.set('sort_by_date', params.sort_by_date)
-    if (params?.limit !== undefined) searchParams.set('limit', String(params.limit))
-    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
+    appendCatalogListSearchParams(searchParams, params)
     const qs = searchParams.toString()
     return request<{ total: number; images: CatalogImage[] }>(
       `/images/catalog${qs ? `?${qs}` : ''}`
@@ -359,6 +369,22 @@ export const ImagesAPI = {
       `/images/${image_type}/${encodeURIComponent(image_key)}${qs}`,
     )
   },
+
+  /**
+   * CLIP visual neighbors for a catalog key (GET /images/catalog/.../similar).
+   * Reusable from Search in Phase 7; accepts the same filter query params as listCatalog.
+   */
+  getCatalogSimilar: (imageKey: string, params?: CatalogListQueryParams) => {
+    const searchParams = new URLSearchParams()
+    appendCatalogListSearchParams(searchParams, params)
+    const q = searchParams.toString()
+    return request<CatalogSimilarResponse>(
+      `/images/catalog/${encodeURIComponent(imageKey)}/similar${q ? `?${q}` : ''}`,
+    )
+  },
+
+  getStackMembers: (stackId: number) =>
+    request<{ items: CatalogImage[] }>(`/images/stacks/${stackId}/members`),
 
   chatSearch: (payload: ChatSearchRequest) =>
     request<ChatSearchResponse>('/images/chat-search', {
@@ -729,6 +755,9 @@ export interface IdentityBestPhotoItem {
   date_taken: string
   rating: number
   instagram_posted: boolean
+  stack_id?: number | null
+  stack_member_count?: number | null
+  is_stack_representative?: boolean | null
 }
 
 export interface IdentityBestPhotosMeta {
@@ -932,6 +961,20 @@ export interface CatalogImage {
   /** Present when catalog list was requested with score_perspective. */
   catalog_perspective_score?: number | null
   catalog_score_perspective?: string
+  /** Burst stack (06-01+); null when not in a stack. */
+  stack_id?: number | null
+  stack_member_count?: number | null
+  is_stack_representative?: boolean | null
+  /** From GET …/similar only (CLIP cosine-derived). */
+  similarity?: number
+  why_matched?: string
+  thumbnail_url?: string
+}
+
+export type CatalogSimilarResponse = {
+  images: CatalogImage[]
+  total: number
+  meta: { clip_model_id: string; clip_embed_dim: number }
 }
 
 /** OpenAI-style chat messages for tool-calling search (request + response). */
