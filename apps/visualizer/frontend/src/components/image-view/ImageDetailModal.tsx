@@ -1,11 +1,24 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import type { ImageView } from '../../services/api'
+import type { CatalogImage, ImageView } from '../../services/api'
 import { ImagesAPI } from '../../services/api'
 import { useBodyScrollLock, useFocusTrap } from '../../hooks'
-import { IMAGE_DETAILS_TITLE } from '../../constants/strings'
+import {
+  IMAGE_DETAILS_TITLE,
+  CATALOG_SIMILAR_MORE_LIKE_THIS,
+  CATALOG_SIMILAR_LOADING,
+  CATALOG_SIMILAR_SECTION_TITLE,
+  CATALOG_SIMILAR_EMPTY_HEADING,
+  CATALOG_SIMILAR_EMPTY_BODY,
+  CATALOG_SIMILAR_NO_EMBED_TITLE,
+  CATALOG_SIMILAR_NO_EMBED_BODY,
+  CATALOG_SIMILAR_FETCH_ERROR,
+} from '../../constants/strings'
+import { Button } from '../ui/Button/Button'
 import { CatalogImageDetailSections } from './CatalogImageDetailSections'
 import { InstagramImageDetailSections } from './InstagramImageDetailSections'
 import { ImageMetadataBadges, type PrimaryScoreSource } from './ImageMetadataBadges'
+import { ImageTile } from './ImageTile'
+import { fromCatalogListRow } from './adapters'
 import { ModalCloseButton } from './ModalCloseButton'
 import { ErrorBoundary, ErrorState, invalidate, invalidateAll, useQuery } from '../../data'
 
@@ -57,6 +70,108 @@ function ImageDetailModalFallback({
   )
 }
 
+function CatalogVisualSimilaritySection({ imageKey }: { imageKey: string }) {
+  const [loading, setLoading] = useState(false)
+  const [fetchError, setFetchError] = useState(false)
+  const [noEmbed, setNoEmbed] = useState(false)
+  const [empty, setEmpty] = useState(false)
+  const [items, setItems] = useState<CatalogImage[]>([])
+  const [similarOpen, setSimilarOpen] = useState<CatalogImage | null>(null)
+
+  const runSimilar = useCallback(() => {
+    setLoading(true)
+    setFetchError(false)
+    setNoEmbed(false)
+    setEmpty(false)
+    setItems([])
+    void ImagesAPI.getCatalogSimilar(imageKey, { limit: 24, offset: 0 })
+      .then((res) => {
+        if (res.images.length === 0) {
+          setEmpty(true)
+        } else {
+          setItems(res.images)
+        }
+      })
+      .catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e)
+        if (msg.includes('Visual similarity is unavailable')) {
+          setNoEmbed(true)
+        } else {
+          setFetchError(true)
+        }
+      })
+      .finally(() => setLoading(false))
+  }, [imageKey])
+
+  return (
+    <>
+      <div className="space-y-4 border-t border-border pt-6">
+        <Button
+          type="button"
+          variant="secondary"
+          size="md"
+          className="min-h-11 w-full sm:w-auto"
+          disabled={loading}
+          onClick={runSimilar}
+        >
+          {loading ? CATALOG_SIMILAR_LOADING : CATALOG_SIMILAR_MORE_LIKE_THIS}
+        </Button>
+        {loading && items.length === 0 && !fetchError && !noEmbed && !empty ? (
+          <p className="text-sm text-text-secondary" role="status">
+            {CATALOG_SIMILAR_LOADING}
+          </p>
+        ) : null}
+        {noEmbed ? (
+          <div className="space-y-1" role="alert">
+            <p className="text-sm font-semibold text-error">{CATALOG_SIMILAR_NO_EMBED_TITLE}</p>
+            <p className="text-sm text-text-secondary">{CATALOG_SIMILAR_NO_EMBED_BODY}</p>
+          </div>
+        ) : null}
+        {fetchError ? (
+          <p className="text-sm text-error" role="alert">
+            {CATALOG_SIMILAR_FETCH_ERROR}
+          </p>
+        ) : null}
+        {empty ? (
+          <div className="space-y-1">
+            <h3 className="text-card-title text-text">{CATALOG_SIMILAR_EMPTY_HEADING}</h3>
+            <p className="text-sm text-text-secondary">{CATALOG_SIMILAR_EMPTY_BODY}</p>
+          </div>
+        ) : null}
+        {items.length > 0 ? (
+          <div className="space-y-3">
+            <h3 className="text-card-title text-text">{CATALOG_SIMILAR_SECTION_TITLE}</h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+              {items.map((row) => (
+                <div key={row.key} className="min-w-0 space-y-1">
+                  <ImageTile
+                    image={fromCatalogListRow(row)}
+                    variant="grid"
+                    primaryScoreSource="catalog"
+                    onClick={() => setSimilarOpen(row)}
+                  />
+                  <p className="text-center text-xs text-text-secondary">
+                    {Math.round((row.similarity ?? 0) * 100)}%
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+      {similarOpen ? (
+        <ImageDetailModal
+          imageType="catalog"
+          imageKey={similarOpen.key}
+          initialImage={fromCatalogListRow(similarOpen)}
+          primaryScoreSource="catalog"
+          onClose={() => setSimilarOpen(null)}
+        />
+      ) : null}
+    </>
+  )
+}
+
 function ImageDetailModalBody({
   imageType,
   imageKey,
@@ -85,26 +200,33 @@ function ImageDetailModalBody({
   }, [detailKey])
 
   return (
-    <div className="grid gap-6 p-6 md:grid-cols-2">
-      <div className="aspect-square overflow-hidden rounded-base bg-surface">
-        <img
-          src={`/api/images/${imageType}/${encodeURIComponent(imageKey)}/thumbnail`}
-          alt={image?.filename ?? imageKey}
-          className="h-full w-full object-contain"
-        />
-      </div>
+    <>
+      <div className="grid gap-6 p-6 md:grid-cols-2">
+        <div className="aspect-square overflow-hidden rounded-base bg-surface">
+          <img
+            src={`/api/images/${imageType}/${encodeURIComponent(imageKey)}/thumbnail`}
+            alt={image?.filename ?? imageKey}
+            className="h-full w-full object-contain"
+          />
+        </div>
 
-      <div className="space-y-6">
-        <ImageMetadataBadges image={image} primaryScoreSource={primaryScoreSource} />
+        <div className="space-y-6">
+          <ImageMetadataBadges image={image} primaryScoreSource={primaryScoreSource} />
 
-        {image.image_type === 'catalog' ? (
-          <CatalogImageDetailSections image={image} onDataChanged={handleDataChanged} />
-        ) : null}
-        {image.image_type === 'instagram' ? (
-          <InstagramImageDetailSections image={image} onDataChanged={handleDataChanged} />
-        ) : null}
+          {image.image_type === 'catalog' ? (
+            <CatalogImageDetailSections image={image} onDataChanged={handleDataChanged} />
+          ) : null}
+          {image.image_type === 'instagram' ? (
+            <InstagramImageDetailSections image={image} onDataChanged={handleDataChanged} />
+          ) : null}
+        </div>
       </div>
-    </div>
+      {image.image_type === 'catalog' ? (
+        <div className="px-6 pb-6">
+          <CatalogVisualSimilaritySection imageKey={imageKey} />
+        </div>
+      ) : null}
+    </>
   )
 }
 
