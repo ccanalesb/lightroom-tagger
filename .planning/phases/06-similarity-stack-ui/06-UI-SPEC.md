@@ -1,12 +1,12 @@
 ---
-phase: 6
+
+## phase: 6
 slug: 06-similarity-stack-ui
 status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-04-25
 reviewed: 2026-04-25
----
 
 # Phase 6 — UI Design Contract
 
@@ -20,13 +20,15 @@ reviewed: 2026-04-25
 
 ## Design System
 
-| Property | Value |
-|----------|-------|
-| Tool | none |
-| Preset | not applicable |
-| Component library | none (custom `Card`, `Button`, `Badge`, `ImageTile` — no shadcn / Radix) |
-| Icon library | None — use text labels for affordances, or existing inline patterns only (no new icon package) |
-| Font | Inter (`tailwind.config.js` `fontFamily.sans`); per DESIGN.md scale |
+
+| Property          | Value                                                                                          |
+| ----------------- | ---------------------------------------------------------------------------------------------- |
+| Tool              | none                                                                                           |
+| Preset            | not applicable                                                                                 |
+| Component library | none (custom `Card`, `Button`, `Badge`, `ImageTile` — no shadcn / Radix)                       |
+| Icon library      | None — use text labels for affordances, or existing inline patterns only (no new icon package) |
+| Font              | Inter (`tailwind.config.js` `fontFamily.sans`); per DESIGN.md scale                            |
+
 
 ---
 
@@ -34,16 +36,18 @@ reviewed: 2026-04-25
 
 Declared values (multiples of 4). Use Tailwind numeric spacing (`gap-2`, `p-4`, `space-y-4`, etc.); **8px base** per DESIGN.md §6.
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| xs | 4px | Inline gaps in badge stacks, tight thumb metadata (`gap-1`) |
-| sm | 8px | Overlay cluster (`right-2 top-2`), between stack badge and posted badge, strip gaps (`gap-2`) |
-| sm+ | 12px | Expanded stack strip gutters when `gap-3` gives better thumbnail rhythm |
-| md | 16px | Default card/section padding, grid `gap-4` between tiles |
-| lg | 24px | Section separation, expanded stack strip padding |
-| xl | 32px | Page-level blocks when adding a new “similarity results” region |
-| 2xl | 48px | (Reserved) |
-| 3xl | 64px | (Reserved) |
+
+| Token | Value | Usage                                                                                         |
+| ----- | ----- | --------------------------------------------------------------------------------------------- |
+| xs    | 4px   | Inline gaps in badge stacks, tight thumb metadata (`gap-1`)                                   |
+| sm    | 8px   | Overlay cluster (`right-2 top-2`), between stack badge and posted badge, strip gaps (`gap-2`) |
+| sm+   | 12px  | Expanded stack strip gutters when `gap-3` gives better thumbnail rhythm                       |
+| md    | 16px  | Default card/section padding, grid `gap-4` between tiles                                      |
+| lg    | 24px  | Section separation, expanded stack strip padding                                              |
+| xl    | 32px  | Page-level blocks when adding a new “similarity results” region                               |
+| 2xl   | 48px  | (Reserved)                                                                                    |
+| 3xl   | 64px  | (Reserved)                                                                                    |
+
 
 **Exceptions:** **44px minimum height** for standalone tap targets (e.g. "Show stack" / "More like this" as full-width or `min-h-11` row buttons on touch-first layouts). **ImageTile** overlay: keep `right-2 top-2` (8px) for badges — existing pattern.
 
@@ -53,12 +57,14 @@ Declared values (multiples of 4). Use Tailwind numeric spacing (`gap-2`, `p-4`, 
 
 **Weights (exactly two for new copy):** **400** (regular) and **600** (semibold). Align with `05-UI-SPEC` / Identity phase: new labels use `font-semibold`, not `font-medium`.
 
-| Role | Size | Weight | Line Height |
-|------|------|--------|-------------|
-| Body | 14px (`text-sm`) | 400 | 1.5 (default) |
-| Label / meta | 12px (`text-xs`) | 600 | 1.4 |
-| Section heading (in card/modal) | 22px (`text-card-title`) | 600 | 1.27 (theme) |
-| Display (page / modal title) | Per existing page | 600 | per DESIGN.md |
+
+| Role                            | Size                     | Weight | Line Height   |
+| ------------------------------- | ------------------------ | ------ | ------------- |
+| Body                            | 14px (`text-sm`)         | 400    | 1.5 (default) |
+| Label / meta                    | 12px (`text-xs`)         | 600    | 1.4           |
+| Section heading (in card/modal) | 22px (`text-card-title`) | 600    | 1.27 (theme)  |
+| Display (page / modal title)    | Per existing page        | 600    | per DESIGN.md |
+
 
 - Stack count **badge** text: 12px `text-xs`, weight **600** (match `Badge` contract in DESIGN.md; use `font-semibold` if extending badge styles).
 - Similarity **score** or distance meta under thumbnails: 12px `text-xs` `text-text-secondary`, weight 400.
@@ -70,13 +76,15 @@ Declared values (multiples of 4). Use Tailwind numeric spacing (`gap-2`, `p-4`, 
 
 **Contract:** Use CSS variables via Tailwind semantic classes — `bg-bg`, `bg-surface`, `text-text`, `text-text-secondary`, `text-text-tertiary`, `border-border`, `text-accent`, `bg-accent`, `text-success`, `text-error` — **never raw hex in components.** Narrative reference only: DESIGN.md §2.
 
-| Role | Semantic | Usage |
-|------|----------|-------|
-| Dominant (60%) | `bg-bg` | Page and modal backdrops |
-| Secondary (30%) | `bg-surface`, `border-border`, `shadow-card` | `ImageTile` / `Card` surfaces, expanded stack strip, similarity results container |
-| Accent (10%) | `text-accent`, `bg-accent` (buttons), `ring-accent` on focus | Primary actions: **More like this**, **Show stack** (when styled as primary), focus rings, links |
-| Destructive | `text-error` | API failures, missing-embedding errors (`role="alert"`) |
-| Non-destructive emphasis | `Badge` variants | Stack count: `default` or `accent` (pick one and use consistently in Catalog + Best Photos); do not use `success` for stack (reserve `success` for **Posted** / positive states) |
+
+| Role                     | Semantic                                                     | Usage                                                                                                                                                                            |
+| ------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dominant (60%)           | `bg-bg`                                                      | Page and modal backdrops                                                                                                                                                         |
+| Secondary (30%)          | `bg-surface`, `border-border`, `shadow-card`                 | `ImageTile` / `Card` surfaces, expanded stack strip, similarity results container                                                                                                |
+| Accent (10%)             | `text-accent`, `bg-accent` (buttons), `ring-accent` on focus | Primary actions: **More like this**, **Show stack** (when styled as primary), focus rings, links                                                                                 |
+| Destructive              | `text-error`                                                 | API failures, missing-embedding errors (`role="alert"`)                                                                                                                          |
+| Non-destructive emphasis | `Badge` variants                                             | Stack count: `default` or `accent` (pick one and use consistently in Catalog + Best Photos); do not use `success` for stack (reserve `success` for **Posted** / positive states) |
+
 
 **Accent reserved for:** Interactive control states for similarity and stack actions, focus rings, and the active/hover state of those controls — **not** for static metadata that is not clickable.
 
@@ -86,26 +94,30 @@ Declared values (multiples of 4). Use Tailwind numeric spacing (`gap-2`, `p-4`, 
 
 ## Copywriting Contract
 
-| Element | Copy |
-|---------|------|
-| Primary CTA (similarity) | **More like this** — action that runs CLIP visual similarity for the current catalog image (button label; store in `constants/strings.ts` e.g. `CATALOG_SIMILAR_MORE_LIKE_THIS`). |
-| Stack affordance (expand) | **Show stack** (collapsed) / **Hide stack** (expanded) — text buttons, no icon dependency (e.g. `CATALOG_STACK_SHOW` / `CATALOG_STACK_HIDE`). |
-| Section heading (similarity results) | **Visually similar** — `h3` with `text-card-title` (or `text-sm font-semibold` if nested in a compact modal sub-section; stay consistent with one chosen pattern in Catalog + detail modal). |
-| Stack badge (count only, short) | **{n} in stack** — e.g. `3 in stack` for `stack_member_count` when `> 1` and `is_stack_representative` (e.g. `CATALOG_STACK_COUNT_BADGE` with `format`). If `stack_member_count === 1`, omit badge (solo image). |
-| Empty state — no similar images (API OK, zero results) | Heading: **No close matches** · Body: **No other photos scored high enough in this model’s visual space. Try another photo or re-run the image embedding job if this catalog is new.** |
-| Error — missing image embedding | **Visual similarity is unavailable** · **This photo has no image embedding yet. Run the “Embed images” (or your product name for `batch_embed_image`) job, then try again.** |
-| Error — generic fetch failure | **Couldn’t load similar photos** · **Check your connection and try again.** (reuse or align with existing API error one-liner pattern) |
-| Error — members fetch | **Couldn’t load stack members** · **Try again.** |
-| Destructive confirmation | *None* — this phase has no delete/split/merge. |
+
+| Element                                                | Copy                                                                                                                                                                                                             |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Primary CTA (similarity)                               | **More like this** — action that runs CLIP visual similarity for the current catalog image (button label; store in `constants/strings.ts` e.g. `CATALOG_SIMILAR_MORE_LIKE_THIS`).                                |
+| Stack affordance (expand)                              | **Show stack** (collapsed) / **Hide stack** (expanded) — text buttons, no icon dependency (e.g. `CATALOG_STACK_SHOW` / `CATALOG_STACK_HIDE`).                                                                    |
+| Section heading (similarity results)                   | **Visually similar** — `h3` with `text-card-title` (or `text-sm font-semibold` if nested in a compact modal sub-section; stay consistent with one chosen pattern in Catalog + detail modal).                     |
+| Stack badge (count only, short)                        | **{n} in stack** — e.g. `3 in stack` for `stack_member_count` when `> 1` and `is_stack_representative` (e.g. `CATALOG_STACK_COUNT_BADGE` with `format`). If `stack_member_count === 1`, omit badge (solo image). |
+| Empty state — no similar images (API OK, zero results) | Heading: **No close matches** · Body: **No other photos scored high enough in this model’s visual space. Try another photo or re-run the image embedding job if this catalog is new.**                           |
+| Error — missing image embedding                        | **Visual similarity is unavailable** · **This photo has no image embedding yet. Run the “Embed images” (or your product name for `batch_embed_image`) job, then try again.**                                     |
+| Error — generic fetch failure                          | **Couldn’t load similar photos** · **Check your connection and try again.** (reuse or align with existing API error one-liner pattern)                                                                           |
+| Error — members fetch                                  | **Couldn’t load stack members** · **Try again.**                                                                                                                                                                 |
+| Destructive confirmation                               | *None* — this phase has no delete/split/merge.                                                                                                                                                                   |
+
 
 ---
 
 ## Registry Safety
 
-| Registry | Blocks Used | Safety Gate |
-|----------|-------------|-------------|
-| shadcn official | — | not applicable |
-| Third-party | — | not applicable |
+
+| Registry        | Blocks Used | Safety Gate    |
+| --------------- | ----------- | -------------- |
+| shadcn official | —           | not applicable |
+| Third-party     | —           | not applicable |
+
 
 **No new UI dependencies** required for this contract.
 
@@ -115,13 +127,15 @@ Declared values (multiples of 4). Use Tailwind numeric spacing (`gap-2`, `p-4`, 
 
 Types and field names for planner/executor; **stack IDs and flags stay generic** (D-04).
 
-| Field / concept | Use |
-|-------------------|-----|
-| `stack_id` | Opaque id for expand/members API |
-| `stack_member_count` | Shown in badge; drives Show stack visibility when `> 1` |
+
+| Field / concept           | Use                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stack_id`                | Opaque id for expand/members API                                                                                                                                                                                                                                                                                                                     |
+| `stack_member_count`      | Shown in badge; drives Show stack visibility when `> 1`                                                                                                                                                                                                                                                                                              |
 | `is_stack_representative` | Representative row shows badge + expand; **non-representative** members follow **list-collapse** decision in PLAN (hide from primary grid or show with badge only — UI-SPEC requires **one representative tile per stack** in default **Catalog and Best Photos grids**; non-reps excluded from the primary list unless PLAN documents an exception) |
-| Similarity result row | Reuse catalog image DTO + optional **similarity** in `0..1` (or documented score field) for optional `text-xs` meta under tile |
-| Seed exclusion | Never show the seed image in its own "similar" list |
+| Similarity result row     | Reuse catalog image DTO + optional **similarity** in `0..1` (or documented score field) for optional `text-xs` meta under tile                                                                                                                                                                                                                       |
+| Seed exclusion            | Never show the seed image in its own "similar" list                                                                                                                                                                                                                                                                                                  |
+
 
 Reusable plumbing: `ImagesAPI` (or equivalent) method callable from Catalog now and from Search in Phase 7 without chat-specific args.
 
@@ -135,7 +149,7 @@ Reusable plumbing: `ImagesAPI` (or equivalent) method callable from Catalog now 
 
 1. **Representative row:** For each catalog/best-photos item with `is_stack_representative === true` and `stack_member_count > 1`, render a **count badge** in `ImageTile` `overlayBadges` (after Posted if both apply: column `gap-1` in overlay) using `Badge` and **{n} in stack** copy.
 2. **Expand:** A **Show stack** control lives in the **tile footer** or **metadata row** (match existing `ImageTile` footer pattern — discretion: same placement in Catalog and Best Photos). Clicking it **toggles** expanded state, calls members endpoint **once** per open (cache in component state; close on navigation if needed).
-3. **Expanded content:** A **horizontal strip** of member thumbnails below the representative row (full width of the grid cell), `gap-2` or `gap-3`, `ImageTile` at **reduced** visual weight (e.g. smaller width via grid column or `max-w-*`) **or** same tile size if grid already constrains — must not break pagination shell. Members use the same `ImageTile` component; **do not** show a second "in stack" badge on every member; optional tiny label "Member" is **out** — keep clean.
+3. **Expanded content:** A **horizontal strip** of member thumbnails below the representative row (full width of the grid cell), `gap-2` or `gap-3`, `ImageTile` at **reduced** visual weight (e.g. smaller width via grid column or `max-w-`*) **or** same tile size if grid already constrains — must not break pagination shell. Members use the same `ImageTile` component; **do not** show a second "in stack" badge on every member; optional tiny label "Member" is **out** — keep clean.
 4. **Collapse semantics:** **Default** grid shows **at most one tile per stack** (representative). Non-representative members appear **only** inside expanded strip or a dedicated members fetch — not as duplicate top-level rows (aligns with STACK-03 and RESEARCH assumption A1; pagination totals are a PLAN/executor concern with explicit `total` semantics).
 5. **Loading:** While members load, show **skeleton** or `text-sm text-text-secondary` **Loading…** in the expanded area only (not full-page).
 
@@ -143,7 +157,7 @@ Reusable plumbing: `ImagesAPI` (or equivalent) method callable from Catalog now 
 
 1. **Entry:** **More like this** `Button` (secondary or `variant` consistent with `Button` in DESIGN.md) on **ImageDetailModal** and/or catalog card context **per implementation discretion** — at minimum **one** discoverable path from the catalog image detail flow.
 2. **Behavior:** Triggers similar-image API (CLIP-only). On success, render **Visually similar** section with a responsive grid of `ImageTile` (same gaps as catalog grid: `gap-4` in container).
-3. **Meta:** If API returns a score, show under tile as **\~NN%** or **0.00–1.00** in `text-xs text-text-secondary` (one format, chosen in implementation).
+3. **Meta:** If API returns a score, show under tile as **NN%** or **0.00–1.00** in `text-xs text-text-secondary` (one format, chosen in implementation).
 4. **Loading:** Button shows loading state (disabled + **Finding similar…** or spinner pattern consistent with other async actions in app).
 5. **Degradation:** If embeddings missing, show **Error — missing image embedding** copy above; no half-empty grid.
 
@@ -155,16 +169,18 @@ Reusable plumbing: `ImagesAPI` (or equivalent) method callable from Catalog now 
 
 ## Component inventory (this phase)
 
-| Component / area | Responsibility |
-|------------------|------------------|
-| `ImageTile` | Badges, footer slot for stack/similarity affordances (extend props only as needed) |
-| `Badge` | Stack count; Posted unchanged |
-| `Button` | More like this, Show stack / Hide stack |
-| `Card` | Optional wrapper for "Visually similar" block inside modal or page |
-| `CatalogTab` | Stack display + similar flow wiring |
-| `BestPhotosGrid` | Stack display + same expand pattern as Catalog |
-| `ImageDetailModal` | "More like this" + results section |
-| `constants/strings.ts` | All user-facing strings in Copywriting table |
+
+| Component / area       | Responsibility                                                                     |
+| ---------------------- | ---------------------------------------------------------------------------------- |
+| `ImageTile`            | Badges, footer slot for stack/similarity affordances (extend props only as needed) |
+| `Badge`                | Stack count; Posted unchanged                                                      |
+| `Button`               | More like this, Show stack / Hide stack                                            |
+| `Card`                 | Optional wrapper for "Visually similar" block inside modal or page                 |
+| `CatalogTab`           | Stack display + similar flow wiring                                                |
+| `BestPhotosGrid`       | Stack display + same expand pattern as Catalog                                     |
+| `ImageDetailModal`     | "More like this" + results section                                                 |
+| `constants/strings.ts` | All user-facing strings in Copywriting table                                       |
+
 
 ---
 
@@ -179,12 +195,12 @@ Reusable plumbing: `ImagesAPI` (or equivalent) method callable from Catalog now 
 
 ## Checker Sign-Off
 
-- [x] Dimension 1 Copywriting: PASS
-- [x] Dimension 2 Visuals: PASS with non-blocking hierarchy note addressed
-- [x] Dimension 3 Color: PASS
-- [x] Dimension 4 Typography: PASS
-- [x] Dimension 5 Spacing: PASS
-- [x] Dimension 6 Registry Safety: PASS
+- Dimension 1 Copywriting: PASS
+- Dimension 2 Visuals: PASS with non-blocking hierarchy note addressed
+- Dimension 3 Color: PASS
+- Dimension 4 Typography: PASS
+- Dimension 5 Spacing: PASS
+- Dimension 6 Registry Safety: PASS
 
 **Approval:** approved
 
