@@ -1058,6 +1058,8 @@ export type ChatSearchRequest = {
   provider_id?: string
   model?: string
   score_perspective?: string
+  /** CLIP-similar candidate set for intersection-first chat search (NLS-06). */
+  pinned_image_key?: string
 }
 
 export type ChatSearchResultImage = CatalogImage & {

@@ -67,6 +67,8 @@ export function SearchPage() {
   const [errorText, setErrorText] = useState<string | null>(null)
   const [currentImages, setCurrentImages] = useState<ChatSearchResultImage[]>([])
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null)
+  const [pinnedImageKey, setPinnedImageKey] = useState<string | null>(null)
+  const [pinSimilarityWarning, setPinSimilarityWarning] = useState<string | null>(null)
   const threadRef = useRef<HTMLDivElement>(null)
 
   const [allModels, setAllModels] = useState<DescriptionModel[]>([])
@@ -170,6 +172,8 @@ export function SearchPage() {
     setErrorText(null)
     setStatus('idle')
     setInput('')
+    setPinnedImageKey(null)
+    setPinSimilarityWarning(null)
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -189,10 +193,30 @@ export function SearchPage() {
         limit: 50,
         provider_id: resolvedModel?.provider_id,
         model: resolvedModel?.model_id,
+        ...(pinnedImageKey ? { pinned_image_key: pinnedImageKey } : {}),
       })
       const assistantText =
-        data.assistant_message ?? `Found ${data.total} result(s) (${data.search_mode}).`
+        data.assistant_message ||
+        (data.total === 0
+          ? "I couldn't find any photos matching that. Try rephrasing or a broader query."
+          : `Found ${data.total} result(s).`)
       setCurrentImages(data.images)
+      const meta = data.metadata as
+        | { pin_state?: string; fallback_reason?: string }
+        | null
+        | undefined
+      if (meta?.pin_state === 'inactive' && meta.fallback_reason) {
+        const fr = meta.fallback_reason
+        setPinSimilarityWarning(
+          fr === 'no_clip_embedding'
+            ? 'CLIP embedding missing for pinned image'
+            : fr === 'invalid_pin_key'
+              ? 'Pinned image is no longer in the catalog'
+              : fr,
+        )
+      } else {
+        setPinSimilarityWarning(null)
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -375,15 +399,57 @@ export function SearchPage() {
             </div>
           ) : (
             <div className="transition-opacity duration-150">
+              {pinnedImageKey ? (
+                <p className="text-xs text-text-secondary mb-2">
+                  Pinned to{' '}
+                  <span className="font-medium text-text">
+                    {currentImages.find((i) => i.key === pinnedImageKey)?.filename ??
+                      pinnedImageKey}
+                  </span>
+                </p>
+              ) : null}
+              {pinSimilarityWarning ? (
+                <p
+                  role="status"
+                  className="text-xs text-amber-600 dark:text-amber-400 mb-2"
+                >
+                  Similarity pin inactive: {pinSimilarityWarning}. Results use your full catalog.
+                </p>
+              ) : null}
               <TileGrid>
                 {currentImages.map((image) => (
-                  <ImageTile
+                  <div
                     key={image.id != null ? String(image.id) : image.key}
-                    image={fromCatalogListRow(image)}
-                    variant="grid"
-                    primaryScoreSource="catalog"
-                    onClick={() => setSelectedImage({ key: image.key, initial: image })}
-                  />
+                    className="relative"
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={pinnedImageKey === image.key}
+                      aria-label={
+                        pinnedImageKey === image.key
+                          ? 'Unpin image'
+                          : 'Pin image for similarity search'
+                      }
+                      className={
+                        'absolute top-1 right-1 z-10 rounded border px-1.5 py-0.5 text-[10px] font-medium shadow-sm ' +
+                        (pinnedImageKey === image.key
+                          ? 'border-primary bg-primary/15 text-primary'
+                          : 'border-border bg-surface/95 text-text-secondary hover:text-text')
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setPinnedImageKey((prev) => (prev === image.key ? null : image.key))
+                      }}
+                    >
+                      {pinnedImageKey === image.key ? 'Pinned' : 'Pin'}
+                    </button>
+                    <ImageTile
+                      image={fromCatalogListRow(image)}
+                      variant="grid"
+                      primaryScoreSource="catalog"
+                      onClick={() => setSelectedImage({ key: image.key, initial: image })}
+                    />
+                  </div>
                 ))}
               </TileGrid>
             </div>
