@@ -20,6 +20,7 @@ from lightroom_tagger.core.description_service import (
 )
 from lightroom_tagger.core.analyzer import get_vision_model
 from lightroom_tagger.core.database import (
+    catalog_key_is_primary_grid_row,
     delete_matches_for_insta_key,
     get_image_description,
     get_instagram_by_date_filter,
@@ -91,6 +92,10 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         'matched': 0,
         'skipped': 0,
         'descriptions_generated': 0,
+        'non_representative_candidates_filtered': 0,
+        'stack_members_applied': 0,
+        'stack_members_skipped_conflicts': 0,
+        'stack_members_skipped_other': 0,
     }
     matches_found = []
 
@@ -142,6 +147,21 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                 c for c in candidates
                 if (c.get('key'), media_key) not in rejected
             ]
+
+        before_rep_filter = len(candidates)
+        candidates = [
+            c for c in candidates
+            if c.get('key') and catalog_key_is_primary_grid_row(db, c['key'])
+        ]
+        removed_nr = before_rep_filter - len(candidates)
+        if removed_nr:
+            stats['non_representative_candidates_filtered'] += removed_nr
+            if log_callback:
+                log_callback(
+                    'info',
+                    f'[{media_key}] Representative-only: dropped {removed_nr} non-representative '
+                    f'catalog candidate(s) ({before_rep_filter} → {len(candidates)})',
+                )
 
         if log_callback and idx <= 3:
             log_callback('debug', f'[{media_key}] Found {initial_candidate_count} candidates by date, {len(candidates)} after filters')

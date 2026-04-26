@@ -539,6 +539,12 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 batch_progress_callback=batch_progress_callback,
             )
 
+            log_callback(
+                'info',
+                'Matching summary: non-representative catalog candidates filtered (cumulative) = '
+                f"{stats.get('non_representative_candidates_filtered', 0)}",
+            )
+
             if runner.is_cancelled(job_id):
                 runner.finalize_cancelled(job_id)
                 return
