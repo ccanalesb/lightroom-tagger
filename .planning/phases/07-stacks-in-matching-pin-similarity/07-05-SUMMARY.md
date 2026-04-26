@@ -21,7 +21,7 @@ completed: "2026-04-26"
 | 1 | `ad989d9` | test(07-05): stack matching integration and MatchesTab status |
 | 2 | `63b1712` | test(07-05): SearchPage pin-flow integration tests |
 | 3 | `c8c96e0` | docs(07-05): phase 7 verification matrix |
-| 4 | *(this commit)* | docs(07-05): plan 05 summary |
+| 4 | `03258e5` | docs(07-05): plan 05 summary |
 
 ## Files
 
