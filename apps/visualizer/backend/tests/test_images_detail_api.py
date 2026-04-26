@@ -130,6 +130,53 @@ def test_detail_catalog_returns_identity_and_available_perspectives(detail_clien
     assert data["catalog_perspective_score"] is None
     assert data["catalog_score_perspective"] is None
 
+    # Solo image: stack columns match catalog list row shape (Phase 07 detail parity).
+    assert data["stack_id"] is None
+    assert data["stack_member_count"] is None
+    assert data["is_stack_representative"] is False
+
+
+def test_detail_catalog_stack_fields_for_multi_member_stack(tmp_path, monkeypatch):
+    db_path = str(tmp_path / "library.db")
+    conn = init_database(db_path)
+    k_rep = store_image(
+        conn,
+        {"date_taken": "2024-01-01", "filename": "rep.jpg", "rating": 1},
+    )
+    k_mem = store_image(
+        conn,
+        {"date_taken": "2024-01-02", "filename": "mem.jpg", "rating": 1},
+    )
+    conn.execute(
+        "INSERT INTO image_stacks (representative_key, stack_size, user_modified) "
+        "VALUES (?, ?, 0)",
+        (k_rep, 2),
+    )
+    sid = int(conn.execute("SELECT last_insert_rowid() AS x").fetchone()["x"])
+    conn.execute(
+        "INSERT INTO image_stack_members (stack_id, image_key) VALUES (?, ?)",
+        (sid, k_rep),
+    )
+    conn.execute(
+        "INSERT INTO image_stack_members (stack_id, image_key) VALUES (?, ?)",
+        (sid, k_mem),
+    )
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setattr("utils.db.LIBRARY_DB", db_path)
+    client = create_app().test_client()
+
+    rep_payload = client.get(f"/api/images/catalog/{k_rep}").get_json()
+    mem_payload = client.get(f"/api/images/catalog/{k_mem}").get_json()
+
+    assert rep_payload["stack_id"] == sid
+    assert rep_payload["stack_member_count"] == 2
+    assert rep_payload["is_stack_representative"] is True
+    assert mem_payload["stack_id"] == sid
+    assert mem_payload["stack_member_count"] == 2
+    assert mem_payload["is_stack_representative"] is False
+
 
 def test_detail_catalog_with_score_perspective_query(detail_client):
     client, catalog_key, s0, _ = detail_client

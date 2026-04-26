@@ -32,6 +32,7 @@ from lightroom_tagger.core.database import (
     StackMutationError,
     _deserialize_row,
     build_description_fts_query,
+    catalog_image_stack_row_fields,
     get_image,
     get_image_description,
     get_instagram_dump_media,
@@ -1026,6 +1027,8 @@ def post_stack_split_member(db, stack_id: int):
     except StackMutationError as e:
         if e.status_code == 404:
             return error_not_found("stack")
+        if e.status_code >= 500:
+            return error_server_error(str(e))
         return error_bad_request(str(e))
     except Exception as e:
         return error_server_error(str(e))
@@ -1054,6 +1057,8 @@ def post_stack_merge(db, target_stack_id: int):
     except StackMutationError as e:
         if e.status_code == 404:
             return error_not_found("stack")
+        if e.status_code >= 500:
+            return error_server_error(str(e))
         return error_bad_request(str(e))
     except Exception as e:
         return error_server_error(str(e))
@@ -1078,6 +1083,8 @@ def post_stack_representative(db, stack_id: int):
     except StackMutationError as e:
         if e.status_code == 404:
             return error_not_found("stack")
+        if e.status_code >= 500:
+            return error_server_error(str(e))
         return error_bad_request(str(e))
     except Exception as e:
         return error_server_error(str(e))
@@ -1775,6 +1782,8 @@ def _build_catalog_detail(db, image_key, score_perspective):
         out["id"] = int(rid)
     else:
         out["id"] = None
+
+    out.update(catalog_image_stack_row_fields(db, image_key))
 
     return out, False
 

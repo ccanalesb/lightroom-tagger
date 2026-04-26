@@ -1690,6 +1690,38 @@ def stack_metadata_for_api(db: sqlite3.Connection, stack_id: int) -> dict | None
     }
 
 
+def catalog_image_stack_row_fields(db: sqlite3.Connection, image_key: str) -> dict:
+    """Stack columns aligned with catalog list / by-keys rows for detail API parity.
+
+    Non-members and solo images return ``stack_id`` / ``stack_member_count`` as
+    ``None`` and ``is_stack_representative`` false.
+    """
+    row = db.execute(
+        """
+        SELECT st.stack_id AS stack_id, st.stack_size AS stack_member_count,
+        CASE WHEN st.stack_id IS NOT NULL AND i.key = st.representative_key
+             THEN 1 ELSE 0 END AS is_stack_representative
+        FROM images i
+        LEFT JOIN image_stack_members AS m_st ON m_st.image_key = i.key
+        LEFT JOIN image_stacks AS st ON st.stack_id = m_st.stack_id
+        WHERE i.key = ?
+        """,
+        (image_key,),
+    ).fetchone()
+    if not row or row["stack_id"] is None:
+        return {
+            "stack_id": None,
+            "stack_member_count": None,
+            "is_stack_representative": False,
+        }
+    smc = row["stack_member_count"]
+    return {
+        "stack_id": int(row["stack_id"]),
+        "stack_member_count": int(smc) if smc is not None else None,
+        "is_stack_representative": bool(row["is_stack_representative"]),
+    }
+
+
 def stack_split_member_out(
     db: sqlite3.Connection, stack_id: int, image_key: str
 ) -> dict:
