@@ -307,3 +307,140 @@ def test_match_dump_media_stack_apply_skips_conflicting_member(
     ).fetchone()
     assert row_ok is not None
     db.close()
+
+
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False)
+@patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
+def test_match_dump_media_stack_apply_reaches_all_non_conflict_members(
+    mock_score, _describe_matched, _describe_insta, tmp_path,
+):
+    """When no member conflicts, stack-wide apply persists one row per non-rep member."""
+    from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
+
+    db_path = tmp_path / 'lib.db'
+    db = init_database(str(db_path))
+
+    def _img(name: str, dt: str) -> str:
+        p = tmp_path / name
+        p.write_bytes(b'')
+        return store_image(
+            db,
+            {
+                'filename': name,
+                'filepath': str(p),
+                'date_taken': dt,
+                'instagram_posted': False,
+            },
+        )
+
+    rep_key = _img('a.jpg', '2026-03-10T12:00:00')
+    m1 = _img('b.jpg', '2026-03-11T12:00:00')
+    m2 = _img('c.jpg', '2026-03-12T12:00:00')
+
+    db.execute(
+        'INSERT INTO image_stacks (representative_key, stack_size, user_modified) '
+        'VALUES (?, ?, 0)',
+        (rep_key, 3),
+    )
+    sid_row = db.execute('SELECT last_insert_rowid() AS id').fetchone()
+    sid = int(sid_row['id'])
+    for k in (rep_key, m1, m2):
+        db.execute(
+            'INSERT INTO image_stack_members (stack_id, image_key) VALUES (?, ?)',
+            (sid, k),
+        )
+    db.commit()
+
+    ig_path = tmp_path / 'ig_stack.jpg'
+    ig_path.write_bytes(b'')
+    store_instagram_dump_media(
+        db,
+        {
+            'media_key': 'ig_stack',
+            'file_path': str(ig_path),
+            'filename': 'ig_stack.jpg',
+            'date_folder': '202603',
+            'caption': '',
+            'created_at': '2026-03-15T12:00:00',
+        },
+    )
+
+    mock_score.side_effect = lambda _db, dump_image, _vc, **kw: [
+        _score_template_row(rep_key, dump_image['key']),
+    ]
+
+    stats, matches = match_dump_media(
+        db,
+        threshold=0.5,
+        media_key='ig_stack',
+        skip_undescribed=True,
+    )
+
+    assert stats['stack_members_applied'] == 2
+    assert stats['stack_members_skipped_conflicts'] == 0
+    lr_keys = matches[0].get('_lightroom_catalog_keys') or []
+    assert set(lr_keys) == {rep_key, m1, m2}
+
+    for ck in (m1, m2):
+        assert db.execute(
+            'SELECT 1 FROM matches WHERE catalog_key = ? AND insta_key = ?',
+            (ck, 'ig_stack'),
+        ).fetchone()
+    db.close()
+
+
+@patch('database.add_job_log')
+@patch('jobs.handlers.match_dump_media')
+@patch('jobs.handlers.init_database')
+@patch('jobs.handlers.load_config')
+@patch('jobs.handlers.update_job_field')
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
+@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+def test_handle_vision_match_result_payload_includes_stack_apply_counts(
+    mock_getenv,
+    mock_require,
+    mock_update_field,
+    mock_config,
+    mock_init_db,
+    mock_match,
+    _mock_add_log,
+):
+    from jobs.handlers import handle_vision_match
+
+    mock_config.return_value = MagicMock(
+        vision_model='gemma3:27b',
+        match_threshold=0.7,
+        phash_weight=0.4,
+        desc_weight=0.3,
+        vision_weight=0.3,
+        ollama_host='http://localhost:11434',
+        catalog_path=None,
+        small_catalog_path=None,
+    )
+    mock_match.return_value = (
+        {
+            'processed': 1,
+            'matched': 1,
+            'skipped': 0,
+            'descriptions_generated': 0,
+            'non_representative_candidates_filtered': 0,
+            'stack_members_applied': 2,
+            'stack_members_skipped_conflicts': 1,
+            'stack_members_skipped_other': 0,
+        },
+        [],
+    )
+    mock_init_db.return_value = MagicMock()
+
+    runner = MagicMock()
+    runner.db = MagicMock()
+    runner.is_cancelled.return_value = False
+
+    handle_vision_match(runner, 'job-stack', {})
+
+    runner.complete_job.assert_called()
+    _jid, payload = runner.complete_job.call_args[0]
+    assert payload['stack_apply_applied'] == 2
+    assert payload['stack_apply_skipped_conflicts'] == 1
+    assert payload['stack_apply_skipped_other'] == 0
