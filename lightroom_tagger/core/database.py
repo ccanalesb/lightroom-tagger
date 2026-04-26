@@ -7,7 +7,7 @@ import shutil
 import sqlite3
 import threading
 import time
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -1389,6 +1389,7 @@ def query_catalog_images(
     dominant_colors: list[str] | None = None,
     mood_tags: list[str] | None = None,
     has_repetition: bool | None = None,
+    restrict_to_keys: Collection[str] | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[dict], int]:
@@ -1454,6 +1455,15 @@ def query_catalog_images(
         mood_tags=mood_tags,
         has_repetition=has_repetition,
     )
+
+    if restrict_to_keys is not None:
+        rk = [str(k) for k in restrict_to_keys if k]
+        if not rk:
+            clauses.append("1=0")
+        else:
+            ph = ",".join("?" * len(rk))
+            clauses.append(f"i.key IN ({ph})")
+            bindings.extend(rk)
 
     where_sql = "WHERE " + " AND ".join(clauses)
     join_sql = (

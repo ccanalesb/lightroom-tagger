@@ -113,6 +113,7 @@ def run_semantic_hybrid_search(
     query_vec_blob: bytes,
     limit: int,
     offset: int,
+    restrict_to_keys: frozenset[str] | None = None,
 ) -> tuple[list[SemanticSearchRow], int, SemanticSearchMeta]:
     """Fuse FTS BM25 ordering with vec KNN (cosine) via RRF; D-09 post-filter when vec index non-empty."""
     _ = user_query
@@ -121,14 +122,21 @@ def run_semantic_hybrid_search(
     vec_n = int(vec_row["c"] if vec_row else 0)
     semantic_index_empty = vec_n == 0
 
-    fts_keys = fts_ranked_catalog_keys(conn, fts_match, limit=FTS_CANDIDATE_LIMIT)
-    knn_pairs: list[tuple[str, float]] = (
+    global_fts_keys = fts_ranked_catalog_keys(conn, fts_match, limit=FTS_CANDIDATE_LIMIT)
+    knn_pairs_full: list[tuple[str, float]] = (
         []
         if semantic_index_empty
         else knn_embedded_catalog_keys(conn, query_vec_blob, k=KNN_K)
     )
 
-    if not semantic_index_empty and len(fts_keys) == 0:
+    if restrict_to_keys is not None:
+        fts_keys = [k for k in global_fts_keys if k in restrict_to_keys]
+        knn_pairs = [(k, d) for k, d in knn_pairs_full if k in restrict_to_keys]
+    else:
+        fts_keys = global_fts_keys
+        knn_pairs = knn_pairs_full
+
+    if restrict_to_keys is None and not semantic_index_empty and len(global_fts_keys) == 0:
         return (
             [],
             0,
@@ -137,6 +145,18 @@ def run_semantic_hybrid_search(
                 semantic_index_empty=False,
                 rrf_k=RRF_K,
                 fts_no_match=True,
+            ),
+        )
+
+    if not semantic_index_empty and len(fts_keys) == 0 and len(knn_pairs) == 0:
+        return (
+            [],
+            0,
+            SemanticSearchMeta(
+                missing_embeddings_count=missing,
+                semantic_index_empty=False,
+                rrf_k=RRF_K,
+                fts_no_match=len(global_fts_keys) == 0,
             ),
         )
 

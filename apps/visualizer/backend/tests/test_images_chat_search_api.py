@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from app import create_app
 
+from lightroom_tagger.core.clip_similarity import NoClipEmbeddingError
 from lightroom_tagger.core.database import init_database, store_image
 from lightroom_tagger.core.semantic_search import SemanticSearchMeta, SemanticSearchRow
 
@@ -81,8 +82,9 @@ def test_chat_search_semantic_fallback(
         query_vec_blob,
         limit,
         offset,
+        restrict_to_keys=None,
     ):
-        _ = (fts_match, query_vec_blob, limit, offset)
+        _ = (fts_match, query_vec_blob, limit, offset, restrict_to_keys)
         return (
             [
                 SemanticSearchRow(
@@ -157,6 +159,134 @@ def test_chat_search_multiturn_forwards_current_message_last(
     assert turns[-1] == {"role": "user", "content": "second"}
     assert turns[0] == {"role": "user", "content": "first"}
     assert turns[1] == {"role": "assistant", "content": "ok"}
+
+
+def test_chat_search_pin_active_semantic_passes_restrict_to_keys(
+    chat_search_client, monkeypatch
+) -> None:
+    client, k = chat_search_client
+    captured: dict = {}
+
+    def capture_hybrid(_db, **kw):
+        captured["restrict_to_keys"] = kw.get("restrict_to_keys")
+        return (
+            [
+                SemanticSearchRow(
+                    image_key=k,
+                    rrf_score=0.1,
+                    why_matched="test",
+                ),
+            ],
+            1,
+            SemanticSearchMeta(
+                missing_embeddings_count=0,
+                semantic_index_empty=False,
+                rrf_k=60,
+                fts_no_match=False,
+            ),
+        )
+
+    monkeypatch.setattr(
+        "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
+        lambda *a, **k: "{}",
+    )
+    monkeypatch.setattr("api.images.embed_query_to_vec_blob", lambda _q: b"\xef" * (768 * 4))
+    monkeypatch.setattr("api.images.run_semantic_hybrid_search", capture_hybrid)
+    monkeypatch.setattr(
+        "api.images.list_pin_similarity_candidate_keys",
+        lambda _db, seed: [seed, "neighbor-key"],
+    )
+    r = client.post(
+        "/api/images/chat-search",
+        json={"message": "hills in spring", "pinned_image_key": k},
+    )
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["search_mode"] == "semantic"
+    assert data["metadata"]["pin_state"] == "active"
+    assert captured["restrict_to_keys"] == frozenset({k, "neighbor-key"})
+
+
+def test_chat_search_pin_inactive_no_clip_embedding_falls_back_semantic(
+    chat_search_client, monkeypatch
+) -> None:
+    client, k = chat_search_client
+    captured: dict = {}
+
+    def capture_hybrid(_db, **kw):
+        captured["restrict_to_keys"] = kw.get("restrict_to_keys")
+        return (
+            [
+                SemanticSearchRow(
+                    image_key=k,
+                    rrf_score=0.1,
+                    why_matched="test",
+                ),
+            ],
+            1,
+            SemanticSearchMeta(
+                missing_embeddings_count=0,
+                semantic_index_empty=False,
+                rrf_k=60,
+                fts_no_match=False,
+            ),
+        )
+
+    def boom(_db, seed):
+        raise NoClipEmbeddingError(seed)
+
+    monkeypatch.setattr(
+        "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
+        lambda *a, **k: "{}",
+    )
+    monkeypatch.setattr("api.images.embed_query_to_vec_blob", lambda _q: b"\xef" * (768 * 4))
+    monkeypatch.setattr("api.images.run_semantic_hybrid_search", capture_hybrid)
+    monkeypatch.setattr("api.images.list_pin_similarity_candidate_keys", boom)
+    r = client.post(
+        "/api/images/chat-search",
+        json={"message": "hills in spring", "pinned_image_key": k},
+    )
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["metadata"]["pin_state"] == "inactive"
+    assert data["metadata"]["fallback_reason"] == "no_clip_embedding"
+    assert captured["restrict_to_keys"] is None
+
+
+def test_chat_search_pin_inactive_invalid_key_metadata(
+    chat_search_client, monkeypatch
+) -> None:
+    client, _k = chat_search_client
+    captured: dict = {}
+
+    def capture_hybrid(_db, **kw):
+        captured["restrict_to_keys"] = kw.get("restrict_to_keys")
+        return (
+            [],
+            0,
+            SemanticSearchMeta(
+                missing_embeddings_count=0,
+                semantic_index_empty=False,
+                rrf_k=60,
+                fts_no_match=True,
+            ),
+        )
+
+    monkeypatch.setattr(
+        "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
+        lambda *a, **k: "{}",
+    )
+    monkeypatch.setattr("api.images.embed_query_to_vec_blob", lambda _q: b"\xef" * (768 * 4))
+    monkeypatch.setattr("api.images.run_semantic_hybrid_search", capture_hybrid)
+    r = client.post(
+        "/api/images/chat-search",
+        json={"message": "hills in spring", "pinned_image_key": "not-a-real-catalog-key"},
+    )
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["metadata"]["pin_state"] == "inactive"
+    assert data["metadata"]["fallback_reason"] == "invalid_pin_key"
+    assert captured["restrict_to_keys"] is None
 
 
 def test_chat_search_invalid_llm_json_400(

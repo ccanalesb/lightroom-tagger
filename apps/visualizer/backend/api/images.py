@@ -23,7 +23,11 @@ from lightroom_tagger.core.catalog_nl_filter import (
     catalog_nl_filter_to_query_kwargs,
     parse_catalog_nl_filter_from_llm,
 )
-from lightroom_tagger.core.clip_similarity import NoClipEmbeddingError, run_clip_similar_for_seed
+from lightroom_tagger.core.clip_similarity import (
+    NoClipEmbeddingError,
+    list_pin_similarity_candidate_keys,
+    run_clip_similar_for_seed,
+)
 from lightroom_tagger.core.database import (
     StackMutationError,
     _deserialize_row,
@@ -62,6 +66,41 @@ _DESC_JSON_COLS = (
     "dominant_colors",
     "mood_tags",
 )
+
+
+def _merge_chat_search_metadata(
+    base: dict[str, Any] | None,
+    pin: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if base is None and pin is None:
+        return None
+    out: dict[str, Any] = {}
+    if base:
+        out.update(base)
+    if pin:
+        out.update(pin)
+    return out or None
+
+
+def _chat_pin_context(
+    db: sqlite3.Connection,
+    body: dict[str, Any],
+) -> tuple[frozenset[str] | None, dict[str, Any] | None]:
+    """Return (restrict_to_keys, pin_metadata). ``None`` restrict → full catalog."""
+    raw = body.get("pinned_image_key")
+    if raw is None:
+        return None, None
+    pk = str(raw).strip()
+    if not pk:
+        return None, None
+    row = db.execute("SELECT 1 FROM images WHERE key = ?", (pk,)).fetchone()
+    if not row:
+        return None, {"pin_state": "inactive", "fallback_reason": "invalid_pin_key"}
+    try:
+        keys = list_pin_similarity_candidate_keys(db, pk)
+        return frozenset(keys), {"pin_state": "active"}
+    except NoClipEmbeddingError:
+        return None, {"pin_state": "inactive", "fallback_reason": "no_clip_embedding"}
 
 
 def _deserialize_description(row: dict) -> dict:
@@ -1202,6 +1241,7 @@ def chat_search_images(db):
             )
 
         limit, offset = _clamp_pagination(body.get("limit", 50), body.get("offset", 0))
+        pin_restrict, pin_meta = _chat_pin_context(db, body)
 
         turns_for_llm = prior + [{"role": "user", "content": message_stripped}]
 
@@ -1228,6 +1268,7 @@ def chat_search_images(db):
                     model=body.get("model"),
                     db=db,
                     log_callback=None,
+                    restrict_to_keys=pin_restrict,
                 )
             except (ModelUnavailableError, ValueError) as exc:
                 return error_bad_request(str(exc))
@@ -1242,7 +1283,7 @@ def chat_search_images(db):
                     "total": total,
                     "images": images,
                     "filters": None,
-                    "metadata": None,
+                    "metadata": _merge_chat_search_metadata(None, pin_meta),
                     "messages": updated_messages,
                     "assistant_message": assistant_text,
                 }
@@ -1297,6 +1338,7 @@ def chat_search_images(db):
                 query_vec_blob=blob,
                 limit=limit,
                 offset=offset,
+                restrict_to_keys=pin_restrict,
             )
 
             keys = [r.image_key for r in rows]
@@ -1313,24 +1355,27 @@ def chat_search_images(db):
                     img["why_matched"] = sem_row.why_matched
                     img["thumbnail_url"] = f"/api/images/catalog/{sem_row.image_key}/thumbnail"
 
+            sem_meta = {
+                "missing_embeddings_count": meta.missing_embeddings_count,
+                "semantic_index_empty": meta.semantic_index_empty,
+                "rrf_k": meta.rrf_k,
+                "fts_no_match": meta.fts_no_match,
+            }
             return jsonify(
                 {
                     "search_mode": "semantic",
                     "total": total,
                     "images": images,
                     "filters": None,
-                    "metadata": {
-                        "missing_embeddings_count": meta.missing_embeddings_count,
-                        "semantic_index_empty": meta.semantic_index_empty,
-                        "rrf_k": meta.rrf_k,
-                        "fts_no_match": meta.fts_no_match,
-                    },
+                    "metadata": _merge_chat_search_metadata(sem_meta, pin_meta),
                 }
             )
 
         qkwargs = dict(kwargs_eff)
         qkwargs["limit"] = limit
         qkwargs["offset"] = offset
+        if pin_restrict is not None:
+            qkwargs["restrict_to_keys"] = pin_restrict
 
         score_perspective_from_filter = (filters.score_perspective or "").strip() or None
 
@@ -1346,7 +1391,7 @@ def chat_search_images(db):
                 "total": total,
                 "images": images,
                 "filters": filters.model_dump(exclude_none=True),
-                "metadata": None,
+                "metadata": _merge_chat_search_metadata(None, pin_meta),
             }
         )
     except Exception as e:

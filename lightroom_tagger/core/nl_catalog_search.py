@@ -228,6 +228,7 @@ def run_tool_calling_search(
     db: sqlite3.Connection,
     log_callback: LogCallback = None,
     max_tool_rounds: int = 5,
+    restrict_to_keys: frozenset[str] | None = None,
 ) -> tuple[str, list[dict]]:
     """Run multi-turn tool-calling search loop.
 
@@ -257,6 +258,24 @@ def run_tool_calling_search(
 
     client = registry.get_client(resolved_provider)
     conv = _messages_for_openai_tool_loop(messages)
+
+    _TOOL_SEARCH_SYSTEM = (
+        "You are a photo catalog search assistant. "
+        "Use the provided tools to find photos matching the user's request.\n"
+        "If you are unsure which filters to use, call get_catalog_schema first — "
+        "it tells you which fields have data and how many images match each filter.\n"
+        "Key constraints:\n"
+        "- description_search uses FTS over AI-generated image descriptions. "
+        "Descriptions use visual nouns (crowd, sidewalk, market) NOT genre labels like 'street photography'. "
+        "Genre labels return 0 results.\n"
+        "- has_repetition is a pre-computed boolean flag (~8000 images). Use it as the PRIMARY filter "
+        "for repetition/patterns/symmetry. Do NOT combine it with description_search containing 'pattern'.\n"
+        "- score_perspective + sort_by_score='desc' + limit=1 finds THE single best-scored photo.\n"
+        "Always return a brief, friendly summary of what you found (or didn't find)."
+    )
+    if not any(m.get("role") == "system" for m in conv):
+        conv = [{"role": "system", "content": _TOOL_SEARCH_SYSTEM}] + conv
+
     if not any(m.get("role") == "user" for m in conv):
         raise ValueError("tool-calling search requires at least one user message")
     updated_messages: list[dict] = list(messages)
@@ -298,7 +317,9 @@ def run_tool_calling_search(
                 args = {}
             if not isinstance(args, dict):
                 args = {}
-            result = execute_tool(tc.function.name, args, db)
+            result = execute_tool(
+                tc.function.name, args, db, restrict_to_keys=restrict_to_keys
+            )
             result_str = json.dumps(result)
 
             tool_msg = {"role": "tool", "tool_call_id": tc.id, "content": result_str}

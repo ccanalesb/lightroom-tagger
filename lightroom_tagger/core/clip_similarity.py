@@ -63,6 +63,37 @@ def get_clip_embedding_blob_for_key(db: sqlite3.Connection, image_key: str) -> b
     return bytes(row["embedding"])
 
 
+def list_pin_similarity_candidate_keys(
+    db: sqlite3.Connection,
+    seed_key: str,
+    *,
+    max_candidates: int = 600,
+) -> list[str]:
+    """Ordered catalog keys for pin-to-similar chat search: *seed_key* first, then CLIP
+    neighbors (primary-grid rows only). Raises :class:`NoClipEmbeddingError` if the
+    seed has no CLIP row."""
+    blob = get_clip_embedding_blob_for_key(db, seed_key)
+    if blob is None:
+        raise NoClipEmbeddingError(seed_key)
+
+    max_candidates = max(1, int(max_candidates))
+    need_neighbors = max(0, max_candidates - 1)
+    knn_k = min(KNN_K_MAX, max(50, need_neighbors * 20)) if need_neighbors else 1
+    knn_k = min(KNN_K_MAX, max(knn_k, 1))
+
+    raw = knn_clip_catalog_keys(db, blob, k=knn_k)
+    out: list[str] = [seed_key]
+    for image_key, _dist in raw:
+        if image_key == seed_key:
+            continue
+        if not catalog_key_is_primary_grid_row(db, image_key):
+            continue
+        out.append(image_key)
+        if len(out) >= max_candidates:
+            break
+    return out
+
+
 def run_clip_similar_for_seed(
     db: sqlite3.Connection,
     seed_key: str,

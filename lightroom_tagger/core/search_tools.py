@@ -14,8 +14,9 @@ SEARCH_CATALOG_TOOL = {
         "name": "search_catalog",
         "description": (
             "Search the photo catalog with optional filters. "
-            "Returns images sorted by relevance or score. "
-            "Use limit=1 for 'the best', limit=10 for browsing."
+            "All filters are AND-combined. "
+            "Use limit=1 for 'the best', limit=10 for browsing. "
+            "Call get_catalog_schema first if unsure which filters have data."
         ),
         "parameters": {
             "type": "object",
@@ -23,43 +24,98 @@ SEARCH_CATALOG_TOOL = {
                 "description_search": {
                     "type": "string",
                     "description": (
-                        "What is visually in the photo — people, scenes, colours, mood, objects. "
-                        "Free-text search over AI-generated descriptions."
+                        "FTS over AI-generated image descriptions — visual content only "
+                        "(objects, scenes, people, mood). "
+                        "Use visual nouns (crowd, sidewalk, market, mountains). "
+                        "NEVER use genre labels like 'street photography' — they return 0. "
+                        "Do NOT combine with has_repetition or mood_tags for the same concept."
+                    ),
+                },
+                "mood_tags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "AI-generated mood/atmosphere tags. An image matches if it has ANY of the tags. "
+                        "Examples: ['melancholic'], ['dramatic', 'moody'], ['joyful', 'festive']. "
+                        "Call get_catalog_schema to see a sample of available tags (11000+ images have them). "
+                        "Use for mood, atmosphere, or feeling queries instead of description_search."
+                    ),
+                },
+                "dominant_colors": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Filter by dominant color hex codes (e.g. ['#c62828', '#1565c0']). "
+                        "ONLY use hex codes — color names like 'red' will return 0 results. "
+                        "An image matches if ANY of the listed hex codes appears in its dominant colors."
                     ),
                 },
                 "score_perspective": {
                     "type": "string",
                     "description": (
                         "Perspective slug for quality scoring. "
-                        "Call get_scoring_perspectives first to see valid slugs."
+                        "Call get_scoring_perspectives or get_catalog_schema to see valid slugs."
                     ),
                 },
                 "sort_by_score": {
                     "type": "string",
                     "enum": ["asc", "desc"],
-                    "description": "Sort by score. Requires score_perspective.",
+                    "description": "Sort by score (desc=best first). Requires score_perspective.",
                 },
                 "sort_by_date": {
                     "type": "string",
                     "enum": ["newest", "oldest"],
+                    "description": "Sort by date taken. Can combine with sort_by_score (score wins).",
+                },
+                "date_from": {
+                    "type": "string",
+                    "description": "Start date inclusive, format YYYY-MM-DD.",
+                },
+                "date_to": {
+                    "type": "string",
+                    "description": "End date inclusive, format YYYY-MM-DD.",
+                },
+                "month": {
+                    "type": "string",
+                    "description": (
+                        "Filter to a specific month, format YYYYMM (e.g. '202312' for December 2023). "
+                        "Use this for 'photos from [month]' queries."
+                    ),
+                },
+                "color_label": {
+                    "type": "string",
+                    "enum": ["red", "yellow", "green", "blue", "purple"],
+                    "description": "Lightroom color label/flag assigned to the image.",
                 },
                 "min_score": {
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 10,
-                    "description": "Minimum score (1–10). Requires score_perspective.",
+                    "description": "Minimum quality score (1–10). Requires score_perspective.",
                 },
                 "min_rating": {
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 5,
-                    "description": "Minimum Lightroom star rating.",
+                    "description": "Minimum Lightroom star rating (1–5).",
+                },
+                "has_repetition": {
+                    "type": "boolean",
+                    "description": (
+                        "Pre-computed flag: true = image has visual repetition/patterns/symmetry (~8000 images). "
+                        "Use as PRIMARY filter for repetition/pattern queries. "
+                        "Do NOT also add 'pattern' or 'repetition' to description_search."
+                    ),
+                },
+                "posted": {
+                    "type": "boolean",
+                    "description": "Instagram posted: true=already posted (95 images), false=not yet posted.",
                 },
                 "limit": {
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 100,
-                    "description": "Number of results to return. Default 10. Use 1 for 'the best'.",
+                    "description": "Results to return. Default 10. Use 1 for 'the best'.",
                 },
             },
             "additionalProperties": False,
@@ -97,18 +153,148 @@ FILTER_BY_DATE_TOOL = {
     },
 }
 
-ALL_TOOLS = [SEARCH_CATALOG_TOOL, GET_SCORING_PERSPECTIVES_TOOL, FILTER_BY_DATE_TOOL]
+GET_CATALOG_SCHEMA_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "get_catalog_schema",
+        "description": (
+            "Returns counts for every available filter in search_catalog. "
+            "Call this first when you are unsure whether a filter has data or "
+            "want to pick the right combination of filters before searching."
+        ),
+        "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+}
+
+ALL_TOOLS = [
+    SEARCH_CATALOG_TOOL,
+    GET_SCORING_PERSPECTIVES_TOOL,
+    GET_CATALOG_SCHEMA_TOOL,
+]
 
 
-def execute_tool(name: str, args: dict[str, Any], db: sqlite3.Connection) -> dict[str, Any]:
+def execute_tool(
+    name: str,
+    args: dict[str, Any],
+    db: sqlite3.Connection,
+    *,
+    restrict_to_keys: frozenset[str] | None = None,
+) -> dict[str, Any]:
     """Execute a tool call and return a result dict suitable for a tool message."""
     if name == "get_scoring_perspectives":
         return _exec_get_scoring_perspectives(db)
     if name == "search_catalog":
-        return _exec_search_catalog(args, db)
+        return _exec_search_catalog(args, db, restrict_to_keys=restrict_to_keys)
     if name == "filter_by_date":
-        return _exec_filter_by_date(args, db)
+        return _exec_filter_by_date(args, db, restrict_to_keys=restrict_to_keys)
+    if name == "get_catalog_schema":
+        return _exec_get_catalog_schema(db)
     return {"error": f"Unknown tool: {name}"}
+
+
+def _exec_get_catalog_schema(db: sqlite3.Connection) -> dict[str, Any]:
+    """Return available filter fields with live counts so the model can pick
+    the right combination of filters without blind trial-and-error."""
+    import json as _json
+
+    total = db.execute("SELECT count(*) as cnt FROM images").fetchone()["cnt"]
+
+    def count(sql: str) -> int:
+        return db.execute(sql).fetchone()["cnt"]
+
+    analyzed = count("SELECT count(*) as cnt FROM image_descriptions WHERE image_type='catalog'")
+    has_rep = count(
+        "SELECT count(*) as cnt FROM image_descriptions WHERE image_type='catalog' AND has_repetition = 1"
+    )
+    rated = count("SELECT count(*) as cnt FROM images WHERE rating >= 1")
+    instagram_posted = count("SELECT count(*) as cnt FROM images WHERE instagram_posted = 1")
+    with_mood = count(
+        "SELECT count(*) as cnt FROM image_descriptions "
+        "WHERE image_type='catalog' AND mood_tags IS NOT NULL AND mood_tags NOT IN ('[]','null','')"
+    )
+    with_colors = count(
+        "SELECT count(*) as cnt FROM image_descriptions "
+        "WHERE image_type='catalog' AND dominant_colors IS NOT NULL AND dominant_colors NOT IN ('[]','null','')"
+    )
+
+    perspectives = [
+        r["perspective_slug"]
+        for r in db.execute(
+            "SELECT DISTINCT perspective_slug FROM image_scores WHERE is_current=1 ORDER BY perspective_slug"
+        ).fetchall()
+    ]
+
+    color_labels = {
+        r["lbl"]: r["cnt"]
+        for r in db.execute(
+            "SELECT LOWER(color_label) as lbl, count(*) as cnt FROM images "
+            "WHERE color_label IS NOT NULL AND color_label != '' GROUP BY LOWER(color_label)"
+        ).fetchall()
+    }
+
+    # Sample of mood tags (most common)
+    mood_counts: dict[str, int] = {}
+    for row in db.execute(
+        "SELECT mood_tags FROM image_descriptions "
+        "WHERE image_type='catalog' AND mood_tags NOT IN ('[]','null','') AND mood_tags IS NOT NULL "
+        "LIMIT 2000"
+    ).fetchall():
+        try:
+            for tag in _json.loads(row["mood_tags"]):
+                mood_counts[tag] = mood_counts.get(tag, 0) + 1
+        except Exception:
+            pass
+    top_moods = sorted(mood_counts, key=lambda t: -mood_counts[t])[:40]
+
+    # Date range
+    date_range = db.execute(
+        "SELECT MIN(date_taken) as min_d, MAX(date_taken) as max_d FROM images WHERE date_taken IS NOT NULL"
+    ).fetchone()
+
+    return {
+        "total_catalog_images": total,
+        "analyzed_images": analyzed,
+        "date_range": {
+            "earliest": (date_range["min_d"] or "")[:10],
+            "latest": (date_range["max_d"] or "")[:10],
+            "note": "Use date_from/date_to (YYYY-MM-DD) or month (YYYYMM) to filter by date.",
+        },
+        "filters": {
+            "description_search": {
+                "description": "FTS over AI-generated descriptions. Use visual nouns, NOT genre labels.",
+                "indexed_images": analyzed,
+            },
+            "mood_tags": {
+                "description": "AI mood/atmosphere tags. Pass array of tags; image matches if it has ANY.",
+                "images_with_mood_tags": with_mood,
+                "top_40_tags": top_moods,
+            },
+            "dominant_colors": {
+                "description": "Hex color codes only (e.g. '#c62828'). Image matches if ANY code present.",
+                "images_with_colors": with_colors,
+            },
+            "has_repetition": {
+                "description": "Visual repetition/patterns/symmetry flag.",
+                "images_with_true": has_rep,
+            },
+            "color_label": {
+                "description": "Lightroom color flag.",
+                "available_values_and_counts": color_labels,
+            },
+            "score_perspective": {
+                "description": "Quality score perspective. Use with sort_by_score='desc'.",
+                "available_slugs": perspectives,
+            },
+            "min_rating": {
+                "description": "Lightroom star rating 1–5.",
+                "images_with_any_rating": rated,
+            },
+            "posted": {
+                "description": "Instagram posted: true=posted, false=not yet posted.",
+                "images_posted": instagram_posted,
+            },
+        },
+    }
 
 
 def _exec_get_scoring_perspectives(db: sqlite3.Connection) -> dict[str, Any]:
@@ -120,7 +306,12 @@ def _exec_get_scoring_perspectives(db: sqlite3.Connection) -> dict[str, Any]:
     return {"perspectives": slugs}
 
 
-def _exec_search_catalog(args: dict[str, Any], db: sqlite3.Connection) -> dict[str, Any]:
+def _exec_search_catalog(
+    args: dict[str, Any],
+    db: sqlite3.Connection,
+    *,
+    restrict_to_keys: frozenset[str] | None = None,
+) -> dict[str, Any]:
     try:
         limit = min(int(args.get("limit") or 10), 100)
 
@@ -138,15 +329,38 @@ def _exec_search_catalog(args: dict[str, Any], db: sqlite3.Connection) -> dict[s
             kwargs["min_score"] = int(args["min_score"])
         if args.get("min_rating") is not None:
             kwargs["min_rating"] = int(args["min_rating"])
+        if args.get("has_repetition") is not None:
+            kwargs["has_repetition"] = bool(args["has_repetition"])
+        if args.get("posted") is not None:
+            kwargs["posted"] = bool(args["posted"])
+        if args.get("date_from"):
+            kwargs["date_from"] = str(args["date_from"])
+        if args.get("date_to"):
+            kwargs["date_to"] = str(args["date_to"])
+        if args.get("month"):
+            kwargs["month"] = str(args["month"])
+        if args.get("color_label"):
+            kwargs["color_label"] = str(args["color_label"])
+        if args.get("mood_tags"):
+            kwargs["mood_tags"] = [str(t) for t in args["mood_tags"]]
+        if args.get("dominant_colors"):
+            kwargs["dominant_colors"] = [str(c) for c in args["dominant_colors"]]
 
-        rows, total = query_catalog_images(db, limit=limit, offset=0, **kwargs)
+        rows, total = query_catalog_images(
+            db, limit=limit, offset=0, restrict_to_keys=restrict_to_keys, **kwargs
+        )
         images = _rows_to_tool_result(rows, score_perspective_slug=sp)
         return {"total_matched": total, "returned": len(images), "images": images}
     except ValueError as exc:
         return {"error": str(exc)}
 
 
-def _exec_filter_by_date(args: dict[str, Any], db: sqlite3.Connection) -> dict[str, Any]:
+def _exec_filter_by_date(
+    args: dict[str, Any],
+    db: sqlite3.Connection,
+    *,
+    restrict_to_keys: frozenset[str] | None = None,
+) -> dict[str, Any]:
     try:
         limit = min(int(args.get("limit") or 10), 100)
         kwargs: dict[str, Any] = {}
@@ -157,7 +371,9 @@ def _exec_filter_by_date(args: dict[str, Any], db: sqlite3.Connection) -> dict[s
         if args.get("sort_direction"):
             kwargs["sort_by_date"] = str(args["sort_direction"])
 
-        rows, total = query_catalog_images(db, limit=limit, offset=0, **kwargs)
+        rows, total = query_catalog_images(
+            db, limit=limit, offset=0, restrict_to_keys=restrict_to_keys, **kwargs
+        )
         images = _rows_to_tool_result(rows, score_perspective_slug=None)
         return {"total_matched": total, "returned": len(images), "images": images}
     except ValueError as exc:
