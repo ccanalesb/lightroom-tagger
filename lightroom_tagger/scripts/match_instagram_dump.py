@@ -20,6 +20,7 @@ from lightroom_tagger.core.description_service import (
 )
 from lightroom_tagger.core.analyzer import get_vision_model
 from lightroom_tagger.core.database import (
+    apply_instagram_match_to_stack_members,
     catalog_key_is_primary_grid_row,
     delete_matches_for_insta_key,
     get_image_description,
@@ -321,6 +322,29 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                 for rank, candidate in enumerate(above_threshold, 1):
                     candidate['rank'] = rank
                     store_match(db, candidate, commit=False)
+                stack_apply = apply_instagram_match_to_stack_members(
+                    db,
+                    insta_key=dump_media['media_key'],
+                    representative_key=matched_catalog_key,
+                    template=best_match,
+                    commit=False,
+                )
+            best_match['_lightroom_catalog_keys'] = stack_apply['lightroom_catalog_keys']
+            stats['stack_members_applied'] += stack_apply['applied_count']
+            stats['stack_members_skipped_conflicts'] += stack_apply['skipped_conflicts_count']
+            stats['stack_members_skipped_other'] += stack_apply['skipped_other_count']
+            if log_callback and (
+                stack_apply['applied_count']
+                or stack_apply['skipped_conflicts_count']
+                or stack_apply['skipped_other_count']
+            ):
+                log_callback(
+                    'info',
+                    f'[{media_key}] Stack apply: extra_members_applied='
+                    f"{stack_apply['applied_count']}, skipped_conflicts="
+                    f"{stack_apply['skipped_conflicts_count']}, skipped_other="
+                    f"{stack_apply['skipped_other_count']}",
+                )
 
             mark_dump_media_processed(
                 db, dump_media['media_key'],

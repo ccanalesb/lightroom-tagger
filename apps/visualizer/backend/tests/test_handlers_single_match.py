@@ -4,6 +4,7 @@ from lightroom_tagger.core.database import (
     init_database,
     store_image,
     store_instagram_dump_media,
+    store_match,
 )
 
 
@@ -194,4 +195,115 @@ def test_match_dump_media_representative_only_sends_members_to_scoring(
     assert member_key not in captured.get('catalog_keys', [])
     assert stats['non_representative_candidates_filtered'] >= 1
     assert len(matches) == 1
+    db.close()
+
+
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False)
+@patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
+def test_match_dump_media_stack_apply_skips_conflicting_member(
+    mock_score, _describe_matched, _describe_insta, tmp_path,
+):
+    """Stack-wide apply must not overwrite a member already matched to another IG key."""
+    from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
+
+    db_path = tmp_path / 'lib.db'
+    db = init_database(str(db_path))
+
+    def _img(name: str, dt: str) -> str:
+        p = tmp_path / name
+        p.write_bytes(b'')
+        return store_image(
+            db,
+            {
+                'filename': name,
+                'filepath': str(p),
+                'date_taken': dt,
+                'instagram_posted': False,
+            },
+        )
+
+    rep_key = _img('a.jpg', '2026-03-10T12:00:00')
+    member_ok = _img('b.jpg', '2026-03-11T12:00:00')
+    member_conflict = _img('c.jpg', '2026-03-12T12:00:00')
+
+    db.execute(
+        'INSERT INTO image_stacks (representative_key, stack_size, user_modified) '
+        'VALUES (?, ?, 0)',
+        (rep_key, 3),
+    )
+    sid_row = db.execute('SELECT last_insert_rowid() AS id').fetchone()
+    sid = int(sid_row['id'])
+    for k in (rep_key, member_ok, member_conflict):
+        db.execute(
+            'INSERT INTO image_stack_members (stack_id, image_key) VALUES (?, ?)',
+            (sid, k),
+        )
+    db.commit()
+
+    store_match(
+        db,
+        {
+            'catalog_key': member_conflict,
+            'insta_key': 'other_ig',
+            'phash_distance': 1,
+            'phash_score': 0.5,
+            'desc_similarity': 0.5,
+            'vision_result': 'x',
+            'vision_score': 0.5,
+            'total_score': 0.5,
+            'model_used': 'legacy',
+            'rank': 1,
+        },
+        commit=True,
+    )
+
+    ig_path = tmp_path / 'ig_new.jpg'
+    ig_path.write_bytes(b'')
+    store_instagram_dump_media(
+        db,
+        {
+            'media_key': 'ig_new',
+            'file_path': str(ig_path),
+            'filename': 'ig_new.jpg',
+            'date_folder': '202603',
+            'caption': '',
+            'created_at': '2026-03-15T12:00:00',
+        },
+    )
+
+    mock_score.side_effect = lambda _db, dump_image, _vc, **kw: [
+        _score_template_row(rep_key, dump_image['key']),
+    ]
+
+    stats, matches = match_dump_media(
+        db,
+        threshold=0.5,
+        media_key='ig_new',
+        skip_undescribed=True,
+    )
+
+    assert stats['stack_members_applied'] == 1
+    assert stats['stack_members_skipped_conflicts'] == 1
+    assert len(matches) == 1
+    lr_keys = matches[0].get('_lightroom_catalog_keys') or []
+    assert rep_key in lr_keys and member_ok in lr_keys
+    assert member_conflict not in lr_keys
+
+    row_other = db.execute(
+        'SELECT 1 FROM matches WHERE catalog_key = ? AND insta_key = ?',
+        (member_conflict, 'other_ig'),
+    ).fetchone()
+    assert row_other is not None
+    row_bad = db.execute(
+        'SELECT 1 FROM matches WHERE catalog_key = ? AND insta_key = ?',
+        (member_conflict, 'ig_new'),
+    ).fetchone()
+    assert row_bad is None
+
+    row_ok = db.execute(
+        'SELECT 1 FROM matches WHERE catalog_key = ? AND insta_key = ?',
+        (member_ok, 'ig_new'),
+    ).fetchone()
+    assert row_ok is not None
     db.close()

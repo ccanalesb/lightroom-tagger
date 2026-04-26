@@ -1595,6 +1595,107 @@ def catalog_key_is_primary_grid_row(db: sqlite3.Connection, image_key: str) -> b
     return bool(row and int(row["ok"]))
 
 
+def list_catalog_stack_member_keys(db: sqlite3.Connection, catalog_key: str) -> list[str]:
+    """Return all ``image_key`` values in the stack containing *catalog_key*.
+
+    If the key is not in ``image_stack_members``, returns ``[catalog_key]`` (solo image).
+    """
+    row = db.execute(
+        "SELECT stack_id FROM image_stack_members WHERE image_key = ? LIMIT 1",
+        (catalog_key,),
+    ).fetchone()
+    if not row:
+        return [catalog_key]
+    stack_id = int(row["stack_id"])
+    rows = db.execute(
+        "SELECT image_key FROM image_stack_members WHERE stack_id = ? ORDER BY image_key",
+        (stack_id,),
+    ).fetchall()
+    return [str(r["image_key"]) for r in rows]
+
+
+def catalog_has_instagram_match_conflict(
+    db: sqlite3.Connection, catalog_key: str, insta_key: str
+) -> bool:
+    """True when *catalog_key* already has a library match to a different Instagram key."""
+    row = db.execute(
+        """
+        SELECT 1 FROM matches
+        WHERE catalog_key = ? AND insta_key IS NOT NULL AND insta_key != ?
+        LIMIT 1
+        """,
+        (catalog_key, insta_key),
+    ).fetchone()
+    return row is not None
+
+
+def apply_instagram_match_to_stack_members(
+    db: sqlite3.Connection,
+    *,
+    insta_key: str,
+    representative_key: str,
+    template: dict,
+    commit: bool = True,
+) -> dict:
+    """Persist matches for non-representative stack members from a rep-level template.
+
+    The representative's match row(s) are stored by the caller. This function adds
+    rows for other members, skipping members that already match a different
+    ``insta_key`` (non-destructive).
+
+    Returns:
+        ``applied_count``, ``skipped_conflicts_count``, ``skipped_other_count``,
+        and ``lightroom_catalog_keys`` (representative plus applied members; used
+        for Lightroom keyword writes).
+    """
+    members = list_catalog_stack_member_keys(db, representative_key)
+    applied = 0
+    skipped_conflicts = 0
+    skipped_other = 0
+    lightroom_catalog_keys: list[str] = [representative_key]
+
+    for member_key in members:
+        if member_key == representative_key:
+            continue
+        if catalog_has_instagram_match_conflict(db, member_key, insta_key):
+            skipped_conflicts += 1
+            continue
+        exists_row = db.execute(
+            "SELECT 1 FROM images WHERE key = ? LIMIT 1",
+            (member_key,),
+        ).fetchone()
+        if not exists_row:
+            skipped_other += 1
+            continue
+
+        rec = {
+            "catalog_key": member_key,
+            "insta_key": insta_key,
+            "phash_distance": template.get("phash_distance"),
+            "phash_score": template.get("phash_score"),
+            "desc_similarity": template.get("desc_similarity"),
+            "vision_result": template.get("vision_result"),
+            "vision_score": template.get("vision_score"),
+            "total_score": template.get("total_score"),
+            "model_used": template.get("model_used"),
+            "rank": template.get("rank", 1),
+            "vision_reasoning": template.get("vision_reasoning"),
+        }
+        store_match(db, rec, commit=False)
+        applied += 1
+        lightroom_catalog_keys.append(member_key)
+
+    if commit:
+        db.commit()
+
+    return {
+        "applied_count": applied,
+        "skipped_conflicts_count": skipped_conflicts,
+        "skipped_other_count": skipped_other,
+        "lightroom_catalog_keys": lightroom_catalog_keys,
+    }
+
+
 def get_images_without_hash(db: sqlite3.Connection) -> list[dict]:
     """Get all images that don't have a computed hash yet."""
     rows = db.execute(

@@ -382,6 +382,21 @@ def handle_instagram_import(runner, job_id: str, metadata: dict):
         runner.fail_job(job_id, str(e), severity=severity)
 
 
+def _expand_matches_for_lightroom_writes(matches: list) -> list:
+    """One match row may imply multiple catalog keys after stack-wide apply."""
+    out = []
+    for m in matches:
+        keys = m.get('_lightroom_catalog_keys')
+        if keys:
+            for ck in keys:
+                entry = {**m, 'catalog_key': ck}
+                entry.pop('_lightroom_catalog_keys', None)
+                out.append(entry)
+        elif m.get('catalog_key'):
+            out.append(dict(m))
+    return out
+
+
 def handle_vision_match(runner, job_id: str, metadata: dict):
     """Run vision matching with cascade filtering."""
     runner.update_progress(job_id, 10, 'Initializing...')
@@ -544,6 +559,13 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 'Matching summary: non-representative catalog candidates filtered (cumulative) = '
                 f"{stats.get('non_representative_candidates_filtered', 0)}",
             )
+            log_callback(
+                'info',
+                'Stack-wide apply: members_applied='
+                f"{stats.get('stack_members_applied', 0)}, skipped_conflicts="
+                f"{stats.get('stack_members_skipped_conflicts', 0)}, skipped_other="
+                f"{stats.get('stack_members_skipped_other', 0)}",
+            )
 
             if runner.is_cancelled(job_id):
                 runner.finalize_cancelled(job_id)
@@ -563,7 +585,8 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 catalog_path = config.catalog_path or config.small_catalog_path
                 if catalog_path and Path(catalog_path).exists():
                     try:
-                        lr_stats = update_lightroom_from_matches(catalog_path, matches)
+                        lr_matches = _expand_matches_for_lightroom_writes(matches)
+                        lr_stats = update_lightroom_from_matches(catalog_path, lr_matches)
                     except RuntimeError as e:
                         if str(e) == "Close Lightroom before writing to catalog.":
                             log_callback('error', str(e))
@@ -579,6 +602,11 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 'matched': stats['matched'],
                 'skipped': stats['skipped'],
                 'descriptions_generated': stats.get('descriptions_generated', 0),
+                'stack_apply_applied': stats.get('stack_members_applied', 0),
+                'stack_apply_skipped_conflicts': stats.get(
+                    'stack_members_skipped_conflicts', 0
+                ),
+                'stack_apply_skipped_other': stats.get('stack_members_skipped_other', 0),
                 'lightroom_updated': lr_stats['success'],
                 'lightroom_failed': lr_stats['failed'],
                 'method': 'cascade_matching',
