@@ -60,6 +60,9 @@ Know which catalog images are posted on Instagram and get structured artistic cr
 - ✓ Two-stage cascade matching: description + vision weighted scoring, skip_undescribed — v2.1 (MATCH-01..04)
 - ✓ Burst shot stacking: `image_stacks` schema, `batch_stack_detect` handler, configurable `stack_burst_delta_ms`, checkpoint resume — v3.0 Phase 4 (STACK-01)
 - ✓ Similarity & stack UI: stack representatives collapse primary lists, Catalog/Best Photos expose stack badges + member expansion, and catalog image detail has “More like this” CLIP similarity — v3.0 Phase 6 (SIM-02, STACK-03)
+- ✓ Stack-aware Instagram matching: compare against representatives and apply confirmed matches stack-wide with non-destructive conflict skips and explicit counters — v3.0 Phase 7 (STACK-04)
+- ✓ Stack edit mutations (split, merge, representative change) available in backend API + Images UI with confirm/undo interaction where safe — v3.0 Phase 7 (STACK-05)
+- ✓ Search pin-to-similar flow: single active pin, similarity-first refinement, and visible fallback when pin similarity is unavailable — v3.0 Phase 7 (NLS-06)
 
 ### Deferred (future)
 
@@ -89,6 +92,7 @@ The user is a photographer managing work across multiple Lightroom catalogs (per
 - **v2.1 shipped** (2026-04-23) — 9 phases, 20 requirements: matching polish, job queue UX, filter framework, identity clarity, badge/card consistency, React Suspense data layer, two-stage cascade matching
 - **v3.0 Phase 4 complete** (2026-04-24) — Stack detection: `image_stacks`/`image_stack_members` schema, `batch_stack_detect` handler with burst grouping by `date_taken`, configurable `stack_burst_delta_ms`, `StackDetectionSettingsPanel` UI, checkpoint resume. STACK-01 shipped.
 - **v3.0 Phase 6 complete** (2026-04-25) — Similarity & Stack UI: CLIP-only `GET /api/images/catalog/<key>/similar`, stack member API, catalog/best-photo stack badges + expansion, and `ImageDetailModal` “More like this”. SIM-02 and STACK-03 shipped; NLS-06 chat pin remains Phase 7.
+- **v3.0 Phase 7 complete** (2026-04-26) — Stacks in matching + pin similarity: representative-only Instagram candidate scoring, stack-wide apply with conflict skips and counters, stack mutation API (split/merge/representative) plus Catalog/detail UI actions, and chat pin-to-similar orchestration with inactive fallback messaging. STACK-04, STACK-05, and NLS-06 shipped.
 - ~38K LOC across Python backend and React/TypeScript frontend (405 files changed in v2.1)
 - Tech stack: Flask + SQLite (catalog read-only, library DB read-write), React 19 + Vite + Recharts + CodeMirror
 - 4 configurable critique perspectives with photography-theory rubrics
@@ -154,4 +158,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-25 — v3.0 Phase 6 complete (Similarity & Stack UI — SIM-02 and STACK-03 shipped)*
+*Last updated: 2026-04-26 — v3.0 Phase 7 complete (Stacks in matching + pin similarity — STACK-04, STACK-05, NLS-06 shipped)*
