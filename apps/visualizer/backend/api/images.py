@@ -25,14 +25,19 @@ from lightroom_tagger.core.catalog_nl_filter import (
 )
 from lightroom_tagger.core.clip_similarity import NoClipEmbeddingError, run_clip_similar_for_seed
 from lightroom_tagger.core.database import (
+    StackMutationError,
     _deserialize_row,
     build_description_fts_query,
     get_image,
     get_image_description,
     get_instagram_dump_media,
+    library_write,
     query_catalog_images,
     query_catalog_images_by_keys,
     reject_match,
+    stack_merge_into,
+    stack_set_representative,
+    stack_split_member_out,
     unvalidate_match,
     validate_match,
 )
@@ -959,6 +964,82 @@ def get_stack_members(db, stack_id: int):
         for it in items:
             it["thumbnail_url"] = f"/api/images/catalog/{it['key']}/thumbnail"
         return jsonify({"items": items})
+    except Exception as e:
+        return error_server_error(str(e))
+
+
+@bp.route("/stacks/<int:stack_id>/split-member", methods=["POST"])
+@with_db
+def post_stack_split_member(db, stack_id: int):
+    """Remove a member from a stack (solo image) or dissolve a two-member stack."""
+    try:
+        if stack_id < 1:
+            return error_not_found("stack")
+        body = request.get_json(silent=True)
+        if not body or not isinstance(body, dict):
+            return error_bad_request("JSON body required")
+        image_key = body.get("image_key")
+        if not image_key or not isinstance(image_key, str):
+            return error_bad_request("image_key required")
+        with library_write(db):
+            result = stack_split_member_out(db, stack_id, image_key.strip())
+        return jsonify(result), 200
+    except StackMutationError as e:
+        if e.status_code == 404:
+            return error_not_found("stack")
+        return error_bad_request(str(e))
+    except Exception as e:
+        return error_server_error(str(e))
+
+
+@bp.route("/stacks/<int:target_stack_id>/merge", methods=["POST"])
+@with_db
+def post_stack_merge(db, target_stack_id: int):
+    """Merge *source_stack_id* into *target_stack_id* (all members moved, source row deleted)."""
+    try:
+        if target_stack_id < 1:
+            return error_not_found("stack")
+        body = request.get_json(silent=True)
+        if not body or not isinstance(body, dict):
+            return error_bad_request("JSON body required")
+        raw_source = body.get("source_stack_id")
+        if raw_source is None:
+            return error_bad_request("source_stack_id required")
+        try:
+            source_stack_id = int(raw_source)
+        except (TypeError, ValueError):
+            return error_bad_request("source_stack_id must be an integer")
+        with library_write(db):
+            result = stack_merge_into(db, target_stack_id, source_stack_id)
+        return jsonify(result), 200
+    except StackMutationError as e:
+        if e.status_code == 404:
+            return error_not_found("stack")
+        return error_bad_request(str(e))
+    except Exception as e:
+        return error_server_error(str(e))
+
+
+@bp.route("/stacks/<int:stack_id>/representative", methods=["POST"])
+@with_db
+def post_stack_representative(db, stack_id: int):
+    """Change which catalog key is the stack representative (must be a current member)."""
+    try:
+        if stack_id < 1:
+            return error_not_found("stack")
+        body = request.get_json(silent=True)
+        if not body or not isinstance(body, dict):
+            return error_bad_request("JSON body required")
+        image_key = body.get("image_key")
+        if not image_key or not isinstance(image_key, str):
+            return error_bad_request("image_key required")
+        with library_write(db):
+            result = stack_set_representative(db, stack_id, image_key.strip())
+        return jsonify(result), 200
+    except StackMutationError as e:
+        if e.status_code == 404:
+            return error_not_found("stack")
+        return error_bad_request(str(e))
     except Exception as e:
         return error_server_error(str(e))
 
