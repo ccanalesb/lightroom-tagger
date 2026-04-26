@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { SearchPage } from './SearchPage'
-import { ImagesAPI, ProvidersAPI, type CatalogImage } from '../services/api'
+import { SearchPage } from '../SearchPage'
+import { ImagesAPI, ProvidersAPI, type CatalogImage } from '../../services/api'
 
 const sampleImage: CatalogImage = {
   id: 1,
@@ -127,7 +127,7 @@ describe('SearchPage', () => {
     )
   })
 
-  it('replacing pin updates which key is sent', async () => {
+  it('replacing pin updates which key is sent on the next search', async () => {
     vi.mocked(ImagesAPI.chatSearch).mockResolvedValue({
       search_mode: 'nl_filter',
       total: 2,
@@ -167,7 +167,7 @@ describe('SearchPage', () => {
     )
   })
 
-  it('shows inactive pin warning from response metadata', async () => {
+  it('shows inactive pin warning when backend marks pin inactive after similarity failure', async () => {
     vi.mocked(ImagesAPI.chatSearch)
       .mockResolvedValueOnce({
         search_mode: 'nl_filter',
@@ -204,5 +204,80 @@ describe('SearchPage', () => {
     const warn = await screen.findByRole('status')
     expect(warn).toHaveTextContent(/Similarity pin inactive/)
     expect(warn).toHaveTextContent(/CLIP embedding missing/)
+  })
+
+  it('end-to-end: replaced pin is the key sent when the next turn returns inactive pin', async () => {
+    vi.mocked(ImagesAPI.chatSearch)
+      .mockResolvedValueOnce({
+        search_mode: 'nl_filter',
+        total: 2,
+        images: [sampleImage, sampleImageB],
+        filters: {},
+      })
+      .mockResolvedValueOnce({
+        search_mode: 'nl_filter',
+        total: 2,
+        images: [sampleImage, sampleImageB],
+        filters: {},
+        metadata: { pin_state: 'active' },
+      })
+      .mockResolvedValueOnce({
+        search_mode: 'nl_filter',
+        total: 2,
+        images: [sampleImage, sampleImageB],
+        filters: {},
+        metadata: { pin_state: 'active' },
+      })
+      .mockResolvedValueOnce({
+        search_mode: 'semantic',
+        total: 0,
+        images: [],
+        filters: null,
+        metadata: { pin_state: 'inactive', fallback_reason: 'no_clip_embedding' },
+      })
+
+    render(
+      <MemoryRouter>
+        <SearchPage />
+      </MemoryRouter>,
+    )
+
+    const input = screen.getByPlaceholderText(/Ask about your library/i)
+    fireEvent.change(input, { target: { value: 'open' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    await screen.findByText('other.jpg')
+    const [pinFirst] = screen.getAllByRole('button', {
+      name: 'Pin image for similarity search',
+    })
+    fireEvent.click(pinFirst!)
+    fireEvent.change(input, { target: { value: 'with A' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(vi.mocked(ImagesAPI.chatSearch).mock.calls.length).toBeGreaterThanOrEqual(2)
+    })
+    expect(vi.mocked(ImagesAPI.chatSearch).mock.calls.at(-1)![0]).toEqual(
+      expect.objectContaining({ pinned_image_key: sampleImage.key }),
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Pin image for similarity search' }),
+    )
+    fireEvent.change(input, { target: { value: 'with B' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(vi.mocked(ImagesAPI.chatSearch).mock.calls.length).toBeGreaterThanOrEqual(3)
+    })
+    expect(vi.mocked(ImagesAPI.chatSearch).mock.calls.at(-1)![0]).toEqual(
+      expect.objectContaining({ pinned_image_key: sampleImageB.key }),
+    )
+
+    fireEvent.change(input, { target: { value: 'similarity fail' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    const warn = await screen.findByRole('status')
+    expect(warn).toHaveTextContent(/Similarity pin inactive/)
   })
 })
