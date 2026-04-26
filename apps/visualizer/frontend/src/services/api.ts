@@ -313,6 +313,29 @@ export const SystemAPI = {
     request<CacheStatus>('/cache/status'),
 }
 
+/** STACK-05 mutation responses (`/api/images/stacks/...`). */
+export interface StackMetadata {
+  stack_id: number
+  representative_key: string
+  stack_member_count: number
+  member_keys: string[]
+}
+
+export interface StackSplitMemberResponse {
+  split_out_key: string
+  remaining_stack: StackMetadata | null
+  dissolved: boolean
+}
+
+export interface StackMergeResponse {
+  stack: StackMetadata
+  merged_stack_id: number
+}
+
+export interface StackRepresentativeResponse {
+  stack: StackMetadata
+}
+
 export const ImagesAPI = {
   listInstagram: (params?: {
     limit?: number
@@ -385,6 +408,48 @@ export const ImagesAPI = {
 
   getStackMembers: (stackId: number) =>
     request<{ items: CatalogImage[] }>(`/images/stacks/${stackId}/members`),
+
+  splitStackMember: async (stackId: number, imageKey: string) => {
+    const result = await request<StackSplitMemberResponse>(
+      `/images/stacks/${stackId}/split-member`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ image_key: imageKey }),
+      },
+    )
+    invalidateAll(['images.catalog'])
+    invalidateAll(['images.detail'])
+    invalidateAll(['dashboard'])
+    invalidateAll(['identity'])
+    return result
+  },
+
+  mergeStacks: async (targetStackId: number, sourceStackId: number) => {
+    const result = await request<StackMergeResponse>(`/images/stacks/${targetStackId}/merge`, {
+      method: 'POST',
+      body: JSON.stringify({ source_stack_id: sourceStackId }),
+    })
+    invalidateAll(['images.catalog'])
+    invalidateAll(['images.detail'])
+    invalidateAll(['dashboard'])
+    invalidateAll(['identity'])
+    return result
+  },
+
+  setStackRepresentative: async (stackId: number, imageKey: string) => {
+    const result = await request<StackRepresentativeResponse>(
+      `/images/stacks/${stackId}/representative`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ image_key: imageKey }),
+      },
+    )
+    invalidateAll(['images.catalog'])
+    invalidateAll(['images.detail'])
+    invalidateAll(['dashboard'])
+    invalidateAll(['identity'])
+    return result
+  },
 
   chatSearch: (payload: ChatSearchRequest) =>
     request<ChatSearchResponse>('/images/chat-search', {
@@ -1045,6 +1110,11 @@ export interface ImageView {
   instagram_url?: string
   post_url?: string
   image_hash?: string
+
+  /** Burst stack (catalog list / detail when present). */
+  stack_id?: number | null
+  stack_member_count?: number | null
+  is_stack_representative?: boolean | null
 
   // Instagram-only metadata (present on detail responses for image_type='instagram').
   instagram_folder?: string

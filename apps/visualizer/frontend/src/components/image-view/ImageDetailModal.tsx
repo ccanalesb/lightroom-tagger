@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { CatalogImage, ImageView } from '../../services/api'
 import { ImagesAPI } from '../../services/api'
 import { useBodyScrollLock, useFocusTrap } from '../../hooks'
@@ -12,8 +12,24 @@ import {
   CATALOG_SIMILAR_NO_EMBED_TITLE,
   CATALOG_SIMILAR_NO_EMBED_BODY,
   CATALOG_SIMILAR_FETCH_ERROR,
+  ACTION_CANCEL,
+  ACTION_UNDO,
+  CATALOG_STACK_SPLIT_OUT,
+  CATALOG_STACK_MAKE_REPRESENTATIVE,
+  CATALOG_STACK_MERGE_INTO,
+  CATALOG_STACK_MERGE_SOURCE_ARIA,
+  CATALOG_STACK_MERGE_PLACEHOLDER,
+  CATALOG_STACK_MERGE_RUN,
+  CATALOG_STACK_CONFIRM_SPLIT_TITLE,
+  CATALOG_STACK_CONFIRM_SPLIT_BODY,
+  CATALOG_STACK_CONFIRM_REP_TITLE,
+  CATALOG_STACK_CONFIRM_REP_BODY,
+  CATALOG_STACK_CONFIRM_MERGE_TITLE,
+  CATALOG_STACK_CONFIRM_MERGE_BODY,
+  CATALOG_STACK_TOAST_REP_UPDATED,
 } from '../../constants/strings'
 import { Button } from '../ui/Button/Button'
+import { ConfirmModalFrame, UndoToastBar, useUndoToast } from '../ui/ConfirmUndoAction'
 import { CatalogImageDetailSections } from './CatalogImageDetailSections'
 import { InstagramImageDetailSections } from './InstagramImageDetailSections'
 import { ImageMetadataBadges, type PrimaryScoreSource } from './ImageMetadataBadges'
@@ -172,12 +188,197 @@ function CatalogVisualSimilaritySection({ imageKey }: { imageKey: string }) {
   )
 }
 
+type StackConfirmSpec = {
+  title: ReactNode
+  children: ReactNode
+  confirmLabel: string
+  confirmVariant: 'danger' | 'primary'
+  onConfirm: () => Promise<void>
+}
+
+/** Stack split / merge / representative (catalog detail). Loads members to validate multi-key stack. */
+function CatalogDetailStackEditing({
+  imageKey,
+  stackId,
+  onDataChanged,
+}: {
+  imageKey: string
+  stackId: number
+  onDataChanged: () => void
+}) {
+  const [members, setMembers] = useState<CatalogImage[] | null>(null)
+  const [mutating, setMutating] = useState(false)
+  const [mergeSourceId, setMergeSourceId] = useState('')
+  const [confirm, setConfirm] = useState<StackConfirmSpec | null>(null)
+  const { toast, offerUndo, runUndo } = useUndoToast()
+
+  useEffect(() => {
+    let cancelled = false
+    void ImagesAPI.getStackMembers(stackId)
+      .then((r) => {
+        if (!cancelled) setMembers(r.items)
+      })
+      .catch(() => {
+        if (!cancelled) setMembers([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [stackId])
+
+  async function refreshMembers() {
+    try {
+      const r = await ImagesAPI.getStackMembers(stackId)
+      setMembers(r.items)
+    } catch {
+      setMembers([])
+    }
+    onDataChanged()
+  }
+
+  async function runConfirmed(spec: StackConfirmSpec) {
+    setMutating(true)
+    try {
+      await spec.onConfirm()
+    } finally {
+      setMutating(false)
+      setConfirm(null)
+    }
+  }
+
+  if (!members || members.length < 2) return null
+
+  const isStackRep = members.some((m) => m.key === imageKey && m.is_stack_representative)
+  const hasRep = members.some((m) => m.is_stack_representative)
+
+  const openSplitConfirm = () => {
+    setConfirm({
+      title: CATALOG_STACK_CONFIRM_SPLIT_TITLE,
+      children: <p className="text-sm text-text-secondary">{CATALOG_STACK_CONFIRM_SPLIT_BODY}</p>,
+      confirmLabel: CATALOG_STACK_SPLIT_OUT,
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        await ImagesAPI.splitStackMember(stackId, imageKey)
+        await refreshMembers()
+      },
+    })
+  }
+
+  const openRepConfirm = () => {
+    const prevRep = members.find((m) => m.is_stack_representative)?.key
+    if (!prevRep || prevRep === imageKey) return
+    setConfirm({
+      title: CATALOG_STACK_CONFIRM_REP_TITLE,
+      children: <p className="text-sm text-text-secondary">{CATALOG_STACK_CONFIRM_REP_BODY}</p>,
+      confirmLabel: CATALOG_STACK_MAKE_REPRESENTATIVE,
+      confirmVariant: 'primary',
+      onConfirm: async () => {
+        await ImagesAPI.setStackRepresentative(stackId, imageKey)
+        await refreshMembers()
+        offerUndo(CATALOG_STACK_TOAST_REP_UPDATED, async () => {
+          await ImagesAPI.setStackRepresentative(stackId, prevRep)
+          await refreshMembers()
+        })
+      },
+    })
+  }
+
+  const openMergeConfirm = () => {
+    const sid = parseInt(mergeSourceId.trim(), 10)
+    if (!Number.isFinite(sid) || sid < 1 || sid === stackId) return
+    setConfirm({
+      title: CATALOG_STACK_CONFIRM_MERGE_TITLE,
+      children: <p className="text-sm text-text-secondary">{CATALOG_STACK_CONFIRM_MERGE_BODY}</p>,
+      confirmLabel: CATALOG_STACK_MERGE_RUN,
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        await ImagesAPI.mergeStacks(stackId, sid)
+        setMergeSourceId('')
+        onDataChanged()
+      },
+    })
+  }
+
+  return (
+    <div className="space-y-3 rounded-base border border-border bg-surface p-4">
+      <h3 className="text-sm font-semibold text-text">Burst stack</h3>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="min-h-9"
+          disabled={mutating}
+          onClick={openSplitConfirm}
+        >
+          {CATALOG_STACK_SPLIT_OUT}
+        </Button>
+        {!isStackRep ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="min-h-9"
+            disabled={mutating}
+            onClick={openRepConfirm}
+          >
+            {CATALOG_STACK_MAKE_REPRESENTATIVE}
+          </Button>
+        ) : null}
+      </div>
+      {hasRep ? (
+        <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+          <span className="w-full text-xs font-medium text-text-secondary">{CATALOG_STACK_MERGE_INTO}</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            aria-label={CATALOG_STACK_MERGE_SOURCE_ARIA}
+            placeholder={CATALOG_STACK_MERGE_PLACEHOLDER}
+            value={mergeSourceId}
+            disabled={mutating}
+            onChange={(e) => setMergeSourceId(e.target.value)}
+            className="h-9 min-w-[6rem] rounded-base border border-border bg-bg px-2 text-sm text-text"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="min-h-9"
+            disabled={mutating || !mergeSourceId.trim()}
+            onClick={openMergeConfirm}
+          >
+            {CATALOG_STACK_MERGE_RUN}
+          </Button>
+        </div>
+      ) : null}
+
+      {confirm ? (
+        <ConfirmModalFrame
+          zIndexClass="z-[80]"
+          title={confirm.title}
+          confirmLabel={confirm.confirmLabel}
+          cancelLabel={ACTION_CANCEL}
+          confirmVariant={confirm.confirmVariant}
+          onConfirm={() => void runConfirmed(confirm)}
+          onCancel={() => setConfirm(null)}
+          busy={mutating}
+        >
+          {confirm.children}
+        </ConfirmModalFrame>
+      ) : null}
+
+      <UndoToastBar toast={toast} undoLabel={ACTION_UNDO} onUndo={() => void runUndo()} />
+    </div>
+  )
+}
+
 function ImageDetailModalBody({
   imageType,
   imageKey,
   primaryScoreSource,
   scorePerspectiveSlug,
-}: Omit<ImageDetailModalProps, 'initialImage' | 'onClose'>) {
+  initialImage,
+}: Omit<ImageDetailModalProps, 'onClose'>) {
   const detailKey = [
     'images.detail',
     imageType,
@@ -199,6 +400,9 @@ function ImageDetailModalBody({
     bump((n) => n + 1)
   }, [detailKey])
 
+  const stackIdRaw = image.stack_id ?? initialImage?.stack_id
+  const stackId = stackIdRaw != null ? Number(stackIdRaw) : null
+
   return (
     <>
       <div className="grid gap-6 p-6 md:grid-cols-2">
@@ -218,6 +422,13 @@ function ImageDetailModalBody({
           ) : null}
           {image.image_type === 'instagram' ? (
             <InstagramImageDetailSections image={image} onDataChanged={handleDataChanged} />
+          ) : null}
+          {image.image_type === 'catalog' && stackId != null && !Number.isNaN(stackId) ? (
+            <CatalogDetailStackEditing
+              imageKey={imageKey}
+              stackId={stackId}
+              onDataChanged={handleDataChanged}
+            />
           ) : null}
         </div>
       </div>
@@ -322,6 +533,7 @@ export function ImageDetailModal({
               <ImageDetailModalBody
                 imageType={imageType}
                 imageKey={imageKey}
+                initialImage={initialImage}
                 primaryScoreSource={primaryScoreSource}
                 scorePerspectiveSlug={scorePerspectiveSlug}
               />

@@ -50,6 +50,9 @@ export function fromCatalogListRow(row: CatalogImage): ImageView {
     description_perspectives: row.description_perspectives ?? null,
     catalog_perspective_score: row.catalog_perspective_score,
     catalog_score_perspective: row.catalog_score_perspective ?? null,
+    stack_id: row.stack_id,
+    stack_member_count: row.stack_member_count,
+    is_stack_representative: row.is_stack_representative,
     // Identity fields intentionally omitted — list does not carry them.
   }
 }

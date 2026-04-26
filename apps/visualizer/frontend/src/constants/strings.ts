@@ -292,6 +292,23 @@ export const CATALOG_SIMILAR_FETCH_ERROR = 'Couldn’t load similar photos'
 export const CATALOG_STACK_MEMBERS_ERROR = 'Couldn’t load stack members'
 export const CATALOG_STACK_MEMBERS_LOADING = 'Loading…'
 export const CATALOG_STACK_MEMBERS_REGION_ARIA = 'Stack members'
+export const ACTION_UNDO = 'Undo'
+export const CATALOG_STACK_SPLIT_OUT = 'Split out'
+export const CATALOG_STACK_MAKE_REPRESENTATIVE = 'Make representative'
+export const CATALOG_STACK_MERGE_INTO = 'Merge stack into this'
+export const CATALOG_STACK_MERGE_SOURCE_ARIA = 'Source stack ID to merge'
+export const CATALOG_STACK_MERGE_PLACEHOLDER = 'e.g. 12'
+export const CATALOG_STACK_MERGE_RUN = 'Merge'
+export const CATALOG_STACK_CONFIRM_SPLIT_TITLE = 'Remove from stack?'
+export const CATALOG_STACK_CONFIRM_SPLIT_BODY =
+  'This photo will leave the burst stack. You can re-group it later with stack detection.'
+export const CATALOG_STACK_CONFIRM_REP_TITLE = 'Change representative?'
+export const CATALOG_STACK_CONFIRM_REP_BODY =
+  'The grid thumbnail for this stack will switch to this photo.'
+export const CATALOG_STACK_CONFIRM_MERGE_TITLE = 'Merge stacks?'
+export const CATALOG_STACK_CONFIRM_MERGE_BODY =
+  'All photos from the source stack join this one. The source stack row is removed.'
+export const CATALOG_STACK_TOAST_REP_UPDATED = 'Representative updated'
 
 export function formatStackCountBadge(n: number): string {
   return `${n} in stack`
