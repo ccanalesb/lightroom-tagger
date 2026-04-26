@@ -394,7 +394,21 @@ export function SearchPage() {
               <p className="text-text-secondary text-sm">Ask about your photos to see results here.</p>
             </div>
           ) : status === 'idle' && messages.length > 0 && currentImages.length === 0 ? (
-            <div className="flex items-center justify-center h-full min-h-[200px]">
+            <div className="flex flex-col items-center justify-center h-full min-h-[200px] gap-2 px-1">
+              {pinnedImageKey ? (
+                <p className="text-xs text-text-secondary self-stretch">
+                  Pinned to{' '}
+                  <span className="font-medium text-text">{pinnedImageKey}</span>
+                </p>
+              ) : null}
+              {pinSimilarityWarning ? (
+                <p
+                  role="status"
+                  className="text-xs text-amber-600 dark:text-amber-400 self-stretch"
+                >
+                  Similarity pin inactive: {pinSimilarityWarning}. Results use your full catalog.
+                </p>
+              ) : null}
               <p className="text-gray-500 text-sm">No matches found. Try a different query.</p>
             </div>
           ) : (

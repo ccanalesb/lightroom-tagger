@@ -253,6 +253,36 @@ def test_chat_search_pin_inactive_no_clip_embedding_falls_back_semantic(
     assert captured["restrict_to_keys"] is None
 
 
+def test_chat_search_nl_filter_with_pin_restricts_catalog_query(
+    chat_search_client, monkeypatch
+) -> None:
+    client, k = chat_search_client
+    captured: dict = {}
+
+    def capture_query(db, **kwargs):
+        captured["kwargs"] = kwargs
+        return ([], 0)
+
+    monkeypatch.setattr(
+        "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
+        lambda *a, **k: '{"keyword": "hill"}',
+    )
+    monkeypatch.setattr("api.images.query_catalog_images", capture_query)
+    monkeypatch.setattr(
+        "api.images.list_pin_similarity_candidate_keys",
+        lambda _db, seed: [seed, "neighbor-key"],
+    )
+    r = client.post(
+        "/api/images/chat-search",
+        json={"message": "show hills", "pinned_image_key": k},
+    )
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["search_mode"] == "nl_filter"
+    assert captured["kwargs"]["restrict_to_keys"] == frozenset({k, "neighbor-key"})
+    assert data["metadata"]["pin_state"] == "active"
+
+
 def test_chat_search_pin_inactive_invalid_key_metadata(
     chat_search_client, monkeypatch
 ) -> None:
