@@ -54,6 +54,12 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 - **v2.1 Phase 1 complete** (2026-04-17) — Matching & review polish. Backend two-bucket sort with tombstone serialization (D-08/09/11), validate-transaction created_at backfill (D-12), frontend string constants + MatchGroup.all_rejected (D-14), MatchDetailModal locked reject flow (D-01..D-07), MatchesTab tombstone cards + validated divider.
 - **v3.0 Phase 1 complete** (2026-04-23) — Visual tags & keyword search (VIS-01, NLS-02). Standalone FTS5 on `image_descriptions`, visual tag columns (`dominant_colors`, `mood_tags`, `has_repetition`, `description_search_document`), describe prompt extended, `_store_structured` fallbacks, `GET /api/images/catalog?description_search=` end-to-end, CatalogTab search filter, backfill AnalyzeTab checkbox. 73 backend + 7 frontend tests.
 
+### Pending Todos
+
+- Count: 2
+- `benchmark-embedding-recall.md` — Benchmark DINOv2/CLIP embeddings against user-validated match pairs
+- `2026-04-26-plan-backend-restart-and-compression-fix.md` — Plan backend restart and compression fix
+
 ## Traceability
 
 | Req | Phase | Status |
