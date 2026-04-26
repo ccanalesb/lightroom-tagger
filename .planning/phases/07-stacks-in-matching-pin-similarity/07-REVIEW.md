@@ -34,7 +34,7 @@ Phase 07 delivers representative-only Instagram match candidates, stack-wide mat
 | HTTP semantics | Split/merge/representative handlers: 5xx `StackMutationError` → 500 |
 | Tests | `test_images_detail_api.py`: solo stack fields + two-member stack |
 
-**Fix commit:** `fix(07-review): catalog detail stack fields and stack API 5xx mapping` — verify with `git log -1 --oneline`.
+**Fix commit:** `b4bd866` — `fix(07-review): catalog detail stack fields and stack API 5xx mapping`
 
 ## Tests run
 
