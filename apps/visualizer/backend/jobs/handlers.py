@@ -494,6 +494,12 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
         try:
             raw_clip_int = int(float(raw_clip))
         except (TypeError, ValueError):
+            add_job_log(
+                runner.db,
+                job_id,
+                'warning',
+                f'[vision-match] clip_top_k coercion: raw={raw_clip!r} -> default=50',
+            )
             raw_clip_int = 50
         clip_top_k = max(1, min(raw_clip_int, 500))
 
