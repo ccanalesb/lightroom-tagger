@@ -621,6 +621,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
     _migrate_image_clip_embeddings_vec0(conn)
     # Stack members reference `images` by key at insert time; `images` is created above.
     _migrate_image_stacks(conn)
+    _migrate_catalog_similarity(conn)
     seed_perspectives_from_prompts_dir(conn)
     conn.commit()
     return conn
@@ -852,6 +853,40 @@ def _migrate_image_stacks(conn: sqlite3.Connection) -> None:
 
         CREATE UNIQUE INDEX IF NOT EXISTS uq_image_stack_members_image_key
             ON image_stack_members(image_key);
+        """
+    )
+
+
+def _migrate_catalog_similarity(conn: sqlite3.Connection) -> None:
+    """Idempotent derived tables for job-driven catalog visual similarity."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS catalog_similarity_groups (
+            group_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            seed_key TEXT NOT NULL,
+            candidate_count INTEGER NOT NULL DEFAULT 0,
+            best_similarity REAL NOT NULL DEFAULT 0,
+            job_id TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_catalog_similarity_groups_created
+            ON catalog_similarity_groups(created_at DESC, group_id DESC);
+        CREATE INDEX IF NOT EXISTS idx_catalog_similarity_groups_seed
+            ON catalog_similarity_groups(seed_key);
+
+        CREATE TABLE IF NOT EXISTS catalog_similarity_candidates (
+            group_id INTEGER NOT NULL
+                REFERENCES catalog_similarity_groups(group_id) ON DELETE CASCADE,
+            candidate_key TEXT NOT NULL,
+            similarity REAL NOT NULL,
+            rank INTEGER NOT NULL,
+            why_matched TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (group_id, candidate_key)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_catalog_similarity_candidates_group_rank
+            ON catalog_similarity_candidates(group_id, rank);
         """
     )
 
@@ -1614,6 +1649,73 @@ def catalog_key_is_primary_grid_row(db: sqlite3.Connection, image_key: str) -> b
     return bool(row and int(row["ok"]))
 
 
+def list_clip_embedded_catalog_keys_newest_first(db: sqlite3.Connection) -> list[str]:
+    """Catalog keys with CLIP embeddings, ordered newest-to-oldest for batch jobs."""
+    rows = db.execute(
+        """
+        SELECT e.image_key AS key, i.date_taken AS date_taken
+        FROM image_clip_embeddings e
+        INNER JOIN images i ON i.key = e.image_key
+        ORDER BY i.date_taken DESC, i.key DESC
+        """
+    ).fetchall()
+    return [str(r["key"]) for r in rows if r["key"]]
+
+
+def clear_catalog_similarity_results(db: sqlite3.Connection) -> None:
+    """Clear derived catalog similarity job output."""
+    db.execute("DELETE FROM catalog_similarity_candidates")
+    db.execute("DELETE FROM catalog_similarity_groups")
+    db.commit()
+
+
+def insert_catalog_similarity_group(
+    db: sqlite3.Connection,
+    *,
+    seed_key: str,
+    candidates: Sequence[dict],
+    job_id: str | None = None,
+) -> int:
+    """Persist one catalog similarity group and its ranked candidate rows."""
+    if not candidates:
+        raise ValueError("candidates must not be empty")
+    best_similarity = max(float(c.get("similarity") or 0.0) for c in candidates)
+    cur = db.execute(
+        """
+        INSERT INTO catalog_similarity_groups
+            (seed_key, candidate_count, best_similarity, job_id, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            seed_key,
+            len(candidates),
+            best_similarity,
+            job_id,
+            datetime.now().isoformat(),
+        ),
+    )
+    group_id = int(cur.lastrowid)
+    db.executemany(
+        """
+        INSERT INTO catalog_similarity_candidates
+            (group_id, candidate_key, similarity, rank, why_matched)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                group_id,
+                str(c["candidate_key"]),
+                float(c["similarity"]),
+                int(c.get("rank") or idx + 1),
+                str(c.get("why_matched") or ""),
+            )
+            for idx, c in enumerate(candidates)
+        ],
+    )
+    db.commit()
+    return group_id
+
+
 def list_catalog_stack_member_keys(db: sqlite3.Connection, catalog_key: str) -> list[str]:
     """Return all ``image_key`` values in the stack containing *catalog_key*.
 
@@ -2120,7 +2222,9 @@ def get_catalog_images_missing_cache(db: sqlite3.Connection) -> list:
 
 def get_all_catalog_images(db: sqlite3.Connection) -> list:
     """Get all catalog images with resolved file paths."""
-    rows = db.execute("SELECT * FROM images").fetchall()
+    rows = db.execute(
+        "SELECT * FROM images ORDER BY date_taken DESC, key DESC"
+    ).fetchall()
     images = [_deserialize_row(r) for r in rows]
     for img in images:
         if img.get('filepath'):
@@ -2892,9 +2996,19 @@ def count_catalog_images_missing_text_embedding(conn: sqlite3.Connection) -> int
     return int(row["cnt"] if row else 0)
 
 
+def _sort_catalog_key_rows_newest_first(rows: list[sqlite3.Row]) -> list[str]:
+    """Return keys sorted by ``date_taken`` desc, then key desc."""
+    keyed: list[tuple[str, str]] = []
+    for row in rows:
+        key = str(row["key"])
+        date_taken = str(row["date_taken"] or "")
+        keyed.append((key, date_taken))
+    keyed.sort(key=lambda item: (item[1], item[0]), reverse=True)
+    return [key for key, _ in keyed]
+
+
 def _list_catalog_keys_text_embed_sql_params(
     *,
-    require_missing_embedding: bool,
     months: int | None,
     year: str | None,
     min_rating: int | None,
@@ -2902,10 +3016,6 @@ def _list_catalog_keys_text_embed_sql_params(
     frag = _embeddable_catalog_description_sql("d")
     parts: list[str] = [frag]
     params: list = []
-    if require_missing_embedding:
-        parts.append(
-            "NOT EXISTS (SELECT 1 FROM image_text_embeddings e WHERE e.image_key = d.image_key)"
-        )
     if months is not None:
         parts.append("i.date_taken >= date('now', ?)")
         params.append(f"-{months} months")
@@ -2917,7 +3027,7 @@ def _list_catalog_keys_text_embed_sql_params(
         params.append(min_rating)
     where = " AND ".join(parts)
     sql = f"""
-        SELECT i.key AS key
+        SELECT i.key AS key, i.date_taken AS date_taken
         FROM images i
         INNER JOIN image_descriptions d ON d.image_key = i.key AND d.image_type = 'catalog'
         WHERE {where}
@@ -2935,13 +3045,18 @@ def list_catalog_keys_needing_text_embedding(
 ) -> list[tuple[str, str]]:
     """Catalog keys with embeddable text in the date/rating window, excluding vec0 rows."""
     sql, params = _list_catalog_keys_text_embed_sql_params(
-        require_missing_embedding=True,
         months=months,
         year=year,
         min_rating=min_rating,
     )
     rows = conn.execute(sql, params).fetchall()
-    return [(r["key"], "catalog") for r in rows]
+    embedded_keys = {
+        str(r["image_key"])
+        for r in conn.execute("SELECT image_key FROM image_text_embeddings").fetchall()
+    }
+    filtered_rows = [r for r in rows if str(r["key"]) not in embedded_keys]
+    ordered_keys = _sort_catalog_key_rows_newest_first(filtered_rows)
+    return [(key, "catalog") for key in ordered_keys]
 
 
 def list_catalog_keys_for_text_embed_force(
@@ -2953,13 +3068,13 @@ def list_catalog_keys_for_text_embed_force(
 ) -> list[tuple[str, str]]:
     """All embeddable catalog keys in the window, including keys already in ``image_text_embeddings``."""
     sql, params = _list_catalog_keys_text_embed_sql_params(
-        require_missing_embedding=False,
         months=months,
         year=year,
         min_rating=min_rating,
     )
     rows = conn.execute(sql, params).fetchall()
-    return [(r["key"], "catalog") for r in rows]
+    ordered_keys = _sort_catalog_key_rows_newest_first(rows)
+    return [(key, "catalog") for key in ordered_keys]
 
 
 def upsert_image_text_embedding(
@@ -2986,7 +3101,6 @@ def upsert_image_clip_embedding(
 
 def _list_catalog_keys_clip_embed_sql_params(
     *,
-    require_missing_embedding: bool,
     months: int | None,
     year: str | None,
     min_rating: int | None,
@@ -2995,10 +3109,6 @@ def _list_catalog_keys_clip_embed_sql_params(
         "i.filepath IS NOT NULL AND TRIM(COALESCE(i.filepath, '')) != ''",
     ]
     params: list = []
-    if require_missing_embedding:
-        parts.append(
-            "NOT EXISTS (SELECT 1 FROM image_clip_embeddings e WHERE e.image_key = i.key)"
-        )
     if months is not None:
         parts.append("i.date_taken >= date('now', ?)")
         params.append(f"-{months} months")
@@ -3010,7 +3120,7 @@ def _list_catalog_keys_clip_embed_sql_params(
         params.append(min_rating)
     where = " AND ".join(parts)
     sql = f"""
-        SELECT i.key AS key
+        SELECT i.key AS key, i.date_taken AS date_taken
         FROM images i
         WHERE {where}
         ORDER BY i.key ASC
@@ -3027,13 +3137,17 @@ def list_catalog_keys_needing_clip_embedding(
 ) -> list[str]:
     """Catalog keys with a usable file path in the date/rating window, missing CLIP vec0 rows."""
     sql, params = _list_catalog_keys_clip_embed_sql_params(
-        require_missing_embedding=True,
         months=months,
         year=year,
         min_rating=min_rating,
     )
     rows = conn.execute(sql, params).fetchall()
-    return [r["key"] for r in rows]
+    embedded_keys = {
+        str(r["image_key"])
+        for r in conn.execute("SELECT image_key FROM image_clip_embeddings").fetchall()
+    }
+    filtered_rows = [r for r in rows if str(r["key"]) not in embedded_keys]
+    return _sort_catalog_key_rows_newest_first(filtered_rows)
 
 
 def list_catalog_keys_for_clip_embed_force(
@@ -3045,13 +3159,12 @@ def list_catalog_keys_for_clip_embed_force(
 ) -> list[str]:
     """All catalog keys with a usable file path in the window, including keys in ``image_clip_embeddings``."""
     sql, params = _list_catalog_keys_clip_embed_sql_params(
-        require_missing_embedding=False,
         months=months,
         year=year,
         min_rating=min_rating,
     )
     rows = conn.execute(sql, params).fetchall()
-    return [r["key"] for r in rows]
+    return _sort_catalog_key_rows_newest_first(rows)
 
 
 def get_all_images_with_descriptions(db: sqlite3.Connection,

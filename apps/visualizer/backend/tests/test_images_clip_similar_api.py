@@ -9,6 +9,7 @@ import sqlite_vec
 from app import create_app
 
 from lightroom_tagger.core.database import (
+    insert_catalog_similarity_group,
     init_database,
     library_write,
     store_image,
@@ -117,6 +118,56 @@ def test_clip_similar_success_includes_meta_and_similarity(clip_similar_client) 
     assert 0.0 <= im["similarity"] <= 1.0
     assert "why_matched" in im
     assert "Visual match (" in im["why_matched"]
+
+
+def test_catalog_similarity_groups_endpoint_returns_persisted_groups(tmp_path, monkeypatch) -> None:
+    db_path = str(tmp_path / "library.db")
+    conn = init_database(db_path)
+    k_seed = store_image(
+        conn,
+        {
+            "date_taken": "2024-01-02",
+            "filename": "seed.jpg",
+            "filepath": "/seed.jpg",
+            "id": "1",
+        },
+    )
+    k_candidate = store_image(
+        conn,
+        {
+            "date_taken": "2024-01-01",
+            "filename": "candidate.jpg",
+            "filepath": "/candidate.jpg",
+            "id": "2",
+        },
+    )
+    insert_catalog_similarity_group(
+        conn,
+        seed_key=k_seed,
+        candidates=[
+            {
+                "candidate_key": k_candidate,
+                "similarity": 0.95,
+                "rank": 1,
+                "why_matched": "Visual match (95%)",
+            }
+        ],
+        job_id="job-1",
+    )
+    conn.close()
+
+    monkeypatch.setattr("utils.db.LIBRARY_DB", db_path)
+    client = create_app().test_client()
+    r = client.get("/api/images/catalog-similarity-groups")
+
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data is not None
+    assert data["total"] == 1
+    group = data["items"][0]
+    assert group["seed"]["key"] == k_seed
+    assert group["candidates"][0]["key"] == k_candidate
+    assert group["candidates"][0]["similarity"] == 0.95
 
 
 @pytest.fixture

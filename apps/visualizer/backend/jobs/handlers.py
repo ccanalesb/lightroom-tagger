@@ -17,20 +17,27 @@ from lightroom_tagger.core.clip_embedding_service import (
 )
 from lightroom_tagger.core.database import (
     build_description_search_document,
+    catalog_key_is_primary_grid_row,
+    clear_catalog_similarity_results,
+    insert_catalog_similarity_group,
     init_database,
     library_write,
+    list_clip_embedded_catalog_keys_newest_first,
     list_catalog_keys_for_clip_embed_force,
     list_catalog_keys_for_text_embed_force,
     list_catalog_keys_needing_clip_embedding,
     list_catalog_keys_needing_text_embedding,
+    resolve_filepath,
     upsert_image_clip_embedding,
     upsert_image_text_embedding,
 )
+from lightroom_tagger.core.clip_similarity import NoClipEmbeddingError, run_clip_similar_for_seed
 from lightroom_tagger.core.embedding_service import (
     TEXT_EMBED_MODEL_ID,
     embed_texts,
     numpy_to_vec_blob,
 )
+from lightroom_tagger.core.vision_cache import get_or_create_cached_image
 from lightroom_tagger.core.provider_errors import AuthenticationError, InvalidRequestError
 from lightroom_tagger.scripts.import_instagram_dump import import_dump
 from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
@@ -48,6 +55,12 @@ from .checkpoint import (
 
 _CHECKPOINT_MAX_ENTRIES = 100_000
 _BATCH_EMBED_IMAGE_SIZE = 8
+_EMBED_PREFLIGHT_SAMPLE_SIZE = 25
+_EMBED_PREFLIGHT_FAIL_RATIO = 0.7
+_EMBED_SKIP_DETAIL_LOG_LIMIT = 5
+_EMBED_SUMMARY_LOG_EVERY = 250
+_CATALOG_SIMILARITY_SUMMARY_EVERY = 500
+_STACK_DETECT_SUMMARY_EVERY = 500
 
 # SQL fragments to exclude video files from describe queries at the DB level so
 # the processor never wastes a worker slot attempting to describe a .mov/.mp4/etc.
@@ -2564,6 +2577,16 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
             'info',
             f'batch_embed_image: model={CLIP_EMBED_MODEL_ID}',
         )
+        add_job_log(
+            runner.db,
+            job_id,
+            'info',
+            (
+                'batch_embed_image stage=precompute_embeddings '
+                '(builds similarity index only; does not produce matches). '
+                'After completion, run vision_match or stack detection.'
+            ),
+        )
 
         months, year = _resolve_date_window(metadata)
         min_rating_raw = metadata.get('min_rating')
@@ -2575,6 +2598,12 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 min_rating = None
 
         force = bool(metadata.get('force', False))
+        add_job_log(
+            runner.db,
+            job_id,
+            'info',
+            f'batch_embed_image filters: force={force}, months={months}, year={year}, min_rating={min_rating}',
+        )
         if force:
             full_list = list_catalog_keys_for_clip_embed_force(
                 lib_db, months=months, year=year, min_rating=min_rating
@@ -2621,15 +2650,137 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
             runner.clear_checkpoint(job_id)
             runner.complete_job(
                 job_id,
-                {'embedded': 0, 'skipped': 0, 'failed': 0, 'total': 0},
+                {
+                    'embedded': 0,
+                    'skipped': 0,
+                    'failed': 0,
+                    'total': 0,
+                    'skip_reason_counts': {
+                        'no_row': 0,
+                        'empty_path': 0,
+                        'unresolved_or_missing': 0,
+                        'encode_failed': 0,
+                    },
+                },
             )
             return
 
         embedded = 0
         skipped = 0
         failed = 0
+        skip_reason_counts = {
+            'no_row': 0,
+            'empty_path': 0,
+            'unresolved_or_missing': 0,
+            'encode_failed': 0,
+        }
         buf_keys: list[str] = []
         buf_paths: list[str] = []
+        skip_detail_logged = {
+            'no_row': 0,
+            'empty_path': 0,
+            'unresolved_or_missing': 0,
+            'encode_failed': 0,
+        }
+        summary_marker = 0
+
+        def classify_path(image_key: str) -> tuple[str | None, str | None, str | None]:
+            row = lib_db.execute(
+                "SELECT filepath FROM images WHERE key = ?",
+                (image_key,),
+            ).fetchone()
+            if not row:
+                return None, 'no_row', None
+            filepath = str(row['filepath'] or '').strip()
+            if not filepath:
+                return None, 'empty_path', None
+            resolved = resolve_filepath(filepath)
+            if not resolved or not os.path.isfile(resolved):
+                return None, 'unresolved_or_missing', (resolved or filepath)
+            cached = get_or_create_cached_image(lib_db, image_key, resolved)
+            if cached and os.path.isfile(cached):
+                return cached, None, None
+            # Compression/viewable conversion can fail for unsupported sources
+            # (e.g. videos/motion-photo sidecars). Treat as encode failure so
+            # preflight keeps focusing on true path accessibility problems.
+            return None, 'encode_failed', resolved
+
+        def maybe_log_skip_detail(reason: str, message: str) -> None:
+            count = skip_detail_logged.get(reason, 0)
+            if count < _EMBED_SKIP_DETAIL_LOG_LIMIT:
+                add_job_log(runner.db, job_id, 'warning', message)
+                skip_detail_logged[reason] = count + 1
+                return
+            if count == _EMBED_SKIP_DETAIL_LOG_LIMIT:
+                add_job_log(
+                    runner.db,
+                    job_id,
+                    'info',
+                    (
+                        f'additional {reason} skip logs suppressed after '
+                        f'{_EMBED_SKIP_DETAIL_LOG_LIMIT} samples; see skip_reason_counts'
+                    ),
+                )
+                skip_detail_logged[reason] = count + 1
+
+        def maybe_log_summary() -> None:
+            nonlocal summary_marker
+            done = embedded + skipped + failed
+            if done - summary_marker < _EMBED_SUMMARY_LOG_EVERY and done != total_at_start:
+                return
+            summary_marker = done
+            add_job_log(
+                runner.db,
+                job_id,
+                'info',
+                (
+                    f'embed-summary done={done}/{total_at_start} embedded={embedded} '
+                    f'skipped={skipped} failed={failed} '
+                    f'reasons={skip_reason_counts}'
+                ),
+            )
+
+        sample_size = min(len(remaining), _EMBED_PREFLIGHT_SAMPLE_SIZE)
+        if sample_size > 0:
+            sample_failures = {
+                'no_row': 0,
+                'empty_path': 0,
+                'unresolved_or_missing': 0,
+            }
+            sample_examples: dict[str, list[str]] = {
+                'no_row': [],
+                'empty_path': [],
+                'unresolved_or_missing': [],
+            }
+            for sample_key in remaining[:sample_size]:
+                _, sample_reason, sample_detail = classify_path(sample_key)
+                if sample_reason in sample_failures:
+                    sample_failures[sample_reason] += 1
+                    if len(sample_examples[sample_reason]) < 3:
+                        detail = f" ({sample_detail})" if sample_detail else ""
+                        sample_examples[sample_reason].append(f"{sample_key}{detail}")
+            sample_failed_count = (
+                sample_failures['no_row']
+                + sample_failures['empty_path']
+                + sample_failures['unresolved_or_missing']
+            )
+            fail_ratio = sample_failed_count / sample_size
+            if fail_ratio >= _EMBED_PREFLIGHT_FAIL_RATIO:
+                runner.fail_job(
+                    job_id,
+                    (
+                        f'Embed preflight failed: {sample_failed_count}/{sample_size} sampled images '
+                        'have missing or inaccessible paths '
+                        f"(no_row={sample_failures['no_row']}, empty_path={sample_failures['empty_path']}, "
+                        f"unresolved_or_missing={sample_failures['unresolved_or_missing']}). "
+                        f"Examples: no_row={sample_examples['no_row']}, "
+                        f"empty_path={sample_examples['empty_path']}, "
+                        f"unresolved_or_missing={sample_examples['unresolved_or_missing']}. "
+                        'Verify catalog filepath values and mounted storage accessibility before retrying.'
+                    ),
+                    severity='critical',
+                )
+                return
 
         def persist_progress() -> bool:
             if len(processed_pairs) > _CHECKPOINT_MAX_ENTRIES:
@@ -2667,8 +2818,10 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                         row_vec = encode_images([path], batch_size=1)
                         vecs_list.append(row_vec[0])
                     except Exception as per_err:
-                        add_job_log(runner.db, job_id, 'warning',
-                                    f'{img_key}: failed to encode ({per_err}), skipping')
+                        maybe_log_skip_detail(
+                            'encode_failed',
+                            f'{img_key}: failed to encode ({per_err}), skipping',
+                        )
                         vecs_list.append(None)
                 vecs = vecs_list  # type: ignore[assignment]
             for j, img_key in enumerate(buf_keys):
@@ -2677,6 +2830,7 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 vec = vecs[j]
                 if vec is None:
                     failed += 1
+                    skip_reason_counts['encode_failed'] += 1
                     processed_pairs.add(img_key)
                 else:
                     vec_blob = numpy_to_clip_vec_blob(vec)
@@ -2688,6 +2842,7 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                     return False
                 pct = int(5 + ((embedded + skipped + failed) / max(total_at_start, 1)) * 95)
                 runner.update_progress(job_id, pct, f'Embedded {embedded}/{total_at_start}')
+                maybe_log_summary()
             buf_keys.clear()
             buf_paths.clear()
             return True
@@ -2696,24 +2851,24 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
             if runner.is_cancelled(job_id):
                 runner.finalize_cancelled(job_id)
                 return
-            row = lib_db.execute(
-                "SELECT filepath FROM images WHERE key = ?",
-                (key,),
-            ).fetchone()
-            filepath = str(row['filepath'] or '').strip() if row else ''
-            if not row or not filepath or not os.path.isfile(filepath):
+            filepath, skip_reason, skip_detail = classify_path(key)
+            if skip_reason:
                 skipped += 1
-                add_job_log(
-                    runner.db,
-                    job_id,
-                    'warning',
-                    f'{key}: skipped image embed (no row, empty path, or file missing on disk)',
-                )
+                skip_reason_counts[skip_reason] += 1
+                reason_msg = {
+                    'no_row': 'catalog row missing',
+                    'empty_path': 'filepath is empty',
+                    'unresolved_or_missing': 'resolved path missing or inaccessible',
+                    'encode_failed': 'compression/viewable image unavailable',
+                }[skip_reason]
+                detail = f" ({skip_detail})" if skip_detail else ""
+                maybe_log_skip_detail(skip_reason, f'{key}: skipped image embed ({reason_msg}){detail}')
                 processed_pairs.add(key)
                 if not persist_progress():
                     return
                 pct = int(5 + ((embedded + skipped) / max(total_at_start, 1)) * 95)
                 runner.update_progress(job_id, pct, f'Embedded {embedded}/{total_at_start} (skipped {skipped})')
+                maybe_log_summary()
                 continue
 
             buf_keys.append(key)
@@ -2748,6 +2903,7 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 'skipped': skipped,
                 'failed': failed,
                 'total': total_at_start,
+                'skip_reason_counts': skip_reason_counts,
             },
         )
     except Exception as e:
@@ -2820,7 +2976,7 @@ def _build_burst_segments(
             cur.append(key)
         prev_ts = ts
     segments.append(cur)
-    return segments, skipped_no_date
+    return list(reversed(segments)), skipped_no_date
 
 
 def _select_stack_representative_key(lib_db: sqlite3.Connection, burst_keys: tuple[str, ...]) -> str | None:
@@ -2845,6 +3001,126 @@ def _select_stack_representative_key(lib_db: sqlite3.Connection, burst_keys: tup
         return None
     r = row.get('k') if isinstance(row, dict) else row[0]
     return str(r) if r is not None else None
+
+
+def _catalog_similarity_why_matched_line(similarity: float) -> str:
+    pct = max(0, min(100, int(round(float(similarity) * 100.0))))
+    return f"Visual match ({pct}%)"
+
+
+def handle_batch_catalog_similarity(runner, job_id: str, metadata: dict) -> None:
+    """Materialize catalog-to-catalog CLIP similarity groups for later review."""
+    lib_db: sqlite3.Connection | None = None
+    try:
+        db_path = _resolve_library_db_or_fail(runner, job_id)
+        if db_path is None:
+            return
+        lib_db = init_database(db_path)
+
+        try:
+            min_similarity = float(metadata.get('min_similarity', 0.9))
+        except (TypeError, ValueError):
+            min_similarity = 0.9
+        min_similarity = max(0.0, min(1.0, min_similarity))
+        try:
+            limit_per_seed = int(metadata.get('limit_per_seed', 8))
+        except (TypeError, ValueError):
+            limit_per_seed = 8
+        limit_per_seed = max(1, min(limit_per_seed, 50))
+
+        all_keys = list_clip_embedded_catalog_keys_newest_first(lib_db)
+        total = len(all_keys)
+        add_job_log(
+            runner.db,
+            job_id,
+            'info',
+            (
+                'batch_catalog_similarity stage=find_similar_photos '
+                f'min_similarity={min_similarity:.2f}, limit_per_seed={limit_per_seed}, '
+                f'embedded_catalog_images={total}'
+            ),
+        )
+        runner.update_progress(job_id, 5, f'Found {total} embedded catalog images')
+
+        clear_catalog_similarity_results(lib_db)
+
+        groups_created = 0
+        candidates_created = 0
+        skipped_non_primary = 0
+        skipped_no_embedding = 0
+        seen_pairs: set[tuple[str, str]] = set()
+
+        for idx, seed_key in enumerate(all_keys, start=1):
+            if runner.is_cancelled(job_id):
+                runner.finalize_cancelled(job_id)
+                return
+            if not catalog_key_is_primary_grid_row(lib_db, seed_key):
+                skipped_non_primary += 1
+                continue
+            try:
+                pairs, _meta = run_clip_similar_for_seed(
+                    lib_db,
+                    seed_key,
+                    limit=limit_per_seed,
+                    offset=0,
+                )
+            except NoClipEmbeddingError:
+                skipped_no_embedding += 1
+                continue
+
+            candidates: list[dict] = []
+            for candidate_key, distance in pairs:
+                sim = max(0.0, min(1.0, 1.0 - float(distance)))
+                if sim < min_similarity:
+                    continue
+                pair_key = tuple(sorted((seed_key, candidate_key)))
+                if pair_key in seen_pairs:
+                    continue
+                seen_pairs.add(pair_key)
+                candidates.append(
+                    {
+                        'candidate_key': candidate_key,
+                        'similarity': sim,
+                        'rank': len(candidates) + 1,
+                        'why_matched': _catalog_similarity_why_matched_line(sim),
+                    }
+                )
+
+            if candidates:
+                insert_catalog_similarity_group(
+                    lib_db,
+                    seed_key=seed_key,
+                    candidates=candidates,
+                    job_id=job_id,
+                )
+                groups_created += 1
+                candidates_created += len(candidates)
+
+            if idx % _CATALOG_SIMILARITY_SUMMARY_EVERY == 0 or idx == total:
+                progress = int(5 + (idx / max(total, 1)) * 95)
+                msg = (
+                    f'Similarity scan {idx}/{total}: groups={groups_created}, '
+                    f'candidates={candidates_created}, skipped_non_primary={skipped_non_primary}'
+                )
+                runner.update_progress(job_id, min(progress, 100), msg)
+
+        result = {
+            'groups_created': int(groups_created),
+            'candidates_created': int(candidates_created),
+            'embedded_catalog_images': int(total),
+            'skipped_non_primary': int(skipped_non_primary),
+            'skipped_no_embedding': int(skipped_no_embedding),
+            'min_similarity': float(min_similarity),
+            'limit_per_seed': int(limit_per_seed),
+        }
+        add_job_log(runner.db, job_id, 'info', f'Catalog similarity complete: {result}')
+        runner.complete_job(job_id, result)
+    except Exception as e:
+        severity = _failure_severity_from_exception(e)
+        runner.fail_job(job_id, str(e), severity=severity)
+    finally:
+        if lib_db:
+            lib_db.close()
 
 
 def handle_batch_stack_detect(runner, job_id: str, metadata: dict) -> None:
@@ -3015,6 +3291,23 @@ def _handle_batch_stack_detect_inner(runner, job_id: str, metadata: dict) -> Non
         stacks_created = 0
         stacks_updated = 0
         images_stacked = 0
+        last_stack_summary = 0
+
+        def emit_stack_summary(*, force: bool = False) -> None:
+            nonlocal last_stack_summary
+            done = len(processed_image_keys)
+            if not force and done - last_stack_summary < _STACK_DETECT_SUMMARY_EVERY:
+                return
+            last_stack_summary = done
+            pct = int(5 + (done / max(total_work_units, 1)) * 95)
+            runner.update_progress(
+                job_id,
+                min(pct, 100),
+                (
+                    f'Stack scan {done}/{total_work_units}: stacks_created={stacks_created}, '
+                    f'images_stacked={images_stacked}, skipped_no_date={images_skipped_no_date}'
+                ),
+            )
 
         def persist_progress() -> bool:
             if len(processed_image_keys) > _CHECKPOINT_MAX_ENTRIES:
@@ -3050,12 +3343,7 @@ def _handle_batch_stack_detect_inner(runner, job_id: str, metadata: dict) -> Non
                 row_s = get_job(runner.db, job_id)
                 if row_s and row_s.get('status') == 'failed':
                     return
-                pct = int(5 + (len(processed_image_keys) / max(total_work_units, 1)) * 95)
-                runner.update_progress(
-                    job_id,
-                    min(pct, 100),
-                    f'Processed bursts ({len(processed_image_keys)}/{total_work_units} keys)',
-                )
+                emit_stack_summary()
                 continue
 
             burst_tuple = tuple(segment)
@@ -3091,12 +3379,7 @@ def _handle_batch_stack_detect_inner(runner, job_id: str, metadata: dict) -> Non
             if runner.is_cancelled(job_id):
                 runner.finalize_cancelled(job_id)
                 return
-            pct = int(5 + (len(processed_image_keys) / max(total_work_units, 1)) * 95)
-            runner.update_progress(
-                job_id,
-                min(pct, 100),
-                f'Created stack {stacks_created} ({len(processed_image_keys)}/{total_work_units} keys)',
-            )
+            emit_stack_summary()
 
         if runner.is_cancelled(job_id):
             runner.finalize_cancelled(job_id)
@@ -3118,6 +3401,7 @@ def _handle_batch_stack_detect_inner(runner, job_id: str, metadata: dict) -> Non
             'info',
             f'Stack detection complete: {result}; {images_skipped_no_date} images skipped (no date_taken)',
         )
+        emit_stack_summary(force=True)
         runner.clear_checkpoint(job_id)
         runner.complete_job(job_id, result)
     except Exception as e:
@@ -3140,6 +3424,7 @@ JOB_HANDLERS = {
     'batch_score': handle_batch_score,
     'batch_analyze': handle_batch_analyze,
     'batch_stack_detect': handle_batch_stack_detect,
+    'batch_catalog_similarity': handle_batch_catalog_similarity,
     'batch_text_embed': handle_batch_text_embed,
     'batch_embed_image': handle_batch_embed_image,
 }

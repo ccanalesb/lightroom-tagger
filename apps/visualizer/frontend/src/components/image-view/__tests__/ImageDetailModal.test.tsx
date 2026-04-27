@@ -27,7 +27,6 @@ vi.mock('../InstagramImageDetailSections', () => ({
 
 import { ImageDetailModal } from '../ImageDetailModal'
 import { ImagesAPI } from '../../../services/api'
-import { CATALOG_SIMILAR_MORE_LIKE_THIS } from '../../../constants/strings'
 
 function buildDetail(overrides: Partial<ImageDetailResponse> = {}): ImageDetailResponse {
   return {
@@ -68,13 +67,8 @@ describe('ImageDetailModal', () => {
     expect(screen.getByTestId('catalog-sections').dataset.key).toBe('k1')
   })
 
-  it('offers More like this and requests similar images for catalog', async () => {
+  it('does not expose on-demand visual similarity from the detail modal', async () => {
     vi.spyOn(ImagesAPI, 'getImageDetail').mockResolvedValue(buildDetail())
-    const similarSpy = vi.spyOn(ImagesAPI, 'getCatalogSimilar').mockResolvedValue({
-      images: [],
-      total: 0,
-      meta: { clip_model_id: 'clip-ViT-B-32', clip_embed_dim: 512 },
-    })
     render(
       <ImageDetailModal
         imageType="catalog"
@@ -86,10 +80,7 @@ describe('ImageDetailModal', () => {
     await waitFor(() => {
       expect(screen.getByTestId('catalog-sections')).toBeInTheDocument()
     })
-    fireEvent.click(screen.getByRole('button', { name: CATALOG_SIMILAR_MORE_LIKE_THIS }))
-    await waitFor(() => {
-      expect(similarSpy).toHaveBeenCalledWith('k1', { limit: 24, offset: 0 })
-    })
+    expect(screen.queryByRole('button', { name: /more like this/i })).toBeNull()
   })
 
   it('passes score_perspective query when provided', async () => {

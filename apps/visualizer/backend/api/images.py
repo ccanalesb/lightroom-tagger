@@ -972,6 +972,78 @@ def get_catalog_image_similar(db, image_key: str):
         return error_server_error(str(e))
 
 
+@bp.route("/catalog-similarity-groups", methods=["GET"])
+@with_db
+def list_catalog_similarity_groups(db):
+    """Reviewable catalog visual similarity groups materialized by batch jobs."""
+    try:
+        limit, offset = _clamp_pagination(
+            request.args.get("limit", 20, type=int),
+            request.args.get("offset", 0, type=int),
+        )
+        total_row = db.execute(
+            "SELECT COUNT(*) AS c FROM catalog_similarity_groups"
+        ).fetchone()
+        total = int(total_row["c"] if total_row else 0)
+        groups = db.execute(
+            """
+            SELECT group_id, seed_key, candidate_count, best_similarity, job_id, created_at
+            FROM catalog_similarity_groups
+            ORDER BY created_at DESC, group_id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset),
+        ).fetchall()
+
+        items: list[dict] = []
+        for group in groups:
+            seed_key = str(group["seed_key"])
+            seed_rows = query_catalog_images_by_keys(db, [seed_key])
+            seed_images = _rows_to_catalog_api_images(seed_rows, None)
+            if not seed_images:
+                continue
+            candidate_rows = db.execute(
+                """
+                SELECT candidate_key, similarity, rank, why_matched
+                FROM catalog_similarity_candidates
+                WHERE group_id = ?
+                ORDER BY rank ASC, similarity DESC
+                """,
+                (group["group_id"],),
+            ).fetchall()
+            candidate_keys = [str(r["candidate_key"]) for r in candidate_rows]
+            catalog_rows = query_catalog_images_by_keys(db, candidate_keys)
+            candidates = _rows_to_catalog_api_images(catalog_rows, None)
+            by_key = {img["key"]: img for img in candidates}
+            ordered_candidates = []
+            for row in candidate_rows:
+                img = by_key.get(str(row["candidate_key"]))
+                if not img:
+                    continue
+                sim = float(row["similarity"] or 0.0)
+                img["similarity"] = sim
+                img["why_matched"] = row["why_matched"] or _clip_similarity_why_matched_line(sim)
+                img["thumbnail_url"] = f"/api/images/catalog/{img['key']}/thumbnail"
+                ordered_candidates.append(img)
+            seed = seed_images[0]
+            seed["thumbnail_url"] = f"/api/images/catalog/{seed['key']}/thumbnail"
+            items.append(
+                {
+                    "group_id": int(group["group_id"]),
+                    "seed": seed,
+                    "candidates": ordered_candidates,
+                    "candidate_count": int(group["candidate_count"] or len(ordered_candidates)),
+                    "best_similarity": float(group["best_similarity"] or 0.0),
+                    "job_id": group["job_id"],
+                    "created_at": group["created_at"],
+                }
+            )
+
+        return jsonify({"items": items, "total": total})
+    except Exception as e:
+        return error_server_error(str(e))
+
+
 # Stack strip order: members by ``image_key`` ASC (stable for UI).
 @bp.route("/stacks/<int:stack_id>/members", methods=["GET"])
 @with_db

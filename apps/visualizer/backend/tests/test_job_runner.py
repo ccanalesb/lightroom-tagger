@@ -2,6 +2,7 @@ import os
 import sys
 import tempfile
 import threading
+import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
@@ -61,6 +62,22 @@ def test_job_runner_dedupes_identical_progress_logs():
         runner.update_progress(job_id, 10, 'Embedding 10/100')
 
         assert count_job_logs(db, job_id) == baseline + 1
+
+
+def test_job_runner_preserves_started_at_on_progress_updates():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, 'test.db')
+        db = init_db(db_path)
+
+        runner = JobRunner(db)
+        job_id = create_job(db, 'test_job', {})
+        runner.start_job(job_id, 'test_job', {})
+        started_at = get_job(db, job_id)['started_at']
+        time.sleep(0.01)
+
+        runner.update_progress(job_id, 25, 'Quarter done')
+
+        assert get_job(db, job_id)['started_at'] == started_at
 
 def test_job_runner_completes_job():
     with tempfile.TemporaryDirectory() as tmpdir:

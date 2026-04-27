@@ -366,7 +366,7 @@ def update_job_status(db: sqlite3.Connection, job_id: str, status: str,
         sets.append("current_step = ?")
         params.append(current_step)
     if status == 'running':
-        sets.append("started_at = ?")
+        sets.append("started_at = COALESCE(started_at, ?)")
         params.append(datetime.now().isoformat())
     elif status in ('completed', 'failed', 'cancelled'):
         sets.append("completed_at = ?")

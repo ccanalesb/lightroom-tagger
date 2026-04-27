@@ -4,14 +4,9 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { CatalogTab } from '../CatalogTab'
 import {
-  ACTION_UNDO,
   CATALOG_FILTER_LABEL_KEYWORD,
-  CATALOG_STACK_SHOW,
-  CATALOG_STACK_SPLIT_OUT,
-  CATALOG_STACK_MAKE_REPRESENTATIVE,
-  CATALOG_STACK_CONFIRM_SPLIT_TITLE,
-  CATALOG_STACK_CONFIRM_REP_TITLE,
   FILTER_DESCRIPTION_SEARCH_ARIA,
+  formatStackCountBadge,
 } from '../../../constants/strings'
 import type { CatalogImage } from '../../../services/api'
 import { deleteMatching } from '../../../data/cache'
@@ -164,10 +159,9 @@ describe('CatalogTab', () => {
     vi.useRealTimers()
   })
 
-  it('offers Show stack and fetches members when a stack representative row is present', async () => {
-    const { rep, member } = stackRepAndMember()
+  it('shows stack badge in grid without stack action controls', async () => {
+    const { rep } = stackRepAndMember()
     apiMocks.listCatalogMock.mockResolvedValue({ images: [rep], total: 1 })
-    apiMocks.getStackMembersMock.mockResolvedValue({ items: [rep, member] })
 
     render(
       <MemoryRouter>
@@ -177,96 +171,7 @@ describe('CatalogTab', () => {
       </MemoryRouter>,
     )
 
-    const show = await screen.findByRole('button', { name: CATALOG_STACK_SHOW })
-    fireEvent.click(show)
-
-    await waitFor(() => {
-      expect(apiMocks.getStackMembersMock).toHaveBeenCalledWith(42)
-    })
-  })
-
-  it('shows stack split/representative controls only in expanded stack strip', async () => {
-    const { rep, member } = stackRepAndMember()
-    apiMocks.listCatalogMock.mockResolvedValue({ images: [rep], total: 1 })
-    apiMocks.getStackMembersMock.mockResolvedValue({ items: [rep, member] })
-
-    render(
-      <MemoryRouter>
-        <Suspense fallback={null}>
-          <CatalogTab />
-        </Suspense>
-      </MemoryRouter>,
-    )
-
-    expect(screen.queryByRole('button', { name: CATALOG_STACK_SPLIT_OUT })).toBeNull()
-
-    fireEvent.click(await screen.findByRole('button', { name: CATALOG_STACK_SHOW }))
-
-    await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: CATALOG_STACK_SPLIT_OUT }).length).toBeGreaterThan(0)
-    })
-    expect(screen.getByRole('button', { name: CATALOG_STACK_MAKE_REPRESENTATIVE })).toBeTruthy()
-  })
-
-  it('confirm modal gates split: confirms before splitStackMember runs', async () => {
-    const { rep, member } = stackRepAndMember()
-    apiMocks.listCatalogMock.mockResolvedValue({ images: [rep], total: 1 })
-    apiMocks.getStackMembersMock.mockResolvedValue({ items: [rep, member] })
-
-    render(
-      <MemoryRouter>
-        <Suspense fallback={null}>
-          <CatalogTab />
-        </Suspense>
-      </MemoryRouter>,
-    )
-
-    fireEvent.click(await screen.findByRole('button', { name: CATALOG_STACK_SHOW }))
-
-    const splitStripButtons = await screen.findAllByRole('button', { name: CATALOG_STACK_SPLIT_OUT })
-    fireEvent.click(splitStripButtons[0]!)
-
-    expect(await screen.findByText(CATALOG_STACK_CONFIRM_SPLIT_TITLE)).toBeTruthy()
-    expect(apiMocks.splitStackMemberMock).not.toHaveBeenCalled()
-
-    const splitAll = screen.getAllByRole('button', { name: CATALOG_STACK_SPLIT_OUT })
-    fireEvent.click(splitAll[splitAll.length - 1]!)
-
-    await waitFor(() => {
-      expect(apiMocks.splitStackMemberMock).toHaveBeenCalledWith(42, 'a/b/seed.jpg')
-    })
-  })
-
-  it('representative change uses shared undo toast and undo calls setStackRepresentative again', async () => {
-    const { rep, member } = stackRepAndMember()
-    apiMocks.listCatalogMock.mockResolvedValue({ images: [rep], total: 1 })
-    apiMocks.getStackMembersMock.mockResolvedValue({ items: [rep, member] })
-
-    render(
-      <MemoryRouter>
-        <Suspense fallback={null}>
-          <CatalogTab />
-        </Suspense>
-      </MemoryRouter>,
-    )
-
-    fireEvent.click(await screen.findByRole('button', { name: CATALOG_STACK_SHOW }))
-
-    fireEvent.click(await screen.findByRole('button', { name: CATALOG_STACK_MAKE_REPRESENTATIVE }))
-
-    expect(await screen.findByText(CATALOG_STACK_CONFIRM_REP_TITLE)).toBeTruthy()
-
-    const makeRepButtons = screen.getAllByRole('button', { name: CATALOG_STACK_MAKE_REPRESENTATIVE })
-    fireEvent.click(makeRepButtons[makeRepButtons.length - 1]!)
-
-    await waitFor(() => {
-      expect(apiMocks.setStackRepresentativeMock).toHaveBeenNthCalledWith(1, 42, 'a/b/member.jpg')
-    })
-
-    fireEvent.click(await screen.findByRole('button', { name: ACTION_UNDO }))
-
-    await waitFor(() => {
-      expect(apiMocks.setStackRepresentativeMock).toHaveBeenNthCalledWith(2, 42, 'a/b/seed.jpg')
-    })
+    expect(await screen.findByText(formatStackCountBadge(3))).toBeTruthy()
+    expect(apiMocks.getStackMembersMock).not.toHaveBeenCalled()
   })
 })

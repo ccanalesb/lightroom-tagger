@@ -11,6 +11,23 @@ from jobs.checkpoint import CHECKPOINT_VERSION, fingerprint_batch_stack_detect
 from jobs.runner import JobRunner
 
 
+def test_build_burst_segments_returns_newest_segments_first() -> None:
+    from jobs.handlers import _build_burst_segments
+
+    segments, skipped = _build_burst_segments(
+        [
+            {"key": "old-1", "date_taken": "2024-01-01T10:00:00+00:00"},
+            {"key": "old-2", "date_taken": "2024-01-01T10:00:00.500000+00:00"},
+            {"key": "new-1", "date_taken": "2024-01-02T10:00:00+00:00"},
+            {"key": "new-2", "date_taken": "2024-01-02T10:00:00.500000+00:00"},
+        ],
+        2000,
+    )
+
+    assert skipped == 0
+    assert segments == [["new-1", "new-2"], ["old-1", "old-2"]]
+
+
 def _make_runner() -> MagicMock:
     runner = MagicMock()
     runner.db = MagicMock()

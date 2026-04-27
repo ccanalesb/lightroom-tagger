@@ -406,6 +406,16 @@ export const ImagesAPI = {
     )
   },
 
+  listCatalogSimilarityGroups: (params?: { limit?: number; offset?: number }) => {
+    const sp = new URLSearchParams()
+    if (params?.limit !== undefined) sp.set('limit', String(params.limit))
+    if (params?.offset !== undefined) sp.set('offset', String(params.offset))
+    const qs = sp.toString()
+    return request<CatalogSimilarityGroupsResponse>(
+      `/images/catalog-similarity-groups${qs ? `?${qs}` : ''}`,
+    )
+  },
+
   getStackMembers: (stackId: number) =>
     request<{ items: CatalogImage[] }>(`/images/stacks/${stackId}/members`),
 
@@ -1040,6 +1050,21 @@ export type CatalogSimilarResponse = {
   images: CatalogImage[]
   total: number
   meta: { clip_model_id: string; clip_embed_dim: number }
+}
+
+export type CatalogSimilarityGroup = {
+  group_id: number
+  seed: CatalogImage
+  candidates: CatalogImage[]
+  candidate_count: number
+  best_similarity: number
+  job_id?: string | null
+  created_at?: string | null
+}
+
+export type CatalogSimilarityGroupsResponse = {
+  items: CatalogSimilarityGroup[]
+  total: number
 }
 
 /** OpenAI-style chat messages for tool-calling search (request + response). */

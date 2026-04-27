@@ -4,14 +4,10 @@ import {
   useRef,
   useState,
   useTransition,
-  type MouseEvent,
-  type ReactNode,
 } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ImagesAPI, PerspectivesAPI, type CatalogImage } from '../../services/api';
 import { ImageDetailModal, ImageTile, fromCatalogListRow } from '../image-view';
-import { Button } from '../ui/Button/Button';
-import { ConfirmModalFrame, UndoToastBar, useUndoToast } from '../ui/ConfirmUndoAction';
 import { Badge } from '../ui/badges';
 import { Pagination } from '../ui/Pagination';
 import { TileGrid } from '../ui/TileGrid';
@@ -50,26 +46,6 @@ import {
   CATALOG_FILTER_COLOR_PLACEHOLDER,
   CATALOG_FILTER_COLOR_ARIA,
   msgShowingOf,
-  ACTION_CANCEL,
-  ACTION_UNDO,
-  CATALOG_STACK_SHOW,
-  CATALOG_STACK_HIDE,
-  CATALOG_STACK_MEMBERS_ERROR,
-  CATALOG_STACK_MEMBERS_LOADING,
-  CATALOG_STACK_MEMBERS_REGION_ARIA,
-  CATALOG_STACK_SPLIT_OUT,
-  CATALOG_STACK_MAKE_REPRESENTATIVE,
-  CATALOG_STACK_MERGE_INTO,
-  CATALOG_STACK_MERGE_SOURCE_ARIA,
-  CATALOG_STACK_MERGE_PLACEHOLDER,
-  CATALOG_STACK_MERGE_RUN,
-  CATALOG_STACK_CONFIRM_SPLIT_TITLE,
-  CATALOG_STACK_CONFIRM_SPLIT_BODY,
-  CATALOG_STACK_CONFIRM_REP_TITLE,
-  CATALOG_STACK_CONFIRM_REP_BODY,
-  CATALOG_STACK_CONFIRM_MERGE_TITLE,
-  CATALOG_STACK_CONFIRM_MERGE_BODY,
-  CATALOG_STACK_TOAST_REP_UPDATED,
   formatStackCountBadge,
 } from '../../constants/strings';
 import { formatMonth } from '../../utils/date';
@@ -79,14 +55,6 @@ import type { FilterSchema } from '../filters/types';
 import { stableSerializeRecord } from '../../utils/stableQueryKey';
 
 const LIMIT = 50;
-
-type StackConfirmSpec = {
-  title: ReactNode
-  children: ReactNode
-  confirmLabel: string
-  confirmVariant: 'danger' | 'primary'
-  onConfirm: () => Promise<void>
-}
 
 function CatalogImageWithStack({
   image,
@@ -99,110 +67,6 @@ function CatalogImageWithStack({
   const count = image.stack_member_count ?? 0
   const isRep = image.is_stack_representative === true
   const showStack = isRep && stackId != null && count > 1
-  const regionId = `stack-members-${image.key.replace(/[^a-zA-Z0-9_-]/g, '_')}`
-
-  const [expanded, setExpanded] = useState(false)
-  const [members, setMembers] = useState<CatalogImage[] | undefined>(undefined)
-  const [loadError, setLoadError] = useState<string | undefined>(undefined)
-  const [loading, setLoading] = useState(false)
-  const [mutating, setMutating] = useState(false)
-  const [mergeSourceId, setMergeSourceId] = useState('')
-  const [confirm, setConfirm] = useState<StackConfirmSpec | null>(null)
-  const { toast, offerUndo, runUndo } = useUndoToast()
-
-  const handleToggleStack = (e: MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation()
-    if (!showStack || stackId == null) return
-    if (expanded) {
-      setExpanded(false)
-      return
-    }
-    setExpanded(true)
-    if (members !== undefined) return
-    setLoading(true)
-    setLoadError(undefined)
-    void ImagesAPI.getStackMembers(stackId)
-      .then((res) => setMembers(res.items))
-      .catch(() => setLoadError(CATALOG_STACK_MEMBERS_ERROR))
-      .finally(() => setLoading(false))
-  }
-
-  async function refreshMembersOrCollapse() {
-    if (stackId == null) return
-    try {
-      const r = await ImagesAPI.getStackMembers(stackId)
-      setMembers(r.items)
-    } catch {
-      setExpanded(false)
-      setMembers(undefined)
-    }
-  }
-
-  async function runConfirmed(spec: StackConfirmSpec) {
-    setMutating(true)
-    try {
-      await spec.onConfirm()
-    } finally {
-      setMutating(false)
-      setConfirm(null)
-    }
-  }
-
-  const openSplitConfirm = (memberKey: string) => {
-    if (stackId == null) return
-    setConfirm({
-      title: CATALOG_STACK_CONFIRM_SPLIT_TITLE,
-      children: <p className="text-sm text-text-secondary">{CATALOG_STACK_CONFIRM_SPLIT_BODY}</p>,
-      confirmLabel: CATALOG_STACK_SPLIT_OUT,
-      confirmVariant: 'danger',
-      onConfirm: async () => {
-        await ImagesAPI.splitStackMember(stackId, memberKey)
-        await refreshMembersOrCollapse()
-      },
-    })
-  }
-
-  const openRepConfirm = (memberKey: string) => {
-    if (stackId == null || !members) return
-    const prevRep = members.find((m) => m.is_stack_representative)?.key
-    if (!prevRep || prevRep === memberKey) return
-    setConfirm({
-      title: CATALOG_STACK_CONFIRM_REP_TITLE,
-      children: <p className="text-sm text-text-secondary">{CATALOG_STACK_CONFIRM_REP_BODY}</p>,
-      confirmLabel: CATALOG_STACK_MAKE_REPRESENTATIVE,
-      confirmVariant: 'primary',
-      onConfirm: async () => {
-        await ImagesAPI.setStackRepresentative(stackId, memberKey)
-        const r = await ImagesAPI.getStackMembers(stackId)
-        setMembers(r.items)
-        offerUndo(CATALOG_STACK_TOAST_REP_UPDATED, async () => {
-          await ImagesAPI.setStackRepresentative(stackId, prevRep)
-          const r2 = await ImagesAPI.getStackMembers(stackId)
-          setMembers(r2.items)
-        })
-      },
-    })
-  }
-
-  const openMergeConfirm = () => {
-    if (stackId == null) return
-    const sid = parseInt(mergeSourceId.trim(), 10)
-    if (!Number.isFinite(sid) || sid < 1 || sid === stackId) return
-    setConfirm({
-      title: CATALOG_STACK_CONFIRM_MERGE_TITLE,
-      children: <p className="text-sm text-text-secondary">{CATALOG_STACK_CONFIRM_MERGE_BODY}</p>,
-      confirmLabel: CATALOG_STACK_MERGE_RUN,
-      confirmVariant: 'danger',
-      onConfirm: async () => {
-        await ImagesAPI.mergeStacks(stackId, sid)
-        setMergeSourceId('')
-        setExpanded(false)
-        setMembers(undefined)
-      },
-    })
-  }
-
-  const hasRepInStrip = Boolean(members?.some((m) => m.is_stack_representative))
 
   return (
     <div className="min-w-0">
@@ -216,135 +80,7 @@ function CatalogImageWithStack({
             <Badge variant="default">{formatStackCountBadge(count)}</Badge>
           ) : undefined
         }
-        footer={
-          showStack ? (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              fullWidth
-              className="min-h-11"
-              aria-expanded={expanded}
-              aria-controls={regionId}
-              onClick={handleToggleStack}
-            >
-              {expanded ? CATALOG_STACK_HIDE : CATALOG_STACK_SHOW}
-            </Button>
-          ) : null
-        }
       />
-      {showStack && expanded ? (
-        <div
-          id={regionId}
-          role="region"
-          aria-label={CATALOG_STACK_MEMBERS_REGION_ARIA}
-          className="mt-2 rounded-base border border-border bg-surface p-2"
-        >
-          {loading && members === undefined && !loadError ? (
-            <p className="text-xs text-text-secondary">{CATALOG_STACK_MEMBERS_LOADING}</p>
-          ) : null}
-          {loadError ? (
-            <p className="text-sm text-error" role="alert">
-              {CATALOG_STACK_MEMBERS_ERROR}
-            </p>
-          ) : null}
-          {members && !loadError ? (
-            <>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {members.map((m) => (
-                  <div key={m.key} className="w-[7.5rem] shrink-0 min-w-0 space-y-1">
-                    <ImageTile
-                      image={fromCatalogListRow(m)}
-                      variant="strip"
-                      primaryScoreSource="catalog"
-                      onClick={() => onSelect(m)}
-                      className="!w-full max-w-full"
-                    />
-                    <div className="flex flex-col gap-1">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        fullWidth
-                        className="min-h-9 text-xs"
-                        disabled={mutating}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openSplitConfirm(m.key)
-                        }}
-                      >
-                        {CATALOG_STACK_SPLIT_OUT}
-                      </Button>
-                      {!m.is_stack_representative ? (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          fullWidth
-                          className="min-h-9 text-xs"
-                          disabled={mutating}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            openRepConfirm(m.key)
-                          }}
-                        >
-                          {CATALOG_STACK_MAKE_REPRESENTATIVE}
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {hasRepInStrip ? (
-                <div className="mt-2 flex flex-wrap items-end gap-2 border-t border-border pt-2">
-                  <span className="w-full text-xs font-medium text-text-secondary">
-                    {CATALOG_STACK_MERGE_INTO}
-                  </span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    aria-label={CATALOG_STACK_MERGE_SOURCE_ARIA}
-                    placeholder={CATALOG_STACK_MERGE_PLACEHOLDER}
-                    value={mergeSourceId}
-                    disabled={mutating}
-                    onChange={(e) => setMergeSourceId(e.target.value)}
-                    className="h-9 min-w-[6rem] rounded-base border border-border bg-bg px-2 text-sm text-text"
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="min-h-9"
-                    disabled={mutating || !mergeSourceId.trim()}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      openMergeConfirm()
-                    }}
-                  >
-                    {CATALOG_STACK_MERGE_RUN}
-                  </Button>
-                </div>
-              ) : null}
-            </>
-          ) : null}
-        </div>
-      ) : null}
-
-      {confirm ? (
-        <ConfirmModalFrame
-          title={confirm.title}
-          confirmLabel={confirm.confirmLabel}
-          cancelLabel={ACTION_CANCEL}
-          confirmVariant={confirm.confirmVariant}
-          onConfirm={() => void runConfirmed(confirm)}
-          onCancel={() => setConfirm(null)}
-          busy={mutating}
-        >
-          {confirm.children}
-        </ConfirmModalFrame>
-      ) : null}
-
-      <UndoToastBar toast={toast} undoLabel={ACTION_UNDO} onUndo={() => void runUndo()} />
     </div>
   );
 }
@@ -519,33 +255,13 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
   const filters = useFilters(catalogSchema);
   const { values: filterValues, rawValues: filterRawValues, toQueryParams, activeCount } = filters;
 
-  const dateRangeValue = filterValues.dateRange as { from?: string; to?: string } | undefined;
-  const dateRangeFrom = dateRangeValue?.from ?? '';
-  const dateRangeTo = dateRangeValue?.to ?? '';
-
   const listParams = useMemo(
     () => ({
       ...toQueryParams(),
       limit: LIMIT,
       offset: (page - 1) * LIMIT,
     }),
-    [
-      page,
-      toQueryParams,
-      filterValues.posted,
-      filterValues.analyzed,
-      filterValues.month,
-      filterValues.keyword,
-      filterValues.descriptionSearch,
-      filterValues.minRating,
-      filterValues.colorLabel,
-      filterValues.scorePerspective,
-      filterValues.minCatalogScore,
-      filterValues.sortByScore,
-      filterValues.sortByDate,
-      dateRangeFrom,
-      dateRangeTo,
-    ],
+    [page, toQueryParams],
   );
 
   const listQueryKey = useMemo(
@@ -580,8 +296,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
     filterValues.analyzed,
     filterValues.month,
     filterValues.minRating,
-    dateRangeFrom,
-    dateRangeTo,
+    filterValues.dateRange,
     filterValues.scorePerspective,
     filterValues.minCatalogScore,
     filterValues.sortByScore,
