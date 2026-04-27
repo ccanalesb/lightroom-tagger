@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
 status: Milestone complete
-last_updated: "2026-04-26T18:19:37.833Z"
+last_updated: "2026-04-27T13:40:00.000Z"
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 37
-  completed_plans: 37
+  total_phases: 10
+  completed_phases: 10
+  total_plans: 40
+  completed_plans: 40
   percent: 100
 ---
 
@@ -22,16 +22,16 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
-| Phase | Phase 7 — Stacks in matching & pin similarity |
-| Status | **Ready to discuss/plan** after Phase 6 completion |
-| Last activity | 2026-04-25 — Phase 6 Similarity & Stack UI complete: 4/4 plans, clean review, verification 9/9 passed; next: `/gsd-discuss-phase 7` |
+| Phase | Phase 7.1 — phase-7-remediation-fixes |
+| Status | **Complete** |
+| Last activity | 2026-04-27 — Completed quick task 260427-d5m to improve embed-job log observability (job log summaries + checkpoint compaction + inspector fix). |
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
-**Current focus:** Phase 07 — stacks-in-matching-pin-similarity
+**Current focus:** Phase 07.1 — phase-7-remediation-fixes
 
 ## Deferred Items
 
@@ -46,6 +46,7 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 
 - Phase 5.1 added: Search UI polish (clear button, spacing, mobile layout, dropdown overflow) — 2026-04-24
 - Phase 5.2 added: Tool-calling search (multi-tool LLM, capability detection, rich tool results, multi-turn history) — 2026-04-24
+- Phase 7.1 inserted after Phase 7: Phase 7 remediation fixes (URGENT) — 2026-04-26
 
 ## Accumulated Context
 
@@ -60,6 +61,12 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 - `benchmark-embedding-recall.md` — Benchmark DINOv2/CLIP embeddings against user-validated match pairs
 - `2026-04-26-plan-backend-restart-and-compression-fix.md` — Plan backend restart and compression fix
 - `2026-04-26-fixes-for-embed-job-discoverability-and-path-failures.md` — Fixes for embed job discoverability and path failures
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260427-d5m | based on your finding for the gaps on 7.1 | 2026-04-27 | 89038ad | [260427-d5m-based-on-your-finding-for-the-gaps-on-7-](./quick/260427-d5m-based-on-your-finding-for-the-gaps-on-7-/) |
 
 ## Traceability
 
