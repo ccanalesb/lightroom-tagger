@@ -311,6 +311,9 @@ export const SystemAPI = {
 
   cacheStatus: () =>
     request<CacheStatus>('/cache/status'),
+
+  cachePipelineStatus: () =>
+    request<CachePipelineStatus>('/cache/pipeline-status'),
 }
 
 /** STACK-05 mutation responses (`/api/images/stacks/...`). */
@@ -976,6 +979,32 @@ export interface CacheStatus {
   missing: number
   cache_size_mb: number
   cache_dir: string
+}
+
+/** Single bucket payload from ``/api/cache/pipeline-status``. */
+export interface CachePipelineRun {
+  job_id: string
+  type: string
+  status: string
+  created_at: string
+  started_at: string | null
+  completed_at: string | null
+  error: string | null
+}
+
+/** All pipeline-status buckets — one entry per CatalogCacheTab trigger.
+ *
+ * Each value is ``null`` when no matching job has ever run. Keys are stable
+ * and aligned with the UI buttons; ``embed_catalog_and_instagram`` matches
+ * jobs created with ``image_type: 'catalog_and_instagram'``.
+ */
+export interface CachePipelineStatus {
+  embed_catalog: CachePipelineRun | null
+  embed_catalog_and_instagram: CachePipelineRun | null
+  stack_detect: CachePipelineRun | null
+  catalog_similarity: CachePipelineRun | null
+  catalog_cache_build: CachePipelineRun | null
+  prepare_catalog: CachePipelineRun | null
 }
 
 export interface InstagramImage {

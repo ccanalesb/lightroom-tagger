@@ -592,6 +592,26 @@ export const CATALOG_CACHE_EMBED_CATALOG_IG_LABEL = 'Embed catalog + Instagram i
 export const CATALOG_CACHE_STACK_DETECT_LABEL = 'Run stack detection'
 export const CATALOG_CACHE_SIMILARITY_LABEL = 'Run catalog similarity'
 export const CATALOG_CACHE_PREPARE_CATALOG_TITLE = 'Pre-compress catalog images'
+
+/** One-sentence explanations shown next to each pipeline trigger so users
+ * understand what the job does before clicking. Kept short (≤ ~20 words). */
+export const CATALOG_CACHE_EMBED_CATALOG_HELPER =
+  'Compute CLIP visual embeddings for every catalog image so vision matching can shortlist candidates fast.'
+export const CATALOG_CACHE_EMBED_CATALOG_IG_HELPER =
+  'Same as catalog embed, plus Instagram dump images so prefilter works in both directions.'
+export const CATALOG_CACHE_STACK_DETECT_HELPER =
+  'Group burst-shot catalog images into stacks by date so only the representative frame goes through matching.'
+export const CATALOG_CACHE_SIMILARITY_HELPER =
+  'Materialize catalog-to-catalog similarity groups for review (preview shown above).'
+
+/** Last-run badge labels rendered next to each trigger.
+ *
+ * The status itself is already shown via a coloured `Badge`, so the inline
+ * text only repeats the relative time. Format intentionally omits punctuation
+ * so it reads cleanly next to the status pill (e.g. `completed · Last run
+ * 5 minutes ago`). */
+export const CATALOG_CACHE_LAST_RUN_NEVER = 'Never run'
+export const CATALOG_CACHE_LAST_RUN_LABEL = (ago: string) => `Last run ${ago}`
 export const CATALOG_CACHE_PREPARE_CATALOG_HELPER =
   "Decodes and compresses every catalog image (RAW → JPEG) so vision matching, description, and scoring jobs don't pay decode cost on the hot path. Optional — runs lazily on first use if skipped."
 
