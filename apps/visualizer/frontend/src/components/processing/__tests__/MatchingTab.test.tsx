@@ -1,24 +1,16 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 import { MatchingTab } from '../MatchingTab'
 
 const mocks = vi.hoisted(() => ({
   createJob: vi.fn(),
-  invalidateAll: vi.fn(),
 }))
 
 vi.mock('../../../services/api', () => ({
   JobsAPI: {
     create: (...args: unknown[]) => mocks.createJob(...args),
   },
-  ImagesAPI: {
-    listCatalogSimilarityGroups: vi.fn(),
-  },
-}))
-
-vi.mock('../../../data', () => ({
-  useQuery: () => ({ items: [], total: 0 }),
-  invalidateAll: (...args: unknown[]) => mocks.invalidateAll(...args),
 }))
 
 vi.mock('../../../stores/matchOptionsContext', () => ({
@@ -43,39 +35,47 @@ vi.mock('../../matching/AdvancedOptions', () => ({
   AdvancedOptions: () => <div data-testid="advanced-options" />,
 }))
 
-vi.mock('../../image-view', () => ({
-  ImageTile: () => <div data-testid="image-tile" />,
-  fromCatalogListRow: (row: unknown) => row,
-}))
+function renderMatchingTab() {
+  return render(
+    <MemoryRouter>
+      <MatchingTab />
+    </MemoryRouter>,
+  )
+}
 
 describe('MatchingTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.createJob.mockResolvedValue({ id: 'job-sim', type: 'batch_catalog_similarity' })
+    mocks.createJob.mockResolvedValue({ id: 'job-vm', type: 'vision_match' })
     vi.spyOn(window, 'alert').mockImplementation(() => {})
   })
 
-  it('enqueues catalog similarity as a batch job', async () => {
-    render(<MatchingTab />)
+  it('sends clip_top_k in metadata', async () => {
+    renderMatchingTab()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Find Similar Photos' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start Vision Matching' }))
 
     await waitFor(() => {
-      expect(mocks.createJob).toHaveBeenCalledWith('batch_catalog_similarity', {
-        min_similarity: 0.9,
-        limit_per_seed: 8,
-      })
+      expect(mocks.createJob).toHaveBeenCalledWith(
+        'vision_match',
+        expect.objectContaining({ clip_top_k: 50 }),
+      )
     })
-    expect(mocks.invalidateAll).toHaveBeenCalledWith(['catalog.similarity.groups'])
   })
 
-  it('enqueues stack detection as a batch job', async () => {
-    render(<MatchingTab />)
+  it('clips top-k field has min and max bounds', () => {
+    renderMatchingTab()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Detect Burst Stacks' }))
+    const spin = screen.getByRole('spinbutton', { name: /clip shortlist size/i })
+    expect(spin).toHaveAttribute('min', '1')
+    expect(spin).toHaveAttribute('max', '500')
+  })
 
-    await waitFor(() => {
-      expect(mocks.createJob).toHaveBeenCalledWith('batch_stack_detect', { force: true })
-    })
+  it('does not render Catalog Discovery Jobs or stack or similarity actions', () => {
+    renderMatchingTab()
+
+    expect(screen.queryByText('Catalog Discovery Jobs')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Find Similar Photos' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Detect Burst Stacks' })).not.toBeInTheDocument()
   })
 })

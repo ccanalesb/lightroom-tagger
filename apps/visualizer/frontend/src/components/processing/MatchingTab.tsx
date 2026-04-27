@@ -1,11 +1,11 @@
 import { useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
+import { Input } from '../ui/Input/Input';
 import { useMatchOptions } from '../../stores/matchOptionsContext';
 import { AdvancedOptions } from '../matching/AdvancedOptions';
-import { ImagesAPI, JobsAPI, type CatalogSimilarityGroup } from '../../services/api';
-import { ImageTile, fromCatalogListRow } from '../image-view';
-import { invalidateAll, useQuery } from '../../data';
+import { JobsAPI } from '../../services/api';
 import {
   ADVANCED_DATE_FILTER,
   ADVANCED_DATE_ALL,
@@ -16,6 +16,12 @@ import {
   ADVANCED_DATE_YEAR_2025,
   ADVANCED_DATE_YEAR_2024,
   ADVANCED_DATE_YEAR_2023,
+  ADVANCED_FIX_WEIGHTS,
+  MATCHING_CLIP_TOP_K_LABEL,
+  MATCHING_CLIP_TOP_K_HELPER,
+  MATCHING_CLIP_TOP_K_ERROR,
+  MATCHING_CATALOG_CACHE_POINTER,
+  PROCESSING_CATALOG_CACHE_ROUTE,
 } from '../../constants/strings';
 
 const DATE_FILTERS = [
@@ -36,19 +42,33 @@ export interface MatchingTabProps {
 export function MatchingTab(props: MatchingTabProps = {}) {
   const { onJobEnqueued } = props;
   const [dateFilter, setDateFilter] = useState<(typeof DATE_FILTERS)[number]['value']>('all');
+  const [clipTopKDraft, setClipTopKDraft] = useState('50');
+  const [clipTopKError, setClipTopKError] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
-  const [isSimilarityStarting, setIsSimilarityStarting] = useState(false);
-  const [isStackStarting, setIsStackStarting] = useState(false);
   const { options, updateOption, resetOptions, weightsError } = useMatchOptions();
-  const catalogSimilarity = useQuery(
-    ['catalog.similarity.groups', { limit: 12, offset: 0 }] as const,
-    () => ImagesAPI.listCatalogSimilarityGroups({ limit: 12, offset: 0 }),
-  );
+
+  const clampClipTopKOnBlur = useCallback(() => {
+    setClipTopKDraft((prev) => {
+      let n = parseInt(prev, 10);
+      if (prev === '' || Number.isNaN(n)) {
+        return '50';
+      }
+      n = Math.min(500, Math.max(1, n));
+      return String(n);
+    });
+    setClipTopKError(null);
+  }, []);
 
   const startMatching = useCallback(async () => {
     if (weightsError) {
-      alert('Please fix weight configuration before starting');
+      alert(ADVANCED_FIX_WEIGHTS);
+      return;
+    }
+
+    const clipTopK = parseInt(clipTopKDraft, 10);
+    if (!Number.isFinite(clipTopK) || clipTopK < 1 || clipTopK > 500) {
+      setClipTopKError(MATCHING_CLIP_TOP_K_ERROR);
       return;
     }
 
@@ -63,6 +83,7 @@ export function MatchingTab(props: MatchingTabProps = {}) {
         },
         max_workers: options.maxWorkers,
         skip_undescribed: options.skipUndescribed,
+        clip_top_k: clipTopK,
         ...(options.providerId ? { provider_id: options.providerId } : {}),
         ...(options.providerModel ? { provider_model: options.providerModel } : {}),
       };
@@ -83,39 +104,7 @@ export function MatchingTab(props: MatchingTabProps = {}) {
     } finally {
       setIsStarting(false);
     }
-  }, [dateFilter, options, weightsError, onJobEnqueued]);
-
-  const startCatalogSimilarity = useCallback(async () => {
-    setIsSimilarityStarting(true);
-    try {
-      await JobsAPI.create('batch_catalog_similarity', {
-        min_similarity: 0.9,
-        limit_per_seed: 8,
-      });
-      onJobEnqueued?.();
-      invalidateAll(['catalog.similarity.groups']);
-      alert('Catalog similarity job started! Check Job Queue tab to monitor progress.');
-    } catch (error) {
-      alert(`Failed to start job: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsSimilarityStarting(false);
-    }
-  }, [onJobEnqueued]);
-
-  const startStackDetection = useCallback(async () => {
-    setIsStackStarting(true);
-    try {
-      await JobsAPI.create('batch_stack_detect', { force: true });
-      onJobEnqueued?.();
-      alert('Stack detection job started! Check Job Queue tab to monitor progress.');
-    } catch (error) {
-      alert(`Failed to start job: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsStackStarting(false);
-    }
-  }, [onJobEnqueued]);
-
-  const groups = catalogSimilarity.items ?? [];
+  }, [clipTopKDraft, dateFilter, options, weightsError, onJobEnqueued]);
 
   return (
     <div>
@@ -142,6 +131,36 @@ export function MatchingTab(props: MatchingTabProps = {}) {
                 ))}
               </select>
             </div>
+
+            <div>
+              <Input
+                id="matching-clip-top-k"
+                label={MATCHING_CLIP_TOP_K_LABEL}
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={500}
+                step={1}
+                value={clipTopKDraft}
+                onChange={(e) => {
+                  setClipTopKError(null);
+                  setClipTopKDraft(e.target.value.replace(/\D/g, ''));
+                }}
+                onBlur={clampClipTopKOnBlur}
+                error={clipTopKError ?? undefined}
+                fullWidth
+              />
+              <p className="mt-1 text-sm text-text-secondary">{MATCHING_CLIP_TOP_K_HELPER}</p>
+            </div>
+
+            <p className="text-sm text-text-secondary">
+              <Link
+                to={PROCESSING_CATALOG_CACHE_ROUTE}
+                className="font-semibold text-accent hover:underline focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 rounded-sm"
+              >
+                {MATCHING_CATALOG_CACHE_POINTER}
+              </Link>
+            </p>
 
             <AdvancedOptions
               isOpen={showAdvanced}
@@ -170,113 +189,6 @@ export function MatchingTab(props: MatchingTabProps = {}) {
           </div>
         </CardContent>
       </Card>
-
-      <Card padding="lg" className="mt-6">
-        <CardHeader>
-          <CardTitle>Catalog Discovery Jobs</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            <div className="rounded-base border border-border bg-surface p-4">
-              <h3 className="text-sm font-semibold text-text">Detect Burst Stacks</h3>
-              <p className="mt-1 text-sm text-text-secondary">
-                Rebuilds derived stack groups from catalog capture times. Use this for burst
-                sequences like near-identical frames shot seconds apart. This does not modify the
-                Lightroom catalog.
-              </p>
-              <Button
-                variant="primary"
-                size="lg"
-                fullWidth
-                className="mt-3"
-                onClick={startStackDetection}
-                disabled={isStackStarting}
-              >
-                {isStackStarting ? 'Starting Stack Detection...' : 'Detect Burst Stacks'}
-              </Button>
-            </div>
-
-            <div className="rounded-base border border-border bg-surface p-4">
-              <h3 className="text-sm font-semibold text-text">Find Similar Catalog Photos</h3>
-              <p className="mt-1 text-sm text-text-secondary">
-                Runs a batch job over the existing visual index and saves reviewable catalog
-                similarity groups. This does not modify the Lightroom catalog.
-              </p>
-              <Button
-                variant="primary"
-                size="lg"
-                fullWidth
-                className="mt-3"
-                onClick={startCatalogSimilarity}
-                disabled={isSimilarityStarting}
-              >
-                {isSimilarityStarting ? 'Starting Similarity Job...' : 'Find Similar Photos'}
-              </Button>
-            </div>
-            <CatalogSimilarityGroupsPreview groups={groups} total={catalogSimilarity.total} />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function CatalogSimilarityGroupsPreview({
-  groups,
-  total,
-}: {
-  groups: CatalogSimilarityGroup[]
-  total?: number
-}) {
-  if (groups.length === 0) {
-    return (
-      <p className="rounded-base border border-border bg-surface p-4 text-sm text-text-secondary">
-        No catalog similarity groups yet. Run Find Similar Photos after Embed Images completes.
-      </p>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-text">Latest similarity groups</h3>
-        <span className="text-xs text-text-secondary">{total ?? groups.length} groups</span>
-      </div>
-      <div className="space-y-4">
-        {groups.map((group) => (
-          <div key={group.group_id} className="rounded-base border border-border bg-surface p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-text">
-                Best match {Math.round(group.best_similarity * 100)}%
-              </span>
-              <span className="text-xs text-text-secondary">
-                {group.candidate_count} candidate{group.candidate_count === 1 ? '' : 's'}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <ImageTile
-                image={fromCatalogListRow(group.seed)}
-                variant="strip"
-                primaryScoreSource="catalog"
-                onClick={() => {}}
-              />
-              {group.candidates.slice(0, 3).map((candidate) => (
-                <div key={candidate.key} className="space-y-1">
-                  <ImageTile
-                    image={fromCatalogListRow(candidate)}
-                    variant="strip"
-                    primaryScoreSource="catalog"
-                    onClick={() => {}}
-                  />
-                  <p className="text-center text-xs text-text-secondary">
-                    {Math.round((candidate.similarity ?? 0) * 100)}%
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

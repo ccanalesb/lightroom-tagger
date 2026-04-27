@@ -7,15 +7,16 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, fullWidth = false, className = '', ...props }, ref) => {
+  ({ label, error, fullWidth = false, className = '', id, ...props }, ref) => {
     return (
       <div className={fullWidth ? 'w-full' : ''}>
         {label && (
-          <label className="block text-sm font-medium text-text-secondary mb-1.5">
+          <label htmlFor={id} className="block text-sm font-medium text-text-secondary mb-1.5">
             {label}
           </label>
         )}
         <input
+          id={id}
           ref={ref}
           className={`
             px-3 py-2 rounded-base border border-border
