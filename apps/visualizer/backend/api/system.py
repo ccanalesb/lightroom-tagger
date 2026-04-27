@@ -142,6 +142,96 @@ def get_catalog_status():
         return jsonify({'error': str(e)}), 500
 
 
+_CACHE_PIPELINE_BUCKETS: tuple[tuple[str, str, dict], ...] = (
+    # (bucket_key, job_type, extra_metadata_filter)
+    # ``extra_metadata_filter`` keys map to ``json_extract(metadata, '$.<key>')``.
+    # ``None`` means "absent or NULL" (legacy jobs without that key).
+    ('embed_catalog', 'batch_embed_image', {'image_type': ('catalog', None)}),
+    ('embed_catalog_and_instagram', 'batch_embed_image', {'image_type': ('catalog_and_instagram',)}),
+    ('stack_detect', 'batch_stack_detect', {}),
+    ('catalog_similarity', 'batch_catalog_similarity', {}),
+    ('catalog_cache_build', 'catalog_cache_build', {}),
+    ('prepare_catalog', 'prepare_catalog', {}),
+)
+
+
+def _last_job_for_bucket(
+    db,
+    job_type: str,
+    metadata_filter: dict[str, tuple],
+) -> dict | None:
+    """Return the most recent job row matching *job_type* + JSON metadata filter, or ``None``.
+
+    Uses ``json_extract(metadata, '$.<key>')`` so we can split a single job_type
+    (e.g. ``batch_embed_image``) into multiple UI buckets via metadata values.
+    A ``None`` inside an allowed-values tuple matches rows where the key is
+    absent (NULL) — preserves the historical "image_type defaults to catalog"
+    semantics for legacy jobs.
+    """
+    clauses = ['type = ?']
+    params: list = [job_type]
+    for key, allowed in metadata_filter.items():
+        col = f"json_extract(metadata, '$.{key}')"
+        sub_clauses = []
+        for value in allowed:
+            if value is None:
+                sub_clauses.append(f"{col} IS NULL")
+            else:
+                sub_clauses.append(f"{col} = ?")
+                params.append(value)
+        if sub_clauses:
+            clauses.append('(' + ' OR '.join(sub_clauses) + ')')
+    sql = (
+        "SELECT id, type, status, created_at, started_at, completed_at, error "
+        "FROM jobs WHERE " + ' AND '.join(clauses) +
+        " ORDER BY created_at DESC LIMIT 1"
+    )
+    row = db.execute(sql, tuple(params)).fetchone()
+    if row is None:
+        return None
+    row = dict(row)
+    return {
+        'job_id': row['id'],
+        'type': row['type'],
+        'status': row['status'],
+        'created_at': row['created_at'],
+        'started_at': row['started_at'],
+        'completed_at': row['completed_at'],
+        'error': row['error'],
+    }
+
+
+@bp.route('/cache/pipeline-status', methods=['GET'])
+def get_cache_pipeline_status():
+    """Latest run per Catalog Cache pipeline trigger.
+
+    One entry per UI button on ``CatalogCacheTab``:
+
+    * ``embed_catalog`` — most recent ``batch_embed_image`` with
+      ``metadata.image_type`` of ``catalog`` or absent (legacy default).
+    * ``embed_catalog_and_instagram`` — same but ``image_type`` is
+      ``catalog_and_instagram``.
+    * ``stack_detect`` — most recent ``batch_stack_detect``.
+    * ``catalog_similarity`` — most recent ``batch_catalog_similarity``.
+    * ``catalog_cache_build`` — most recent composite chain (D-08).
+    * ``prepare_catalog`` — most recent pre-compress run.
+
+    Each value is ``null`` when no matching job exists, otherwise:
+
+    ``{ job_id, type, status, created_at, started_at, completed_at, error }``.
+    """
+    try:
+        result: dict = {}
+        for bucket_key, job_type, metadata_filter in _CACHE_PIPELINE_BUCKETS:
+            result[bucket_key] = _last_job_for_bucket(
+                current_app.db, job_type, metadata_filter,
+            )
+        return jsonify(result)
+    except Exception as e:
+        logger.exception('Failed to gather cache pipeline status')
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/cache/status', methods=['GET'])
 def get_cache_status():
     """Get vision cache status."""
