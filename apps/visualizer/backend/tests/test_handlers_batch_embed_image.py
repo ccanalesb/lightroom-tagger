@@ -15,7 +15,9 @@ from jobs.runner import JobRunner
 from lightroom_tagger.core.database import (
     init_database,
     library_write,
+    list_instagram_dump_keys_needing_clip_embedding,
     store_image,
+    store_instagram_dump_media,
     upsert_image_clip_embedding,
 )
 
@@ -30,6 +32,49 @@ def _make_runner() -> MagicMock:
     runner.db = MagicMock()
     runner.is_cancelled.return_value = False
     return runner
+
+
+def test_instagram_dump_keys_needing_clip_embedding_excludes_existing_vec(
+    tmp_path,
+) -> None:
+    """Dump keys missing vec rows are listed; keys already embedded are omitted."""
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    store_instagram_dump_media(
+        conn,
+        {
+            "media_key": "ig_embedded",
+            "file_path": "/fake/a.jpg",
+            "filename": "a.jpg",
+            "date_folder": "202601",
+        },
+    )
+    store_instagram_dump_media(
+        conn,
+        {
+            "media_key": "ig_need_vec",
+            "file_path": "/fake/b.jpg",
+            "filename": "b.jpg",
+            "date_folder": "202602",
+        },
+    )
+    blob = sqlite_vec.serialize_float32([0.0] * 512)
+    with library_write(conn):
+        upsert_image_clip_embedding(conn, "ig_embedded", blob)
+    conn.close()
+
+    conn = init_database(str(db_path))
+    try:
+        keys = list_instagram_dump_keys_needing_clip_embedding(
+            conn,
+            months=None,
+            year=None,
+            min_rating=None,
+        )
+    finally:
+        conn.close()
+
+    assert keys == ["ig_need_vec"]
 
 
 @patch("jobs.handlers.add_job_log")
