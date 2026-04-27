@@ -103,6 +103,79 @@ def _shortlist_passthrough(_db, _mk, cand_keys, top_k):
     return cand_keys[:top_k]
 
 
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False)
+@patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
+@patch('lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip')
+def test_shortlist_gates_score_candidates_with_vision(
+    mock_shortlist, mock_score, _describe_matched, _describe_insta, tmp_path,
+):
+    """D-03: scorer never receives more than clip_top_k representative candidates."""
+    from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
+
+    db_path = tmp_path / 'lib.db'
+    db = init_database(str(db_path))
+
+    for i in range(8):
+        p = tmp_path / f'cap{i}.jpg'
+        p.write_bytes(b'')
+        store_image(
+            db,
+            {
+                'filename': f'cap{i}.jpg',
+                'filepath': str(p),
+                'date_taken': f'2026-03-{i + 1:02d}T12:00:00',
+                'instagram_posted': False,
+            },
+        )
+
+    ig_path = tmp_path / 'ig_gate.jpg'
+    ig_path.write_bytes(b'')
+    store_instagram_dump_media(
+        db,
+        {
+            'media_key': 'ig_gate',
+            'file_path': str(ig_path),
+            'filename': 'ig_gate.jpg',
+            'date_folder': '202603',
+            'caption': '',
+            'created_at': '2026-03-15T12:00:00',
+        },
+    )
+
+    shortlisted: list[str] = []
+
+    def _shortlist_gate(_db, _mk, cand_keys, top_k):
+        out = cand_keys[: min(3, len(cand_keys))]
+        shortlisted.clear()
+        shortlisted.extend(out)
+        return out
+
+    mock_shortlist.side_effect = _shortlist_gate
+    mock_score.return_value = []
+
+    match_dump_media(
+        db,
+        threshold=0.5,
+        media_key='ig_gate',
+        skip_undescribed=True,
+        clip_top_k=3,
+    )
+
+    mock_shortlist.assert_called()
+    assert mock_shortlist.call_args[0][3] == 3
+    assert len(mock_shortlist.call_args[0][2]) >= 8
+
+    mock_score.assert_called()
+    for call in mock_score.call_args_list:
+        vision_candidates = call[0][2]
+        assert len(vision_candidates) <= 3
+        assert len(vision_candidates) > 0
+        for c in vision_candidates:
+            assert c.get('key') in shortlisted
+    db.close()
+
+
 def _score_template_row(rep_key: str, insta_key: str) -> dict:
     return {
         'catalog_key': rep_key,
