@@ -23,6 +23,9 @@ def _make_db() -> sqlite3.Connection:
 
     We only build the two tables the selector touches; the rest of the
     Instagram / catalog schema is irrelevant for these tests.
+
+    ``file_path`` is included because the selector applies an extension-based
+    video filter (``_INSTAGRAM_NOT_VIDEO_SQL``) on ``m.file_path``.
     """
     conn = sqlite3.connect(':memory:')
     conn.row_factory = sqlite3.Row
@@ -30,6 +33,7 @@ def _make_db() -> sqlite3.Connection:
         """
         CREATE TABLE instagram_dump_media (
             media_key TEXT PRIMARY KEY,
+            file_path TEXT,
             date_folder TEXT,
             created_at TEXT
         );
@@ -43,11 +47,19 @@ def _make_db() -> sqlite3.Connection:
     return conn
 
 
-def _insert(conn, key, *, created_at=None, date_folder=None):
+def _insert(conn, key, *, created_at=None, date_folder=None, file_path=None):
+    """Insert a media row.
+
+    ``file_path`` defaults to ``"<key>.jpg"`` so the video-extension filter
+    keeps the row visible. Tests that exercise the video filter pass an
+    explicit value (e.g. ``"clip.mp4"``).
+    """
+    if file_path is None:
+        file_path = f'{key}.jpg'
     conn.execute(
-        "INSERT INTO instagram_dump_media (media_key, date_folder, created_at) "
-        "VALUES (?, ?, ?)",
-        (key, date_folder, created_at),
+        "INSERT INTO instagram_dump_media (media_key, file_path, date_folder, created_at) "
+        "VALUES (?, ?, ?, ?)",
+        (key, file_path, date_folder, created_at),
     )
 
 
