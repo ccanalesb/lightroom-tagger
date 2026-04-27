@@ -440,6 +440,13 @@ export const MATCHING_FAILED = 'Matching failed'
 export const MATCHING_FAILED_UNKNOWN = 'Unknown error'
 export const MATCHING_DISMISS = 'Dismiss'
 
+export const MATCHING_CLIP_TOP_K_LABEL = 'CLIP shortlist size (top-k)'
+export const MATCHING_CLIP_TOP_K_HELPER =
+  'Default 50 — cosine shortlist before scoring; tune for recall vs cost.'
+export const MATCHING_CLIP_TOP_K_ERROR = 'Enter a value between 1 and 500.'
+export const MATCHING_CATALOG_CACHE_POINTER =
+  'Stack and similarity jobs run from the Catalog cache tab.'
+
 // Match Card
 export const MATCH_CARD_IG_LABEL = 'IG'
 export const MATCH_CARD_CATALOG_LABEL = 'Cat'
@@ -566,6 +573,7 @@ export const PROCESSING_EMBED_CATALOG_QUEUED =
 export const PROCESSING_EMBED_CATALOG_FAILED_PREFIX = 'Couldn’t start Embed images job:'
 export const PROCESSING_OPEN_JOB_QUEUE = 'Open Job Queue'
 export const PROCESSING_JOB_QUEUE_ROUTE = '/processing?tab=jobs'
+export const PROCESSING_CATALOG_CACHE_ROUTE = '/processing?tab=cache'
 
 // Descriptions Page
 export const DESC_PAGE_TITLE = 'AI Descriptions'
