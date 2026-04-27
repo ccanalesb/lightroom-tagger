@@ -94,6 +94,42 @@ def list_pin_similarity_candidate_keys(
     return out
 
 
+def shortlist_catalog_candidates_by_clip(
+    db: sqlite3.Connection,
+    insta_media_key: str,
+    candidate_keys: list[str],
+    top_k: int,
+) -> list[str]:
+    """Intersect CLIP KNN neighbors with *candidate_keys*, preserving KNN order.
+
+    *candidate_keys* must already be representative-only catalog rows (Phase 7 filter).
+    """
+    top_k = max(1, min(int(top_k), KNN_K_MAX))
+    if not candidate_keys:
+        return []
+
+    blob = get_clip_embedding_blob_for_key(db, insta_media_key)
+    if blob is None:
+        return []
+
+    allowed = set(candidate_keys)
+    need_neighbors = max(0, top_k - 1)
+    knn_k = min(KNN_K_MAX, max(50, need_neighbors * 20)) if need_neighbors > 0 else 1
+    knn_k = min(KNN_K_MAX, max(knn_k, 1))
+
+    raw = knn_clip_catalog_keys(db, blob, k=knn_k)
+    out: list[str] = []
+    seen: set[str] = set()
+    for image_key, _dist in raw:
+        if image_key not in allowed or image_key in seen:
+            continue
+        seen.add(image_key)
+        out.append(image_key)
+        if len(out) >= top_k:
+            break
+    return out
+
+
 def run_clip_similar_for_seed(
     db: sqlite3.Connection,
     seed_key: str,

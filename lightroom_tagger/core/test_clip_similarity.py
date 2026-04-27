@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 import sqlite_vec
 
@@ -9,6 +11,7 @@ from lightroom_tagger.core.clip_similarity import (
     NoClipEmbeddingError,
     get_clip_embedding_blob_for_key,
     run_clip_similar_for_seed,
+    shortlist_catalog_candidates_by_clip,
 )
 from lightroom_tagger.core.database import (
     init_database,
@@ -104,6 +107,51 @@ def _insert_two_member_stack(
     )
     conn.commit()
     return sid
+
+
+@patch('lightroom_tagger.core.clip_similarity.knn_clip_catalog_keys')
+def test_shortlist_catalog_candidates_by_clip_length_subset_and_order(mock_knn, tmp_path) -> None:
+    """Output size, subset, and KNN-first-seen order among allowed keys."""
+    conn = init_database(str(tmp_path / 'lib.db'))
+    seed = store_image(
+        conn,
+        {'date_taken': '2024-01-01', 'filename': 'seed.jpg', 'filepath': '/seed.jpg'},
+    )
+    with library_write(conn):
+        upsert_image_clip_embedding(conn, seed, _unit_axis(0))
+
+    mock_knn.return_value = [
+        ('noise', 0.01),
+        ('k3', 0.02),
+        ('k1', 0.03),
+        ('k2', 0.04),
+    ]
+    cand = ['k1', 'k2', 'k4']
+    out = shortlist_catalog_candidates_by_clip(conn, seed, cand, top_k=2)
+    assert len(out) <= 2
+    assert set(out) <= set(cand)
+    assert out == ['k1', 'k2']
+    mock_knn.assert_called_once()
+
+
+def test_shortlist_catalog_candidates_by_clip_empty_candidates(tmp_path) -> None:
+    conn = init_database(str(tmp_path / 'lib.db'))
+    k = store_image(
+        conn,
+        {'date_taken': '2024-01-01', 'filename': 'a.jpg', 'filepath': '/a.jpg'},
+    )
+    with library_write(conn):
+        upsert_image_clip_embedding(conn, k, _unit_axis(0))
+    assert shortlist_catalog_candidates_by_clip(conn, k, [], top_k=5) == []
+
+
+def test_shortlist_catalog_candidates_by_clip_missing_seed_embedding_returns_empty(tmp_path) -> None:
+    conn = init_database(str(tmp_path / 'lib.db'))
+    k = store_image(
+        conn,
+        {'date_taken': '2024-01-01', 'filename': 'a.jpg', 'filepath': '/a.jpg'},
+    )
+    assert shortlist_catalog_candidates_by_clip(conn, k, ['x'], top_k=3) == []
 
 
 def test_non_representative_stack_member_excluded_from_similar(tmp_path) -> None:
