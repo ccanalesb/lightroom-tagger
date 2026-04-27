@@ -61,6 +61,7 @@ _EMBED_SKIP_DETAIL_LOG_LIMIT = 5
 _EMBED_SUMMARY_LOG_EVERY = 250
 _CATALOG_SIMILARITY_SUMMARY_EVERY = 500
 _STACK_DETECT_SUMMARY_EVERY = 500
+_VISION_MATCH_PREFILTER_SUMMARY_EVERY = 40
 
 # SQL fragments to exclude video files from describe queries at the DB level so
 # the processor never wastes a worker slot attempting to describe a .mov/.mp4/etc.
@@ -429,6 +430,13 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
         provider_model = metadata.get('provider_model')
         max_workers = int(metadata.get('max_workers', config.matching_workers or 4))
 
+        raw_clip = metadata.get('clip_top_k', 50)
+        try:
+            raw_clip_int = int(float(raw_clip))
+        except (TypeError, ValueError):
+            raw_clip_int = 50
+        clip_top_k = max(1, min(raw_clip_int, 500))
+
         fp_vm = fingerprint_vision_match(
             threshold=float(custom_threshold),
             weights=dict(custom_weights),
@@ -442,6 +450,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             provider_id=provider_id,
             provider_model=provider_model,
             max_workers=max_workers,
+            clip_top_k=clip_top_k,
         )
 
         update_job_field(runner.db, job_id, 'metadata', {
@@ -476,9 +485,24 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                         )
 
         done_media: set[str] = set(resume_media)
+        media_since_prefilter_summary = 0
         # Coordinator thread only: on_media_complete calls runner.persist_checkpoint (not workers).
 
-        def on_media_complete(mk: str) -> None:
+        def _emit_prefilter_summary(stats_snap: dict) -> None:
+            add_job_log(
+                runner.db,
+                job_id,
+                'info',
+                (
+                    'vision-match-prefilter-summary '
+                    f"date_window_in={int(stats_snap.get('clip_prefilter_candidates_in', 0))} "
+                    f"clip_shortlist_out={int(stats_snap.get('clip_prefilter_shortlist_total', 0))} "
+                    f"judgments={int(stats_snap.get('vision_judgments_total', 0))}"
+                ),
+            )
+
+        def on_media_complete(mk: str, stats_snap: dict | None = None) -> None:
+            nonlocal media_since_prefilter_summary
             done_media.add(mk)
             if len(done_media) > _CHECKPOINT_MAX_ENTRIES:
                 add_job_log(
@@ -502,6 +526,11 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                     'processed_media_keys': sorted(done_media),
                 },
             )
+            if stats_snap is not None:
+                media_since_prefilter_summary += 1
+                if media_since_prefilter_summary >= _VISION_MATCH_PREFILTER_SUMMARY_EVERY:
+                    _emit_prefilter_summary(stats_snap)
+                    media_since_prefilter_summary = 0
 
         import time
 
@@ -561,11 +590,15 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 provider_id=provider_id,
                 provider_model=provider_model,
                 max_workers=max_workers,
+                clip_top_k=clip_top_k,
                 should_cancel=lambda: runner.is_cancelled(job_id),
                 resume_processed_keys=resume_media or None,
                 on_media_complete=on_media_complete,
                 batch_progress_callback=batch_progress_callback,
             )
+
+            if media_since_prefilter_summary > 0:
+                _emit_prefilter_summary(stats)
 
             log_callback(
                 'info',
@@ -615,6 +648,9 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 'matched': stats['matched'],
                 'skipped': stats['skipped'],
                 'descriptions_generated': stats.get('descriptions_generated', 0),
+                'clip_prefilter_candidates_in': stats.get('clip_prefilter_candidates_in', 0),
+                'clip_prefilter_shortlist_total': stats.get('clip_prefilter_shortlist_total', 0),
+                'vision_judgments_total': stats.get('vision_judgments_total', 0),
                 'stack_apply_applied': stats.get('stack_members_applied', 0),
                 'stack_apply_skipped_conflicts': stats.get(
                     'stack_members_skipped_conflicts', 0

@@ -55,7 +55,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      clip_top_k: int = 50,
                      *, should_cancel: Callable[[], bool] | None = None,
                      resume_processed_keys: set[str] | None = None,
-                     on_media_complete: Callable[[str], None] | None = None,
+                     on_media_complete: Callable[..., None] | None = None,
                      batch_progress_callback: Callable[[int, int, int, int], None] | None = None) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
@@ -81,7 +81,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         should_cancel: If set, called before each item; return True to stop early
         resume_processed_keys: If set, skip dump rows whose ``media_key`` is in this set
             (no stats increment for skipped rows).
-        on_media_complete: If set, invoked once per media row after its iteration finishes.
+        on_media_complete: If set, invoked as ``(media_key, stats)`` once per finished row
+            that completes the loop body (same rows as previously).
 
     Returns:
         Tuple of (stats dict, matches list)
@@ -99,6 +100,9 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         'descriptions_generated': 0,
         'non_representative_candidates_filtered': 0,
         'clip_shortlist_applied': 0,
+        'clip_prefilter_candidates_in': 0,
+        'clip_prefilter_shortlist_total': 0,
+        'vision_judgments_total': 0,
         'stack_members_applied': 0,
         'stack_members_skipped_conflicts': 0,
         'stack_members_skipped_other': 0,
@@ -187,6 +191,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         row_by_key = {c['key']: c for c in candidates if c.get('key')}
         candidates = [row_by_key[k] for k in short_keys if k in row_by_key]
         stats['clip_shortlist_applied'] += 1
+        stats['clip_prefilter_candidates_in'] += dw_in
+        stats['clip_prefilter_shortlist_total'] += len(candidates)
         if log_callback:
             log_callback(
                 'debug',
@@ -332,6 +338,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             should_cancel=should_cancel,
             batch_progress_callback=_make_batch_cb(idx, total),
         )
+        stats['vision_judgments_total'] += len(vision_candidates)
 
         if should_cancel is not None and should_cancel():
             if log_callback:
@@ -405,7 +412,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         if progress_callback:
             progress_callback(idx, total, f'Processing {dump_media["media_key"]} ({idx}/{total})')
         if on_media_complete is not None:
-            on_media_complete(dump_media['media_key'])
+            on_media_complete(dump_media['media_key'], stats)
 
     return stats, matches_found
 

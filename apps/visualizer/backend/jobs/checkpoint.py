@@ -217,7 +217,6 @@ def fingerprint_vision_match(
     """SHA-256 hex of canonical JSON for vision_match checkpoint scope."""
     stable_weights = {k: weights[k] for k in sorted(weights)}
     payload = {
-        "clip_top_k": int(clip_top_k),
         "force_descriptions": bool(force_descriptions),
         "force_reprocess": bool(force_reprocess),
         "last_months": last_months,
@@ -231,6 +230,9 @@ def fingerprint_vision_match(
         "weights": stable_weights,
         "year": year,
     }
+    # Omit default so fingerprints match checkpoints from builds before clip_top_k existed.
+    if int(clip_top_k) != 50:
+        payload["clip_top_k"] = int(clip_top_k)
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 

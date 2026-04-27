@@ -1,3 +1,4 @@
+import re
 from unittest.mock import MagicMock, patch
 
 from jobs.checkpoint import fingerprint_vision_match
@@ -556,3 +557,120 @@ def test_handle_vision_match_result_payload_includes_stack_apply_counts(
     assert payload['stack_apply_applied'] == 2
     assert payload['stack_apply_skipped_conflicts'] == 1
     assert payload['stack_apply_skipped_other'] == 0
+    assert payload.get('clip_prefilter_candidates_in') == 0
+    assert payload.get('clip_prefilter_shortlist_total') == 0
+    assert payload.get('vision_judgments_total') == 0
+
+
+@patch('database.add_job_log')
+@patch('jobs.handlers.match_dump_media')
+@patch('jobs.handlers.init_database')
+@patch('jobs.handlers.load_config')
+@patch('jobs.handlers.update_job_field')
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
+@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+def test_handle_vision_match_clip_top_k_bounds(
+    mock_getenv,
+    mock_require,
+    mock_update_field,
+    mock_config,
+    mock_init_db,
+    mock_match,
+    _mock_add_log,
+):
+    from jobs.handlers import handle_vision_match
+
+    mock_config.return_value = MagicMock(
+        vision_model='gemma3:27b',
+        match_threshold=0.7,
+        phash_weight=0.4,
+        desc_weight=0.3,
+        vision_weight=0.3,
+        ollama_host='http://localhost:11434',
+        matching_workers=4,
+        catalog_path=None,
+        small_catalog_path=None,
+    )
+    mock_match.return_value = (
+        {
+            'processed': 1,
+            'matched': 0,
+            'skipped': 0,
+            'clip_prefilter_candidates_in': 0,
+            'clip_prefilter_shortlist_total': 0,
+            'vision_judgments_total': 0,
+        },
+        [],
+    )
+    mock_init_db.return_value = MagicMock()
+
+    runner = MagicMock()
+    runner.db = MagicMock()
+    runner.is_cancelled.return_value = False
+
+    handle_vision_match(runner, 'job-k', {'clip_top_k': 0})
+    assert mock_match.call_args.kwargs['clip_top_k'] == 1
+
+    handle_vision_match(runner, 'job-k', {'clip_top_k': 9999})
+    assert mock_match.call_args.kwargs['clip_top_k'] == 500
+
+
+@patch('jobs.handlers.add_job_log')
+@patch('jobs.handlers.match_dump_media')
+@patch('jobs.handlers.init_database')
+@patch('jobs.handlers.load_config')
+@patch('jobs.handlers.update_job_field')
+@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
+@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+def test_handle_vision_match_prefilter_summary_log_regex(
+    mock_getenv,
+    mock_require,
+    mock_update_field,
+    mock_config,
+    mock_init_db,
+    mock_match,
+    mock_add_log,
+):
+    from jobs.handlers import handle_vision_match
+
+    stats_out = {
+        'processed': 1,
+        'matched': 0,
+        'skipped': 0,
+        'clip_prefilter_candidates_in': 12,
+        'clip_prefilter_shortlist_total': 5,
+        'vision_judgments_total': 5,
+    }
+
+    def _side_effect(*_a, **_kwargs):
+        cb = _kwargs.get('on_media_complete')
+        if cb:
+            cb('mk1', stats_out)
+        return stats_out, []
+
+    mock_match.side_effect = _side_effect
+    mock_config.return_value = MagicMock(
+        vision_model='gemma3:27b',
+        match_threshold=0.7,
+        phash_weight=0.4,
+        desc_weight=0.3,
+        vision_weight=0.3,
+        ollama_host='http://localhost:11434',
+        matching_workers=4,
+        catalog_path=None,
+        small_catalog_path=None,
+    )
+    mock_init_db.return_value = MagicMock()
+
+    runner = MagicMock()
+    runner.db = MagicMock()
+    runner.is_cancelled.return_value = False
+
+    handle_vision_match(runner, 'job-log', {})
+
+    pat = re.compile(
+        r'^vision-match-prefilter-summary date_window_in=\d+ '
+        r'clip_shortlist_out=\d+ judgments=\d+$'
+    )
+    msgs = [c[0][3] for c in mock_add_log.call_args_list if len(c[0]) > 3]
+    assert any(pat.match(m) for m in msgs), msgs
