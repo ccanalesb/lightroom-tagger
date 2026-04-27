@@ -1,11 +1,33 @@
 from unittest.mock import MagicMock, patch
 
+from jobs.checkpoint import fingerprint_vision_match
 from lightroom_tagger.core.database import (
     init_database,
     store_image,
     store_instagram_dump_media,
     store_match,
 )
+
+
+def test_fingerprint_vision_match_includes_clip_top_k():
+    kwargs = dict(
+        threshold=0.7,
+        weights={'phash': 0.4, 'description': 0.3, 'vision': 0.3},
+        month=None,
+        year=None,
+        last_months=None,
+        media_key=None,
+        force_reprocess=False,
+        force_descriptions=False,
+        skip_undescribed=True,
+        provider_id=None,
+        provider_model=None,
+        max_workers=4,
+    )
+    assert fingerprint_vision_match(**kwargs, clip_top_k=50) != fingerprint_vision_match(
+        **kwargs,
+        clip_top_k=200,
+    )
 
 
 # log_callback imports add_job_log; real add_job_log + MagicMock runner.db breaks json.dumps(logs).

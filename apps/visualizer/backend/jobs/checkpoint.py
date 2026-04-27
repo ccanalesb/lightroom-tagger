@@ -212,10 +212,12 @@ def fingerprint_vision_match(
     provider_id: Any,
     provider_model: Any,
     max_workers: int,
+    clip_top_k: int = 50,
 ) -> str:
     """SHA-256 hex of canonical JSON for vision_match checkpoint scope."""
     stable_weights = {k: weights[k] for k in sorted(weights)}
     payload = {
+        "clip_top_k": int(clip_top_k),
         "force_descriptions": bool(force_descriptions),
         "force_reprocess": bool(force_reprocess),
         "last_months": last_months,
