@@ -6,17 +6,29 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/badges';
 import { CollapsibleSection } from '../ui/CollapsibleSection';
 import { ImageTile, fromCatalogListRow } from '../image-view';
-import { ImagesAPI, JobsAPI, type CatalogSimilarityGroup } from '../../services/api';
+import {
+  ImagesAPI,
+  JobsAPI,
+  SystemAPI,
+  type CachePipelineRun,
+  type CatalogSimilarityGroup,
+} from '../../services/api';
+import { formatTimeAgo } from '../../utils/date';
 import {
   ANALYZE_PRIMARY_BUTTON_STARTING,
   CACHE_REFRESH_BUTTON,
   CATALOG_CACHE_BUILD_CTA,
   CATALOG_CACHE_BUILD_SUCCESS,
+  CATALOG_CACHE_EMBED_CATALOG_HELPER,
+  CATALOG_CACHE_EMBED_CATALOG_IG_HELPER,
   CATALOG_CACHE_EMBED_CATALOG_LABEL,
   CATALOG_CACHE_EMBED_CATALOG_IG_LABEL,
+  CATALOG_CACHE_LAST_RUN_LABEL,
+  CATALOG_CACHE_LAST_RUN_NEVER,
   CATALOG_CACHE_PIPELINE_TITLE,
   CATALOG_CACHE_PREPARE_CATALOG_HELPER,
   CATALOG_CACHE_PREPARE_CATALOG_TITLE,
+  CATALOG_CACHE_SIMILARITY_HELPER,
   CATALOG_CACHE_SIMILARITY_LABEL,
   CATALOG_CACHE_SIMILARITY_BEST_MATCH_PCT,
   CATALOG_CACHE_SIMILARITY_CANDIDATE_LABEL,
@@ -24,6 +36,7 @@ import {
   CATALOG_CACHE_SIMILARITY_PREVIEW_TITLE,
   CATALOG_CACHE_SIMILARITY_TOTAL_GROUPS_LABEL,
   CATALOG_CACHE_SIMILARITY_VIEW_ALL,
+  CATALOG_CACHE_STACK_DETECT_HELPER,
   CATALOG_CACHE_STACK_DETECT_LABEL,
   PROCESSING_JOB_QUEUE_ROUTE,
   PROCESSING_OPEN_JOB_QUEUE,
@@ -67,6 +80,10 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
     ['catalog.similarity.groups', { limit: 12, offset: 0 }] as const,
     () => ImagesAPI.listCatalogSimilarityGroups({ limit: 12, offset: 0 }),
   );
+  const pipelineStatus = useQuery(
+    ['catalog.cache.pipeline-status', listRev] as const,
+    () => SystemAPI.cachePipelineStatus(),
+  );
 
   const [buildStarting, setBuildStarting] = useState(false);
   const [buildSuccess, setBuildSuccess] = useState(false);
@@ -77,6 +94,7 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
 
   const refreshStats = useCallback(() => {
     invalidateAll(['catalog.cache.stats']);
+    invalidateAll(['catalog.cache.pipeline-status']);
     setListRev((n) => n + 1);
   }, []);
 
@@ -112,6 +130,7 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
         if (key === 'similarity') {
           invalidateAll(['catalog.similarity.groups']);
         }
+        invalidateAll(['catalog.cache.pipeline-status']);
         onJobEnqueued?.();
       } catch (err) {
         const message = err instanceof Error ? err.message : MSG_FAILED_START_JOB;
@@ -230,68 +249,53 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
             isOpen={showPipeline}
             onToggle={() => setShowPipeline(!showPipeline)}
           >
-            <div className="space-y-6">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  disabled={anyBusy}
-                  onClick={() =>
-                    runAdvancedJob('embed_catalog', 'batch_embed_image', { image_type: 'catalog' })
-                  }
-                >
-                  {CATALOG_CACHE_EMBED_CATALOG_LABEL}
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  disabled={anyBusy}
-                  onClick={() =>
-                    runAdvancedJob('embed_catalog_ig', 'batch_embed_image', {
-                      image_type: 'catalog_and_instagram',
-                    })
-                  }
-                >
-                  {CATALOG_CACHE_EMBED_CATALOG_IG_LABEL}
-                </Button>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  disabled={anyBusy}
-                  onClick={() => runAdvancedJob('stack', 'batch_stack_detect', {})}
-                >
-                  {CATALOG_CACHE_STACK_DETECT_LABEL}
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  disabled={anyBusy}
-                  onClick={() => runAdvancedJob('similarity', 'batch_catalog_similarity', {})}
-                >
-                  {CATALOG_CACHE_SIMILARITY_LABEL}
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold text-text">{CATALOG_CACHE_PREPARE_CATALOG_TITLE}</h3>
-                <p className="text-xs text-text-secondary leading-relaxed">{CATALOG_CACHE_PREPARE_CATALOG_HELPER}</p>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  disabled={anyBusy}
-                  onClick={() => runAdvancedJob('prepare', 'prepare_catalog', {})}
-                >
-                  {CATALOG_CACHE_PREPARE_CATALOG_TITLE}
-                </Button>
-              </div>
+            <div className="space-y-3">
+              <PipelineRow
+                label={CATALOG_CACHE_EMBED_CATALOG_LABEL}
+                helper={CATALOG_CACHE_EMBED_CATALOG_HELPER}
+                lastRun={pipelineStatus.embed_catalog ?? null}
+                disabled={anyBusy}
+                isBusy={advancedBusy === 'embed_catalog'}
+                onRun={() =>
+                  runAdvancedJob('embed_catalog', 'batch_embed_image', { image_type: 'catalog' })
+                }
+              />
+              <PipelineRow
+                label={CATALOG_CACHE_EMBED_CATALOG_IG_LABEL}
+                helper={CATALOG_CACHE_EMBED_CATALOG_IG_HELPER}
+                lastRun={pipelineStatus.embed_catalog_and_instagram ?? null}
+                disabled={anyBusy}
+                isBusy={advancedBusy === 'embed_catalog_ig'}
+                onRun={() =>
+                  runAdvancedJob('embed_catalog_ig', 'batch_embed_image', {
+                    image_type: 'catalog_and_instagram',
+                  })
+                }
+              />
+              <PipelineRow
+                label={CATALOG_CACHE_STACK_DETECT_LABEL}
+                helper={CATALOG_CACHE_STACK_DETECT_HELPER}
+                lastRun={pipelineStatus.stack_detect ?? null}
+                disabled={anyBusy}
+                isBusy={advancedBusy === 'stack'}
+                onRun={() => runAdvancedJob('stack', 'batch_stack_detect', {})}
+              />
+              <PipelineRow
+                label={CATALOG_CACHE_SIMILARITY_LABEL}
+                helper={CATALOG_CACHE_SIMILARITY_HELPER}
+                lastRun={pipelineStatus.catalog_similarity ?? null}
+                disabled={anyBusy}
+                isBusy={advancedBusy === 'similarity'}
+                onRun={() => runAdvancedJob('similarity', 'batch_catalog_similarity', {})}
+              />
+              <PipelineRow
+                label={CATALOG_CACHE_PREPARE_CATALOG_TITLE}
+                helper={CATALOG_CACHE_PREPARE_CATALOG_HELPER}
+                lastRun={pipelineStatus.prepare_catalog ?? null}
+                disabled={anyBusy}
+                isBusy={advancedBusy === 'prepare'}
+                onRun={() => runAdvancedJob('prepare', 'prepare_catalog', {})}
+              />
             </div>
           </CollapsibleSection>
 
@@ -308,6 +312,77 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+type PipelineRowProps = {
+  label: string;
+  helper: string;
+  lastRun: CachePipelineRun | null;
+  disabled: boolean;
+  isBusy: boolean;
+  onRun: () => void;
+};
+
+/** Row within the Pipeline stages disclosure: helper text on the left,
+ * "Last run" badge below, action button on the right. Stays vertical on
+ * narrow viewports because the helper text is the most important hint. */
+function PipelineRow({ label, helper, lastRun, disabled, isBusy, onRun }: PipelineRowProps) {
+  return (
+    <div className="flex flex-col gap-2 rounded-base border border-border bg-white p-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0 flex-1 space-y-1">
+        <h3 className="text-sm font-semibold text-text">{label}</h3>
+        <p className="text-xs leading-relaxed text-text-secondary">{helper}</p>
+        <LastRunBadge run={lastRun} />
+      </div>
+      <div className="shrink-0">
+        <Button
+          variant="secondary"
+          size="sm"
+          type="button"
+          disabled={disabled}
+          onClick={onRun}
+        >
+          {isBusy ? ANALYZE_PRIMARY_BUTTON_STARTING : label}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function lastRunBadgeVariant(status: string): 'success' | 'warning' | 'error' | 'accent' | 'default' {
+  switch (status) {
+    case 'completed':
+      return 'success';
+    case 'failed':
+      return 'error';
+    case 'cancelled':
+      return 'warning';
+    case 'running':
+    case 'pending':
+      return 'accent';
+    default:
+      return 'default';
+  }
+}
+
+function LastRunBadge({ run }: { run: CachePipelineRun | null }) {
+  if (!run) {
+    return (
+      <p className="text-xs text-text-tertiary" data-testid="catalog-cache-last-run">
+        {CATALOG_CACHE_LAST_RUN_NEVER}
+      </p>
+    );
+  }
+  const referenceTimestamp = run.completed_at ?? run.started_at ?? run.created_at;
+  const ago = formatTimeAgo(referenceTimestamp);
+  return (
+    <div className="flex items-center gap-2 flex-wrap" data-testid="catalog-cache-last-run">
+      <Badge variant={lastRunBadgeVariant(run.status)}>{run.status}</Badge>
+      <span className="text-xs text-text-secondary" title={referenceTimestamp ?? undefined}>
+        {CATALOG_CACHE_LAST_RUN_LABEL(ago)}
+      </span>
     </div>
   );
 }

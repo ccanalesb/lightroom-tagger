@@ -9,11 +9,14 @@ import {
   ADVANCED_WEIGHTS_TITLE,
   CATALOG_CACHE_BUILD_CTA,
   CATALOG_CACHE_BUILD_SUCCESS,
+  CATALOG_CACHE_EMBED_CATALOG_HELPER,
   CATALOG_CACHE_EMBED_CATALOG_LABEL,
+  CATALOG_CACHE_LAST_RUN_NEVER,
   CATALOG_CACHE_PIPELINE_TITLE,
   CATALOG_CACHE_SIMILARITY_BEST_MATCH_PCT,
   CATALOG_CACHE_SIMILARITY_PREVIEW_TITLE,
   CATALOG_CACHE_SIMILARITY_TOTAL_GROUPS_LABEL,
+  CATALOG_CACHE_STACK_DETECT_LABEL,
   PROCESSING_JOB_QUEUE_ROUTE,
   PROCESSING_OPEN_JOB_QUEUE,
 } from '../../../constants/strings';
@@ -49,13 +52,24 @@ function renderCatalogCacheTab(props: { onOpenJobQueue?: () => void } = {}) {
   );
 }
 
+const EMPTY_PIPELINE_STATUS = {
+  embed_catalog: null,
+  embed_catalog_and_instagram: null,
+  stack_detect: null,
+  catalog_similarity: null,
+  catalog_cache_build: null,
+  prepare_catalog: null,
+};
+
 describe('CatalogCacheTab', () => {
+  let pipelineStatusBody: typeof EMPTY_PIPELINE_STATUS | Record<string, unknown> = EMPTY_PIPELINE_STATUS;
   beforeEach(() => {
     deleteMatching(() => true);
     mockCreate.mockReset();
     mockFetch.mockReset();
     mockListCatalogSimilarityGroups.mockReset();
     mockListCatalogSimilarityGroups.mockResolvedValue({ items: [], total: 0 });
+    pipelineStatusBody = EMPTY_PIPELINE_STATUS;
     mockFetch.mockImplementation((input: RequestInfo | URL) => {
       const url =
         typeof input === 'string'
@@ -63,6 +77,14 @@ describe('CatalogCacheTab', () => {
           : input instanceof Request
             ? input.url
             : String(input);
+      // Order matters — `/cache/pipeline-status` must match before
+      // `/cache/status` since `includes` is a substring check.
+      if (url.includes('/cache/pipeline-status')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => pipelineStatusBody,
+        });
+      }
       if (url.includes('/cache/status')) {
         return Promise.resolve({
           ok: true,
@@ -204,5 +226,63 @@ describe('CatalogCacheTab', () => {
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalledWith('batch_embed_image', { image_type: 'catalog' });
     });
+  });
+
+  it('renders helper copy and Never run badge when no pipeline jobs exist', async () => {
+    renderCatalogCacheTab();
+    fireEvent.click(
+      await screen.findByRole('button', { name: new RegExp(CATALOG_CACHE_PIPELINE_TITLE, 'i') }),
+    );
+    expect(await screen.findByText(CATALOG_CACHE_EMBED_CATALOG_HELPER)).toBeTruthy();
+    // 5 pipeline rows (catalog, catalog+ig, stack, similarity, prepare) all
+    // start with "Never run" until at least one job has been created.
+    const neverBadges = await screen.findAllByText(CATALOG_CACHE_LAST_RUN_NEVER);
+    expect(neverBadges.length).toBe(5);
+  });
+
+  it('renders status badge and relative timestamp for last run', async () => {
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    pipelineStatusBody = {
+      ...EMPTY_PIPELINE_STATUS,
+      stack_detect: {
+        job_id: 'job-stack',
+        type: 'batch_stack_detect',
+        status: 'completed',
+        created_at: fiveMinAgo,
+        started_at: fiveMinAgo,
+        completed_at: fiveMinAgo,
+        error: null,
+      },
+    };
+    renderCatalogCacheTab();
+    fireEvent.click(
+      await screen.findByRole('button', { name: new RegExp(CATALOG_CACHE_PIPELINE_TITLE, 'i') }),
+    );
+    await screen.findByRole('button', { name: CATALOG_CACHE_STACK_DETECT_LABEL });
+    expect(screen.getByText('completed')).toBeTruthy();
+    expect(screen.getByText(/Last run.*minutes? ago/)).toBeTruthy();
+  });
+
+  it('renders failed badge variant when last run failed', async () => {
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    pipelineStatusBody = {
+      ...EMPTY_PIPELINE_STATUS,
+      embed_catalog: {
+        job_id: 'job-embed',
+        type: 'batch_embed_image',
+        status: 'failed',
+        created_at: oneHourAgo,
+        started_at: oneHourAgo,
+        completed_at: oneHourAgo,
+        error: 'boom',
+      },
+    };
+    renderCatalogCacheTab();
+    fireEvent.click(
+      await screen.findByRole('button', { name: new RegExp(CATALOG_CACHE_PIPELINE_TITLE, 'i') }),
+    );
+    await screen.findByRole('button', { name: CATALOG_CACHE_EMBED_CATALOG_LABEL });
+    expect(screen.getByText('failed')).toBeTruthy();
+    expect(screen.getByText(/Last run.*hour/)).toBeTruthy();
   });
 });
