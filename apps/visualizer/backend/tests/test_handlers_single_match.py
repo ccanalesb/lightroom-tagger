@@ -98,6 +98,11 @@ def test_handle_vision_match_passes_skip_undescribed(mock_getenv, mock_exists, m
     assert mock_match.call_args.kwargs.get('skip_undescribed') is True
 
 
+def _shortlist_passthrough(_db, _mk, cand_keys, top_k):
+    """Preserve pre–Phase-8 test behavior when IG has no CLIP row in the DB."""
+    return cand_keys[:top_k]
+
+
 def _score_template_row(rep_key: str, insta_key: str) -> dict:
     return {
         'catalog_key': rep_key,
@@ -115,9 +120,13 @@ def _score_template_row(rep_key: str, insta_key: str) -> dict:
 
 @patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False)
 @patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False)
+@patch(
+    'lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip',
+    side_effect=_shortlist_passthrough,
+)
 @patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
 def test_match_dump_media_representative_only_sends_members_to_scoring(
-    mock_score, _describe_matched, _describe_insta, tmp_path,
+    mock_score, _mock_shortlist, _describe_matched, _describe_insta, tmp_path,
 ):
     """Stack members must not appear in the vision/scoring candidate list."""
     from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
@@ -200,9 +209,13 @@ def test_match_dump_media_representative_only_sends_members_to_scoring(
 
 @patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False)
 @patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False)
+@patch(
+    'lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip',
+    side_effect=_shortlist_passthrough,
+)
 @patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
 def test_match_dump_media_stack_apply_skips_conflicting_member(
-    mock_score, _describe_matched, _describe_insta, tmp_path,
+    mock_score, _mock_shortlist, _describe_matched, _describe_insta, tmp_path,
 ):
     """Stack-wide apply must not overwrite a member already matched to another IG key."""
     from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
@@ -311,9 +324,13 @@ def test_match_dump_media_stack_apply_skips_conflicting_member(
 
 @patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False)
 @patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False)
+@patch(
+    'lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip',
+    side_effect=_shortlist_passthrough,
+)
 @patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
 def test_match_dump_media_stack_apply_reaches_all_non_conflict_members(
-    mock_score, _describe_matched, _describe_insta, tmp_path,
+    mock_score, _mock_shortlist, _describe_matched, _describe_insta, tmp_path,
 ):
     """When no member conflicts, stack-wide apply persists one row per non-rep member."""
     from lightroom_tagger.scripts.match_instagram_dump import match_dump_media

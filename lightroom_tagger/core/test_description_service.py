@@ -3,6 +3,10 @@ from unittest.mock import patch
 from lightroom_tagger.core.database import init_database, store_image, store_image_description, get_image_description
 
 
+def _shortlist_passthrough(_db, _mk, cand_keys, top_k):
+    return cand_keys[:top_k]
+
+
 def _make_db(tmp_path):
     db_path = str(tmp_path / 'test.db')
     return init_database(db_path)
@@ -191,12 +195,13 @@ class TestDescribeInstagramImage:
 class TestMatchDumpMediaDescriptions:
     """Verify match_dump_media triggers description generation for matches."""
 
+    @patch('lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip')
     @patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image')
     @patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
     @patch('lightroom_tagger.scripts.match_instagram_dump.find_candidates_by_date')
     @patch('lightroom_tagger.scripts.match_instagram_dump.get_unprocessed_dump_media')
     def test_generates_description_on_match(self, mock_unprocessed, mock_candidates,
-                                             mock_score, mock_describe, tmp_path):
+                                             mock_score, mock_describe, mock_shortlist, tmp_path):
         from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
 
         db = _make_db(tmp_path)
@@ -206,6 +211,7 @@ class TestMatchDumpMediaDescriptions:
         mock_candidates.return_value = [{'key': 'CAT1', 'filepath': '/p/a.jpg', 'phash': 'abc', 'description': ''}]
         mock_score.return_value = [{'catalog_key': 'CAT1', 'total_score': 0.9, 'vision_result': 'same', 'vision_score': 0.9}]
         mock_describe.return_value = True
+        mock_shortlist.side_effect = _shortlist_passthrough
 
         with patch('lightroom_tagger.scripts.match_instagram_dump.mark_dump_media_processed'), \
              patch('lightroom_tagger.scripts.match_instagram_dump.init_instagram_dump_table'), \
@@ -215,12 +221,13 @@ class TestMatchDumpMediaDescriptions:
         mock_describe.assert_called_once_with(db, 'CAT1', force=False)
         assert stats['descriptions_generated'] == 1
 
+    @patch('lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip')
     @patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image')
     @patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
     @patch('lightroom_tagger.scripts.match_instagram_dump.find_candidates_by_date')
     @patch('lightroom_tagger.scripts.match_instagram_dump.get_unprocessed_dump_media')
     def test_passes_force_flag(self, mock_unprocessed, mock_candidates,
-                                mock_score, mock_describe, tmp_path):
+                                mock_score, mock_describe, mock_shortlist, tmp_path):
         from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
 
         db = _make_db(tmp_path)
@@ -230,6 +237,7 @@ class TestMatchDumpMediaDescriptions:
         mock_candidates.return_value = [{'key': 'CAT2', 'filepath': '/p/b.jpg', 'phash': 'def', 'description': ''}]
         mock_score.return_value = [{'catalog_key': 'CAT2', 'total_score': 0.85, 'vision_result': 'same', 'vision_score': 0.85}]
         mock_describe.return_value = True
+        mock_shortlist.side_effect = _shortlist_passthrough
 
         with patch('lightroom_tagger.scripts.match_instagram_dump.mark_dump_media_processed'), \
              patch('lightroom_tagger.scripts.match_instagram_dump.init_instagram_dump_table'), \
@@ -238,12 +246,13 @@ class TestMatchDumpMediaDescriptions:
 
         mock_describe.assert_called_once_with(db, 'CAT2', force=True)
 
+    @patch('lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip')
     @patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image')
     @patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
     @patch('lightroom_tagger.scripts.match_instagram_dump.find_candidates_by_date')
     @patch('lightroom_tagger.scripts.match_instagram_dump.get_unprocessed_dump_media')
     def test_description_exception_logs_without_callback(self, mock_unprocessed, mock_candidates,
-                                                           mock_score, mock_describe, tmp_path):
+                                                           mock_score, mock_describe, mock_shortlist, tmp_path):
         from lightroom_tagger.scripts import match_instagram_dump
         from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
 
@@ -254,6 +263,7 @@ class TestMatchDumpMediaDescriptions:
         mock_candidates.return_value = [{'key': 'CAT3', 'filepath': '/p/c.jpg', 'phash': 'ghi', 'description': ''}]
         mock_score.return_value = [{'catalog_key': 'CAT3', 'total_score': 0.9, 'vision_result': 'same', 'vision_score': 0.9}]
         mock_describe.side_effect = RuntimeError('model down')
+        mock_shortlist.side_effect = _shortlist_passthrough
 
         with patch('lightroom_tagger.scripts.match_instagram_dump.mark_dump_media_processed'), \
              patch('lightroom_tagger.scripts.match_instagram_dump.init_instagram_dump_table'), \

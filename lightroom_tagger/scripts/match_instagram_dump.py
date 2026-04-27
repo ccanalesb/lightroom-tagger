@@ -19,6 +19,7 @@ from lightroom_tagger.core.description_service import (
     describe_matched_image,
 )
 from lightroom_tagger.core.analyzer import get_vision_model
+from lightroom_tagger.core.clip_similarity import shortlist_catalog_candidates_by_clip
 from lightroom_tagger.core.database import (
     apply_instagram_match_to_stack_members,
     catalog_key_is_primary_grid_row,
@@ -51,6 +52,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      provider_model: str | None = None,
                      max_workers: int = 1,
                      skip_undescribed: bool = True,
+                     clip_top_k: int = 50,
                      *, should_cancel: Callable[[], bool] | None = None,
                      resume_processed_keys: set[str] | None = None,
                      on_media_complete: Callable[[str], None] | None = None,
@@ -74,6 +76,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         force_descriptions: If True, regenerate descriptions even when one exists
         skip_undescribed: If True, candidates without AI summaries get description score 0
             without inline describe; if False, missing summaries may be generated on the fly
+        clip_top_k: Max representative catalog candidates passed to phash/description/vision
+            scoring after CLIP cosine shortlisting (D-03).
         should_cancel: If set, called before each item; return True to stop early
         resume_processed_keys: If set, skip dump rows whose ``media_key`` is in this set
             (no stats increment for skipped rows).
@@ -94,6 +98,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         'skipped': 0,
         'descriptions_generated': 0,
         'non_representative_candidates_filtered': 0,
+        'clip_shortlist_applied': 0,
         'stack_members_applied': 0,
         'stack_members_skipped_conflicts': 0,
         'stack_members_skipped_other': 0,
@@ -166,6 +171,28 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
 
         if log_callback and idx <= 3:
             log_callback('debug', f'[{media_key}] Found {initial_candidate_count} candidates by date, {len(candidates)} after filters')
+
+        if not candidates:
+            mark_dump_media_attempted(db, dump_media['media_key'])
+            stats['skipped'] += 1
+            if log_callback and idx <= 3:
+                log_callback('warning', f'[{media_key}] Skipped - no candidates found')
+            continue
+
+        dw_in = len(candidates)
+        cand_keys = [c['key'] for c in candidates if c.get('key')]
+        short_keys = shortlist_catalog_candidates_by_clip(
+            db, dump_media['media_key'], cand_keys, clip_top_k,
+        )
+        row_by_key = {c['key']: c for c in candidates if c.get('key')}
+        candidates = [row_by_key[k] for k in short_keys if k in row_by_key]
+        stats['clip_shortlist_applied'] += 1
+        if log_callback:
+            log_callback(
+                'debug',
+                f'[{media_key}] CLIP shortlist: date_window_in={dw_in} '
+                f'clip_shortlist_out={len(candidates)}',
+            )
 
         if not candidates:
             mark_dump_media_attempted(db, dump_media['media_key'])

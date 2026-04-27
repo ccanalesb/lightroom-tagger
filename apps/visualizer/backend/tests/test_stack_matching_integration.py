@@ -14,6 +14,10 @@ from lightroom_tagger.core.database import (
 from database import create_job, get_job, init_db
 
 
+def _shortlist_passthrough(_db, _mk, cand_keys, top_k):
+    return cand_keys[:top_k]
+
+
 def _score_row(rep_key: str, insta_key: str) -> dict:
     return {
         'catalog_key': rep_key,
@@ -72,10 +76,14 @@ def _make_stack(db, tmp_path, rep_name: str, member_names: list[str]) -> tuple[s
 
 @patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False)
 @patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False)
+@patch(
+    'lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip',
+    side_effect=_shortlist_passthrough,
+)
 @patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
 @patch('jobs.handlers.load_config')
 def test_integration_vision_match_representative_only_candidates(
-    mock_load_config, mock_score, _dm, _di, tmp_path, monkeypatch
+    mock_load_config, mock_score, _mock_shortlist, _dm, _di, tmp_path, monkeypatch
 ):
     """Vision scoring receives representative keys only; job result reflects stack apply."""
     from jobs.handlers import handle_vision_match
@@ -151,10 +159,14 @@ def test_integration_vision_match_representative_only_candidates(
 
 @patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False)
 @patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False)
+@patch(
+    'lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip',
+    side_effect=_shortlist_passthrough,
+)
 @patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
 @patch('jobs.handlers.load_config')
 def test_integration_vision_match_stack_apply_skips_conflict_and_surfaces_counts(
-    mock_load_config, mock_score, _dm, _di, tmp_path, monkeypatch
+    mock_load_config, mock_score, _mock_shortlist, _dm, _di, tmp_path, monkeypatch
 ):
     """Partial stack apply: conflicting member skipped; payload and logs report skips."""
     from jobs.handlers import handle_vision_match
