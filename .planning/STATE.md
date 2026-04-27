@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
 status: Executing Phase 08
-last_updated: "2026-04-27T23:59:00.000Z"
+last_updated: "2026-04-27T21:06:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 46
-  completed_plans: 42
-  percent: 91
+  completed_plans: 43
+  percent: 93
 ---
 
 # Planning state
@@ -23,8 +23,8 @@ progress:
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
 | Phase | Phase 8 — embedding-prefilter-and-cache-pipeline |
-| Status | **Executing Phase 08 — plan 08-02 complete** |
-| Last activity | 2026-04-27 — **08-02 executed:** `handle_vision_match` clamps `clip_top_k` (1..500), fingerprint omits default `clip_top_k`, `match_dump_media` cumulative `clip_prefilter_*` / `vision_judgments_total`, D-07 `vision-match-prefilter-summary` throttled logs (`_VISION_MATCH_PREFILTER_SUMMARY_EVERY=40`). Artifacts: `08-02-SUMMARY.md`. Commits: `3355292`, `bbf377b` + docs. Next: **08-03** Instagram embed extension. Earlier context: Phase 8 planning complete (6 waves 08-01..08-06); MATCH-02/CACHE-01 coverage per original plan map. |
+| Status | **Executing Phase 08 — plan 08-03 complete** |
+| Last activity | 2026-04-27 — **08-03 executed:** `list_instagram_dump_keys_needing_clip_embedding` (+ force variant), `batch_embed_image` supports `image_type: catalog_and_instagram` (catalog-first dedupe + collision warning), `fingerprint_batch_embed_image` canonical scope (`catalog` vs `catalog_and_instagram`), dual-source `classify_path` for dump `file_path`. Artifacts: `08-03-SUMMARY.md`. Commits: `191356d`, `7415387`, `467383d` + docs. Next: **08-04** composite catalog cache job. Earlier context: Phase 8 waves 08-04..08-06 pending; MATCH-02/CACHE-01 coverage per roadmap. |
 
 ## Project Reference
 
