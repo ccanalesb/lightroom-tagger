@@ -2,6 +2,7 @@ import { RangeSlider } from './RangeSlider';
 import { WeightSlider } from './WeightSlider';
 import { WorkerSlider } from './WorkerSlider';
 import { ProviderModelSelect } from '../ui/ProviderModelSelect';
+import type { ReactNode } from 'react';
 import {
   ADVANCED_OPTIONS_TITLE,
   ADVANCED_THRESHOLD_LABEL,
@@ -36,6 +37,8 @@ interface AdvancedOptionsProps {
   onSkipUndescribedChange: (value: boolean) => void;
   weightsError: string | null;
   onReset: () => void;
+  /** Extra controls rendered below matching sliders (e.g. Catalog Cache pipeline triggers). */
+  children?: ReactNode;
 }
 
 export function AdvancedOptions({
@@ -58,6 +61,7 @@ export function AdvancedOptions({
   onSkipUndescribedChange,
   weightsError,
   onReset,
+  children,
 }: AdvancedOptionsProps) {
   const totalWeight = phashWeight + descWeight + visionWeight;
   const weightsValid = Math.abs(totalWeight - 1.0) < 0.001;
@@ -166,6 +170,10 @@ export function AdvancedOptions({
               {ADVANCED_RESET_DEFAULTS}
             </button>
           </div>
+
+          {children ? (
+            <div className="mt-4 border-t border-gray-200 pt-4">{children}</div>
+          ) : null}
         </div>
       )}
     </div>

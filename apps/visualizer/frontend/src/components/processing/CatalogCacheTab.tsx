@@ -3,16 +3,23 @@ import { invalidateAll, useQuery } from '../../data';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/badges';
+import { AdvancedOptions } from '../matching/AdvancedOptions';
 import { JobsAPI } from '../../services/api';
+import { useMatchOptions } from '../../stores/matchOptionsContext';
 import {
-  PROCESSING_EMBED_CATALOG_BODY,
-  PROCESSING_EMBED_CATALOG_FAILED_PREFIX,
-  PROCESSING_EMBED_CATALOG_QUEUED,
-  PROCESSING_EMBED_CATALOG_START,
-  PROCESSING_EMBED_CATALOG_STARTING,
-  PROCESSING_EMBED_CATALOG_TITLE,
+  ANALYZE_PRIMARY_BUTTON_STARTING,
+  CACHE_REFRESH_BUTTON,
+  CATALOG_CACHE_BUILD_CTA,
+  CATALOG_CACHE_BUILD_SUCCESS,
+  CATALOG_CACHE_EMBED_CATALOG_LABEL,
+  CATALOG_CACHE_EMBED_CATALOG_IG_LABEL,
+  CATALOG_CACHE_PREPARE_CATALOG_HELPER,
+  CATALOG_CACHE_PREPARE_CATALOG_TITLE,
+  CATALOG_CACHE_SIMILARITY_LABEL,
+  CATALOG_CACHE_STACK_DETECT_LABEL,
   PROCESSING_JOB_QUEUE_ROUTE,
   PROCESSING_OPEN_JOB_QUEUE,
+  MSG_FAILED_START_JOB,
 } from '../../constants/strings';
 
 interface CacheStats {
@@ -32,52 +39,35 @@ async function fetchCacheStats(): Promise<CacheStats> {
   return data;
 }
 
+type AdvancedBusyKey =
+  | 'embed_catalog'
+  | 'embed_catalog_ig'
+  | 'stack'
+  | 'similarity'
+  | 'prepare';
+
 export interface CatalogCacheTabProps {
   onJobEnqueued?: () => void;
   onOpenJobQueue?: () => void;
 }
 
 export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheTabProps) {
+  const { options, updateOption, resetOptions, weightsError } = useMatchOptions();
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [listRev, setListRev] = useState(0);
   const stats = useQuery(['catalog.cache.stats', listRev] as const, fetchCacheStats);
-  const [isRebuilding, setIsRebuilding] = useState(false);
-  const [embedStarting, setEmbedStarting] = useState(false);
-  const [embedQueued, setEmbedQueued] = useState(false);
-  const [embedError, setEmbedError] = useState<string | null>(null);
+
+  const [buildStarting, setBuildStarting] = useState(false);
+  const [buildSuccess, setBuildSuccess] = useState(false);
+  const [buildError, setBuildError] = useState<string | null>(null);
+  const [advancedBusy, setAdvancedBusy] = useState<AdvancedBusyKey | null>(null);
+
+  const anyBusy = buildStarting || advancedBusy !== null;
 
   const refreshStats = useCallback(() => {
     invalidateAll(['catalog.cache.stats']);
     setListRev((n) => n + 1);
   }, []);
-
-  const handleRebuildCache = useCallback(async () => {
-    setIsRebuilding(true);
-    try {
-      await JobsAPI.create('prepare_catalog', {});
-      alert('Catalog cache rebuild started! Check Job Queue tab to monitor progress.');
-      onJobEnqueued?.();
-    } catch (err) {
-      alert(`Failed to start rebuild: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setIsRebuilding(false);
-    }
-  }, [onJobEnqueued]);
-
-  const handleStartEmbedJob = useCallback(async () => {
-    setEmbedStarting(true);
-    setEmbedQueued(false);
-    setEmbedError(null);
-    try {
-      await JobsAPI.create('batch_embed_image', { image_type: 'catalog' });
-      setEmbedQueued(true);
-      onJobEnqueued?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setEmbedError(message);
-    } finally {
-      setEmbedStarting(false);
-    }
-  }, [onJobEnqueued]);
 
   const handleOpenJobQueue = useCallback(() => {
     if (onOpenJobQueue) {
@@ -86,6 +76,38 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
     }
     window.location.assign(PROCESSING_JOB_QUEUE_ROUTE);
   }, [onOpenJobQueue]);
+
+  const handleBuildCatalogCache = useCallback(async () => {
+    setBuildStarting(true);
+    setBuildSuccess(false);
+    setBuildError(null);
+    try {
+      await JobsAPI.create('catalog_cache_build', {});
+      setBuildSuccess(true);
+      onJobEnqueued?.();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : MSG_FAILED_START_JOB;
+      setBuildError(message);
+    } finally {
+      setBuildStarting(false);
+    }
+  }, [onJobEnqueued]);
+
+  const runAdvancedJob = useCallback(
+    async (key: AdvancedBusyKey, type: string, metadata: Record<string, unknown>) => {
+      setAdvancedBusy(key);
+      try {
+        await JobsAPI.create(type, metadata);
+        onJobEnqueued?.();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : MSG_FAILED_START_JOB;
+        alert(`${MSG_FAILED_START_JOB}: ${message}`);
+      } finally {
+        setAdvancedBusy(null);
+      }
+    },
+    [onJobEnqueued],
+  );
 
   const cachePercentage =
     stats.total_images > 0 ? Math.round((stats.cached_images / stats.total_images) * 100) : 0;
@@ -101,36 +123,6 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
             The vision cache stores preprocessed Lightroom catalog images for fast AI comparison.
             Rebuilding the cache will process all catalog images and may take several minutes.
           </p>
-
-          <div className="mb-6 rounded-base border border-border bg-surface p-4">
-            <h3 className="text-sm font-semibold text-text">{PROCESSING_EMBED_CATALOG_TITLE}</h3>
-            <p className="mt-1 text-sm text-text-secondary">{PROCESSING_EMBED_CATALOG_BODY}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleStartEmbedJob}
-                disabled={embedStarting}
-              >
-                {embedStarting ? PROCESSING_EMBED_CATALOG_STARTING : PROCESSING_EMBED_CATALOG_START}
-              </Button>
-              {embedQueued ? (
-                <Button variant="secondary" size="sm" onClick={handleOpenJobQueue}>
-                  {PROCESSING_OPEN_JOB_QUEUE}
-                </Button>
-              ) : null}
-            </div>
-            {embedQueued ? (
-              <p className="mt-2 text-sm text-success" role="status">
-                {PROCESSING_EMBED_CATALOG_QUEUED}
-              </p>
-            ) : null}
-            {embedError ? (
-              <p className="mt-2 text-sm text-error" role="status">
-                {PROCESSING_EMBED_CATALOG_FAILED_PREFIX} {embedError}
-              </p>
-            ) : null}
-          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div className="p-4 bg-surface rounded-base border border-border">
@@ -170,9 +162,9 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
             </div>
           </div>
 
-          <div className="mb-4">
+          <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-text">Cache Progress</span>
+              <span className="text-sm font-semibold text-text">Cache Progress</span>
               <span className="text-sm text-text-secondary">{cachePercentage}%</span>
             </div>
             <div className="w-full bg-surface rounded-full h-3 border border-border">
@@ -180,24 +172,126 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
                 className="h-full rounded-full transition-all duration-300"
                 style={{
                   width: `${cachePercentage}%`,
-                  backgroundColor: cachePercentage === 100 ? 'var(--color-success)' : 'var(--color-accent)',
+                  backgroundColor:
+                    cachePercentage === 100 ? 'var(--color-success)' : 'var(--color-accent)',
                 }}
               />
             </div>
           </div>
 
-          <div className="pt-4 space-y-2">
+          <div className="space-y-3 mb-6">
             <Button
               variant="primary"
               size="lg"
               fullWidth
-              onClick={handleRebuildCache}
-              disabled={isRebuilding}
+              onClick={handleBuildCatalogCache}
+              disabled={anyBusy}
             >
-              {isRebuilding ? 'Starting Rebuild...' : 'Rebuild Catalog Cache'}
+              {buildStarting ? ANALYZE_PRIMARY_BUTTON_STARTING : CATALOG_CACHE_BUILD_CTA}
             </Button>
-            <Button variant="secondary" size="md" fullWidth onClick={refreshStats}>
-              Refresh Stats
+            {buildSuccess ? (
+              <div className="rounded-base border border-border bg-surface p-4 space-y-3">
+                <p className="text-sm text-success" role="status">
+                  {CATALOG_CACHE_BUILD_SUCCESS}
+                </p>
+                <Button variant="secondary" size="sm" type="button" onClick={handleOpenJobQueue}>
+                  {PROCESSING_OPEN_JOB_QUEUE}
+                </Button>
+              </div>
+            ) : null}
+            {buildError ? (
+              <p className="text-sm text-error" role="status">
+                {MSG_FAILED_START_JOB}: {buildError}
+              </p>
+            ) : null}
+          </div>
+
+          <AdvancedOptions
+            isOpen={showAdvanced}
+            onToggle={() => setShowAdvanced(!showAdvanced)}
+            {...options}
+            onProviderChange={(providerId, modelId) => {
+              updateOption('providerId', providerId);
+              updateOption('providerModel', modelId);
+            }}
+            onThresholdChange={(v) => updateOption('threshold', v)}
+            onPhashWeightChange={(v) => updateOption('phashWeight', v)}
+            onDescWeightChange={(v) => updateOption('descWeight', v)}
+            onVisionWeightChange={(v) => updateOption('visionWeight', v)}
+            maxWorkers={options.maxWorkers}
+            onMaxWorkersChange={(v) => updateOption('maxWorkers', v)}
+            onSkipUndescribedChange={(v) => updateOption('skipUndescribed', v)}
+            weightsError={weightsError}
+            onReset={resetOptions}
+          >
+            <div className="space-y-6">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  disabled={anyBusy}
+                  onClick={() =>
+                    runAdvancedJob('embed_catalog', 'batch_embed_image', { image_type: 'catalog' })
+                  }
+                >
+                  {CATALOG_CACHE_EMBED_CATALOG_LABEL}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  disabled={anyBusy}
+                  onClick={() =>
+                    runAdvancedJob('embed_catalog_ig', 'batch_embed_image', {
+                      image_type: 'catalog_and_instagram',
+                    })
+                  }
+                >
+                  {CATALOG_CACHE_EMBED_CATALOG_IG_LABEL}
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  disabled={anyBusy}
+                  onClick={() => runAdvancedJob('stack', 'batch_stack_detect', {})}
+                >
+                  {CATALOG_CACHE_STACK_DETECT_LABEL}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  disabled={anyBusy}
+                  onClick={() => runAdvancedJob('similarity', 'batch_catalog_similarity', {})}
+                >
+                  {CATALOG_CACHE_SIMILARITY_LABEL}
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-text">{CATALOG_CACHE_PREPARE_CATALOG_TITLE}</h3>
+                <p className="text-xs text-text-secondary leading-relaxed">{CATALOG_CACHE_PREPARE_CATALOG_HELPER}</p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  disabled={anyBusy}
+                  onClick={() => runAdvancedJob('prepare', 'prepare_catalog', {})}
+                >
+                  {CATALOG_CACHE_PREPARE_CATALOG_TITLE}
+                </Button>
+              </div>
+            </div>
+          </AdvancedOptions>
+
+          <div className="pt-4">
+            <Button variant="secondary" size="md" fullWidth onClick={refreshStats} disabled={anyBusy}>
+              {CACHE_REFRESH_BUTTON}
             </Button>
           </div>
 
