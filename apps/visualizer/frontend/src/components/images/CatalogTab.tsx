@@ -8,7 +8,6 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ImagesAPI, PerspectivesAPI, type CatalogImage } from '../../services/api';
 import { ImageDetailModal, ImageTile, fromCatalogListRow } from '../image-view';
-import { Badge } from '../ui/badges';
 import { Pagination } from '../ui/Pagination';
 import { TileGrid } from '../ui/TileGrid';
 import { useQuery } from '../../data';
@@ -46,7 +45,6 @@ import {
   CATALOG_FILTER_COLOR_PLACEHOLDER,
   CATALOG_FILTER_COLOR_ARIA,
   msgShowingOf,
-  formatStackCountBadge,
 } from '../../constants/strings';
 import { formatMonth } from '../../utils/date';
 import { useFilters } from '../../hooks/useFilters';
@@ -55,35 +53,6 @@ import type { FilterSchema } from '../filters/types';
 import { stableSerializeRecord } from '../../utils/stableQueryKey';
 
 const LIMIT = 50;
-
-function CatalogImageWithStack({
-  image,
-  onSelect,
-}: {
-  image: CatalogImage
-  onSelect: (row: CatalogImage) => void
-}) {
-  const stackId = image.stack_id
-  const count = image.stack_member_count ?? 0
-  const isRep = image.is_stack_representative === true
-  const showStack = isRep && stackId != null && count > 1
-
-  return (
-    <div className="min-w-0">
-      <ImageTile
-        image={fromCatalogListRow(image)}
-        variant="grid"
-        primaryScoreSource="catalog"
-        onClick={() => onSelect(image)}
-        overlayBadges={
-          showStack ? (
-            <Badge variant="default">{formatStackCountBadge(count)}</Badge>
-          ) : undefined
-        }
-      />
-    </div>
-  );
-}
 
 /** Row-data we need to open the consolidated modal — only type + key are
  *  required (detail endpoint fills the rest); the full row is kept so the
@@ -388,10 +357,12 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
           <div className={`relative transition-opacity duration-150${isPending ? ' opacity-50 pointer-events-none' : ''}`}>
             <TileGrid>
               {images.map((image) => (
-                <CatalogImageWithStack
+                <ImageTile
                   key={image.id != null ? String(image.id) : image.key}
-                  image={image}
-                  onSelect={(row) => setSelected({ key: row.key, initial: row })}
+                  image={fromCatalogListRow(image)}
+                  variant="grid"
+                  primaryScoreSource="catalog"
+                  onClick={() => setSelected({ key: image.key, initial: image })}
                 />
               ))}
             </TileGrid>

@@ -77,6 +77,9 @@ export function fromBestPhotoRow(row: IdentityBestPhotoItem): ImageView {
     date_taken: row.date_taken,
     rating: row.rating,
     instagram_posted: row.instagram_posted,
+    stack_id: row.stack_id,
+    stack_member_count: row.stack_member_count,
+    is_stack_representative: row.is_stack_representative,
     // Identity fields are authoritative on this endpoint.
     identity_aggregate_score: row.aggregate_score,
     identity_perspectives_covered: row.perspectives_covered,

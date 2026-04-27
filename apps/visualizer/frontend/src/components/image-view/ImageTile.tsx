@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import type { ImageView } from '../../services/api'
+import { Badge } from '../ui/badges'
+import { formatStackCountBadge } from '../../constants/strings'
 import { ImageMetadataBadges, type PrimaryScoreSource } from './ImageMetadataBadges'
 import { imageTileVariantClasses, type ImageTileVariant } from './imageTileVariants'
 
@@ -12,14 +14,25 @@ interface ImageTileProps {
   onClick: () => void
   /** Secondary line beneath filename (e.g. folder, "Estimated 2024/05"). */
   subtitle?: string
-  /** Optional ReactNode overlayed top-right on the thumbnail (e.g. Instagram
-   *  matched/described badges). */
+  /** Caller-supplied overlays rendered top-right on the thumbnail. The
+   *  stack-representative badge is derived from `image.stack_*` fields and
+   *  rendered automatically beneath any caller-supplied overlays — that
+   *  derivation is intentionally centralized here so every surface stays
+   *  consistent. */
   overlayBadges?: ReactNode
   /** Content rendered below the metadata row (e.g. post-next reason bullets). */
   footer?: ReactNode
   /** When true, hides the metadata-row "Posted" chip (e.g. when using overlayBadges). */
   hidePostedMetadataBadge?: boolean
   className?: string
+}
+
+function deriveStackOverlay(image: ImageView): ReactNode {
+  const count = image.stack_member_count ?? 0
+  const isStackRep =
+    image.stack_id != null && image.is_stack_representative === true && count > 1
+  if (!isStackRep) return null
+  return <Badge variant="default">{formatStackCountBadge(count)}</Badge>
 }
 
 /**
@@ -49,6 +62,15 @@ export function ImageTile({
       ? new Date(image.created_at).toLocaleDateString()
       : '—'
 
+  const stackOverlay = deriveStackOverlay(image)
+  const composedOverlays =
+    overlayBadges || stackOverlay ? (
+      <>
+        {overlayBadges}
+        {stackOverlay}
+      </>
+    ) : null
+
   return (
     <div
       className={`group overflow-hidden rounded-card border border-border bg-bg shadow-card transition-all hover:border-border-strong hover:shadow-deep ${classes.root} ${className}`.trim()}
@@ -69,9 +91,9 @@ export function ImageTile({
             className="absolute inset-0 h-full w-full object-cover"
             loading="lazy"
           />
-          {overlayBadges ? (
+          {composedOverlays ? (
             <div className="absolute right-2 top-2 flex flex-col gap-1">
-              {overlayBadges}
+              {composedOverlays}
             </div>
           ) : null}
         </div>

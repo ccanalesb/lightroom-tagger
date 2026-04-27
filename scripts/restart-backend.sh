@@ -3,11 +3,16 @@ set -euo pipefail
 
 # Safe backend restart — kills ONLY the backend listener, never the frontend.
 
-PID=$(lsof -ti :5001 -sTCP:LISTEN 2>/dev/null || true)
+PIDS=()
+while IFS= read -r pid; do
+  [[ -n "$pid" ]] && PIDS+=("$pid")
+done < <(lsof -ti :5001 -sTCP:LISTEN 2>/dev/null || true)
 
-if [[ -n "$PID" ]]; then
-  kill "$PID"
-  echo "Killed backend (pid $PID)"
+if [[ "${#PIDS[@]}" -gt 0 ]]; then
+  for pid in "${PIDS[@]}"; do
+    kill "$pid"
+    echo "Killed backend (pid $pid)"
+  done
   sleep 2
 else
   echo "No backend listener found on :5001"

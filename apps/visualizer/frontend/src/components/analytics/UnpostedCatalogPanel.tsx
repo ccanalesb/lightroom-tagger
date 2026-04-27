@@ -1,4 +1,4 @@
-import { Suspense, useMemo, useState } from 'react'
+import { Suspense, useMemo, useState, useTransition } from 'react'
 import {
   AnalyticsAPI,
   ImagesAPI,
@@ -110,6 +110,7 @@ function UnpostedCatalogPanelInner() {
 
   const [applied, setApplied] = useState<AppliedUnpostedFilters>(initialApplied)
   const [page, setPage] = useState(1)
+  const [isPending, startTransition] = useTransition()
   const [selected, setSelected] = useState<UnpostedCatalogItem | null>(null)
 
   const data = useQuery(
@@ -128,13 +129,15 @@ function UnpostedCatalogPanelInner() {
   const { months: availableMonths, rows, total, error } = data
 
   const handleApply = () => {
-    setApplied({
-      dateFrom: dateFromDraft,
-      dateTo: dateToDraft,
-      minRating: minRatingDraft,
-      month: monthDraft,
+    startTransition(() => {
+      setApplied({
+        dateFrom: dateFromDraft,
+        dateTo: dateToDraft,
+        minRating: minRatingDraft,
+        month: monthDraft,
+      })
+      setPage(1)
     })
-    setPage(1)
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -253,7 +256,7 @@ function UnpostedCatalogPanelInner() {
           ) : null}
 
           {!error && rows.length > 0 ? (
-            <>
+            <div className={`transition-opacity duration-150${isPending ? ' opacity-50 pointer-events-none' : ''}`}>
               <TileGrid>
                 {rows.map((row) => (
                   <ImageTile
@@ -269,10 +272,11 @@ function UnpostedCatalogPanelInner() {
                 <Pagination
                   currentPage={page}
                   totalPages={totalPages}
-                  onPageChange={setPage}
+                  onPageChange={(p) => startTransition(() => setPage(p))}
+                  disabled={isPending}
                 />
               ) : null}
-            </>
+            </div>
           ) : null}
         </CardContent>
       </Card>

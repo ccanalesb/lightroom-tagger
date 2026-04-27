@@ -68,4 +68,14 @@ describe('MatchingTab', () => {
     })
     expect(mocks.invalidateAll).toHaveBeenCalledWith(['catalog.similarity.groups'])
   })
+
+  it('enqueues stack detection as a batch job', async () => {
+    render(<MatchingTab />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Detect Burst Stacks' }))
+
+    await waitFor(() => {
+      expect(mocks.createJob).toHaveBeenCalledWith('batch_stack_detect', { force: true })
+    })
+  })
 })

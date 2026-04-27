@@ -1520,11 +1520,27 @@ def list_dump_media(db):
 @bp.route("/matches", methods=["GET"])
 @with_db
 def list_matches(db):
-    """List matches grouped by Instagram image."""
+    """List matches grouped by Instagram image.
+
+    Filters out **conflicting candidates**: a row whose ``catalog_key`` is
+    already validated against a *different* ``insta_key`` is dropped from the
+    response. The row stays in the ``matches`` table (preserved for downstream
+    model fine-tuning), but the UI never sees it because a single Lightroom
+    photo can only be claimed by one Instagram post.
+    """
     try:
         matches = db.execute(
             "SELECT * FROM matches ORDER BY insta_key, COALESCE(rank, 1), total_score DESC"
         ).fetchall()
+
+        claimed_catalog_keys = {
+            row["catalog_key"]
+            for row in db.execute(
+                "SELECT DISTINCT catalog_key FROM matches "
+                "WHERE validated_at IS NOT NULL AND catalog_key IS NOT NULL"
+            ).fetchall()
+            if row.get("catalog_key")
+        }
 
         # Build lookup tables for images (avoid N+1 queries)
         instagram_lookup = {}
@@ -1574,6 +1590,16 @@ def list_matches(db):
         for match in matches:
             insta_key = match.get("insta_key")
             catalog_key = match.get("catalog_key")
+
+            # Conflict filter: catalog already validated against a different
+            # insta_key → hide this row from the UI. The validated row itself
+            # has ``validated_at IS NOT NULL`` so it survives.
+            if (
+                catalog_key
+                and catalog_key in claimed_catalog_keys
+                and not match.get("validated_at")
+            ):
+                continue
 
             enriched = {
                 **match,

@@ -155,6 +155,105 @@ def test_list_matches_sorts_unvalidated_before_validated_bucket():
         assert data['match_groups'][0]['instagram_key'] == 'ig/sort_unval'
 
 
+def test_list_matches_hides_candidate_when_catalog_validated_elsewhere():
+    """Catalog validated against IG-A must not surface as a candidate for IG-B.
+
+    Reproduces the L1005658 bug: a candidate stored before another IG validated
+    the same catalog should be filtered from the response while staying in the
+    ``matches`` table for downstream model training.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, 'test.db')
+        db = init_database(db_path)
+        store_match(db, {
+            'catalog_key': 'cat_shared', 'insta_key': 'ig_a',
+            'phash_distance': 0, 'phash_score': 0.9, 'desc_similarity': 0.8,
+            'vision_result': 'SAME', 'vision_score': 0.95, 'total_score': 0.88, 'rank': 4,
+        })
+        store_match(db, {
+            'catalog_key': 'cat_shared', 'insta_key': 'ig_b',
+            'phash_distance': 0, 'phash_score': 0.95, 'desc_similarity': 0.9,
+            'vision_result': 'SAME', 'vision_score': 0.98, 'total_score': 0.92, 'rank': 1,
+        })
+        store_match(db, {
+            'catalog_key': 'cat_other', 'insta_key': 'ig_b',
+            'phash_distance': 5, 'phash_score': 0.7, 'desc_similarity': 0.6,
+            'vision_result': 'UNCERTAIN', 'vision_score': 0.75, 'total_score': 0.75, 'rank': 2,
+        })
+        db.execute(
+            "UPDATE matches SET validated_at = ? WHERE catalog_key = ? AND insta_key = ?",
+            ('2026-04-22T10:00:56', 'cat_shared', 'ig_a'),
+        )
+        db.commit()
+
+        # Sanity: row still exists in the table (preserved for fine-tuning).
+        row_count = db.execute(
+            "SELECT COUNT(*) AS c FROM matches WHERE catalog_key = ? AND insta_key = ?",
+            ('cat_shared', 'ig_b'),
+        ).fetchone()['c']
+        assert row_count == 1
+        db.close()
+
+        client = _make_client(db_path)
+        resp = client.get('/api/images/matches')
+        assert resp.status_code == 200
+        data = resp.get_json()
+
+        groups_by_key = {g['instagram_key']: g for g in data['match_groups']}
+        ig_b_group = groups_by_key['ig_b']
+        candidate_catalog_keys = [c['catalog_key'] for c in ig_b_group['candidates']]
+        assert 'cat_shared' not in candidate_catalog_keys, \
+            'Conflicting catalog must be hidden from non-validated IG group'
+        assert candidate_catalog_keys == ['cat_other']
+        assert ig_b_group['candidate_count'] == 1
+        assert ig_b_group['has_validated'] is False
+
+        ig_a_group = groups_by_key['ig_a']
+        a_keys = [c['catalog_key'] for c in ig_a_group['candidates']]
+        assert a_keys == ['cat_shared'], \
+            'Validated row stays visible in its own group'
+        assert ig_a_group['has_validated'] is True
+
+        flat_pairs = {(m['catalog_key'], m['instagram_key']) for m in data.get('matches', [])}
+        assert ('cat_shared', 'ig_b') not in flat_pairs
+        assert data['total_matches'] == 2
+
+
+def test_list_matches_drops_group_when_only_candidate_is_conflict():
+    """IG whose every candidate is filtered disappears from match_groups silently.
+
+    Re-running matching for that IG is the path forward; we don't want a
+    misleading empty card in the UI.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, 'test.db')
+        db = init_database(db_path)
+        store_match(db, {
+            'catalog_key': 'cat_lone', 'insta_key': 'ig_winner',
+            'phash_distance': 0, 'phash_score': 0.9, 'desc_similarity': 0.8,
+            'vision_result': 'SAME', 'vision_score': 0.95, 'total_score': 0.9, 'rank': 1,
+        })
+        store_match(db, {
+            'catalog_key': 'cat_lone', 'insta_key': 'ig_loser',
+            'phash_distance': 0, 'phash_score': 0.9, 'desc_similarity': 0.8,
+            'vision_result': 'SAME', 'vision_score': 0.95, 'total_score': 0.85, 'rank': 1,
+        })
+        db.execute(
+            "UPDATE matches SET validated_at = ? WHERE insta_key = ?",
+            ('2026-04-22T10:00:00', 'ig_winner'),
+        )
+        db.commit()
+        db.close()
+
+        client = _make_client(db_path)
+        resp = client.get('/api/images/matches')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        keys = {g['instagram_key'] for g in data['match_groups']}
+        assert 'ig_loser' not in keys
+        assert 'ig_winner' in keys
+
+
 def test_list_matches_tombstone_all_rejected_after_validated():
     """Fully-rejected insta_key with no matches rows appears after validated groups in reviewed bucket."""
     with tempfile.TemporaryDirectory() as tmpdir:

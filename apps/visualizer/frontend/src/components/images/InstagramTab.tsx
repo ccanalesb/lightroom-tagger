@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { ImageDetailModal, ImageTile, fromInstagramRow } from '../image-view';
 import { Badge } from '../ui/badges';
 import { Pagination } from '../ui/Pagination';
@@ -24,6 +24,7 @@ import { stableSerializeRecord } from '../../utils/stableQueryKey';
 
 export function InstagramTab() {
   const [page, setPage] = useState(1);
+  const [isPending, startTransition] = useTransition();
 
   const monthsPayload = useQuery(['images.instagram', 'months'] as const, () =>
     ImagesAPI.getInstagramMonths(),
@@ -88,11 +89,11 @@ export function InstagramTab() {
   const pagination = listData.pagination;
 
   useEffect(() => {
-    setPage(1);
+    startTransition(() => setPage(1));
   }, [dateFolder, sortByDate]);
 
   const handlePageChange = (nextPage: number) => {
-    setPage(nextPage);
+    startTransition(() => setPage(nextPage));
   };
 
   return (
@@ -108,38 +109,40 @@ export function InstagramTab() {
         disabled={false}
       />
 
-      <TileGrid>
-        {images.map((image) => (
-          <ImageTile
-            key={image.key}
-            image={fromInstagramRow(image)}
-            variant="grid"
-            primaryScoreSource="none"
-            subtitle={image.instagram_folder || image.source_folder || undefined}
-            footer={
-              image.matched_catalog_key ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="success">{BADGE_MATCHED}</Badge>
-                  {typeof image.match_score === 'number' && (
-                    <Badge variant="default">{Math.round(image.match_score * 100)}%</Badge>
-                  )}
-                </div>
-              ) : null
-            }
-            onClick={() => open(image)}
-          />
-        ))}
-      </TileGrid>
+      <div className={`transition-opacity duration-150${isPending ? ' opacity-50 pointer-events-none' : ''}`}>
+        <TileGrid>
+          {images.map((image) => (
+            <ImageTile
+              key={image.key}
+              image={fromInstagramRow(image)}
+              variant="grid"
+              primaryScoreSource="none"
+              subtitle={image.instagram_folder || image.source_folder || undefined}
+              footer={
+                image.matched_catalog_key ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="success">{BADGE_MATCHED}</Badge>
+                    {typeof image.match_score === 'number' && (
+                      <Badge variant="default">{Math.round(image.match_score * 100)}%</Badge>
+                    )}
+                  </div>
+                ) : null
+              }
+              onClick={() => open(image)}
+            />
+          ))}
+        </TileGrid>
 
-      {pagination.total_pages > 1 && (
-        <div className="flex justify-center pt-4">
-          <Pagination
-            currentPage={pagination.current_page}
-            totalPages={pagination.total_pages}
-            onPageChange={handlePageChange}
-          />
-        </div>
-      )}
+        {pagination.total_pages > 1 && (
+          <div className="flex justify-center pt-4">
+            <Pagination
+              currentPage={pagination.current_page}
+              totalPages={pagination.total_pages}
+              onPageChange={handlePageChange}
+            />
+          </div>
+        )}
+      </div>
 
       {isOpen && selectedItem && (
         <ImageDetailModal

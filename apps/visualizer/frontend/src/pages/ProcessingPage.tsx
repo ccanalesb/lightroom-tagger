@@ -1,4 +1,4 @@
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState, useTransition } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Tabs, Tab } from '../components/ui/Tabs';
 import { MatchingTab } from '../components/processing/MatchingTab';
@@ -22,6 +22,7 @@ import {
   TAB_PROVIDERS,
   TAB_SETTINGS,
   NAV_PROCESSING,
+  PROCESSING_JOB_QUEUE_ROUTE,
 } from '../constants/strings';
 
 const PAGE_SIZE = 50;
@@ -62,6 +63,7 @@ function JobQueueTabWithData({
   refreshJobList: () => void;
 }) {
   const [jobsOffset, setJobsOffset] = useState(0);
+  const [isPending, startTransition] = useTransition();
   const listResponse = useQuery(
     ['jobs.list', { limit: PAGE_SIZE, offset: jobsOffset }] as const,
     () => JobsAPI.list({ limit: PAGE_SIZE, offset: jobsOffset }),
@@ -76,12 +78,13 @@ function JobQueueTabWithData({
       connected={connected}
       onRefreshJobs={refreshJobList}
       onInvalidateJobList={refreshJobList}
+      isPending={isPending}
       pagination={{
         offset: jobsOffset,
         limit: PAGE_SIZE,
         total: jobsTotal,
       }}
-      onOffsetChange={setJobsOffset}
+      onOffsetChange={(offset) => startTransition(() => setJobsOffset(offset))}
     />
   );
 }
@@ -108,6 +111,10 @@ export function ProcessingPage() {
       { replace: true },
     );
   };
+
+  const openJobQueueTab = useCallback(() => {
+    navigate(PROCESSING_JOB_QUEUE_ROUTE, { replace: true });
+  }, [navigate]);
 
   const tabs: Tab[] = [
     {
@@ -177,7 +184,7 @@ export function ProcessingPage() {
           )}
         >
           <Suspense fallback={tabSuspenseFallback}>
-            <CatalogCacheTab onJobEnqueued={refreshJobList} />
+            <CatalogCacheTab onJobEnqueued={refreshJobList} onOpenJobQueue={openJobQueueTab} />
           </Suspense>
         </ErrorBoundary>
       ),

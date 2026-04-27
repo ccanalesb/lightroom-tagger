@@ -93,6 +93,72 @@ describe('ImageTile', () => {
     expect(screen.getByText('Matched')).toBeInTheDocument()
   })
 
+  it('auto-renders the stack-count badge when image is a stack representative with members', () => {
+    render(
+      <ImageTile
+        image={baseImage({
+          stack_id: 7,
+          stack_member_count: 4,
+          is_stack_representative: true,
+        })}
+        variant="grid"
+        primaryScoreSource="none"
+        onClick={() => {}}
+      />,
+    )
+    expect(screen.getByText('4 in stack')).toBeInTheDocument()
+  })
+
+  it('does not render the stack badge for non-representative members', () => {
+    render(
+      <ImageTile
+        image={baseImage({
+          stack_id: 7,
+          stack_member_count: 4,
+          is_stack_representative: false,
+        })}
+        variant="grid"
+        primaryScoreSource="none"
+        onClick={() => {}}
+      />,
+    )
+    expect(screen.queryByText(/in stack$/)).toBeNull()
+  })
+
+  it('does not render the stack badge for solo stacks (count <= 1)', () => {
+    render(
+      <ImageTile
+        image={baseImage({
+          stack_id: 7,
+          stack_member_count: 1,
+          is_stack_representative: true,
+        })}
+        variant="grid"
+        primaryScoreSource="none"
+        onClick={() => {}}
+      />,
+    )
+    expect(screen.queryByText(/in stack$/)).toBeNull()
+  })
+
+  it('renders caller overlay alongside the auto stack badge', () => {
+    render(
+      <ImageTile
+        image={baseImage({
+          stack_id: 7,
+          stack_member_count: 3,
+          is_stack_representative: true,
+        })}
+        variant="grid"
+        primaryScoreSource="none"
+        overlayBadges={<Badge variant="success">Posted</Badge>}
+        onClick={() => {}}
+      />,
+    )
+    expect(screen.getByText('Posted')).toBeInTheDocument()
+    expect(screen.getByText('3 in stack')).toBeInTheDocument()
+  })
+
   it('footer slot renders beneath metadata badges', () => {
     render(
       <ImageTile

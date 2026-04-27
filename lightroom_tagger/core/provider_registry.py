@@ -237,14 +237,20 @@ class ProviderRegistry:
             return False
 
         try:
-            client = self.get_client(provider_id)
-            client.chat.completions.create(
+            # Use a no-retry client so the probe fails fast instead of retrying.
+            base_client = self.get_client(provider_id)
+            probe_client = openai.OpenAI(
+                api_key=base_client.api_key,
+                base_url=str(base_client.base_url),
+                max_retries=0,
+                timeout=10.0,
+            )
+            probe_client.chat.completions.create(
                 model=probe_model,
                 messages=[{"role": "user", "content": "hi"}],
                 tools=[_PROBE_TOOL],
                 tool_choice="auto",
                 max_tokens=1,
-                timeout=5.0,
             )
             return True
         except Exception:

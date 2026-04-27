@@ -5,7 +5,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import numpy as np
-import pytest
 
 from lightroom_tagger.core.database import init_database, store_image, store_image_description
 
@@ -91,3 +90,82 @@ def test_batch_text_embed_writes_vec_row(mock_load_config, _mock_add_log, tmp_pa
         assert int(row["c"]) == 1
     finally:
         verify.close()
+
+
+@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.load_config")
+def test_batch_text_embed_processes_newest_first(
+    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+):
+    from jobs import handlers
+    from jobs.handlers import handle_batch_text_embed
+
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    old_key = store_image(
+        conn,
+        {
+            "date_taken": "2024-01-10",
+            "filename": "old.jpg",
+            "rating": 2,
+        },
+    )
+    new_key = store_image(
+        conn,
+        {
+            "date_taken": "2024-01-11",
+            "filename": "new.jpg",
+            "rating": 2,
+        },
+    )
+    store_image_description(
+        conn,
+        {
+            "image_key": old_key,
+            "image_type": "catalog",
+            "summary": "old summary",
+            "subjects": [],
+            "best_perspective": "p",
+            "perspectives": {},
+            "composition": {},
+            "technical": {},
+            "model_used": "t",
+            "description_search_document": "old-doc",
+        },
+    )
+    store_image_description(
+        conn,
+        {
+            "image_key": new_key,
+            "image_type": "catalog",
+            "summary": "new summary",
+            "subjects": [],
+            "best_perspective": "p",
+            "perspectives": {},
+            "composition": {},
+            "technical": {},
+            "model_used": "t",
+            "description_search_document": "new-doc",
+        },
+    )
+    conn.close()
+
+    seen_batches: list[list[str]] = []
+
+    def _embed(texts, batch_size=16):
+        seen_batches.append(list(texts))
+        return np.ones((len(texts), 768), dtype=np.float32)
+
+    monkeypatch.setenv("LIBRARY_DB", str(db_path))
+    mock_load_config.return_value = MagicMock(db_path=str(db_path))
+    monkeypatch.setattr(handlers, "embed_texts", _embed)
+
+    runner = _make_runner()
+    handle_batch_text_embed(
+        runner,
+        "job-newest-first",
+        {"image_type": "catalog", "force": True},
+    )
+
+    assert len(seen_batches) == 1
+    assert seen_batches[0] == ["new summary", "old summary"]

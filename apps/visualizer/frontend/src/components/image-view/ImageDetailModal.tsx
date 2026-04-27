@@ -25,6 +25,8 @@ import { ConfirmModalFrame, UndoToastBar, useUndoToast } from '../ui/ConfirmUndo
 import { CatalogImageDetailSections } from './CatalogImageDetailSections'
 import { InstagramImageDetailSections } from './InstagramImageDetailSections'
 import { ImageMetadataBadges, type PrimaryScoreSource } from './ImageMetadataBadges'
+import { ImageTile } from './ImageTile'
+import { fromCatalogListRow } from './adapters'
 import { ModalCloseButton } from './ModalCloseButton'
 import { ErrorBoundary, ErrorState, invalidate, invalidateAll, useQuery } from '../../data'
 
@@ -86,11 +88,9 @@ type StackConfirmSpec = {
 
 /** Stack split / merge / representative (catalog detail). Loads members to validate multi-key stack. */
 function CatalogDetailStackEditing({
-  imageKey,
   stackId,
   onDataChanged,
 }: {
-  imageKey: string
   stackId: number
   onDataChanged: () => void
 }) {
@@ -136,32 +136,31 @@ function CatalogDetailStackEditing({
 
   if (!members || members.length < 2) return null
 
-  const isStackRep = members.some((m) => m.key === imageKey && m.is_stack_representative)
   const hasRep = members.some((m) => m.is_stack_representative)
 
-  const openSplitConfirm = () => {
+  const openSplitConfirm = (memberKey: string) => {
     setConfirm({
       title: CATALOG_STACK_CONFIRM_SPLIT_TITLE,
       children: <p className="text-sm text-text-secondary">{CATALOG_STACK_CONFIRM_SPLIT_BODY}</p>,
       confirmLabel: CATALOG_STACK_SPLIT_OUT,
       confirmVariant: 'danger',
       onConfirm: async () => {
-        await ImagesAPI.splitStackMember(stackId, imageKey)
+        await ImagesAPI.splitStackMember(stackId, memberKey)
         await refreshMembers()
       },
     })
   }
 
-  const openRepConfirm = () => {
+  const openRepConfirm = (memberKey: string) => {
     const prevRep = members.find((m) => m.is_stack_representative)?.key
-    if (!prevRep || prevRep === imageKey) return
+    if (!prevRep || prevRep === memberKey) return
     setConfirm({
       title: CATALOG_STACK_CONFIRM_REP_TITLE,
       children: <p className="text-sm text-text-secondary">{CATALOG_STACK_CONFIRM_REP_BODY}</p>,
       confirmLabel: CATALOG_STACK_MAKE_REPRESENTATIVE,
       confirmVariant: 'primary',
       onConfirm: async () => {
-        await ImagesAPI.setStackRepresentative(stackId, imageKey)
+        await ImagesAPI.setStackRepresentative(stackId, memberKey)
         await refreshMembers()
         offerUndo(CATALOG_STACK_TOAST_REP_UPDATED, async () => {
           await ImagesAPI.setStackRepresentative(stackId, prevRep)
@@ -190,29 +189,44 @@ function CatalogDetailStackEditing({
   return (
     <div className="space-y-3 rounded-base border border-border bg-surface p-4">
       <h3 className="text-sm font-semibold text-text">Burst stack</h3>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="min-h-9"
-          disabled={mutating}
-          onClick={openSplitConfirm}
-        >
-          {CATALOG_STACK_SPLIT_OUT}
-        </Button>
-        {!isStackRep ? (
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="min-h-9"
-            disabled={mutating}
-            onClick={openRepConfirm}
-          >
-            {CATALOG_STACK_MAKE_REPRESENTATIVE}
-          </Button>
-        ) : null}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {members.map((member) => (
+          <div key={member.key} className="w-[7.5rem] shrink-0 min-w-0 space-y-1">
+            <ImageTile
+              image={fromCatalogListRow(member)}
+              variant="strip"
+              primaryScoreSource="catalog"
+              onClick={() => {}}
+              className="!w-full max-w-full"
+            />
+            <div className="flex flex-col gap-1">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                fullWidth
+                className="min-h-9 text-xs"
+                disabled={mutating}
+                onClick={() => openSplitConfirm(member.key)}
+              >
+                {CATALOG_STACK_SPLIT_OUT}
+              </Button>
+              {!member.is_stack_representative ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  fullWidth
+                  className="min-h-9 text-xs"
+                  disabled={mutating}
+                  onClick={() => openRepConfirm(member.key)}
+                >
+                  {CATALOG_STACK_MAKE_REPRESENTATIVE}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ))}
       </div>
       {hasRep ? (
         <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
@@ -317,7 +331,6 @@ function ImageDetailModalBody({
           ) : null}
           {image.image_type === 'catalog' && stackId != null && !Number.isNaN(stackId) ? (
             <CatalogDetailStackEditing
-              imageKey={imageKey}
               stackId={stackId}
               onDataChanged={handleDataChanged}
             />

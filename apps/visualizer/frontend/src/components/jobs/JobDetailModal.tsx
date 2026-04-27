@@ -7,6 +7,11 @@ import {
   JOB_CONFIG_WEIGHTS,
   JOB_DETAILS_CURRENT_STEP,
   JOB_DETAILS_ERROR,
+  JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE,
+  JOB_DETAILS_EMBED_REASON_EMPTY_PATH,
+  JOB_DETAILS_EMBED_REASON_ENCODE_FAILED,
+  JOB_DETAILS_EMBED_REASON_NO_ROW,
+  JOB_DETAILS_EMBED_REASON_UNRESOLVED,
   ERROR_SEVERITY_LABELS,
   JOB_DETAILS_LOGS,
   JOB_DETAILS_LOGS_TRUNCATED_HEADER,
@@ -37,6 +42,12 @@ import { Button } from '../ui/Button';
 import { Card, CardTitle } from '../ui/Card';
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'accent';
+const EMBED_REASON_LABELS: Record<string, string> = {
+  no_row: JOB_DETAILS_EMBED_REASON_NO_ROW,
+  empty_path: JOB_DETAILS_EMBED_REASON_EMPTY_PATH,
+  unresolved_or_missing: JOB_DETAILS_EMBED_REASON_UNRESOLVED,
+  encode_failed: JOB_DETAILS_EMBED_REASON_ENCODE_FAILED,
+};
 
 function statusToBadgeVariant(status: Job['status']): BadgeVariant {
   switch (status) {
@@ -285,6 +296,24 @@ function JobDetailModalBody({ job, onClose, onJobUpdate }: JobDetailModalProps) 
     };
   }, [displayJob.result]);
 
+  const embedReasonCounts = useMemo(() => {
+    if (displayJob.type !== 'batch_embed_image') return null;
+    const rawCounts =
+      displayJob.result && typeof displayJob.result === 'object'
+        ? (displayJob.result as Record<string, unknown>).skip_reason_counts
+        : null;
+    if (!rawCounts || typeof rawCounts !== 'object') return null;
+    return (Object.keys(EMBED_REASON_LABELS) as Array<keyof typeof EMBED_REASON_LABELS>).map((key) => {
+      const value = (rawCounts as Record<string, unknown>)[key];
+      const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
+      return {
+        key,
+        label: EMBED_REASON_LABELS[key],
+        count: Number.isFinite(numericValue) ? numericValue : 0,
+      };
+    });
+  }, [displayJob.result, displayJob.type]);
+
   const handleRetry = async () => {
     setRetrying(true);
     try {
@@ -433,6 +462,20 @@ function JobDetailModalBody({ job, onClose, onJobUpdate }: JobDetailModalProps) 
           </div>
         </div>
       )}
+
+      {embedReasonCounts ? (
+        <div className="rounded-base border border-border border-warning/40 bg-surface p-3">
+          <h4 className="mb-2 font-medium text-sm text-text">{JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE}</h4>
+          <div className="grid grid-cols-1 gap-1 text-sm text-text sm:grid-cols-2">
+            {embedReasonCounts.map((entry) => (
+              <div key={entry.key} className="flex items-center justify-between gap-2">
+                <span className="text-text-secondary">{entry.label}</span>
+                <span className="font-mono text-xs">{entry.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {resultPreview && (
         <div className="rounded-base border border-border border-success/40 bg-surface p-3">

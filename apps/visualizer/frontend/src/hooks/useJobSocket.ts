@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { invalidate, invalidateAll, patchMatching } from '../data'
+import { invalidateAll, patchMatching } from '../data'
 import { useSocketStore } from '../stores/socketStore'
 import type { Job } from '../types/job'
 
@@ -38,23 +38,19 @@ export function useJobSocket({
     }
 
     const handleJobUpdated = (job: Job) => {
+      // Always patch in-place — status changes (including terminal ones) only
+      // update an existing row; no rows are added or removed. This avoids
+      // deleting the cache entry and triggering a Suspense flash in the job
+      // list. A full refresh happens only on job_created / jobs_recovered.
       const jobsListPrefix = JSON.stringify(['jobs.list']).slice(0, -1)
-      if (job.status === 'running' || job.status === 'pending') {
-        // Progress update only — patch in-place so useQuery returns cached
-        // data immediately (no fetch, no Suspense flash).
-        patchMatching(
-          (k) => k.startsWith(jobsListPrefix),
-          (value) => {
-            const resp = value as { data?: Job[] }
-            if (!resp?.data) return value
-            return { ...resp, data: resp.data.map((j) => (j.id === job.id ? job : j)) }
-          },
-        )
-      } else {
-        // Terminal state (completed/failed/cancelled) — need fresh list from server.
-        invalidateAll(['jobs.list'])
-      }
-      invalidate(['jobs.detail', job.id])
+      patchMatching(
+        (k) => k.startsWith(jobsListPrefix),
+        (value) => {
+          const resp = value as { data?: Job[] }
+          if (!resp?.data) return value
+          return { ...resp, data: resp.data.map((j) => (j.id === job.id ? job : j)) }
+        },
+      )
       setJobListRevision((n) => n + 1)
       onJobUpdated?.(job)
     }

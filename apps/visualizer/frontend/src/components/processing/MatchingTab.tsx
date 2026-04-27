@@ -39,6 +39,7 @@ export function MatchingTab(props: MatchingTabProps = {}) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isSimilarityStarting, setIsSimilarityStarting] = useState(false);
+  const [isStackStarting, setIsStackStarting] = useState(false);
   const { options, updateOption, resetOptions, weightsError } = useMatchOptions();
   const catalogSimilarity = useQuery(
     ['catalog.similarity.groups', { limit: 12, offset: 0 }] as const,
@@ -101,6 +102,19 @@ export function MatchingTab(props: MatchingTabProps = {}) {
     }
   }, [onJobEnqueued]);
 
+  const startStackDetection = useCallback(async () => {
+    setIsStackStarting(true);
+    try {
+      await JobsAPI.create('batch_stack_detect', { force: true });
+      onJobEnqueued?.();
+      alert('Stack detection job started! Check Job Queue tab to monitor progress.');
+    } catch (error) {
+      alert(`Failed to start job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsStackStarting(false);
+    }
+  }, [onJobEnqueued]);
+
   const groups = catalogSimilarity.items ?? [];
 
   return (
@@ -159,23 +173,46 @@ export function MatchingTab(props: MatchingTabProps = {}) {
 
       <Card padding="lg" className="mt-6">
         <CardHeader>
-          <CardTitle>Find Similar Catalog Photos</CardTitle>
+          <CardTitle>Catalog Discovery Jobs</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">
-              Runs a batch job over the existing visual index and saves reviewable catalog
-              similarity groups. This does not modify the Lightroom catalog.
-            </p>
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              onClick={startCatalogSimilarity}
-              disabled={isSimilarityStarting}
-            >
-              {isSimilarityStarting ? 'Starting Similarity Job...' : 'Find Similar Photos'}
-            </Button>
+          <div className="space-y-6">
+            <div className="rounded-base border border-border bg-surface p-4">
+              <h3 className="text-sm font-semibold text-text">Detect Burst Stacks</h3>
+              <p className="mt-1 text-sm text-text-secondary">
+                Rebuilds derived stack groups from catalog capture times. Use this for burst
+                sequences like near-identical frames shot seconds apart. This does not modify the
+                Lightroom catalog.
+              </p>
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                className="mt-3"
+                onClick={startStackDetection}
+                disabled={isStackStarting}
+              >
+                {isStackStarting ? 'Starting Stack Detection...' : 'Detect Burst Stacks'}
+              </Button>
+            </div>
+
+            <div className="rounded-base border border-border bg-surface p-4">
+              <h3 className="text-sm font-semibold text-text">Find Similar Catalog Photos</h3>
+              <p className="mt-1 text-sm text-text-secondary">
+                Runs a batch job over the existing visual index and saves reviewable catalog
+                similarity groups. This does not modify the Lightroom catalog.
+              </p>
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                className="mt-3"
+                onClick={startCatalogSimilarity}
+                disabled={isSimilarityStarting}
+              >
+                {isSimilarityStarting ? 'Starting Similarity Job...' : 'Find Similar Photos'}
+              </Button>
+            </div>
             <CatalogSimilarityGroupsPreview groups={groups} total={catalogSimilarity.total} />
           </div>
         </CardContent>

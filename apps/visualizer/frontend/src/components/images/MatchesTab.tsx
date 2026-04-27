@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { TileGrid } from '../ui/TileGrid';
@@ -19,7 +19,7 @@ import { MatchGroupTile } from './MatchGroupTile';
 import { FilterBar } from '../filters/FilterBar';
 import { useFilters } from '../../hooks/useFilters';
 import type { FilterSchema } from '../filters/types';
-import { useQuery } from '../../data';
+import { invalidateAll, useQuery } from '../../data';
 
 export function MatchesTab() {
   const [matchGroups, setMatchGroups] = useState<MatchGroup[]>([]);
@@ -53,6 +53,14 @@ export function MatchesTab() {
     ['matching.groups', sortParam] as const,
     () => MatchingAPI.list(100, 0, { sort_by_date: sortParam }),
   );
+
+  // Invalidate on unmount so the next visit always fetches fresh data.
+  // We intentionally don't invalidate while mounted to avoid Suspense flashes.
+  useEffect(() => {
+    return () => {
+      invalidateAll(['matching.groups']);
+    };
+  }, []);
 
   const total = listData.total_groups ?? listData.total;
 

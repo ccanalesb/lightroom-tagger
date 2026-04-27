@@ -1,6 +1,6 @@
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown } from '@codemirror/lang-markdown';
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState, useTransition } from 'react';
 import { ErrorBoundary, ErrorState, invalidateAll, useQuery } from '../../data';
 import { Modal } from '../modal/Modal';
 import { Badge } from '../ui/badges';
@@ -213,6 +213,7 @@ function PerspectiveEditorBody({
 
 function PerspectivesTabInner() {
   const [listRev, setListRev] = useState(0);
+  const [, startTransition] = useTransition();
   const rows = useQuery(['perspectives.list', listRev] as const, () => PerspectivesAPI.list());
 
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
@@ -225,14 +226,14 @@ function PerspectivesTabInner() {
 
   const refreshList = useCallback(() => {
     invalidateAll(['perspectives.list']);
-    setListRev((n) => n + 1);
-  }, []);
+    startTransition(() => setListRev((n) => n + 1));
+  }, [startTransition]);
 
   async function handleToggleActive(row: PerspectiveSummary, next: boolean) {
     setError(null);
     try {
       await PerspectivesAPI.update(row.slug, { active: next });
-      setListRev((n) => n + 1);
+      startTransition(() => setListRev((n) => n + 1));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update active flag');
     }

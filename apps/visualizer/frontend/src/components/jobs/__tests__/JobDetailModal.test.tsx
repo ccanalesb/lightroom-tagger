@@ -3,6 +3,13 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { deleteMatching } from '../../../data/cache';
 import { JobDetailModal } from '../JobDetailModal';
 import type { Job } from '../../../types/job';
+import {
+  JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE,
+  JOB_DETAILS_EMBED_REASON_EMPTY_PATH,
+  JOB_DETAILS_EMBED_REASON_ENCODE_FAILED,
+  JOB_DETAILS_EMBED_REASON_NO_ROW,
+  JOB_DETAILS_EMBED_REASON_UNRESOLVED,
+} from '../../../constants/strings';
 
 const mockGet = vi.fn();
 vi.mock('../../../services/api', () => ({
@@ -149,5 +156,32 @@ describe('JobDetailModal', () => {
       expect(screen.getByText(/^Logs$/)).toBeTruthy();
     });
     expect(screen.queryByText(/Show all/)).toBeNull();
+  });
+
+  it('renders grouped embed diagnostics for batch_embed_image jobs', async () => {
+    mockGet.mockResolvedValue(
+      makeJob({
+        type: 'batch_embed_image',
+        result: {
+          embedded: 2,
+          skipped: 4,
+          failed: 1,
+          total: 7,
+          skip_reason_counts: {
+            no_row: 1,
+            empty_path: 1,
+            unresolved_or_missing: 2,
+            encode_failed: 1,
+          },
+        },
+      }),
+    );
+    render(<JobDetailModal job={makeJob({ type: 'batch_embed_image' })} onClose={() => {}} />);
+
+    expect(await screen.findByText(JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE)).toBeTruthy();
+    expect(screen.getByText(JOB_DETAILS_EMBED_REASON_NO_ROW).parentElement).toHaveTextContent('1');
+    expect(screen.getByText(JOB_DETAILS_EMBED_REASON_EMPTY_PATH).parentElement).toHaveTextContent('1');
+    expect(screen.getByText(JOB_DETAILS_EMBED_REASON_UNRESOLVED).parentElement).toHaveTextContent('2');
+    expect(screen.getByText(JOB_DETAILS_EMBED_REASON_ENCODE_FAILED).parentElement).toHaveTextContent('1');
   });
 });

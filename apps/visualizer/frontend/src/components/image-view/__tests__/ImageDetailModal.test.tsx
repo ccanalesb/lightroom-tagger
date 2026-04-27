@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import type { ImageDetailResponse } from '../../../services/api'
+import type { CatalogImage, ImageDetailResponse } from '../../../services/api'
 import { deleteMatching } from '../../../data/cache'
+import {
+  CATALOG_STACK_CONFIRM_REP_TITLE,
+  CATALOG_STACK_MAKE_REPRESENTATIVE,
+} from '../../../constants/strings'
 
 vi.mock('../CatalogImageDetailSections', () => ({
   CatalogImageDetailSections: ({
@@ -36,6 +40,27 @@ function buildDetail(overrides: Partial<ImageDetailResponse> = {}): ImageDetailR
     rating: 3,
     identity_aggregate_score: 7.2,
     identity_per_perspective: [],
+    ...overrides,
+  }
+}
+
+function buildCatalogImage(overrides: Partial<CatalogImage> = {}): CatalogImage {
+  return {
+    id: 1,
+    key: 'k1',
+    filename: 'one.jpg',
+    filepath: '/one.jpg',
+    date_taken: '2026-01-01',
+    rating: 0,
+    pick: false,
+    color_label: '',
+    keywords: [],
+    title: '',
+    caption: '',
+    copyright: '',
+    width: 100,
+    height: 100,
+    instagram_posted: false,
     ...overrides,
   }
 }
@@ -81,6 +106,57 @@ describe('ImageDetailModal', () => {
       expect(screen.getByTestId('catalog-sections')).toBeInTheDocument()
     })
     expect(screen.queryByRole('button', { name: /more like this/i })).toBeNull()
+  })
+
+  it('lets the representative choose another stack member in the modal', async () => {
+    vi.spyOn(ImagesAPI, 'getImageDetail').mockResolvedValue(
+      buildDetail({ stack_id: 42, stack_member_count: 2, is_stack_representative: true }),
+    )
+    vi.spyOn(ImagesAPI, 'getStackMembers').mockResolvedValue({
+      items: [
+        buildCatalogImage({
+          key: 'k1',
+          filename: 'one.jpg',
+          stack_id: 42,
+          stack_member_count: 2,
+          is_stack_representative: true,
+        }),
+        buildCatalogImage({
+          id: 2,
+          key: 'k2',
+          filename: 'two.jpg',
+          stack_id: 42,
+          stack_member_count: 2,
+          is_stack_representative: false,
+        }),
+      ],
+    })
+    const repSpy = vi.spyOn(ImagesAPI, 'setStackRepresentative').mockResolvedValue({
+      stack: {
+        stack_id: 42,
+        representative_key: 'k2',
+        stack_member_count: 2,
+        member_keys: ['k1', 'k2'],
+      },
+    })
+
+    render(
+      <ImageDetailModal
+        imageType="catalog"
+        imageKey="k1"
+        primaryScoreSource="catalog"
+        onClose={() => {}}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: CATALOG_STACK_MAKE_REPRESENTATIVE }))
+    expect(await screen.findByText(CATALOG_STACK_CONFIRM_REP_TITLE)).toBeInTheDocument()
+    const confirmButtons = screen.getAllByRole('button', { name: CATALOG_STACK_MAKE_REPRESENTATIVE })
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]!)
+
+    await waitFor(() => {
+      expect(repSpy).toHaveBeenCalledWith(42, 'k2')
+    })
   })
 
   it('passes score_perspective query when provided', async () => {

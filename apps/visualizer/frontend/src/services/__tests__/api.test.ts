@@ -174,17 +174,31 @@ describe('ImagesAPI.getImageDetail', () => {
   })
 })
 
-describe('mutation invalidation (cache)', () => {
+describe('mutation cache updates', () => {
   beforeEach(() => {
     deleteMatching(() => true)
     vi.clearAllMocks()
   })
 
-  it('MatchingAPI.validate clears matching.groups query so list refetches', async () => {
+  it('MatchingAPI.validate patches matching.groups cache without forcing a refetch', async () => {
     const listPayload = {
-      total: 0,
-      total_groups: 0,
-      match_groups: [] as unknown[],
+      total: 1,
+      total_groups: 1,
+      match_groups: [
+        {
+          instagram_key: 'ik',
+          candidate_count: 1,
+          best_score: 0.9,
+          has_validated: false,
+          candidates: [
+            {
+              catalog_key: 'ck',
+              instagram_key: 'ik',
+              score: 0.9,
+            },
+          ],
+        },
+      ],
       matches: [] as unknown[],
     }
     fetchMock.mockResolvedValueOnce({
@@ -203,20 +217,38 @@ describe('mutation invalidation (cache)', () => {
     })
     await MatchingAPI.validate('ck', 'ik')
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => listPayload,
-    })
     const p2 = catchThrown(() => query(['matching.groups', 'newest'], listFetcher)) as Promise<unknown>
     await p2
-    expect(fetchMock).toHaveBeenCalledTimes(3)
+    const cached = query(['matching.groups', 'newest'], listFetcher)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(cached.match_groups[0]?.has_validated).toBe(true)
+    expect(cached.match_groups[0]?.candidates[0]?.validated_at).toEqual(expect.any(String))
   })
 
-  it('MatchingAPI.reject clears matching.groups query so list refetches', async () => {
+  it('MatchingAPI.reject patches matching.groups cache without forcing a refetch', async () => {
     const listPayload = {
-      total: 0,
-      total_groups: 0,
-      match_groups: [] as unknown[],
+      total: 1,
+      total_groups: 1,
+      match_groups: [
+        {
+          instagram_key: 'i1',
+          candidate_count: 2,
+          best_score: 0.9,
+          has_validated: false,
+          candidates: [
+            {
+              catalog_key: 'c1',
+              instagram_key: 'i1',
+              score: 0.9,
+            },
+            {
+              catalog_key: 'c2',
+              instagram_key: 'i1',
+              score: 0.4,
+            },
+          ],
+        },
+      ],
       matches: [] as unknown[],
     }
     fetchMock.mockResolvedValueOnce({
@@ -234,13 +266,14 @@ describe('mutation invalidation (cache)', () => {
     })
     await MatchingAPI.reject('c1', 'i1')
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => listPayload,
-    })
     const p2 = catchThrown(() => query(['matching.groups', 'oldest'], listFetcher)) as Promise<unknown>
     await p2
-    expect(fetchMock).toHaveBeenCalledTimes(3)
+    const cached = query(['matching.groups', 'oldest'], listFetcher)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(cached.match_groups[0]?.candidate_count).toBe(1)
+    expect(cached.match_groups[0]?.candidates).toHaveLength(1)
+    expect(cached.match_groups[0]?.candidates[0]?.catalog_key).toBe('c2')
+    expect(cached.match_groups[0]?.best_score).toBeGreaterThan(0)
   })
 
   it('DescriptionsAPI.generate clears descriptions query for that image key', async () => {

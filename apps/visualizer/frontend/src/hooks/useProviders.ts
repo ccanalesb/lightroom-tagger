@@ -2,6 +2,11 @@ import { useCallback, useReducer } from 'react'
 import { invalidateAll, useQuery } from '../data'
 import { ProvidersAPI, type Provider, type ProviderModel } from '../services/api'
 
+const EMPTY_PROVIDER_BUNDLE: { providers: Provider[]; fallbackOrder: string[] } = {
+  providers: [],
+  fallbackOrder: [],
+}
+
 async function fetchProviderBundle(): Promise<{
   providers: Provider[]
   fallbackOrder: string[]
@@ -15,7 +20,9 @@ async function fetchProviderBundle(): Promise<{
 
 export function useProviders() {
   const [rev, bump] = useReducer((n: number) => n + 1, 0)
-  const bundle = useQuery(['providers.list', 'hook', rev] as const, fetchProviderBundle)
+  const bundle = useQuery(['providers.list', 'hook', rev] as const, fetchProviderBundle, {
+    initialValue: EMPTY_PROVIDER_BUNDLE,
+  })
 
   const refresh = useCallback(() => {
     invalidateAll(['providers.list'])
@@ -44,6 +51,7 @@ export function useProviderModels(providerId: string | null) {
       if (!providerId) return []
       return ProvidersAPI.listModels(providerId)
     },
+    { initialValue: [] },
   )
 
   return { models, loading: false, error: null }

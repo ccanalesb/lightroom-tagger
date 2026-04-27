@@ -224,6 +224,10 @@ def _job_processor():
     _PROGRESS_THROTTLE_S = 1.0
 
     def _throttled_emit_progress(job_id: str, progress: int, step: str) -> None:
+        # Long-running handlers may stay inside one job for minutes; refresh
+        # heartbeat from progress callbacks so ``/_processor_health`` doesn't
+        # incorrectly report ``stale`` while work is actively advancing.
+        _processor_heartbeat(last_iteration_at=time.time())
         if not socketio:
             return
         now = time.time()

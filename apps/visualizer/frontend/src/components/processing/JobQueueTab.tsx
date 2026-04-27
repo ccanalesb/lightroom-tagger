@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { MouseEvent } from 'react';
 import { JobsAPI } from '../../services/api';
 import type { Job } from '../../types/job';
@@ -40,6 +40,7 @@ export interface JobQueueTabProps {
   connected: boolean;
   onRefreshJobs: () => void | Promise<void>;
   onInvalidateJobList: () => void;
+  isPending?: boolean;
   pagination: JobQueueTabPagination;
   onOffsetChange: (offset: number) => void;
 }
@@ -48,13 +49,16 @@ export function JobQueueTab({
   jobs,
   connected,
   onRefreshJobs,
-  onInvalidateJobList,
+  onInvalidateJobList: _onInvalidateJobList,
+  isPending = false,
   pagination,
   onOffsetChange,
 }: JobQueueTabProps) {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+
+  const handleCloseModal = useCallback(() => setSelectedJob(null), []);
 
   const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
   const totalPages = Math.max(1, Math.ceil(pagination.total / pagination.limit));
@@ -72,7 +76,8 @@ export function JobQueueTab({
     setCancellingId(jobId);
     try {
       await JobsAPI.cancel(jobId);
-      onInvalidateJobList();
+      // List is updated by the job_updated socket event (patchMatching),
+      // so no explicit invalidation is needed here.
     } catch (err) {
       alert(`Failed to cancel job: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
@@ -85,7 +90,7 @@ export function JobQueueTab({
     setRetryingId(jobId);
     try {
       await JobsAPI.retry(jobId);
-      onInvalidateJobList();
+      // Same as cancelJob — socket handles the list patch.
     } catch (err) {
       alert(`Failed to retry job: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
@@ -145,7 +150,7 @@ export function JobQueueTab({
         </Card>
       ) : (
         <Card padding="none">
-          <div className="overflow-x-auto">
+          <div className={`overflow-x-auto transition-opacity duration-150${isPending ? ' opacity-50 pointer-events-none' : ''}`}>
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border bg-surface">
@@ -239,7 +244,7 @@ export function JobQueueTab({
       )}
 
       {selectedJob && (
-        <JobDetailModal job={selectedJob} onClose={() => setSelectedJob(null)} />
+        <JobDetailModal job={selectedJob} onClose={handleCloseModal} />
       )}
     </div>
   );

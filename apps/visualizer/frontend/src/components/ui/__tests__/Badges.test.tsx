@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { ImageTypeBadge, StatusBadge, VisionBadge } from '../badges'
+import { ImageTypeBadge, PerspectiveBadge, StatusBadge, VisionBadge } from '../badges'
 
 describe('ImageTypeBadge', () => {
   it('should render CAT for catalog type', () => {
@@ -62,5 +62,40 @@ describe('VisionBadge', () => {
     const { container } = render(<VisionBadge result={undefined} />)
     expect(screen.getByText('UNCERTAIN')).toBeTruthy()
     expect(container.firstElementChild!.className).toMatch(/bg-orange-50|text-warning/)
+  })
+})
+
+describe('PerspectiveBadge', () => {
+  it('prefers displayName over derived slug label', () => {
+    render(<PerspectiveBadge perspectiveSlug="street" score={7} displayName="Rue" />)
+    expect(screen.getByText('Rue 7')).toBeInTheDocument()
+  })
+
+  it('derives a readable label from slug when displayName is omitted', () => {
+    const { container } = render(<PerspectiveBadge perspectiveSlug="color-theory" score={5} />)
+    expect(container.textContent).toMatch(/Color Theory\s*5/)
+  })
+
+  it('formats integer scores without fractional digits', () => {
+    render(<PerspectiveBadge perspectiveSlug="x" score={10} />)
+    expect(screen.getByText('X 10')).toBeInTheDocument()
+  })
+
+  it('formats non-integer scores to one decimal place', () => {
+    render(<PerspectiveBadge perspectiveSlug="x" score={8.25} />)
+    expect(screen.getByText('X 8.3')).toBeInTheDocument()
+  })
+
+  it('applies known slug color bundles on the badge root', () => {
+    const { container, rerender } = render(
+      <PerspectiveBadge perspectiveSlug="street" score={1} />,
+    )
+    expect(container.firstElementChild!.className).toContain('violet')
+    rerender(<PerspectiveBadge perspectiveSlug="documentary" score={1} />)
+    expect(container.firstElementChild!.className).toContain('amber')
+    rerender(<PerspectiveBadge perspectiveSlug="publisher" score={1} />)
+    expect(container.firstElementChild!.className).toContain('rose')
+    rerender(<PerspectiveBadge perspectiveSlug="color_theory" score={1} />)
+    expect(container.firstElementChild!.className).toContain('emerald')
   })
 })

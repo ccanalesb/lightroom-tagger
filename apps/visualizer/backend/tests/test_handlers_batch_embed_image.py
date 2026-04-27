@@ -60,7 +60,7 @@ def test_batch_embed_image_zero_work_completes(
 @patch("jobs.handlers.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_writes_clip_row(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    mock_load_config, mock_add_log, tmp_path, monkeypatch
 ) -> None:
     from jobs.handlers import handle_batch_embed_image
 
@@ -94,6 +94,8 @@ def test_batch_embed_image_writes_clip_row(
     runner.complete_job.assert_called_once()
     result = runner.complete_job.call_args[0][1]
     assert result["embedded"] == 1
+    messages = [str(c.args[3]) for c in mock_add_log.call_args_list if len(c.args) > 3]
+    assert any("builds similarity index only" in msg for msg in messages)
 
     verify = init_database(str(db_path))
     try:
@@ -152,6 +154,11 @@ def test_batch_embed_image_incremental_skips_existing(
         return np.ones((len(paths), 512), dtype=np.float32)
 
     monkeypatch.setattr(job_handlers, "encode_images", _encode)
+    monkeypatch.setattr(
+        job_handlers,
+        "get_or_create_cached_image",
+        lambda _db, _k, path: path,
+    )
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
     mock_load_config.return_value = MagicMock(db_path=str(db_path))
@@ -215,6 +222,11 @@ def test_batch_embed_image_force_reprocesses(
         return np.ones((len(paths), 512), dtype=np.float32)
 
     monkeypatch.setattr(job_handlers, "encode_images", _encode)
+    monkeypatch.setattr(
+        job_handlers,
+        "get_or_create_cached_image",
+        lambda _db, _k, path: path,
+    )
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
     mock_load_config.return_value = MagicMock(db_path=str(db_path))
@@ -228,6 +240,7 @@ def test_batch_embed_image_force_reprocesses(
     assert res["embedded"] == 2
     assert len(calls) == 1
     assert len(calls[0][0]) == 2
+    assert calls[0][0] == [str(b), str(a)]
 
     verify = init_database(str(db_path))
     try:
@@ -300,6 +313,11 @@ def test_batch_embed_image_checkpoint_resume(
         return np.ones((len(paths), 512), dtype=np.float32)
 
     monkeypatch.setattr(job_handlers, "encode_images", _encode)
+    monkeypatch.setattr(
+        job_handlers,
+        "get_or_create_cached_image",
+        lambda _db, _k, path: path,
+    )
 
     monkeypatch.setenv("LIBRARY_DB", str(lib_path))
     mock_load_config.return_value = MagicMock(db_path=str(lib_path))
@@ -380,3 +398,295 @@ def test_batch_embed_image_fingerprint_mismatch_clears_checkpoint(
     assert any("batch_embed_image fingerprint changed" in str(m) for m in messages)
     assert len(calls) == 1
     assert len(calls[0][0]) == 2
+
+
+@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.load_config")
+def test_batch_embed_image_resolves_filepath_before_encode(
+    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+) -> None:
+    from jobs.handlers import handle_batch_embed_image
+
+    resolved_jpg = tmp_path / "resolved.jpg"
+    _write_min_jpg(resolved_jpg)
+
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    store_image(
+        conn,
+        {
+            "date_taken": "2024-02-01",
+            "filename": "resolved.jpg",
+            "filepath": "//tnas/ccanales/resolved.jpg",
+            "rating": 1,
+        },
+    )
+    conn.close()
+
+    calls: list[list[str]] = []
+
+    def _encode(paths, batch_size=8):
+        calls.append(list(paths))
+        return np.ones((len(paths), 512), dtype=np.float32)
+
+    monkeypatch.setattr(job_handlers, "encode_images", _encode)
+    monkeypatch.setattr(job_handlers, "resolve_filepath", lambda _p: str(resolved_jpg))
+    monkeypatch.setattr(
+        job_handlers,
+        "get_or_create_cached_image",
+        lambda _db, _k, path: path,
+    )
+
+    monkeypatch.setenv("LIBRARY_DB", str(db_path))
+    mock_load_config.return_value = MagicMock(db_path=str(db_path))
+
+    runner = _make_runner()
+    handle_batch_embed_image(runner, "job-resolve", {"image_type": "catalog"})
+
+    assert len(calls) == 1
+    assert calls[0] == [str(resolved_jpg)]
+
+
+@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.load_config")
+def test_batch_embed_image_uses_cached_path_for_encode(
+    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+) -> None:
+    from jobs.handlers import handle_batch_embed_image
+
+    original_jpg = tmp_path / "original.jpg"
+    cached_jpg = tmp_path / "cached.jpg"
+    _write_min_jpg(original_jpg)
+    _write_min_jpg(cached_jpg)
+
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    store_image(
+        conn,
+        {
+            "date_taken": "2024-02-03",
+            "filename": "original.jpg",
+            "filepath": str(original_jpg),
+            "rating": 1,
+        },
+    )
+    conn.close()
+
+    calls: list[list[str]] = []
+
+    def _encode(paths, batch_size=8):
+        calls.append(list(paths))
+        return np.ones((len(paths), 512), dtype=np.float32)
+
+    monkeypatch.setattr(job_handlers, "encode_images", _encode)
+    monkeypatch.setattr(
+        job_handlers,
+        "get_or_create_cached_image",
+        lambda _db, _k, _path: str(cached_jpg),
+    )
+
+    monkeypatch.setenv("LIBRARY_DB", str(db_path))
+    mock_load_config.return_value = MagicMock(db_path=str(db_path))
+
+    runner = _make_runner()
+    handle_batch_embed_image(runner, "job-cached", {"image_type": "catalog"})
+
+    assert len(calls) == 1
+    assert calls[0] == [str(cached_jpg)]
+
+
+@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.load_config")
+def test_batch_embed_image_preflight_fails_fast_when_paths_inaccessible(
+    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+) -> None:
+    from jobs.handlers import handle_batch_embed_image
+
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    for i in range(4):
+        store_image(
+            conn,
+            {
+                "date_taken": f"2024-03-{i + 1:02d}",
+                "filename": f"bad-{i}.jpg",
+                "filepath": "" if i % 2 == 0 else f"/definitely/missing-{i}.jpg",
+                "rating": 1,
+            },
+        )
+    conn.close()
+
+    mock_enc = MagicMock(return_value=np.ones((1, 512), dtype=np.float32))
+    monkeypatch.setattr(job_handlers, "encode_images", mock_enc)
+    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 4)
+    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_FAIL_RATIO", 0.5)
+
+    monkeypatch.setenv("LIBRARY_DB", str(db_path))
+    mock_load_config.return_value = MagicMock(db_path=str(db_path))
+
+    runner = _make_runner()
+    handle_batch_embed_image(runner, "job-preflight", {"image_type": "catalog"})
+
+    runner.fail_job.assert_called_once()
+    fail_message = str(runner.fail_job.call_args[0][1])
+    assert "Embed preflight failed" in fail_message
+    assert "Verify catalog filepath values and mounted storage accessibility" in fail_message
+    runner.complete_job.assert_not_called()
+    mock_enc.assert_not_called()
+
+
+@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.load_config")
+def test_batch_embed_image_does_not_preflight_fail_on_compression_unavailable(
+    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+) -> None:
+    from jobs.handlers import handle_batch_embed_image
+
+    good_jpg = tmp_path / "ok.jpg"
+    _write_min_jpg(good_jpg)
+
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    store_image(
+        conn,
+        {
+            "date_taken": "2024-03-10",
+            "filename": "ok.jpg",
+            "filepath": str(good_jpg),
+            "rating": 1,
+        },
+    )
+    conn.close()
+
+    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 1)
+    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_FAIL_RATIO", 0.1)
+    monkeypatch.setattr(
+        job_handlers,
+        "get_or_create_cached_image",
+        lambda _db, _k, _path: None,
+    )
+    monkeypatch.setattr(
+        job_handlers,
+        "encode_images",
+        lambda paths, batch_size=8: np.ones((len(paths), 512), dtype=np.float32),
+    )
+
+    monkeypatch.setenv("LIBRARY_DB", str(db_path))
+    mock_load_config.return_value = MagicMock(db_path=str(db_path))
+
+    runner = _make_runner()
+    handle_batch_embed_image(runner, "job-compress-miss", {"image_type": "catalog"})
+
+    runner.fail_job.assert_not_called()
+    runner.complete_job.assert_called_once()
+    result = runner.complete_job.call_args[0][1]
+    assert result["embedded"] == 0
+    assert result["skipped"] == 1
+    assert result["skip_reason_counts"]["encode_failed"] == 1
+
+
+@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.load_config")
+def test_batch_embed_image_reports_grouped_skip_reason_counts(
+    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+) -> None:
+    from jobs.handlers import handle_batch_embed_image
+
+    good_jpg = tmp_path / "good.jpg"
+    _write_min_jpg(good_jpg)
+
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    key_empty = store_image(
+        conn,
+        {
+            "date_taken": "2024-04-01",
+            "filename": "empty.jpg",
+            "filepath": "",
+            "rating": 1,
+        },
+    )
+    key_missing = store_image(
+        conn,
+        {
+            "date_taken": "2024-04-02",
+            "filename": "missing.jpg",
+            "filepath": "/missing/path.jpg",
+            "rating": 1,
+        },
+    )
+    key_good = store_image(
+        conn,
+        {
+            "date_taken": "2024-04-03",
+            "filename": "good.jpg",
+            "filepath": str(good_jpg),
+            "rating": 1,
+        },
+    )
+    conn.close()
+
+    missing_key = "missing-no-row-key"
+    monkeypatch.setattr(
+        job_handlers,
+        "list_catalog_keys_needing_clip_embedding",
+        lambda *args, **kwargs: [missing_key, key_empty, key_missing, key_good],
+    )
+    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 0)
+    monkeypatch.setattr(
+        job_handlers,
+        "encode_images",
+        lambda paths, batch_size=8: [None for _ in paths],
+    )
+
+    monkeypatch.setenv("LIBRARY_DB", str(db_path))
+    mock_load_config.return_value = MagicMock(db_path=str(db_path))
+
+    runner = _make_runner()
+    handle_batch_embed_image(runner, "job-grouped-reasons", {"image_type": "catalog"})
+
+    runner.complete_job.assert_called_once()
+    result = runner.complete_job.call_args[0][1]
+    assert result["embedded"] == 0
+    assert result["skipped"] == 3
+    assert result["failed"] == 1
+    assert result["skip_reason_counts"] == {
+        "no_row": 1,
+        "empty_path": 1,
+        "unresolved_or_missing": 1,
+        "encode_failed": 1,
+    }
+
+
+@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.load_config")
+def test_batch_embed_image_suppresses_excessive_skip_detail_logs(
+    mock_load_config, mock_add_log, tmp_path, monkeypatch
+) -> None:
+    from jobs.handlers import handle_batch_embed_image
+
+    db_path = tmp_path / "library.db"
+    init_database(str(db_path)).close()
+
+    missing_keys = [f"missing-{i}" for i in range(20)]
+    monkeypatch.setattr(
+        job_handlers,
+        "list_catalog_keys_needing_clip_embedding",
+        lambda *args, **kwargs: missing_keys,
+    )
+    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 0)
+    monkeypatch.setenv("LIBRARY_DB", str(db_path))
+    mock_load_config.return_value = MagicMock(db_path=str(db_path))
+
+    runner = _make_runner()
+    handle_batch_embed_image(runner, "job-skip-sampling", {"image_type": "catalog"})
+
+    warnings = [
+        str(c.args[3])
+        for c in mock_add_log.call_args_list
+        if len(c.args) > 3 and c.args[2] == "warning" and "skipped image embed" in str(c.args[3])
+    ]
+    info = [str(c.args[3]) for c in mock_add_log.call_args_list if len(c.args) > 3 and c.args[2] == "info"]
+
+    assert len(warnings) <= job_handlers._EMBED_SKIP_DETAIL_LOG_LIMIT
+    assert any("additional no_row skip logs suppressed" in msg for msg in info)

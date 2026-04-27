@@ -60,7 +60,7 @@ export function PerspectiveBadge({
 
   const label = displayName ?? labelFromSlug(normalized)
   const scoreStr = score.toFixed(score % 1 === 0 ? 0 : 1)
-  const extra = [colorClass, className].filter(Boolean).join(' ')
+  const extra = ['self-start', colorClass, className].filter(Boolean).join(' ')
 
   return (
     <Badge variant={mappedVariant} className={extra}>

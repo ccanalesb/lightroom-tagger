@@ -288,6 +288,12 @@ export const CATALOG_SIMILAR_EMPTY_BODY =
 export const CATALOG_SIMILAR_NO_EMBED_TITLE = 'Visual similarity is unavailable'
 export const CATALOG_SIMILAR_NO_EMBED_BODY =
   'This photo has no image embedding yet. Run the “Embed images” (or your product name for `batch_embed_image`) job, then try again.'
+export const CATALOG_SIMILAR_RUN_EMBED_JOB = 'Run Embed images job'
+export const CATALOG_SIMILAR_EMBED_JOB_STARTING = 'Starting Embed images job…'
+export const CATALOG_SIMILAR_EMBED_JOB_QUEUED =
+  'Embed images job queued. Open Processing → Job Queue to monitor progress.'
+export const CATALOG_SIMILAR_EMBED_JOB_FAILED = 'Couldn’t start Embed images job'
+export const CATALOG_SIMILAR_OPEN_JOB_QUEUE = 'Open Job Queue'
 export const CATALOG_SIMILAR_FETCH_ERROR = 'Couldn’t load similar photos'
 export const CATALOG_STACK_MEMBERS_ERROR = 'Couldn’t load stack members'
 export const CATALOG_STACK_MEMBERS_LOADING = 'Loading…'
@@ -352,6 +358,11 @@ export const JOB_DETAILS_LOGS_SHOW_ALL_LOADING = 'Loading…'
 export const JOB_DETAILS_LOADING_ARIA = 'Loading job details'
 export const JOB_DETAILS_FETCH_ERROR =
   'Could not refresh job details. Showing the last known summary.'
+export const JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE = 'Embed diagnostics'
+export const JOB_DETAILS_EMBED_REASON_NO_ROW = 'Missing catalog row'
+export const JOB_DETAILS_EMBED_REASON_EMPTY_PATH = 'Missing filepath'
+export const JOB_DETAILS_EMBED_REASON_UNRESOLVED = 'Path missing/unreachable'
+export const JOB_DETAILS_EMBED_REASON_ENCODE_FAILED = 'Encode failed'
 
 // Job Queue
 export const JOB_QUEUE_PAGINATION_RANGE = (start: number, end: number, total: number) =>
@@ -545,6 +556,16 @@ export const CACHE_REFRESH_BUTTON = 'Refresh'
 export const CACHE_JOB_RUNNING = 'Cache preparation in progress...'
 export const CACHE_JOB_COMPLETED = 'Cache preparation completed!'
 export const CACHE_WARNING_NOT_READY = 'Catalog not fully cached. Matching may be slower.'
+export const PROCESSING_EMBED_CATALOG_TITLE = 'Embed catalog images'
+export const PROCESSING_EMBED_CATALOG_BODY =
+  'Generate visual embeddings for catalog photos so similarity search can run without missing-embedding errors.'
+export const PROCESSING_EMBED_CATALOG_START = 'Run Embed images job'
+export const PROCESSING_EMBED_CATALOG_STARTING = 'Starting Embed images job…'
+export const PROCESSING_EMBED_CATALOG_QUEUED =
+  'Embed images job queued. Open Job Queue to monitor progress.'
+export const PROCESSING_EMBED_CATALOG_FAILED_PREFIX = 'Couldn’t start Embed images job:'
+export const PROCESSING_OPEN_JOB_QUEUE = 'Open Job Queue'
+export const PROCESSING_JOB_QUEUE_ROUTE = '/processing?tab=jobs'
 
 // Descriptions Page
 export const DESC_PAGE_TITLE = 'AI Descriptions'
