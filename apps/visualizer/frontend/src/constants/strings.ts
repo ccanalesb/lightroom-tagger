@@ -589,6 +589,17 @@ export const CATALOG_CACHE_PREPARE_CATALOG_TITLE = 'Pre-compress catalog images'
 export const CATALOG_CACHE_PREPARE_CATALOG_HELPER =
   "Decodes and compresses every catalog image (RAW → JPEG) so vision matching, description, and scoring jobs don't pay decode cost on the hot path. Optional — runs lazily on first use if skipped."
 
+/** Primary card — latest similarity groups preview (job-ui-contract / WR-08-01). */
+export const CATALOG_CACHE_SIMILARITY_PREVIEW_TITLE = 'Latest similarity groups'
+export const CATALOG_CACHE_SIMILARITY_EMPTY =
+  'No catalog similarity groups yet. Run catalog similarity from Advanced options after Embed Images completes.'
+export const CATALOG_CACHE_SIMILARITY_TOTAL_GROUPS_LABEL = (n: number) =>
+  `${n} group${n === 1 ? '' : 's'}`
+export const CATALOG_CACHE_SIMILARITY_VIEW_ALL = 'View all'
+export const CATALOG_CACHE_SIMILARITY_BEST_MATCH_PCT = (pct: number) => `Best match ${pct}%`
+export const CATALOG_CACHE_SIMILARITY_CANDIDATE_LABEL = (n: number) =>
+  `${n} candidate${n === 1 ? '' : 's'}`
+
 // Descriptions Page
 export const DESC_PAGE_TITLE = 'AI Descriptions'
 export const DESC_PAGE_TAB_ALL = 'All'

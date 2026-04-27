@@ -1,10 +1,12 @@
 import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { invalidateAll, useQuery } from '../../data';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/badges';
 import { AdvancedOptions } from '../matching/AdvancedOptions';
-import { JobsAPI } from '../../services/api';
+import { ImageTile, fromCatalogListRow } from '../image-view';
+import { ImagesAPI, JobsAPI, type CatalogSimilarityGroup } from '../../services/api';
 import { useMatchOptions } from '../../stores/matchOptionsContext';
 import {
   ANALYZE_PRIMARY_BUTTON_STARTING,
@@ -16,6 +18,12 @@ import {
   CATALOG_CACHE_PREPARE_CATALOG_HELPER,
   CATALOG_CACHE_PREPARE_CATALOG_TITLE,
   CATALOG_CACHE_SIMILARITY_LABEL,
+  CATALOG_CACHE_SIMILARITY_BEST_MATCH_PCT,
+  CATALOG_CACHE_SIMILARITY_CANDIDATE_LABEL,
+  CATALOG_CACHE_SIMILARITY_EMPTY,
+  CATALOG_CACHE_SIMILARITY_PREVIEW_TITLE,
+  CATALOG_CACHE_SIMILARITY_TOTAL_GROUPS_LABEL,
+  CATALOG_CACHE_SIMILARITY_VIEW_ALL,
   CATALOG_CACHE_STACK_DETECT_LABEL,
   PROCESSING_JOB_QUEUE_ROUTE,
   PROCESSING_OPEN_JOB_QUEUE,
@@ -56,6 +64,10 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [listRev, setListRev] = useState(0);
   const stats = useQuery(['catalog.cache.stats', listRev] as const, fetchCacheStats);
+  const catalogSimilarity = useQuery(
+    ['catalog.similarity.groups', { limit: 12, offset: 0 }] as const,
+    () => ImagesAPI.listCatalogSimilarityGroups({ limit: 12, offset: 0 }),
+  );
 
   const [buildStarting, setBuildStarting] = useState(false);
   const [buildSuccess, setBuildSuccess] = useState(false);
@@ -98,6 +110,9 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
       setAdvancedBusy(key);
       try {
         await JobsAPI.create(type, metadata);
+        if (key === 'similarity') {
+          invalidateAll(['catalog.similarity.groups']);
+        }
         onJobEnqueued?.();
       } catch (err) {
         const message = err instanceof Error ? err.message : MSG_FAILED_START_JOB;
@@ -204,6 +219,11 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
                 {MSG_FAILED_START_JOB}: {buildError}
               </p>
             ) : null}
+
+            <CatalogSimilarityGroupsPreview
+              groups={catalogSimilarity.items ?? []}
+              total={catalogSimilarity.total}
+            />
           </div>
 
           <AdvancedOptions
@@ -304,4 +324,74 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
       </Card>
     </div>
   );
+}
+
+function CatalogSimilarityGroupsPreview({
+  groups,
+  total,
+}: {
+  groups: CatalogSimilarityGroup[]
+  total?: number
+}) {
+  if (groups.length === 0) {
+    return (
+      <p className="rounded-base border border-border bg-surface p-4 text-sm text-text-secondary">
+        {CATALOG_CACHE_SIMILARITY_EMPTY}
+      </p>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h3 className="text-sm font-semibold text-text">{CATALOG_CACHE_SIMILARITY_PREVIEW_TITLE}</h3>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-text-secondary">
+            {CATALOG_CACHE_SIMILARITY_TOTAL_GROUPS_LABEL(total ?? groups.length)}
+          </span>
+          <Link
+            to={PROCESSING_JOB_QUEUE_ROUTE}
+            className="text-xs font-medium text-accent hover:underline"
+          >
+            {CATALOG_CACHE_SIMILARITY_VIEW_ALL}
+          </Link>
+        </div>
+      </div>
+      <div className="space-y-4">
+        {groups.map((group) => (
+          <div key={group.group_id} className="rounded-base border border-border bg-surface p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-sm font-medium text-text">
+                {CATALOG_CACHE_SIMILARITY_BEST_MATCH_PCT(Math.round(group.best_similarity * 100))}
+              </span>
+              <span className="text-xs text-text-secondary">
+                {CATALOG_CACHE_SIMILARITY_CANDIDATE_LABEL(group.candidate_count)}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <ImageTile
+                image={fromCatalogListRow(group.seed)}
+                variant="strip"
+                primaryScoreSource="catalog"
+                onClick={() => {}}
+              />
+              {group.candidates.slice(0, 3).map((candidate) => (
+                <div key={candidate.key} className="space-y-1">
+                  <ImageTile
+                    image={fromCatalogListRow(candidate)}
+                    variant="strip"
+                    primaryScoreSource="catalog"
+                    onClick={() => {}}
+                  />
+                  <p className="text-center text-xs text-text-secondary">
+                    {Math.round((candidate.similarity ?? 0) * 100)}%
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
