@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Executing Phase 08
-last_updated: "2026-04-27T21:45:00.000Z"
+status: Phase 08 verified — milestone v3.0 ready for completion
+last_updated: "2026-04-27T21:37:51.383Z"
 progress:
   total_phases: 11
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 46
   completed_plans: 46
   percent: 100
@@ -23,15 +23,15 @@ progress:
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
 | Phase | Phase 8 — embedding-prefilter-and-cache-pipeline |
-| Status | **Executing Phase 08 — plan 08-06 complete (all six Phase 8 waves executed)** |
-| Last activity | 2026-04-27 — **08-06 executed:** `CatalogCacheTab` primary **Build catalog cache** → `JobsAPI.create('catalog_cache_build', {})`; success banner + Open Job Queue; `AdvancedOptions` reuse with optional `children` for embed (catalog / catalog_and_instagram), stack detect, catalog similarity, pre-compress (`prepare_catalog`). Strings `CATALOG_CACHE_*`; vitest partial API mock + provider fetch stubs. Artifacts: `08-06-SUMMARY.md`. Commits: `8c8c39d`, `9dee9b1`. Phase 8 CACHE-01 UI closed; MATCH-02 verification remains roadmap-dependent. |
+| Status | **Phase 08 verified — milestone v3.0 ready for completion** |
+| Last activity | 2026-04-27 — **Phase 08 closed:** all 6 waves executed, 3 review-fix commits land (WR-08-01 similarity preview, WR-08-02 SQL anti-join, WR-08-03 coercion warning), cross-phase regression clean (638 backend pass, 287 frontend pass; 15 backend failures pre-existed at `79ba1e4`), live validation: `catalog_cache_build` job emits D-08 stage banners, `vision_match` accepts `clip_top_k` end-to-end, browser walkthrough confirms `clip_top_k` input, removed Discovery card, "Build catalog cache" CTA, restored similarity preview, AdvancedOptions reuse. Artifacts: `08-VERIFICATION.md`, `08-REVIEW.md`, `08-REVIEW-FIX.md`. Phase 8 CACHE-01 + MATCH-02 closed. |
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
-**Current focus:** Phase 08 — embedding-prefilter-and-cache-pipeline
+**Current focus:** Milestone v3.0 — all phases verified, ready to run `/gsd-complete-milestone`
 
 ## Deferred Items
 
