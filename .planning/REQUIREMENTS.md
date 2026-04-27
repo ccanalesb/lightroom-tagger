@@ -39,7 +39,7 @@
 ### Matching Performance & Catalog Cache Pipeline *(added 2026-04-27)*
 
 - [ ] **MATCH-02**: `vision_match` consults `image_clip_embeddings` to cosine-shortlist date-windowed catalog candidates before LLM judgment runs. Pre-filter reduces LLM comparison calls by ≥10× vs the Phase 7 baseline on a representative batch, while preserving recall on user-validated match pairs. Pipeline emits per-stage candidate counts (date-window in → embedding shortlist out → LLM judgments) in the job log.
-- [ ] **CACHE-01**: Catalog cache pipeline rewire — `batch_stack_detect` and `batch_catalog_similarity` are recognized as catalog-cache work (they consume `image_clip_embeddings` and produce cache artifacts). UI triggers live on the catalog cache surface, not the matching tab. The cache builds as a chain (`batch_embed_image` → `batch_stack_detect` → `batch_catalog_similarity`) with per-stage progress and skip reasons visible; individual stages remain re-runnable.
+- [x] **CACHE-01**: Catalog cache pipeline rewire — `batch_stack_detect` and `batch_catalog_similarity` are recognized as catalog-cache work (they consume `image_clip_embeddings` and produce cache artifacts). UI triggers live on the catalog cache surface, not the matching tab. The cache builds as a chain (`batch_embed_image` → `batch_stack_detect` → `batch_catalog_similarity`) with per-stage progress and skip reasons visible; individual stages remain re-runnable. *(Phase 8 — backend composite job 08-04; MatchingTab cleanup 08-05; CatalogCacheTab UI 08-06 — 2026-04-27)*
 
 ---
 
@@ -86,7 +86,7 @@
 | SIM-01 | 5 | ✅ Complete (2026-04-24) |
 | SIM-02 | 6 | ✅ Complete (2026-04-25) |
 | MATCH-02 | 8 | Pending |
-| CACHE-01 | 8 | Pending |
+| CACHE-01 | 8 | ✅ Complete (2026-04-27) |
 
 **Total:** 16 requirements across 5 categories.
 

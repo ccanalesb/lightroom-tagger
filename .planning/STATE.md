@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
 status: Executing Phase 08
-last_updated: "2026-04-27T21:20:00.000Z"
+last_updated: "2026-04-27T21:45:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 46
-  completed_plans: 45
-  percent: 98
+  completed_plans: 46
+  percent: 100
 ---
 
 # Planning state
@@ -23,8 +23,8 @@ progress:
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
 | Phase | Phase 8 — embedding-prefilter-and-cache-pipeline |
-| Status | **Executing Phase 08 — plan 08-05 complete** |
-| Last activity | 2026-04-27 — **08-05 executed:** MatchingTab adds CLIP shortlist size (`clip_top_k`, default 50, bounds 1–500 in metadata), removes Catalog Discovery Jobs card and preview, adds link to `/processing?tab=cache`; strings centralized; Input label/`htmlFor` wiring; vitest updates. Artifacts: `08-05-SUMMARY.md`. Commits: `0d8d11f`, `caa4ea5`. Next: **08-06** CatalogCacheTab (`catalog_cache_build` CTA + Advanced). Earlier context: Phase 8 wave 08-06 pending; CACHE-01 UI completion awaits 08-06. |
+| Status | **Executing Phase 08 — plan 08-06 complete (all six Phase 8 waves executed)** |
+| Last activity | 2026-04-27 — **08-06 executed:** `CatalogCacheTab` primary **Build catalog cache** → `JobsAPI.create('catalog_cache_build', {})`; success banner + Open Job Queue; `AdvancedOptions` reuse with optional `children` for embed (catalog / catalog_and_instagram), stack detect, catalog similarity, pre-compress (`prepare_catalog`). Strings `CATALOG_CACHE_*`; vitest partial API mock + provider fetch stubs. Artifacts: `08-06-SUMMARY.md`. Commits: `8c8c39d`, `9dee9b1`. Phase 8 CACHE-01 UI closed; MATCH-02 verification remains roadmap-dependent. |
 
 ## Project Reference
 
