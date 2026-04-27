@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Milestone re-opened — Phase 8 active (scope expanded 2026-04-27)
-last_updated: "2026-04-27T20:35:00.000Z"
+status: Executing Phase 08
+last_updated: "2026-04-27T21:30:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 10
-  total_plans: 40
-  completed_plans: 40
-  percent: 100
+  total_plans: 46
+  completed_plans: 41
+  percent: 89
 ---
 
 # Planning state
@@ -23,15 +23,15 @@ progress:
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
 | Phase | Phase 8 — embedding-prefilter-and-cache-pipeline |
-| Status | **Planning complete — ready for execute-phase** |
-| Last activity | 2026-04-27 — Phase 8 planning complete. 6 PLAN.md files written across 6 waves (08-01..08-06). Plan-checker iteration 1: BLOCK (wave conflict on `strings.ts`, missing D-03 gating regression test). Iteration 2: PASS_WITH_NOTES (0 BLOCK, 0 HIGH, 2 MEDIUM, 1 LOW; both MEDIUM doc-drift items cleaned up inline in `08-PATTERNS.md` and `08-02-PLAN.md`). Requirements coverage confirmed: MATCH-02 (08-01, 08-02, 08-05) and CACHE-01 (08-03, 08-04, 08-05, 08-06). Wave layout: 1 (CLIP shortlist core) → 2 (`vision_match` plumbing + D-07 logs) → 3 (Instagram embed extension D-01) → 4 (`catalog_cache_build` composite job D-08) → 5 (MatchingTab UI D-02/D-06) → 6 (CatalogCacheTab UI D-04/D-05 with `AdvancedOptions` reuse). |
+| Status | **Executing Phase 08 — plan 08-01 complete** |
+| Last activity | 2026-04-27 — **08-01 executed:** `shortlist_catalog_candidates_by_clip` + `match_dump_media` D-03 gating (`clip_top_k` default 50), D-03 regression `test_shortlist_gates_score_candidates_with_vision`. Artifacts: `08-01-SUMMARY.md`. Commits: `396a20a`, `fbc0250`, `ba72f02` + docs. Next: **08-02** vision_match plumbing. Earlier context: Phase 8 planning complete (6 waves 08-01..08-06); MATCH-02/CACHE-01 coverage per original plan map. |
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
-**Current focus:** Phase 07.1 — phase-7-remediation-fixes
+**Current focus:** Phase 08 — embedding-prefilter-and-cache-pipeline
 
 ## Deferred Items
 

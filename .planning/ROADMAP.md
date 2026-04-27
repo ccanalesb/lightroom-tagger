@@ -223,7 +223,7 @@ Plans:
 | 6 | Similarity & stack UI | SIM-02, STACK-03 | 3 | ✅ Complete (2026-04-25; 4/4 plans) |
 | 7 | Stacks in matching & pin similarity | STACK-04, STACK-05, NLS-06 | 4 | Pending |
 | 7.1 | Phase 7 remediation fixes | Remediation | 3 | ✅ Complete (2026-04-26; 3/3 plans) |
-| 8 | Embedding pre-filter & catalog cache pipeline | MATCH-02, CACHE-01 | TBD | Planned (2026-04-27 — scope expanded) |
+| 8 | Embedding pre-filter & catalog cache pipeline | MATCH-02, CACHE-01 | TBD | In progress (2026-04-27 — 08-01 CLIP shortlist core complete) |
 
 ---
 
