@@ -163,7 +163,7 @@ def test_batch_score_non_force_never_calls_get_undescribed_catalog_images(
     def _execute_side_effect(sql, params=()):
         m = MagicMock()
         q = ' '.join(sql.split())
-        if 'SELECT key FROM images' in q:
+        if 'FROM images' in q and 'image_scores' not in q:
             m.fetchall.return_value = [{'key': 'img1'}, {'key': 'img2'}]
         elif 'image_scores' in q:
             m.fetchall.return_value = []
