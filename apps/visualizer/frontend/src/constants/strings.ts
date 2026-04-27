@@ -575,6 +575,20 @@ export const PROCESSING_OPEN_JOB_QUEUE = 'Open Job Queue'
 export const PROCESSING_JOB_QUEUE_ROUTE = '/processing?tab=jobs'
 export const PROCESSING_CATALOG_CACHE_ROUTE = '/processing?tab=cache'
 
+/** Catalog Cache tab — composite pipeline + Advanced stage triggers (Phase 08 / CACHE-01). */
+export const CATALOG_CACHE_BUILD_CTA = 'Build catalog cache'
+export const CATALOG_CACHE_BUILD_SUCCESS =
+  'Catalog cache build started! Check the Job Queue tab for progress.'
+/** Advanced — embed catalog rows only (`image_type: catalog`). */
+export const CATALOG_CACHE_EMBED_CATALOG_LABEL = 'Embed catalog images only'
+/** Advanced — embed catalog + Instagram (`image_type: catalog_and_instagram`). */
+export const CATALOG_CACHE_EMBED_CATALOG_IG_LABEL = 'Embed catalog + Instagram images'
+export const CATALOG_CACHE_STACK_DETECT_LABEL = 'Run stack detection'
+export const CATALOG_CACHE_SIMILARITY_LABEL = 'Run catalog similarity'
+export const CATALOG_CACHE_PREPARE_CATALOG_TITLE = 'Pre-compress catalog images'
+export const CATALOG_CACHE_PREPARE_CATALOG_HELPER =
+  "Decodes and compresses every catalog image (RAW → JPEG) so vision matching, description, and scoring jobs don't pay decode cost on the hot path. Optional — runs lazily on first use if skipped."
+
 // Descriptions Page
 export const DESC_PAGE_TITLE = 'AI Descriptions'
 export const DESC_PAGE_TAB_ALL = 'All'
