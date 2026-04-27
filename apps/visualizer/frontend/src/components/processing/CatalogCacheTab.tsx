@@ -4,10 +4,9 @@ import { invalidateAll, useQuery } from '../../data';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/badges';
-import { AdvancedOptions } from '../matching/AdvancedOptions';
+import { CollapsibleSection } from '../ui/CollapsibleSection';
 import { ImageTile, fromCatalogListRow } from '../image-view';
 import { ImagesAPI, JobsAPI, type CatalogSimilarityGroup } from '../../services/api';
-import { useMatchOptions } from '../../stores/matchOptionsContext';
 import {
   ANALYZE_PRIMARY_BUTTON_STARTING,
   CACHE_REFRESH_BUTTON,
@@ -15,6 +14,7 @@ import {
   CATALOG_CACHE_BUILD_SUCCESS,
   CATALOG_CACHE_EMBED_CATALOG_LABEL,
   CATALOG_CACHE_EMBED_CATALOG_IG_LABEL,
+  CATALOG_CACHE_PIPELINE_TITLE,
   CATALOG_CACHE_PREPARE_CATALOG_HELPER,
   CATALOG_CACHE_PREPARE_CATALOG_TITLE,
   CATALOG_CACHE_SIMILARITY_LABEL,
@@ -60,8 +60,7 @@ export interface CatalogCacheTabProps {
 }
 
 export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheTabProps) {
-  const { options, updateOption, resetOptions, weightsError } = useMatchOptions();
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showPipeline, setShowPipeline] = useState(false);
   const [listRev, setListRev] = useState(0);
   const stats = useQuery(['catalog.cache.stats', listRev] as const, fetchCacheStats);
   const catalogSimilarity = useQuery(
@@ -226,23 +225,10 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
             />
           </div>
 
-          <AdvancedOptions
-            isOpen={showAdvanced}
-            onToggle={() => setShowAdvanced(!showAdvanced)}
-            {...options}
-            onProviderChange={(providerId, modelId) => {
-              updateOption('providerId', providerId);
-              updateOption('providerModel', modelId);
-            }}
-            onThresholdChange={(v) => updateOption('threshold', v)}
-            onPhashWeightChange={(v) => updateOption('phashWeight', v)}
-            onDescWeightChange={(v) => updateOption('descWeight', v)}
-            onVisionWeightChange={(v) => updateOption('visionWeight', v)}
-            maxWorkers={options.maxWorkers}
-            onMaxWorkersChange={(v) => updateOption('maxWorkers', v)}
-            onSkipUndescribedChange={(v) => updateOption('skipUndescribed', v)}
-            weightsError={weightsError}
-            onReset={resetOptions}
+          <CollapsibleSection
+            title={CATALOG_CACHE_PIPELINE_TITLE}
+            isOpen={showPipeline}
+            onToggle={() => setShowPipeline(!showPipeline)}
           >
             <div className="space-y-6">
               <div className="flex flex-wrap gap-2">
@@ -307,7 +293,7 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
                 </Button>
               </div>
             </div>
-          </AdvancedOptions>
+          </CollapsibleSection>
 
           <div className="pt-4">
             <Button variant="secondary" size="md" fullWidth onClick={refreshStats} disabled={anyBusy}>

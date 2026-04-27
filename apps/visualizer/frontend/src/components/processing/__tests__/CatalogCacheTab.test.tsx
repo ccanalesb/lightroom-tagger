@@ -4,13 +4,13 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { deleteMatching } from '../../../data/cache';
 import { CatalogCacheTab } from '../CatalogCacheTab';
-import { MatchOptionsProvider } from '../../../stores/matchOptionsContext';
 import {
   ADVANCED_OPTIONS_TITLE,
   ADVANCED_WEIGHTS_TITLE,
   CATALOG_CACHE_BUILD_CTA,
   CATALOG_CACHE_BUILD_SUCCESS,
   CATALOG_CACHE_EMBED_CATALOG_LABEL,
+  CATALOG_CACHE_PIPELINE_TITLE,
   CATALOG_CACHE_SIMILARITY_BEST_MATCH_PCT,
   CATALOG_CACHE_SIMILARITY_PREVIEW_TITLE,
   CATALOG_CACHE_SIMILARITY_TOTAL_GROUPS_LABEL,
@@ -43,9 +43,7 @@ function renderCatalogCacheTab(props: { onOpenJobQueue?: () => void } = {}) {
   return render(
     <MemoryRouter>
       <Suspense fallback={null}>
-        <MatchOptionsProvider>
-          <CatalogCacheTab {...props} />
-        </MatchOptionsProvider>
+        <CatalogCacheTab {...props} />
       </Suspense>
     </MemoryRouter>,
   );
@@ -75,33 +73,6 @@ describe('CatalogCacheTab', () => {
             cache_size_mb: 100,
             cache_dir: '/tmp/cache',
           }),
-        });
-      }
-      if (url.includes('/providers/defaults')) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({
-            vision_comparison: { provider: null as string | null, model: null as string | null },
-            description: { provider: null as string | null, model: null as string | null },
-          }),
-        });
-      }
-      if (url.includes('/providers/fallback-order')) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ order: [] as string[] }),
-        });
-      }
-      if (url.includes('/providers/') && url.includes('/models')) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => [],
-        });
-      }
-      if (url.includes('/providers')) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => [],
         });
       }
       return Promise.reject(new Error(`Unhandled fetch in test: ${url}`));
@@ -141,10 +112,25 @@ describe('CatalogCacheTab', () => {
     expect(PROCESSING_JOB_QUEUE_ROUTE).toBe('/processing?tab=jobs');
   });
 
-  it('reveals AdvancedOptions when disclosure is toggled', async () => {
+  it('reveals pipeline disclosure when toggled (no matching controls)', async () => {
     renderCatalogCacheTab();
-    fireEvent.click(await screen.findByRole('button', { name: new RegExp(ADVANCED_OPTIONS_TITLE, 'i') }));
-    expect(await screen.findByText(ADVANCED_WEIGHTS_TITLE)).toBeTruthy();
+    fireEvent.click(
+      await screen.findByRole('button', { name: new RegExp(CATALOG_CACHE_PIPELINE_TITLE, 'i') }),
+    );
+    expect(await screen.findByRole('button', { name: CATALOG_CACHE_EMBED_CATALOG_LABEL })).toBeTruthy();
+  });
+
+  it('does not render matching-only controls (provider, weights, advanced options)', async () => {
+    renderCatalogCacheTab();
+    await screen.findByRole('button', { name: CATALOG_CACHE_BUILD_CTA });
+    fireEvent.click(
+      await screen.findByRole('button', { name: new RegExp(CATALOG_CACHE_PIPELINE_TITLE, 'i') }),
+    );
+    await screen.findByRole('button', { name: CATALOG_CACHE_EMBED_CATALOG_LABEL });
+    expect(screen.queryByText(ADVANCED_OPTIONS_TITLE)).toBeNull();
+    expect(screen.queryByText(ADVANCED_WEIGHTS_TITLE)).toBeNull();
+    expect(screen.queryByLabelText(/provider/i)).toBeNull();
+    expect(screen.queryByLabelText(/threshold/i)).toBeNull();
   });
 
   it('fetches catalog similarity groups preview and renders group summary', async () => {
@@ -208,10 +194,12 @@ describe('CatalogCacheTab', () => {
     );
   });
 
-  it('enqueues batch_embed_image catalog-only from Advanced section', async () => {
+  it('enqueues batch_embed_image catalog-only from pipeline section', async () => {
     mockCreate.mockResolvedValue({ id: 'job-embed', type: 'batch_embed_image' });
     renderCatalogCacheTab();
-    fireEvent.click(await screen.findByRole('button', { name: new RegExp(ADVANCED_OPTIONS_TITLE, 'i') }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: new RegExp(CATALOG_CACHE_PIPELINE_TITLE, 'i') }),
+    );
     fireEvent.click(await screen.findByRole('button', { name: CATALOG_CACHE_EMBED_CATALOG_LABEL }));
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalledWith('batch_embed_image', { image_type: 'catalog' });

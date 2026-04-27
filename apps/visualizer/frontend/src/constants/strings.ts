@@ -580,6 +580,12 @@ export const CATALOG_CACHE_BUILD_CTA = 'Build catalog cache'
 export const CATALOG_CACHE_BUILD_SUCCESS =
   'Catalog cache build started! Check the Job Queue tab for progress.'
 /** Advanced — embed catalog rows only (`image_type: catalog`). */
+/** Disclosure label for the catalog cache pipeline section.
+ *
+ * Distinct from `ADVANCED_OPTIONS_TITLE` (matching-only) because the cache tab
+ * exposes pipeline triggers, not vision matching weights/provider/thresholds.
+ */
+export const CATALOG_CACHE_PIPELINE_TITLE = 'Pipeline stages'
 export const CATALOG_CACHE_EMBED_CATALOG_LABEL = 'Embed catalog images only'
 /** Advanced — embed catalog + Instagram (`image_type: catalog_and_instagram`). */
 export const CATALOG_CACHE_EMBED_CATALOG_IG_LABEL = 'Embed catalog + Instagram images'
