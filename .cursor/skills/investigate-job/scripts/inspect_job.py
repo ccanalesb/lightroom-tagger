@@ -25,11 +25,32 @@ def find_db():
 def get_job(conn, job_id):
     c = conn.cursor()
     c.execute(
-        "SELECT id, type, status, progress, current_step, created_at, started_at, completed_at, error, error_severity, metadata, logs "
+        "SELECT id, type, status, progress, current_step, created_at, started_at, completed_at, error, error_severity, metadata "
         "FROM jobs WHERE id = ?",
         (job_id,),
     )
     return c.fetchone()
+
+
+def get_job_logs(conn, job_id, limit=5):
+    c = conn.cursor()
+    c.execute(
+        "SELECT ts, level, message FROM job_logs WHERE job_id = ? ORDER BY id DESC LIMIT ?",
+        (job_id, limit),
+    )
+    rows = c.fetchall()
+    rows.reverse()
+    return [
+        {"timestamp": row[0], "level": row[1], "message": row[2]}
+        for row in rows
+    ]
+
+
+def count_job_logs(conn, job_id):
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM job_logs WHERE job_id = ?", (job_id,))
+    row = c.fetchone()
+    return int(row[0] if row else 0)
 
 
 def list_recent(conn, n=10):
@@ -58,7 +79,7 @@ def parse_latencies(logs):
     return latencies
 
 
-def print_job(row):
+def print_job(conn, row):
     cols = ["id", "type", "status", "progress", "current_step",
             "created_at", "started_at", "completed_at", "error", "error_severity"]
     print("=" * 60)
@@ -66,7 +87,8 @@ def print_job(row):
         print(f"  {col:<18} {val}")
 
     meta = json.loads(row[10]) if row[10] else {}
-    logs = json.loads(row[11]) if row[11] else []
+    logs = get_job_logs(conn, row[0], limit=5)
+    logs_total = count_job_logs(conn, row[0])
 
     print(f"\n  {'metadata':<18}", end="")
     if meta:
@@ -75,12 +97,20 @@ def print_job(row):
         checkpoint = meta.get("checkpoint", {})
         print(json.dumps(compact))
         if checkpoint:
-            processed = checkpoint.get("processed_media_keys", [])
-            print(f"  {'checkpoint':<18} version={checkpoint.get('checkpoint_version')} | {len(processed)} keys processed")
+            processed_count = (
+                len(checkpoint.get("processed_pairs", []))
+                or len(checkpoint.get("processed_media_keys", []))
+                or len(checkpoint.get("processed_image_keys", []))
+                or len(checkpoint.get("processed_triplets", []))
+            )
+            print(
+                f"  {'checkpoint':<18} version={checkpoint.get('checkpoint_version')} | "
+                f"{processed_count} keys processed"
+            )
     else:
         print("{}")
 
-    print(f"\n  {'log entries':<18} {len(logs)}")
+    print(f"\n  {'log entries':<18} {logs_total}")
 
     # Last 5 log messages
     if logs:
@@ -143,14 +173,15 @@ def main():
 
     job_id = sys.argv[1]
     row = get_job(conn, job_id)
-    conn.close()
 
     if not row:
+        conn.close()
         print(f"Job {job_id!r} not found.")
         print("Try: python inspect_job.py --recent")
         sys.exit(1)
 
-    print_job(row)
+    print_job(conn, row)
+    conn.close()
 
 
 if __name__ == "__main__":

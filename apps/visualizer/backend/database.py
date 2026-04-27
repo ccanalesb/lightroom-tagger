@@ -284,6 +284,43 @@ def count_job_logs(db: sqlite3.Connection, job_id: str) -> int:
     return int(row["c"]) if row else 0
 
 
+def get_job_log_stats_bulk(
+    db: sqlite3.Connection, job_ids: list[str]
+) -> dict[str, dict]:
+    """Return per-job log summary stats without loading log payloads."""
+    if not job_ids:
+        return {}
+    placeholders = ",".join("?" for _ in job_ids)
+    rows = db.execute(
+        f"""
+        SELECT
+            job_id,
+            COUNT(*) AS logs_total,
+            SUM(CASE WHEN level = 'warning' THEN 1 ELSE 0 END) AS warning_count,
+            SUM(CASE WHEN level = 'error' THEN 1 ELSE 0 END) AS error_count,
+            MAX(ts) AS last_log_at
+        FROM job_logs
+        WHERE job_id IN ({placeholders})
+        GROUP BY job_id
+        """,
+        tuple(job_ids),
+    ).fetchall()
+    stats: dict[str, dict] = {}
+    for row in rows:
+        job_id = row["job_id"] if isinstance(row, dict) else row[0]
+        logs_total = row["logs_total"] if isinstance(row, dict) else row[1]
+        warning_count = row["warning_count"] if isinstance(row, dict) else row[2]
+        error_count = row["error_count"] if isinstance(row, dict) else row[3]
+        last_log_at = row["last_log_at"] if isinstance(row, dict) else row[4]
+        stats[job_id] = {
+            "logs_total": int(logs_total or 0),
+            "warning_count": int(warning_count or 0),
+            "error_count": int(error_count or 0),
+            "last_log_at": last_log_at,
+        }
+    return stats
+
+
 def get_job(
     db: sqlite3.Connection,
     job_id: str,
@@ -425,9 +462,19 @@ def list_jobs(
             "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
             (limit, offset)
         ).fetchall()
+    row_ids = [
+        (r['id'] if isinstance(r, dict) else r[0])
+        for r in rows
+    ]
+    stats_by_job = get_job_log_stats_bulk(db, row_ids)
     results = []
     for r in rows:
         r = dict(r)
+        stats = stats_by_job.get(r['id'], {})
+        r['logs_total'] = int(stats.get('logs_total', 0))
+        r['warning_count'] = int(stats.get('warning_count', 0))
+        r['error_count'] = int(stats.get('error_count', 0))
+        r['last_log_at'] = stats.get('last_log_at')
         if include_logs:
             r['logs'] = _load_logs_tail(db, r['id'], limit=DEFAULT_LOG_TAIL)
         else:
@@ -455,9 +502,19 @@ def get_active_jobs(db: sqlite3.Connection) -> list:
     rows = db.execute(
         "SELECT * FROM jobs WHERE status IN ('running', 'pending')"
     ).fetchall()
+    row_ids = [
+        (r['id'] if isinstance(r, dict) else r[0])
+        for r in rows
+    ]
+    stats_by_job = get_job_log_stats_bulk(db, row_ids)
     results = []
     for r in rows:
         r = dict(r)
+        stats = stats_by_job.get(r['id'], {})
+        r['logs_total'] = int(stats.get('logs_total', 0))
+        r['warning_count'] = int(stats.get('warning_count', 0))
+        r['error_count'] = int(stats.get('error_count', 0))
+        r['last_log_at'] = stats.get('last_log_at')
         r['logs'] = []
         results.append(_deserialize_job(r))
     return results

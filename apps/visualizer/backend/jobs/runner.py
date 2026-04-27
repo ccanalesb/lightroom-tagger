@@ -32,6 +32,7 @@ class JobRunner:
         self.db_path = db_path
         self.emit_progress = emit_progress or (lambda *args: None)
         self.active_jobs: dict[str, threading.Event] = {}
+        self._last_progress_log: dict[str, tuple[int, str]] = {}
 
     # ------------------------------------------------------------------
     # Thread-local DB handle
@@ -66,6 +67,7 @@ class JobRunner:
             return False
         cancel_event = threading.Event()
         self.active_jobs[job_id] = cancel_event
+        self._last_progress_log.pop(job_id, None)
         update_job_status(self.db, job_id, 'running', progress=0, current_step='Starting...')
         add_job_log(self.db, job_id, 'info', f'Job {job_type} started')
         return True
@@ -78,7 +80,10 @@ class JobRunner:
         if row and row.get('status') in ('completed', 'cancelled'):
             return
         update_job_status(self.db, job_id, 'running', progress=progress, current_step=current_step)
-        add_job_log(self.db, job_id, 'info', current_step)
+        log_key = (progress, current_step)
+        if self._last_progress_log.get(job_id) != log_key:
+            add_job_log(self.db, job_id, 'info', current_step)
+            self._last_progress_log[job_id] = log_key
         self.emit_progress(job_id, progress, current_step)
 
     def complete_job(self, job_id: str, result: dict):
@@ -96,6 +101,7 @@ class JobRunner:
             (job_id,),
         )
         self.db.commit()
+        self._last_progress_log.pop(job_id, None)
         self.clear_cancel_registration(job_id)
 
     def fail_job(self, job_id: str, error: str, *, severity: str = 'error') -> None:
@@ -114,6 +120,7 @@ class JobRunner:
             (error, severity, job_id),
         )
         self.db.commit()
+        self._last_progress_log.pop(job_id, None)
         self.clear_cancel_registration(job_id)
 
     def is_cancelled(self, job_id: str) -> bool:
@@ -129,6 +136,7 @@ class JobRunner:
 
     def clear_cancel_registration(self, job_id: str) -> None:
         self.active_jobs.pop(job_id, None)
+        self._last_progress_log.pop(job_id, None)
 
     def persist_checkpoint(self, job_id: str, checkpoint_body: dict) -> None:
         """Merge versioned checkpoint data into ``jobs.metadata`` (jobs DB)."""

@@ -172,9 +172,29 @@ def test_list_jobs_omits_logs_by_default():
         default_listing = list_jobs(db)
         assert len(default_listing) == 1
         assert default_listing[0]['logs'] == []
+        assert default_listing[0]['logs_total'] == 10
+        assert default_listing[0]['warning_count'] == 0
+        assert default_listing[0]['error_count'] == 0
+        assert default_listing[0]['last_log_at'] is not None
 
         with_logs = list_jobs(db, include_logs=True)
         assert len(with_logs[0]['logs']) == 10
+
+
+def test_list_jobs_exposes_warning_and_error_counts():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, 'test.db')
+        db = init_db(db_path)
+        job_id = create_job(db, 'batch_score', {})
+        add_job_log(db, job_id, 'info', 'ok')
+        add_job_log(db, job_id, 'warning', 'warn')
+        add_job_log(db, job_id, 'error', 'fail')
+
+        listing = list_jobs(db)
+        assert len(listing) == 1
+        assert listing[0]['logs_total'] == 3
+        assert listing[0]['warning_count'] == 1
+        assert listing[0]['error_count'] == 1
 
 
 def test_add_job_log_silently_ignores_unknown_job_id():

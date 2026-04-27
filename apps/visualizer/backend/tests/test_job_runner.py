@@ -45,6 +45,23 @@ def test_job_runner_emits_progress_updates():
         assert job['progress'] == 50
         assert job['current_step'] == 'Halfway done'
 
+
+def test_job_runner_dedupes_identical_progress_logs():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, 'test.db')
+        db = init_db(db_path)
+
+        runner = JobRunner(db)
+        job_id = create_job(db, 'test_job', {})
+        runner.start_job(job_id, 'test_job', {})
+        baseline = count_job_logs(db, job_id)
+
+        runner.update_progress(job_id, 10, 'Embedding 10/100')
+        runner.update_progress(job_id, 10, 'Embedding 10/100')
+        runner.update_progress(job_id, 10, 'Embedding 10/100')
+
+        assert count_job_logs(db, job_id) == baseline + 1
+
 def test_job_runner_completes_job():
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, 'test.db')

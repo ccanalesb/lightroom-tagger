@@ -28,6 +28,37 @@ def _db_busy_response():
     """Return a 503 JSON response for transient SQLite lock/busy errors."""
     return jsonify({'error': _DB_BUSY_MESSAGE, 'code': 'db_busy'}), 503
 
+
+_CHECKPOINT_LIST_KEYS = (
+    'processed_pairs',
+    'processed_media_keys',
+    'processed_image_keys',
+    'processed_triplets',
+)
+
+
+def _compact_checkpoint_lists(checkpoint: dict) -> dict:
+    compact = dict(checkpoint)
+    for key in _CHECKPOINT_LIST_KEYS:
+        value = compact.get(key)
+        if isinstance(value, list):
+            compact[f'{key}_count'] = len(value)
+            del compact[key]
+    return compact
+
+
+def _compact_job_payload(job: dict) -> dict:
+    payload = dict(job)
+    metadata = payload.get('metadata')
+    if isinstance(metadata, dict):
+        checkpoint = metadata.get('checkpoint')
+        if isinstance(checkpoint, dict):
+            payload['metadata'] = {
+                **metadata,
+                'checkpoint': _compact_checkpoint_lists(checkpoint),
+            }
+    return payload
+
 @bp.route('/', methods=['GET'])
 def list_all_jobs():
     status = request.args.get('status')
@@ -36,6 +67,7 @@ def list_all_jobs():
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
     jobs = list_jobs(current_app.db, status=status, limit=limit, offset=offset)
+    jobs = [_compact_job_payload(job) for job in jobs]
     total = count_jobs(current_app.db, status=status)
     return success_paginated(jobs, total=total, offset=offset, limit=limit)
 
@@ -69,7 +101,7 @@ def create_new_job():
             return _db_busy_response()
         raise
 
-    return jsonify(job), 201
+    return jsonify(_compact_job_payload(job)), 201
 
 @bp.route('/<job_id>', methods=['GET'])
 def get_job_details(job_id):
@@ -100,7 +132,7 @@ def get_job_details(job_id):
     # ``logs_total`` must reflect the *full* log count, not the tail length,
     # so the frontend can render "showing N of M" correctly.
     job['logs_total'] = count_job_logs(current_app.db, job_id)
-    return jsonify(job)
+    return jsonify(_compact_job_payload(job))
 
 @bp.route('/<job_id>', methods=['DELETE'])
 def cancel_job(job_id):
@@ -120,16 +152,16 @@ def cancel_job(job_id):
             add_job_log(current_app.db, job_id, 'info', 'Cancel requested via API')
             updated = get_job(current_app.db, job_id)
             if socketio:
-                socketio.emit('job_updated', updated)
-            return jsonify(updated)
+                socketio.emit('job_updated', _compact_job_payload(updated))
+            return jsonify(_compact_job_payload(updated))
 
         if job['status'] == 'pending':
             update_job_status(current_app.db, job_id, 'cancelled')
             add_job_log(current_app.db, job_id, 'info', 'Cancel requested via API')
             updated = get_job(current_app.db, job_id)
             if socketio:
-                socketio.emit('job_updated', updated)
-            return jsonify(updated)
+                socketio.emit('job_updated', _compact_job_payload(updated))
+            return jsonify(_compact_job_payload(updated))
 
         # Idempotent cancel: a cancel against an already-terminal job returns
         # the current row with a hint instead of an error, so rapid clicks /
@@ -143,7 +175,7 @@ def cancel_job(job_id):
                 # process). Cheap no-op if the job isn't active.
                 r.signal_cancel(job_id)
             return jsonify({
-                **job,
+                **_compact_job_payload(job),
                 'cancel_noop': True,
                 'cancel_noop_reason': f"Job is already {job['status']}",
             })
@@ -175,7 +207,7 @@ def retry_job(job_id):
         update_job_field(current_app.db, job_id, 'result', None)
         add_job_log(current_app.db, job_id, 'info', 'Job queued for retry')
 
-        return jsonify(get_job(current_app.db, job_id))
+        return jsonify(_compact_job_payload(get_job(current_app.db, job_id)))
     except sqlite3.OperationalError as e:
         if 'locked' in str(e).lower() or 'busy' in str(e).lower():
             return _db_busy_response()
@@ -185,7 +217,7 @@ def retry_job(job_id):
 @bp.route('/active', methods=['GET'])
 def list_active_jobs():
     jobs = get_active_jobs(current_app.db)
-    return jsonify(jobs)
+    return jsonify([_compact_job_payload(job) for job in jobs])
 
 
 @bp.route('/health', methods=['GET'])

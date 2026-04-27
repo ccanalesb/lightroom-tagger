@@ -147,6 +147,75 @@ def test_get_job_logs_total_present_when_no_param(client):
     assert response['logs_total'] == 3
 
 
+def test_list_jobs_includes_log_summary_and_compacts_checkpoint(client):
+    from database import add_job_log, update_job_field
+
+    create_resp = client.post('/api/jobs/', json={'type': 'batch_embed_image', 'metadata': {}})
+    job_id = create_resp.json['id']
+    update_job_field(
+        client.application.db,
+        job_id,
+        'metadata',
+        {
+            'checkpoint': {
+                'checkpoint_version': 1,
+                'processed_pairs': ['a', 'b', 'c'],
+            }
+        },
+    )
+    add_job_log(client.application.db, job_id, 'warning', 'warn')
+    add_job_log(client.application.db, job_id, 'error', 'boom')
+
+    response = client.get('/api/jobs/').json
+    row = next(job for job in response['data'] if job['id'] == job_id)
+    assert row['logs_total'] == 2
+    assert row['warning_count'] == 1
+    assert row['error_count'] == 1
+    checkpoint = row['metadata']['checkpoint']
+    assert checkpoint['processed_pairs_count'] == 3
+    assert 'processed_pairs' not in checkpoint
+
+
+def test_get_job_details_compacts_checkpoint_lists(client):
+    from database import update_job_field
+
+    create_resp = client.post('/api/jobs/', json={'type': 'batch_embed_image', 'metadata': {}})
+    job_id = create_resp.json['id']
+    update_job_field(
+        client.application.db,
+        job_id,
+        'metadata',
+        {
+            'checkpoint': {
+                'checkpoint_version': 2,
+                'processed_media_keys': ['k1', 'k2'],
+                'processed_image_keys': ['k3'],
+            }
+        },
+    )
+
+    response = client.get(f'/api/jobs/{job_id}').json
+    checkpoint = response['metadata']['checkpoint']
+    assert checkpoint['processed_media_keys_count'] == 2
+    assert checkpoint['processed_image_keys_count'] == 1
+    assert 'processed_media_keys' not in checkpoint
+    assert 'processed_image_keys' not in checkpoint
+
+
+def test_active_jobs_includes_log_summary_fields(client):
+    from database import add_job_log
+
+    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    job_id = create_resp.json['id']
+    add_job_log(client.application.db, job_id, 'warning', 'be careful')
+
+    jobs = client.get('/api/jobs/active').json
+    row = next(job for job in jobs if job['id'] == job_id)
+    assert row['logs_total'] >= 1
+    assert row['warning_count'] >= 1
+    assert 'last_log_at' in row
+
+
 def test_list_jobs_limit_clamped_below(client):
     response = client.get('/api/jobs/?limit=0')
     assert response.status_code == 200
