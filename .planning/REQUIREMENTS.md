@@ -36,6 +36,12 @@
 - [x] **SIM-01**: Job generates and stores image embeddings (CLIP-style) for catalog images *(Phase 5 — 2026-04-24)*
 - [x] **SIM-02**: "More like this" from any catalog photo surfaces visually similar results, accessible from the catalog view; chat-panel pin remains scoped to NLS-06 *(Phase 6 — 2026-04-25)*
 
+### Matching Performance & Catalog Cache Pipeline *(added 2026-04-27)*
+
+- [ ] **MATCH-02**: `vision_match` consults `image_clip_embeddings` to cosine-shortlist date-windowed catalog candidates before LLM judgment runs. Pre-filter reduces LLM comparison calls by ≥10× vs the Phase 7 baseline on a representative batch, while preserving recall on user-validated match pairs. Pipeline emits per-stage candidate counts (date-window in → embedding shortlist out → LLM judgments) in the job log.
+- [ ] **MATCH-03**: When the embedding pre-filter shortlist is empty for an Instagram media item, the UI surfaces an explicit "wider search" opt-in (extended date window or no date window). The wider-search fallback never runs automatically — the user must trigger it.
+- [ ] **CACHE-01**: Catalog cache pipeline rewire — `batch_stack_detect` and `batch_catalog_similarity` are recognized as catalog-cache work (they consume `image_clip_embeddings` and produce cache artifacts). UI triggers live on the catalog cache surface, not the matching tab. The cache builds as a chain (`batch_embed_image` → `batch_stack_detect` → `batch_catalog_similarity`) with per-stage progress and skip reasons visible; individual stages remain re-runnable.
+
 ---
 
 ## Future Requirements
@@ -80,8 +86,11 @@
 | VIS-01 | 1 | Pending |
 | SIM-01 | 5 | ✅ Complete (2026-04-24) |
 | SIM-02 | 6 | ✅ Complete (2026-04-25) |
+| MATCH-02 | 8 | Pending |
+| MATCH-03 | 8 | Pending |
+| CACHE-01 | 8 | Pending |
 
-**Total:** 14 requirements across 4 categories.
+**Total:** 17 requirements across 5 categories.
 
 ---
 
@@ -92,6 +101,9 @@
 - **STACK-04** depends on **STACK-01** and **STACK-02** (stacks must exist before matching can use representatives)
 - **STACK-03** depends on **STACK-01** (at minimum burst stacks needed for Best Photos view)
 - **SIM-02** depends on **SIM-01** (embeddings must be generated before similarity queries work)
+- **MATCH-02** depends on **SIM-01** (CLIP embeddings must populate `image_clip_embeddings` before the matching pre-filter can shortlist) and on **STACK-04** (representative-only candidate filter from Phase 7 must already cut non-rep rows before the embedding shortlist runs)
+- **CACHE-01** depends on **SIM-01**, **STACK-01**, and **SIM-02** (the cache stages being chained — embed, stack-detect, catalog-similarity — must each already exist as standalone jobs)
+- **MATCH-03** depends on **MATCH-02** (the wider-search fallback only makes sense once the embedding pre-filter is the primary path)
 ## Implementation Guidance (non-requirement)
 
 - LLM-to-SQL: The LLM must return a **validated filter object** (Pydantic), not executable SQL. Allowlisted query parameters only. Reuse existing `ProviderRegistry` pattern.
