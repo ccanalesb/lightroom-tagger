@@ -23,7 +23,7 @@ created: 2026-04-27
 | Preset | not applicable |
 | Component library | **none** — custom `Card` / `Button` / `Input` under `src/components/ui/` |
 | Icon library | **none** — disclosure uses text arrows (`▶` / `▼`) per `AdvancedOptions` |
-| Font | **Inter** (400, 500, 600, 700) from `index.css` / Google Fonts |
+| Font | **Inter** — phase contract: **400** and **600** only (families in `index.css` / Google Fonts may load additional weights; not declared here) |
 
 **Stack alignment:** React 19 + TypeScript + Vite + Tailwind 3; semantic colors via CSS variables (`--color-background`, `--color-surface`, `--color-accent`, etc.) in `index.css`.
 
@@ -51,12 +51,12 @@ Declared values (multiples of 4; matches existing `space-y-6`, `p-4`, `gap-4` us
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
-| Body | 14px (`text-sm`) | 400 (regular) | 1.5 |
-| Label | 14px (`text-sm`) | 500 (medium) / 600 (semibold) for field labels | 1.5 |
-| Heading | 14px (`text-sm font-semibold`) for card subheads; 16px base for `CardTitle` if component uses `text-base` | 600 | 1.2 |
-| Display | 16–18px for primary page/card titles | 600–700 | 1.2 |
+| Body | 14px (`text-sm`) | **400** | 1.5 |
+| Label | 14px (`text-sm`) | **600** (field labels, stat labels, disclosure control) | 1.5 |
+| Heading | 14px–16px (card subheads, `CardTitle` range) | **600** | 1.2 |
+| Display | 16px–18px (primary card/page titles) | **600** | 1.2 |
 
-**Contract:** Do not introduce a fifth text size for this phase; reuse `text-sm` / `text-xs` / existing `CardTitle` sizing.
+**Contract:** This phase declares **two weights only: 400 and 600.** Do not introduce a fifth text size for this phase; reuse `text-sm` / `text-xs` / existing `CardTitle` sizing. Unnamed Tailwind classes elsewhere (e.g. `font-medium`) on inherited or untouched surfaces are out-of-contract details, not part of the Phase 8 type spec.
 
 ---
 
