@@ -51,6 +51,7 @@ from .checkpoint import (
     fingerprint_batch_score,
     fingerprint_batch_stack_detect,
     fingerprint_batch_text_embed,
+    fingerprint_catalog_cache_build,
     fingerprint_catalog_keys,
     fingerprint_vision_match,
 )
@@ -64,6 +65,63 @@ _EMBED_SUMMARY_LOG_EVERY = 250
 _CATALOG_SIMILARITY_SUMMARY_EVERY = 500
 _STACK_DETECT_SUMMARY_EVERY = 500
 _VISION_MATCH_PREFILTER_SUMMARY_EVERY = 40
+
+
+def _catalog_cache_stage_mapped_progress(stage_index: int, inner_pct: int) -> int:
+    """Map a standalone handler's 5–100% progress into one third of the composite bar."""
+    inner_pct = max(5, min(100, int(inner_pct)))
+    span_total = 100 - 5
+    stage_span = span_total / 3.0
+    frac = (inner_pct - 5) / span_total if span_total else 0.0
+    base = 5 + stage_index * stage_span
+    return int(min(100, base + frac * stage_span))
+
+
+class _CatalogCacheStageRunner:
+    """Delegates to ``JobRunner`` but captures ``complete_job`` / ``finalize_cancelled`` per stage."""
+
+    __slots__ = (
+        '_runner',
+        'job_id',
+        'stage_index',
+        'stage_complete_result',
+        'stage_cancelled',
+    )
+
+    def __init__(self, runner, job_id: str, stage_index: int):
+        object.__setattr__(self, '_runner', runner)
+        object.__setattr__(self, 'job_id', job_id)
+        object.__setattr__(self, 'stage_index', stage_index)
+        object.__setattr__(self, 'stage_complete_result', None)
+        object.__setattr__(self, 'stage_cancelled', False)
+
+    @property
+    def db(self):  # noqa: ANN201 — mirror runner.db typing
+        return self._runner.db
+
+    def update_progress(self, job_id: str, pct: int, msg: str | None = None) -> None:
+        mapped = _catalog_cache_stage_mapped_progress(self.stage_index, int(pct))
+        self._runner.update_progress(job_id, mapped, msg)
+
+    def complete_job(self, job_id: str, result: dict) -> None:
+        self.stage_complete_result = result
+
+    def finalize_cancelled(self, job_id: str) -> None:
+        object.__setattr__(self, 'stage_cancelled', True)
+
+    def persist_checkpoint(self, job_id: str, body: dict) -> None:
+        """Composite job uses chain-local checkpoint suppression on embed/stack inners."""
+        return
+
+    def clear_checkpoint(self, job_id: str) -> None:
+        return
+
+    def fail_job(self, job_id: str, msg: str, *, severity: str = 'error') -> None:
+        self._runner.fail_job(job_id, msg, severity=severity)
+
+    def __getattr__(self, name: str):
+        return getattr(self._runner, name)
+
 
 # SQL fragments to exclude video files from describe queries at the DB level so
 # the processor never wastes a worker slot attempting to describe a .mov/.mp4/etc.
@@ -2613,22 +2671,25 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
             return
         lib_db = init_database(db_path)
 
-        add_job_log(
-            runner.db,
-            job_id,
-            'info',
-            f'batch_embed_image: model={CLIP_EMBED_MODEL_ID}',
-        )
-        add_job_log(
-            runner.db,
-            job_id,
-            'info',
-            (
-                'batch_embed_image stage=precompute_embeddings '
-                '(builds similarity index only; does not produce matches). '
-                'After completion, run vision_match or stack detection.'
-            ),
-        )
+        chain_mode = bool(metadata.get('_catalog_cache_chain'))
+
+        if not chain_mode:
+            add_job_log(
+                runner.db,
+                job_id,
+                'info',
+                f'batch_embed_image: model={CLIP_EMBED_MODEL_ID}',
+            )
+            add_job_log(
+                runner.db,
+                job_id,
+                'info',
+                (
+                    'batch_embed_image stage=precompute_embeddings '
+                    '(builds similarity index only; does not produce matches). '
+                    'After completion, run vision_match or stack detection.'
+                ),
+            )
 
         months, year = _resolve_date_window(metadata)
         min_rating_raw = metadata.get('min_rating')
@@ -2640,12 +2701,16 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 min_rating = None
 
         force = bool(metadata.get('force', False))
-        add_job_log(
-            runner.db,
-            job_id,
-            'info',
-            f'batch_embed_image filters: force={force}, months={months}, year={year}, min_rating={min_rating}',
-        )
+        if not chain_mode:
+            add_job_log(
+                runner.db,
+                job_id,
+                'info',
+                (
+                    'batch_embed_image filters: '
+                    f'force={force}, months={months}, year={year}, min_rating={min_rating}'
+                ),
+            )
         if image_type == 'catalog':
             if force:
                 full_list = list_catalog_keys_for_clip_embed_force(
@@ -2698,25 +2763,26 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
         )
 
         processed_pairs: set[str] = set()
-        row_job = get_job(runner.db, job_id)
-        if row_job:
-            meta_job = row_job.get('metadata') or {}
-            if isinstance(meta_job, dict):
-                chk = meta_job.get('checkpoint')
-                if (
-                    isinstance(chk, dict)
-                    and chk.get('checkpoint_version') == 1
-                    and chk.get('job_type') == 'batch_embed_image'
-                ):
-                    if chk.get('fingerprint') == fp:
-                        processed_pairs = set(chk.get('processed_pairs') or [])
-                    elif chk.get('fingerprint'):
-                        add_job_log(
-                            runner.db,
-                            job_id,
-                            'info',
-                            'checkpoint mismatch: batch_embed_image fingerprint changed, starting fresh',
-                        )
+        if not chain_mode:
+            row_job = get_job(runner.db, job_id)
+            if row_job:
+                meta_job = row_job.get('metadata') or {}
+                if isinstance(meta_job, dict):
+                    chk = meta_job.get('checkpoint')
+                    if (
+                        isinstance(chk, dict)
+                        and chk.get('checkpoint_version') == 1
+                        and chk.get('job_type') == 'batch_embed_image'
+                    ):
+                        if chk.get('fingerprint') == fp:
+                            processed_pairs = set(chk.get('processed_pairs') or [])
+                        elif chk.get('fingerprint'):
+                            add_job_log(
+                                runner.db,
+                                job_id,
+                                'info',
+                                'checkpoint mismatch: batch_embed_image fingerprint changed, starting fresh',
+                            )
 
         remaining = [k for k in full_list if k not in processed_pairs]
         runner.update_progress(
@@ -2726,7 +2792,8 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
         )
 
         if total_at_start == 0:
-            runner.clear_checkpoint(job_id)
+            if not chain_mode:
+                runner.clear_checkpoint(job_id)
             runner.complete_job(
                 job_id,
                 {
@@ -2886,6 +2953,8 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                     severity='error',
                 )
                 return False
+            if chain_mode:
+                return True
             runner.persist_checkpoint(
                 job_id,
                 {
@@ -2991,7 +3060,8 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
         if row_done and row_done.get('status') == 'failed':
             return
 
-        runner.clear_checkpoint(job_id)
+        if not chain_mode:
+            runner.clear_checkpoint(job_id)
         runner.complete_job(
             job_id,
             {
@@ -3106,12 +3176,18 @@ def _catalog_similarity_why_matched_line(similarity: float) -> str:
 
 def handle_batch_catalog_similarity(runner, job_id: str, metadata: dict) -> None:
     """Materialize catalog-to-catalog CLIP similarity groups for later review."""
+    _handle_catalog_similarity_inner(runner, job_id, metadata)
+
+
+def _handle_catalog_similarity_inner(runner, job_id: str, metadata: dict) -> None:
     lib_db: sqlite3.Connection | None = None
     try:
         db_path = _resolve_library_db_or_fail(runner, job_id)
         if db_path is None:
             return
         lib_db = init_database(db_path)
+
+        chain_mode = bool(metadata.get('_catalog_cache_chain'))
 
         try:
             min_similarity = float(metadata.get('min_similarity', 0.9))
@@ -3126,16 +3202,17 @@ def handle_batch_catalog_similarity(runner, job_id: str, metadata: dict) -> None
 
         all_keys = list_clip_embedded_catalog_keys_newest_first(lib_db)
         total = len(all_keys)
-        add_job_log(
-            runner.db,
-            job_id,
-            'info',
-            (
-                'batch_catalog_similarity stage=find_similar_photos '
-                f'min_similarity={min_similarity:.2f}, limit_per_seed={limit_per_seed}, '
-                f'embedded_catalog_images={total}'
-            ),
-        )
+        if not chain_mode:
+            add_job_log(
+                runner.db,
+                job_id,
+                'info',
+                (
+                    'batch_catalog_similarity stage=find_similar_photos '
+                    f'min_similarity={min_similarity:.2f}, limit_per_seed={limit_per_seed}, '
+                    f'embedded_catalog_images={total}'
+                ),
+            )
         runner.update_progress(job_id, 5, f'Found {total} embedded catalog images')
 
         clear_catalog_similarity_results(lib_db)
@@ -3209,7 +3286,8 @@ def handle_batch_catalog_similarity(runner, job_id: str, metadata: dict) -> None
             'min_similarity': float(min_similarity),
             'limit_per_seed': int(limit_per_seed),
         }
-        add_job_log(runner.db, job_id, 'info', f'Catalog similarity complete: {result}')
+        if not chain_mode:
+            add_job_log(runner.db, job_id, 'info', f'Catalog similarity complete: {result}')
         runner.complete_job(job_id, result)
     except Exception as e:
         severity = _failure_severity_from_exception(e)
@@ -3296,26 +3374,29 @@ def _handle_batch_stack_detect_inner(runner, job_id: str, metadata: dict) -> Non
             force_mode=force_mode,
         )
 
+        chain_mode = bool(metadata.get('_catalog_cache_chain'))
+
         processed_image_keys: set[str] = set()
-        row_job = get_job(runner.db, job_id)
-        if row_job:
-            meta_job = row_job.get('metadata') or {}
-            if isinstance(meta_job, dict):
-                chk = meta_job.get('checkpoint')
-                if (
-                    isinstance(chk, dict)
-                    and chk.get('checkpoint_version') == 1
-                    and chk.get('job_type') == 'batch_stack_detect'
-                ):
-                    if chk.get('fingerprint') == fp:
-                        processed_image_keys = set(chk.get('processed_image_keys') or [])
-                    elif chk.get('fingerprint'):
-                        add_job_log(
-                            runner.db,
-                            job_id,
-                            'info',
-                            'checkpoint mismatch: batch_stack_detect fingerprint changed, starting fresh',
-                        )
+        if not chain_mode:
+            row_job = get_job(runner.db, job_id)
+            if row_job:
+                meta_job = row_job.get('metadata') or {}
+                if isinstance(meta_job, dict):
+                    chk = meta_job.get('checkpoint')
+                    if (
+                        isinstance(chk, dict)
+                        and chk.get('checkpoint_version') == 1
+                        and chk.get('job_type') == 'batch_stack_detect'
+                    ):
+                        if chk.get('fingerprint') == fp:
+                            processed_image_keys = set(chk.get('processed_image_keys') or [])
+                        elif chk.get('fingerprint'):
+                            add_job_log(
+                                runner.db,
+                                job_id,
+                                'info',
+                                'checkpoint mismatch: batch_stack_detect fingerprint changed, starting fresh',
+                            )
 
         if total_at_start == 0:
             runner.update_progress(job_id, 5, 'No catalog images in stack-detect work list')
@@ -3332,7 +3413,8 @@ def _handle_batch_stack_detect_inner(runner, job_id: str, metadata: dict) -> Non
                 'info',
                 f'Stack detection complete: {z}; 0 images skipped (no date_taken)',
             )
-            runner.clear_checkpoint(job_id)
+            if not chain_mode:
+                runner.clear_checkpoint(job_id)
             runner.complete_job(job_id, z)
             return
 
@@ -3380,7 +3462,8 @@ def _handle_batch_stack_detect_inner(runner, job_id: str, metadata: dict) -> Non
                 'info',
                 f'Stack detection complete: {res}; {images_skipped_no_date} images skipped (no date_taken)',
             )
-            runner.clear_checkpoint(job_id)
+            if not chain_mode:
+                runner.clear_checkpoint(job_id)
             runner.complete_job(job_id, res)
             return
 
@@ -3413,6 +3496,8 @@ def _handle_batch_stack_detect_inner(runner, job_id: str, metadata: dict) -> Non
                     severity='error',
                 )
                 return False
+            if chain_mode:
+                return True
             runner.persist_checkpoint(
                 job_id,
                 {
@@ -3498,7 +3583,8 @@ def _handle_batch_stack_detect_inner(runner, job_id: str, metadata: dict) -> Non
             f'Stack detection complete: {result}; {images_skipped_no_date} images skipped (no date_taken)',
         )
         emit_stack_summary(force=True)
-        runner.clear_checkpoint(job_id)
+        if not chain_mode:
+            runner.clear_checkpoint(job_id)
         runner.complete_job(job_id, result)
     except Exception as e:
         severity = _failure_severity_from_exception(e)
@@ -3506,6 +3592,164 @@ def _handle_batch_stack_detect_inner(runner, job_id: str, metadata: dict) -> Non
     finally:
         if lib_db:
             lib_db.close()
+
+
+def handle_catalog_cache_build(runner, job_id: str, metadata: dict) -> None:
+    """Run catalog CLIP embed → stack detection → catalog similarity in-process (CACHE-01)."""
+    with cancel_scope.install(lambda: runner.is_cancelled(job_id)):
+        _handle_catalog_cache_build_inner(runner, job_id, metadata)
+
+
+def _handle_catalog_cache_build_inner(runner, job_id: str, metadata: dict) -> None:
+    db_path = _resolve_library_db_or_fail(runner, job_id)
+    if db_path is None:
+        return
+
+    months, year = _resolve_date_window(metadata)
+    min_rating_raw = metadata.get('min_rating')
+    min_rating = None
+    if min_rating_raw is not None:
+        try:
+            min_rating = int(min_rating_raw)
+        except (TypeError, ValueError):
+            min_rating = None
+
+    fp_chain = fingerprint_catalog_cache_build(metadata, resolved_months=months, resolved_year=year)
+
+    add_job_log(
+        runner.db,
+        job_id,
+        'info',
+        '[catalog-cache-build] chain_start embed→stack_detect→catalog_similarity',
+    )
+
+    embed_meta = dict(metadata)
+    embed_meta['image_type'] = 'catalog_and_instagram'
+    embed_meta['force'] = bool(metadata.get('force_embed', False))
+    embed_meta['_catalog_cache_chain'] = True
+
+    add_job_log(runner.db, job_id, 'info', '[catalog-cache-build] stage=embed status=start')
+    sr_embed = _CatalogCacheStageRunner(runner, job_id, 0)
+    _handle_batch_embed_image_inner(sr_embed, job_id, embed_meta)
+
+    if sr_embed.stage_cancelled:
+        runner.finalize_cancelled(job_id)
+        return
+    row_j = get_job(runner.db, job_id)
+    if row_j and row_j.get('status') == 'failed':
+        return
+
+    embed_result = sr_embed.stage_complete_result or {}
+
+    add_job_log(
+        runner.db,
+        job_id,
+        'info',
+        (
+            '[catalog-cache-build] stage=embed status=complete '
+            f"embedded={embed_result.get('embedded', 0)} skipped={embed_result.get('skipped', 0)} "
+            f"failed={embed_result.get('failed', 0)}"
+        ),
+    )
+
+    lib_db = init_database(db_path)
+    try:
+        cat_need = list_catalog_keys_needing_clip_embedding(
+            lib_db, months=months, year=year, min_rating=min_rating
+        )
+        ig_need = list_instagram_dump_keys_needing_clip_embedding(
+            lib_db, months=months, year=year, min_rating=min_rating
+        )
+        overlap = set(cat_need) & set(ig_need)
+        incomplete_k = len(cat_need) + len(ig_need) - len(overlap)
+    finally:
+        lib_db.close()
+
+    if incomplete_k > 0:
+        add_job_log(
+            runner.db,
+            job_id,
+            'warning',
+            (
+                '[catalog-cache-build] stage=embed warning=incomplete_embeddings '
+                f'count={incomplete_k} proceeding'
+            ),
+        )
+
+    if runner.is_cancelled(job_id):
+        runner.finalize_cancelled(job_id)
+        return
+
+    stack_meta = dict(metadata)
+    stack_meta['force'] = metadata.get('force_stack', False)
+    stack_meta['_catalog_cache_chain'] = True
+
+    add_job_log(runner.db, job_id, 'info', '[catalog-cache-build] stage=stack status=start')
+    sr_stack = _CatalogCacheStageRunner(runner, job_id, 1)
+    _handle_batch_stack_detect_inner(sr_stack, job_id, stack_meta)
+
+    if sr_stack.stage_cancelled:
+        runner.finalize_cancelled(job_id)
+        return
+    row_s = get_job(runner.db, job_id)
+    if row_s and row_s.get('status') == 'failed':
+        return
+
+    stk_result = sr_stack.stage_complete_result or {}
+    add_job_log(
+        runner.db,
+        job_id,
+        'info',
+        (
+            '[catalog-cache-build] stage=stack status=complete '
+            f"stacks_created={stk_result.get('stacks_created', 0)} "
+            f"images_skipped_no_date={stk_result.get('images_skipped_no_date', 0)} "
+            f"images_skipped_already_stacked={stk_result.get('images_skipped_already_stacked', 0)}"
+        ),
+    )
+
+    if runner.is_cancelled(job_id):
+        runner.finalize_cancelled(job_id)
+        return
+
+    sim_meta = dict(metadata)
+    sim_meta['_catalog_cache_chain'] = True
+
+    add_job_log(runner.db, job_id, 'info', '[catalog-cache-build] stage=similarity status=start')
+    sr_sim = _CatalogCacheStageRunner(runner, job_id, 2)
+    _handle_catalog_similarity_inner(sr_sim, job_id, sim_meta)
+
+    if sr_sim.stage_cancelled:
+        runner.finalize_cancelled(job_id)
+        return
+    row_sim = get_job(runner.db, job_id)
+    if row_sim and row_sim.get('status') == 'failed':
+        return
+
+    sim_result = sr_sim.stage_complete_result or {}
+    add_job_log(
+        runner.db,
+        job_id,
+        'info',
+        (
+            '[catalog-cache-build] stage=similarity status=complete '
+            f"groups_created={sim_result.get('groups_created', 0)} "
+            f"candidates_created={sim_result.get('candidates_created', 0)} "
+            f"skipped_non_primary={sim_result.get('skipped_non_primary', 0)} "
+            f"skipped_no_embedding={sim_result.get('skipped_no_embedding', 0)}"
+        ),
+    )
+
+    runner.complete_job(
+        job_id,
+        {
+            'catalog_cache_build': True,
+            'fingerprint': fp_chain,
+            'embed': embed_result,
+            'stack': stk_result,
+            'similarity': sim_result,
+        },
+    )
 
 
 JOB_HANDLERS = {
@@ -3523,4 +3767,5 @@ JOB_HANDLERS = {
     'batch_catalog_similarity': handle_batch_catalog_similarity,
     'batch_text_embed': handle_batch_text_embed,
     'batch_embed_image': handle_batch_embed_image,
+    'catalog_cache_build': handle_catalog_cache_build,
 }

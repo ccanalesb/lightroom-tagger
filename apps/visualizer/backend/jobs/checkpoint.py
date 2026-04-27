@@ -116,6 +116,41 @@ def _normalized_batch_embed_image_type(metadata: dict[str, Any]) -> str:
     return "catalog"
 
 
+def fingerprint_catalog_cache_build(
+    metadata: dict[str, Any],
+    *,
+    resolved_months: int | None = None,
+    resolved_year: str | None = None,
+) -> str:
+    """SHA-256 hex for catalog_cache_build composite job identity (metadata knobs only).
+
+    Mirrors embed/stack/similarity inputs that affect how much work runs — without embedding
+    ordered key lists (those vary per catalog snapshot).
+    """
+    min_rating_raw = metadata.get("min_rating")
+    min_rating: int | None
+    try:
+        min_rating = int(min_rating_raw) if min_rating_raw is not None else None
+    except (TypeError, ValueError):
+        min_rating = None
+    payload: dict[str, Any] = {
+        "embedding_dim": CLIP_EMBED_DIM,
+        "embedding_model_id": CLIP_EMBED_MODEL_ID,
+        "force_embed": bool(metadata.get("force_embed", False)),
+        "force_similarity": bool(metadata.get("force_similarity", False)),
+        "force_stack": bool(metadata.get("force_stack", False)),
+        "image_type": "catalog_and_instagram",
+        "last_months": metadata.get("last_months"),
+        "min_rating": min_rating,
+        "month": metadata.get("month"),
+        "resolved_months": resolved_months,
+        "resolved_year": resolved_year,
+        "year": metadata.get("year"),
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def fingerprint_batch_embed_image(
     metadata: dict[str, Any],
     ordered_keys: list[str],

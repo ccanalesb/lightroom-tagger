@@ -50,6 +50,7 @@ JOB_TYPES_REQUIRING_CATALOG: frozenset[str] = frozenset(
         'single_describe',
         'single_score',
         'instagram_import',
+        'catalog_cache_build',
     }
 )
 
