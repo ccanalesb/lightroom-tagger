@@ -12,6 +12,8 @@ deferred:
     disposition: edge case; no change required for phase closeout
   - item: "image_stacks.stack_size vs live membership count (07-REVIEW low #5)"
     disposition: pre-existing pattern; monitored via stack_metadata_for_api on mutations
+  - item: "Embed job discoverability + path-failure diagnostics follow-up"
+    disposition: tracked in .planning/todos/pending/2026-04-26-fixes-for-embed-job-discoverability-and-path-failures.md and attached to Phase 07 scope
 human_verification:
   recommended:
     - "Browser smoke: open catalog image detail via direct URL or refresh; confirm stack strip controls appear (validates catalog detail stack parity after b4bd866)."
@@ -50,6 +52,9 @@ Phase code review (`07-REVIEW.md`) identified one **high** and one **medium** is
 2. **HTTP semantics for invariant failures** — `StackMutationError` with `status_code >= 500` was incorrectly returned as 400. **Resolved:** split/merge/representative handlers map `e.status_code >= 500` to `error_server_error` (500).
 
 Low-severity review items are listed under YAML `deferred` above; none block phase pass.
+
+Phase follow-up todo (requested to stay attached to this phase):
+- `.planning/todos/pending/2026-04-26-fixes-for-embed-job-discoverability-and-path-failures.md`
 
 ---
 

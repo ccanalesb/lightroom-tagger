@@ -122,4 +122,5 @@
 
 ## Deferred Ideas
 
-None.
+- Follow-up todo attached after execution:
+  - `.planning/todos/pending/2026-04-26-fixes-for-embed-job-discoverability-and-path-failures.md`

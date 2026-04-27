@@ -117,7 +117,9 @@ Out of scope:
 <deferred>
 ## Deferred Ideas
 
-None - discussion stayed within phase scope.
+- Embed-job UX and storage-path failure handling follow-up captured for this phase:
+  - `.planning/todos/pending/2026-04-26-fixes-for-embed-job-discoverability-and-path-failures.md`
+  - Scope: add clear "run embed job" affordance, Job Queue navigation, and preflight diagnostics for missing/unreachable catalog file paths.
 
 </deferred>
 

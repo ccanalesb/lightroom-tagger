@@ -26,3 +26,6 @@ After manually enqueueing `batch_embed_image`, the job can also appear to be "ru
    - if unreachable rate is high, fail fast with a single actionable message (mount path/share offline) instead of thousands of skip logs.
 4. Add a concise "why skipped" summary in job result payload (counts grouped by missing file, empty path, no DB row) so UI can render a clear diagnosis.
 5. Document expected storage/mount requirements for environments that use network shares (`//tnas/...`) and add troubleshooting steps in Processing/Catalog Cache help copy.
+6. In Phase 8 planning, explicitly decide and document why matching/stacking should depend on original filepaths versus operating virtually on cached/compressed derivatives:
+   - validate whether "virtual stacking on compressed cache outputs" can satisfy quality + traceability requirements;
+   - if original files are still required, record the non-negotiable reasons (fidelity, reproducibility, write-back identity contract).
