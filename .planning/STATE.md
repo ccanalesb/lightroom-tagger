@@ -24,7 +24,7 @@ progress:
 | Active milestone | v3.0 Intelligent Discovery |
 | Phase | Phase 8 — embedding-prefilter-and-cache-pipeline |
 | Status | **Discussion pending** |
-| Last activity | 2026-04-27 — Re-opened v3.0 for Phase 8 with scope expanded to cover (a) catalog cache pipeline rewire (CACHE-01: stack-detect + catalog-similarity become catalog-cache pipeline stages, triggers move out of MatchingTab, cache builds as a chain), (b) embedding pre-filter for `vision_match` (MATCH-02: CLIP-cosine shortlist inside the date window before LLM judgment, ≥10× LLM-call reduction target), (c) opt-in wider-search fallback (MATCH-03). REQUIREMENTS.md gains MATCH-02 / MATCH-03 / CACHE-01 with acceptance language and dependencies. ROADMAP.md Phase 8 section rewritten; phase index and progress table updated. |
+| Last activity | 2026-04-27 — Re-opened v3.0 for Phase 8 with scope covering (a) catalog cache pipeline rewire (CACHE-01: stack-detect + catalog-similarity become catalog-cache pipeline stages, triggers move out of MatchingTab, cache builds as a chain) and (b) embedding pre-filter for `vision_match` (MATCH-02: CLIP-cosine shortlist inside the date window before LLM judgment, ≥10× LLM-call reduction target). REQUIREMENTS.md gains MATCH-02 / CACHE-01 with acceptance language and dependencies. ROADMAP.md Phase 8 section rewritten; phase index and progress table updated. (Initially included MATCH-03 wider-search fallback; dropped 2026-04-27 — not user-requested.) |
 
 ## Project Reference
 

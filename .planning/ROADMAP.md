@@ -65,7 +65,7 @@
 | 6 | [Similarity & stack UI](#phase-6--similarity--stack-ui) | SIM-02, STACK-03 |
 | 7 | [Stacks in matching & pin similarity](#phase-7--stacks-in-matching--pin-similarity) | STACK-04, STACK-05, NLS-06 |
 | 7.1 | [Phase 7 remediation fixes](#phase-71--phase-7-remediation-fixes-inserted-2026-04-26) | Remediation |
-| 8 | [Embedding pre-filter & catalog cache pipeline](#phase-8--embedding-pre-filter--catalog-cache-pipeline) | MATCH-02, MATCH-03, CACHE-01 |
+| 8 | [Embedding pre-filter & catalog cache pipeline](#phase-8--embedding-pre-filter--catalog-cache-pipeline) | MATCH-02, CACHE-01 |
 
 #### Phase 1 — Visual tags & keyword search
 
@@ -195,7 +195,6 @@ Plans:
 - Date window (90 days) remains the first filter — cuts effective catalog size before any embedding work
 - Recall-first top-k (generous default, e.g. top-100/200) — missing a true match is worse than extra LLM calls
 - LLM cascade runs only on the shortlist, not the full catalog
-- Opt-in fallback: when shortlist is empty, user can explicitly trigger a wider search (extended or removed date window); fallback is never automatic
 - Pipeline is observable — every stage logs candidate counts in/out
 
 **Design decisions (added 2026-04-27 with expanded scope):**
@@ -204,10 +203,9 @@ Plans:
 - Embedding model question (DINOv2 vs CLIP vs SigLIP) is deferred — Phase 8 wires the existing CLIP embeddings; benchmark-embedding-recall is its own follow-up todo and may promote a different model in a later phase
 - FAISS vs sqlite-vec is a discuss-phase decision — sqlite-vec is already loaded and powers similarity today; FAISS is real engineering only justified if sqlite-vec KNN can't meet the recall/latency target on this catalog size
 
-**Requirements (covered: MATCH-02, MATCH-03, CACHE-01):**
+**Requirements (covered: MATCH-02, CACHE-01):**
 - `vision_match` consults `image_clip_embeddings` to cosine-shortlist candidates inside the date window before LLM judgment runs; ≥10× LLM-call reduction vs current Phase 7 baseline on a representative batch, with recall preserved on user-validated match pairs
 - Stack detection and catalog similarity job triggers live on the catalog cache surface (not the matching tab); cache pipeline runs as a chain (`batch_embed_image` → `batch_stack_detect` → `batch_catalog_similarity`) with per-stage progress, candidate counts, and skip reasons visible in the job log
-- When the pre-filter shortlist is empty for a media item, the UI surfaces an explicit "wider search" opt-in (extended or removed date window); fallback never auto-runs
 - Pipeline observability: each cascade stage emits throttled summary logs showing in→out candidate counts, so operators can verify the pre-filter is doing its job
 - Benchmark of CLIP recall on user-validated match pairs is captured in the existing `benchmark-embedding-recall.md` todo (separate work, not a Phase 8 gate; sets the top-k floor for tuning)
 
@@ -225,7 +223,7 @@ Plans:
 | 6 | Similarity & stack UI | SIM-02, STACK-03 | 3 | ✅ Complete (2026-04-25; 4/4 plans) |
 | 7 | Stacks in matching & pin similarity | STACK-04, STACK-05, NLS-06 | 4 | Pending |
 | 7.1 | Phase 7 remediation fixes | Remediation | 3 | ✅ Complete (2026-04-26; 3/3 plans) |
-| 8 | Embedding pre-filter & catalog cache pipeline | MATCH-02, MATCH-03, CACHE-01 | TBD | Planned (2026-04-27 — scope expanded) |
+| 8 | Embedding pre-filter & catalog cache pipeline | MATCH-02, CACHE-01 | TBD | Planned (2026-04-27 — scope expanded) |
 
 ---
 
