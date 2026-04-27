@@ -88,7 +88,9 @@ All user-visible strings for new or changed copy **must** be added to `apps/visu
 | Error state — job start failed | **Couldn’t start job:** {server message} (mirror `PROCESSING_EMBED_CATALOG_FAILED_PREFIX` pattern: problem + keep technical detail in same line for debugging). |
 | CLIP top-k field — label | **CLIP shortlist size (top-k)** — helper: default **50**; cosine shortlist before scoring; tune for recall vs cost. |
 | CLIP top-k — validation error (in-app) | If out of range: **Enter a value between 1 and 500.** (bounds per discretion; fixed in spec). |
-| Advanced section — catalog cache (reuse component title) | Reuse `ADVANCED_OPTIONS_TITLE` (**Advanced options**) for the disclosure wrapping individual stage triggers + legacy prepare. |
+| Advanced section — catalog cache (reuse component title) | Reuse `ADVANCED_OPTIONS_TITLE` (**Advanced options**) for the disclosure wrapping individual stage triggers + the pre-compress action. |
+| `prepare_catalog` action — label | **Pre-compress catalog images** (avoid "legacy" or "rebuild" — neutral and describes the work). |
+| `prepare_catalog` action — helper | **Decodes and compresses every catalog image (RAW → JPEG) so vision matching, description, and scoring jobs don't pay decode cost on the hot path. Optional — runs lazily on first use if skipped.** |
 | Destructive confirmation | **None** for Phase 8 — `not applicable` |
 
 **Alerts after enqueue:** Prefer the existing success alert pattern ("…started! Check Job Queue…") for composite chain; align wording with a single new string e.g. **Catalog cache build started! Check the Job Queue tab for progress.** so operators know it is a multi-stage job.
@@ -113,7 +115,7 @@ All user-visible strings for new or changed copy **must** be added to `apps/visu
    - `batch_embed_image` (existing behavior extended for IG; label clarifies catalog + Instagram when backend supports it),
    - `batch_stack_detect`,
    - `batch_catalog_similarity`,
-   - `prepare_catalog` (legacy — only here, not duplicated at top level).
+   - `prepare_catalog` — labeled **Pre-compress catalog images** in `strings.ts`. Helper copy: *"Decodes and compresses every catalog image (RAW → JPEG) so vision matching, description, and scoring jobs don't pay decode cost on the hot path. Optional — runs lazily on first use if skipped."* Lives only in Advanced; never duplicated at the top level.
 3. **Remove duplication:** Any standalone "Embed" block that competes with the chain must be **merged** into the Advanced section or de-emphasized so **one** primary story exists: chain first, surgery second.
 4. **Progress:** Reuse existing cache stats grid and progress bar; after chain job enqueue, show success line + **Open job queue** secondary action (same pattern as embed success).
 
