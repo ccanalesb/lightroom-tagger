@@ -27,6 +27,8 @@ from lightroom_tagger.core.database import (
     list_catalog_keys_for_text_embed_force,
     list_catalog_keys_needing_clip_embedding,
     list_catalog_keys_needing_text_embedding,
+    list_instagram_dump_keys_for_clip_embed_force,
+    list_instagram_dump_keys_needing_clip_embedding,
     resolve_filepath,
     upsert_image_clip_embedding,
     upsert_image_text_embedding,
@@ -2585,7 +2587,7 @@ def _handle_batch_text_embed_inner(runner, job_id: str, metadata: dict) -> None:
 
 
 def handle_batch_embed_image(runner, job_id: str, metadata: dict) -> None:
-    """Embed catalog images into ``image_clip_embeddings`` (sqlite-vec)."""
+    """Embed catalog and/or Instagram dump images into ``image_clip_embeddings`` (sqlite-vec)."""
     with cancel_scope.install(lambda: runner.is_cancelled(job_id)):
         _handle_batch_embed_image_inner(runner, job_id, metadata)
 
@@ -2593,11 +2595,15 @@ def handle_batch_embed_image(runner, job_id: str, metadata: dict) -> None:
 def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None:
     lib_db = None
     try:
-        image_type = metadata.get('image_type', 'catalog')
-        if image_type != 'catalog':
+        raw_scope = metadata.get('image_type', 'catalog')
+        image_type = str(raw_scope).strip() if raw_scope is not None else 'catalog'
+        if image_type not in ('catalog', 'catalog_and_instagram'):
             runner.fail_job(
                 job_id,
-                'batch_embed_image only supports catalog images',
+                (
+                    "batch_embed_image: image_type must be 'catalog' "
+                    "or 'catalog_and_instagram'"
+                ),
                 severity='warning',
             )
             return
@@ -2640,14 +2646,51 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
             'info',
             f'batch_embed_image filters: force={force}, months={months}, year={year}, min_rating={min_rating}',
         )
-        if force:
-            full_list = list_catalog_keys_for_clip_embed_force(
-                lib_db, months=months, year=year, min_rating=min_rating
-            )
+        if image_type == 'catalog':
+            if force:
+                full_list = list_catalog_keys_for_clip_embed_force(
+                    lib_db, months=months, year=year, min_rating=min_rating
+                )
+            else:
+                full_list = list_catalog_keys_needing_clip_embedding(
+                    lib_db, months=months, year=year, min_rating=min_rating
+                )
         else:
-            full_list = list_catalog_keys_needing_clip_embedding(
-                lib_db, months=months, year=year, min_rating=min_rating
-            )
+            if force:
+                cat_keys = list_catalog_keys_for_clip_embed_force(
+                    lib_db, months=months, year=year, min_rating=min_rating
+                )
+                ig_keys = list_instagram_dump_keys_for_clip_embed_force(
+                    lib_db, months=months, year=year, min_rating=min_rating
+                )
+            else:
+                cat_keys = list_catalog_keys_needing_clip_embedding(
+                    lib_db, months=months, year=year, min_rating=min_rating
+                )
+                ig_keys = list_instagram_dump_keys_needing_clip_embedding(
+                    lib_db, months=months, year=year, min_rating=min_rating
+                )
+            overlap = set(cat_keys) & set(ig_keys)
+            if overlap:
+                add_job_log(
+                    runner.db,
+                    job_id,
+                    'warning',
+                    (
+                        'batch_embed_image: catalog and Instagram dump share '
+                        f'{len(overlap)} key(s); embedding each once'
+                    ),
+                )
+            seen_keys: set[str] = set()
+            full_list = []
+            for k in cat_keys:
+                if k not in seen_keys:
+                    seen_keys.add(k)
+                    full_list.append(k)
+            for k in ig_keys:
+                if k not in seen_keys:
+                    seen_keys.add(k)
+                    full_list.append(k)
 
         total_at_start = len(full_list)
         fp = fingerprint_batch_embed_image(
@@ -2725,21 +2768,38 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 "SELECT filepath FROM images WHERE key = ?",
                 (image_key,),
             ).fetchone()
-            if not row:
-                return None, 'no_row', None
-            filepath = str(row['filepath'] or '').strip()
-            if not filepath:
-                return None, 'empty_path', None
-            resolved = resolve_filepath(filepath)
-            if not resolved or not os.path.isfile(resolved):
-                return None, 'unresolved_or_missing', (resolved or filepath)
-            cached = get_or_create_cached_image(lib_db, image_key, resolved)
-            if cached and os.path.isfile(cached):
-                return cached, None, None
-            # Compression/viewable conversion can fail for unsupported sources
-            # (e.g. videos/motion-photo sidecars). Treat as encode failure so
-            # preflight keeps focusing on true path accessibility problems.
-            return None, 'encode_failed', resolved
+            if row:
+                filepath = str(row['filepath'] or '').strip()
+                if not filepath:
+                    return None, 'empty_path', None
+                resolved = resolve_filepath(filepath)
+                if not resolved or not os.path.isfile(resolved):
+                    return None, 'unresolved_or_missing', (resolved or filepath)
+                cached = get_or_create_cached_image(lib_db, image_key, resolved)
+                if cached and os.path.isfile(cached):
+                    return cached, None, None
+                # Compression/viewable conversion can fail for unsupported sources
+                # (e.g. videos/motion-photo sidecars). Treat as encode failure so
+                # preflight keeps focusing on true path accessibility problems.
+                return None, 'encode_failed', resolved
+
+            row_dm = lib_db.execute(
+                "SELECT file_path FROM instagram_dump_media WHERE media_key = ?",
+                (image_key,),
+            ).fetchone()
+            if row_dm:
+                filepath = str(row_dm['file_path'] or '').strip()
+                if not filepath:
+                    return None, 'empty_path', None
+                resolved = resolve_filepath(filepath)
+                if not resolved or not os.path.isfile(resolved):
+                    return None, 'unresolved_or_missing', (resolved or filepath)
+                cached = get_or_create_cached_image(lib_db, image_key, resolved)
+                if cached and os.path.isfile(cached):
+                    return cached, None, None
+                return None, 'encode_failed', resolved
+
+            return None, 'no_row', None
 
         def maybe_log_skip_detail(reason: str, message: str) -> None:
             count = skip_detail_logged.get(reason, 0)
@@ -2892,7 +2952,7 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 skipped += 1
                 skip_reason_counts[skip_reason] += 1
                 reason_msg = {
-                    'no_row': 'catalog row missing',
+                    'no_row': 'catalog/dump row missing',
                     'empty_path': 'filepath is empty',
                     'unresolved_or_missing': 'resolved path missing or inaccessible',
                     'encode_failed': 'compression/viewable image unavailable',

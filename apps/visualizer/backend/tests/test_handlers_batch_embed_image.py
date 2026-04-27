@@ -168,6 +168,65 @@ def test_batch_embed_image_writes_clip_row(
 
 @patch("jobs.handlers.add_job_log")
 @patch("jobs.handlers.load_config")
+def test_batch_embed_image_catalog_and_instagram_embeds_instagram_dump_row(
+    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+) -> None:
+    from jobs.handlers import handle_batch_embed_image
+
+    ig_jpg = tmp_path / "ig.jpg"
+    _write_min_jpg(ig_jpg)
+
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    store_instagram_dump_media(
+        conn,
+        {
+            "media_key": "ig_dump_mk",
+            "file_path": str(ig_jpg),
+            "filename": "ig.jpg",
+            "date_folder": "202604",
+        },
+    )
+    conn.close()
+
+    mock_enc = MagicMock(
+        return_value=np.ones((1, 512), dtype=np.float32)
+    )
+    monkeypatch.setattr(job_handlers, "encode_images", mock_enc)
+    monkeypatch.setattr(
+        job_handlers,
+        "get_or_create_cached_image",
+        lambda _db, _k, path: path,
+    )
+
+    monkeypatch.setenv("LIBRARY_DB", str(db_path))
+    mock_load_config.return_value = MagicMock(db_path=str(db_path))
+
+    runner = _make_runner()
+    handle_batch_embed_image(
+        runner,
+        "job-cat-ig",
+        {"image_type": "catalog_and_instagram"},
+    )
+
+    runner.complete_job.assert_called_once()
+    result = runner.complete_job.call_args[0][1]
+    assert result["embedded"] == 1
+    assert result["total"] == 1
+
+    verify = init_database(str(db_path))
+    try:
+        row = verify.execute(
+            "SELECT 1 FROM image_clip_embeddings WHERE image_key = ?",
+            ("ig_dump_mk",),
+        ).fetchone()
+        assert row is not None
+    finally:
+        verify.close()
+
+
+@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.load_config")
 def test_batch_embed_image_incremental_skips_existing(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
