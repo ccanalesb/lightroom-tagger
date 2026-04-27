@@ -24,7 +24,7 @@ progress:
 | Active milestone | v3.0 Intelligent Discovery |
 | Phase | Phase 7.1 — phase-7-remediation-fixes |
 | Status | **Complete** |
-| Last activity | 2026-04-27 — Completed quick task 260427-d5m to improve embed-job log observability (job log summaries + checkpoint compaction + inspector fix). |
+| Last activity | 2026-04-27 — Completed quick task 260427-f75 to make catalog similarity job-driven and clean up stack/similarity UI gaps. |
 
 ## Project Reference
 
@@ -67,6 +67,7 @@ Items acknowledged and deferred at milestone close on 2026-04-23:
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260427-d5m | based on your finding for the gaps on 7.1 | 2026-04-27 | 89038ad | [260427-d5m-based-on-your-finding-for-the-gaps-on-7-](./quick/260427-d5m-based-on-your-finding-for-the-gaps-on-7-/) |
+| 260427-f75 | Fix job-driven catalog similarity UX gaps | 2026-04-27 | b6e8885 | [260427-f75-fix-job-driven-catalog-similarity-ux-gap](./quick/260427-f75-fix-job-driven-catalog-similarity-ux-gap/) |
 
 ## Traceability
 
