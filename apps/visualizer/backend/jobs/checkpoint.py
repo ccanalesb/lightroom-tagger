@@ -107,6 +107,15 @@ def fingerprint_batch_text_embed(
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _normalized_batch_embed_image_type(metadata: dict[str, Any]) -> str:
+    """Canonical embed scope for resume identity: ``catalog`` vs ``catalog_and_instagram``."""
+    raw = metadata.get("image_type", "catalog")
+    s = str(raw).strip() if raw is not None else "catalog"
+    if s == "catalog_and_instagram":
+        return "catalog_and_instagram"
+    return "catalog"
+
+
 def fingerprint_batch_embed_image(
     metadata: dict[str, Any],
     ordered_keys: list[str],
@@ -132,7 +141,7 @@ def fingerprint_batch_embed_image(
         "embedding_dim": CLIP_EMBED_DIM,
         "embedding_model_id": CLIP_EMBED_MODEL_ID,
         "force": bool(metadata.get("force", False)),
-        "image_type": str(metadata.get("image_type", "catalog")),
+        "image_type": _normalized_batch_embed_image_type(metadata),
         "min_rating": min_rating,
         "pairs": pairs,
         "resolved_months": resolved_months,

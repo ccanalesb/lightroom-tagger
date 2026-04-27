@@ -34,6 +34,19 @@ def _make_runner() -> MagicMock:
     return runner
 
 
+def test_fingerprint_batch_embed_image_differs_catalog_vs_catalog_and_instagram() -> None:
+    keys = ["2024-01-01_a.jpg", "2024-01-02_b.jpg"]
+    meta_cat = {"image_type": "catalog", "force": False}
+    meta_union = {"image_type": "catalog_and_instagram", "force": False}
+    fp_cat = fingerprint_batch_embed_image(
+        meta_cat, keys, resolved_months=None, resolved_year=None
+    )
+    fp_union = fingerprint_batch_embed_image(
+        meta_union, keys, resolved_months=None, resolved_year=None
+    )
+    assert fp_cat != fp_union
+
+
 def test_instagram_dump_keys_needing_clip_embedding_excludes_existing_vec(
     tmp_path,
 ) -> None:
