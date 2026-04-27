@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
 status: Executing Phase 08
-last_updated: "2026-04-27T22:35:00.000Z"
+last_updated: "2026-04-27T21:20:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 46
-  completed_plans: 44
-  percent: 93
+  completed_plans: 45
+  percent: 98
 ---
 
 # Planning state
@@ -23,8 +23,8 @@ progress:
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
 | Phase | Phase 8 — embedding-prefilter-and-cache-pipeline |
-| Status | **Executing Phase 08 — plan 08-04 complete** |
-| Last activity | 2026-04-27 — **08-04 executed:** composite job `catalog_cache_build` chains `_handle_batch_embed_image_inner` → `_handle_batch_stack_detect_inner` → `_handle_catalog_similarity_inner` in-process with `_CatalogCacheStageRunner`, D-08 `[catalog-cache-build]` banners, warn-and-proceed on embedding backlog, `_catalog_cache_chain` suppresses standalone checkpoints under composite job id; `fingerprint_catalog_cache_build`; `JOB_HANDLERS` + `JOB_TYPES_REQUIRING_CATALOG`. Artifacts: `08-04-SUMMARY.md`. Commits: `3674220`, `34090a1` + docs. Next: **08-05** MatchingTab (`clip_top_k`, remove discovery card). Earlier context: Phase 8 waves 08-05..08-06 pending; MATCH-02/CACHE-01 coverage per roadmap. |
+| Status | **Executing Phase 08 — plan 08-05 complete** |
+| Last activity | 2026-04-27 — **08-05 executed:** MatchingTab adds CLIP shortlist size (`clip_top_k`, default 50, bounds 1–500 in metadata), removes Catalog Discovery Jobs card and preview, adds link to `/processing?tab=cache`; strings centralized; Input label/`htmlFor` wiring; vitest updates. Artifacts: `08-05-SUMMARY.md`. Commits: `0d8d11f`, `caa4ea5`. Next: **08-06** CatalogCacheTab (`catalog_cache_build` CTA + Advanced). Earlier context: Phase 8 wave 08-06 pending; CACHE-01 UI completion awaits 08-06. |
 
 ## Project Reference
 
