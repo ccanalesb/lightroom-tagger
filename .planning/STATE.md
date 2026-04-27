@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
 status: Executing Phase 08
-last_updated: "2026-04-27T21:30:00.000Z"
+last_updated: "2026-04-27T23:59:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 46
-  completed_plans: 41
-  percent: 89
+  completed_plans: 42
+  percent: 91
 ---
 
 # Planning state
@@ -23,8 +23,8 @@ progress:
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
 | Phase | Phase 8 — embedding-prefilter-and-cache-pipeline |
-| Status | **Executing Phase 08 — plan 08-01 complete** |
-| Last activity | 2026-04-27 — **08-01 executed:** `shortlist_catalog_candidates_by_clip` + `match_dump_media` D-03 gating (`clip_top_k` default 50), D-03 regression `test_shortlist_gates_score_candidates_with_vision`. Artifacts: `08-01-SUMMARY.md`. Commits: `396a20a`, `fbc0250`, `ba72f02` + docs. Next: **08-02** vision_match plumbing. Earlier context: Phase 8 planning complete (6 waves 08-01..08-06); MATCH-02/CACHE-01 coverage per original plan map. |
+| Status | **Executing Phase 08 — plan 08-02 complete** |
+| Last activity | 2026-04-27 — **08-02 executed:** `handle_vision_match` clamps `clip_top_k` (1..500), fingerprint omits default `clip_top_k`, `match_dump_media` cumulative `clip_prefilter_*` / `vision_judgments_total`, D-07 `vision-match-prefilter-summary` throttled logs (`_VISION_MATCH_PREFILTER_SUMMARY_EVERY=40`). Artifacts: `08-02-SUMMARY.md`. Commits: `3355292`, `bbf377b` + docs. Next: **08-03** Instagram embed extension. Earlier context: Phase 8 planning complete (6 waves 08-01..08-06); MATCH-02/CACHE-01 coverage per original plan map. |
 
 ## Project Reference
 
