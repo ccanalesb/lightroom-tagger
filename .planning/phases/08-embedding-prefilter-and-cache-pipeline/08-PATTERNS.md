@@ -26,7 +26,7 @@
 | `apps/visualizer/backend/tests/test_handlers_single_match.py` | Wiring, bounds, summary logs, fingerprint interaction | Existing `add_job_log` capture | Extend with `-k` selectors per validation map |
 | `apps/visualizer/backend/tests/test_handlers_batch_embed_image.py` | Instagram / scope in `batch_embed_image` | Existing embed handler tests | Fingerprint + checkpoint when IG toggles |
 | `apps/visualizer/backend/tests/test_handlers_catalog_cache_build.py` | Composite chain order + cancel + stage logs | `test_handlers_batch_embed_image.py` style | New file per `08-VALIDATION.md` |
-| `apps/visualizer/backend/tests/test_checkpoint_fingerprints.py` | `fingerprint_vision_match` includes `clip_top_k` | Other fingerprint tests if present | New or extend per planner |
+| `apps/visualizer/backend/tests/test_handlers_single_match.py` (fingerprint cases) | `fingerprint_vision_match` includes `clip_top_k` | Existing fingerprint helper tests in this file | Extend with `-k fingerprint` cases per planner; do **not** create a separate `test_checkpoint_fingerprints.py` |
 | `apps/visualizer/frontend/src/components/processing/__tests__/MatchingTab.test.tsx` | No stack/similarity CTAs; `clip_top_k` metadata | Existing | Per `08-VALIDATION.md` |
 | `apps/visualizer/frontend/src/components/processing/__tests__/CatalogCacheTab.test.tsx` | Primary CTA + `AdvancedOptions` reuse | Existing | Per `08-VALIDATION.md` |
 
