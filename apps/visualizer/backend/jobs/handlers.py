@@ -1,5 +1,6 @@
 """Job type handlers for vision matching and catalog operations."""
 import os
+import random
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -16,9 +17,11 @@ from lightroom_tagger.core.clip_embedding_service import (
     numpy_to_clip_vec_blob,
 )
 from lightroom_tagger.core.database import (
+    VISION_CACHE_OVERSIZED_SENTINEL,
     build_description_search_document,
     catalog_key_is_primary_grid_row,
     clear_catalog_similarity_results,
+    get_vision_cached_image,
     insert_catalog_similarity_group,
     init_database,
     library_write,
@@ -65,6 +68,11 @@ _EMBED_SUMMARY_LOG_EVERY = 250
 _CATALOG_SIMILARITY_SUMMARY_EVERY = 500
 _STACK_DETECT_SUMMARY_EVERY = 500
 _VISION_MATCH_PREFILTER_SUMMARY_EVERY = 40
+
+# Test-only seed override for the embed preflight sampler. Setting this from a
+# test gives deterministic random.sample() output without exposing the seed in
+# production behaviour. ``None`` (default) uses real entropy.
+_PREFLIGHT_RNG_SEED: int | None = None
 
 
 def _catalog_cache_stage_mapped_progress(stage_index: int, inner_pct: int) -> int:
@@ -2836,7 +2844,30 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
         }
         summary_marker = 0
 
+        def _try_vision_cache(image_key: str) -> str | None:
+            """Return the cached compressed JPEG path when it exists on disk.
+
+            Cache-first short-circuit: ``prepare_catalog`` may already have
+            decoded + JPEG-compressed this image, in which case the original
+            RAW/JPG can be missing or unmounted and we still have everything
+            embedding needs. Skips the OVERSIZED sentinel and any row whose
+            ``compressed_path`` no longer exists on disk (stale cache).
+            """
+            cached_row = get_vision_cached_image(lib_db, image_key)
+            if not cached_row:
+                return None
+            comp = str(cached_row.get('compressed_path') or '').strip()
+            if not comp or comp == VISION_CACHE_OVERSIZED_SENTINEL:
+                return None
+            if not os.path.isfile(comp):
+                return None
+            return comp
+
         def classify_path(image_key: str) -> tuple[str | None, str | None, str | None]:
+            cached_now = _try_vision_cache(image_key)
+            if cached_now is not None:
+                return cached_now, None, None
+
             row = lib_db.execute(
                 "SELECT filepath FROM images WHERE key = ?",
                 (image_key,),
@@ -2921,7 +2952,17 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 'empty_path': [],
                 'unresolved_or_missing': [],
             }
-            for sample_key in remaining[:sample_size]:
+            # Random sample so a sticky inaccessible subdirectory at the head
+            # of the list (e.g. motion-photo lrdata sidecars) doesn't poison
+            # the preflight verdict for an otherwise healthy catalog.
+            # ``random.Random(None)`` seeds from entropy; tests inject an int.
+            preflight_rng = random.Random(_PREFLIGHT_RNG_SEED)
+            sample_keys = (
+                preflight_rng.sample(remaining, sample_size)
+                if len(remaining) > sample_size
+                else list(remaining)
+            )
+            for sample_key in sample_keys:
                 _, sample_reason, sample_detail = classify_path(sample_key)
                 if sample_reason in sample_failures:
                     sample_failures[sample_reason] += 1
@@ -2935,21 +2976,36 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
             )
             fail_ratio = sample_failed_count / sample_size
             if fail_ratio >= _EMBED_PREFLIGHT_FAIL_RATIO:
-                runner.fail_job(
-                    job_id,
-                    (
-                        f'Embed preflight failed: {sample_failed_count}/{sample_size} sampled images '
-                        'have missing or inaccessible paths '
-                        f"(no_row={sample_failures['no_row']}, empty_path={sample_failures['empty_path']}, "
-                        f"unresolved_or_missing={sample_failures['unresolved_or_missing']}). "
-                        f"Examples: no_row={sample_examples['no_row']}, "
-                        f"empty_path={sample_examples['empty_path']}, "
-                        f"unresolved_or_missing={sample_examples['unresolved_or_missing']}. "
-                        'Verify catalog filepath values and mounted storage accessibility before retrying.'
-                    ),
-                    severity='critical',
+                preflight_msg = (
+                    f'Embed preflight: {sample_failed_count}/{sample_size} sampled images '
+                    'have missing or inaccessible paths '
+                    f"(no_row={sample_failures['no_row']}, empty_path={sample_failures['empty_path']}, "
+                    f"unresolved_or_missing={sample_failures['unresolved_or_missing']}). "
+                    f"Examples: no_row={sample_examples['no_row']}, "
+                    f"empty_path={sample_examples['empty_path']}, "
+                    f"unresolved_or_missing={sample_examples['unresolved_or_missing']}."
                 )
-                return
+                # Soft preflight: per-file processing already skips missing
+                # files cleanly under ``unresolved_or_missing``, so a high
+                # failure ratio is no longer a reason to abort the whole job.
+                # Hard-fail only when *every* sampled image was missing AND
+                # we're not part of a chain — that pattern usually means an
+                # unmounted NAS where no work can succeed.
+                if fail_ratio >= 1.0 and not chain_mode:
+                    runner.fail_job(
+                        job_id,
+                        f'{preflight_msg} '
+                        'All sampled images are inaccessible — verify catalog filepath values '
+                        'and mounted storage before retrying.',
+                        severity='critical',
+                    )
+                    return
+                add_job_log(
+                    runner.db,
+                    job_id,
+                    'warning',
+                    f'{preflight_msg} Continuing — missing files will be skipped per-image.',
+                )
 
         def persist_progress() -> bool:
             if len(processed_pairs) > _CHECKPOINT_MAX_ENTRIES:

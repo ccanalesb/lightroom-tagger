@@ -18,6 +18,7 @@ from lightroom_tagger.core.database import (
     list_instagram_dump_keys_needing_clip_embedding,
     store_image,
     store_instagram_dump_media,
+    store_vision_cached_image,
     upsert_image_clip_embedding,
 )
 
@@ -646,8 +647,9 @@ def test_batch_embed_image_preflight_fails_fast_when_paths_inaccessible(
 
     runner.fail_job.assert_called_once()
     fail_message = str(runner.fail_job.call_args[0][1])
-    assert "Embed preflight failed" in fail_message
-    assert "Verify catalog filepath values and mounted storage accessibility" in fail_message
+    assert "Embed preflight" in fail_message
+    assert "All sampled images are inaccessible" in fail_message
+    assert "verify catalog filepath values" in fail_message
     runner.complete_job.assert_not_called()
     mock_enc.assert_not_called()
 
@@ -807,3 +809,178 @@ def test_batch_embed_image_suppresses_excessive_skip_detail_logs(
 
     assert len(warnings) <= job_handlers._EMBED_SKIP_DETAIL_LOG_LIMIT
     assert any("additional no_row skip logs suppressed" in msg for msg in info)
+
+
+@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.load_config")
+def test_batch_embed_image_uses_vision_cache_when_original_missing(
+    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+) -> None:
+    """Cache-first lookup: a usable cached JPEG is enough — original may be gone.
+
+    Reproduces the motion-photo lrdata case: ``prepare_catalog`` already
+    cached a compressed JPEG for the image, then Lightroom cleaned up the
+    original. Embed must succeed off the cache without faulting.
+    """
+    from jobs.handlers import handle_batch_embed_image
+
+    cached_jpg = tmp_path / "cached.jpg"
+    _write_min_jpg(cached_jpg)
+    missing_original = tmp_path / "missing" / "original.jpg"
+
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    catalog_key = store_image(
+        conn,
+        {
+            "date_taken": "2024-05-09",
+            "filename": "original.jpg",
+            "filepath": str(missing_original),
+            "rating": 1,
+        },
+    )
+    with library_write(conn):
+        store_vision_cached_image(conn, catalog_key, str(cached_jpg), None, 12345.0)
+    conn.close()
+
+    captured_paths: list[list[str]] = []
+
+    def _encode(paths, batch_size=8):
+        captured_paths.append(list(paths))
+        return np.ones((len(paths), 512), dtype=np.float32)
+
+    monkeypatch.setattr(job_handlers, "encode_images", _encode)
+    monkeypatch.setenv("LIBRARY_DB", str(db_path))
+    mock_load_config.return_value = MagicMock(db_path=str(db_path))
+
+    runner = _make_runner()
+    handle_batch_embed_image(runner, "job-cache-first", {"image_type": "catalog"})
+
+    runner.fail_job.assert_not_called()
+    runner.complete_job.assert_called_once()
+    result = runner.complete_job.call_args[0][1]
+    assert result["embedded"] == 1
+    assert result["skipped"] == 0
+    assert captured_paths == [[str(cached_jpg)]]
+
+
+@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.load_config")
+def test_batch_embed_image_preflight_warns_and_continues_on_partial_miss(
+    mock_load_config, mock_add_log, tmp_path, monkeypatch
+) -> None:
+    """Soft preflight: 70-99% missing logs a warning and proceeds.
+
+    The per-file loop counts each missing file under
+    ``unresolved_or_missing`` and the job completes cleanly with whatever
+    embeddings did succeed.
+    """
+    from jobs.handlers import handle_batch_embed_image
+
+    good_jpg = tmp_path / "good.jpg"
+    _write_min_jpg(good_jpg)
+
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    for i in range(7):
+        store_image(
+            conn,
+            {
+                "date_taken": f"2024-06-{i + 1:02d}",
+                "filename": f"missing-{i}.jpg",
+                "filepath": f"/definitely/missing-{i}.jpg",
+                "rating": 1,
+            },
+        )
+    store_image(
+        conn,
+        {
+            "date_taken": "2024-06-09",
+            "filename": "good.jpg",
+            "filepath": str(good_jpg),
+            "rating": 1,
+        },
+    )
+    conn.close()
+
+    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 8)
+    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_FAIL_RATIO", 0.5)
+    monkeypatch.setattr(job_handlers, "_PREFLIGHT_RNG_SEED", 1234)
+    monkeypatch.setattr(
+        job_handlers,
+        "encode_images",
+        lambda paths, batch_size=8: np.ones((len(paths), 512), dtype=np.float32),
+    )
+    monkeypatch.setenv("LIBRARY_DB", str(db_path))
+    mock_load_config.return_value = MagicMock(db_path=str(db_path))
+
+    runner = _make_runner()
+    handle_batch_embed_image(runner, "job-partial-miss", {"image_type": "catalog"})
+
+    runner.fail_job.assert_not_called()
+    runner.complete_job.assert_called_once()
+    result = runner.complete_job.call_args[0][1]
+    assert result["embedded"] == 1
+    assert result["skipped"] == 7
+    assert result["skip_reason_counts"]["unresolved_or_missing"] == 7
+    warnings = [
+        str(c.args[3])
+        for c in mock_add_log.call_args_list
+        if len(c.args) > 3 and c.args[2] == "warning"
+    ]
+    assert any(
+        "Embed preflight" in msg and "Continuing" in msg for msg in warnings
+    ), warnings
+
+
+@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.load_config")
+def test_batch_embed_image_preflight_does_not_abort_in_chain_mode(
+    mock_load_config, mock_add_log, tmp_path, monkeypatch
+) -> None:
+    """Even at 100% sample-failure, chain_mode never aborts — chain proceeds
+    to stack/similarity steps with whatever embeddings already exist."""
+    from jobs.handlers import handle_batch_embed_image
+
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    for i in range(4):
+        store_image(
+            conn,
+            {
+                "date_taken": f"2024-07-{i + 1:02d}",
+                "filename": f"missing-{i}.jpg",
+                "filepath": f"/definitely/missing-{i}.jpg",
+                "rating": 1,
+            },
+        )
+    conn.close()
+
+    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 4)
+    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_FAIL_RATIO", 0.5)
+    monkeypatch.setattr(
+        job_handlers,
+        "encode_images",
+        lambda paths, batch_size=8: np.ones((len(paths), 512), dtype=np.float32),
+    )
+    monkeypatch.setenv("LIBRARY_DB", str(db_path))
+    mock_load_config.return_value = MagicMock(db_path=str(db_path))
+
+    runner = _make_runner()
+    handle_batch_embed_image(
+        runner,
+        "job-chain-allmiss",
+        {"image_type": "catalog", "_catalog_cache_chain": True},
+    )
+
+    runner.fail_job.assert_not_called()
+    runner.complete_job.assert_called_once()
+    result = runner.complete_job.call_args[0][1]
+    assert result["embedded"] == 0
+    assert result["skipped"] == 4
+    warnings = [
+        str(c.args[3])
+        for c in mock_add_log.call_args_list
+        if len(c.args) > 3 and c.args[2] == "warning"
+    ]
+    assert any("Embed preflight" in msg for msg in warnings), warnings
