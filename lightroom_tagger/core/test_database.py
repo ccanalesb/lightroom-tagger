@@ -22,6 +22,7 @@ from lightroom_tagger.core.database import (
     init_image_descriptions_table,
     init_vision_comparisons_table,
     library_write,
+    list_instagram_dump_keys_needing_clip_embedding,
     migrate_unified_image_keys,
     query_catalog_images,
     store_image,
@@ -556,6 +557,40 @@ class TestInstagramDumpMedia(unittest.TestCase):
         self.assertEqual(stored['media_key'], '202603/17940060624158613')
         self.assertEqual(stored['file_path'], '/home/cristian/instagram-dump/media/posts/202603/17940060624158613.jpg')
         self.assertEqual(stored['processed'], False)
+
+    def test_list_instagram_dump_keys_needing_clip_embedding_anti_join(self):
+        """SQL anti-join returns only missing embedding keys in date_folder/media_key order (WR-08-02)."""
+        from lightroom_tagger.core.database import (
+            init_instagram_dump_table,
+            store_instagram_dump_media,
+        )
+
+        init_instagram_dump_table(self.db)
+        row = self.db.execute("PRAGMA user_version").fetchone()
+        self.assertGreaterEqual(int(row["user_version"]), 5)
+
+        base = {'file_path': '/p/a.jpg', 'filename': 'a.jpg', 'date_folder': '202603'}
+        store_instagram_dump_media(self.db, {**base, 'media_key': '202603/z'})
+        store_instagram_dump_media(self.db, {**base, 'media_key': '202603/m'})
+        store_instagram_dump_media(self.db, {**base, 'media_key': '202603/a'})
+
+        blob = sqlite_vec.serialize_float32([0.0] * 512)
+        with library_write(self.db):
+            upsert_image_clip_embedding(self.db, '202603/m', blob)
+
+        need = list_instagram_dump_keys_needing_clip_embedding(
+            self.db, months=None, year=None, min_rating=None
+        )
+        self.assertEqual(need, ['202603/z', '202603/a'])
+
+        with library_write(self.db):
+            upsert_image_clip_embedding(self.db, '202603/z', blob)
+            upsert_image_clip_embedding(self.db, '202603/a', blob)
+
+        need_empty = list_instagram_dump_keys_needing_clip_embedding(
+            self.db, months=None, year=None, min_rating=None
+        )
+        self.assertEqual(need_empty, [])
 
     def test_get_unprocessed_dump_media(self):
         """Test getting unprocessed media."""

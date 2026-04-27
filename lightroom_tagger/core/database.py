@@ -3173,12 +3173,12 @@ def list_catalog_keys_for_clip_embed_force(
     return _sort_catalog_key_rows_newest_first(rows)
 
 
-def _list_instagram_dump_clip_embed_sql_params(
+def _instagram_dump_clip_embed_filters(
     *,
     months: int | None,
     year: str | None,
-) -> tuple[str, tuple]:
-    """WHERE clause fragments for Instagram dump rows eligible for CLIP embedding.
+) -> tuple[list[str], list]:
+    """Base ``WHERE`` fragments (alias ``m``) for Instagram dump CLIP-eligible rows.
 
     Mirrors the date window semantics of :func:`_list_catalog_keys_clip_embed_sql_params`
     (``months`` rolling window + optional calendar ``year``). Dump rows have no
@@ -3199,6 +3199,16 @@ def _list_instagram_dump_clip_embed_sql_params(
     if year is not None:
         parts.append("m.date_folder LIKE ?")
         params.append(f"{year}%")
+    return parts, params
+
+
+def _list_instagram_dump_clip_embed_sql_params(
+    *,
+    months: int | None,
+    year: str | None,
+) -> tuple[str, tuple]:
+    """WHERE clause fragments for Instagram dump rows eligible for CLIP embedding."""
+    parts, params_list = _instagram_dump_clip_embed_filters(months=months, year=year)
     where_sql = " AND ".join(parts)
     sql = f"""
         SELECT m.media_key AS media_key, m.date_folder AS date_folder
@@ -3206,7 +3216,7 @@ def _list_instagram_dump_clip_embed_sql_params(
         WHERE {where_sql}
         ORDER BY m.date_folder DESC, m.media_key DESC
     """
-    return sql, tuple(params)
+    return sql, tuple(params_list)
 
 
 def list_instagram_dump_keys_needing_clip_embedding(
@@ -3225,18 +3235,18 @@ def list_instagram_dump_keys_needing_clip_embedding(
     dump media has no catalog rating column.
     """
     _ = min_rating
-    sql, params = _list_instagram_dump_clip_embed_sql_params(months=months, year=year)
-    rows = conn.execute(sql, params).fetchall()
-    embedded_keys = {
-        str(r["image_key"])
-        for r in conn.execute("SELECT image_key FROM image_clip_embeddings").fetchall()
-    }
-    out: list[str] = []
-    for row in rows:
-        mk = str(row["media_key"])
-        if mk not in embedded_keys:
-            out.append(mk)
-    return out
+    parts, params_list = _instagram_dump_clip_embed_filters(months=months, year=year)
+    parts_with_null = [*parts, "ce.image_key IS NULL"]
+    where_sql = " AND ".join(parts_with_null)
+    sql = f"""
+        SELECT m.media_key AS media_key
+        FROM instagram_dump_media m
+        LEFT JOIN image_clip_embeddings ce ON ce.image_key = m.media_key
+        WHERE {where_sql}
+        ORDER BY m.date_folder DESC, m.media_key DESC
+    """
+    rows = conn.execute(sql, tuple(params_list)).fetchall()
+    return [str(row["media_key"]) for row in rows]
 
 
 def list_instagram_dump_keys_for_clip_embed_force(
