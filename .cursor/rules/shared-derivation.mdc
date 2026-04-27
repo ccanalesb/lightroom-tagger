@@ -1,0 +1,58 @@
+---
+description: Derivations on shared frontend types belong in shared components, not in consumers. Lift before merge.
+globs:
+  - "apps/visualizer/frontend/src/components/**/*.tsx"
+  - "apps/visualizer/frontend/src/components/**/*.ts"
+alwaysApply: false
+---
+
+# Shared Derivation — Lift Don't Duplicate
+
+When you derive a UI rule from fields on a **shared type** (e.g., `ImageView`, `JobRow`, `MatchView`), the derivation must live in the **shared component** that renders that type, not in each consumer.
+
+## Concrete heuristic
+
+If a derivation reads a field that is shared across surfaces — e.g., `image.stack_id`, `image.is_stack_representative`, `image.stack_member_count` — and produces a piece of UI (badge, overlay, accent), put the rendering in the shared component and let consumers opt out via props if they truly need to.
+
+## Pattern (correct)
+
+```5:35:apps/visualizer/frontend/src/components/image-view/ImageTile.tsx
+function deriveStackOverlay(image: ImageView): ReactNode | null {
+  const count = image.stack_member_count ?? 0;
+  if (!image.is_stack_representative || count <= 1) return null;
+  return <Badge variant="muted">{formatStackCountBadge(count)}</Badge>;
+}
+```
+
+Consumers (CatalogTab, BestPhotosGrid, UnpostedCatalogPanel) just render `<ImageTile image={…} />` — no per-grid derivation, no wrapper components.
+
+## Anti-pattern (caught the hard way in phase 7.1)
+
+```tsx
+// CatalogImageWithStack.tsx
+const showBadge = image.is_stack_representative && (image.stack_member_count ?? 0) > 1;
+
+// BestPhotoTileWithStack.tsx — DUPLICATE
+const isRep = image.is_stack_representative;
+const count = image.stack_member_count ?? 0;
+const showStackBadge = isRep && count > 1;
+```
+
+Two consumers, identical derivation, two places to update when the rule changes (or to forget to update — which is what happened).
+
+## Workflow
+
+When you find yourself writing such a derivation in a consumer:
+
+1. **Stop.** Open the shared renderer for the type (e.g., `ImageTile.tsx`).
+2. Check if the derivation belongs there. If yes, lift it.
+3. Run the callsite sweep (see `dry-callsite-sweep.mdc`) to find any other consumer doing the same thing — delete the duplication.
+4. Update tests on the shared component to cover the new derivation; consumer tests should only assert delegation, not re-test the derivation.
+
+## Caller-supplied overlays
+
+Consumers can still add badges via `overlayBadges` props. The shared component must merge caller overlays with auto-derived ones; never overwrite.
+
+## Why this exists
+
+The DRY violation in phase 7.1 cost a full session of fix work. The shared `ImageTile` was the obvious home for stack-rep badge logic but two wrappers had quietly grown around it.

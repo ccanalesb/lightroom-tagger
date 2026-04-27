@@ -6,6 +6,62 @@
         "command": ".cursor/hooks/safe-kill-port.sh",
         "matcher": "kill|lsof.*xargs.*kill|pkill",
         "failClosed": true
+      },
+      {
+        "command": ".cursor/hooks/enforce-browser-harness.sh",
+        "matcher": "playwright",
+        "failClosed": true
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": ".cursor/hooks/ui-edit-flag.sh",
+        "matcher": "Write|StrReplace|EditNotebook|TabWrite",
+        "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/shared-edit-flag.sh",
+        "matcher": "Write|StrReplace|EditNotebook|TabWrite",
+        "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/job-handler-flag.sh",
+        "matcher": "Write|StrReplace|EditNotebook|TabWrite",
+        "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/job-handler-clear.sh",
+        "matcher": "Write|StrReplace|EditNotebook|TabWrite",
+        "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/phase-walkthrough-flag.sh",
+        "matcher": "Write|StrReplace|EditNotebook|TabWrite",
+        "failClosed": false
+      }
+    ],
+    "afterShellExecution": [
+      {
+        "command": ".cursor/hooks/ui-validation-clear.sh",
+        "matcher": "browser-harness",
+        "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/shared-sweep-clear.sh",
+        "matcher": "rg|grep|ripgrep|git",
+        "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/phase-walkthrough-clear.sh",
+        "matcher": "browser-harness",
+        "failClosed": false
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": ".cursor/hooks/lr-enforce-on-submit.sh",
+        "matcher": "UserPromptSubmit",
+        "failClosed": false
       }
     ]
   }

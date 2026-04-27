@@ -98,23 +98,63 @@ Must exit 0. No exceptions.
 
 If a new method is added to `services/api.ts`, verify the backend endpoint it calls is reachable and returns valid JSON (use curl, see above).
 
+## Job lifecycle invariants (when phase touches `apps/visualizer/backend/jobs/`)
+
+Beyond API checks, exercise the affected job end-to-end and assert:
+
+1. **`started_at` is set once.** Confirm `update_job_status` uses `COALESCE(started_at, ?)` and that progress updates do not overwrite it. SQL spot-check:
+   ```bash
+   sqlite3 .cache/visualizer.db \
+     "SELECT id, started_at, updated_at FROM jobs WHERE id='<job-id>'"
+   ```
+2. **Log narrative is complete.** The handler must produce a start line with input snapshot, throttled progress, bucketed skip counters, and a final outcome line. See `job-log-contract.mdc`. Spot-check:
+   ```bash
+   sqlite3 .cache/visualizer.db \
+     "SELECT level, message FROM job_logs WHERE job_id='<job-id>' ORDER BY created_at"
+   ```
+   The output must read as a coherent timeline without consulting the code.
+3. **No silent skips.** If `total_items > processed_items`, every gap must be accounted for in a named skip bucket logged in the final summary.
+
+## UI walkthrough (when phase touches `apps/visualizer/frontend/`)
+
+Live validation is not just curl + tsc. Capture a fresh-page user-journey screenshot:
+
+```bash
+browser-harness <<'PY'
+new_tab("http://localhost:5173/<most-changed-route>")
+# perform the user task with no prior knowledge of where the button is
+# capture /tmp/phase-N-walkthrough.png via cdp Page.captureScreenshot
+PY
+```
+
+If the user task requires opening the docs to find the button, the phase fails on discoverability. See `phase-exit-walkthrough.mdc`.
+
 ## Failure handling
 
 If any live check fails:
 
-1. **Do not mark the phase `passed`** — set status to `human_needed` or `gaps_found`
-2. Diagnose: check backend logs (`tail /tmp/backend.log`), verify DB state, inspect the prompt/filter logic
-3. Fix the issue, re-run the check, then proceed
-4. Document the failure and fix in the phase's VERIFICATION.md
+1. **Do not mark the phase `passed`** — set status to `human_needed` or `gaps_found`. Listing items as `partial` while still marking overall status `passed` is forbidden — `passed` requires every item to be `pass` or `n/a`.
+2. Diagnose: check backend logs (`tail /tmp/backend.log`), verify DB state, inspect the prompt/filter logic.
+3. Fix the issue inline, re-run the check, then proceed.
+4. Document the failure and the fix in the phase's `VERIFICATION.md` — including the screenshot path for any UI walkthrough.
 
 ## What this rule replaces / supplements
 
-The existing `verify_phase_goal` step reads plan files and summaries. This rule adds the requirement that **the system actually works at runtime**, not just that the code was written. Both checks are required — code review + live validation.
+The existing `verify_phase_goal` step reads plan files and summaries. This rule adds the requirement that **the system actually works at runtime as the user will use it**, not just that the code was written. All four checks are required: code review, API live validation, job lifecycle assertion (when applicable), UI walkthrough screenshot (when applicable).
+
+## Hooks that enforce this rule
+
+- `phase-walkthrough-flag.sh` + `phase-walkthrough-clear.sh` — block submit when `*-VERIFICATION.md` becomes `status: passed` until a browser-harness screenshot capture is observed.
+- `job-handler-flag.sh` + `job-handler-clear.sh` — block submit when `handlers.py` is edited until a Processing UI surface is also edited.
+- `lr-enforce-on-submit.sh` — aggregator that surfaces all pending validation gates with actionable next steps.
 
 ## Scope
 
 Apply this rule whenever a phase touches:
 - `apps/visualizer/backend/api/`
+- `apps/visualizer/backend/jobs/`
+- `apps/visualizer/backend/database.py`
 - `lightroom_tagger/core/`
+- `apps/visualizer/frontend/` (any source file)
 - `apps/visualizer/frontend/src/services/api.ts`
 - Any LLM prompt string or NL filter logic

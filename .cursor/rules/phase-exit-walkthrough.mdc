@@ -1,0 +1,56 @@
+---
+description: Before marking a phase passed, walk through the user-facing change in browser-harness and capture a screenshot. Triggered when *-VERIFICATION.md becomes status:passed.
+globs:
+  - ".planning/phases/**/*-VERIFICATION.md"
+  - ".planning/quick/**/*-SUMMARY.md"
+alwaysApply: false
+---
+
+# Phase Exit Walkthrough — Earn The "Passed" Stamp
+
+The `phase-walkthrough-flag.sh` hook detects when a `*-VERIFICATION.md` is updated to contain `status: passed`. The aggregator gate blocks your final response until the `phase-walkthrough-clear.sh` hook sees a `browser-harness` invocation that captured a screenshot.
+
+## Required walkthrough
+
+For any phase that touched frontend surfaces:
+
+```bash
+browser-harness <<'PY'
+import base64, time
+
+new_tab("http://localhost:5173/<most-changed-route>")
+wait_for_load()
+time.sleep(2)
+
+# Perform the user task FROM A FRESH STATE — no prior knowledge of where the
+# button is. If the button is not findable in <=2 clicks from the route above,
+# the phase fails on discoverability.
+js("...")  # interact
+
+time.sleep(2)
+text = js("document.body.innerText")
+assert "<observable outcome>" in text, f"User journey did not produce visible outcome: {text[:300]}"
+
+result = cdp("Page.captureScreenshot", format="png")
+with open("/tmp/phase-<N>-walkthrough.png", "wb") as f:
+    f.write(base64.b64decode(result["data"]))
+print("PASS — walkthrough screenshot saved")
+PY
+```
+
+Embed the screenshot path in `VERIFICATION.md` as evidence.
+
+## What this catches
+
+- Features that ship without a UI trigger (phases 6/7 catalog similarity).
+- Features that ship with a UI trigger but no result surface.
+- UI proportion / regression bugs that don't manifest in jest/vitest tests.
+- "Passed" verifications that read code and tests but never use the feature.
+
+## Phases that don't touch frontend
+
+If a phase is purely backend (no `apps/visualizer/frontend/**` edits), it is exempt. Add `walkthrough_exempt: true` under the front-matter of `*-VERIFICATION.md` and the gate passes after editing.
+
+## Why this exists
+
+`07.1-VERIFICATION.md` was marked `status: passed` with `gaps: []` while phase 7.1 still had: (a) no UI trigger for `batch_stack_detect` and `batch_catalog_similarity`, (b) duplicated stack badge derivation across two grids, (c) `Show stack` button breaking grid proportions. A fresh-page walkthrough would have surfaced all three immediately.
