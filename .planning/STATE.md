@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
 status: Executing Phase 08
-last_updated: "2026-04-27T21:06:00.000Z"
+last_updated: "2026-04-27T22:35:00.000Z"
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 46
-  completed_plans: 43
+  completed_plans: 44
   percent: 93
 ---
 
@@ -23,8 +23,8 @@ progress:
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
 | Phase | Phase 8 — embedding-prefilter-and-cache-pipeline |
-| Status | **Executing Phase 08 — plan 08-03 complete** |
-| Last activity | 2026-04-27 — **08-03 executed:** `list_instagram_dump_keys_needing_clip_embedding` (+ force variant), `batch_embed_image` supports `image_type: catalog_and_instagram` (catalog-first dedupe + collision warning), `fingerprint_batch_embed_image` canonical scope (`catalog` vs `catalog_and_instagram`), dual-source `classify_path` for dump `file_path`. Artifacts: `08-03-SUMMARY.md`. Commits: `191356d`, `7415387`, `467383d` + docs. Next: **08-04** composite catalog cache job. Earlier context: Phase 8 waves 08-04..08-06 pending; MATCH-02/CACHE-01 coverage per roadmap. |
+| Status | **Executing Phase 08 — plan 08-04 complete** |
+| Last activity | 2026-04-27 — **08-04 executed:** composite job `catalog_cache_build` chains `_handle_batch_embed_image_inner` → `_handle_batch_stack_detect_inner` → `_handle_catalog_similarity_inner` in-process with `_CatalogCacheStageRunner`, D-08 `[catalog-cache-build]` banners, warn-and-proceed on embedding backlog, `_catalog_cache_chain` suppresses standalone checkpoints under composite job id; `fingerprint_catalog_cache_build`; `JOB_HANDLERS` + `JOB_TYPES_REQUIRING_CATALOG`. Artifacts: `08-04-SUMMARY.md`. Commits: `3674220`, `34090a1` + docs. Next: **08-05** MatchingTab (`clip_top_k`, remove discovery card). Earlier context: Phase 8 waves 08-05..08-06 pending; MATCH-02/CACHE-01 coverage per roadmap. |
 
 ## Project Reference
 
