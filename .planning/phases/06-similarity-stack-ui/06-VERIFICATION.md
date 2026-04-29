@@ -5,11 +5,13 @@ status: passed
 score: 9/9
 overrides_applied: 0
 re_verification:
-  previous_status: null
-  previous_score: null
+  previous_status: passed
+  previous_score: 9/9
   gaps_closed: []
-  gaps_remaining: []
-  regressions: []
+  gaps_remaining:
+    - "ImageDetailModal 'More like this' UI removed by quick 260427-f75 (commit b6e8885, 2026-04-27); replaced with materialized similarity groups in CatalogCacheTab. SIM-02 functionally satisfied via job-driven pivot."
+  regressions:
+    - "Frontend `CatalogVisualSimilaritySection` component and `ImageDetailModal` 'More like this' button were removed; orphaned client method `ImagesAPI.getCatalogSimilar` and `CATALOG_SIMILAR_*` constants left as tech debt — closed in Phase 9."
 gaps: []
 deferred: []
 human_verification: []
@@ -40,6 +42,10 @@ human_verification: []
 | 9 | No SearchPage integration beyond shared client types (no pin / similar UI on Search) | ✓ VERIFIED | `SearchPage.tsx` has no `getCatalogSimilar`, `getStackMembers`, or stack/similarity strings |
 
 **Score:** 9/9 must-have truths verified
+
+### Post-verification re-verification note (2026-04-29)
+
+**Observable truth #8** (the row citing `ImagesAPI.getCatalogSimilar`, `CatalogVisualSimilaritySection`, and the "More like this" / "Visually similar" entries in `ImageDetailModal`) was **deliberately reverted** after Phase 6 verification by quick task `260427-f75` (commit `b6e8885`, 2026-04-27). The shipped flow is now job-driven similarity groups (`batch_catalog_similarity` → materialized groups) surfaced on **Processing → Catalog cache**, not on-demand catalog-modal "More like this". This `re_verification` block records the **as-shipped** state for audit traceability — it does **not** re-mark Phase 6 must-haves as newly failed; SIM-02 is functionally satisfied by the materialized-groups pivot. Orphaned client exports (`ImagesAPI.getCatalogSimilar`, `CATALOG_SIMILAR_*` constants) were left as tech debt and are removed in Phase 9 (`09-03`).
 
 ### Required artifacts
 
