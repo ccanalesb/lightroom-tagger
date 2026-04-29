@@ -396,19 +396,6 @@ export const ImagesAPI = {
     )
   },
 
-  /**
-   * CLIP visual neighbors for a catalog key (GET /images/catalog/.../similar).
-   * Reusable from Search in Phase 7; accepts the same filter query params as listCatalog.
-   */
-  getCatalogSimilar: (imageKey: string, params?: CatalogListQueryParams) => {
-    const searchParams = new URLSearchParams()
-    appendCatalogListSearchParams(searchParams, params)
-    const q = searchParams.toString()
-    return request<CatalogSimilarResponse>(
-      `/images/catalog/${encodeURIComponent(imageKey)}/similar${q ? `?${q}` : ''}`,
-    )
-  },
-
   listCatalogSimilarityGroups: (params?: { limit?: number; offset?: number }) => {
     const sp = new URLSearchParams()
     if (params?.limit !== undefined) sp.set('limit', String(params.limit))
@@ -1073,12 +1060,6 @@ export interface CatalogImage {
   similarity?: number
   why_matched?: string
   thumbnail_url?: string
-}
-
-export type CatalogSimilarResponse = {
-  images: CatalogImage[]
-  total: number
-  meta: { clip_model_id: string; clip_embed_dim: number }
 }
 
 export type CatalogSimilarityGroup = {
