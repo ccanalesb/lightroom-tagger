@@ -236,7 +236,7 @@ Plans:
 - [x] 09-01-PLAN.md — REQUIREMENTS.md doc sync (checkboxes, SIM-02 text, STACK-02 relocation)
 - [x] 09-02-PLAN.md — VERIFICATION artifact updates (06 re-verification + 05.1/05.2 stubs)
 - [x] 09-03-PLAN.md — Dead code removal (`CATALOG_SIMILAR_*` family + `getCatalogSimilar` + `CatalogSimilarResponse`)
-- [ ] 09-04-PLAN.md — Final verification sweep (tsc, rg, pytest)
+- [x] 09-04-PLAN.md — Final verification sweep (tsc, rg, pytest)
 
 **Success criteria:**
 
