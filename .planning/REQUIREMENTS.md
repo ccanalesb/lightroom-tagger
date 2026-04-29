@@ -72,19 +72,19 @@
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
 | NLS-01 | 2 | Complete (2026-04-23) — API + validation |
-| NLS-02 | 1 | Pending |
+| NLS-02 | 1 | ✅ Complete (2026-04-23) |
 | NLS-03 | 3 | ✅ Complete (2026-04-23) |
 | NLS-04 | 3 | ✅ Complete (2026-04-23) |
 | NLS-05 | 5 | ✅ Complete (2026-04-24) |
-| NLS-06 | 7 | Pending |
+| NLS-06 | 7 | ✅ Complete (Phase 7) |
 | STACK-01 | 4 | ✅ Complete (2026-04-24) |
-| STACK-02 | 4 | Pending |
+| STACK-02 | 4 | Descoped (2026-04-24) |
 | STACK-03 | 6 | ✅ Complete (2026-04-25) |
-| STACK-04 | 7 | Pending |
-| STACK-05 | 7 | Pending |
-| VIS-01 | 1 | Pending |
+| STACK-04 | 7 | ✅ Complete (Phase 7) |
+| STACK-05 | 7 | ✅ Complete (Phase 7) |
+| VIS-01 | 1 | ✅ Complete (2026-04-23) |
 | SIM-01 | 5 | ✅ Complete (2026-04-24) |
-| SIM-02 | 6, 9 | Partial — Phase 9 (gap closure: pivot doc sync + orphaned-code removal) |
+| SIM-02 | 6, 9 | ✅ Complete (Phase 6 + Phase 9) |
 | MATCH-02 | 8, 10 | Partial — Phase 10 (gap closure: quantitative ≥10× benchmark on user-validated match pairs) |
 | CACHE-01 | 8 | ✅ Complete (2026-04-27) |
 
