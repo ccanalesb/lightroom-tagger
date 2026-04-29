@@ -38,7 +38,7 @@ export function PerspectiveBadge({
   className?: string
 }) {
   const normalized = perspectiveSlug.toLowerCase().replace(/-/g, '_')
-  let mappedVariant: BadgeVariant = 'default'
+  const mappedVariant: BadgeVariant = 'default'
   let colorClass = ''
 
   switch (normalized) {

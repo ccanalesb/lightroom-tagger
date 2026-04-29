@@ -49,7 +49,7 @@ function ImageScoresPanelLoaded({
     ['scores', 'current', imageKey, imageType, reloadToken] as const,
     () => ScoresAPI.getCurrent(imageKey, { image_type: imageType }),
   );
-  const current = payload.current ?? [];
+  const current = useMemo(() => payload.current ?? [], [payload]);
 
   const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(() => new Set());
   const [historyBySlug, setHistoryBySlug] = useState<Record<string, ImageScoreRow[]>>({});

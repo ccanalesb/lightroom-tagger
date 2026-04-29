@@ -2,7 +2,7 @@ import { getEntry, setEntry, type CacheEntry } from './cache'
 
 export function query<T>(key: readonly unknown[], fetcher: () => Promise<T>): T {
   const k = JSON.stringify(key)
-  let entry = getEntry(k)
+  const entry = getEntry(k)
   if (!entry) {
     const created: CacheEntry = {
       status: 'pending',

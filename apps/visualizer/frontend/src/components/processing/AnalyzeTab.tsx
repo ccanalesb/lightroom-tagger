@@ -83,6 +83,7 @@ const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
 
 // Translate a ``DateFilter`` enum value into the metadata keys the backend
 // expects. Exported for unit testing.
+// eslint-disable-next-line react-refresh/only-export-components
 export function buildDateMetadata(
   filter: DateFilter,
 ): { last_months?: number; year?: string; date_filter: DateFilter } {

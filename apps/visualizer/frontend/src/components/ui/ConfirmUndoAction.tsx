@@ -91,6 +91,7 @@ export type UseUndoToastResult = {
  * Timed undo affordance after destructive success. Works with optional *onUndo*
  * when server rollback exists (e.g. revert stack representative).
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useUndoToast(options?: { timeoutMs?: number }): UseUndoToastResult {
   const timeoutMs = options?.timeoutMs ?? DEFAULT_UNDO_TIMEOUT_MS
   const [toast, setToast] = useState<UndoToastState>({ kind: 'hidden' })

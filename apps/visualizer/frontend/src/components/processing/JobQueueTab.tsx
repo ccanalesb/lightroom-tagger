@@ -49,7 +49,6 @@ export function JobQueueTab({
   jobs,
   connected,
   onRefreshJobs,
-  onInvalidateJobList: _onInvalidateJobList,
   isPending = false,
   pagination,
   onOffsetChange,

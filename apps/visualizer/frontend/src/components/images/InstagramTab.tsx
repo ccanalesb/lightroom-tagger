@@ -75,7 +75,7 @@ export function InstagramTab() {
       limit: ITEMS_PER_PAGE,
       offset: (page - 1) * ITEMS_PER_PAGE,
     }),
-    [page, toQueryParams, dateFolder, sortByDate],
+    [page, toQueryParams],
   );
 
   const listKey = useMemo(
