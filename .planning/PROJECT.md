@@ -59,7 +59,7 @@ Know which catalog images are posted on Instagram and get structured artistic cr
 - ✓ React Suspense data layer: zero useEffect fetches, module-level cache, no new deps — v2.1 (DATA-01)
 - ✓ Two-stage cascade matching: description + vision weighted scoring, skip_undescribed — v2.1 (MATCH-01..04)
 - ✓ Burst shot stacking: `image_stacks` schema, `batch_stack_detect` handler, configurable `stack_burst_delta_ms`, checkpoint resume — v3.0 Phase 4 (STACK-01)
-- ✓ Similarity & stack UI: stack representatives collapse primary lists, Catalog/Best Photos expose stack badges + member expansion, and catalog image detail has “More like this” CLIP similarity — v3.0 Phase 6 (SIM-02, STACK-03)
+- ✓ Similarity & stack UI: stack representatives collapse primary lists, Catalog/Best Photos expose stack badges + member expansion, and similarity discovery is delivered via job-driven materialized similarity groups on Processing → Catalog cache (post-Phase-6 pivot, quick `260427-f75` 2026-04-27) — v3.0 Phase 6 + Phase 9 cleanup (SIM-02, STACK-03)
 - ✓ Stack-aware Instagram matching: compare against representatives and apply confirmed matches stack-wide with non-destructive conflict skips and explicit counters — v3.0 Phase 7 (STACK-04)
 - ✓ Stack edit mutations (split, merge, representative change) available in backend API + Images UI with confirm/undo interaction where safe — v3.0 Phase 7 (STACK-05)
 - ✓ Search pin-to-similar flow: single active pin, similarity-first refinement, and visible fallback when pin similarity is unavailable — v3.0 Phase 7 (NLS-06)
@@ -93,6 +93,8 @@ The user is a photographer managing work across multiple Lightroom catalogs (per
 - **v3.0 Phase 4 complete** (2026-04-24) — Stack detection: `image_stacks`/`image_stack_members` schema, `batch_stack_detect` handler with burst grouping by `date_taken`, configurable `stack_burst_delta_ms`, `StackDetectionSettingsPanel` UI, checkpoint resume. STACK-01 shipped.
 - **v3.0 Phase 6 complete** (2026-04-25) — Similarity & Stack UI: CLIP-only `GET /api/images/catalog/<key>/similar`, stack member API, catalog/best-photo stack badges + expansion, and `ImageDetailModal` “More like this”. SIM-02 and STACK-03 shipped; NLS-06 chat pin remains Phase 7.
 - **v3.0 Phase 7 complete** (2026-04-26) — Stacks in matching + pin similarity: representative-only Instagram candidate scoring, stack-wide apply with conflict skips and counters, stack mutation API (split/merge/representative) plus Catalog/detail UI actions, and chat pin-to-similar orchestration with inactive fallback messaging. STACK-04, STACK-05, and NLS-06 shipped.
+- **v3.0 Phase 8 complete** (2026-04-27) — Embedding pre-filter + catalog cache pipeline: CLIP shortlist over date-windowed candidates before LLM judgments, `clip_top_k` plumbed through `vision_match`, `catalog_cache_build` composite job (`batch_embed_image` → `batch_stack_detect` → `batch_catalog_similarity`) with stage banners + skip counts, MatchingTab `clip_top_k` input, CatalogCacheTab UI with primary "Build catalog cache" CTA + advanced stage triggers. Quick `260427-f75` (2026-04-27) pivoted SIM-02 UX to materialized similarity groups on the catalog cache surface, removing the on-demand "More like this" entry. CACHE-01 + MATCH-02 (implementation) shipped.
+- **v3.0 Phase 9 complete** (2026-04-29) — v3.0 cleanup gap closure: REQUIREMENTS.md body checkboxes + traceability synced (NLS-02, NLS-06, VIS-01, STACK-04, STACK-05 ✓; STACK-02 Descoped 2026-04-24; SIM-02 rewritten for job-driven pivot); 06-VERIFICATION re_verification block annotated; 05.1/05.2 stub VERIFICATION.md created; orphan frontend exports removed (`getCatalogSimilar`, `CatalogSimilarResponse`, 14 `CATALOG_SIMILAR_*` constants); pre-existing lint baseline cleared. SIM-02 + STACK-02 documentation/dead-code closed.
 - ~38K LOC across Python backend and React/TypeScript frontend (405 files changed in v2.1)
 - Tech stack: Flask + SQLite (catalog read-only, library DB read-write), React 19 + Vite + Recharts + CodeMirror
 - 4 configurable critique perspectives with photography-theory rubrics
@@ -158,4 +160,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-26 — v3.0 Phase 7 complete (Stacks in matching + pin similarity — STACK-04, STACK-05, NLS-06 shipped)*
+*Last updated: 2026-04-29 — v3.0 Phase 9 complete (v3.0 cleanup gap closure — SIM-02 docs/dead-code synced, STACK-02 descope formalized, lint baseline cleared)*
