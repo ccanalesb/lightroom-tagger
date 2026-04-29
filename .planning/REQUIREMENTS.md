@@ -22,7 +22,6 @@
 ### Photo Stacking
 
 - [x] **STACK-01**: Job detects burst shots (photos within a configurable time window by date_taken) and groups them into stacks
-- [ ] **STACK-02**: Job clusters visually similar but time-separated photos into stacks using pHash similarity
 - [x] **STACK-03**: Catalog and Best Photos views show the stack representative with a count badge; user can expand to see all members *(Phase 6 — 2026-04-25)*
 - [ ] **STACK-04**: Stack-aware matching: Instagram matching compares against stack representatives only, then associates the match result with the full stack
 - [ ] **STACK-05**: User can split or merge stacks and change which image is the representative
@@ -64,6 +63,7 @@
 - Real-time / streaming search results
 - Voice input for NL search
 - Embedding generation at import time (lazy generation via job is sufficient)
+- **STACK-02** *(descoped 2026-04-24)*: pHash clustering for time-separated near-duplicates was dropped from Phase 4 scope; burst-only stacks (**STACK-01**) are sufficient for v3.0.
 
 ---
 
@@ -96,7 +96,7 @@
 
 - **NLS-03** depends on text embeddings from a `batch_text_embed` job (needs NLS-01 and NLS-02 first to establish search layer)
 - **NLS-06** depends on **SIM-01** (image embeddings must exist to power the pinned-photo similarity trigger in the chat panel)
-- **STACK-04** depends on **STACK-01** and **STACK-02** (stacks must exist before matching can use representatives)
+- **STACK-04** depends on **STACK-01** (burst stacks and representatives required for representative-only matching; **STACK-02** pHash clustering is descoped for v3.0 — see Out of Scope).
 - **STACK-03** depends on **STACK-01** (at minimum burst stacks needed for Best Photos view)
 - **SIM-02** depends on **SIM-01** (embeddings must be generated before similarity queries work)
 - **MATCH-02** depends on **SIM-01** (CLIP embeddings must populate `image_clip_embeddings` before the matching pre-filter can shortlist) and on **STACK-04** (representative-only candidate filter from Phase 7 must already cut non-rep rows before the embedding shortlist runs)
