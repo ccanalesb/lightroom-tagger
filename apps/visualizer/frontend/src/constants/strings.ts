@@ -276,25 +276,9 @@ export const FILTER_DESCRIPTION_SEARCH_ARIA =
 export const CATALOG_FILTER_COLOR_PLACEHOLDER = 'e.g. Red'
 export const CATALOG_FILTER_COLOR_ARIA = 'Color label'
 
-// Phase 06 — visual similarity & stack (SIM-02, STACK-03)
-export const CATALOG_SIMILAR_MORE_LIKE_THIS = 'More like this'
+// Phase 06 — stack expand/collapse (STACK-03). On-demand similarity copy was removed in Phase 9 (SIM-02 pivoted to job-driven materialized groups).
 export const CATALOG_STACK_SHOW = 'Show stack'
 export const CATALOG_STACK_HIDE = 'Hide stack'
-export const CATALOG_SIMILAR_SECTION_TITLE = 'Visually similar'
-export const CATALOG_SIMILAR_LOADING = 'Finding similar…'
-export const CATALOG_SIMILAR_EMPTY_HEADING = 'No close matches'
-export const CATALOG_SIMILAR_EMPTY_BODY =
-  'No other photos scored high enough in this model’s visual space. Try another photo or re-run the image embedding job if this catalog is new.'
-export const CATALOG_SIMILAR_NO_EMBED_TITLE = 'Visual similarity is unavailable'
-export const CATALOG_SIMILAR_NO_EMBED_BODY =
-  'This photo has no image embedding yet. Run the “Embed images” (or your product name for `batch_embed_image`) job, then try again.'
-export const CATALOG_SIMILAR_RUN_EMBED_JOB = 'Run Embed images job'
-export const CATALOG_SIMILAR_EMBED_JOB_STARTING = 'Starting Embed images job…'
-export const CATALOG_SIMILAR_EMBED_JOB_QUEUED =
-  'Embed images job queued. Open Processing → Job Queue to monitor progress.'
-export const CATALOG_SIMILAR_EMBED_JOB_FAILED = 'Couldn’t start Embed images job'
-export const CATALOG_SIMILAR_OPEN_JOB_QUEUE = 'Open Job Queue'
-export const CATALOG_SIMILAR_FETCH_ERROR = 'Couldn’t load similar photos'
 export const CATALOG_STACK_MEMBERS_ERROR = 'Couldn’t load stack members'
 export const CATALOG_STACK_MEMBERS_LOADING = 'Loading…'
 export const CATALOG_STACK_MEMBERS_REGION_ARIA = 'Stack members'
