@@ -229,6 +229,15 @@ Plans:
 
 **Out of scope:** Any new functional behavior; new tests beyond what doc/code touchpoints introduce; design changes to the cache pipeline.
 
+**Plans:** 4 plans
+
+Plans:
+
+- [ ] 09-01-PLAN.md — REQUIREMENTS.md doc sync (checkboxes, SIM-02 text, STACK-02 relocation)
+- [ ] 09-02-PLAN.md — VERIFICATION artifact updates (06 re-verification + 05.1/05.2 stubs)
+- [ ] 09-03-PLAN.md — Dead code removal (`CATALOG_SIMILAR_*` family + `getCatalogSimilar` + `CatalogSimilarResponse`)
+- [ ] 09-04-PLAN.md — Final verification sweep (tsc, rg, pytest)
+
 **Success criteria:**
 
 - `REQUIREMENTS.md` traceability table fully matches phase VERIFICATION verdicts (no false `Pending`).
