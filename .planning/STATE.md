@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Phase 08 verified — milestone v3.0 ready for completion
-last_updated: "2026-04-27T21:37:51.383Z"
+status: Gap closure — phases 9, 10, 11 created from v3.0-MILESTONE-AUDIT.md (status tech_debt)
+last_updated: "2026-04-29T13:56:00.000Z"
 progress:
-  total_phases: 11
+  total_phases: 14
   completed_phases: 11
   total_plans: 46
   completed_plans: 46
-  percent: 100
+  percent: 79
 ---
 
 # Planning state
@@ -22,9 +22,10 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v3.0 Intelligent Discovery |
-| Phase | Phase 8 — embedding-prefilter-and-cache-pipeline |
-| Status | **Phase 08 verified — milestone v3.0 ready for completion** |
-| Last activity | 2026-04-27 — **Phase 08 closed:** all 6 waves executed, 3 review-fix commits land (WR-08-01 similarity preview, WR-08-02 SQL anti-join, WR-08-03 coercion warning), cross-phase regression clean (638 backend pass, 287 frontend pass; 15 backend failures pre-existed at `79ba1e4`), live validation: `catalog_cache_build` job emits D-08 stage banners, `vision_match` accepts `clip_top_k` end-to-end, browser walkthrough confirms `clip_top_k` input, removed Discovery card, "Build catalog cache" CTA, restored similarity preview, AdvancedOptions reuse. Artifacts: `08-VERIFICATION.md`, `08-REVIEW.md`, `08-REVIEW-FIX.md`. Phase 8 CACHE-01 + MATCH-02 closed. |
+| Phase | Phase 9 — v3.0 cleanup: docs, artifacts, dead code (gap closure) |
+| Status | **Gap closure phases 9, 10, 11 created from v3.0-MILESTONE-AUDIT.md (status: tech_debt) — ready to plan Phase 9** |
+| Last activity | 2026-04-29 — `/gsd-audit-milestone` flagged 2 partial requirements (SIM-02 pivoted UX, MATCH-02 quantitative deferred), 1 descoped (STACK-02), and 8 tech-debt categories. `/gsd-plan-milestone-gaps` added 3 gap closure phases: **9** (docs/artifacts/dead-code sync — 7 success criteria), **10** (MATCH-02 quantitative benchmark consuming `benchmark-embedding-recall.md` — 5 criteria), **11** (Phase 7/8 deferred polish — 7 criteria). ROADMAP.md and REQUIREMENTS.md updated; phase directories created. SIM-02 reset to `[ ]` pending Phase 9 text rewrite. MATCH-02 traceability now points to phases 8, 10. |
+| Previous activity | 2026-04-27 — **Phase 08 closed:** all 6 waves executed, 3 review-fix commits land (WR-08-01 similarity preview, WR-08-02 SQL anti-join, WR-08-03 coercion warning), cross-phase regression clean (638 backend pass, 287 frontend pass; 15 backend failures pre-existed at `79ba1e4`), live validation: `catalog_cache_build` job emits D-08 stage banners, `vision_match` accepts `clip_top_k` end-to-end, browser walkthrough confirms `clip_top_k` input, removed Discovery card, "Build catalog cache" CTA, restored similarity preview, AdvancedOptions reuse. Artifacts: `08-VERIFICATION.md`, `08-REVIEW.md`, `08-REVIEW-FIX.md`. Phase 8 CACHE-01 + MATCH-02 closed. |
 
 ## Project Reference
 

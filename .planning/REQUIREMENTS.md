@@ -34,7 +34,7 @@
 ### Visual Similarity Search
 
 - [x] **SIM-01**: Job generates and stores image embeddings (CLIP-style) for catalog images *(Phase 5 — 2026-04-24)*
-- [x] **SIM-02**: "More like this" from any catalog photo surfaces visually similar results, accessible from the catalog view; chat-panel pin remains scoped to NLS-06 *(Phase 6 — 2026-04-25)*
+- [ ] **SIM-02**: "More like this" from any catalog photo surfaces visually similar results, accessible from the catalog view; chat-panel pin remains scoped to NLS-06 *(Phase 6 implementation — 2026-04-25; UX pivoted to job-driven similarity groups by quick `260427-f75` on 2026-04-27 — text rewrite + dead-code removal pending in Phase 9)*
 
 ### Matching Performance & Catalog Cache Pipeline *(added 2026-04-27)*
 
@@ -84,11 +84,11 @@
 | STACK-05 | 7 | Pending |
 | VIS-01 | 1 | Pending |
 | SIM-01 | 5 | ✅ Complete (2026-04-24) |
-| SIM-02 | 6 | ✅ Complete (2026-04-25) |
-| MATCH-02 | 8 | Pending |
+| SIM-02 | 6, 9 | Partial — Phase 9 (gap closure: pivot doc sync + orphaned-code removal) |
+| MATCH-02 | 8, 10 | Partial — Phase 10 (gap closure: quantitative ≥10× benchmark on user-validated match pairs) |
 | CACHE-01 | 8 | ✅ Complete (2026-04-27) |
 
-**Total:** 16 requirements across 5 categories.
+**Total:** 16 requirements across 5 categories. Gap closure phases 9, 10, 11 added 2026-04-29 from `v3.0-MILESTONE-AUDIT.md` (status: `tech_debt`).
 
 ---
 

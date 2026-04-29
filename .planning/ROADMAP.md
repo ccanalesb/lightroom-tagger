@@ -5,7 +5,7 @@
 - ✅ **v1.0 MVP** — Phases 1–4 (shipped 2026-04-11) · [archive](./milestones/v1.0-ROADMAP.md)
 - ✅ **v2.0 Advanced Critique & Insights** — Phases 5–11 (shipped 2026-04-15) · [archive](./milestones/v2.0-ROADMAP.md)
 - ✅ **v2.1 Polish & Consolidate** — 9 phases (shipped 2026-04-23) · [archive](./milestones/v2.1-ROADMAP.md)
-- 🚧 **v3.0 Intelligent Discovery** — 8 phases (in progress) — [roadmap below](#v3-0-intelligent-discovery)
+- 🚧 **v3.0 Intelligent Discovery** — 11 phases (in progress) — [roadmap below](#v3-0-intelligent-discovery)
 
 ## Phases
 
@@ -66,6 +66,9 @@
 | 7 | [Stacks in matching & pin similarity](#phase-7--stacks-in-matching--pin-similarity) | STACK-04, STACK-05, NLS-06 |
 | 7.1 | [Phase 7 remediation fixes](#phase-71--phase-7-remediation-fixes-inserted-2026-04-26) | Remediation |
 | 8 | [Embedding pre-filter & catalog cache pipeline](#phase-8--embedding-pre-filter--catalog-cache-pipeline) | MATCH-02, CACHE-01 |
+| 9 | [v3.0 cleanup: docs, artifacts, dead code](#phase-9--v30-cleanup-docs-artifacts-dead-code-inserted-2026-04-29) | Gap closure (SIM-02, STACK-02) |
+| 10 | [MATCH-02 quantitative benchmark](#phase-10--match-02-quantitative-benchmark-inserted-2026-04-29) | Gap closure (MATCH-02) |
+| 11 | [v3.0 deferred polish](#phase-11--v30-deferred-polish-inserted-2026-04-29) | Gap closure (Phase 7/8 deferred) |
 
 #### Phase 1 — Visual tags & keyword search
 
@@ -209,6 +212,79 @@ Plans:
 - Pipeline observability: each cascade stage emits throttled summary logs showing in→out candidate counts, so operators can verify the pre-filter is doing its job
 - Benchmark of CLIP recall on user-validated match pairs is captured in the existing `benchmark-embedding-recall.md` todo (separate work, not a Phase 8 gate; sets the top-k floor for tuning)
 
+#### Phase 9 — v3.0 cleanup: docs, artifacts, dead code *(INSERTED 2026-04-29)*
+
+**Goal:** Close documentation drift and orphaned-code tech debt accumulated during v3.0 so `REQUIREMENTS.md`, phase verification artifacts, and the frontend reflect the as-shipped state. Created from `.planning/v3.0-MILESTONE-AUDIT.md` gap closure.
+
+**Requirements:** SIM-02 (text update + UX decision), STACK-02 (descope relocation)
+
+**Gap closure scope:**
+
+- **REQUIREMENTS.md sync:** Flip `[ ]` → `[x]` in body and traceability table for NLS-02, VIS-01, NLS-06, STACK-04, STACK-05; refresh per-row Status column to match phase VERIFICATION verdicts.
+- **SIM-02 text rewrite:** Update REQUIREMENTS.md SIM-02 description to reflect the job-driven materialization pivot landed by quick task `260427-f75` (commit `b6e8885`) — replace "More like this from any catalog photo, accessible from the catalog view" with the actual shipped flow (materialized similarity groups previewed in CatalogCacheTab).
+- **STACK-02 relocation:** Move STACK-02 from active `## v3.0 Requirements / Photo Stacking` to `## Future Requirements` (or `## Out of Scope (v3.0)`) with the 2026-04-24 descope rationale; remove the STACK-02 dependency from the STACK-04 line in the Dependencies section.
+- **06-VERIFICATION re-verification block:** Add a YAML `re_verification` block to `.planning/phases/06-similarity-stack-ui/06-VERIFICATION.md` documenting that `ImageDetailModal "More like this"` and `CatalogVisualSimilaritySection` were deliberately removed by `260427-f75` post-verification, so the artifact accurately reflects the shipped state.
+- **5.1 / 5.2 stub VERIFICATION.md:** Create `05.1-VERIFICATION.md` and `05.2-VERIFICATION.md` with `status: passed` pointing to Phase 5 parent verification — these sub-phases shipped without their own files, leaving an audit hole.
+- **Dead code removal:** Decide between deleting orphaned exports `ImagesAPI.getCatalogSimilar` (`api.ts:403`) + `CATALOG_SIMILAR_MORE_LIKE_THIS` (`strings.ts:280`) OR rewiring them into a discoverable surface (e.g., a "View similar" link from the materialized similarity-groups preview). Default plan: delete the dead exports unless the user wants to restore the on-demand entry point.
+
+**Out of scope:** Any new functional behavior; new tests beyond what doc/code touchpoints introduce; design changes to the cache pipeline.
+
+**Success criteria:**
+
+- `REQUIREMENTS.md` traceability table fully matches phase VERIFICATION verdicts (no false `Pending`).
+- STACK-02 is in `Future Requirements` or `Out of Scope`; `Dependencies` no longer references it as a STACK-04 prerequisite.
+- `06-VERIFICATION.md` includes a re-verification block explicitly documenting the `260427-f75` removal.
+- `05.1-VERIFICATION.md` and `05.2-VERIFICATION.md` exist with `status: passed`.
+- `rg getCatalogSimilar apps/visualizer/frontend/src` returns zero hits (or wired through to a UI surface).
+- `rg CATALOG_SIMILAR_MORE_LIKE_THIS apps/visualizer/frontend/src` returns zero hits (or wired through).
+- Frontend `tsc --noEmit` passes; backend pytest sweep passes (no new regressions).
+
+#### Phase 10 — MATCH-02 quantitative benchmark *(INSERTED 2026-04-29)*
+
+**Goal:** Measure the ≥10× LLM-call-reduction claim from MATCH-02 against user-validated match pairs and confirm recall preservation, consuming the existing `benchmark-embedding-recall.md` pending todo. Created from `.planning/v3.0-MILESTONE-AUDIT.md` gap closure.
+
+**Requirements:** MATCH-02 (quantitative validation only — implementation is already in place)
+
+**Gap closure scope:**
+
+- **Benchmark dataset:** Build IG-side CLIP embeddings on a representative slice (the existing benchmark queue from `benchmark-embedding-recall.md`) so the prefilter has real shortlist candidates instead of `clip_shortlist_out=0`.
+- **Pre-prefilter baseline:** Replay the same `vision_match` job with the prefilter disabled (or against a pre-Phase-8 commit) to count LLM judgments on the full date-windowed candidate set.
+- **Post-prefilter measurement:** Run the same job with the prefilter at default `clip_top_k=50` and at sensitivity points (e.g., 100, 200) and count LLM judgments + per-stage candidate funnel.
+- **Recall check:** For the user-validated true-positive match pairs in the benchmark set, confirm the prefilter shortlist still contains the true match at each `clip_top_k` setting; flag any recall drops.
+- **Outcome:** Update REQUIREMENTS.md MATCH-02 with the measured reduction figure (replace ≥10× with the actual measured ratio if different) and recall result; close `benchmark-embedding-recall.md` pending todo with the report.
+
+**Out of scope:** Embedding model swap (DINOv2 / SigLIP) — that is its own follow-up; FAISS migration; new prefilter parameters beyond `clip_top_k` sensitivity sweep.
+
+**Success criteria:**
+
+- A benchmark report (e.g., `.planning/phases/10-match-02-quantitative-benchmark/BENCHMARK.md`) records: dataset size, IG-embedding coverage, pre/post LLM-call counts, measured reduction ratio, recall on user-validated match pairs, and recommended `clip_top_k` setting.
+- REQUIREMENTS.md MATCH-02 line states the measured reduction ratio (and updates the ≥10× target if reality differs).
+- `benchmark-embedding-recall.md` pending todo is moved to `done/` with a link to the benchmark report.
+
+#### Phase 11 — v3.0 deferred polish *(INSERTED 2026-04-29)*
+
+**Goal:** Address low-severity deferred review items from Phases 7 and 8, plus the embed job discoverability follow-up todo, so the v3.0 close has no carry-forward debt. Created from `.planning/v3.0-MILESTONE-AUDIT.md` gap closure.
+
+**Requirements:** — (no REQ-IDs; cross-cutting polish)
+
+**Gap closure scope:**
+
+- **a11y:** Add `aria-expanded` to the AdvancedOptions toggle in `apps/visualizer/frontend/src/components/matching/AdvancedOptions.tsx` (Phase 8 IN-08-01).
+- **Inline copy centralization:** Move remaining inline copy on `apps/visualizer/frontend/src/components/processing/CatalogCacheTab.tsx` to `constants/strings.ts` (Phase 8 IN-08-02).
+- **Log label clarity:** Rename `vision_judgments_total` cumulative result key to a clearer label in `apps/visualizer/backend/jobs/handlers.py` (Phase 8 IN-08-03).
+- **Undo-toast edge case:** Fix `useUndoToast.offerUndo` so providing `message` without `onUndo` keeps the toast visible long enough to read instead of clearing immediately (Phase 7 review low #4).
+- **Stack-size consistency:** Audit `image_stacks.stack_size` against live `image_stack_members` membership count and either keep them synced on every mutation or drop the column in favor of `stack_metadata_for_api` (Phase 7 review low #5).
+- **Tool-calling pin schema:** Tighten the catalog-tool schema text vs pin-restricted execution rules so the LLM cannot request candidates outside the pinned similarity scope (Phase 7 review low #3).
+- **Embed job discoverability:** Implement the items from `.planning/todos/pending/2026-04-26-fixes-for-embed-job-discoverability-and-path-failures.md` (UI affordance + path-failure diagnostics).
+
+**Out of scope:** Any new feature work; design changes to the matching cascade or cache pipeline; broader refactors.
+
+**Success criteria:**
+
+- All 7 deferred items have a commit landing the fix or a documented decision to drop with rationale.
+- Phase 7 and 8 verification artifacts have their `deferred:` lists trimmed to reflect closure.
+- Embed-job discoverability todo is moved to `done/` with the closing commit linked.
+
 #### Progress (v3.0)
 
 | Phase | Goal | Requirements | Success criteria count | Status |
@@ -224,6 +300,9 @@ Plans:
 | 7 | Stacks in matching & pin similarity | STACK-04, STACK-05, NLS-06 | 4 | Pending |
 | 7.1 | Phase 7 remediation fixes | Remediation | 3 | ✅ Complete (2026-04-26; 3/3 plans) |
 | 8 | Embedding pre-filter & catalog cache pipeline | MATCH-02, CACHE-01 | TBD | ✅ Waves complete (2026-04-27 — 6/6 plans; 08-06 CatalogCacheTab `catalog_cache_build` + `AdvancedOptions` + stage triggers; MATCH-02 quantitative verification ongoing) |
+| 9 | v3.0 cleanup: docs, artifacts, dead code | Gap closure (SIM-02 text, STACK-02 relocation) | 7 | Pending (gap closure — created 2026-04-29) |
+| 10 | MATCH-02 quantitative benchmark | Gap closure (MATCH-02) | 5 | Pending (gap closure — created 2026-04-29) |
+| 11 | v3.0 deferred polish | Gap closure (Phase 7/8 deferred) | 7 | Pending (gap closure — created 2026-04-29) |
 
 ---
 
