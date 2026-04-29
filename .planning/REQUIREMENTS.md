@@ -13,27 +13,27 @@
 ### Natural Language Search
 
 - [x] **NLS-01**: User can type a natural language query and get catalog results mapped from structured filters — LLM returns a validated filter object (date ranges, scores, posted status, keywords), never raw SQL *(API: `POST /api/images/nl-search`, 2026-04-23; natural-language **UI** in NLS-05)*
-- [ ] **NLS-02**: User can search description text with keywords and get matching catalog photos
+- [x] **NLS-02**: User can search description text with keywords and get matching catalog photos
 - [x] **NLS-03**: Semantic search understands abstract queries ("moody cityscapes", "feeling of solitude") using text embeddings
 - [x] **NLS-04**: Search results show thumbnails, scores, and a brief "why matched" explanation per result
 - [x] **NLS-05**: Search is accessible as a chat-like panel with conversation history on one side and a results grid on the other; each message refines the active result set *(Phase 5 — 2026-04-24)*
-- [ ] **NLS-06**: User can pin a catalog photo inside the chat panel to trigger visual similarity search ("find more like this")
+- [x] **NLS-06**: User can pin a catalog photo inside the chat panel to trigger visual similarity search ("find more like this")
 
 ### Photo Stacking
 
 - [x] **STACK-01**: Job detects burst shots (photos within a configurable time window by date_taken) and groups them into stacks
 - [x] **STACK-03**: Catalog and Best Photos views show the stack representative with a count badge; user can expand to see all members *(Phase 6 — 2026-04-25)*
-- [ ] **STACK-04**: Stack-aware matching: Instagram matching compares against stack representatives only, then associates the match result with the full stack
-- [ ] **STACK-05**: User can split or merge stacks and change which image is the representative
+- [x] **STACK-04**: Stack-aware matching: Instagram matching compares against stack representatives only, then associates the match result with the full stack
+- [x] **STACK-05**: User can split or merge stacks and change which image is the representative
 
 ### Visual Attribute Tags
 
-- [ ] **VIS-01**: Describe pipeline extracts dominant_colors, mood_tags, and has_repetition as structured fields alongside existing description output
+- [x] **VIS-01**: Describe pipeline extracts dominant_colors, mood_tags, and has_repetition as structured fields alongside existing description output
 
 ### Visual Similarity Search
 
 - [x] **SIM-01**: Job generates and stores image embeddings (CLIP-style) for catalog images *(Phase 5 — 2026-04-24)*
-- [ ] **SIM-02**: "More like this" from any catalog photo surfaces visually similar results, accessible from the catalog view; chat-panel pin remains scoped to NLS-06 *(Phase 6 implementation — 2026-04-25; UX pivoted to job-driven similarity groups by quick `260427-f75` on 2026-04-27 — text rewrite + dead-code removal pending in Phase 9)*
+- [x] **SIM-02**: Similarity discovery is delivered via job-driven similarity groups (`batch_catalog_similarity` → materialized groups) surfaced on **Processing → Catalog cache** (including latest similarity-groups preview). On-demand "More like this" from every catalog detail view is **not** the shipped primary path after quick task `260427-f75` (commit `b6e8885`, 2026-04-27). Chat-panel pinned similarity stays covered by **NLS-06**.
 
 ### Matching Performance & Catalog Cache Pipeline *(added 2026-04-27)*
 
