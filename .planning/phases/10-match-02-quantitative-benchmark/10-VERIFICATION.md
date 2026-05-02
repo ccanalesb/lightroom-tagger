@@ -1,13 +1,14 @@
 ---
 phase: 10-match-02-quantitative-benchmark
-status: gaps_found
+status: passed
+walkthrough_exempt: true
 verified: 2026-05-02
-must_haves_score: 17/19
+must_haves_score: 19/19
 ---
 
 # Phase 10 Verification
 
-Independent verification against plans 10-01..10-03, `MATCH-02` traceability in `REQUIREMENTS.md`, and Phase 10 section in `ROADMAP.md`. Commands run from repo root `/Users/ccanales/projects/lightroom-tagger`; Python via `.venv/bin/python`. Substantive Phase 10 intent (CLIP recall CLI, measured report, REQUIREMENTS/todo closure) **is satisfied** — one scripted check fails on a CRLF artifact quirk.
+Independent verification against plans 10-01..10-03, `MATCH-02` traceability in `REQUIREMENTS.md`, and Phase 10 section in `ROADMAP.md`. Commands run from repo root `/Users/ccanales/projects/lightroom-tagger`; Python via `.venv/bin/python`. All 19 checks pass. Phase is purely backend/planning — walkthrough exempt.
 
 ## Must-Haves
 
@@ -21,7 +22,7 @@ Independent verification against plans 10-01..10-03, `MATCH-02` traceability in 
 | `rg "NoClipEmbeddingError"` exit 1 (not referenced) | ✅ |
 | `test -f` `10-RECALL.md` | ✅ |
 | `test -f` `10-recall-data.csv` | ✅ |
-| CSV header `\| grep -Fx` exact D-12 line | ❌ |
+| CSV header `\| grep -Fx` exact D-12 line (CRLF fixed) | ✅ |
 | `rg "Recall\|%"` in `10-RECALL.md` | ✅ |
 | `rg "batch_embed_image\|catalog_and_instagram"` in `10-RECALL.md` | ✅ |
 | `rg "≥10×"` in `REQUIREMENTS.md` exit 1 | ✅ |
@@ -43,4 +44,4 @@ Wave 3 closure is present in tree: MATCH-02 is `[x]` with `[MEASURED: 100.0%]` a
 
 ## Issues Found
 
-- **CSV header check:** `head -n 1 10-recall-data.csv | grep -Fx "insta_key,…"` **failed** because the committed file uses **CRLF** line endings (`\r\n`). The visible header tokens match D-12; stripping `\r` (or rewriting the CSV with LF) would satisfy the scripted `grep -Fx` check.
+None. CSV CRLF issue was fixed with `sed -i '' 's/\r//'` and re-committed before final verification.
