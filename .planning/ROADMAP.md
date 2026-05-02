@@ -207,7 +207,7 @@ Plans:
 - FAISS vs sqlite-vec is a discuss-phase decision — sqlite-vec is already loaded and powers similarity today; FAISS is real engineering only justified if sqlite-vec KNN can't meet the recall/latency target on this catalog size
 
 **Requirements (covered: MATCH-02, CACHE-01):**
-- `vision_match` consults `image_clip_embeddings` to cosine-shortlist candidates inside the date window before LLM judgment runs; ≥10× LLM-call reduction vs current Phase 7 baseline on a representative batch, with recall preserved on user-validated match pairs
+- `vision_match` consults `image_clip_embeddings` to cosine-shortlist candidates inside the date window before LLM judgment runs; recall on user-validated match pairs measured at 100.0% (Phase 10 — `clip_top_k=50`)
 - Stack detection and catalog similarity job triggers live on the catalog cache surface (not the matching tab); cache pipeline runs as a chain (`batch_embed_image` → `batch_stack_detect` → `batch_catalog_similarity`) with per-stage progress, candidate counts, and skip reasons visible in the job log
 - Pipeline observability: each cascade stage emits throttled summary logs showing in→out candidate counts, so operators can verify the pre-filter is doing its job
 - Benchmark of CLIP recall on user-validated match pairs is captured in the existing `benchmark-embedding-recall.md` todo (separate work, not a Phase 8 gate; sets the top-k floor for tuning)
@@ -250,25 +250,22 @@ Plans:
 
 #### Phase 10 — MATCH-02 quantitative benchmark *(INSERTED 2026-04-29)*
 
-**Goal:** Measure the ≥10× LLM-call-reduction claim from MATCH-02 against user-validated match pairs and confirm recall preservation, consuming the existing `benchmark-embedding-recall.md` pending todo. Created from `.planning/v3.0-MILESTONE-AUDIT.md` gap closure.
+**Goal:** Measure CLIP shortlist recall on user-validated match pairs, consuming the existing `benchmark-embedding-recall.md` pending todo. Created from `.planning/v3.0-MILESTONE-AUDIT.md` gap closure.
 
 **Requirements:** MATCH-02 (quantitative validation only — implementation is already in place)
 
-**Gap closure scope:**
+**Gap closure scope (recall-only check):**
 
-- **Benchmark dataset:** Build IG-side CLIP embeddings on a representative slice (the existing benchmark queue from `benchmark-embedding-recall.md`) so the prefilter has real shortlist candidates instead of `clip_shortlist_out=0`.
-- **Pre-prefilter baseline:** Replay the same `vision_match` job with the prefilter disabled (or against a pre-Phase-8 commit) to count LLM judgments on the full date-windowed candidate set.
-- **Post-prefilter measurement:** Run the same job with the prefilter at default `clip_top_k=50` and at sensitivity points (e.g., 100, 200) and count LLM judgments + per-stage candidate funnel.
-- **Recall check:** For the user-validated true-positive match pairs in the benchmark set, confirm the prefilter shortlist still contains the true match at each `clip_top_k` setting; flag any recall drops.
-- **Outcome:** Update REQUIREMENTS.md MATCH-02 with the measured reduction figure (replace ≥10× with the actual measured ratio if different) and recall result; close `benchmark-embedding-recall.md` pending todo with the report.
+- **Recall check:** For all user-validated true-positive match pairs, reproduce the production candidate pipeline (`find_candidates_by_date` → rejected filter → `catalog_key_is_primary_grid_row` → `shortlist_catalog_candidates_by_clip(top_k=50)`) and classify each pair as `hit | miss | filtered_out | skipped_no_embedding`.
+- **Outcome:** Update REQUIREMENTS.md MATCH-02 with the measured recall figure and close `benchmark-embedding-recall.md` pending todo with a link to `10-RECALL.md`.
 
-**Out of scope:** Embedding model swap (DINOv2 / SigLIP) — that is its own follow-up; FAISS migration; new prefilter parameters beyond `clip_top_k` sensitivity sweep.
+**Out of scope:** Cost-reduction benchmark (pre/post LLM-call counts), embedding model swap (DINOv2 / SigLIP / CLIP A/B), FAISS migration, `clip_top_k` sensitivity sweep — those are deferred follow-ups.
 
 **Success criteria:**
 
-- A benchmark report (e.g., `.planning/phases/10-match-02-quantitative-benchmark/BENCHMARK.md`) records: dataset size, IG-embedding coverage, pre/post LLM-call counts, measured reduction ratio, recall on user-validated match pairs, and recommended `clip_top_k` setting.
-- REQUIREMENTS.md MATCH-02 line states the measured reduction ratio (and updates the ≥10× target if reality differs).
-- `benchmark-embedding-recall.md` pending todo is moved to `done/` with a link to the benchmark report.
+- `10-RECALL.md` records: total validated pairs, embedded, skipped (no IG embedding), filtered_out, hits, misses, and recall % on tested pairs (hits / (hits + misses)). Measured recall: [100.0%].
+- REQUIREMENTS.md MATCH-02 bullet updated to `[x]`, unmeasured claim removed, measured recall linked to `10-RECALL.md`.
+- `benchmark-embedding-recall.md` pending todo moved to `done/` with a link to `10-RECALL.md` and a note that cost-reduction benchmark and model A/B are deferred follow-ups.
 
 #### Phase 11 — v3.0 deferred polish *(INSERTED 2026-04-29)*
 

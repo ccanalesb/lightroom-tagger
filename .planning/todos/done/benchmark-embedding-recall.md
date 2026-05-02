@@ -33,3 +33,7 @@ high recall (99%+) on real match pairs before building the embedding pre-filter 
 - Also test CLIP and SigLIP for comparison — DINOv2 is the hypothesis but worth validating
 - Test with images that have aggressive crops (~20%) to confirm global embedding holds up
 - Dataset: use `matching` table or equivalent where user has confirmed/rejected matches
+
+---
+
+Closed Phase 10 (2026-05-01): recall-only measurement — see [.planning/phases/10-match-02-quantitative-benchmark/10-RECALL.md](../phases/10-match-02-quantitative-benchmark/10-RECALL.md). Recall measurement only — cost-reduction benchmark and DINOv2/CLIP/SigLIP A/B comparison are deferred follow-ups.
