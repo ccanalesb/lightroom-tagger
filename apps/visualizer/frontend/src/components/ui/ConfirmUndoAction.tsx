@@ -112,11 +112,11 @@ export function useUndoToast(options?: { timeoutMs?: number }): UseUndoToastResu
   const offerUndo = useCallback(
     (message: string, onUndo?: () => Promise<void>) => {
       clearTimer()
-      if (!onUndo) {
-        setToast({ kind: 'hidden' })
-        return
+      if (onUndo != null) {
+        setToast({ kind: 'visible', message, onUndo })
+      } else {
+        setToast({ kind: 'visible', message })
       }
-      setToast({ kind: 'visible', message, onUndo })
       timerRef.current = setTimeout(() => {
         setToast({ kind: 'hidden' })
         timerRef.current = null
@@ -140,13 +140,13 @@ export function useUndoToast(options?: { timeoutMs?: number }): UseUndoToastResu
 export type UndoToastBarProps = {
   toast: UndoToastState
   undoLabel: string
-  onUndo: () => void
+  onUndo?: () => void
   /** Accessibility label for the live region */
   politeness?: 'polite' | 'assertive'
 }
 
 export function UndoToastBar({ toast, undoLabel, onUndo, politeness = 'polite' }: UndoToastBarProps) {
-  if (toast.kind !== 'visible' || !toast.onUndo) return null
+  if (toast.kind !== 'visible') return null
 
   return (
     <div
@@ -156,13 +156,15 @@ export function UndoToastBar({ toast, undoLabel, onUndo, politeness = 'polite' }
       aria-live={politeness}
     >
       <p className="text-sm text-text">{toast.message}</p>
-      <button
-        type="button"
-        className="shrink-0 text-sm font-semibold text-accent underline"
-        onClick={onUndo}
-      >
-        {undoLabel}
-      </button>
+      {toast.onUndo != null ? (
+        <button
+          type="button"
+          className="shrink-0 text-sm font-semibold text-accent underline"
+          onClick={onUndo}
+        >
+          {undoLabel}
+        </button>
+      ) : null}
     </div>
   )
 }
