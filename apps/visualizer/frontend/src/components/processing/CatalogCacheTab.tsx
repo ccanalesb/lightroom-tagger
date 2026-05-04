@@ -66,6 +66,9 @@ interface CacheStats {
 
 async function fetchCacheStats(): Promise<CacheStats> {
   const response = await fetch('/api/cache/status');
+  if (!response.ok) {
+    throw new Error(`Cache status fetch failed: ${response.status} ${response.statusText}`);
+  }
   const data = (await response.json()) as CacheStats & { error?: string };
   if (data.error) {
     throw new Error(data.error);
