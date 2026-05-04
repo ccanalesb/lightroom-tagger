@@ -559,10 +559,31 @@ export const PROCESSING_OPEN_JOB_QUEUE = 'Open Job Queue'
 export const PROCESSING_JOB_QUEUE_ROUTE = '/processing?tab=jobs'
 export const PROCESSING_CATALOG_CACHE_ROUTE = '/processing?tab=cache'
 
+export const SEARCH_PIN_INACTIVE_PREFIX = 'Similarity pin inactive:'
+export const SEARCH_PIN_INACTIVE_SUFFIX = 'Results use your full catalog.'
+export const SEARCH_PIN_WARN_NO_CLIP = 'CLIP embedding not yet built for pinned image'
+export const SEARCH_PIN_HELP_EMBED = 'Run "Embed catalog images only" (or Build catalog cache) under Processing → Catalog cache, then try again.'
+export const SEARCH_PIN_LINK_CACHE = 'Open Catalog cache'
+
 /** Catalog Cache tab — composite pipeline + Advanced stage triggers (Phase 08 / CACHE-01). */
 export const CATALOG_CACHE_BUILD_CTA = 'Build catalog cache'
 export const CATALOG_CACHE_BUILD_SUCCESS =
   'Catalog cache build started! Check the Job Queue tab for progress.'
+export const CATALOG_CACHE_CARD_TITLE = 'Catalog Vision Cache'
+export const CATALOG_CACHE_INTRO_BODY =
+  'The vision cache stores preprocessed Lightroom catalog images for fast AI comparison. Rebuilding the cache will process all catalog images and may take several minutes.'
+export const CATALOG_CACHE_STAT_TOTAL_LABEL = 'Total Images'
+export const CATALOG_CACHE_STAT_TOTAL_HELPER = 'Images in Lightroom catalog'
+export const CATALOG_CACHE_STAT_CACHED_LABEL = 'Cached Images'
+export const CATALOG_CACHE_STAT_CACHED_HELPER = 'Processed for AI matching'
+export const CATALOG_CACHE_STAT_MISSING_LABEL = 'Missing'
+export const CATALOG_CACHE_STAT_MISSING_HELPER = 'Not yet cached'
+export const CATALOG_CACHE_STAT_SIZE_LABEL = 'Cache Size'
+export const CATALOG_CACHE_STAT_SIZE_HELPER = 'Disk space used'
+export const CATALOG_CACHE_PROGRESS_LABEL = 'Cache Progress'
+export const CATALOG_CACHE_LOCATION_PREFIX = 'Cache Location:'
+export const CATALOG_CACHE_NAS_TROUBLESHOOTING =
+  'Network share (NAS) paths must be mounted and readable by the backend host. If the embed job skips most images, verify the catalog path is accessible from the server.'
 /** Advanced — embed catalog rows only (`image_type: catalog`). */
 /** Disclosure label for the catalog cache pipeline section.
  *
@@ -602,7 +623,7 @@ export const CATALOG_CACHE_PREPARE_CATALOG_HELPER =
 /** Primary card — latest similarity groups preview (job-ui-contract / WR-08-01). */
 export const CATALOG_CACHE_SIMILARITY_PREVIEW_TITLE = 'Latest similarity groups'
 export const CATALOG_CACHE_SIMILARITY_EMPTY =
-  'No catalog similarity groups yet. Run catalog similarity from Advanced options after Embed Images completes.'
+  'No catalog similarity groups yet. Run catalog similarity from Pipeline stages after Embed Images completes.'
 export const CATALOG_CACHE_SIMILARITY_TOTAL_GROUPS_LABEL = (n: number) =>
   `${n} group${n === 1 ? '' : 's'}`
 export const CATALOG_CACHE_SIMILARITY_VIEW_ALL = 'View all'
