@@ -1802,18 +1802,14 @@ def _handle_batch_describe_inner(runner, job_id: str, metadata: dict):
                 ]
 
         if image_type in ('instagram', 'both'):
-            if force or year is not None:
-                images_to_describe += _select_instagram_keys(
-                    lib_db,
-                    months=months,
-                    year=year,
-                    undescribed_only=not force,
-                )
-            else:
-                images_to_describe += [
-                    (img['media_key'], 'instagram')
-                    for img in get_undescribed_instagram_images(lib_db, months=months)
-                ]
+            # Always route through _select_instagram_keys so the COALESCE/date_folder
+            # fallback applies consistently regardless of force/year flags.
+            images_to_describe += _select_instagram_keys(
+                lib_db,
+                months=months,
+                year=year,
+                undescribed_only=not force,
+            )
 
         if backfill_visual_tags and not images_to_describe:
             add_job_log(
