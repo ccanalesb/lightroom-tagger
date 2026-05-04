@@ -48,7 +48,7 @@ Close 7 deferred low-severity items from Phase 7 and Phase 8 reviews, plus the e
 - `apps/visualizer/frontend/src/components/ui/ConfirmUndoAction.tsx` — useUndoToast message-only fix (Phase 7 low #4)
 - `apps/visualizer/backend/jobs/handlers.py` — vision_judgments_total comment (IN-08-03)
 - `lightroom_tagger/core/database.py` — stack_size comment (Phase 7 low #5)
-- `apps/visualizer/frontend/src/components/search/SearchPage.tsx` — embed discoverability warning + links
+- `apps/visualizer/frontend/src/pages/SearchPage.tsx` — embed discoverability warning + links
 
 ### Prior phase artifacts
 - `.planning/phases/08-embedding-prefilter-and-cache-pipeline/08-REVIEW.md` — original IN-08-01, IN-08-02, IN-08-03 text
