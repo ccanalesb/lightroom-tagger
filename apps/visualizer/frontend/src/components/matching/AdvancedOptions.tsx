@@ -69,6 +69,9 @@ export function AdvancedOptions({
   return (
     <div className="border-t pt-4">
       <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls="advanced-options-panel"
         onClick={onToggle}
         className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
       >
@@ -76,7 +79,7 @@ export function AdvancedOptions({
       </button>
 
       {isOpen && (
-        <div className="mt-4 space-y-4 bg-white p-4 rounded border">
+        <div id="advanced-options-panel" className="mt-4 space-y-4 bg-white p-4 rounded border">
           <ProviderModelSelect
             providerId={providerId}
             modelId={providerModel}
