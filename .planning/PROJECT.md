@@ -2,23 +2,22 @@
 
 ## What This Is
 
-A web application that connects your Lightroom catalog with Instagram to track what you've published and provides AI-powered structured artistic analysis of your photography. It scores images across configurable critique perspectives (street, documentary, publisher, color theory), surfaces your photographic identity through style fingerprints and best-photo rankings, analyzes posting patterns, and suggests what to shoot or post next — all from a unified insights dashboard.
+A web application that connects your Lightroom catalog with Instagram to track what you've published and provides AI-powered structured artistic analysis of your photography. It scores images across configurable critique perspectives (street, documentary, publisher, color theory), surfaces your photographic identity through style fingerprints and best-photo rankings, analyzes posting patterns, and suggests what to shoot or post next — all from a unified insights dashboard. The catalog is a queryable, visually-aware library: natural language search, semantic embeddings, photo stacking, and CLIP-based visual similarity discovery are all built in.
 
 ## Core Value
 
 Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
 
-## Current Milestone: v3.0 Intelligent Discovery
+## Current State: v3.0 Shipped — Planning Next Milestone
 
-**Goal:** Turn the catalog from a passive archive into a queryable, visually-aware library you can explore by meaning, mood, and similarity.
+**v3.0 Intelligent Discovery shipped 2026-05-04.** The catalog is now a queryable, visually-aware library. All 14 phases complete, 15/15 requirements satisfied.
 
-**Target features:**
-- Natural language search — ask questions like "best street photo from December I haven't posted" or "moody cityscapes" (LLM-to-SQL + full-text + semantic embeddings)
-- Photo stacking — group burst/near-duplicate shots, score the representative instead of every member (primary driver: cut redundant scoring costs)
-- Visual attribute tags — extend describe-time output to extract dominant colors, mood, repetition → filter facets in catalog
-- Visual similarity search — image embeddings so you can say "show me more like this photo"
-
-**Seeds incorporated:** SEED-005, SEED-006, SEED-018
+**What shipped in v3.0:**
+- Natural language search (LLM-to-SQL, FTS5, semantic embeddings, multi-tool chat)
+- Photo stacking (burst grouping, representative scoring, split/merge/change-rep UI)
+- Visual attribute tags (dominant colors, mood tags, has_repetition in describe pipeline)
+- CLIP-based visual similarity + catalog cache pipeline (embed → stack-detect → similarity)
+- Stack-aware Instagram matching + pin-to-similar in chat search
 
 ## Requirements
 
@@ -63,6 +62,11 @@ Know which catalog images are posted on Instagram and get structured artistic cr
 - ✓ Stack-aware Instagram matching: compare against representatives and apply confirmed matches stack-wide with non-destructive conflict skips and explicit counters — v3.0 Phase 7 (STACK-04)
 - ✓ Stack edit mutations (split, merge, representative change) available in backend API + Images UI with confirm/undo interaction where safe — v3.0 Phase 7 (STACK-05)
 - ✓ Search pin-to-similar flow: single active pin, similarity-first refinement, and visible fallback when pin similarity is unavailable — v3.0 Phase 7 (NLS-06)
+- ✓ Visual attribute tags (dominant colors, mood tags, has_repetition) in describe pipeline + catalog filter facets — v3.0 Phase 1 (VIS-01, NLS-02)
+- ✓ Natural language catalog filter: NL input → validated Pydantic filter → query results — v3.0 Phase 2 (NLS-01)
+- ✓ Semantic hybrid search: text embeddings + RRF fusion + "why matched" metadata — v3.0 Phases 3, 5 (NLS-03, NLS-04, NLS-05)
+- ✓ Multi-tool chat search: LLM reasons and calls typed tools; capability detection; multi-turn history — v3.0 Phase 5.2
+- ✓ CLIP embedding pre-filter: cosine shortlist before LLM matching judgments; 100% recall on 239 validated pairs at top_k=50 — v3.0 Phase 8 (MATCH-02, CACHE-01)
 
 ### Deferred (future)
 
@@ -90,20 +94,15 @@ The user is a photographer managing work across multiple Lightroom catalogs (per
 - **v1.0 shipped** (2026-04-11) — 4 phases, 22 requirements: catalog management, jobs, Instagram sync, AI descriptions
 - **v2.0 shipped** (2026-04-15) — 7 phases, 17 requirements: structured scoring, posting analytics, identity/suggestions, insights dashboard
 - **v2.1 shipped** (2026-04-23) — 9 phases, 20 requirements: matching polish, job queue UX, filter framework, identity clarity, badge/card consistency, React Suspense data layer, two-stage cascade matching
-- **v3.0 Phase 4 complete** (2026-04-24) — Stack detection: `image_stacks`/`image_stack_members` schema, `batch_stack_detect` handler with burst grouping by `date_taken`, configurable `stack_burst_delta_ms`, `StackDetectionSettingsPanel` UI, checkpoint resume. STACK-01 shipped.
-- **v3.0 Phase 6 complete** (2026-04-25) — Similarity & Stack UI: CLIP-only `GET /api/images/catalog/<key>/similar`, stack member API, catalog/best-photo stack badges + expansion, and `ImageDetailModal` “More like this”. SIM-02 and STACK-03 shipped; NLS-06 chat pin remains Phase 7.
-- **v3.0 Phase 7 complete** (2026-04-26) — Stacks in matching + pin similarity: representative-only Instagram candidate scoring, stack-wide apply with conflict skips and counters, stack mutation API (split/merge/representative) plus Catalog/detail UI actions, and chat pin-to-similar orchestration with inactive fallback messaging. STACK-04, STACK-05, and NLS-06 shipped.
-- **v3.0 Phase 8 complete** (2026-04-27) — Embedding pre-filter + catalog cache pipeline: CLIP shortlist over date-windowed candidates before LLM judgments, `clip_top_k` plumbed through `vision_match`, `catalog_cache_build` composite job (`batch_embed_image` → `batch_stack_detect` → `batch_catalog_similarity`) with stage banners + skip counts, MatchingTab `clip_top_k` input, CatalogCacheTab UI with primary "Build catalog cache" CTA + advanced stage triggers. Quick `260427-f75` (2026-04-27) pivoted SIM-02 UX to materialized similarity groups on the catalog cache surface, removing the on-demand "More like this" entry. CACHE-01 + MATCH-02 (implementation) shipped.
-- **v3.0 Phase 9 complete** (2026-04-29) — v3.0 cleanup gap closure: REQUIREMENTS.md body checkboxes + traceability synced (NLS-02, NLS-06, VIS-01, STACK-04, STACK-05 ✓; STACK-02 Descoped 2026-04-24; SIM-02 rewritten for job-driven pivot); 06-VERIFICATION re_verification block annotated; 05.1/05.2 stub VERIFICATION.md created; orphan frontend exports removed (`getCatalogSimilar`, `CatalogSimilarResponse`, 14 `CATALOG_SIMILAR_*` constants); pre-existing lint baseline cleared. SIM-02 + STACK-02 documentation/dead-code closed.
-- **v3.0 Phase 11 complete** (2026-05-04) — v3 deferred polish: CatalogCacheTab copy centralized via strings.ts (card title, stats, NAS note); SearchPage inactive-pin embed discoverability links to `/processing?tab=cache` and job queue; AdvancedOptions `aria-expanded`/`aria-controls`/panel `id`; undo toast message-only path shows full timeout with live region; stack_size drift + vision_judgments_total + restrict_to_keys operator docs. Code review fixes: CatalogCacheTab `response.ok` guard, Instagram describe cohort aligned to `_select_instagram_keys`, ConfirmModalFrame `role="dialog"` + Escape dismiss, SearchPage model-load error surfaced.
-- ~38K LOC across Python backend and React/TypeScript frontend (405 files changed in v2.1)
-- Tech stack: Flask + SQLite (catalog read-only, library DB read-write), React 19 + Vite + Recharts + CodeMirror
+- **v3.0 shipped** (2026-05-04) — 14 phases, 56 plans, 289 commits: natural language search (NL filters + FTS5 + semantic embeddings + multi-tool chat), photo stacking, visual attribute tags, CLIP similarity + catalog cache pipeline, stack-aware matching. 422 files changed, 37k+ LOC added. All 15 requirements satisfied.
+- Tech stack: Flask + SQLite (catalog read-only, library DB read-write), React 19 + Vite + Recharts + CodeMirror, sqlite-vec (CLIP + text embeddings), sentence-transformers
 - 4 configurable critique perspectives with photography-theory rubrics
 - Pydantic-validated structured output with deterministic + LLM JSON repair
 - Job checkpointing and orphan recovery for crash resilience
 - React Suspense data layer: module-level cache, useQuery, invalidate/invalidateAll, ErrorBoundary — zero new npm deps
-- Reusable filter framework: `useFilters(schema)` + `<FilterBar>` — CatalogTab + InstagramTab migrated; remaining tabs deferred v3.0
-- Pre-existing `test_providers_api.py::TestDefaults` backend test failure (provider default drift, unrelated to v2.1)
+- Reusable filter framework: `useFilters(schema)` + `<FilterBar>` — CatalogTab + InstagramTab migrated
+- CLIP shortlist recall: 100.0% on 239 validated pairs at `clip_top_k=50`
+- Pre-existing `test_providers_api.py::TestDefaults` backend test failure (provider default drift, unrelated to v3.0)
 
 ### Instagram Dump Format
 User provides Instagram export dumps containing images, captions, timestamps, and EXIF. App matches these to Lightroom catalog entries by comparing images, then writes keywords back to the SQLite catalog file. Instagram exports do NOT include per-post engagement metrics — analytics are derived from posting patterns and AI scores only.
@@ -142,6 +141,12 @@ Critique comes from defined perspectives (street photographer, documentary, publ
 | Phase 7: class component ErrorBoundary (no dep) | React class boundaries are the only standard option | ✓ Good — zero new deps preserved |
 | Two-stage cascade: no weight redistribution | Explicit weights; `vision_weight=0` = no vision, not rebalance | ✓ Good — D-10 test confirmed; no silent bugs |
 | Phase 8 added mid-v2.1 | Description signal was broken; fix required for correct matching | ✓ Good — added without disrupting completed phases |
+| sqlite-vec for CLIP + text embeddings (no FAISS) | Already loaded; sufficient for catalog size; avoids native build dep | ✓ Good — KNN recall 100% on validated pairs; no FAISS needed |
+| Job-driven materialized similarity groups (pivot from on-demand) | On-demand "More like this" removed; similarity lives on catalog cache surface | ✓ Good — better performance; groups persist and are browsable |
+| CLIP pre-filter before LLM matching judgments | Recall-first shortlist; missing a match is worse than extra LLM calls | ✓ Good — 100% recall at top_k=50; reduces LLM call volume |
+| `catalog_cache_build` composite job (embed → stack-detect → similarity) | Chain runs in a single cancel scope; stage-by-stage re-run still available | ✓ Good — operators use one button; pipeline is observable with stage banners |
+| Multi-tool LLM chat search (vs single JSON filter) | Model reasons and calls typed tools; handles superlatives and quantity | ✓ Good — richer queries; capability detection filters non-tool-calling models |
+| STACK-02 (pHash second pass) descoped | Burst grouping by date_taken satisfies the stack-detection use case | ✓ Good — scope right-sized; pHash deferred to future milestone |
 
 ## Evolution
 
@@ -161,4 +166,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-04 — v3.0 Phase 11 complete (v3 deferred polish: strings.ts centralization for CatalogCacheTab/SearchPage, AdvancedOptions disclosure a11y, undo toast message-only fix, embed discoverability links in inactive-pin warning, stack_size/vision_judgments_total operator docs. All 14 v3.0 phases complete.)*
+*Last updated: 2026-05-04 after v3.0 milestone — Intelligent Discovery shipped. All 14 phases, 56 plans, 15 requirements complete.*

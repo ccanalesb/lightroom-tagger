@@ -90,6 +90,54 @@
 
 ---
 
+## Milestone: v3.0 — Intelligent Discovery
+
+**Shipped:** 2026-05-04
+**Phases:** 14 (1–11 + 5.1, 5.2, 7.1) | **Plans:** 56 | **Timeline:** 12 days (2026-04-23 → 2026-05-04)
+
+### What Was Built
+- Natural language search: NL-to-SQL filter (Pydantic-validated), FTS5 keyword search, semantic hybrid search (text embeddings + RRF), multi-tool chat search with typed tools and capability detection
+- Photo stacking: burst grouping by `date_taken`, `image_stacks`/`image_stack_members` schema, three-tier representative selection, split/merge/change-rep UI with confirm/undo
+- Visual attribute tags: `dominant_colors`, `mood_tags`, `has_repetition` extracted at describe time; catalog filter facets
+- CLIP visual similarity: sqlite-vec KNN, materialized similarity groups in catalog cache pipeline, stack badges + expand/collapse in Images UI
+- Stack-aware Instagram matching: compare against representatives, apply confirmed matches stack-wide, non-destructive conflict skips
+- Catalog cache pipeline: `catalog_cache_build` composite job (embed → stack-detect → similarity) with stage banners, per-stage re-run, observable candidate counts
+- Phase 7.1 remediation: 3 targeted fixes for production-safety regressions from Phase 7
+- Phases 9–11 gap closure: REQUIREMENTS.md sync, dead code cleanup, CLIP recall benchmark (100.0% on 239 pairs), deferred polish (a11y, copy centralization, discoverability)
+
+### What Worked
+- **Milestone audit + gap closure pattern** — running `/gsd-audit-milestone` before declaring v3.0 done surfaced real gaps (SIM-02 pivot documentation, MATCH-02 unquantified, Phase 7/8 deferred debt); gap closure phases 9–11 cleared everything cleanly
+- **sqlite-vec as CLIP store** — no FAISS required; KNN recall at 100% on 239 validated pairs; avoids native build complexity on macOS/NAS environments
+- **Recall-first shortlist design** — generous `clip_top_k` default (50) + measured recall before tightening; the right order of operations for embedding pre-filters
+- **Code review inline fix rule** — workspace rule requiring medium+ findings be fixed before phase close caught real bugs (Instagram cohort mismatch, ConfirmModalFrame missing dialog semantics) that would otherwise have shipped as debt
+- **Decimal phases (5.1, 5.2, 7.1)** — inserted without renumbering; 5.1 for Search UI polish, 5.2 for tool-calling search architecture pivot, 7.1 for urgent Phase 7 production fixes; all three proved the insertion pattern reliable
+
+### What Was Inefficient
+- **Phase 7 → 7.1 rework cycle** — Phase 7 shipped with production-safety defects that required a full remediation phase (7.1); more rigorous plan-checker iteration on Phase 7 would have caught these inline
+- **SIM-02 pivot mid-milestone** — quick task `260427-f75` pivoted the "More like this" UX from on-demand to materialized after Phase 6 verified on-demand; the pivot was correct but required retroactive REQUIREMENTS.md and VERIFICATION.md surgery in Phase 9
+- **v3.0 roadmap grew to 14 phases** — 3 of the 14 were inserted gap-closure phases; could have been avoided with sharper requirements on SIM-02 UX and earlier MATCH-02 quantification
+- **SUMMARY.md accomplishment extraction** — CLI still extracts headers/labels instead of content for some plan types; manual curation required at milestone close (same issue as v2.0)
+
+### Patterns Established
+- **Catalog cache pipeline** — `batch_embed_image` → `batch_stack_detect` → `batch_catalog_similarity` chain with per-stage re-run; pattern reusable for future multi-stage pipeline jobs
+- **CLIP shortlist as pre-filter contract** — `shortlist_catalog_candidates_by_clip(top_k)` intersects KNN with allowed keys; insert before any costly judgment; measure recall before tuning `top_k`
+- **Milestone audit → gap closure phases** — run `/gsd-audit-milestone` after last functional phase; create numbered gap-closure phases (9, 10, 11) for docs, quantitative validation, and deferred polish; cleaner than open-ended "cleanup"
+- **Code review inline fix rule** — workspace rule `.cursor/rules/gsd-code-review-fix.mdc` enforces medium+ findings are fixed before close; this caught real bugs in Phase 11
+
+### Key Lessons
+1. Plan-checker rigor on complex phases pays more than extra verification phases later — Phase 7 defects that generated Phase 7.1 would have been caught with one more plan-checker iteration
+2. Quantify claims before calling a requirement complete — MATCH-02 "≥10× fewer candidates" shipped unverified; Phase 10 benchmark was needed to replace the placeholder with measured 100% recall
+3. Pivot decisions mid-milestone (like SIM-02 UX) are fine but require explicit re_verification block annotation and REQUIREMENTS.md text update; don't assume VERIFICATION.md is correct after a post-verification code change
+4. sqlite-vec + sentence-transformers is sufficient for personal-catalog scale; skip the FAISS evaluation until a measured latency problem exists
+
+### Cost Observations
+- 14 phases executed in 12 days (2026-04-23 → 2026-05-04)
+- 3 phases were gap closure (phases 9, 10, 11) — ~21% of phases were debt paydown
+- Phase 7.1 (remediation) added ~1 day of recovery time; avoidable with stricter plan-checking on Phase 7
+- 289 commits total; wave-based parallel execution kept wall-clock time under 2 weeks for a very large feature set
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -99,6 +147,7 @@
 | v1.0 | 4 | 21 | Established catalog + jobs + Instagram + AI pipeline |
 | v2.0 | 7 | 24 | Added audit-driven gap closure phases; parallel API composition |
 | v2.1 | 9 | 35 | Polish + reusable framework + Suspense data layer + cascade matching |
+| v3.0 | 14 | 56 | NL search + stacking + CLIP similarity + catalog cache pipeline; 3 gap-closure phases (21% of total) |
 
 ### Top Lessons (Verified Across Milestones)
 
@@ -106,3 +155,5 @@
 2. On-demand analysis with job queue scales better than batch-everything-upfront — validated in both describe (v1) and score (v2) workflows
 3. Decimal phases (4.1) and mid-milestone appendable phases (Phase 8) work cleanly — GSD roadmap is mutable without disrupting completed work
 4. Keep planning artifacts current (traceability table, backlog cleanup, SUMMARY.md) during execution, not as end-of-milestone debt — accumulation makes milestone close messier than it needs to be
+5. Plan-checker rigor on complex phases > recovery phases later — Phase 7 defects requiring Phase 7.1 were avoidable with one more checker iteration
+6. Quantify requirement claims before marking complete; `≥10×` unverified placeholders create debt that must be paid at milestone audit time

@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.0
 milestone_name: Intelligent Discovery
-status: Milestone complete
-last_updated: "2026-05-04T20:41:29.475Z"
+status: v3.0 milestone complete
+last_updated: "2026-05-04T21:03:34.372Z"
 progress:
   total_phases: 14
   completed_phases: 14
@@ -36,11 +36,22 @@ See: .planning/PROJECT.md (updated 2026-04-23)
 
 ## Deferred Items
 
-Items acknowledged and deferred at milestone close on 2026-04-23:
+Items acknowledged and deferred at milestone close on 2026-04-23 (v2.1):
 
 | Category | Item | Status |
 |----------|------|--------|
 | quick_task | 260420-840-consolidate-image-metadata | missing |
+| seed | SEED-001 through SEED-020 (20 dormant seeds) | dormant |
+
+Items acknowledged and deferred at milestone close on 2026-05-04 (v3.0):
+
+| Category | Item | Status |
+|----------|------|--------|
+| quick_task | 260420-840-consolidate-image-metadata | missing |
+| quick_task | 260427-d5m-based-on-your-finding-for-the-gaps-on-7- | missing |
+| quick_task | 260427-f75-fix-job-driven-catalog-similarity-ux-gap | missing |
+| todo | 2026-04-26-fixes-for-embed-job-discoverability-and-path-failures | pending (partial — discoverability UI shipped in Phase 11; path-failure diagnostics deferred) |
+| todo | 2026-04-26-plan-backend-restart-and-compression-fix | pending (ops/tooling item) |
 | seed | SEED-001 through SEED-020 (20 dormant seeds) | dormant |
 
 ## Roadmap Evolution
