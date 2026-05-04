@@ -203,7 +203,17 @@ describe('SearchPage', () => {
 
     const warn = await screen.findByRole('status')
     expect(warn).toHaveTextContent(/Similarity pin inactive/)
-    expect(warn).toHaveTextContent(/CLIP embedding missing/)
+    expect(warn).toHaveTextContent(/CLIP embedding not yet built for pinned image/)
+    expect(warn.textContent).toContain('Embed catalog images only')
+    expect(warn.textContent).toContain('Processing')
+    expect(screen.getByRole('link', { name: 'Open Catalog cache' })).toHaveAttribute(
+      'href',
+      '/processing?tab=cache',
+    )
+    expect(screen.getByRole('link', { name: 'Open Job Queue' })).toHaveAttribute(
+      'href',
+      '/processing?tab=jobs',
+    )
   })
 
   it('end-to-end: replaced pin is the key sent when the next turn returns inactive pin', async () => {
@@ -279,5 +289,9 @@ describe('SearchPage', () => {
 
     const warn = await screen.findByRole('status')
     expect(warn).toHaveTextContent(/Similarity pin inactive/)
+    expect(screen.getByRole('link', { name: 'Open Catalog cache' })).toHaveAttribute(
+      'href',
+      '/processing?tab=cache',
+    )
   })
 })

@@ -1,9 +1,20 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ImageDetailModal, ImageTile, fromCatalogListRow } from '../components/image-view'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { TileGrid } from '../components/ui/TileGrid'
 import { SkeletonGrid } from '../components/ui/page-states'
+import {
+  PROCESSING_CATALOG_CACHE_ROUTE,
+  PROCESSING_JOB_QUEUE_ROUTE,
+  PROCESSING_OPEN_JOB_QUEUE,
+  SEARCH_PIN_HELP_EMBED,
+  SEARCH_PIN_INACTIVE_PREFIX,
+  SEARCH_PIN_INACTIVE_SUFFIX,
+  SEARCH_PIN_LINK_CACHE,
+  SEARCH_PIN_WARN_NO_CLIP,
+} from '../constants/strings'
 import {
   ImagesAPI,
   ProvidersAPI,
@@ -69,6 +80,7 @@ export function SearchPage() {
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null)
   const [pinnedImageKey, setPinnedImageKey] = useState<string | null>(null)
   const [pinSimilarityWarning, setPinSimilarityWarning] = useState<string | null>(null)
+  const [pinInactiveReason, setPinInactiveReason] = useState<string | null>(null)
   const threadRef = useRef<HTMLDivElement>(null)
 
   const [allModels, setAllModels] = useState<DescriptionModel[]>([])
@@ -174,6 +186,7 @@ export function SearchPage() {
     setInput('')
     setPinnedImageKey(null)
     setPinSimilarityWarning(null)
+    setPinInactiveReason(null)
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -207,15 +220,17 @@ export function SearchPage() {
         | undefined
       if (meta?.pin_state === 'inactive' && meta.fallback_reason) {
         const fr = meta.fallback_reason
+        setPinInactiveReason(fr)
         setPinSimilarityWarning(
           fr === 'no_clip_embedding'
-            ? 'CLIP embedding missing for pinned image'
+            ? SEARCH_PIN_WARN_NO_CLIP
             : fr === 'invalid_pin_key'
               ? 'Pinned image is no longer in the catalog'
               : fr,
         )
       } else {
         setPinSimilarityWarning(null)
+        setPinInactiveReason(null)
       }
       setMessages((prev) => [
         ...prev,
@@ -298,9 +313,9 @@ export function SearchPage() {
           >
             {/* Provider + Model selectors — wrap on narrow containers */}
             {noToolCapableModels ? (
-              <p className="text-xs text-text-secondary" role="status">
+              <div role="status" aria-live="polite" className="text-xs text-text-secondary">
                 No tool-capable models configured
-              </p>
+              </div>
             ) : null}
             {chatProviders.length > 0 && !noToolCapableModels ? (
               <div className="flex flex-wrap gap-1.5">
@@ -343,9 +358,9 @@ export function SearchPage() {
               </div>
             ) : null}
             {lastSearchMode === 'tool_calling' ? (
-              <p className="text-xs text-text-secondary" role="status">
+              <div role="status" aria-live="polite" className="text-xs text-text-secondary">
                 ⚡ Tool calling
-              </p>
+              </div>
             ) : null}
 
             <label htmlFor="search-chat-input" className="sr-only">Message</label>
@@ -402,12 +417,30 @@ export function SearchPage() {
                 </p>
               ) : null}
               {pinSimilarityWarning ? (
-                <p
-                  role="status"
-                  className="text-xs text-amber-600 dark:text-amber-400 self-stretch"
-                >
-                  Similarity pin inactive: {pinSimilarityWarning}. Results use your full catalog.
-                </p>
+                <div role="status" aria-live="polite" className="text-xs text-amber-600 dark:text-amber-400 self-stretch space-y-1">
+                  <p className="m-0">
+                    {SEARCH_PIN_INACTIVE_PREFIX} {pinSimilarityWarning}. {SEARCH_PIN_INACTIVE_SUFFIX}
+                  </p>
+                  {pinInactiveReason === 'no_clip_embedding' ? (
+                    <div className="space-y-1">
+                      <p className="m-0">{SEARCH_PIN_HELP_EMBED}</p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1">
+                        <Link
+                          to={PROCESSING_CATALOG_CACHE_ROUTE}
+                          className="font-medium text-accent underline"
+                        >
+                          {SEARCH_PIN_LINK_CACHE}
+                        </Link>
+                        <Link
+                          to={PROCESSING_JOB_QUEUE_ROUTE}
+                          className="font-medium text-accent underline"
+                        >
+                          {PROCESSING_OPEN_JOB_QUEUE}
+                        </Link>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
               <p className="text-gray-500 text-sm">No matches found. Try a different query.</p>
             </div>
@@ -423,12 +456,30 @@ export function SearchPage() {
                 </p>
               ) : null}
               {pinSimilarityWarning ? (
-                <p
-                  role="status"
-                  className="text-xs text-amber-600 dark:text-amber-400 mb-2"
-                >
-                  Similarity pin inactive: {pinSimilarityWarning}. Results use your full catalog.
-                </p>
+                <div role="status" aria-live="polite" className="text-xs text-amber-600 dark:text-amber-400 mb-2 space-y-1">
+                  <p className="m-0">
+                    {SEARCH_PIN_INACTIVE_PREFIX} {pinSimilarityWarning}. {SEARCH_PIN_INACTIVE_SUFFIX}
+                  </p>
+                  {pinInactiveReason === 'no_clip_embedding' ? (
+                    <div className="space-y-1">
+                      <p className="m-0">{SEARCH_PIN_HELP_EMBED}</p>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1">
+                        <Link
+                          to={PROCESSING_CATALOG_CACHE_ROUTE}
+                          className="font-medium text-accent underline"
+                        >
+                          {SEARCH_PIN_LINK_CACHE}
+                        </Link>
+                        <Link
+                          to={PROCESSING_JOB_QUEUE_ROUTE}
+                          className="font-medium text-accent underline"
+                        >
+                          {PROCESSING_OPEN_JOB_QUEUE}
+                        </Link>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
               <TileGrid>
                 {currentImages.map((image) => (
