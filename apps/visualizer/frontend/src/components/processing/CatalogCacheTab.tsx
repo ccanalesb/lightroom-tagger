@@ -19,15 +19,20 @@ import {
   CACHE_REFRESH_BUTTON,
   CATALOG_CACHE_BUILD_CTA,
   CATALOG_CACHE_BUILD_SUCCESS,
+  CATALOG_CACHE_CARD_TITLE,
   CATALOG_CACHE_EMBED_CATALOG_HELPER,
   CATALOG_CACHE_EMBED_CATALOG_IG_HELPER,
   CATALOG_CACHE_EMBED_CATALOG_LABEL,
   CATALOG_CACHE_EMBED_CATALOG_IG_LABEL,
+  CATALOG_CACHE_INTRO_BODY,
   CATALOG_CACHE_LAST_RUN_LABEL,
   CATALOG_CACHE_LAST_RUN_NEVER,
+  CATALOG_CACHE_LOCATION_PREFIX,
+  CATALOG_CACHE_NAS_TROUBLESHOOTING,
   CATALOG_CACHE_PIPELINE_TITLE,
   CATALOG_CACHE_PREPARE_CATALOG_HELPER,
   CATALOG_CACHE_PREPARE_CATALOG_TITLE,
+  CATALOG_CACHE_PROGRESS_LABEL,
   CATALOG_CACHE_SIMILARITY_HELPER,
   CATALOG_CACHE_SIMILARITY_LABEL,
   CATALOG_CACHE_SIMILARITY_BEST_MATCH_PCT,
@@ -38,6 +43,14 @@ import {
   CATALOG_CACHE_SIMILARITY_VIEW_ALL,
   CATALOG_CACHE_STACK_DETECT_HELPER,
   CATALOG_CACHE_STACK_DETECT_LABEL,
+  CATALOG_CACHE_STAT_CACHED_HELPER,
+  CATALOG_CACHE_STAT_CACHED_LABEL,
+  CATALOG_CACHE_STAT_MISSING_HELPER,
+  CATALOG_CACHE_STAT_MISSING_LABEL,
+  CATALOG_CACHE_STAT_SIZE_HELPER,
+  CATALOG_CACHE_STAT_SIZE_LABEL,
+  CATALOG_CACHE_STAT_TOTAL_HELPER,
+  CATALOG_CACHE_STAT_TOTAL_LABEL,
   PROCESSING_JOB_QUEUE_ROUTE,
   PROCESSING_OPEN_JOB_QUEUE,
   MSG_FAILED_START_JOB,
@@ -149,55 +162,52 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
     <div className="space-y-6">
       <Card padding="lg">
         <CardHeader>
-          <CardTitle>Catalog Vision Cache</CardTitle>
+          <CardTitle>{CATALOG_CACHE_CARD_TITLE}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-text-secondary mb-6">
-            The vision cache stores preprocessed Lightroom catalog images for fast AI comparison.
-            Rebuilding the cache will process all catalog images and may take several minutes.
-          </p>
+          <p className="text-sm text-text-secondary mb-6">{CATALOG_CACHE_INTRO_BODY}</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div className="p-4 bg-surface rounded-base border border-border">
               <div className="flex items-start justify-between mb-2">
-                <span className="text-sm text-text-secondary">Total Images</span>
+                <span className="text-sm text-text-secondary">{CATALOG_CACHE_STAT_TOTAL_LABEL}</span>
                 <Badge variant="default">{stats.total_images.toLocaleString()}</Badge>
               </div>
-              <p className="text-xs text-text-tertiary">Images in Lightroom catalog</p>
+              <p className="text-xs text-text-tertiary">{CATALOG_CACHE_STAT_TOTAL_HELPER}</p>
             </div>
 
             <div className="p-4 bg-surface rounded-base border border-border">
               <div className="flex items-start justify-between mb-2">
-                <span className="text-sm text-text-secondary">Cached Images</span>
+                <span className="text-sm text-text-secondary">{CATALOG_CACHE_STAT_CACHED_LABEL}</span>
                 <Badge variant={cachePercentage === 100 ? 'success' : 'accent'}>
                   {stats.cached_images.toLocaleString()}
                 </Badge>
               </div>
-              <p className="text-xs text-text-tertiary">Processed for AI matching</p>
+              <p className="text-xs text-text-tertiary">{CATALOG_CACHE_STAT_CACHED_HELPER}</p>
             </div>
 
             <div className="p-4 bg-surface rounded-base border border-border">
               <div className="flex items-start justify-between mb-2">
-                <span className="text-sm text-text-secondary">Missing</span>
+                <span className="text-sm text-text-secondary">{CATALOG_CACHE_STAT_MISSING_LABEL}</span>
                 <Badge variant={stats.missing > 0 ? 'warning' : 'success'}>
                   {stats.missing.toLocaleString()}
                 </Badge>
               </div>
-              <p className="text-xs text-text-tertiary">Not yet cached</p>
+              <p className="text-xs text-text-tertiary">{CATALOG_CACHE_STAT_MISSING_HELPER}</p>
             </div>
 
             <div className="p-4 bg-surface rounded-base border border-border">
               <div className="flex items-start justify-between mb-2">
-                <span className="text-sm text-text-secondary">Cache Size</span>
+                <span className="text-sm text-text-secondary">{CATALOG_CACHE_STAT_SIZE_LABEL}</span>
                 <Badge variant="default">{stats.cache_size_mb.toFixed(1)} MB</Badge>
               </div>
-              <p className="text-xs text-text-tertiary">Disk space used</p>
+              <p className="text-xs text-text-tertiary">{CATALOG_CACHE_STAT_SIZE_HELPER}</p>
             </div>
           </div>
 
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-text">Cache Progress</span>
+              <span className="text-sm font-semibold text-text">{CATALOG_CACHE_PROGRESS_LABEL}</span>
               <span className="text-sm text-text-secondary">{cachePercentage}%</span>
             </div>
             <div className="w-full bg-surface rounded-full h-3 border border-border">
@@ -307,9 +317,10 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
 
           <div className="mt-4 p-3 bg-surface rounded-base border border-border">
             <p className="text-xs text-text-tertiary">
-              <strong>Cache Location:</strong> {stats.cache_dir}
+              <strong>{CATALOG_CACHE_LOCATION_PREFIX}</strong> {stats.cache_dir}
             </p>
           </div>
+          <p className="text-xs text-text-tertiary mt-2">{CATALOG_CACHE_NAS_TROUBLESHOOTING}</p>
         </CardContent>
       </Card>
     </div>
