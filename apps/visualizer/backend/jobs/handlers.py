@@ -562,6 +562,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
         media_since_prefilter_summary = 0
         # Coordinator thread only: on_media_complete calls runner.persist_checkpoint (not workers).
 
+        # judgments= log field / vision_judgments_total count shortlisted catalog candidates through score_candidates_with_vision, not LLM HTTP requests — keep names for parsers.
         def _emit_prefilter_summary(stats_snap: dict) -> None:
             add_job_log(
                 runner.db,
@@ -724,7 +725,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 'descriptions_generated': stats.get('descriptions_generated', 0),
                 'clip_prefilter_candidates_in': stats.get('clip_prefilter_candidates_in', 0),
                 'clip_prefilter_shortlist_total': stats.get('clip_prefilter_shortlist_total', 0),
-                'vision_judgments_total': stats.get('vision_judgments_total', 0),
+                'vision_judgments_total': stats.get('vision_judgments_total', 0),  # vision-scored candidates, not HTTP calls
                 'stack_apply_applied': stats.get('stack_members_applied', 0),
                 'stack_apply_skipped_conflicts': stats.get(
                     'stack_members_skipped_conflicts', 0
