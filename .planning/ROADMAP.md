@@ -277,10 +277,10 @@ Plans:
 
 - **a11y:** Add `aria-expanded` to the AdvancedOptions toggle in `apps/visualizer/frontend/src/components/matching/AdvancedOptions.tsx` (Phase 8 IN-08-01).
 - **Inline copy centralization:** Move remaining inline copy on `apps/visualizer/frontend/src/components/processing/CatalogCacheTab.tsx` to `constants/strings.ts` (Phase 8 IN-08-02).
-- **Log label clarity:** Rename `vision_judgments_total` cumulative result key to a clearer label in `apps/visualizer/backend/jobs/handlers.py` (Phase 8 IN-08-03).
+- **Log label clarity:** Add inline comment documenting `vision_judgments_total` / `judgments=` semantics in `apps/visualizer/backend/jobs/handlers.py`; keep key and log label unchanged (Phase 8 IN-08-03, D-03).
 - **Undo-toast edge case:** Fix `useUndoToast.offerUndo` so providing `message` without `onUndo` keeps the toast visible long enough to read instead of clearing immediately (Phase 7 review low #4).
-- **Stack-size consistency:** Audit `image_stacks.stack_size` against live `image_stack_members` membership count and either keep them synced on every mutation or drop the column in favor of `stack_metadata_for_api` (Phase 7 review low #5).
-- **Tool-calling pin schema:** Tighten the catalog-tool schema text vs pin-restricted execution rules so the LLM cannot request candidates outside the pinned similarity scope (Phase 7 review low #3).
+- **Stack-size consistency:** Document and accept drift risk for `image_stacks.stack_size` vs live membership; `stack_metadata_for_api` remains authoritative for API responses (Phase 7 review low #5, D-01).
+- **Tool-calling pin schema:** Document and defer: `get_catalog_schema` may show global counts while execution stays restricted by `restrict_to_keys` when a pin is active; comment-only in code (Phase 7 review low #3, D-02).
 - **Embed job discoverability:** Implement the items from `.planning/todos/pending/2026-04-26-fixes-for-embed-job-discoverability-and-path-failures.md` (UI affordance + path-failure diagnostics).
 
 **Out of scope:** Any new feature work; design changes to the matching cascade or cache pipeline; broader refactors.
@@ -290,6 +290,8 @@ Plans:
 - All 7 deferred items have a commit landing the fix or a documented decision to drop with rationale.
 - Phase 7 and 8 verification artifacts have their `deferred:` lists trimmed to reflect closure.
 - Embed-job discoverability todo is moved to `done/` with the closing commit linked.
+
+**Plan execution:** 3 plans (`11-01` … `11-03`). **`11-01` complete (2026-05-04)** — `strings.ts` Catalog Cache + Search pin constants; `database.py` stack/`restrict_to_keys` documentation; `handlers.py` `vision_judgments_total` semantics comments (`11-01-SUMMARY.md`). **Next:** `11-02`.
 
 #### Progress (v3.0)
 
@@ -308,7 +310,7 @@ Plans:
 | 8 | Embedding pre-filter & catalog cache pipeline | MATCH-02, CACHE-01 | TBD | ✅ Waves complete (2026-04-27 — 6/6 plans; 08-06 CatalogCacheTab `catalog_cache_build` + `AdvancedOptions` + stage triggers; MATCH-02 quantitative verification ongoing) |
 | 9 | v3.0 cleanup: docs, artifacts, dead code | Gap closure (SIM-02 text, STACK-02 relocation) | 7 | Pending (gap closure — created 2026-04-29) |
 | 10 | MATCH-02 quantitative benchmark | Gap closure (MATCH-02) | 5 | Pending (gap closure — created 2026-04-29) |
-| 11 | v3.0 deferred polish | Gap closure (Phase 7/8 deferred) | 7 | Pending (gap closure — created 2026-04-29) |
+| 11 | v3.0 deferred polish | Gap closure (Phase 7/8 deferred) | 7 | In progress (2026-05-04 — 1/3 plans; **11-01** ✅) |
 
 ---
 
