@@ -836,7 +836,7 @@ def _migrate_image_stacks(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS image_stacks (
             stack_id INTEGER PRIMARY KEY AUTOINCREMENT,
             representative_key TEXT NOT NULL,
-            stack_size INTEGER NOT NULL DEFAULT 0,
+            stack_size INTEGER NOT NULL DEFAULT 0, -- maintained on split/merge/set_representative; drift vs members theoretical; stack_metadata_for_api authoritative for live counts
             user_modified INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
@@ -1491,6 +1491,7 @@ def query_catalog_images(
         has_repetition=has_repetition,
     )
 
+    # get_catalog_schema may expose global catalog counts; when a pin is active, catalog listing/search here is still restricted to restrict_to_keys at execution time.
     if restrict_to_keys is not None:
         rk = [str(k) for k in restrict_to_keys if k]
         if not rk:
@@ -1900,6 +1901,7 @@ def stack_split_member_out(
         new_rep = sorted(remaining_keys)[-1]
 
     n = len(remaining_keys)
+    # stack_metadata_for_api is authoritative for API stack_member_count (live membership).
     db.execute(
         """
         UPDATE image_stacks
@@ -1974,6 +1976,7 @@ def stack_merge_into(
     if not new_rep or new_rep not in keys:
         new_rep = sorted(keys)[-1]
 
+    # stack_metadata_for_api is authoritative for API stack_member_count (live membership).
     db.execute(
         """
         UPDATE image_stacks
@@ -2027,6 +2030,7 @@ def stack_set_representative(
         (stack_id,),
     ).fetchone()
     n = int(cnt_row["c"]) if cnt_row else 0
+    # stack_metadata_for_api is authoritative for API stack_member_count (live membership).
     db.execute(
         "UPDATE image_stacks SET stack_size = ? WHERE stack_id = ?",
         (n, stack_id),
