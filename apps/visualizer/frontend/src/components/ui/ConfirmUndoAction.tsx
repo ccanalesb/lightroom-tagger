@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Button } from './Button/Button'
 
 export const DEFAULT_UNDO_TIMEOUT_MS = 8000
@@ -31,17 +31,23 @@ export function ConfirmModalFrame({
   busy = false,
   confirmVariant = 'danger',
 }: ConfirmModalFrameProps) {
+  const titleId = useId()
+
   return (
     <div
       className={`fixed inset-0 bg-black/70 flex items-center justify-center ${zIndexClass} p-4`}
       onClick={onCancel}
+      onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className="bg-white rounded-lg max-w-lg w-full shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-4 border-b">
-          <h3 className="text-lg font-bold text-text">{title}</h3>
+          <h3 id={titleId} className="text-lg font-bold text-text">{title}</h3>
         </div>
 
         <div className="p-4 space-y-4">{children}</div>
