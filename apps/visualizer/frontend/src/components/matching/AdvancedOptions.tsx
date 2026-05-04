@@ -167,6 +167,7 @@ export function AdvancedOptions({
 
           <div className="pt-2 border-t">
             <button
+              type="button"
               onClick={onReset}
               className="text-sm text-gray-600 hover:text-gray-800"
             >

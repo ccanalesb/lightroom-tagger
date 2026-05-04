@@ -116,7 +116,11 @@ export function SearchPage() {
         if (provider) localStorage.setItem(PROVIDER_STORAGE_KEY, provider)
         if (model) localStorage.setItem(MODEL_STORAGE_KEY, model)
       })
-      .catch(() => {})
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setErrorText(err instanceof Error ? err.message : 'Failed to load AI models')
+        }
+      })
       .finally(() => {
         if (!cancelled) setDescriptionModelsLoadFinished(true)
       })
