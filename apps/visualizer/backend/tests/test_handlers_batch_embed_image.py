@@ -637,7 +637,6 @@ def test_batch_embed_image_preflight_fails_fast_when_paths_inaccessible(
     mock_enc = MagicMock(return_value=np.ones((1, 512), dtype=np.float32))
     monkeypatch.setattr(job_handlers, "encode_images", mock_enc)
     monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 4)
-    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_FAIL_RATIO", 0.5)
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
     mock_load_config.return_value = MagicMock(db_path=str(db_path))
@@ -647,9 +646,10 @@ def test_batch_embed_image_preflight_fails_fast_when_paths_inaccessible(
 
     runner.fail_job.assert_called_once()
     fail_message = str(runner.fail_job.call_args[0][1])
-    assert "Embed preflight" in fail_message
-    assert "All sampled images are inaccessible" in fail_message
-    assert "verify catalog filepath values" in fail_message
+    assert "network share" in fail_message
+    assert "not mounted" in fail_message
+    assert "sampled paths unreachable" in fail_message
+    assert "All sampled images are inaccessible" not in fail_message
     runner.complete_job.assert_not_called()
     mock_enc.assert_not_called()
 
@@ -866,15 +866,10 @@ def test_batch_embed_image_uses_vision_cache_when_original_missing(
 
 @patch("jobs.handlers.add_job_log")
 @patch("jobs.handlers.load_config")
-def test_batch_embed_image_preflight_warns_and_continues_on_partial_miss(
+def test_batch_embed_image_preflight_aborts_when_majority_unreachable(
     mock_load_config, mock_add_log, tmp_path, monkeypatch
 ) -> None:
-    """Soft preflight: 70-99% missing logs a warning and proceeds.
-
-    The per-file loop counts each missing file under
-    ``unresolved_or_missing`` and the job completes cleanly with whatever
-    embeddings did succeed.
-    """
+    """Preflight fails fast when strictly >50% of the fixed sample is unreachable (5/8)."""
     from jobs.handlers import handle_batch_embed_image
 
     good_jpg = tmp_path / "good.jpg"
@@ -882,30 +877,40 @@ def test_batch_embed_image_preflight_warns_and_continues_on_partial_miss(
 
     db_path = tmp_path / "library.db"
     conn = init_database(str(db_path))
-    for i in range(7):
-        store_image(
-            conn,
-            {
-                "date_taken": f"2024-06-{i + 1:02d}",
-                "filename": f"missing-{i}.jpg",
-                "filepath": f"/definitely/missing-{i}.jpg",
-                "rating": 1,
-            },
+    bad_keys: list[str] = []
+    for i in range(5):
+        bad_keys.append(
+            store_image(
+                conn,
+                {
+                    "date_taken": f"2024-06-{i + 1:02d}",
+                    "filename": f"missing-{i}.jpg",
+                    "filepath": f"/definitely/missing-{i}.jpg",
+                    "rating": 1,
+                },
+            )
         )
-    store_image(
-        conn,
-        {
-            "date_taken": "2024-06-09",
-            "filename": "good.jpg",
-            "filepath": str(good_jpg),
-            "rating": 1,
-        },
-    )
+    good_keys: list[str] = []
+    for i in range(3):
+        good_keys.append(
+            store_image(
+                conn,
+                {
+                    "date_taken": f"2024-06-{i + 10:02d}",
+                    "filename": f"good-{i}.jpg",
+                    "filepath": str(good_jpg),
+                    "rating": 1,
+                },
+            )
+        )
     conn.close()
 
+    monkeypatch.setattr(
+        job_handlers,
+        "list_catalog_keys_needing_clip_embedding",
+        lambda *args, **kwargs: bad_keys + good_keys,
+    )
     monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 8)
-    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_FAIL_RATIO", 0.5)
-    monkeypatch.setattr(job_handlers, "_PREFLIGHT_RNG_SEED", 1234)
     monkeypatch.setattr(
         job_handlers,
         "encode_images",
@@ -915,22 +920,136 @@ def test_batch_embed_image_preflight_warns_and_continues_on_partial_miss(
     mock_load_config.return_value = MagicMock(db_path=str(db_path))
 
     runner = _make_runner()
-    handle_batch_embed_image(runner, "job-partial-miss", {"image_type": "catalog"})
+    handle_batch_embed_image(runner, "job-majority-miss", {"image_type": "catalog"})
+
+    runner.fail_job.assert_called_once()
+    runner.complete_job.assert_not_called()
+    fail_message = str(runner.fail_job.call_args[0][1])
+    assert "network share" in fail_message
+    assert "sampled paths unreachable" in fail_message
+    errors = [
+        str(c.args[3])
+        for c in mock_add_log.call_args_list
+        if len(c.args) > 3 and c.args[2] == "error"
+    ]
+    assert any("network share" in msg for msg in errors), errors
+
+
+@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.load_config")
+def test_batch_embed_image_preflight_continues_at_exact_half_failures(
+    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+) -> None:
+    """At exactly 50% unreachable (4/8), preflight does not abort (boundary)."""
+    from jobs.handlers import handle_batch_embed_image
+
+    good_jpg = tmp_path / "good.jpg"
+    _write_min_jpg(good_jpg)
+
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    bad_keys = [
+        store_image(
+            conn,
+            {
+                "date_taken": f"2024-08-{i + 1:02d}",
+                "filename": f"missing-{i}.jpg",
+                "filepath": f"/definitely/missing-{i}.jpg",
+                "rating": 1,
+            },
+        )
+        for i in range(4)
+    ]
+    good_keys = [
+        store_image(
+            conn,
+            {
+                "date_taken": f"2024-08-{i + 10:02d}",
+                "filename": f"good-{i}.jpg",
+                "filepath": str(good_jpg),
+                "rating": 1,
+            },
+        )
+        for i in range(4)
+    ]
+    conn.close()
+
+    monkeypatch.setattr(
+        job_handlers,
+        "list_catalog_keys_needing_clip_embedding",
+        lambda *args, **kwargs: bad_keys + good_keys,
+    )
+    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 8)
+    monkeypatch.setattr(
+        job_handlers,
+        "encode_images",
+        lambda paths, batch_size=8: np.ones((len(paths), 512), dtype=np.float32),
+    )
+    monkeypatch.setenv("LIBRARY_DB", str(db_path))
+    mock_load_config.return_value = MagicMock(db_path=str(db_path))
+
+    runner = _make_runner()
+    handle_batch_embed_image(runner, "job-half-boundary", {"image_type": "catalog"})
 
     runner.fail_job.assert_not_called()
     runner.complete_job.assert_called_once()
-    result = runner.complete_job.call_args[0][1]
-    assert result["embedded"] == 1
-    assert result["skipped"] == 7
-    assert result["skip_reason_counts"]["unresolved_or_missing"] == 7
-    warnings = [
-        str(c.args[3])
-        for c in mock_add_log.call_args_list
-        if len(c.args) > 3 and c.args[2] == "warning"
+
+
+@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.load_config")
+def test_batch_embed_image_preflight_continues_when_under_half_failures(
+    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+) -> None:
+    """Under 50% unreachable in the full sample continues without preflight abort."""
+    from jobs.handlers import handle_batch_embed_image
+
+    good_jpg = tmp_path / "good.jpg"
+    _write_min_jpg(good_jpg)
+
+    db_path = tmp_path / "library.db"
+    conn = init_database(str(db_path))
+    bad_key = store_image(
+        conn,
+        {
+            "date_taken": "2024-09-01",
+            "filename": "missing.jpg",
+            "filepath": "/definitely/missing.jpg",
+            "rating": 1,
+        },
+    )
+    good_keys = [
+        store_image(
+            conn,
+            {
+                "date_taken": f"2024-09-{i + 2:02d}",
+                "filename": f"ok-{i}.jpg",
+                "filepath": str(good_jpg),
+                "rating": 1,
+            },
+        )
+        for i in range(3)
     ]
-    assert any(
-        "Embed preflight" in msg and "Continuing" in msg for msg in warnings
-    ), warnings
+    conn.close()
+
+    monkeypatch.setattr(
+        job_handlers,
+        "list_catalog_keys_needing_clip_embedding",
+        lambda *args, **kwargs: [bad_key, *good_keys],
+    )
+    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 4)
+    monkeypatch.setattr(
+        job_handlers,
+        "encode_images",
+        lambda paths, batch_size=8: np.ones((len(paths), 512), dtype=np.float32),
+    )
+    monkeypatch.setenv("LIBRARY_DB", str(db_path))
+    mock_load_config.return_value = MagicMock(db_path=str(db_path))
+
+    runner = _make_runner()
+    handle_batch_embed_image(runner, "job-under-half", {"image_type": "catalog"})
+
+    runner.fail_job.assert_not_called()
+    runner.complete_job.assert_called_once()
 
 
 @patch("jobs.handlers.add_job_log")

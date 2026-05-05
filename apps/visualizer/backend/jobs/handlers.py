@@ -62,7 +62,7 @@ from .checkpoint import (
 _CHECKPOINT_MAX_ENTRIES = 100_000
 _BATCH_EMBED_IMAGE_SIZE = 8
 _EMBED_PREFLIGHT_SAMPLE_SIZE = 25
-_EMBED_PREFLIGHT_FAIL_RATIO = 0.7
+_EMBED_PREFLIGHT_FAIL_RATIO = 0.5
 _EMBED_SKIP_DETAIL_LOG_LIMIT = 5
 _EMBED_SUMMARY_LOG_EVERY = 250
 _CATALOG_SIMILARITY_SUMMARY_EVERY = 500
@@ -2972,7 +2972,7 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 + sample_failures['unresolved_or_missing']
             )
             fail_ratio = sample_failed_count / sample_size
-            if fail_ratio >= _EMBED_PREFLIGHT_FAIL_RATIO:
+            if fail_ratio > _EMBED_PREFLIGHT_FAIL_RATIO:
                 preflight_msg = (
                     f'Embed preflight: {sample_failed_count}/{sample_size} sampled images '
                     'have missing or inaccessible paths '
@@ -2982,27 +2982,22 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                     f"empty_path={sample_examples['empty_path']}, "
                     f"unresolved_or_missing={sample_examples['unresolved_or_missing']}."
                 )
-                # Soft preflight: per-file processing already skips missing
-                # files cleanly under ``unresolved_or_missing``, so a high
-                # failure ratio is no longer a reason to abort the whole job.
-                # Hard-fail only when *every* sampled image was missing AND
-                # we're not part of a chain — that pattern usually means an
-                # unmounted NAS where no work can succeed.
-                if fail_ratio >= 1.0 and not chain_mode:
-                    runner.fail_job(
+                if chain_mode:
+                    add_job_log(
+                        runner.db,
                         job_id,
-                        f'{preflight_msg} '
-                        'All sampled images are inaccessible — verify catalog filepath values '
-                        'and mounted storage before retrying.',
-                        severity='critical',
+                        'warning',
+                        f'{preflight_msg} Continuing — missing files will be skipped per-image.',
                     )
+                else:
+                    abort_msg = (
+                        f'{sample_failed_count}/{sample_size} sampled paths unreachable — '
+                        'this usually means your network share is not mounted. '
+                        'Check your mount and retry.'
+                    )
+                    add_job_log(runner.db, job_id, 'error', abort_msg)
+                    runner.fail_job(job_id, abort_msg, severity='critical')
                     return
-                add_job_log(
-                    runner.db,
-                    job_id,
-                    'warning',
-                    f'{preflight_msg} Continuing — missing files will be skipped per-image.',
-                )
 
         def persist_progress() -> bool:
             if len(processed_pairs) > _CHECKPOINT_MAX_ENTRIES:
