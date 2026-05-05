@@ -70,7 +70,7 @@
 
 ### v4.0 Backend Health & E2E Coverage
 
-- [ ] Phase 12: Operational baseline & embed reliability — OPS-01..OPS-05
+- [x] Phase 12: Operational baseline & embed reliability — OPS-01..OPS-05 (completed 2026-05-05)
 - [ ] Phase 13: Handlers split (per-job-family) — REFACTOR-01
 - [ ] Phase 14: Database & images API split — REFACTOR-02, REFACTOR-03
 - [ ] Phase 15: Service modules & boundary policy — REFACTOR-04, REFACTOR-05
