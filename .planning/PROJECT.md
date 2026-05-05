@@ -106,6 +106,7 @@ The user is a photographer managing work across multiple Lightroom catalogs (per
 - **v2.0 shipped** (2026-04-15) — 7 phases, 17 requirements: structured scoring, posting analytics, identity/suggestions, insights dashboard
 - **v2.1 shipped** (2026-04-23) — 9 phases, 20 requirements: matching polish, job queue UX, filter framework, identity clarity, badge/card consistency, React Suspense data layer, two-stage cascade matching
 - **v3.0 shipped** (2026-05-04) — 14 phases, 56 plans, 289 commits: natural language search (NL filters + FTS5 + semantic embeddings + multi-tool chat), photo stacking, visual attribute tags, CLIP similarity + catalog cache pipeline, stack-aware matching. 422 files changed, 37k+ LOC added. All 15 requirements satisfied.
+- **v4.0 Phase 12 complete** (2026-05-05) — Operational baseline & embed reliability: embed preflight strict >50% fail-fast, silent JPEG compression on vision-cache hits, skip_reason_counts D-07 alignment, JobDetailModal 3-bucket diagnostics panel (OPS-01..05 verified).
 - Tech stack: Flask + SQLite (catalog read-only, library DB read-write), React 19 + Vite + Recharts + CodeMirror, sqlite-vec (CLIP + text embeddings), sentence-transformers
 - 4 configurable critique perspectives with photography-theory rubrics
 - Pydantic-validated structured output with deterministic + LLM JSON repair
@@ -177,4 +178,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-05 — v4.0 Backend Health & E2E Coverage milestone started.*
+*Last updated: 2026-05-05 — Phase 12 complete (OPS-01..05). v4.0 Phase 13 next.*
