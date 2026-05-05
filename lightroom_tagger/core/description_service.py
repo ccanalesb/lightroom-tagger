@@ -58,7 +58,9 @@ def describe_matched_image(db: sqlite3.Connection, catalog_key: str, force: bool
                            provider_id: str | None = None,
                            model: str | None = None,
                            log_callback: LogCallback = None,
-                           perspective_slugs: list[str] | None = None) -> bool:
+                           perspective_slugs: list[str] | None = None,
+                           *,
+                           telemetry: dict | None = None) -> bool:
     """Generate and store a description for a catalog image if needed.
 
     Returns True if a non-empty description was stored. Returns False if
@@ -86,10 +88,32 @@ def describe_matched_image(db: sqlite3.Connection, catalog_key: str, force: bool
     image_for_describe = cached_path if cached_path and os.path.exists(cached_path) else filepath
 
     user_prompt = _resolve_description_user_prompt(db, perspective_slugs)
-    structured = describe_image(
-        image_for_describe, provider_id=provider_id, model=model,
-        log_callback=log_callback, user_prompt=user_prompt,
+    use_silent_compression = (
+        provider_id is not None
+        and bool(cached_path)
+        and cached_path == image_for_describe
+        and os.path.exists(cached_path)
     )
+    if use_silent_compression:
+        structured = describe_image(
+            image_for_describe,
+            provider_id=provider_id,
+            model=model,
+            log_callback=log_callback,
+            user_prompt=user_prompt,
+            silent_compression=True,
+        )
+        if telemetry is not None:
+            with telemetry['_lock']:
+                telemetry['silent_compression_skips'] += 1
+    else:
+        structured = describe_image(
+            image_for_describe,
+            provider_id=provider_id,
+            model=model,
+            log_callback=log_callback,
+            user_prompt=user_prompt,
+        )
     if not _description_structured_is_valid(structured):
         return False
 

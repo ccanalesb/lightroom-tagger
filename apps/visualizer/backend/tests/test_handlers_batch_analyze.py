@@ -265,6 +265,85 @@ def test_batch_analyze_resume_skips_describe_when_stage_score(
     assert mock_score.call_count == 1
 
 
+@patch('jobs.handlers.get_job', return_value=None)
+@patch('jobs.handlers.add_job_log')
+@patch('jobs.handlers._score_single_image')
+@patch('lightroom_tagger.core.description_service.describe_image')
+@patch('lightroom_tagger.core.description_service.get_or_create_cached_image')
+@patch('jobs.handlers.init_database')
+@patch('jobs.handlers.load_config')
+@patch('jobs.handlers.os.getenv')
+@patch('jobs.handlers.require_library_db')
+def test_batch_analyze_compression_already_done_silent(
+    mock_require_lib,
+    mock_getenv,
+    mock_config,
+    mock_init_db,
+    mock_get_cache,
+    mock_describe,
+    mock_score,
+    mock_add_log,
+    _mock_get_job,
+    tmp_path,
+):
+    from jobs.handlers import handle_batch_analyze
+    from lightroom_tagger.core.database import init_database as lt_init, store_image
+    from PIL import Image
+
+    db_file = tmp_path / 'library.db'
+    cache_jpg = tmp_path / 'cached.jpg'
+    orig_jpg = tmp_path / 'orig.jpg'
+    Image.new('RGB', (2, 2)).save(cache_jpg, 'JPEG')
+    Image.new('RGB', (2, 2)).save(orig_jpg, 'JPEG')
+
+    conn = lt_init(str(db_file))
+    store_image(
+        conn,
+        {
+            'filepath': str(orig_jpg),
+            'filename': 'photo.jpg',
+            'date_taken': '2024-01-01',
+            'rating': 1,
+        },
+    )
+    conn.close()
+
+    mock_getenv.return_value = str(db_file)
+    mock_require_lib.return_value = str(db_file)
+    mock_config.return_value = MagicMock(db_path=str(db_file))
+    mock_init_db.side_effect = lambda p: lt_init(str(p))
+    mock_get_cache.return_value = str(cache_jpg)
+    mock_describe.return_value = {
+        'summary': 'x',
+        'composition': {},
+        'perspectives': {},
+        'technical': {},
+        'subjects': [],
+        'best_perspective': 's',
+    }
+    mock_score.return_value = ('scored', True, None)
+
+    runner = _make_runner()
+
+    handle_batch_analyze(
+        runner,
+        'job-silent-comp',
+        {
+            'image_type': 'catalog',
+            'max_workers': 1,
+            'perspective_slugs': ['p1'],
+            'provider_id': 'ollama',
+        },
+    )
+
+    info_msgs = [
+        str(c.args[3])
+        for c in mock_add_log.call_args_list
+        if len(c.args) >= 4 and c.args[2] == 'info'
+    ]
+    assert any(m == '1 images already compressed, skipped.' for m in info_msgs), info_msgs
+
+
 @patch('jobs.handlers.add_job_log')
 @patch('jobs.handlers._score_single_image')
 @patch('lightroom_tagger.core.description_service.describe_matched_image')

@@ -114,6 +114,38 @@ class TestDescribeMatchedImage:
         mock_cache.assert_not_called()
         assert get_image_description(db, catalog_key) is None
 
+    def test_uses_silent_compression_when_vision_cache_hit_and_provider(self, tmp_path):
+        """Catalog cache hit + provider describe passes silent_compression=True."""
+        from lightroom_tagger.core.description_service import describe_matched_image
+        from PIL import Image
+
+        db = _make_db(tmp_path)
+        orig = str(tmp_path / 'photo.jpg')
+        cached = str(tmp_path / 'c.jpg')
+        Image.new('RGB', (2, 2)).save(orig, 'JPEG')
+        Image.new('RGB', (2, 2)).save(cached, 'JPEG')
+        catalog_key = store_image(db, {'filepath': orig, 'filename': 'photo.jpg'})
+
+        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc, \
+             patch(
+                 'lightroom_tagger.core.description_service.get_or_create_cached_image',
+                 return_value=cached,
+             ), \
+             patch('lightroom_tagger.core.description_service.get_description_model', return_value='test-model'):
+            mock_desc.return_value = {
+                'summary': 'A street scene',
+                'composition': {'depth': 'shallow'},
+                'perspectives': {'street': {'score': 7}},
+                'technical': {'mood': 'gritty'},
+                'subjects': ['person'],
+                'best_perspective': 'street',
+            }
+            describe_matched_image(db, catalog_key, provider_id='test-prov')
+
+        mock_desc.assert_called_once()
+        _, kwargs = mock_desc.call_args
+        assert kwargs.get('silent_compression') is True
+
     def test_skips_video_even_with_force(self, tmp_path):
         """force=True must not override the video short-circuit — the provider
         still cannot describe video bytes."""

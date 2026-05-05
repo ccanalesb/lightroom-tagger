@@ -155,7 +155,13 @@ def parse_description_response(raw: str) -> dict:
     return dict(_DESCRIPTION_FALLBACK)
 
 
-def compress_image(input_path: str, max_size: tuple[int, int] | None = None, quality: int | None = None) -> str:
+def compress_image(
+    input_path: str,
+    max_size: tuple[int, int] | None = None,
+    quality: int | None = None,
+    *,
+    silent: bool = False,
+) -> str:
     """Compress image to reduce file size for vision comparison.
 
     Returns path to temporary compressed file.
@@ -194,11 +200,13 @@ def compress_image(input_path: str, max_size: tuple[int, int] | None = None, qua
             # Log compression
             original_size = os.path.getsize(input_path) / 1024 # KB
             compressed_size = os.path.getsize(temp_path) / 1024 # KB
-            print(f" Compressed: {original_size:.1f}KB -> {compressed_size:.1f}KB", flush=True)
+            if not silent:
+                print(f" Compressed: {original_size:.1f}KB -> {compressed_size:.1f}KB", flush=True)
 
             return temp_path
     except Exception as e:
-        print(f" Compression failed: {e}", flush=True)
+        if not silent:
+            print(f" Compression failed: {e}", flush=True)
         return input_path
 
 
@@ -322,7 +330,9 @@ def extract_exif(path: str) -> dict[str, Any]:
 
 def describe_image(path: str, agent_type: str | None = None,
                     provider_id: str | None = None, model: str | None = None,
-                    log_callback=None, user_prompt: str | None = None) -> dict:
+                    log_callback=None, user_prompt: str | None = None,
+                    *,
+                    silent_compression: bool = False) -> dict:
     """Generate structured description using configured agent.
 
     When *provider_id* is given the new multi-provider pipeline is used
@@ -331,7 +341,12 @@ def describe_image(path: str, agent_type: str | None = None,
     """
     if provider_id is not None:
         return _describe_image_via_provider(
-            path, provider_id, model, log_callback, user_prompt=user_prompt
+            path,
+            provider_id,
+            model,
+            log_callback,
+            user_prompt=user_prompt,
+            silent_compression=silent_compression,
         )
 
     if agent_type is None:
@@ -353,7 +368,9 @@ def describe_image(path: str, agent_type: str | None = None,
 
 def _describe_image_via_provider(path: str, provider_id: str,
                                   model: str | None, log_callback=None,
-                                  user_prompt: str | None = None) -> dict:
+                                  user_prompt: str | None = None,
+                                  *,
+                                  silent_compression: bool = False) -> dict:
     """Generate description via the unified provider pipeline."""
     from lightroom_tagger.core.fallback import FallbackDispatcher
     from lightroom_tagger.core.provider_registry import ProviderRegistry
@@ -378,7 +395,7 @@ def _describe_image_via_provider(path: str, provider_id: str,
     if viewable != path:
         temp_files.append(viewable)
 
-    compressed = compress_image(viewable)
+    compressed = compress_image(viewable, silent=silent_compression)
     if compressed != viewable:
         temp_files.append(compressed)
 

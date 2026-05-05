@@ -2,6 +2,7 @@
 import os
 import random
 import sqlite3
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -1201,6 +1202,7 @@ def _describe_single_image(
     desc_provider_id,
     desc_provider_model,
     perspective_slugs: list[str] | None = None,
+    telemetry: dict | None = None,
 ) -> tuple[str, bool, str | None]:
     """
     Describe a single image (DRY helper).
@@ -1219,6 +1221,7 @@ def _describe_single_image(
                 lib_db, key, force=force,
                 provider_id=desc_provider_id, model=desc_provider_model,
                 perspective_slugs=perspective_slugs,
+                telemetry=telemetry,
             )
         else:
             result = describe_instagram_image(
@@ -1572,6 +1575,10 @@ def _run_describe_pass(
     failed = 0
     consecutive_failures = 0
 
+    telemetry = None
+    if nested_analyze_checkpoint:
+        telemetry = {'silent_compression_skips': 0, '_lock': threading.Lock()}
+
     if max_workers > 1 and total > 3:
         def process_image_worker(key: str, itype: str):
             """Worker function with its own DB connection.
@@ -1588,6 +1595,7 @@ def _run_describe_pass(
                     status, success, error_msg = _describe_single_image(
                         worker_db, key, itype, describe_force, desc_provider_id, desc_provider_model,
                         perspective_slugs,
+                        telemetry,
                     )
                 return (key, status, error_msg)
             finally:
@@ -1672,6 +1680,7 @@ def _run_describe_pass(
             status, success, error_msg = _describe_single_image(
                 lib_db, key, itype, describe_force, desc_provider_id, desc_provider_model,
                 perspective_slugs,
+                telemetry,
             )
 
             if status == 'described':
@@ -1699,6 +1708,18 @@ def _run_describe_pass(
     row_status = get_job(runner.db, job_id)
     if row_status and row_status.get('status') == 'failed':
         return None
+
+    if (
+        nested_analyze_checkpoint
+        and telemetry is not None
+        and telemetry['silent_compression_skips'] > 0
+    ):
+        add_job_log(
+            runner.db,
+            job_id,
+            'info',
+            f"{telemetry['silent_compression_skips']} images already compressed, skipped.",
+        )
 
     result_summary = {
         'described': described,

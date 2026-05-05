@@ -175,6 +175,31 @@ def test_compress_image_creates_temp_file():
             os.unlink(test_path)
 
 
+def test_compress_image_silent_suppresses_prints(capsys):
+    """silent=True must not emit the `` Compressed:`` stdout line."""
+    from PIL import Image
+
+    fd, test_path = tempfile.mkstemp(suffix='.png')
+    os.close(fd)
+
+    try:
+        img = Image.new('RGB', (2000, 2000), color='red')
+        img.save(test_path, 'PNG')
+
+        compressed_path = compress_image(
+            test_path, max_size=(500, 500), quality=80, silent=True,
+        )
+        assert compressed_path != test_path
+        out = capsys.readouterr().out
+        assert 'Compressed:' not in out
+
+        if compressed_path != test_path and os.path.exists(compressed_path):
+            os.unlink(compressed_path)
+    finally:
+        if os.path.exists(test_path):
+            os.unlink(test_path)
+
+
 def test_compress_image_handles_rgba():
     """Compress should convert RGBA to RGB."""
     from PIL import Image
