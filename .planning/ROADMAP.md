@@ -6,6 +6,7 @@
 - ✅ **v2.0 Advanced Critique & Insights** — Phases 5–11 (shipped 2026-04-15) · [archive](./milestones/v2.0-ROADMAP.md)
 - ✅ **v2.1 Polish & Consolidate** — 9 phases (shipped 2026-04-23) · [archive](./milestones/v2.1-ROADMAP.md)
 - ✅ **v3.0 Intelligent Discovery** — 14 phases (shipped 2026-05-04) · [archive](./milestones/v3.0-ROADMAP.md)
+- 📋 **v4.0 Backend Health & E2E Coverage** — Phases 12–18 (in progress)
 
 ## Phases
 
@@ -67,10 +68,16 @@
 
 </details>
 
-### 📋 Next Milestone
+### v4.0 Backend Health & E2E Coverage
 
-No phases planned yet. Run `/gsd-new-milestone` to define the next milestone.
+- [ ] Phase 12: Operational baseline & embed reliability — OPS-01..OPS-05
+- [ ] Phase 13: Handlers split (per-job-family) — REFACTOR-01
+- [ ] Phase 14: Database & images API split — REFACTOR-02, REFACTOR-03
+- [ ] Phase 15: Service modules & boundary policy — REFACTOR-04, REFACTOR-05
+- [ ] Phase 16: Recovery & path-failure unit tests — TEST-01, TEST-02
+- [ ] Phase 17: E2E harness bootstrap (CDP + fixture) — TEST-03
+- [ ] Phase 18: Critical user flows E2E — E2E-01..E2E-06
 
 ---
 
-*Roadmap created: 2026-04-10 · v1.0 shipped: 2026-04-11 · v2.0 shipped: 2026-04-15 · v2.1 shipped: 2026-04-23 · v3.0 shipped: 2026-05-04*
+*Roadmap created: 2026-04-10 · v1.0 shipped: 2026-04-11 · v2.0 shipped: 2026-04-15 · v2.1 shipped: 2026-04-23 · v3.0 shipped: 2026-05-04 · v4.0 roadmap: 2026-05-05*

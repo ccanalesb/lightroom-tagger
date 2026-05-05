@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Backend Health & E2E Coverage
-status: Defining requirements
-last_updated: "2026-05-05T09:31:00.000Z"
+status: Ready to execute Phase 12
+last_updated: "2026-05-05T12:00:00.000Z"
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -15,23 +15,23 @@ progress:
 # Planning state
 
 **Project:** Lightroom Tagger & Analyzer
-**Roadmap:** [.planning/ROADMAP.md](./ROADMAP.md) (v4.0 — defining requirements)
+**Roadmap:** [.planning/ROADMAP.md](./ROADMAP.md) (v4.0 — Phases 12–18)
 
 ## Current focus
 
 | Field | Value |
 |-------|--------|
 | Active milestone | v4.0 Backend Health & E2E Coverage |
-| Phase | Not started (defining requirements) |
-| Status | Defining requirements |
-| Last activity | 2026-05-05 — Milestone v4.0 started |
+| Phase | **Phase 12** — Operational baseline & embed reliability |
+| Status | Ready to execute Phase 12 |
+| Last activity | 2026-05-05 — v4.0 phased roadmap written (Phases 12–18) |
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
-**Current focus:** Phase 11 — v3 deferred polish (`11-02` next)
+**Current focus:** Phase 12 — Operational baseline & embed reliability (OPS-01..OPS-05)
 
 ## Deferred Items
 
