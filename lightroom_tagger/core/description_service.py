@@ -1,7 +1,9 @@
 """Describe matched catalog and Instagram images on demand."""
 import os
 import sqlite3
+import threading
 from collections.abc import Callable
+from typing import TypedDict
 
 from lightroom_tagger.core.analyzer import VIDEO_EXTENSIONS, describe_image, get_description_model
 from lightroom_tagger.core.database import (
@@ -16,6 +18,24 @@ from lightroom_tagger.core.prompt_builder import build_description_user_prompt
 from lightroom_tagger.core.vision_cache import get_or_create_cached_image
 
 LogCallback = Callable[[str, str], None] | None
+
+
+class DescribeTelemetry(TypedDict):
+    """Thread-safe telemetry bag for batch describe passes.
+
+    Construct with::
+
+        telemetry: DescribeTelemetry = {
+            'silent_compression_skips': 0,
+            '_lock': threading.Lock(),
+        }
+
+    Pass ``None`` when telemetry is not needed; any partial dict raises KeyError
+    at the ``with telemetry['_lock']`` site.
+    """
+
+    silent_compression_skips: int
+    _lock: threading.Lock
 
 
 # File extensions the vision pipeline cannot describe. These get short-circuited
@@ -60,7 +80,7 @@ def describe_matched_image(db: sqlite3.Connection, catalog_key: str, force: bool
                            log_callback: LogCallback = None,
                            perspective_slugs: list[str] | None = None,
                            *,
-                           telemetry: dict | None = None) -> bool:
+                           telemetry: DescribeTelemetry | None = None) -> bool:
     """Generate and store a description for a catalog image if needed.
 
     Returns True if a non-empty description was stored. Returns False if

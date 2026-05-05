@@ -264,6 +264,27 @@ export function SearchPage() {
   const selectClass =
     'min-w-0 w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-primary truncate'
 
+  const pinWarningBanner = pinSimilarityWarning ? (
+    <div role="status" aria-live="polite" className="text-xs text-amber-600 dark:text-amber-400 space-y-1">
+      <p className="m-0">
+        {SEARCH_PIN_INACTIVE_PREFIX} {pinSimilarityWarning}. {SEARCH_PIN_INACTIVE_SUFFIX}
+      </p>
+      {pinInactiveReason === SEARCH_PIN_FALLBACK_REASON_NO_CLIP_EMBEDDING ? (
+        <div className="space-y-1">
+          <p className="m-0">{SEARCH_PIN_HELP_EMBED}</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <Link to={PROCESSING_CATALOG_CACHE_ROUTE} className="font-medium text-accent underline">
+              {SEARCH_PIN_LINK_CACHE}
+            </Link>
+            <Link to={PROCESSING_JOB_QUEUE_ROUTE} className="font-medium text-accent underline">
+              {PROCESSING_OPEN_JOB_QUEUE}
+            </Link>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  ) : null
+
   return (
     <div>
       <div className="mb-3">
@@ -421,32 +442,7 @@ export function SearchPage() {
                   <span className="font-medium text-text">{pinnedImageKey}</span>
                 </p>
               ) : null}
-              {pinSimilarityWarning ? (
-                <div role="status" aria-live="polite" className="text-xs text-amber-600 dark:text-amber-400 self-stretch space-y-1">
-                  <p className="m-0">
-                    {SEARCH_PIN_INACTIVE_PREFIX} {pinSimilarityWarning}. {SEARCH_PIN_INACTIVE_SUFFIX}
-                  </p>
-                  {pinInactiveReason === SEARCH_PIN_FALLBACK_REASON_NO_CLIP_EMBEDDING ? (
-                    <div className="space-y-1">
-                      <p className="m-0">{SEARCH_PIN_HELP_EMBED}</p>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1">
-                        <Link
-                          to={PROCESSING_CATALOG_CACHE_ROUTE}
-                          className="font-medium text-accent underline"
-                        >
-                          {SEARCH_PIN_LINK_CACHE}
-                        </Link>
-                        <Link
-                          to={PROCESSING_JOB_QUEUE_ROUTE}
-                          className="font-medium text-accent underline"
-                        >
-                          {PROCESSING_OPEN_JOB_QUEUE}
-                        </Link>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
+              <div className="self-stretch">{pinWarningBanner}</div>
               <p className="text-gray-500 text-sm">No matches found. Try a different query.</p>
             </div>
           ) : (
@@ -460,32 +456,7 @@ export function SearchPage() {
                   </span>
                 </p>
               ) : null}
-              {pinSimilarityWarning ? (
-                <div role="status" aria-live="polite" className="text-xs text-amber-600 dark:text-amber-400 mb-2 space-y-1">
-                  <p className="m-0">
-                    {SEARCH_PIN_INACTIVE_PREFIX} {pinSimilarityWarning}. {SEARCH_PIN_INACTIVE_SUFFIX}
-                  </p>
-                  {pinInactiveReason === SEARCH_PIN_FALLBACK_REASON_NO_CLIP_EMBEDDING ? (
-                    <div className="space-y-1">
-                      <p className="m-0">{SEARCH_PIN_HELP_EMBED}</p>
-                      <div className="flex flex-wrap gap-x-3 gap-y-1">
-                        <Link
-                          to={PROCESSING_CATALOG_CACHE_ROUTE}
-                          className="font-medium text-accent underline"
-                        >
-                          {SEARCH_PIN_LINK_CACHE}
-                        </Link>
-                        <Link
-                          to={PROCESSING_JOB_QUEUE_ROUTE}
-                          className="font-medium text-accent underline"
-                        >
-                          {PROCESSING_OPEN_JOB_QUEUE}
-                        </Link>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
+              <div className="mb-2">{pinWarningBanner}</div>
               <TileGrid>
                 {currentImages.map((image) => (
                   <div
