@@ -44,7 +44,6 @@ from lightroom_tagger.core.embedding_service import (
     numpy_to_vec_blob,
 )
 from lightroom_tagger.core.vision_cache import get_or_create_cached_image
-from lightroom_tagger.scripts.import_instagram_dump import import_dump
 from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
 
 from ..checkpoint import (
@@ -69,6 +68,7 @@ from .common import (
     _select_catalog_keys,
     _select_instagram_keys,
 )
+from .instagram import handle_analyze_instagram, handle_instagram_import
 _BATCH_EMBED_IMAGE_SIZE = 8
 _EMBED_PREFLIGHT_SAMPLE_SIZE = 25
 _EMBED_PREFLIGHT_FAIL_RATIO = 0.5
@@ -176,73 +176,6 @@ def _select_catalog_keys_missing_visual_tags(
         sql += " AND " + " AND ".join(conditions)
     rows = lib_db.execute(sql, tuple(params)).fetchall()
     return [(r['key'], 'catalog') for r in rows]
-
-
-def handle_analyze_instagram(runner, job_id: str, metadata: dict):
-    """Analyze Instagram images."""
-    runner.update_progress(job_id, 50, 'Analyzing images...')
-    runner.complete_job(job_id, {'images_processed': 0})
-
-
-def handle_instagram_import(runner, job_id: str, metadata: dict):
-    """Import Instagram export dump media into the library database."""
-    add_job_log(runner.db, job_id, 'info', 'Starting Instagram dump import...')
-    runner.update_progress(job_id, 10, 'Importing Instagram dump...')
-
-    try:
-        config = load_config()
-        raw = (
-            metadata.get('dump_path')
-            or config.instagram_dump_path
-            or os.getenv('INSTAGRAM_DUMP_PATH')
-            or ''
-        )
-        stripped = str(raw).strip()
-        if not stripped:
-            runner.fail_job(
-                job_id,
-                'Instagram dump path not configured or not a directory',
-                severity='warning',
-            )
-            return
-        dump_path = Path(stripped).expanduser()
-        if not os.path.isdir(dump_path):
-            runner.fail_job(
-                job_id,
-                'Instagram dump path not configured or not a directory',
-                severity='warning',
-            )
-            return
-
-        db_path = require_library_db()
-
-        skip_dedup = bool(metadata.get('skip_dedup', False))
-        reimport = bool(metadata.get('reimport', False))
-
-        db = init_database(db_path)
-        try:
-            imported = import_dump(
-                db,
-                str(dump_path),
-                skip_existing=not reimport,
-                skip_dedup=skip_dedup,
-            )
-        finally:
-            db.close()
-
-        runner.update_progress(job_id, 100, 'Complete')
-        runner.complete_job(
-            job_id,
-            {
-                'imported': imported,
-                'dump_path': str(dump_path),
-                'reimport': reimport,
-                'skip_dedup': skip_dedup,
-            },
-        )
-    except Exception as e:
-        severity = _failure_severity_from_exception(e)
-        runner.fail_job(job_id, str(e), severity=severity)
 
 
 def _expand_matches_for_lightroom_writes(matches: list) -> list:
@@ -3609,21 +3542,3 @@ def _handle_catalog_cache_build_inner(runner, job_id: str, metadata: dict) -> No
         },
     )
 
-
-JOB_HANDLERS = {
-    'analyze_instagram': handle_analyze_instagram,
-    'instagram_import': handle_instagram_import,
-    'vision_match': handle_vision_match,
-    'enrich_catalog': handle_enrich_catalog,
-    'prepare_catalog': handle_prepare_catalog,
-    'batch_describe': handle_batch_describe,
-    'single_describe': handle_single_describe,
-    'single_score': handle_single_score,
-    'batch_score': handle_batch_score,
-    'batch_analyze': handle_batch_analyze,
-    'batch_stack_detect': handle_batch_stack_detect,
-    'batch_catalog_similarity': handle_batch_catalog_similarity,
-    'batch_text_embed': handle_batch_text_embed,
-    'batch_embed_image': handle_batch_embed_image,
-    'catalog_cache_build': handle_catalog_cache_build,
-}
