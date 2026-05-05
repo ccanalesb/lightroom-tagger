@@ -2825,6 +2825,9 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
         embedded = 0
         skipped = 0
         failed = 0
+        # D-07 embed diagnostics (stable keys): no_row → no catalog/dump row;
+        # empty_path → empty filepath; unresolved_or_missing → missing file or
+        # unreachable path; encode_failed → vision-cache/encode path failures.
         skip_reason_counts = {
             'no_row': 0,
             'empty_path': 0,
