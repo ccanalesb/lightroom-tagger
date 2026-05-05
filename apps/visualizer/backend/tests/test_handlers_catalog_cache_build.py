@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import jobs.handlers as job_handlers
-
 
 def _make_runner() -> MagicMock:
     runner = MagicMock()
@@ -20,11 +18,11 @@ def test_catalog_cache_build_registered_in_job_handlers() -> None:
     assert JOB_HANDLERS['catalog_cache_build'] is handle_catalog_cache_build
 
 
-@patch('jobs.handlers.list_instagram_dump_keys_needing_clip_embedding', return_value=[])
-@patch('jobs.handlers.list_catalog_keys_needing_clip_embedding', return_value=[])
-@patch('jobs.handlers._handle_catalog_similarity_inner')
-@patch('jobs.handlers._handle_batch_stack_detect_inner')
-@patch('jobs.handlers._handle_batch_embed_image_inner')
+@patch('jobs.handlers.stacks.list_instagram_dump_keys_needing_clip_embedding', return_value=[])
+@patch('jobs.handlers.stacks.list_catalog_keys_needing_clip_embedding', return_value=[])
+@patch('jobs.handlers.stacks._handle_catalog_similarity_inner')
+@patch('jobs.handlers.stacks._handle_batch_stack_detect_inner')
+@patch('jobs.handlers.stacks._handle_batch_embed_image_inner')
 def test_chain_runs_stages_in_order(
     mock_embed: MagicMock,
     mock_stack: MagicMock,
@@ -81,11 +79,11 @@ def test_chain_runs_stages_in_order(
     assert 'embed' in payload and 'stack' in payload and 'similarity' in payload
 
 
-@patch('jobs.handlers.list_instagram_dump_keys_needing_clip_embedding', return_value=[])
-@patch('jobs.handlers.list_catalog_keys_needing_clip_embedding', return_value=[])
-@patch('jobs.handlers._handle_catalog_similarity_inner')
-@patch('jobs.handlers._handle_batch_stack_detect_inner')
-@patch('jobs.handlers._handle_batch_embed_image_inner')
+@patch('jobs.handlers.stacks.list_instagram_dump_keys_needing_clip_embedding', return_value=[])
+@patch('jobs.handlers.stacks.list_catalog_keys_needing_clip_embedding', return_value=[])
+@patch('jobs.handlers.stacks._handle_catalog_similarity_inner')
+@patch('jobs.handlers.stacks._handle_batch_stack_detect_inner')
+@patch('jobs.handlers.stacks._handle_batch_embed_image_inner')
 def test_chain_honors_cancel_between_stages(
     mock_embed: MagicMock,
     mock_stack: MagicMock,
@@ -121,12 +119,12 @@ def test_chain_honors_cancel_between_stages(
     runner.complete_job.assert_not_called()
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers.list_instagram_dump_keys_needing_clip_embedding', return_value=[])
-@patch('jobs.handlers.list_catalog_keys_needing_clip_embedding', return_value=[])
-@patch('jobs.handlers._handle_catalog_similarity_inner')
-@patch('jobs.handlers._handle_batch_stack_detect_inner')
-@patch('jobs.handlers._handle_batch_embed_image_inner')
+@patch('jobs.handlers.stacks.add_job_log')
+@patch('jobs.handlers.stacks.list_instagram_dump_keys_needing_clip_embedding', return_value=[])
+@patch('jobs.handlers.stacks.list_catalog_keys_needing_clip_embedding', return_value=[])
+@patch('jobs.handlers.stacks._handle_catalog_similarity_inner')
+@patch('jobs.handlers.stacks._handle_batch_stack_detect_inner')
+@patch('jobs.handlers.stacks._handle_batch_embed_image_inner')
 def test_stage_banner_logs_include_similarity_stage(
     mock_embed: MagicMock,
     mock_stack: MagicMock,

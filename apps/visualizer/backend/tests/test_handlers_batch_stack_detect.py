@@ -35,7 +35,7 @@ def _make_runner() -> MagicMock:
     return runner
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.stacks.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_handle_batch_stack_detect_zero_work(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
@@ -69,7 +69,7 @@ def test_handle_batch_stack_detect_zero_work(
         assert isinstance(result[k], int)
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.stacks.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_handle_batch_stack_detect_burst_creates_one_stack(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
@@ -131,7 +131,7 @@ def test_handle_batch_stack_detect_burst_creates_one_stack(
         lib.close()
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.stacks.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_handle_batch_stack_detect_skips_no_date_and_logs(
     mock_load_config, mock_add_log, tmp_path, monkeypatch
@@ -174,7 +174,7 @@ def test_handle_batch_stack_detect_skips_no_date_and_logs(
     assert any("skipped" in str(m).lower() for m in messages)
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.stacks.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_handle_batch_stack_detect_incremental_skips_stacked(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
@@ -225,7 +225,7 @@ def test_handle_batch_stack_detect_incremental_skips_stacked(
     assert res2["stacks_created"] == 0
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.stacks.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_handle_batch_stack_detect_force_rebuild_recreates(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
@@ -285,7 +285,7 @@ def test_handle_batch_stack_detect_force_rebuild_recreates(
         lib.close()
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.stacks.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_handle_batch_stack_detect_checkpoint_resume_second_burst(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch

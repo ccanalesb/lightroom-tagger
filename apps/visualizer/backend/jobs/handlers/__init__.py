@@ -16,6 +16,12 @@ exec(
     _namespace,
 )
 
+from .stacks import (
+    handle_batch_catalog_similarity,
+    handle_batch_stack_detect,
+    handle_catalog_cache_build,
+)
+
 JOB_HANDLERS = {
     'analyze_instagram': handle_analyze_instagram,
     'instagram_import': handle_instagram_import,
