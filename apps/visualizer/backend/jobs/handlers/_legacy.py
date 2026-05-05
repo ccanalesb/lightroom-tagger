@@ -48,8 +48,7 @@ from lightroom_tagger.core.provider_errors import AuthenticationError, InvalidRe
 from lightroom_tagger.scripts.import_instagram_dump import import_dump
 from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
 
-from . import path_setup as _path_setup  # noqa: F401
-from .checkpoint import (
+from ..checkpoint import (
     fingerprint_batch_describe,
     fingerprint_batch_embed_image,
     fingerprint_batch_score,
