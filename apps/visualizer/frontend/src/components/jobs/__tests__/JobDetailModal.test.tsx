@@ -5,10 +5,9 @@ import { JobDetailModal } from '../JobDetailModal';
 import type { Job } from '../../../types/job';
 import {
   JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE,
-  JOB_DETAILS_EMBED_REASON_EMPTY_PATH,
-  JOB_DETAILS_EMBED_REASON_ENCODE_FAILED,
-  JOB_DETAILS_EMBED_REASON_NO_ROW,
-  JOB_DETAILS_EMBED_REASON_UNRESOLVED,
+  JOB_SKIP_EMPTY_PATH,
+  JOB_SKIP_MISSING_FILE,
+  JOB_SKIP_NO_DB_ROW,
 } from '../../../constants/strings';
 
 const mockGet = vi.fn();
@@ -179,9 +178,60 @@ describe('JobDetailModal', () => {
     render(<JobDetailModal job={makeJob({ type: 'batch_embed_image' })} onClose={() => {}} />);
 
     expect(await screen.findByText(JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE)).toBeTruthy();
-    expect(screen.getByText(JOB_DETAILS_EMBED_REASON_NO_ROW).parentElement).toHaveTextContent('1');
-    expect(screen.getByText(JOB_DETAILS_EMBED_REASON_EMPTY_PATH).parentElement).toHaveTextContent('1');
-    expect(screen.getByText(JOB_DETAILS_EMBED_REASON_UNRESOLVED).parentElement).toHaveTextContent('2');
-    expect(screen.getByText(JOB_DETAILS_EMBED_REASON_ENCODE_FAILED).parentElement).toHaveTextContent('1');
+    expect(screen.getByText(JOB_SKIP_NO_DB_ROW).parentElement).toHaveTextContent('1');
+    expect(screen.getByText(JOB_SKIP_EMPTY_PATH).parentElement).toHaveTextContent('1');
+    expect(screen.getByText(JOB_SKIP_MISSING_FILE).parentElement).toHaveTextContent('2');
+    expect(screen.queryByText('Encode failed')).toBeNull();
+  });
+
+  it('embed diagnostics hidden when only encode_failed is positive', async () => {
+    mockGet.mockResolvedValue(
+      makeJob({
+        type: 'batch_embed_image',
+        result: {
+          embedded: 0,
+          skipped: 5,
+          failed: 0,
+          total: 5,
+          skip_reason_counts: {
+            no_row: 0,
+            empty_path: 0,
+            unresolved_or_missing: 0,
+            encode_failed: 5,
+          },
+        },
+      }),
+    );
+    render(<JobDetailModal job={makeJob({ type: 'batch_embed_image' })} onClose={() => {}} />);
+
+    await waitFor(() => {
+      expect(mockGet).toHaveBeenCalled();
+    });
+    expect(screen.queryByText(JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE)).toBeNull();
+  });
+
+  it('embed diagnostics omits zero buckets', async () => {
+    mockGet.mockResolvedValue(
+      makeJob({
+        type: 'batch_embed_image',
+        result: {
+          embedded: 0,
+          skipped: 3,
+          failed: 0,
+          total: 3,
+          skip_reason_counts: {
+            no_row: 0,
+            empty_path: 3,
+            unresolved_or_missing: 0,
+          },
+        },
+      }),
+    );
+    render(<JobDetailModal job={makeJob({ type: 'batch_embed_image' })} onClose={() => {}} />);
+
+    expect(await screen.findByText(JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE)).toBeTruthy();
+    expect(screen.getByText(JOB_SKIP_EMPTY_PATH).parentElement).toHaveTextContent('3');
+    expect(screen.queryByText(JOB_SKIP_NO_DB_ROW)).toBeNull();
+    expect(screen.queryByText(JOB_SKIP_MISSING_FILE)).toBeNull();
   });
 });

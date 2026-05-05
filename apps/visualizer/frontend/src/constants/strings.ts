@@ -343,10 +343,9 @@ export const JOB_DETAILS_LOADING_ARIA = 'Loading job details'
 export const JOB_DETAILS_FETCH_ERROR =
   'Could not refresh job details. Showing the last known summary.'
 export const JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE = 'Embed diagnostics'
-export const JOB_DETAILS_EMBED_REASON_NO_ROW = 'Missing catalog row'
-export const JOB_DETAILS_EMBED_REASON_EMPTY_PATH = 'Missing filepath'
-export const JOB_DETAILS_EMBED_REASON_UNRESOLVED = 'Path missing/unreachable'
-export const JOB_DETAILS_EMBED_REASON_ENCODE_FAILED = 'Encode failed'
+export const JOB_SKIP_MISSING_FILE = "Missing file"
+export const JOB_SKIP_EMPTY_PATH = "Empty path"
+export const JOB_SKIP_NO_DB_ROW = "No DB row"
 
 // Job Queue
 export const JOB_QUEUE_PAGINATION_RANGE = (start: number, end: number, total: number) =>

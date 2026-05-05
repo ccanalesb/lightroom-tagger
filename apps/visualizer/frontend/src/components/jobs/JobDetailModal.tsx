@@ -8,10 +8,9 @@ import {
   JOB_DETAILS_CURRENT_STEP,
   JOB_DETAILS_ERROR,
   JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE,
-  JOB_DETAILS_EMBED_REASON_EMPTY_PATH,
-  JOB_DETAILS_EMBED_REASON_ENCODE_FAILED,
-  JOB_DETAILS_EMBED_REASON_NO_ROW,
-  JOB_DETAILS_EMBED_REASON_UNRESOLVED,
+  JOB_SKIP_EMPTY_PATH,
+  JOB_SKIP_MISSING_FILE,
+  JOB_SKIP_NO_DB_ROW,
   ERROR_SEVERITY_LABELS,
   JOB_DETAILS_LOGS,
   JOB_DETAILS_LOGS_TRUNCATED_HEADER,
@@ -42,12 +41,14 @@ import { Button } from '../ui/Button';
 import { Card, CardTitle } from '../ui/Card';
 
 type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'accent';
-const EMBED_REASON_LABELS: Record<string, string> = {
-  no_row: JOB_DETAILS_EMBED_REASON_NO_ROW,
-  empty_path: JOB_DETAILS_EMBED_REASON_EMPTY_PATH,
-  unresolved_or_missing: JOB_DETAILS_EMBED_REASON_UNRESOLVED,
-  encode_failed: JOB_DETAILS_EMBED_REASON_ENCODE_FAILED,
-};
+
+const EMBED_REASON_LABELS = {
+  no_row: JOB_SKIP_NO_DB_ROW,
+  empty_path: JOB_SKIP_EMPTY_PATH,
+  unresolved_or_missing: JOB_SKIP_MISSING_FILE,
+} as const;
+
+type EmbedSkipBucketKey = keyof typeof EMBED_REASON_LABELS;
 
 function statusToBadgeVariant(status: Job['status']): BadgeVariant {
   switch (status) {
@@ -303,7 +304,7 @@ function JobDetailModalBody({ job, onClose, onJobUpdate }: JobDetailModalProps) 
         ? (displayJob.result as Record<string, unknown>).skip_reason_counts
         : null;
     if (!rawCounts || typeof rawCounts !== 'object') return null;
-    return (Object.keys(EMBED_REASON_LABELS) as Array<keyof typeof EMBED_REASON_LABELS>).map((key) => {
+    const rows = (Object.keys(EMBED_REASON_LABELS) as EmbedSkipBucketKey[]).map((key) => {
       const value = (rawCounts as Record<string, unknown>)[key];
       const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
       return {
@@ -312,6 +313,9 @@ function JobDetailModalBody({ job, onClose, onJobUpdate }: JobDetailModalProps) 
         count: Number.isFinite(numericValue) ? numericValue : 0,
       };
     });
+    const visible = rows.filter((r) => r.count > 0);
+    if (visible.length === 0) return null;
+    return visible;
   }, [displayJob.result, displayJob.type]);
 
   const handleRetry = async () => {
