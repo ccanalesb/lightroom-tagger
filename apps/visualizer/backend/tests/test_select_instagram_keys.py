@@ -64,7 +64,7 @@ def _insert(conn, key, *, created_at=None, date_folder=None, file_path=None):
 
 
 def _call(conn, *, months=None, year=None, undescribed_only=False):
-    from jobs.handlers import _select_instagram_keys
+    from jobs.handlers.common import _select_instagram_keys
 
     return {
         key

@@ -15,7 +15,7 @@ def _make_runner():
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_analyze_completes_with_zero_images(
     _mock_exists, _mock_getenv, mock_config, mock_init_db, _mock_add_log,
 ):
@@ -52,7 +52,7 @@ def test_batch_analyze_completes_with_zero_images(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_analyze_runs_describe_then_score(
     _mock_exists,
     _mock_getenv,
@@ -103,7 +103,7 @@ def test_batch_analyze_runs_describe_then_score(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_analyze_describe_failures_still_invoke_score(
     _mock_exists,
     _mock_getenv,
@@ -152,7 +152,7 @@ def test_batch_analyze_describe_failures_still_invoke_score(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_analyze_sets_current_step_describing_then_scoring(
     _mock_exists,
     _mock_getenv,
@@ -204,7 +204,7 @@ def test_batch_analyze_sets_current_step_describing_then_scoring(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_analyze_resume_skips_describe_when_stage_score(
     _mock_exists,
     _mock_getenv,
@@ -273,7 +273,7 @@ def test_batch_analyze_resume_skips_describe_when_stage_score(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv')
-@patch('jobs.handlers.require_library_db')
+@patch('jobs.handlers.common.require_library_db')
 def test_batch_analyze_compression_already_done_silent(
     mock_require_lib,
     mock_getenv,
@@ -353,7 +353,7 @@ def test_batch_analyze_compression_already_done_silent(
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
 @patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
-@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_analyze_describe_fingerprint_mismatch_resets_pairs(
     _mock_exists,
     _mock_getenv,

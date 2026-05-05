@@ -12,7 +12,7 @@ import pytest
 
 
 def _resolve(metadata):
-    from jobs.handlers import _resolve_date_window
+    from jobs.handlers.common import _resolve_date_window
 
     return _resolve_date_window(metadata)
 
@@ -87,7 +87,7 @@ def _patched_handler_env(handler_name):
 @patch('jobs.handlers.add_job_log')
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
-@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_honors_last_months_int(
     _mock_db_path, mock_config, mock_init_db, _mock_add_log,
 ):
@@ -126,7 +126,7 @@ def test_batch_describe_honors_last_months_int(
 @patch('jobs.handlers.add_job_log')
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
-@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_honors_year_window(
     _mock_db_path, mock_config, mock_init_db, _mock_add_log,
 ):
@@ -161,7 +161,7 @@ def test_batch_describe_honors_year_window(
 @patch('jobs.handlers.add_job_log')
 @patch('jobs.handlers.init_database')
 @patch('jobs.handlers.load_config')
-@patch('jobs.handlers.require_library_db', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_score_honors_last_months_int(
     _mock_db_path, mock_config, mock_init_db, _mock_add_log,
 ):
