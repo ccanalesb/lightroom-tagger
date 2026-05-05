@@ -9,7 +9,7 @@ from PIL import Image
 
 import sqlite_vec
 from database import create_job, get_job, init_db, update_job_field
-import jobs.handlers as job_handlers
+import jobs.handlers.embed as embed_mod
 from jobs.checkpoint import CHECKPOINT_VERSION, fingerprint_batch_embed_image
 from jobs.runner import JobRunner
 from lightroom_tagger.core.database import (
@@ -91,15 +91,15 @@ def test_instagram_dump_keys_needing_clip_embedding_excludes_existing_vec(
     assert keys == ["ig_need_vec"]
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_zero_work_completes(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     mock_enc = MagicMock()
-    monkeypatch.setattr(job_handlers, "encode_images", mock_enc)
+    monkeypatch.setattr(embed_mod, "encode_images", mock_enc)
 
     db_path = tmp_path / "library.db"
     init_database(str(db_path)).close()
@@ -116,12 +116,12 @@ def test_batch_embed_image_zero_work_completes(
     mock_enc.assert_not_called()
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_writes_clip_row(
     mock_load_config, mock_add_log, tmp_path, monkeypatch
 ) -> None:
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     jpg = tmp_path / "x.jpg"
     _write_min_jpg(jpg)
@@ -142,7 +142,7 @@ def test_batch_embed_image_writes_clip_row(
     mock_enc = MagicMock(
         return_value=np.ones((1, 512), dtype=np.float32)
     )
-    monkeypatch.setattr(job_handlers, "encode_images", mock_enc)
+    monkeypatch.setattr(embed_mod, "encode_images", mock_enc)
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
     mock_load_config.return_value = MagicMock(db_path=str(db_path))
@@ -167,12 +167,12 @@ def test_batch_embed_image_writes_clip_row(
         verify.close()
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_catalog_and_instagram_embeds_instagram_dump_row(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     ig_jpg = tmp_path / "ig.jpg"
     _write_min_jpg(ig_jpg)
@@ -193,9 +193,9 @@ def test_batch_embed_image_catalog_and_instagram_embeds_instagram_dump_row(
     mock_enc = MagicMock(
         return_value=np.ones((1, 512), dtype=np.float32)
     )
-    monkeypatch.setattr(job_handlers, "encode_images", mock_enc)
+    monkeypatch.setattr(embed_mod, "encode_images", mock_enc)
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "get_or_create_cached_image",
         lambda _db, _k, path: path,
     )
@@ -226,12 +226,12 @@ def test_batch_embed_image_catalog_and_instagram_embeds_instagram_dump_row(
         verify.close()
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_incremental_skips_existing(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     a = tmp_path / "a.jpg"
     b = tmp_path / "b.jpg"
@@ -271,9 +271,9 @@ def test_batch_embed_image_incremental_skips_existing(
         calls.append((list(paths), batch_size))
         return np.ones((len(paths), 512), dtype=np.float32)
 
-    monkeypatch.setattr(job_handlers, "encode_images", _encode)
+    monkeypatch.setattr(embed_mod, "encode_images", _encode)
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "get_or_create_cached_image",
         lambda _db, _k, path: path,
     )
@@ -291,12 +291,12 @@ def test_batch_embed_image_incremental_skips_existing(
     assert res["embedded"] == 1
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_force_reprocesses(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     a = tmp_path / "a.jpg"
     b = tmp_path / "b.jpg"
@@ -339,9 +339,9 @@ def test_batch_embed_image_force_reprocesses(
         calls.append((list(paths), batch_size))
         return np.ones((len(paths), 512), dtype=np.float32)
 
-    monkeypatch.setattr(job_handlers, "encode_images", _encode)
+    monkeypatch.setattr(embed_mod, "encode_images", _encode)
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "get_or_create_cached_image",
         lambda _db, _k, path: path,
     )
@@ -371,13 +371,13 @@ def test_batch_embed_image_force_reprocesses(
         verify.close()
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_checkpoint_resume(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     """Seeded checkpoint marks first key done; only second image is embedded."""
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     jobs_path = tmp_path / "jobs.db"
     lib_path = tmp_path / "library.db"
@@ -430,9 +430,9 @@ def test_batch_embed_image_checkpoint_resume(
         calls.append((list(paths), batch_size))
         return np.ones((len(paths), 512), dtype=np.float32)
 
-    monkeypatch.setattr(job_handlers, "encode_images", _encode)
+    monkeypatch.setattr(embed_mod, "encode_images", _encode)
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "get_or_create_cached_image",
         lambda _db, _k, path: path,
     )
@@ -448,12 +448,12 @@ def test_batch_embed_image_checkpoint_resume(
     assert calls[0][0] == [str(b)]
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_fingerprint_mismatch_clears_checkpoint(
     mock_load_config, mock_add_log, tmp_path, monkeypatch
 ) -> None:
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     a = tmp_path / "a.jpg"
     b = tmp_path / "b.jpg"
@@ -503,7 +503,7 @@ def test_batch_embed_image_fingerprint_mismatch_clears_checkpoint(
         calls.append((list(paths), batch_size))
         return np.ones((len(paths), 512), dtype=np.float32)
 
-    monkeypatch.setattr(job_handlers, "encode_images", _encode)
+    monkeypatch.setattr(embed_mod, "encode_images", _encode)
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
     mock_load_config.return_value = MagicMock(db_path=str(db_path))
@@ -518,12 +518,12 @@ def test_batch_embed_image_fingerprint_mismatch_clears_checkpoint(
     assert len(calls[0][0]) == 2
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_resolves_filepath_before_encode(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     resolved_jpg = tmp_path / "resolved.jpg"
     _write_min_jpg(resolved_jpg)
@@ -547,10 +547,10 @@ def test_batch_embed_image_resolves_filepath_before_encode(
         calls.append(list(paths))
         return np.ones((len(paths), 512), dtype=np.float32)
 
-    monkeypatch.setattr(job_handlers, "encode_images", _encode)
-    monkeypatch.setattr(job_handlers, "resolve_filepath", lambda _p: str(resolved_jpg))
+    monkeypatch.setattr(embed_mod, "encode_images", _encode)
+    monkeypatch.setattr(embed_mod, "resolve_filepath", lambda _p: str(resolved_jpg))
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "get_or_create_cached_image",
         lambda _db, _k, path: path,
     )
@@ -565,12 +565,12 @@ def test_batch_embed_image_resolves_filepath_before_encode(
     assert calls[0] == [str(resolved_jpg)]
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_uses_cached_path_for_encode(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     original_jpg = tmp_path / "original.jpg"
     cached_jpg = tmp_path / "cached.jpg"
@@ -596,9 +596,9 @@ def test_batch_embed_image_uses_cached_path_for_encode(
         calls.append(list(paths))
         return np.ones((len(paths), 512), dtype=np.float32)
 
-    monkeypatch.setattr(job_handlers, "encode_images", _encode)
+    monkeypatch.setattr(embed_mod, "encode_images", _encode)
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "get_or_create_cached_image",
         lambda _db, _k, _path: str(cached_jpg),
     )
@@ -613,12 +613,12 @@ def test_batch_embed_image_uses_cached_path_for_encode(
     assert calls[0] == [str(cached_jpg)]
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_preflight_fails_fast_when_paths_inaccessible(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     db_path = tmp_path / "library.db"
     conn = init_database(str(db_path))
@@ -635,8 +635,8 @@ def test_batch_embed_image_preflight_fails_fast_when_paths_inaccessible(
     conn.close()
 
     mock_enc = MagicMock(return_value=np.ones((1, 512), dtype=np.float32))
-    monkeypatch.setattr(job_handlers, "encode_images", mock_enc)
-    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 4)
+    monkeypatch.setattr(embed_mod, "encode_images", mock_enc)
+    monkeypatch.setattr(embed_mod, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 4)
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
     mock_load_config.return_value = MagicMock(db_path=str(db_path))
@@ -654,12 +654,12 @@ def test_batch_embed_image_preflight_fails_fast_when_paths_inaccessible(
     mock_enc.assert_not_called()
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_does_not_preflight_fail_on_compression_unavailable(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     good_jpg = tmp_path / "ok.jpg"
     _write_min_jpg(good_jpg)
@@ -677,15 +677,15 @@ def test_batch_embed_image_does_not_preflight_fail_on_compression_unavailable(
     )
     conn.close()
 
-    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 1)
-    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_FAIL_RATIO", 0.1)
+    monkeypatch.setattr(embed_mod, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 1)
+    monkeypatch.setattr(embed_mod, "_EMBED_PREFLIGHT_FAIL_RATIO", 0.1)
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "get_or_create_cached_image",
         lambda _db, _k, _path: None,
     )
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "encode_images",
         lambda paths, batch_size=8: np.ones((len(paths), 512), dtype=np.float32),
     )
@@ -704,12 +704,12 @@ def test_batch_embed_image_does_not_preflight_fail_on_compression_unavailable(
     assert result["skip_reason_counts"]["encode_failed"] == 1
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_reports_grouped_skip_reason_counts(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     good_jpg = tmp_path / "good.jpg"
     _write_min_jpg(good_jpg)
@@ -747,13 +747,13 @@ def test_batch_embed_image_reports_grouped_skip_reason_counts(
 
     missing_key = "missing-no-row-key"
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "list_catalog_keys_needing_clip_embedding",
         lambda *args, **kwargs: [missing_key, key_empty, key_missing, key_good],
     )
-    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 0)
+    monkeypatch.setattr(embed_mod, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 0)
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "encode_images",
         lambda paths, batch_size=8: [None for _ in paths],
     )
@@ -777,23 +777,23 @@ def test_batch_embed_image_reports_grouped_skip_reason_counts(
     }
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_suppresses_excessive_skip_detail_logs(
     mock_load_config, mock_add_log, tmp_path, monkeypatch
 ) -> None:
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     db_path = tmp_path / "library.db"
     init_database(str(db_path)).close()
 
     missing_keys = [f"missing-{i}" for i in range(20)]
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "list_catalog_keys_needing_clip_embedding",
         lambda *args, **kwargs: missing_keys,
     )
-    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 0)
+    monkeypatch.setattr(embed_mod, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 0)
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
     mock_load_config.return_value = MagicMock(db_path=str(db_path))
 
@@ -807,11 +807,11 @@ def test_batch_embed_image_suppresses_excessive_skip_detail_logs(
     ]
     info = [str(c.args[3]) for c in mock_add_log.call_args_list if len(c.args) > 3 and c.args[2] == "info"]
 
-    assert len(warnings) <= job_handlers._EMBED_SKIP_DETAIL_LOG_LIMIT
+    assert len(warnings) <= embed_mod._EMBED_SKIP_DETAIL_LOG_LIMIT
     assert any("additional no_row skip logs suppressed" in msg for msg in info)
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_uses_vision_cache_when_original_missing(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
@@ -822,7 +822,7 @@ def test_batch_embed_image_uses_vision_cache_when_original_missing(
     cached a compressed JPEG for the image, then Lightroom cleaned up the
     original. Embed must succeed off the cache without faulting.
     """
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     cached_jpg = tmp_path / "cached.jpg"
     _write_min_jpg(cached_jpg)
@@ -849,7 +849,7 @@ def test_batch_embed_image_uses_vision_cache_when_original_missing(
         captured_paths.append(list(paths))
         return np.ones((len(paths), 512), dtype=np.float32)
 
-    monkeypatch.setattr(job_handlers, "encode_images", _encode)
+    monkeypatch.setattr(embed_mod, "encode_images", _encode)
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
     mock_load_config.return_value = MagicMock(db_path=str(db_path))
 
@@ -864,13 +864,13 @@ def test_batch_embed_image_uses_vision_cache_when_original_missing(
     assert captured_paths == [[str(cached_jpg)]]
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_preflight_aborts_when_majority_unreachable(
     mock_load_config, mock_add_log, tmp_path, monkeypatch
 ) -> None:
     """Preflight fails fast when strictly >50% of the fixed sample is unreachable (5/8)."""
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     good_jpg = tmp_path / "good.jpg"
     _write_min_jpg(good_jpg)
@@ -906,13 +906,13 @@ def test_batch_embed_image_preflight_aborts_when_majority_unreachable(
     conn.close()
 
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "list_catalog_keys_needing_clip_embedding",
         lambda *args, **kwargs: bad_keys + good_keys,
     )
-    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 8)
+    monkeypatch.setattr(embed_mod, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 8)
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "encode_images",
         lambda paths, batch_size=8: np.ones((len(paths), 512), dtype=np.float32),
     )
@@ -935,13 +935,13 @@ def test_batch_embed_image_preflight_aborts_when_majority_unreachable(
     assert any("network share" in msg for msg in errors), errors
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_preflight_continues_at_exact_half_failures(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     """At exactly 50% unreachable (4/8), preflight does not abort (boundary)."""
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     good_jpg = tmp_path / "good.jpg"
     _write_min_jpg(good_jpg)
@@ -975,13 +975,13 @@ def test_batch_embed_image_preflight_continues_at_exact_half_failures(
     conn.close()
 
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "list_catalog_keys_needing_clip_embedding",
         lambda *args, **kwargs: bad_keys + good_keys,
     )
-    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 8)
+    monkeypatch.setattr(embed_mod, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 8)
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "encode_images",
         lambda paths, batch_size=8: np.ones((len(paths), 512), dtype=np.float32),
     )
@@ -995,13 +995,13 @@ def test_batch_embed_image_preflight_continues_at_exact_half_failures(
     runner.complete_job.assert_called_once()
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_preflight_continues_when_under_half_failures(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     """Under 50% unreachable in the full sample continues without preflight abort."""
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     good_jpg = tmp_path / "good.jpg"
     _write_min_jpg(good_jpg)
@@ -1032,13 +1032,13 @@ def test_batch_embed_image_preflight_continues_when_under_half_failures(
     conn.close()
 
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "list_catalog_keys_needing_clip_embedding",
         lambda *args, **kwargs: [bad_key, *good_keys],
     )
-    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 4)
+    monkeypatch.setattr(embed_mod, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 4)
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "encode_images",
         lambda paths, batch_size=8: np.ones((len(paths), 512), dtype=np.float32),
     )
@@ -1052,14 +1052,14 @@ def test_batch_embed_image_preflight_continues_when_under_half_failures(
     runner.complete_job.assert_called_once()
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_embed_image_preflight_does_not_abort_in_chain_mode(
     mock_load_config, mock_add_log, tmp_path, monkeypatch
 ) -> None:
     """Even at 100% sample-failure, chain_mode never aborts — chain proceeds
     to stack/similarity steps with whatever embeddings already exist."""
-    from jobs.handlers import handle_batch_embed_image
+    from jobs.handlers.embed import handle_batch_embed_image
 
     db_path = tmp_path / "library.db"
     conn = init_database(str(db_path))
@@ -1075,10 +1075,10 @@ def test_batch_embed_image_preflight_does_not_abort_in_chain_mode(
         )
     conn.close()
 
-    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 4)
-    monkeypatch.setattr(job_handlers, "_EMBED_PREFLIGHT_FAIL_RATIO", 0.5)
+    monkeypatch.setattr(embed_mod, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 4)
+    monkeypatch.setattr(embed_mod, "_EMBED_PREFLIGHT_FAIL_RATIO", 0.5)
     monkeypatch.setattr(
-        job_handlers,
+        embed_mod,
         "encode_images",
         lambda paths, batch_size=8: np.ones((len(paths), 512), dtype=np.float32),
     )

@@ -5,6 +5,8 @@ from .. import path_setup as _path_setup  # noqa: F401 — side-effect import; k
 
 from .instagram import handle_analyze_instagram, handle_instagram_import
 
+from .embed import handle_batch_embed_image, handle_batch_text_embed
+
 _legacy_path = Path(__file__).resolve().parent / '_legacy.py'
 _namespace = globals()
 exec(

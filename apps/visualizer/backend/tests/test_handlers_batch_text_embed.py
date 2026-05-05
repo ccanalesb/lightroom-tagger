@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
+import jobs.handlers.embed as embed_mod
 from lightroom_tagger.core.database import init_database, store_image, store_image_description
 
 
@@ -16,10 +17,10 @@ def _make_runner():
     return runner
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_text_embed_zero_work_completes(mock_load_config, _mock_add_log, tmp_path, monkeypatch):
-    from jobs.handlers import handle_batch_text_embed
+    from jobs.handlers.embed import handle_batch_text_embed
 
     db_path = tmp_path / "library.db"
     init_database(str(db_path)).close()
@@ -35,11 +36,10 @@ def test_batch_text_embed_zero_work_completes(mock_load_config, _mock_add_log, t
     assert result["total"] == 0
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_text_embed_writes_vec_row(mock_load_config, _mock_add_log, tmp_path, monkeypatch):
-    from jobs import handlers
-    from jobs.handlers import handle_batch_text_embed
+    from jobs.handlers.embed import handle_batch_text_embed
 
     db_path = tmp_path / "library.db"
     conn = init_database(str(db_path))
@@ -70,7 +70,7 @@ def test_batch_text_embed_writes_vec_row(mock_load_config, _mock_add_log, tmp_pa
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
     mock_load_config.return_value = MagicMock(db_path=str(db_path))
     monkeypatch.setattr(
-        handlers,
+        embed_mod,
         "embed_texts",
         lambda texts, batch_size=16: np.ones((len(texts), 768), dtype=np.float32),
     )
@@ -92,13 +92,12 @@ def test_batch_text_embed_writes_vec_row(mock_load_config, _mock_add_log, tmp_pa
         verify.close()
 
 
-@patch("jobs.handlers.add_job_log")
+@patch("jobs.handlers.embed.add_job_log")
 @patch("jobs.handlers.load_config")
 def test_batch_text_embed_processes_newest_first(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ):
-    from jobs import handlers
-    from jobs.handlers import handle_batch_text_embed
+    from jobs.handlers.embed import handle_batch_text_embed
 
     db_path = tmp_path / "library.db"
     conn = init_database(str(db_path))
@@ -158,7 +157,7 @@ def test_batch_text_embed_processes_newest_first(
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
     mock_load_config.return_value = MagicMock(db_path=str(db_path))
-    monkeypatch.setattr(handlers, "embed_texts", _embed)
+    monkeypatch.setattr(embed_mod, "embed_texts", _embed)
 
     runner = _make_runner()
     handle_batch_text_embed(
