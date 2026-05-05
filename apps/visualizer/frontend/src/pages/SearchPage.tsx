@@ -9,6 +9,7 @@ import {
   PROCESSING_CATALOG_CACHE_ROUTE,
   PROCESSING_JOB_QUEUE_ROUTE,
   PROCESSING_OPEN_JOB_QUEUE,
+  SEARCH_PIN_FALLBACK_REASON_NO_CLIP_EMBEDDING,
   SEARCH_PIN_HELP_EMBED,
   SEARCH_PIN_INACTIVE_PREFIX,
   SEARCH_PIN_INACTIVE_SUFFIX,
@@ -226,7 +227,7 @@ export function SearchPage() {
         const fr = meta.fallback_reason
         setPinInactiveReason(fr)
         setPinSimilarityWarning(
-          fr === 'no_clip_embedding'
+          fr === SEARCH_PIN_FALLBACK_REASON_NO_CLIP_EMBEDDING
             ? SEARCH_PIN_WARN_NO_CLIP
             : fr === 'invalid_pin_key'
               ? 'Pinned image is no longer in the catalog'
@@ -425,7 +426,7 @@ export function SearchPage() {
                   <p className="m-0">
                     {SEARCH_PIN_INACTIVE_PREFIX} {pinSimilarityWarning}. {SEARCH_PIN_INACTIVE_SUFFIX}
                   </p>
-                  {pinInactiveReason === 'no_clip_embedding' ? (
+                  {pinInactiveReason === SEARCH_PIN_FALLBACK_REASON_NO_CLIP_EMBEDDING ? (
                     <div className="space-y-1">
                       <p className="m-0">{SEARCH_PIN_HELP_EMBED}</p>
                       <div className="flex flex-wrap gap-x-3 gap-y-1">
@@ -464,7 +465,7 @@ export function SearchPage() {
                   <p className="m-0">
                     {SEARCH_PIN_INACTIVE_PREFIX} {pinSimilarityWarning}. {SEARCH_PIN_INACTIVE_SUFFIX}
                   </p>
-                  {pinInactiveReason === 'no_clip_embedding' ? (
+                  {pinInactiveReason === SEARCH_PIN_FALLBACK_REASON_NO_CLIP_EMBEDDING ? (
                     <div className="space-y-1">
                       <p className="m-0">{SEARCH_PIN_HELP_EMBED}</p>
                       <div className="flex flex-wrap gap-x-3 gap-y-1">

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { SearchPage } from '../SearchPage'
+import { SEARCH_PIN_FALLBACK_REASON_NO_CLIP_EMBEDDING } from '../../constants/strings'
 import { ImagesAPI, ProvidersAPI, type CatalogImage } from '../../services/api'
 
 const sampleImage: CatalogImage = {
@@ -180,7 +181,10 @@ describe('SearchPage', () => {
         total: 0,
         images: [],
         filters: null,
-        metadata: { pin_state: 'inactive', fallback_reason: 'no_clip_embedding' },
+        metadata: {
+          pin_state: 'inactive',
+          fallback_reason: SEARCH_PIN_FALLBACK_REASON_NO_CLIP_EMBEDDING,
+        },
       })
 
     render(
@@ -243,7 +247,10 @@ describe('SearchPage', () => {
         total: 0,
         images: [],
         filters: null,
-        metadata: { pin_state: 'inactive', fallback_reason: 'no_clip_embedding' },
+        metadata: {
+          pin_state: 'inactive',
+          fallback_reason: SEARCH_PIN_FALLBACK_REASON_NO_CLIP_EMBEDDING,
+        },
       })
 
     render(
