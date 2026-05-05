@@ -7,6 +7,8 @@ from .instagram import handle_analyze_instagram, handle_instagram_import
 
 from .embed import handle_batch_embed_image, handle_batch_text_embed
 
+from .matching import handle_enrich_catalog, handle_prepare_catalog, handle_vision_match
+
 _legacy_path = Path(__file__).resolve().parent / '_legacy.py'
 _namespace = globals()
 exec(
