@@ -1,21 +1,16 @@
-"""Job handler package — job-family modules with _legacy.py as interim monolith."""
-from pathlib import Path
+"""Job handler package — one module per job family."""
+from .. import path_setup as _path_setup  # noqa: F401
 
-from .. import path_setup as _path_setup  # noqa: F401 — side-effect import; keep once here only
-
-from .instagram import handle_analyze_instagram, handle_instagram_import
-
-from .embed import handle_batch_embed_image, handle_batch_text_embed
-
-from .matching import handle_enrich_catalog, handle_prepare_catalog, handle_vision_match
-
-_legacy_path = Path(__file__).resolve().parent / '_legacy.py'
-_namespace = globals()
-exec(
-    compile(_legacy_path.read_text(encoding='utf-8'), str(_legacy_path), 'exec'),
-    _namespace,
+from .analyze import (
+    handle_batch_analyze,
+    handle_batch_describe,
+    handle_batch_score,
+    handle_single_describe,
+    handle_single_score,
 )
-
+from .embed import handle_batch_embed_image, handle_batch_text_embed
+from .instagram import handle_analyze_instagram, handle_instagram_import
+from .matching import handle_enrich_catalog, handle_prepare_catalog, handle_vision_match
 from .stacks import (
     handle_batch_catalog_similarity,
     handle_batch_stack_detect,

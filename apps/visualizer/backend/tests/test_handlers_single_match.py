@@ -34,11 +34,11 @@ def test_fingerprint_vision_match_includes_clip_top_k():
 # log_callback imports add_job_log; real add_job_log + MagicMock runner.db breaks json.dumps(logs).
 @patch('jobs.handlers.matching.add_job_log')
 @patch('jobs.handlers.matching.match_dump_media')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.update_job_field')
+@patch('jobs.handlers.matching.init_database')
+@patch('jobs.handlers.matching.load_config')
+@patch('jobs.handlers.matching.update_job_field')
 @patch('jobs.handlers.matching.require_library_db', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.matching.os.getenv', return_value='/tmp/library.db')
 def test_handle_vision_match_passes_media_key(mock_getenv, mock_exists, mock_update_field,
                                                mock_config, mock_init_db, mock_match, _mock_add_log):
     from jobs.handlers import handle_vision_match
@@ -62,11 +62,11 @@ def test_handle_vision_match_passes_media_key(mock_getenv, mock_exists, mock_upd
 
 @patch('jobs.handlers.matching.add_job_log')
 @patch('jobs.handlers.matching.match_dump_media')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.update_job_field')
+@patch('jobs.handlers.matching.init_database')
+@patch('jobs.handlers.matching.load_config')
+@patch('jobs.handlers.matching.update_job_field')
 @patch('jobs.handlers.matching.require_library_db', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.matching.os.getenv', return_value='/tmp/library.db')
 def test_handle_vision_match_passes_custom_weights(mock_getenv, mock_exists, mock_update_field,
                                                     mock_config, mock_init_db, mock_match, _mock_add_log):
     from jobs.handlers import handle_vision_match
@@ -94,11 +94,11 @@ def test_handle_vision_match_passes_custom_weights(mock_getenv, mock_exists, moc
 
 @patch('jobs.handlers.matching.add_job_log')
 @patch('jobs.handlers.matching.match_dump_media')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.update_job_field')
+@patch('jobs.handlers.matching.init_database')
+@patch('jobs.handlers.matching.load_config')
+@patch('jobs.handlers.matching.update_job_field')
 @patch('jobs.handlers.matching.require_library_db', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.matching.os.getenv', return_value='/tmp/library.db')
 def test_handle_vision_match_passes_skip_undescribed(mock_getenv, mock_exists, mock_update_field,
                                                mock_config, mock_init_db, mock_match, _mock_add_log):
     from jobs.handlers import handle_vision_match
@@ -123,11 +123,11 @@ def test_handle_vision_match_passes_skip_undescribed(mock_getenv, mock_exists, m
 
 @patch('jobs.handlers.matching.add_job_log')
 @patch('jobs.handlers.matching.match_dump_media')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.update_job_field')
+@patch('jobs.handlers.matching.init_database')
+@patch('jobs.handlers.matching.load_config')
+@patch('jobs.handlers.matching.update_job_field')
 @patch('jobs.handlers.matching.require_library_db', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.matching.os.getenv', return_value='/tmp/library.db')
 def test_handle_vision_match_warns_on_invalid_clip_top_k(
     mock_getenv,
     mock_exists,
@@ -548,11 +548,11 @@ def test_match_dump_media_stack_apply_reaches_all_non_conflict_members(
 
 @patch('jobs.handlers.matching.add_job_log')
 @patch('jobs.handlers.matching.match_dump_media')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.update_job_field')
+@patch('jobs.handlers.matching.init_database')
+@patch('jobs.handlers.matching.load_config')
+@patch('jobs.handlers.matching.update_job_field')
 @patch('jobs.handlers.matching.require_library_db', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.matching.os.getenv', return_value='/tmp/library.db')
 def test_handle_vision_match_result_payload_includes_stack_apply_counts(
     mock_getenv,
     mock_require,
@@ -607,11 +607,11 @@ def test_handle_vision_match_result_payload_includes_stack_apply_counts(
 
 @patch('jobs.handlers.matching.add_job_log')
 @patch('jobs.handlers.matching.match_dump_media')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.update_job_field')
+@patch('jobs.handlers.matching.init_database')
+@patch('jobs.handlers.matching.load_config')
+@patch('jobs.handlers.matching.update_job_field')
 @patch('jobs.handlers.matching.require_library_db', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.matching.os.getenv', return_value='/tmp/library.db')
 def test_handle_vision_match_clip_top_k_bounds(
     mock_getenv,
     mock_require,
@@ -660,11 +660,11 @@ def test_handle_vision_match_clip_top_k_bounds(
 
 @patch('jobs.handlers.matching.add_job_log')
 @patch('jobs.handlers.matching.match_dump_media')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.update_job_field')
+@patch('jobs.handlers.matching.init_database')
+@patch('jobs.handlers.matching.load_config')
+@patch('jobs.handlers.matching.update_job_field')
 @patch('jobs.handlers.matching.require_library_db', return_value='/tmp/library.db')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.matching.os.getenv', return_value='/tmp/library.db')
 def test_handle_vision_match_prefilter_summary_log_regex(
     mock_getenv,
     mock_require,

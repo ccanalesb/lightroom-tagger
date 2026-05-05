@@ -12,7 +12,7 @@ from jobs.runner import JobRunner
 
 
 def test_build_burst_segments_returns_newest_segments_first() -> None:
-    from jobs.handlers import _build_burst_segments
+    from jobs.handlers.stacks import _build_burst_segments
 
     segments, skipped = _build_burst_segments(
         [
@@ -36,7 +36,7 @@ def _make_runner() -> MagicMock:
 
 
 @patch("jobs.handlers.stacks.add_job_log")
-@patch("jobs.handlers.load_config")
+@patch("jobs.handlers.stacks.load_config")
 def test_handle_batch_stack_detect_zero_work(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
@@ -70,7 +70,7 @@ def test_handle_batch_stack_detect_zero_work(
 
 
 @patch("jobs.handlers.stacks.add_job_log")
-@patch("jobs.handlers.load_config")
+@patch("jobs.handlers.stacks.load_config")
 def test_handle_batch_stack_detect_burst_creates_one_stack(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
@@ -132,7 +132,7 @@ def test_handle_batch_stack_detect_burst_creates_one_stack(
 
 
 @patch("jobs.handlers.stacks.add_job_log")
-@patch("jobs.handlers.load_config")
+@patch("jobs.handlers.stacks.load_config")
 def test_handle_batch_stack_detect_skips_no_date_and_logs(
     mock_load_config, mock_add_log, tmp_path, monkeypatch
 ) -> None:
@@ -175,7 +175,7 @@ def test_handle_batch_stack_detect_skips_no_date_and_logs(
 
 
 @patch("jobs.handlers.stacks.add_job_log")
-@patch("jobs.handlers.load_config")
+@patch("jobs.handlers.stacks.load_config")
 def test_handle_batch_stack_detect_incremental_skips_stacked(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
@@ -226,7 +226,7 @@ def test_handle_batch_stack_detect_incremental_skips_stacked(
 
 
 @patch("jobs.handlers.stacks.add_job_log")
-@patch("jobs.handlers.load_config")
+@patch("jobs.handlers.stacks.load_config")
 def test_handle_batch_stack_detect_force_rebuild_recreates(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:
@@ -286,7 +286,7 @@ def test_handle_batch_stack_detect_force_rebuild_recreates(
 
 
 @patch("jobs.handlers.stacks.add_job_log")
-@patch("jobs.handlers.load_config")
+@patch("jobs.handlers.stacks.load_config")
 def test_handle_batch_stack_detect_checkpoint_resume_second_burst(
     mock_load_config, _mock_add_log, tmp_path, monkeypatch
 ) -> None:

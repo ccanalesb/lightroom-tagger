@@ -11,10 +11,10 @@ def _make_runner():
     return runner
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_analyze_completes_with_zero_images(
     _mock_exists, _mock_getenv, mock_config, mock_init_db, _mock_add_log,
@@ -45,13 +45,13 @@ def test_batch_analyze_completes_with_zero_images(
         assert payload[key] == 0
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers._score_single_image')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
 @patch('lightroom_tagger.core.description_service.describe_matched_image')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_analyze_runs_describe_then_score(
     _mock_exists,
@@ -96,13 +96,13 @@ def test_batch_analyze_runs_describe_then_score(
     assert payload['score_total'] == 2
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers._score_single_image')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
 @patch('lightroom_tagger.core.description_service.describe_matched_image')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_analyze_describe_failures_still_invoke_score(
     _mock_exists,
@@ -144,14 +144,14 @@ def test_batch_analyze_describe_failures_still_invoke_score(
     assert mock_score.call_count == 2
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers._score_single_image')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
 @patch('lightroom_tagger.core.description_service.describe_matched_image')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
-@patch('jobs.handlers.update_job_field')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.update_job_field')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_analyze_sets_current_step_describing_then_scoring(
     _mock_exists,
@@ -195,15 +195,15 @@ def test_batch_analyze_sets_current_step_describing_then_scoring(
     assert values == ['Describing', 'Scoring'], f'unexpected current_step order: {values!r}'
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers._score_single_image')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
 @patch('lightroom_tagger.core.description_service.describe_matched_image')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
-@patch('jobs.handlers.fingerprint_batch_describe', return_value='fp-describe-constant')
-@patch('jobs.handlers.get_job')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.fingerprint_batch_describe', return_value='fp-describe-constant')
+@patch('jobs.handlers.analyze.get_job')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_analyze_resume_skips_describe_when_stage_score(
     _mock_exists,
@@ -265,14 +265,14 @@ def test_batch_analyze_resume_skips_describe_when_stage_score(
     assert mock_score.call_count == 1
 
 
-@patch('jobs.handlers.get_job', return_value=None)
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers._score_single_image')
+@patch('jobs.handlers.analyze.get_job', return_value=None)
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
 @patch('lightroom_tagger.core.description_service.describe_image')
 @patch('lightroom_tagger.core.description_service.get_or_create_cached_image')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv')
 @patch('jobs.handlers.common.require_library_db')
 def test_batch_analyze_compression_already_done_silent(
     mock_require_lib,
@@ -344,15 +344,15 @@ def test_batch_analyze_compression_already_done_silent(
     assert any(m == '1 images already compressed, skipped.' for m in info_msgs), info_msgs
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers._score_single_image')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
 @patch('lightroom_tagger.core.description_service.describe_matched_image')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
-@patch('jobs.handlers.fingerprint_batch_describe', return_value='fp-live-value')
-@patch('jobs.handlers.get_job')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.fingerprint_batch_describe', return_value='fp-live-value')
+@patch('jobs.handlers.analyze.get_job')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_analyze_describe_fingerprint_mismatch_resets_pairs(
     _mock_exists,

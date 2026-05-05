@@ -9,10 +9,10 @@ def _make_runner():
     return runner
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_should_complete_with_zero_images(
     _mock_exists, mock_getenv, mock_config, mock_init_db, _mock_add_log,
@@ -35,12 +35,12 @@ def test_batch_describe_should_complete_with_zero_images(
     assert result['total'] == 0
 
 
-@patch('jobs.handlers.add_job_log')
+@patch('jobs.handlers.analyze.add_job_log')
 @patch('lightroom_tagger.core.description_service.describe_matched_image')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_should_describe_catalog_images(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_get, mock_describe, _mock_add_log,
@@ -63,12 +63,12 @@ def test_batch_describe_should_describe_catalog_images(
     assert result['failed'] == 0
 
 
-@patch('jobs.handlers.add_job_log')
+@patch('jobs.handlers.analyze.add_job_log')
 @patch('lightroom_tagger.core.description_service.describe_matched_image')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_should_count_failures(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_get, mock_describe, _mock_add_log,
@@ -89,12 +89,12 @@ def test_batch_describe_should_count_failures(
     assert result['failed'] == 1
 
 
-@patch('jobs.handlers.add_job_log')
+@patch('jobs.handlers.analyze.add_job_log')
 @patch('lightroom_tagger.core.description_service.describe_matched_image')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_should_stop_after_consecutive_failures(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_get, mock_describe, mock_add_log,
@@ -120,11 +120,11 @@ def test_batch_describe_should_stop_after_consecutive_failures(
     assert '10 consecutive failures' in msg
 
 
-@patch('jobs.handlers.add_job_log')
+@patch('jobs.handlers.analyze.add_job_log')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_legacy_vision_model_metadata_does_not_set_env(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_get, _mock_add_log,
@@ -154,10 +154,10 @@ def test_batch_describe_legacy_vision_model_metadata_does_not_set_env(
     assert os.environ.get('DESCRIPTION_VISION_MODEL') is None
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 def test_batch_describe_should_fail_job_on_exception(
     mock_getenv, mock_config, mock_init_db, _mock_add_log,
 ):
@@ -175,11 +175,11 @@ def test_batch_describe_should_fail_job_on_exception(
     )
 
 
-@patch('jobs.handlers.add_job_log')
+@patch('jobs.handlers.analyze.add_job_log')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_passes_months_12_for_12months_date_filter(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_get_undescribed, _mock_add_log,
@@ -203,11 +203,11 @@ def test_batch_describe_passes_months_12_for_12months_date_filter(
     assert mock_get_undescribed.call_args.kwargs['months'] == 12
 
 
-@patch('jobs.handlers.add_job_log')
+@patch('jobs.handlers.analyze.add_job_log')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_passes_min_rating_for_catalog_selection(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_get_undescribed, _mock_add_log,
@@ -230,12 +230,12 @@ def test_batch_describe_passes_min_rating_for_catalog_selection(
     assert mock_get_undescribed.call_args.kwargs['min_rating'] == 3
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers._select_catalog_keys_missing_visual_tags')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._select_catalog_keys_missing_visual_tags')
 @patch('lightroom_tagger.core.description_service.describe_matched_image')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_backfill_uses_missing_visual_tag_selection(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_describe, mock_backfill_select,
@@ -264,11 +264,11 @@ def test_batch_describe_backfill_uses_missing_visual_tag_selection(
     assert result['described'] == 1
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers._select_catalog_keys_missing_visual_tags')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._select_catalog_keys_missing_visual_tags')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_backfill_logs_and_completes_when_no_catalog_matches(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_backfill_select, mock_add_log,

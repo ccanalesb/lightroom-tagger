@@ -12,10 +12,10 @@ def _make_runner():
     return runner
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_score_should_complete_with_zero_units(
     _mock_exists, mock_getenv, mock_config, mock_init_db, _mock_add_log,
@@ -40,12 +40,12 @@ def test_batch_score_should_complete_with_zero_units(
     assert result['total'] == 0
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers._score_single_image')
-@patch('jobs.handlers.get_job')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
+@patch('jobs.handlers.analyze.get_job')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_score_checkpoint_skips_already_processed_triplets(
     _mock_exists,
@@ -95,11 +95,11 @@ def test_batch_score_checkpoint_skips_already_processed_triplets(
     assert res['scored'] == 0
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers._score_single_image')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_score_should_call_score_for_each_triplet(
     _mock_exists, mock_getenv, mock_config, mock_init_db, mock_score, _mock_add_log,
@@ -132,12 +132,12 @@ def test_batch_score_should_call_score_for_each_triplet(
     assert runner.complete_job.call_args[0][1]['scored'] == 4
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers._score_single_image')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
-@patch('jobs.handlers.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 @patch('lightroom_tagger.core.database.get_perspective_by_slug')
 def test_batch_score_non_force_never_calls_get_undescribed_catalog_images(

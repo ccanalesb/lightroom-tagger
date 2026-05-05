@@ -152,7 +152,7 @@ def test_stage_banner_logs_include_similarity_stage(
 
 
 def test_catalog_cache_stage_mapped_progress_splits_bar() -> None:
-    from jobs.handlers import _catalog_cache_stage_mapped_progress
+    from jobs.handlers.stacks import _catalog_cache_stage_mapped_progress
 
     assert _catalog_cache_stage_mapped_progress(0, 5) == 5
     assert _catalog_cache_stage_mapped_progress(2, 100) == 100

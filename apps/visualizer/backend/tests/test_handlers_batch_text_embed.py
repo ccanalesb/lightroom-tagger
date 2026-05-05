@@ -18,14 +18,12 @@ def _make_runner():
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
-def test_batch_text_embed_zero_work_completes(mock_load_config, _mock_add_log, tmp_path, monkeypatch):
+def test_batch_text_embed_zero_work_completes(_mock_add_log, tmp_path, monkeypatch):
     from jobs.handlers.embed import handle_batch_text_embed
 
     db_path = tmp_path / "library.db"
     init_database(str(db_path)).close()
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
 
     runner = _make_runner()
     handle_batch_text_embed(runner, "job-zero", {"image_type": "catalog"})
@@ -37,8 +35,7 @@ def test_batch_text_embed_zero_work_completes(mock_load_config, _mock_add_log, t
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
-def test_batch_text_embed_writes_vec_row(mock_load_config, _mock_add_log, tmp_path, monkeypatch):
+def test_batch_text_embed_writes_vec_row(_mock_add_log, tmp_path, monkeypatch):
     from jobs.handlers.embed import handle_batch_text_embed
 
     db_path = tmp_path / "library.db"
@@ -68,7 +65,6 @@ def test_batch_text_embed_writes_vec_row(mock_load_config, _mock_add_log, tmp_pa
     conn.close()
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
     monkeypatch.setattr(
         embed_mod,
         "embed_texts",
@@ -93,9 +89,8 @@ def test_batch_text_embed_writes_vec_row(mock_load_config, _mock_add_log, tmp_pa
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_text_embed_processes_newest_first(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    _mock_add_log, tmp_path, monkeypatch
 ):
     from jobs.handlers.embed import handle_batch_text_embed
 
@@ -156,7 +151,6 @@ def test_batch_text_embed_processes_newest_first(
         return np.ones((len(texts), 768), dtype=np.float32)
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
     monkeypatch.setattr(embed_mod, "embed_texts", _embed)
 
     runner = _make_runner()

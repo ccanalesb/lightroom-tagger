@@ -92,9 +92,8 @@ def test_instagram_dump_keys_needing_clip_embedding_excludes_existing_vec(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_zero_work_completes(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     from jobs.handlers.embed import handle_batch_embed_image
 
@@ -104,8 +103,6 @@ def test_batch_embed_image_zero_work_completes(
     db_path = tmp_path / "library.db"
     init_database(str(db_path)).close()
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(runner, "job-zero", {"image_type": "catalog"})
 
@@ -117,9 +114,8 @@ def test_batch_embed_image_zero_work_completes(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_writes_clip_row(
-    mock_load_config, mock_add_log, tmp_path, monkeypatch
+    mock_add_log, tmp_path, monkeypatch
 ) -> None:
     from jobs.handlers.embed import handle_batch_embed_image
 
@@ -145,8 +141,6 @@ def test_batch_embed_image_writes_clip_row(
     monkeypatch.setattr(embed_mod, "encode_images", mock_enc)
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(runner, "job-clip", {"image_type": "catalog"})
 
@@ -168,9 +162,8 @@ def test_batch_embed_image_writes_clip_row(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_catalog_and_instagram_embeds_instagram_dump_row(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     from jobs.handlers.embed import handle_batch_embed_image
 
@@ -201,8 +194,6 @@ def test_batch_embed_image_catalog_and_instagram_embeds_instagram_dump_row(
     )
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(
         runner,
@@ -227,9 +218,8 @@ def test_batch_embed_image_catalog_and_instagram_embeds_instagram_dump_row(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_incremental_skips_existing(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     from jobs.handlers.embed import handle_batch_embed_image
 
@@ -279,8 +269,6 @@ def test_batch_embed_image_incremental_skips_existing(
     )
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(runner, "job-inc", {"image_type": "catalog"})
 
@@ -292,9 +280,8 @@ def test_batch_embed_image_incremental_skips_existing(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_force_reprocesses(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     from jobs.handlers.embed import handle_batch_embed_image
 
@@ -347,8 +334,6 @@ def test_batch_embed_image_force_reprocesses(
     )
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(
         runner, "job-f", {"image_type": "catalog", "force": True}
@@ -372,9 +357,8 @@ def test_batch_embed_image_force_reprocesses(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_checkpoint_resume(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     """Seeded checkpoint marks first key done; only second image is embedded."""
     from jobs.handlers.embed import handle_batch_embed_image
@@ -438,8 +422,6 @@ def test_batch_embed_image_checkpoint_resume(
     )
 
     monkeypatch.setenv("LIBRARY_DB", str(lib_path))
-    mock_load_config.return_value = MagicMock(db_path=str(lib_path))
-
     runner = JobRunner(jdb)
     handle_batch_embed_image(runner, job_id, {"image_type": "catalog"})
     jdb.close()
@@ -449,9 +431,8 @@ def test_batch_embed_image_checkpoint_resume(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_fingerprint_mismatch_clears_checkpoint(
-    mock_load_config, mock_add_log, tmp_path, monkeypatch
+    mock_add_log, tmp_path, monkeypatch
 ) -> None:
     from jobs.handlers.embed import handle_batch_embed_image
 
@@ -506,8 +487,6 @@ def test_batch_embed_image_fingerprint_mismatch_clears_checkpoint(
     monkeypatch.setattr(embed_mod, "encode_images", _encode)
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = JobRunner(jdb)
     handle_batch_embed_image(runner, job_id, {"image_type": "catalog"})
     jdb.close()
@@ -519,9 +498,8 @@ def test_batch_embed_image_fingerprint_mismatch_clears_checkpoint(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_resolves_filepath_before_encode(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     from jobs.handlers.embed import handle_batch_embed_image
 
@@ -556,8 +534,6 @@ def test_batch_embed_image_resolves_filepath_before_encode(
     )
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(runner, "job-resolve", {"image_type": "catalog"})
 
@@ -566,9 +542,8 @@ def test_batch_embed_image_resolves_filepath_before_encode(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_uses_cached_path_for_encode(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     from jobs.handlers.embed import handle_batch_embed_image
 
@@ -604,8 +579,6 @@ def test_batch_embed_image_uses_cached_path_for_encode(
     )
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(runner, "job-cached", {"image_type": "catalog"})
 
@@ -614,9 +587,8 @@ def test_batch_embed_image_uses_cached_path_for_encode(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_preflight_fails_fast_when_paths_inaccessible(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     from jobs.handlers.embed import handle_batch_embed_image
 
@@ -639,8 +611,6 @@ def test_batch_embed_image_preflight_fails_fast_when_paths_inaccessible(
     monkeypatch.setattr(embed_mod, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 4)
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(runner, "job-preflight", {"image_type": "catalog"})
 
@@ -655,9 +625,8 @@ def test_batch_embed_image_preflight_fails_fast_when_paths_inaccessible(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_does_not_preflight_fail_on_compression_unavailable(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     from jobs.handlers.embed import handle_batch_embed_image
 
@@ -691,8 +660,6 @@ def test_batch_embed_image_does_not_preflight_fail_on_compression_unavailable(
     )
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(runner, "job-compress-miss", {"image_type": "catalog"})
 
@@ -705,9 +672,8 @@ def test_batch_embed_image_does_not_preflight_fail_on_compression_unavailable(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_reports_grouped_skip_reason_counts(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     from jobs.handlers.embed import handle_batch_embed_image
 
@@ -759,8 +725,6 @@ def test_batch_embed_image_reports_grouped_skip_reason_counts(
     )
 
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(runner, "job-grouped-reasons", {"image_type": "catalog"})
 
@@ -778,9 +742,8 @@ def test_batch_embed_image_reports_grouped_skip_reason_counts(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_suppresses_excessive_skip_detail_logs(
-    mock_load_config, mock_add_log, tmp_path, monkeypatch
+    mock_add_log, tmp_path, monkeypatch
 ) -> None:
     from jobs.handlers.embed import handle_batch_embed_image
 
@@ -795,8 +758,6 @@ def test_batch_embed_image_suppresses_excessive_skip_detail_logs(
     )
     monkeypatch.setattr(embed_mod, "_EMBED_PREFLIGHT_SAMPLE_SIZE", 0)
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(runner, "job-skip-sampling", {"image_type": "catalog"})
 
@@ -812,9 +773,8 @@ def test_batch_embed_image_suppresses_excessive_skip_detail_logs(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_uses_vision_cache_when_original_missing(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     """Cache-first lookup: a usable cached JPEG is enough — original may be gone.
 
@@ -851,8 +811,6 @@ def test_batch_embed_image_uses_vision_cache_when_original_missing(
 
     monkeypatch.setattr(embed_mod, "encode_images", _encode)
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(runner, "job-cache-first", {"image_type": "catalog"})
 
@@ -865,9 +823,8 @@ def test_batch_embed_image_uses_vision_cache_when_original_missing(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_preflight_aborts_when_majority_unreachable(
-    mock_load_config, mock_add_log, tmp_path, monkeypatch
+    mock_add_log, tmp_path, monkeypatch
 ) -> None:
     """Preflight fails fast when strictly >50% of the fixed sample is unreachable (5/8)."""
     from jobs.handlers.embed import handle_batch_embed_image
@@ -917,8 +874,6 @@ def test_batch_embed_image_preflight_aborts_when_majority_unreachable(
         lambda paths, batch_size=8: np.ones((len(paths), 512), dtype=np.float32),
     )
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(runner, "job-majority-miss", {"image_type": "catalog"})
 
@@ -936,9 +891,8 @@ def test_batch_embed_image_preflight_aborts_when_majority_unreachable(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_preflight_continues_at_exact_half_failures(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     """At exactly 50% unreachable (4/8), preflight does not abort (boundary)."""
     from jobs.handlers.embed import handle_batch_embed_image
@@ -986,8 +940,6 @@ def test_batch_embed_image_preflight_continues_at_exact_half_failures(
         lambda paths, batch_size=8: np.ones((len(paths), 512), dtype=np.float32),
     )
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(runner, "job-half-boundary", {"image_type": "catalog"})
 
@@ -996,9 +948,8 @@ def test_batch_embed_image_preflight_continues_at_exact_half_failures(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_preflight_continues_when_under_half_failures(
-    mock_load_config, _mock_add_log, tmp_path, monkeypatch
+    _mock_add_log, tmp_path, monkeypatch
 ) -> None:
     """Under 50% unreachable in the full sample continues without preflight abort."""
     from jobs.handlers.embed import handle_batch_embed_image
@@ -1043,8 +994,6 @@ def test_batch_embed_image_preflight_continues_when_under_half_failures(
         lambda paths, batch_size=8: np.ones((len(paths), 512), dtype=np.float32),
     )
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(runner, "job-under-half", {"image_type": "catalog"})
 
@@ -1053,9 +1002,8 @@ def test_batch_embed_image_preflight_continues_when_under_half_failures(
 
 
 @patch("jobs.handlers.embed.add_job_log")
-@patch("jobs.handlers.load_config")
 def test_batch_embed_image_preflight_does_not_abort_in_chain_mode(
-    mock_load_config, mock_add_log, tmp_path, monkeypatch
+    mock_add_log, tmp_path, monkeypatch
 ) -> None:
     """Even at 100% sample-failure, chain_mode never aborts — chain proceeds
     to stack/similarity steps with whatever embeddings already exist."""
@@ -1083,8 +1031,6 @@ def test_batch_embed_image_preflight_does_not_abort_in_chain_mode(
         lambda paths, batch_size=8: np.ones((len(paths), 512), dtype=np.float32),
     )
     monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    mock_load_config.return_value = MagicMock(db_path=str(db_path))
-
     runner = _make_runner()
     handle_batch_embed_image(
         runner,

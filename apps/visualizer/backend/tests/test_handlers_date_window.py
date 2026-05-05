@@ -81,12 +81,12 @@ def _patched_handler_env(handler_name):
     and ``init_database`` hands back a mock SQLite connection. We use this
     helper to cut down on copy-pasted decorators in the tests below.
     """
-    return patch('jobs.handlers.init_database')
+    return patch('jobs.handlers.analyze.init_database')
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_honors_last_months_int(
     _mock_db_path, mock_config, mock_init_db, _mock_add_log,
@@ -123,9 +123,9 @@ def test_batch_describe_honors_last_months_int(
     assert '-9 months' in params
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_describe_honors_year_window(
     _mock_db_path, mock_config, mock_init_db, _mock_add_log,
@@ -158,9 +158,9 @@ def test_batch_describe_honors_year_window(
     assert '2024' in params
 
 
-@patch('jobs.handlers.add_job_log')
-@patch('jobs.handlers.init_database')
-@patch('jobs.handlers.load_config')
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
 @patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
 def test_batch_score_honors_last_months_int(
     _mock_db_path, mock_config, mock_init_db, _mock_add_log,

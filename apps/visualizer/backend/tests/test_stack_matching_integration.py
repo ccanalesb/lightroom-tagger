@@ -81,7 +81,7 @@ def _make_stack(db, tmp_path, rep_name: str, member_names: list[str]) -> tuple[s
     side_effect=_shortlist_passthrough,
 )
 @patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
-@patch('jobs.handlers.load_config')
+@patch('jobs.handlers.matching.load_config')
 def test_integration_vision_match_representative_only_candidates(
     mock_load_config, mock_score, _mock_shortlist, _dm, _di, tmp_path, monkeypatch
 ):
@@ -164,7 +164,7 @@ def test_integration_vision_match_representative_only_candidates(
     side_effect=_shortlist_passthrough,
 )
 @patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
-@patch('jobs.handlers.load_config')
+@patch('jobs.handlers.matching.load_config')
 def test_integration_vision_match_stack_apply_skips_conflict_and_surfaces_counts(
     mock_load_config, mock_score, _mock_shortlist, _dm, _di, tmp_path, monkeypatch
 ):
