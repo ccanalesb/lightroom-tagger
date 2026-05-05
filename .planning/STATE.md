@@ -1,31 +1,30 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.0
-milestone_name: Intelligent Discovery
-status: v3.0 milestone complete
-last_updated: "2026-05-04T21:03:34.372Z"
+milestone: v4.0
+milestone_name: Backend Health & E2E Coverage
+status: Defining requirements
+last_updated: "2026-05-05T09:31:00.000Z"
 progress:
-  total_phases: 14
-  completed_phases: 14
-  total_plans: 56
-  completed_plans: 56
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Planning state
 
 **Project:** Lightroom Tagger & Analyzer
-**Roadmap:** [.planning/ROADMAP.md](./ROADMAP.md) (v3.0 — Phase 11 deferred polish in progress)
+**Roadmap:** [.planning/ROADMAP.md](./ROADMAP.md) (v4.0 — defining requirements)
 
 ## Current focus
 
 | Field | Value |
 |-------|--------|
-| Active milestone | v3.0 Intelligent Discovery |
-| Phase | Phase 11 — v3.0 deferred polish (gap closure) |
-| Status | **Plan 11-01 complete** (`strings.ts` Catalog Cache + Search pin constants; `database.py` D-01/D-02 comments; `handlers.py` D-03 comments). Next: **11-02** (frontend wiring + remaining polish). |
-| Last activity | 2026-05-04 — Executed **11-01-PLAN.md**: T1–T3, three atomic commits (`19cf0c8`, `cb5e139`, `7cec335`), `11-01-SUMMARY.md`, verification `tsc --noEmit` + pytest **663 passed**. |
-| Previous activity | 2026-04-29 — Gap closure phases 9–11 created from milestone audit; Phase 9/10/11 directories and ROADMAP rows added. |
+| Active milestone | v4.0 Backend Health & E2E Coverage |
+| Phase | Not started (defining requirements) |
+| Status | Defining requirements |
+| Last activity | 2026-05-05 — Milestone v4.0 started |
 
 ## Project Reference
 

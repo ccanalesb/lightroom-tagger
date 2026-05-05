@@ -8,7 +8,18 @@ A web application that connects your Lightroom catalog with Instagram to track w
 
 Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
 
-## Current State: v3.0 Shipped — Planning Next Milestone
+## Current Milestone: v4.0 Backend Health & E2E Coverage
+
+**Goal:** Refactor oversized backend files, fix two broken operational workflows, and guarantee no flow is broken via a new E2E test layer using browser harness with real examples.
+
+**Target features:**
+- Structural split: `handlers.py` (3,830L), `database.py` (3,557L), `images.py` (1,954L) → focused modules with a documented module boundary policy
+- Operational fix 1: Embed job discoverability + path failure preflight (network share UX, skip diagnostics)
+- Operational fix 2: Backend restart + resumed-job compression fix (orphan recovery noise on startup)
+- Unit/integration test gaps: restart/orphan recovery, path-failure handling, provider-defaults fix
+- E2E test suite (browser harness): all critical flows covered — single image flows (describe, score, match review) and batch flows (batch_analyze, batch_stack_detect, catalog cache build)
+
+## Previous Milestone: v3.0 Intelligent Discovery (Shipped: 2026-05-04)
 
 **v3.0 Intelligent Discovery shipped 2026-05-04.** The catalog is now a queryable, visually-aware library. All 14 phases complete, 15/15 requirements satisfied.
 
@@ -166,4 +177,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-04 after v3.0 milestone — Intelligent Discovery shipped. All 14 phases, 56 plans, 15 requirements complete.*
+*Last updated: 2026-05-05 — v4.0 Backend Health & E2E Coverage milestone started.*
