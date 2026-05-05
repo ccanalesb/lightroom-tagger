@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Backend Health & E2E Coverage
-status: Milestone complete
-last_updated: "2026-05-05T17:00:39.840Z"
+status: Ready to execute
+last_updated: "2026-05-05T22:00:00.000Z"
 progress:
-  total_phases: 1
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 100
+  total_phases: 7
+  completed_phases: 2
+  total_plans: 16
+  completed_plans: 9
+  percent: 29
 ---
 
 # Planning state
@@ -22,9 +22,9 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v4.0 Backend Health & E2E Coverage |
-| Phase | **Phase 12** — Operational baseline & embed reliability |
-| Status | Ready to execute Phase 12 |
-| Last activity | 2026-05-05 — v4.0 phased roadmap written (Phases 12–18) |
+| Phase | **Phase 14** — Database & images API split |
+| Status | Phase 13 complete — ready for Phase 14 |
+| Last activity | 2026-05-05 — Phase 13 handlers split complete (REFACTOR-01) |
 
 ## Project Reference
 
