@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Backend Health & E2E Coverage
-status: Ready to execute
-last_updated: "2026-05-06T14:22:37.422Z"
+status: Executing Phase 14
+last_updated: "2026-05-06T14:26:41.237Z"
 progress:
   total_phases: 3
   completed_phases: 2
@@ -31,7 +31,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
-**Current focus:** Phase 12 — Operational baseline & embed reliability (OPS-01..OPS-05)
+**Current focus:** Phase 14 — database-images-api-split
 
 ## Deferred Items
 
