@@ -621,7 +621,7 @@ def _migrate_catalog_similarity(conn: sqlite3.Connection) -> None:
 
 def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
     """Remap legacy composite keys to date-truncated form; idempotent via user_version."""
-    from ._legacy import generate_key
+    from .catalog import generate_key
 
     row = conn.execute("PRAGMA user_version").fetchone()
     current_uv = int(row["user_version"] if row else 0)
