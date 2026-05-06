@@ -194,7 +194,6 @@ def list_instagram_images(db):
 
         paginated = enriched_images[offset : offset + limit]
 
-        success_paginated(paginated, total, offset, limit)
         return jsonify(
             {
                 "total": total,

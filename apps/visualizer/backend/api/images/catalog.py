@@ -135,16 +135,16 @@ def _parse_clip_similar_catalog_params():
         return error_bad_request("invalid score_perspective slug"), None
 
     sort_raw = (request.args.get("sort_by_score") or "").strip().lower()
-    has_sort_by_score = bool(sort_raw)
-    if sort_raw and sort_raw not in ("asc", "desc"):
-        return error_bad_request("sort_by_score must be asc or desc"), None
-
-    if has_sort_by_score and not score_perspective:
-        return error_bad_request("sort_by_score requires score_perspective"), None
+    if sort_raw:
+        return error_bad_request(
+            "sort_by_score is not supported for visual similarity — results are ordered by CLIP distance"
+        ), None
 
     sort_date_raw = (request.args.get("sort_by_date") or "").strip().lower()
-    if sort_date_raw and sort_date_raw not in ("newest", "oldest"):
-        return error_bad_request("sort_by_date must be newest or oldest"), None
+    if sort_date_raw:
+        return error_bad_request(
+            "sort_by_date is not supported for visual similarity — results are ordered by CLIP distance"
+        ), None
 
     min_score = None
     if "min_score" in request.args:
