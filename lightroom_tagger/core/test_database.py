@@ -36,8 +36,8 @@ from lightroom_tagger.core.database import (
 )
 
 
-class TestDatabase(unittest.TestCase):
-    """Tests for database functions."""
+class TestDatabaseDbInit(unittest.TestCase):
+    """Tests for database initialization and migrations."""
 
     def setUp(self):
         """Create temporary database for each test."""
@@ -85,6 +85,98 @@ class TestDatabase(unittest.TestCase):
         uv = self.db.execute("PRAGMA user_version").fetchone()
         self.assertEqual(int(uv["user_version"]), 5)
 
+    def test_migrate_unified_image_keys_rewrites_legacy_key(self):
+        """Legacy full-datetime composite keys remap to YYYY-MM-DD_filename."""
+        self.db.execute("PRAGMA user_version = 0")
+        self.db.execute(
+            """
+            INSERT INTO images (key, id, filename, filepath, date_taken)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                "2024-01-15T00:00:00_photo.jpg",
+                "0",
+                "photo.jpg",
+                "",
+                "2024-01-15T00:00:00",
+            ),
+        )
+        self.db.commit()
+        migrate_unified_image_keys(self.db)
+        self.db.commit()
+        row = self.db.execute("SELECT key FROM images").fetchone()
+        self.assertEqual(row["key"], "2024-01-15_photo.jpg")
+
+    def test_migrate_unified_image_keys_merges_collisions(self):
+        """Duplicate rows with different timestamp precision merge instead of crashing."""
+        self.db.execute("PRAGMA user_version = 0")
+        self.db.execute(
+            "INSERT INTO images (key, id, filename, filepath, date_taken, rating) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            ("2020-12-31T22:24:31__DSF2158", "100", "_DSF2158", "/path/a", "2020-12-31T22:24:31", 3),
+        )
+        self.db.execute(
+            "INSERT INTO images (key, id, filename, filepath, date_taken, rating) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            ("2020-12-31T22:24:31.000__DSF2158", "100", "_DSF2158", "/path/a", "2020-12-31T22:24:31.000", 0),
+        )
+        # Both keys present in vision_cache (UNIQUE constraint on key)
+        self.db.execute(
+            "INSERT INTO vision_cache (key, compressed_path, phash, compressed_at, original_mtime) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("2020-12-31T22:24:31__DSF2158", "/cache/a.jpg", "abc", "2021-01-01", 1.0),
+        )
+        self.db.execute(
+            "INSERT INTO vision_cache (key, compressed_path, phash, compressed_at, original_mtime) "
+            "VALUES (?, ?, ?, ?, ?)",
+            ("2020-12-31T22:24:31.000__DSF2158", "/cache/b.jpg", "def", "2021-01-01", 1.0),
+        )
+        # Match referencing the loser key
+        self.db.execute(
+            "INSERT INTO matches (catalog_key, insta_key, total_score) VALUES (?, ?, ?)",
+            ("2020-12-31T22:24:31.000__DSF2158", "insta_abc", 0.9),
+        )
+        self.db.commit()
+
+        migrate_unified_image_keys(self.db)
+        self.db.commit()
+
+        rows = self.db.execute("SELECT key FROM images").fetchall()
+        self.assertEqual(len(rows), 1, "Collision should leave exactly one row")
+        self.assertEqual(rows[0]["key"], "2020-12-31__DSF2158")
+
+        match = self.db.execute(
+            "SELECT catalog_key FROM matches WHERE insta_key = 'insta_abc'"
+        ).fetchone()
+        self.assertIsNotNone(match)
+        survivor_key = rows[0]["key"]
+        self.assertIn(survivor_key, match["catalog_key"],
+                       "Dependent match row should be remapped to survivor key")
+
+        vc_rows = self.db.execute("SELECT key FROM vision_cache").fetchall()
+        vc_keys = [r["key"] for r in vc_rows]
+        self.assertEqual(len(vc_keys), 1,
+                         "vision_cache should have exactly one row after merge")
+        self.assertEqual(vc_keys[0], "2020-12-31__DSF2158")
+
+
+class TestDatabaseEmbeddings(unittest.TestCase):
+    """Tests for CLIP embedding storage (vec0 round-trip)."""
+
+    def setUp(self):
+        """Create temporary database for each test."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.json') as tf:
+            self.temp_db_path = tf.name
+        self.db = init_database(self.temp_db_path)
+
+    def tearDown(self):
+        """Clean up temporary database."""
+        self.db.close()
+        bak = self.temp_db_path + ".pre-key-migration.bak"
+        if os.path.exists(bak):
+            os.unlink(bak)
+        os.unlink(self.temp_db_path)
+
     def test_init_database_image_clip_embedding_roundtrip(self):
         """CLIP vec0 row round-trip via library_write and upsert (Phase 5 SIM-01)."""
         uv = self.db.execute("PRAGMA user_version").fetchone()
@@ -107,6 +199,24 @@ class TestDatabase(unittest.TestCase):
         ).fetchone()
         self.assertIsNotNone(row)
         self.assertEqual(len(row["embedding"]), 2048)
+
+
+class TestDatabaseCatalogCrud(unittest.TestCase):
+    """Tests for catalog CRUD helpers."""
+
+    def setUp(self):
+        """Create temporary database for each test."""
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.json') as tf:
+            self.temp_db_path = tf.name
+        self.db = init_database(self.temp_db_path)
+
+    def tearDown(self):
+        """Clean up temporary database."""
+        self.db.close()
+        bak = self.temp_db_path + ".pre-key-migration.bak"
+        if os.path.exists(bak):
+            os.unlink(bak)
+        os.unlink(self.temp_db_path)
 
     def test_generate_key(self):
         """Test key generation."""
@@ -221,80 +331,6 @@ class TestDatabase(unittest.TestCase):
         count = clear_all(self.db)
         self.assertEqual(count, 2)
         self.assertEqual(get_image_count(self.db), 0)
-
-    def test_migrate_unified_image_keys_rewrites_legacy_key(self):
-        """Legacy full-datetime composite keys remap to YYYY-MM-DD_filename."""
-        self.db.execute("PRAGMA user_version = 0")
-        self.db.execute(
-            """
-            INSERT INTO images (key, id, filename, filepath, date_taken)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                "2024-01-15T00:00:00_photo.jpg",
-                "0",
-                "photo.jpg",
-                "",
-                "2024-01-15T00:00:00",
-            ),
-        )
-        self.db.commit()
-        migrate_unified_image_keys(self.db)
-        self.db.commit()
-        row = self.db.execute("SELECT key FROM images").fetchone()
-        self.assertEqual(row["key"], "2024-01-15_photo.jpg")
-
-    def test_migrate_unified_image_keys_merges_collisions(self):
-        """Duplicate rows with different timestamp precision merge instead of crashing."""
-        self.db.execute("PRAGMA user_version = 0")
-        self.db.execute(
-            "INSERT INTO images (key, id, filename, filepath, date_taken, rating) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            ("2020-12-31T22:24:31__DSF2158", "100", "_DSF2158", "/path/a", "2020-12-31T22:24:31", 3),
-        )
-        self.db.execute(
-            "INSERT INTO images (key, id, filename, filepath, date_taken, rating) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            ("2020-12-31T22:24:31.000__DSF2158", "100", "_DSF2158", "/path/a", "2020-12-31T22:24:31.000", 0),
-        )
-        # Both keys present in vision_cache (UNIQUE constraint on key)
-        self.db.execute(
-            "INSERT INTO vision_cache (key, compressed_path, phash, compressed_at, original_mtime) "
-            "VALUES (?, ?, ?, ?, ?)",
-            ("2020-12-31T22:24:31__DSF2158", "/cache/a.jpg", "abc", "2021-01-01", 1.0),
-        )
-        self.db.execute(
-            "INSERT INTO vision_cache (key, compressed_path, phash, compressed_at, original_mtime) "
-            "VALUES (?, ?, ?, ?, ?)",
-            ("2020-12-31T22:24:31.000__DSF2158", "/cache/b.jpg", "def", "2021-01-01", 1.0),
-        )
-        # Match referencing the loser key
-        self.db.execute(
-            "INSERT INTO matches (catalog_key, insta_key, total_score) VALUES (?, ?, ?)",
-            ("2020-12-31T22:24:31.000__DSF2158", "insta_abc", 0.9),
-        )
-        self.db.commit()
-
-        migrate_unified_image_keys(self.db)
-        self.db.commit()
-
-        rows = self.db.execute("SELECT key FROM images").fetchall()
-        self.assertEqual(len(rows), 1, "Collision should leave exactly one row")
-        self.assertEqual(rows[0]["key"], "2020-12-31__DSF2158")
-
-        match = self.db.execute(
-            "SELECT catalog_key FROM matches WHERE insta_key = 'insta_abc'"
-        ).fetchone()
-        self.assertIsNotNone(match)
-        survivor_key = rows[0]["key"]
-        self.assertIn(survivor_key, match["catalog_key"],
-                       "Dependent match row should be remapped to survivor key")
-
-        vc_rows = self.db.execute("SELECT key FROM vision_cache").fetchall()
-        vc_keys = [r["key"] for r in vc_rows]
-        self.assertEqual(len(vc_keys), 1,
-                         "vision_cache should have exactly one row after merge")
-        self.assertEqual(vc_keys[0], "2020-12-31__DSF2158")
 
 
 class TestQueryCatalogImages(unittest.TestCase):
