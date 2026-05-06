@@ -19,15 +19,14 @@ from lightroom_tagger.core.vision_cache import (
 from lightroom_tagger.core.vision_client import compare_descriptions_batch
 
 from .candidates import find_candidates_by_date, query_by_exif
+from .description_batch import _compute_desc_scores_for_candidates
 from ._legacy import (
-    BATCH_MAX_TOKENS_ESCALATION,
-    _call_batch_chunk,
-    _compute_desc_scores_for_candidates,
     match_batch,
     match_image,
     score_candidates_with_vision,
 )
 from .text_scores import score_candidates, text_similarity
+from .vision_batch import BATCH_MAX_TOKENS_ESCALATION, _call_batch_chunk
 
 __all__ = [
     "BATCH_MAX_TOKENS_ESCALATION",
