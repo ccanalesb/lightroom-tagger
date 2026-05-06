@@ -6,7 +6,7 @@ import re
 import sqlite3
 from typing import Any
 
-from lightroom_tagger.core.posting_analytics import _EN_STOPWORDS
+from lightroom_tagger.core.text_constants import EN_STOPWORDS as _EN_STOPWORDS
 
 # Current catalog scores only — identity aggregation excludes non-catalog rows (D-40 / phase 10).
 _SCORES_BASE_SQL = """
