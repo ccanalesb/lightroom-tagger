@@ -2,6 +2,9 @@
 # Import order matches ``__all__`` (explicit Phase-14-style barrel contract).
 # ruff: noqa: I001
 
+from lightroom_tagger.core.config import get_description_model, get_vision_model, load_config
+from lightroom_tagger.core.exceptions import ContextLengthError
+
 from .description import (
     DESCRIPTION_PROMPT,
     _DESCRIPTION_FALLBACK,
@@ -20,22 +23,19 @@ from .image_prep import (
     convert_raw_to_jpg,
     get_viewable_path,
 )
-from ._legacy import (
-    ContextLengthError,
+from .vision_compare import (
     MAX_TOKENS_ESCALATION,
     _broken_provider_models,
     _compare_via_provider,
     _model_min_tokens,
-    analyze_image,
     compare_with_vision,
-    get_description_model,
-    get_vision_model,
-    load_config,
     parse_vision_response,
+    vision_score,
+)
+from ._legacy import (
+    analyze_image,
     run_external_agent,
     run_local_agent,
-    run_vision_ollama,
-    vision_score,
 )
 
 __all__ = (
@@ -67,6 +67,5 @@ __all__ = (
     "parse_vision_response",
     "run_external_agent",
     "run_local_agent",
-    "run_vision_ollama",
     "vision_score",
 )

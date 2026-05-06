@@ -17,7 +17,7 @@ from typing import Any, cast
 import openai as openai_sdk
 
 from lightroom_tagger.core.analyzer.description import build_description_prompt
-from lightroom_tagger.core.analyzer._legacy import parse_vision_response
+from lightroom_tagger.core.analyzer.vision_compare import parse_vision_response
 from lightroom_tagger.core.exceptions import (
     AuthenticationError,
     ConnectionError,

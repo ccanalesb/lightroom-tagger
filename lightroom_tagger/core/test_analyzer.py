@@ -60,9 +60,9 @@ def test_describe_image_external_skips_provider_pipeline():
 
 def test_compare_with_vision_returns_result():
     """Vision comparison should return dict with verdict and confidence."""
-    with patch('lightroom_tagger.core.analyzer._legacy.compress_image', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer._legacy.get_viewable_path', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer._legacy.run_vision_ollama',
+    with patch('lightroom_tagger.core.analyzer.vision_compare.compress_image', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer.vision_compare.get_viewable_path', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer.vision_compare._compare_via_provider',
                return_value={'confidence': 90, 'verdict': 'SAME', 'reasoning': 'test'}):
 
         result = compare_with_vision('/tmp/local.jpg', '/tmp/insta.jpg')
@@ -135,9 +135,9 @@ def test_parse_vision_response_fallback():
 
 def test_compare_with_vision_returns_dict():
     """Vision comparison returns dict with confidence and verdict."""
-    with patch('lightroom_tagger.core.analyzer._legacy.compress_image', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer._legacy.get_viewable_path', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer._legacy.run_vision_ollama',
+    with patch('lightroom_tagger.core.analyzer.vision_compare.compress_image', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer.vision_compare.get_viewable_path', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer.vision_compare._compare_via_provider',
                return_value={'confidence': 85, 'verdict': 'SAME'}):
 
         result = compare_with_vision('/tmp/local.jpg', '/tmp/insta.jpg')
@@ -253,9 +253,9 @@ def test_compare_with_vision_uses_compression():
             compressed_paths.append(result)
             return result
 
-        with patch('lightroom_tagger.core.analyzer._legacy.get_viewable_path', side_effect=lambda x: x), \
-             patch('lightroom_tagger.core.analyzer._legacy.compress_image', side_effect=track_compress), \
-             patch('lightroom_tagger.core.analyzer._legacy.run_vision_ollama',
+        with patch('lightroom_tagger.core.analyzer.vision_compare.get_viewable_path', side_effect=lambda x: x), \
+             patch('lightroom_tagger.core.analyzer.vision_compare.compress_image', side_effect=track_compress), \
+             patch('lightroom_tagger.core.analyzer.vision_compare._compare_via_provider',
                    return_value={'confidence': 90, 'verdict': 'SAME', 'reasoning': ''}):
 
             result = compare_with_vision(local_path, insta_path)
@@ -273,9 +273,9 @@ def test_compare_with_vision_uses_compression():
 
 def test_compare_with_vision_cleans_up_temp_files():
     """Vision comparison should clean up all temporary files."""
-    with patch('lightroom_tagger.core.analyzer._legacy.compress_image', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer._legacy.get_viewable_path', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer._legacy.run_vision_ollama',
+    with patch('lightroom_tagger.core.analyzer.vision_compare.compress_image', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer.vision_compare.get_viewable_path', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer.vision_compare._compare_via_provider',
                return_value={'confidence': 90, 'verdict': 'SAME', 'reasoning': ''}):
 
         # Track temp files in a real scenario
@@ -413,63 +413,3 @@ def test_get_description_model_falls_back_to_vision_model_env():
         assert get_description_model() == 'gemma3:27b'
 
 
-def test_run_vision_ollama_raises_on_model_not_found():
-    """should raise RuntimeError when Ollama returns model not found."""
-    import json
-    import urllib.request
-    from io import BytesIO
-    from unittest.mock import MagicMock
-
-    from lightroom_tagger.core.analyzer import run_vision_ollama
-
-    mock_response = MagicMock()
-    mock_response.read.return_value = json.dumps(
-        {'error': "model 'gemma3:27b' not found"}
-    ).encode()
-    mock_response.__enter__ = lambda s: s
-    mock_response.__exit__ = MagicMock(return_value=False)
-
-    # Only intercept opens of the two image paths — patching
-    # ``builtins.open`` wholesale breaks unrelated callers like
-    # ``config.load_config`` (which opens ``config.yaml`` via ``open(path)``
-    # with one positional arg, and expects real YAML).
-    real_open = open
-
-    def _fake_open(*args, **kwargs):
-        path = str(args[0]) if args else str(kwargs.get('file', ''))
-        if path.endswith('/a.jpg') or path.endswith('/b.jpg'):
-            return BytesIO(b'\x00' * 10)
-        return real_open(*args, **kwargs)
-
-    with patch('urllib.request.urlopen', return_value=mock_response), \
-         patch('builtins.open', side_effect=_fake_open):
-        try:
-            run_vision_ollama('/tmp/a.jpg', '/tmp/b.jpg')
-            assert False, "Expected RuntimeError"
-        except RuntimeError as e:
-            assert 'not found' in str(e)
-
-
-def test_run_vision_ollama_raises_on_connection_error():
-    """should raise URLError when Ollama is unreachable."""
-    from io import BytesIO
-    from unittest.mock import MagicMock
-    from urllib.error import URLError
-
-    from lightroom_tagger.core.analyzer import run_vision_ollama
-
-    real_open = open
-
-    def _fake_open(*args, **kwargs):
-        path = str(args[0]) if args else str(kwargs.get('file', ''))
-        if path.endswith('/a.jpg') or path.endswith('/b.jpg'):
-            return BytesIO(b'\x00' * 10)
-        return real_open(*args, **kwargs)
-
-    with patch('urllib.request.urlopen', side_effect=URLError('Connection refused')), \
-         patch('builtins.open', side_effect=_fake_open):
-        try:
-            run_vision_ollama('/tmp/a.jpg', '/tmp/b.jpg')
-            assert False, "Expected URLError"
-        except URLError:
-            pass
