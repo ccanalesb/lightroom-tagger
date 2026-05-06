@@ -174,7 +174,7 @@ def _compare_via_provider(local_path: str, insta_path: str,
                 )
             return _skip
 
-        cached_min = _model_min_tokens.get(mdl, 0)
+        cached_min = _model_min_tokens.get(provider_key, 0)
         start_idx = 0
         for i, val in enumerate(MAX_TOKENS_ESCALATION):
             if val >= cached_min:
@@ -191,7 +191,7 @@ def _compare_via_provider(local_path: str, insta_path: str,
                 if state["idx"] < len(MAX_TOKENS_ESCALATION) - 1:
                     state["idx"] += 1
                     next_val = MAX_TOKENS_ESCALATION[state["idx"]]
-                    _model_min_tokens[mdl] = next_val
+                    _model_min_tokens[provider_key] = next_val
                     if log_callback:
                         log_callback(
                             "warning",
