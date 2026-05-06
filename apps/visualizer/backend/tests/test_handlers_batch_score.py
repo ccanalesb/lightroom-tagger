@@ -171,6 +171,78 @@ def test_batch_score_fingerprint_mismatch_resets_and_reprocesses(
 
 @patch('jobs.handlers.analyze.add_job_log')
 @patch('jobs.handlers.analyze._score_single_image')
+@patch('jobs.handlers.analyze.get_job')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
+def test_batch_score_stale_checkpoint_all_processed_completes(
+    _mock_exists,
+    mock_getenv,
+    mock_config,
+    mock_init_db,
+    mock_get_job,
+    mock_score,
+    _mock_add_log,
+):
+    from jobs.handlers import handle_batch_score
+
+    metadata = {
+        'image_type': 'catalog',
+        'date_filter': 'all',
+        'force': False,
+        'max_workers': 1,
+        'perspective_slugs': ['p1'],
+    }
+
+    triples = [
+        ('img_z', 'catalog', 'p1'),
+        ('img_a', 'catalog', 'p1'),
+    ]
+    fp = fingerprint_batch_score(metadata, triples)
+
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_db = MagicMock()
+
+    def _exec(sql, params=()):
+        m = MagicMock()
+        q = ' '.join(sql.split())
+        if 'FROM images' in q and 'image_scores' not in q:
+            m.fetchall.return_value = [{'key': 'img_z'}, {'key': 'img_a'}]
+        elif 'image_scores' in q:
+            m.fetchall.return_value = []
+        else:
+            m.fetchall.return_value = []
+        return m
+
+    mock_db.execute.side_effect = _exec
+    mock_init_db.return_value = mock_db
+
+    mock_get_job.return_value = {
+        'status': 'running',
+        'metadata': {
+            'checkpoint': {
+                'checkpoint_version': 1,
+                'job_type': 'batch_score',
+                'fingerprint': fp,
+                'processed_triplets': ['img_a|catalog|p1', 'img_z|catalog|p1'],
+                'total_at_start': 2,
+            },
+        },
+    }
+
+    runner = _make_runner()
+    handle_batch_score(runner, 'job-stale-score', metadata)
+
+    mock_score.assert_not_called()
+    runner.complete_job.assert_called_once()
+    res = runner.complete_job.call_args[0][1]
+    assert res['scored'] == 0
+    assert res['total'] == 2
+
+
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
 @patch('jobs.handlers.analyze.init_database')
 @patch('jobs.handlers.analyze.load_config')
 @patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
