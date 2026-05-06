@@ -119,23 +119,40 @@ def get_viewable_path(image_path: str) -> str:
     Returns:
         Path to a viewable image (JPG/PNG).
         Returns original path if already viewable.
-        Returns temporary JPG path if RAW/DNG (caller should clean up).
+        Returns temporary JPG path if RAW/DNG and no sidecar exists (caller must clean up).
+        Returns persistent sidecar JPG path if one exists next to the RAW (caller must NOT delete).
+
+    Use ``get_viewable_path_managed`` when you need to know whether the returned path
+    is a temporary file that should be cleaned up vs. a persistent on-disk sidecar.
+    """
+    path, _ = get_viewable_path_managed(image_path)
+    return path
+
+
+def get_viewable_path_managed(image_path: str) -> tuple[str, bool]:
+    """Get a viewable image path with ownership information.
+
+    Returns:
+        (path, is_temp) where ``is_temp=True`` means the path is a mkstemp-created
+        temporary file that the caller **must** clean up, and ``is_temp=False`` means
+        the path is either the original or a persistent on-disk sidecar that must
+        **not** be deleted by the caller.
     """
     ext = os.path.splitext(image_path)[1].lower()
 
     if ext not in RAW_EXTENSIONS:
-        return image_path
+        return image_path, False
 
     jpg_sidecar = image_path.rsplit('.', 1)[0] + '.JPG'
     if os.path.exists(jpg_sidecar):
-        return jpg_sidecar
+        return jpg_sidecar, False  # persistent sidecar — do not delete
 
     jpg_sidecar_lower = image_path.rsplit('.', 1)[0] + '.jpg'
     if os.path.exists(jpg_sidecar_lower):
-        return jpg_sidecar_lower
+        return jpg_sidecar_lower, False  # persistent sidecar — do not delete
 
     converted = convert_raw_to_jpg(image_path)
     if converted:
-        return converted
+        return converted, True  # mkstemp-created temp — caller must clean up
 
-    return image_path
+    return image_path, False

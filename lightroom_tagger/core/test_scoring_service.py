@@ -85,8 +85,8 @@ def test_score_image_persists_row_and_passes_llm_fixer(tmp_path) -> None:
             return_value=mock_dispatcher,
         ),
         patch(
-            "lightroom_tagger.core.scoring_service.get_viewable_path",
-            side_effect=lambda p: p,
+            "lightroom_tagger.core.scoring_service.get_viewable_path_managed",
+            side_effect=lambda p: (p, False),
         ),
         patch(
             "lightroom_tagger.core.scoring_service.compress_image",

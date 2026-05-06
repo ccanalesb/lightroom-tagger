@@ -71,7 +71,7 @@ def test_describe_image_external_skips_provider_pipeline():
 def test_compare_with_vision_returns_result():
     """Vision comparison should return dict with verdict and confidence."""
     with patch('lightroom_tagger.core.analyzer.vision_compare.compress_image', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer.vision_compare.get_viewable_path', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer.vision_compare.get_viewable_path_managed', side_effect=lambda x: (x, False)), \
          patch('lightroom_tagger.core.analyzer.vision_compare._compare_via_provider',
                return_value={'confidence': 90, 'verdict': 'SAME', 'reasoning': 'test'}):
 
@@ -146,7 +146,7 @@ def test_parse_vision_response_fallback():
 def test_compare_with_vision_returns_dict():
     """Vision comparison returns dict with confidence and verdict."""
     with patch('lightroom_tagger.core.analyzer.vision_compare.compress_image', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer.vision_compare.get_viewable_path', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer.vision_compare.get_viewable_path_managed', side_effect=lambda x: (x, False)), \
          patch('lightroom_tagger.core.analyzer.vision_compare._compare_via_provider',
                return_value={'confidence': 85, 'verdict': 'SAME'}):
 
@@ -263,7 +263,7 @@ def test_compare_with_vision_uses_compression():
             compressed_paths.append(result)
             return result
 
-        with patch('lightroom_tagger.core.analyzer.vision_compare.get_viewable_path', side_effect=lambda x: x), \
+        with patch('lightroom_tagger.core.analyzer.vision_compare.get_viewable_path_managed', side_effect=lambda x: (x, False)), \
              patch('lightroom_tagger.core.analyzer.vision_compare.compress_image', side_effect=track_compress), \
              patch('lightroom_tagger.core.analyzer.vision_compare._compare_via_provider',
                    return_value={'confidence': 90, 'verdict': 'SAME', 'reasoning': ''}):
@@ -284,7 +284,7 @@ def test_compare_with_vision_uses_compression():
 def test_compare_with_vision_cleans_up_temp_files():
     """Vision comparison should clean up all temporary files."""
     with patch('lightroom_tagger.core.analyzer.vision_compare.compress_image', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer.vision_compare.get_viewable_path', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer.vision_compare.get_viewable_path_managed', side_effect=lambda x: (x, False)), \
          patch('lightroom_tagger.core.analyzer.vision_compare._compare_via_provider',
                return_value={'confidence': 90, 'verdict': 'SAME', 'reasoning': ''}):
 

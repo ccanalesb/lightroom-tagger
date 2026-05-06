@@ -9,7 +9,7 @@ from typing import Any
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 
-from .image_prep import compress_image, get_viewable_path
+from .image_prep import compress_image, get_viewable_path, get_viewable_path_managed
 
 # Legacy monolithic prompt; prefer prompt_builder + DB perspectives when available.
 DESCRIPTION_PROMPT = """You are an experienced photo editor reviewing images for a photography portfolio. Be direct and constructive. State clearly what works and what doesn't — no flattery, no sugarcoating, but also no performative negativity. Every image has strengths and weaknesses; identify both with specifics.
@@ -219,8 +219,8 @@ def _describe_image_via_provider(path: str, provider_id: str,
         model = models[0]["id"]
 
     temp_files: list[str] = []
-    viewable = get_viewable_path(path)
-    if viewable != path:
+    viewable, viewable_is_temp = get_viewable_path_managed(path)
+    if viewable_is_temp:
         temp_files.append(viewable)
 
     compressed = compress_image(viewable, silent=silent_compression)

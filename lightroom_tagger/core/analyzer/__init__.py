@@ -23,6 +23,7 @@ from .image_prep import (
     compress_image,
     convert_raw_to_jpg,
     get_viewable_path,
+    get_viewable_path_managed,
 )
 from .vision_compare import (
     MAX_TOKENS_ESCALATION,
@@ -56,6 +57,7 @@ __all__ = (
     "extract_exif",
     "get_description_model",
     "get_viewable_path",
+    "get_viewable_path_managed",
     "get_vision_model",
     "load_config",
     "parse_description_response",

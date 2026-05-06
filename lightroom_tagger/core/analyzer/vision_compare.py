@@ -10,7 +10,7 @@ from typing import Any
 from lightroom_tagger.core.exceptions import ContextLengthError
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 
-from .image_prep import RAW_EXTENSIONS, VISION_MAX_DIMENSION, compress_image, get_viewable_path
+from .image_prep import RAW_EXTENSIONS, VISION_MAX_DIMENSION, compress_image, get_viewable_path_managed
 
 MAX_TOKENS_ESCALATION = [256, 4096, 32768, 65536]
 
@@ -75,20 +75,14 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
             if log_callback:
                 log_callback('info', f'Using cached compressed image for {os.path.basename(local_path)}')
         else:
-            viewable_local = get_viewable_path(local_path)
-            if viewable_local != local_path:
+            viewable_local, viewable_local_is_temp = get_viewable_path_managed(local_path)
+            if viewable_local_is_temp:
                 temp_files.append(viewable_local)
                 if log_callback:
-                    ext = os.path.splitext(local_path)[1].lower()
-                    if ext in RAW_EXTENSIONS and viewable_local.lower().endswith(('.jpg', '.jpeg')):
-                        sidecar_path = local_path.rsplit('.', 1)[0] + '.JPG'
-                        sidecar_path_lower = local_path.rsplit('.', 1)[0] + '.jpg'
-                        if os.path.exists(sidecar_path) or os.path.exists(sidecar_path_lower):
-                            log_callback('info', f'Using JPG sidecar for {os.path.basename(local_path)}')
-                        else:
-                            log_callback('info', f'Converted DNG to JPG: {os.path.basename(viewable_local)}')
-            else:
-                viewable_local = local_path
+                    log_callback('info', f'Converted DNG to JPG: {os.path.basename(viewable_local)}')
+            elif viewable_local != local_path:
+                if log_callback:
+                    log_callback('info', f'Using JPG sidecar for {os.path.basename(local_path)}')
 
             compressed_local = compress_image(viewable_local)
             if compressed_local != viewable_local:
@@ -98,11 +92,9 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
         if compressed_insta_path and os.path.exists(compressed_insta_path):
             compressed_insta = compressed_insta_path
         else:
-            viewable_insta = get_viewable_path(insta_path)
-            if viewable_insta != insta_path:
+            viewable_insta, viewable_insta_is_temp = get_viewable_path_managed(insta_path)
+            if viewable_insta_is_temp:
                 temp_files.append(viewable_insta)
-            else:
-                viewable_insta = insta_path
 
             compressed_insta = compress_image(viewable_insta)
             if compressed_insta != viewable_insta:

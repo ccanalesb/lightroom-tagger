@@ -19,7 +19,7 @@ from typing import Any
 from lightroom_tagger.core.analyzer import (
     VIDEO_EXTENSIONS,
     compress_image,
-    get_viewable_path,
+    get_viewable_path_managed,
 )
 from lightroom_tagger.core.vision_cache import get_or_create_cached_image
 from lightroom_tagger.core.database import (
@@ -164,15 +164,15 @@ def score_image_for_perspective(
         if cached and os.path.exists(cached):
             compressed = cached
         else:
-            viewable = get_viewable_path(filepath)
-            if viewable != filepath:
+            viewable, viewable_is_temp = get_viewable_path_managed(filepath)
+            if viewable_is_temp:
                 temp_files.append(viewable)
             compressed = compress_image(viewable)
             if compressed != viewable:
                 temp_files.append(compressed)
     else:
-        viewable = get_viewable_path(filepath)
-        if viewable != filepath:
+        viewable, viewable_is_temp = get_viewable_path_managed(filepath)
+        if viewable_is_temp:
             temp_files.append(viewable)
         compressed = compress_image(viewable)
         if compressed != viewable:
