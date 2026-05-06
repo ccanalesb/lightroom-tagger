@@ -298,7 +298,6 @@ def test_compare_with_vision_cleans_up_temp_files():
 def test_vision_config_environment_variables():
     """Vision compression should respect environment variables."""
     import lightroom_tagger.core.analyzer as analyzer_module
-    import lightroom_tagger.core.analyzer._legacy as legacy_module
     import lightroom_tagger.core.analyzer.image_prep as image_prep_module
 
     # Test default values
@@ -315,7 +314,6 @@ def test_vision_config_environment_variables():
 
         # Constants live in ``image_prep`` — reload submodule chain, then the barrel.
         importlib.reload(image_prep_module)
-        importlib.reload(legacy_module)
         importlib.reload(analyzer_module)
 
         assert analyzer_module.VISION_MAX_DIMENSION == 2048
@@ -334,7 +332,6 @@ def test_vision_config_environment_variables():
 
         # Reload again to restore
         importlib.reload(image_prep_module)
-        importlib.reload(legacy_module)
         importlib.reload(analyzer_module)
 
 

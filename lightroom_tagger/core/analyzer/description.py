@@ -253,3 +253,8 @@ def _describe_image_via_provider(path: str, provider_id: str,
             if os.path.exists(f):
                 with contextlib.suppress(Exception):
                     os.unlink(f)
+
+
+def run_external_agent(_path: str) -> str:
+    """Run external API (e.g., Claude, GPT-4V)."""
+    return ""

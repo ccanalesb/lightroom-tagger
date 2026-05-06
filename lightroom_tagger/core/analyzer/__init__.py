@@ -1,4 +1,4 @@
-"""Image analysis facade — barrel re-exports from submodules and :mod:`._legacy`."""
+"""Image analysis facade — explicit barrel re-exports from ADR-0001 submodules."""
 # Import order matches ``__all__`` (explicit Phase-14-style barrel contract).
 # ruff: noqa: I001
 
@@ -12,6 +12,7 @@ from .description import (
     build_description_prompt,
     describe_image,
     parse_description_response,
+    run_external_agent,
 )
 from .image_inspect import compute_phash, extract_exif
 from .image_prep import (
@@ -32,7 +33,6 @@ from .vision_compare import (
     parse_vision_response,
     vision_score,
 )
-from ._legacy import run_external_agent
 
 __all__ = (
     "ContextLengthError",
