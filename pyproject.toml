@@ -72,6 +72,8 @@ lightroom_tagger = ["py.typed"]
 line-length = 100
 target-version = ['py310', 'py311', 'py312']
 
+# Module boundary policy: docs/architecture.md (max file size, import layers).
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
