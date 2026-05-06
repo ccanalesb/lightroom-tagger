@@ -17,15 +17,14 @@ from .aggregates import (
     compute_image_aggregate_scores,
     compute_single_image_aggregate_scores,
 )
-from ._legacy import (
+from .ranking import (
     _image_meta_map,
-    _posted_catalog_keys_sql,
     _stack_fields_for_image_keys,
     _stack_non_representative_keys,
     rank_best_photos,
-    suggest_what_to_post_next,
 )
 from .style_fingerprint import _aggregate_histogram, build_style_fingerprint
+from .suggest_post import _posted_catalog_keys_sql, suggest_what_to_post_next
 
 __all__ = [
     "_SCORES_BASE_SQL",
