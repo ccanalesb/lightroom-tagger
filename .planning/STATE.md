@@ -58,6 +58,7 @@ Items acknowledged and deferred at milestone close on 2026-05-04 (v3.0):
 - Phase 5.1 added: Search UI polish (clear button, spacing, mobile layout, dropdown overflow) — 2026-04-24
 - Phase 5.2 added: Tool-calling search (multi-tool LLM, capability detection, rich tool results, multi-turn history) — 2026-04-24
 - Phase 7.1 inserted after Phase 7: Phase 7 remediation fixes (URGENT) — 2026-04-26
+- Phase 19 added: Generate read-only HTML comparison-pool report — 2026-05-06
 
 ## Accumulated Context
 

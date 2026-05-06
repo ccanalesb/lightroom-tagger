@@ -77,6 +77,17 @@
 - [ ] Phase 16: Recovery & path-failure unit tests — TEST-01, TEST-02
 - [ ] Phase 17: E2E harness bootstrap (CDP + fixture) — TEST-03
 - [ ] Phase 18: Critical user flows E2E — E2E-01..E2E-06
+- [ ] Phase 19: Generate read-only HTML comparison-pool report
+
+### Phase 19: Generate read-only HTML comparison-pool report
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 18
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 19 to break down)
 
 ---
 
