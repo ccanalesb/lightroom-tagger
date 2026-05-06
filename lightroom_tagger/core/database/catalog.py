@@ -390,7 +390,7 @@ def _append_query_catalog_image_filters(
     Used by :func:`query_catalog_images` and :func:`filter_order_keys_in_catalog`. The
     caller must initialize *clauses* (e.g. ``[\"1=1\"]`` or ``i.key IN (...)``) and *bindings*.
     """
-    from ._legacy import build_description_fts_query
+    from .descriptions import build_description_fts_query
 
     if posted is True:
         clauses.append("i.instagram_posted = 1")

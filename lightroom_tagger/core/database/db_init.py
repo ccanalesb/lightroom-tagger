@@ -466,7 +466,7 @@ def _backfill_matched_catalog_key_from_validated_matches(conn: sqlite3.Connectio
 
 def _migrate_image_descriptions_fts(conn: sqlite3.Connection) -> None:
     """Backfill description_search_document, add standalone FTS5, and index existing rows (D-05). Runs once (user_version 2 → 3)."""
-    from ._legacy import build_description_search_document
+    from .descriptions import build_description_search_document
 
     row = conn.execute("PRAGMA user_version").fetchone()
     current_uv = int(row["user_version"] if row else 0)
