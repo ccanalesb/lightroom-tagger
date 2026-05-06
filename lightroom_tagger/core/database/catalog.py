@@ -2,148 +2,24 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import re
 import sqlite3
 import threading
 import time
-from collections.abc import Collection, Sequence
 from datetime import datetime
 
-from .db_init import _deserialize_row, _serialize_json
-
-
-# ---------------------------------------------------------------------------
-# Single-writer discipline for ``library.db``
-# ---------------------------------------------------------------------------
-#
-# SQLite (including WAL mode) allows exactly one writer at a time. Under
-# parallel describe/score workers (4 threads, each with its own connection,
-# each doing UPDATE/INSERT around a slow vision-model call) we were hitting
-# ``OperationalError: database is locked`` at 10–30% of writes.
-#
-# Two distinct failure modes caused this:
-#
-#   1. Python's default isolation level auto-BEGINs a *deferred* transaction
-#      on the first SELECT. When DML later runs on the same connection,
-#      SQLite must upgrade the read lock to a write lock — that upgrade
-#      fails *immediately* with SQLITE_BUSY if another writer is active,
-#      ignoring ``busy_timeout`` (because the upgrade cannot safely wait
-#      without deadlocking).
-#
-#   2. Multiple helper functions (``store_image_description``,
-#      ``store_vision_cached_image``, ``insert_image_score``,
-#      ``supersede_previous_current_scores``, ``delete_scores_for_version``)
-#      each open their own implicit transaction and commit immediately,
-#      so workers race on the writer seat across many small hot-path calls.
-#
-# The fix is a single process-wide writer lock plus ``BEGIN IMMEDIATE`` on
-# every library.db write. ``BEGIN IMMEDIATE`` takes the writer lock up
-# front and *does* honor ``busy_timeout``, so concurrent Python threads
-# queue on the lock instead of racing SQLite and losing. Reads remain
-# fully parallel: each worker keeps its own connection, only writes go
-# through the serializer.
-#
-# Call sites should use :func:`library_write` rather than bare
-# ``conn.commit()`` whenever they modify ``library.db`` from a context
-# that may run in parallel with other workers.
-
-# ``RLock`` (not ``Lock``) so that nested ``library_write`` calls on the
-# same thread don't self-deadlock. In practice we don't currently nest,
-# but the score/describe call graph changes often and a non-reentrant
-# lock would turn a future refactor into a production hang. The inner
-# BEGIN IMMEDIATE is still guarded by SQLite itself — re-entering
-# ``library_write`` on the same thread means the outer ``BEGIN IMMEDIATE``
-# is already in effect, so the inner block just piggy-backs on it (see
-# the ``in_transaction`` check below).
-_LIBRARY_WRITE_LOCK = threading.RLock()
-
-
-@contextlib.contextmanager
-def library_write(
-    conn: sqlite3.Connection,
-    *,
-    retries: int = 5,
-    log=None,
-):
-    """Acquire the library-DB writer seat for a single transaction.
-
-    Usage::
-
-        with library_write(conn):
-            conn.execute("INSERT ...")
-            conn.execute("UPDATE ...")
-
-    Semantics:
-
-    * Holds ``_LIBRARY_WRITE_LOCK`` for the duration, so at most one Python
-      thread in this process owns a library-DB write transaction at a time.
-    * Calls ``conn.rollback()`` first to discard any implicit deferred read
-      transaction (see failure mode #1 above), then ``BEGIN IMMEDIATE``
-      which grabs the SQLite writer seat and honors ``busy_timeout``.
-    * On success, commits. On any exception inside the ``with`` block,
-      rolls back and re-raises.
-    * Retries ``SQLITE_BUSY`` from ``BEGIN IMMEDIATE`` with exponential
-      backoff — this handles the rare case that an external process (not
-      this Python process) holds the writer seat longer than
-      ``busy_timeout``.
-
-    The ``log`` hook receives ``("level", "message")`` tuples and is
-    intended for job-log forwarding so retries are visible in the UI.
-    """
-    acquired = False
-    owns_transaction = False
-    try:
-        _LIBRARY_WRITE_LOCK.acquire()
-        acquired = True
-
-        # Nested ``library_write`` on the same thread: the outer call
-        # already has an open ``BEGIN IMMEDIATE`` transaction and will
-        # handle commit/rollback. Just yield so the inner block runs
-        # inside the outer transaction.
-        if conn.in_transaction:
-            yield conn
-            return
-
-        last_exc: Exception | None = None
-        for attempt in range(retries):
-            try:
-                conn.rollback()
-                conn.execute("BEGIN IMMEDIATE")
-                owns_transaction = True
-                break
-            except sqlite3.OperationalError as exc:
-                last_exc = exc
-                if "database is locked" in str(exc) and attempt < retries - 1:
-                    if log is not None:
-                        log(
-                            "warning",
-                            f"[library-write] lock busy, retry "
-                            f"{attempt + 1}/{retries}",
-                        )
-                    time.sleep(0.1 * (2 ** attempt) + (time.time() % 0.05))
-                    continue
-                raise
-        if not owns_transaction:  # pragma: no cover
-            raise last_exc if last_exc else sqlite3.OperationalError(
-                "library_write: failed to acquire writer seat"
-            )
-
-        try:
-            yield conn
-        except Exception:
-            with contextlib.suppress(sqlite3.Error):
-                conn.rollback()
-            owns_transaction = False
-            raise
-        else:
-            conn.commit()
-            owns_transaction = False
-    finally:
-        if acquired:
-            _LIBRARY_WRITE_LOCK.release()
+from lightroom_tagger.core.database.catalog_query import (
+    _append_query_catalog_image_filters,
+    _non_empty_str_list_for_json_array_filter,
+    catalog_key_is_primary_grid_row,
+    filter_order_keys_in_catalog,
+    query_catalog_images,
+    query_catalog_images_by_keys,
+)
+from lightroom_tagger.core.database.catalog_write import _LIBRARY_WRITE_LOCK, library_write
+from lightroom_tagger.core.database.db_init import _deserialize_row, _serialize_json
 
 def resolve_filepath(path: str) -> str:
     """Resolve UNC/network paths to local mount points.
@@ -357,465 +233,16 @@ def clear_all(db: sqlite3.Connection) -> int:
     db.execute("DELETE FROM images")
     db.commit()
     return count
-def _non_empty_str_list_for_json_array_filter(values: list[str] | None) -> list[str] | None:
-    """Strip elements, drop blank entries; return None if no filter should apply.
 
-    A list of only whitespace is treated as no filter, matching "empty list" semantics.
-    """
-    if values is None or len(values) == 0:
-        return None
-    out = [str(v).strip() for v in values if v is not None and str(v).strip()]
-    return out or None
 
-def _append_query_catalog_image_filters(
-    clauses: list[str],
-    bindings: list,
-    *,
-    posted: bool | None = None,
-    month: str | None = None,
-    keyword: str | None = None,
-    min_rating: int | None = None,
-    date_from: str | None = None,
-    date_to: str | None = None,
-    color_label: str | None = None,
-    analyzed: bool | None = None,
-    min_score: int | None = None,
-    description_search: str | None = None,
-    dominant_colors: list[str] | None = None,
-    mood_tags: list[str] | None = None,
-    has_repetition: bool | None = None,
-) -> None:
-    """Append shared catalog list AND-clauses (incl. stack collapse) to *clauses* / *bindings*.
-
-    Used by :func:`query_catalog_images` and :func:`filter_order_keys_in_catalog`. The
-    caller must initialize *clauses* (e.g. ``[\"1=1\"]`` or ``i.key IN (...)``) and *bindings*.
-    """
-    from .descriptions import build_description_fts_query
-
-    if posted is True:
-        clauses.append("i.instagram_posted = 1")
-    elif posted is False:
-        clauses.append("i.instagram_posted = 0")
-
-    if month and len(month) == 6 and month.isdigit():
-        clauses.append("strftime('%Y%m', i.date_taken) = ?")
-        bindings.append(month)
-
-    kw = (keyword or "").strip()
-    if kw:
-        pattern = f"%{kw}%"
-        clauses.append(
-            "("
-            "i.keywords LIKE ? COLLATE NOCASE OR "
-            "i.filename LIKE ? COLLATE NOCASE OR "
-            "i.title LIKE ? COLLATE NOCASE OR "
-            "i.description LIKE ? COLLATE NOCASE"
-            ")"
-        )
-        bindings.extend([pattern, pattern, pattern, pattern])
-
-    if min_rating is not None:
-        clauses.append("i.rating >= ?")
-        bindings.append(min_rating)
-
-    if date_from:
-        clauses.append("i.date_taken >= ?")
-        bindings.append(date_from)
-
-    if date_to:
-        clauses.append("i.date_taken <= ?")
-        bindings.append(date_to)
-
-    cl = (color_label or "").strip()
-    if cl:
-        clauses.append("LOWER(i.color_label) = LOWER(?)")
-        bindings.append(cl)
-
-    if analyzed is True:
-        clauses.append("d.image_key IS NOT NULL")
-    elif analyzed is False:
-        clauses.append("d.image_key IS NULL")
-
-    if min_score is not None:
-        clauses.append("s.score IS NOT NULL AND s.score >= ?")
-        bindings.append(min_score)
-
-    if (description_search or "").strip():
-        match_str, fts_err = build_description_fts_query(description_search)
-        if fts_err:
-            raise ValueError(fts_err)
-        if match_str is not None:
-            clauses.append(
-                "i.key IN ("
-                "SELECT d2.image_key FROM image_descriptions d2 "
-                "INNER JOIN image_descriptions_fts ON image_descriptions_fts.rowid = d2.rowid "
-                "WHERE d2.image_type = 'catalog' AND image_descriptions_fts MATCH ?"
-                ")"
-            )
-            bindings.append(match_str)
-
-    dc_tokens = _non_empty_str_list_for_json_array_filter(dominant_colors)
-    if dc_tokens:
-        dc_ph = ",".join("?" * len(dc_tokens))
-        clauses.append(
-            "("
-            "d.dominant_colors IS NOT NULL AND json_type(d.dominant_colors) = 'array' "
-            "AND EXISTS ("
-            "SELECT 1 FROM json_each(d.dominant_colors) AS jde "
-            f"WHERE jde.value IN ({dc_ph})"
-            ")"
-            ")"
-        )
-        bindings.extend(dc_tokens)
-
-    if has_repetition is True:
-        clauses.append("d.has_repetition = 1")
-    elif has_repetition is False:
-        clauses.append("(d.has_repetition IS NULL OR d.has_repetition = 0)")
-
-    mt_tokens = _non_empty_str_list_for_json_array_filter(mood_tags)
-    if mt_tokens:
-        mt_ph = ",".join("?" * len(mt_tokens))
-        clauses.append(
-            "("
-            "d.mood_tags IS NOT NULL AND json_type(d.mood_tags) = 'array' "
-            "AND EXISTS ("
-            "SELECT 1 FROM json_each(d.mood_tags) AS jme "
-            f"WHERE jme.value IN ({mt_ph})"
-            ")"
-            ")"
-        )
-        bindings.extend(mt_tokens)
-
-    clauses.append("(m_st.image_key IS NULL OR i.key = st.representative_key)")
-
-def filter_order_keys_in_catalog(
-    db: sqlite3.Connection,
-    keys: list[str],
-    *,
-    posted: bool | None = None,
-    month: str | None = None,
-    keyword: str | None = None,
-    min_rating: int | None = None,
-    date_from: str | None = None,
-    date_to: str | None = None,
-    color_label: str | None = None,
-    analyzed: bool | None = None,
-    score_perspective: str | None = None,
-    min_score: int | None = None,
-    description_search: str | None = None,
-    dominant_colors: list[str] | None = None,
-    mood_tags: list[str] | None = None,
-    has_repetition: bool | None = None,
-) -> list[str]:
-    """Return members of *keys* that satisfy the same filters as :func:`query_catalog_images`.
-
-    Preserves **input order**. ``sort_by_*`` are not applicable to membership and are
-    omitted. Empty *keys* → ``[]``.
-
-    **min_score** requires **score_perspective** (same rule as :func:`query_catalog_images`).
-    """
-    if not keys:
-        return []
-    sp = (score_perspective or "").strip()
-    use_score_join = bool(sp)
-    if min_score is not None and not use_score_join:
-        raise ValueError("min_score requires score_perspective")
-    if min_score is not None and not (1 <= min_score <= 10):
-        raise ValueError("min_score must be between 1 and 10")
-
-    ph = ",".join("?" * len(keys))
-    clauses: list[str] = [f"i.key IN ({ph})"]
-    bindings: list = list(keys)
-    _append_query_catalog_image_filters(
-        clauses,
-        bindings,
-        posted=posted,
-        month=month,
-        keyword=keyword,
-        min_rating=min_rating,
-        date_from=date_from,
-        date_to=date_to,
-        color_label=color_label,
-        analyzed=analyzed,
-        min_score=min_score,
-        description_search=description_search,
-        dominant_colors=dominant_colors,
-        mood_tags=mood_tags,
-        has_repetition=has_repetition,
-    )
-    where_sql = "WHERE " + " AND ".join(clauses)
-    join_sql = (
-        "FROM images i "
-        "LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog' "
-    )
-    join_bindings: list = []
-    if use_score_join:
-        join_sql += (
-            "LEFT JOIN image_scores s ON s.image_key = i.key "
-            "AND s.image_type = 'catalog' AND s.perspective_slug = ? AND s.is_current = 1 "
-        )
-        join_bindings.append(sp)
-    join_sql += (
-        "LEFT JOIN image_stack_members AS m_st ON m_st.image_key = i.key "
-        "LEFT JOIN image_stacks AS st ON st.stack_id = m_st.stack_id "
-    )
-    params = join_bindings + bindings
-    rows = db.execute(
-        f"SELECT i.key AS image_key {join_sql} {where_sql}",
-        params,
-    ).fetchall()
-    matched = {str(r["image_key"]) for r in rows}
-    return [k for k in keys if k in matched]
-
-def query_catalog_images(
-    db: sqlite3.Connection,
-    *,
-    posted: bool | None = None,
-    month: str | None = None,
-    keyword: str | None = None,
-    min_rating: int | None = None,
-    date_from: str | None = None,
-    date_to: str | None = None,
-    color_label: str | None = None,
-    analyzed: bool | None = None,
-    score_perspective: str | None = None,
-    min_score: int | None = None,
-    sort_by_score: str | None = None,
-    sort_by_date: str | None = None,
-    description_search: str | None = None,
-    dominant_colors: list[str] | None = None,
-    mood_tags: list[str] | None = None,
-    has_repetition: bool | None = None,
-    restrict_to_keys: Collection[str] | None = None,
-    limit: int = 50,
-    offset: int = 0,
-) -> tuple[list[dict], int]:
-    """List catalog images with AND-combined filters, SQL pagination, and total count.
-
-    **description_search** — optional FTS5 match over ``image_descriptions`` for
-    ``image_type='catalog'`` only. Invalid short queries raise ``ValueError`` with message
-    ``description_search must be at least 2 characters`` (map to HTTP 400 in the API).
-
-    Optional **score_perspective** enables a ``LEFT JOIN`` on ``image_scores`` for the
-    current row (``is_current=1``, ``image_type='catalog'``) for that slug.
-
-    **min_score** (1–10) requires **score_perspective** and keeps only rows with a
-    non-null score ``>= min_score``.
-
-    **sort_by_score** ``asc`` / ``desc`` requires **score_perspective**. Unscored rows
-    for that perspective sort after scored rows in both directions (``s.score IS NULL``
-    last via SQLite boolean ordering).
-
-    **sort_by_date** ``newest`` / ``oldest`` orders by ``i.date_taken``. When both
-    ``sort_by_score`` and ``sort_by_date`` are set, score wins as the primary key and
-    date is the tiebreaker.
-
-    **dominant_colors** / **mood_tags** — optional lists of strings; if non-empty
-    (after dropping blank elements), a row must have at least one token from the
-    list present as a JSON array element in ``image_descriptions.dominant_colors`` /
-    ``mood_tags`` (catalog join row ``d``). Filters use SQLite ``json_each`` with
-    bound parameters; invalid or non-array JSON in the column is excluded.
-    """
-    if sort_by_score is not None and sort_by_score not in ("asc", "desc"):
-        raise ValueError("sort_by_score must be 'asc' or 'desc'")
-    if sort_by_date is not None and sort_by_date not in ("newest", "oldest"):
-        raise ValueError("sort_by_date must be 'newest' or 'oldest'")
-
-    sp = (score_perspective or "").strip()
-    use_score_join = bool(sp)
-
-    if sort_by_score is not None and not use_score_join:
-        raise ValueError("sort_by_score requires score_perspective")
-
-    if min_score is not None and not use_score_join:
-        raise ValueError("min_score requires score_perspective")
-
-    if min_score is not None and not (1 <= min_score <= 10):
-        raise ValueError("min_score must be between 1 and 10")
-
-    clauses: list[str] = ["1=1"]
-    bindings: list = []
-    _append_query_catalog_image_filters(
-        clauses,
-        bindings,
-        posted=posted,
-        month=month,
-        keyword=keyword,
-        min_rating=min_rating,
-        date_from=date_from,
-        date_to=date_to,
-        color_label=color_label,
-        analyzed=analyzed,
-        min_score=min_score,
-        description_search=description_search,
-        dominant_colors=dominant_colors,
-        mood_tags=mood_tags,
-        has_repetition=has_repetition,
-    )
-
-    # get_catalog_schema may expose global catalog counts; when a pin is active, catalog listing/search here is still restricted to restrict_to_keys at execution time.
-    if restrict_to_keys is not None:
-        rk = [str(k) for k in restrict_to_keys if k]
-        if not rk:
-            clauses.append("1=0")
-        else:
-            ph = ",".join("?" * len(rk))
-            clauses.append(f"i.key IN ({ph})")
-            bindings.extend(rk)
-
-    where_sql = "WHERE " + " AND ".join(clauses)
-    join_sql = (
-        "FROM images i "
-        "LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog' "
-    )
-    join_bindings: list = []
-    if use_score_join:
-        join_sql += (
-            "LEFT JOIN image_scores s ON s.image_key = i.key "
-            "AND s.image_type = 'catalog' AND s.perspective_slug = ? AND s.is_current = 1 "
-        )
-        join_bindings.append(sp)
-    join_sql += (
-        "LEFT JOIN image_stack_members AS m_st ON m_st.image_key = i.key "
-        "LEFT JOIN image_stacks AS st ON st.stack_id = m_st.stack_id "
-    )
-
-    # Date becomes a tiebreaker for score sorts only when the caller asked
-    # for it explicitly; otherwise keep the original `i.key ASC` tiebreaker
-    # so unrelated callers aren't silently re-ordered by date.
-    if sort_by_date is None:
-        date_tiebreaker = "i.key ASC"
-    else:
-        date_order = "ASC" if sort_by_date == "oldest" else "DESC"
-        date_tiebreaker = f"i.date_taken {date_order}, i.key ASC"
-
-    if sort_by_score == "desc":
-        order_sql = (
-            f"ORDER BY (s.score IS NULL) ASC, s.score DESC, {date_tiebreaker}"
-        )
-    elif sort_by_score == "asc":
-        order_sql = (
-            f"ORDER BY (s.score IS NULL) ASC, s.score ASC, {date_tiebreaker}"
-        )
-    elif sort_by_date == "oldest":
-        order_sql = "ORDER BY i.date_taken ASC, i.key ASC"
-    else:
-        order_sql = "ORDER BY i.date_taken DESC, i.key ASC"
-
-    select_cols = (
-        "i.*, d.summary AS description_summary, "
-        "d.best_perspective AS description_best_perspective, "
-        "d.perspectives AS description_perspectives_json"
-    )
-    if use_score_join:
-        select_cols += ", s.score AS catalog_perspective_score"
-    select_cols += (
-        ", st.stack_id AS stack_id, st.stack_size AS stack_member_count, "
-        "CASE WHEN st.stack_id IS NOT NULL AND i.key = st.representative_key "
-        "THEN 1 ELSE 0 END AS is_stack_representative"
-    )
-
-    count_params = join_bindings + bindings
-    count_row = db.execute(
-        f"SELECT COUNT(*) AS cnt {join_sql} {where_sql}",
-        count_params,
-    ).fetchone()
-    total_count = int(count_row["cnt"])
-
-    select_params = join_bindings + bindings + [limit, offset]
-    rows = db.execute(
-        f"SELECT {select_cols} {join_sql} {where_sql} {order_sql} LIMIT ? OFFSET ?",
-        select_params,
-    ).fetchall()
-    return [_deserialize_row(r) for r in rows], total_count
-
-def query_catalog_images_by_keys(
-    db: sqlite3.Connection,
-    keys: Sequence[str],
-    *,
-    score_perspective: str | None = None,
-) -> list[dict]:
-    """Load catalog rows for ``keys`` with the same columns/joins as :func:`query_catalog_images`.
-
-    Preserves **input order** via ``ORDER BY CASE i.key WHEN …``. Empty ``keys`` → ``[]``.
-    """
-    if not keys:
-        return []
-    key_list = [str(k) for k in keys]
-    sp = (score_perspective or "").strip()
-    use_score_join = bool(sp)
-
-    ph = ",".join("?" * len(key_list))
-    case_when = " ".join(
-        f"WHEN ? THEN {i}" for i in range(len(key_list))
-    )
-    order_sql = f"ORDER BY CASE i.key {case_when} END"
-
-    select_cols = (
-        "i.*, d.summary AS description_summary, "
-        "d.best_perspective AS description_best_perspective, "
-        "d.perspectives AS description_perspectives_json"
-    )
-    if use_score_join:
-        select_cols += ", s.score AS catalog_perspective_score"
-    select_cols += (
-        ", st.stack_id AS stack_id, st.stack_size AS stack_member_count, "
-        "CASE WHEN st.stack_id IS NOT NULL AND i.key = st.representative_key "
-        "THEN 1 ELSE 0 END AS is_stack_representative"
-    )
-
-    join_sql = (
-        "FROM images i "
-        "LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog' "
-    )
-    join_bindings: list = []
-    if use_score_join:
-        join_sql += (
-            "LEFT JOIN image_scores s ON s.image_key = i.key "
-            "AND s.image_type = 'catalog' AND s.perspective_slug = ? AND s.is_current = 1 "
-        )
-        join_bindings.append(sp)
-    join_sql += (
-        "LEFT JOIN image_stack_members AS m_st ON m_st.image_key = i.key "
-        "LEFT JOIN image_stacks AS st ON st.stack_id = m_st.stack_id "
-    )
-
-    where_sql = (
-        f"WHERE i.key IN ({ph}) AND (m_st.image_key IS NULL OR i.key = st.representative_key)"
-    )
-    params = join_bindings + key_list + key_list
-
-    rows = db.execute(
-        f"SELECT {select_cols} {join_sql} {where_sql} {order_sql}",
-        params,
-    ).fetchall()
-    return [_deserialize_row(r) for r in rows]
-
-def catalog_key_is_primary_grid_row(db: sqlite3.Connection, image_key: str) -> bool:
-    """True for catalog keys that are stack representatives or not in a multi-key stack.
-
-    False when the key is a **non-representative** member of a stack (hidden from
-    the default primary grid, same as :func:`query_catalog_images` collapse).
-    """
-    row = db.execute(
-        """
-        SELECT NOT EXISTS(
-            SELECT 1 FROM image_stack_members m
-            INNER JOIN image_stacks s ON s.stack_id = m.stack_id
-            WHERE m.image_key = ? AND m.image_key <> s.representative_key
-        ) AS ok
-        """,
-        (image_key,),
-    ).fetchone()
-    return bool(row and int(row["ok"]))
 # ---------------------------------------------------------------------------
-# Catalog table helpers (aliases for images table)
+# Catalog table helpers (legacy names; aliases for images table)
 # ---------------------------------------------------------------------------
 
 def init_catalog_table(db: sqlite3.Connection):
     """No-op: images table is created in init_database."""
     pass
+
 
 def store_catalog_image(db: sqlite3.Connection, record: dict) -> str:
     """Store catalog image with analysis. Idempotent."""
@@ -845,14 +272,16 @@ def store_catalog_image(db: sqlite3.Connection, record: dict) -> str:
     db.commit()
     return key
 
+
 def get_catalog_images_needing_analysis(db: sqlite3.Connection) -> list:
     """Get catalog images without phash."""
     rows = db.execute("SELECT * FROM images WHERE phash IS NULL").fetchall()
     return [_deserialize_row(r) for r in rows]
 
+
 def get_catalog_images_missing_cache(db: sqlite3.Connection) -> list:
     """Get catalog images without vision cache entries.
-    
+
     Returns images that either:
     - Don't have a cache entry at all
     - Have a cache entry but the compressed file doesn't exist
@@ -862,22 +291,22 @@ def get_catalog_images_missing_cache(db: sqlite3.Connection) -> list:
         LEFT JOIN vision_cache vc ON i.key = vc.key
         WHERE vc.key IS NULL OR vc.compressed_path IS NULL
     """).fetchall()
-    
+
     images = [_deserialize_row(r) for r in rows]
-    
-    # Also check if cached files actually exist on disk
+
     cached_rows = db.execute("""
         SELECT i.*, vc.compressed_path FROM images i
         INNER JOIN vision_cache vc ON i.key = vc.key
         WHERE vc.compressed_path IS NOT NULL
     """).fetchall()
-    
+
     for row in cached_rows:
         compressed_path = row.get('compressed_path', '')
         if compressed_path and not os.path.exists(compressed_path):
             images.append(_deserialize_row(row))
-    
+
     return images
+
 
 def get_all_catalog_images(db: sqlite3.Connection) -> list:
     """Get all catalog images with resolved file paths."""
