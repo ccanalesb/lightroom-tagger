@@ -243,6 +243,20 @@ Do not make direct repo edits outside a GSD workflow unless the user explicitly 
 > This section is managed by `generate-claude-profile` -- do not edit manually.
 <!-- gsd-profile-end -->
 
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked as local markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Multi-context: `lightroom_tagger/CONTEXT.md` (library/CLI) and `apps/visualizer/CONTEXT.md` (Flask + React product). See `docs/agents/domain.md`.
+
 ## NEVER revert or discard the user's work without an explicit instruction
 
 The user's work is sacred. When frustrated, stressed, or scolded, DO NOT react by:

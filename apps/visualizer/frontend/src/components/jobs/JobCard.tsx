@@ -2,6 +2,7 @@ import type { Job } from '../../types/job'
 import { ERROR_SEVERITY_LABELS } from '../../constants/strings'
 import { formatDateTime } from '../../utils/date'
 import { Badge, StatusBadge } from '../ui/badges'
+import { Card } from '../ui/Card/Card'
 
 interface JobCardProps {
   job: Job
@@ -10,14 +11,11 @@ interface JobCardProps {
 
 export function JobCard({ job, onClick }: JobCardProps) {
   return (
-    <div
-      onClick={onClick}
-      className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-    >
+    <Card onClick={onClick}>
       <div className="flex justify-between items-start mb-2">
-        <div>
-          <h3 className="font-semibold">{job.type}</h3>
-          <p className="text-sm text-gray-500">{job.id.slice(0, 8)}</p>
+        <div className="min-w-0">
+          <h3 className="font-semibold text-text truncate">{job.type}</h3>
+          <p className="text-sm text-text-tertiary tabular-nums">{job.id.slice(0, 8)}</p>
         </div>
         <div className="flex flex-row items-center gap-2 shrink-0">
           <StatusBadge status={job.status} />
@@ -37,22 +35,22 @@ export function JobCard({ job, onClick }: JobCardProps) {
 
       {job.status === 'running' && (
         <div className="mt-2">
-          <div className="flex justify-between text-sm mb-1">
+          <div className="flex justify-between text-sm mb-1 text-text-secondary">
             <span>{job.current_step || 'Processing...'}</span>
-            <span>{job.progress}%</span>
+            <span className="tabular-nums">{job.progress}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          <div className="w-full bg-border rounded-full h-2 overflow-hidden">
             <div
-              className="bg-blue-600 h-2 rounded-full"
+              className="bg-accent h-2 rounded-full transition-[width] duration-200"
               style={{ width: `${job.progress}%` }}
             />
           </div>
         </div>
       )}
 
-      <div className="mt-2 text-xs text-gray-500">
+      <div className="mt-2 text-xs text-text-tertiary">
         {formatDateTime(job.created_at)}
       </div>
-    </div>
+    </Card>
   )
 }

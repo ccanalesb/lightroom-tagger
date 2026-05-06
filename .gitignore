@@ -94,3 +94,4 @@ apps/visualizer/backend/*.key
 .augment/*
 artifacts/*
 scripts/ui-audit.mjs
+.scratch/*

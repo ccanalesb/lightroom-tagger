@@ -1,0 +1,438 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-04-30T19:08:00Z",
+  "title": "Design System: Lightroom Tagger Visualizer",
+  "extensions": {
+    "colorMeta": {
+      "background": {
+        "role": "neutral",
+        "displayName": "Paper White",
+        "canonical": "oklch(1 0 0)",
+        "tonalRamp": ["#1a1a1a", "#303030", "#4a4642", "#615d59", "#847f7a", "#a39e98", "#c5c1bc", "#e6e2dd"]
+      },
+      "background-dark": {
+        "role": "neutral",
+        "displayName": "Paper White (night)",
+        "canonical": "oklch(0.20 0.005 60)",
+        "tonalRamp": ["#0e0e0e", "#191919", "#252523", "#31302e", "#3d3b38", "#4f4d49", "#6a6763", "#8f8b87"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Paper Cream",
+        "canonical": "oklch(0.965 0.003 60)",
+        "tonalRamp": ["#1c1a17", "#2f2c28", "#423e3a", "#5a554f", "#756f68", "#948e87", "#cfc8c1", "#f6f5f4"]
+      },
+      "surface-dark": {
+        "role": "neutral",
+        "displayName": "Paper Cream (night)",
+        "canonical": "oklch(0.32 0.005 60)",
+        "tonalRamp": ["#161514", "#21201e", "#2c2b29", "#31302e", "#3d3b38", "#524f4b", "#6c6864", "#8a857f"]
+      },
+      "surface-hover": {
+        "role": "neutral",
+        "displayName": "Paper Cream (hover)",
+        "canonical": "oklch(0.955 0.004 60)",
+        "tonalRamp": ["#1a1816", "#2c2925", "#3f3b37", "#56514c", "#716b65", "#8f8983", "#cdc6bf", "#f1f0ed"]
+      },
+      "surface-hover-dark": {
+        "role": "neutral",
+        "displayName": "Paper Cream Hover (night)",
+        "canonical": "oklch(0.36 0.005 60)",
+        "tonalRamp": ["#1a1917", "#252422", "#2f2e2b", "#3d3b38", "#4a4844", "#605d59", "#7a7670", "#969188"]
+      },
+      "text-primary": {
+        "role": "neutral",
+        "displayName": "Ink Deep",
+        "canonical": "oklch(0.10 0.005 60 / 0.95)",
+        "tonalRamp": ["#0a0a0a", "#262626", "#404040", "#5a5a5a", "#757575", "#909090", "#ababab", "#c7c7c7"]
+      },
+      "text-primary-dark": {
+        "role": "neutral",
+        "displayName": "Ink Deep (night)",
+        "canonical": "oklch(0.97 0.005 60)",
+        "tonalRamp": ["#1a1917", "#363432", "#52504c", "#6e6b67", "#8a857f", "#a6a19a", "#cdc6bf", "#f7f6f5"]
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "Ink Mid",
+        "canonical": "oklch(0.36 0.008 50)",
+        "tonalRamp": ["#1d1b19", "#2d2b28", "#3d3a37", "#4a4642", "#5e5a55", "#7d7873", "#9e9892", "#c0bbb5"]
+      },
+      "text-secondary-dark": {
+        "role": "neutral",
+        "displayName": "Ink Mid (night)",
+        "canonical": "oklch(0.78 0.005 60)",
+        "tonalRamp": ["#1a1917", "#312f2c", "#484540", "#5f5b56", "#76716b", "#8d8881", "#a4a098", "#b8b7b4"]
+      },
+      "text-tertiary": {
+        "role": "neutral",
+        "displayName": "Ink Soft",
+        "canonical": "oklch(0.58 0.008 50)",
+        "tonalRamp": ["#2d2b28", "#454340", "#5d5a56", "#75716c", "#847f7a", "#9c9690", "#b3ada6", "#cac4bd"]
+      },
+      "text-tertiary-dark": {
+        "role": "neutral",
+        "displayName": "Ink Soft (night)",
+        "canonical": "oklch(0.62 0.005 60)",
+        "tonalRamp": ["#1a1917", "#2d2b28", "#403d39", "#534f4a", "#65615c", "#79746e", "#8a8985", "#a09a93"]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(0 0 0 / 0.12)",
+        "tonalRamp": ["#1a1a1a", "#333333", "#4d4d4d", "#666666", "#808080", "#a6a6a6", "#cccccc", "#e6e6e6"]
+      },
+      "border-dark": {
+        "role": "neutral",
+        "displayName": "Hairline (night)",
+        "canonical": "oklch(1 0 0 / 0.12)",
+        "tonalRamp": ["#1a1a1a", "#333333", "#4d4d4d", "#666666", "#808080", "#a6a6a6", "#cccccc", "#e6e6e6"]
+      },
+      "border-strong": {
+        "role": "neutral",
+        "displayName": "Hairline Firm",
+        "canonical": "oklch(0 0 0 / 0.20)",
+        "tonalRamp": ["#1a1a1a", "#333333", "#4d4d4d", "#666666", "#808080", "#a6a6a6", "#cccccc", "#e6e6e6"]
+      },
+      "border-strong-dark": {
+        "role": "neutral",
+        "displayName": "Hairline Firm (night)",
+        "canonical": "oklch(1 0 0 / 0.25)",
+        "tonalRamp": ["#1a1a1a", "#333333", "#4d4d4d", "#666666", "#808080", "#a6a6a6", "#cccccc", "#e6e6e6"]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Workbench Blue",
+        "canonical": "oklch(0.54 0.18 245)",
+        "tonalRamp": ["#001a3a", "#00306a", "#00468f", "#005bab", "#0075de", "#4a96e8", "#7eafef", "#b2c9f3"]
+      },
+      "accent-dark": {
+        "role": "primary",
+        "displayName": "Workbench Blue (night)",
+        "canonical": "oklch(0.70 0.16 245)",
+        "tonalRamp": ["#001a3a", "#00306a", "#00468f", "#005bab", "#0075de", "#4A9EFF", "#7AB8FF", "#b3d3ff"]
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Workbench Blue Deep",
+        "canonical": "oklch(0.42 0.16 245)",
+        "tonalRamp": ["#001226", "#002047", "#003067", "#004087", "#005bab", "#3a7ec5", "#6c9cd5", "#a2bbe3"]
+      },
+      "accent-hover-dark": {
+        "role": "primary",
+        "displayName": "Workbench Blue Deep (night)",
+        "canonical": "oklch(0.78 0.14 245)",
+        "tonalRamp": ["#0c2240", "#1a3a6a", "#2a528f", "#3a6cb5", "#4a96e8", "#7AB8FF", "#9ccaff", "#cfe1ff"]
+      },
+      "accent-light": {
+        "role": "primary",
+        "displayName": "Workbench Blue Tint",
+        "canonical": "oklch(0.97 0.02 245)",
+        "tonalRamp": ["#0c1d2c", "#1a3552", "#2b4d75", "#3e6699", "#5680bd", "#7d9fd2", "#aabfe2", "#f2f9ff"]
+      },
+      "accent-light-dark": {
+        "role": "primary",
+        "displayName": "Workbench Blue Tint (night)",
+        "canonical": "oklch(0.70 0.16 245 / 0.15)",
+        "tonalRamp": ["#0c2240", "#1a3a6a", "#2a528f", "#3a6cb5", "#4a96e8", "#7AB8FF", "#9ccaff", "#cfe1ff"]
+      },
+      "success": {
+        "role": "tertiary",
+        "displayName": "Signal Leaf",
+        "canonical": "oklch(0.62 0.18 145)",
+        "tonalRamp": ["#062014", "#0f3d28", "#175c3f", "#1f7c57", "#1aae39", "#42c465", "#7dd595", "#b5e4c1"]
+      },
+      "success-dark": {
+        "role": "tertiary",
+        "displayName": "Signal Leaf (night)",
+        "canonical": "oklch(0.68 0.10 175)",
+        "tonalRamp": ["#0a2820", "#134638", "#1f6553", "#298870", "#3db39a", "#6cc6b1", "#9bd9c8", "#c8eadf"]
+      },
+      "warning": {
+        "role": "tertiary",
+        "displayName": "Signal Amber",
+        "canonical": "oklch(0.62 0.18 50)",
+        "tonalRamp": ["#241000", "#451f00", "#682f00", "#8c4000", "#dd5b00", "#e8853a", "#efaa75", "#f5cca8"]
+      },
+      "warning-dark": {
+        "role": "tertiary",
+        "displayName": "Signal Amber (night)",
+        "canonical": "oklch(0.72 0.16 60)",
+        "tonalRamp": ["#2a1300", "#4d2400", "#723900", "#9a5210", "#cc6f25", "#ff8c42", "#ffaa75", "#ffc8a3"]
+      },
+      "error": {
+        "role": "tertiary",
+        "displayName": "Signal Coral",
+        "canonical": "oklch(0.61 0.21 25)",
+        "tonalRamp": ["#2a0808", "#521010", "#7a1a1a", "#a52727", "#e03e3e", "#ea6e6e", "#f29c9c", "#f7c4c4"]
+      },
+      "error-dark": {
+        "role": "tertiary",
+        "displayName": "Signal Coral (night)",
+        "canonical": "oklch(0.71 0.18 25)",
+        "tonalRamp": ["#2c0c0c", "#521919", "#7a2828", "#a23838", "#cc4848", "#ff6b6b", "#ff9b9b", "#ffc6c6"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero headline. Once per page, max." },
+      "headline": { "displayName": "Headline", "purpose": "Section openers on long-scroll pages." },
+      "title": { "displayName": "Title", "purpose": "Subsection breaks within a page." },
+      "subtitle": { "displayName": "Subtitle", "purpose": "Card titles, modal headers." },
+      "body": { "displayName": "Body", "purpose": "Default running text. 65–75ch line length." },
+      "label": { "displayName": "Label", "purpose": "Form labels, metadata, tabs, default-size buttons." }
+    },
+    "shadows": [
+      {
+        "name": "card",
+        "value": "rgba(0,0,0,0.04) 0px 4px 18px, rgba(0,0,0,0.027) 0px 2.025px 7.84688px, rgba(0,0,0,0.02) 0px 0.8px 2.925px, rgba(0,0,0,0.01) 0px 0.175px 1.04062px",
+        "purpose": "Resting state for every Card. Four-stop micro-halo, max opacity 0.04. Always paired with a 1px border hairline."
+      },
+      {
+        "name": "deep",
+        "value": "rgba(0,0,0,0.01) 0px 1px 3px, rgba(0,0,0,0.02) 0px 3px 7px, rgba(0,0,0,0.02) 0px 7px 15px, rgba(0,0,0,0.04) 0px 14px 28px, rgba(0,0,0,0.05) 0px 23px 52px",
+        "purpose": "Hover state on hoverable Cards; resting state on modals and featured surfaces."
+      },
+      {
+        "name": "button-rest",
+        "value": "0 1px 2px rgba(0,0,0,0.04)",
+        "purpose": "Subtle lift on primary and danger buttons at rest (shadow-sm in Tailwind)."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 2px var(--color-background), 0 0 0 4px var(--color-accent)",
+        "purpose": "Keyboard focus ring on interactive elements. Two-step (offset + ring) so it reads on any background."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Default for state transitions on buttons, inputs, badges, tabs."
+      },
+      {
+        "name": "theme-transition",
+        "value": "200ms ease",
+        "purpose": "Background-color and color transition on body when toggling light/dark theme."
+      },
+      {
+        "name": "progress-fill",
+        "value": "200ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Width transition on JobCard progress fill so percent updates smoothly."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single-accent action button. Reserved for the primary verb on a surface; never more than one per visible region.",
+      "html": "<button class=\"ds-btn-primary\">Run matching</button>",
+      "css": ".ds-btn-primary { background-color: var(--color-accent, #0075de); color: #ffffff; padding: 8px 16px; font-family: Inter, -apple-system, system-ui, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 16px; font-weight: 600; border: 2px solid var(--color-accent, #0075de); border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); cursor: pointer; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-primary:hover { background-color: var(--color-accent-hover, #005bab); border-color: var(--color-accent-hover, #005bab); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-background, #ffffff), 0 0 0 4px var(--color-accent, #0075de); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The default non-accent button. Cream surface, hairline border, ink-deep text. Used for Cancel, Apply, and any non-primary verb.",
+      "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn-secondary { background-color: var(--color-surface, #f6f5f4); color: var(--color-text-primary, rgba(0,0,0,0.95)); padding: 8px 16px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 16px; font-weight: 500; border: 1px solid var(--color-border, rgba(0,0,0,0.12)); border-radius: 8px; cursor: pointer; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-secondary:hover { background-color: var(--color-surface-hover, #f1f0ed); border-color: var(--color-border-strong, rgba(0,0,0,0.2)); } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-background, #ffffff), 0 0 0 4px var(--color-accent, #0075de); } .ds-btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Lowest-emphasis button. Transparent at rest, fills to cream on hover. Used for inline dismiss / edit / close affordances.",
+      "html": "<button class=\"ds-btn-ghost\">Dismiss</button>",
+      "css": ".ds-btn-ghost { background-color: transparent; color: var(--color-text-primary, rgba(0,0,0,0.95)); padding: 8px 16px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 16px; font-weight: 500; border: 1px solid transparent; border-radius: 8px; cursor: pointer; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-ghost:hover { background-color: var(--color-surface, #f6f5f4); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-background, #ffffff), 0 0 0 4px var(--color-accent, #0075de); }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive action button. Coral fill, white text. Reserved for delete / reject / discard verbs.",
+      "html": "<button class=\"ds-btn-danger\">Reject match</button>",
+      "css": ".ds-btn-danger { background-color: var(--color-error, #e03e3e); color: #ffffff; padding: 8px 16px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 16px; font-weight: 600; border: 2px solid var(--color-error, #e03e3e); border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); cursor: pointer; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-btn-danger:hover { opacity: 0.9; } .ds-btn-danger:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-background, #ffffff), 0 0 0 4px var(--color-error, #e03e3e); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The default container. Paper-white surface, hairline border, four-stop ambient shadow. Hover lifts to deep shadow + firm hairline when hoverable.",
+      "html": "<div class=\"ds-card\">\n  <div class=\"ds-card-title\">Photo metadata</div>\n  <div class=\"ds-card-body\">Aperture f/2.8 · ISO 400 · 1/250s · 85mm · Lr edits applied</div>\n</div>",
+      "css": ".ds-card { background-color: var(--color-background, #ffffff); border: 1px solid var(--color-border, rgba(0,0,0,0.12)); border-radius: 12px; padding: 16px; box-shadow: rgba(0,0,0,0.04) 0px 4px 18px, rgba(0,0,0,0.027) 0px 2.025px 7.84688px, rgba(0,0,0,0.02) 0px 0.8px 2.925px, rgba(0,0,0,0.01) 0px 0.175px 1.04062px; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-card:hover { border-color: var(--color-border-strong, rgba(0,0,0,0.2)); box-shadow: rgba(0,0,0,0.01) 0px 1px 3px, rgba(0,0,0,0.02) 0px 3px 7px, rgba(0,0,0,0.02) 0px 7px 15px, rgba(0,0,0,0.04) 0px 14px 28px, rgba(0,0,0,0.05) 0px 23px 52px; } .ds-card-title { font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -0.25px; line-height: 1.27; color: var(--color-text-primary, rgba(0,0,0,0.95)); margin: 0 0 8px 0; } .ds-card-body { font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 14px; font-weight: 500; letter-spacing: -0.224px; line-height: 1.43; color: var(--color-text-secondary, #4a4642); }"
+    },
+    {
+      "name": "Image Tile",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The signature photo-grid tile. Card surface with a thumbnail frame on top, filename / subtitle / metadata stack below. Top-right slot for overlay badges. Hover promotes the hairline and deepens the shadow.",
+      "html": "<div class=\"ds-tile\">\n  <button type=\"button\" class=\"ds-tile-button\">\n    <div class=\"ds-tile-frame\">\n      <img src=\"https://placehold.co/600x600/f6f5f4/847f7a?text=DSC_4821\" alt=\"\" class=\"ds-tile-img\" loading=\"lazy\" />\n      <div class=\"ds-tile-overlays\">\n        <span class=\"ds-tile-badge\">Stack of 4</span>\n      </div>\n    </div>\n  </button>\n  <div class=\"ds-tile-body\">\n    <p class=\"ds-tile-title\">DSC_4821.NEF</p>\n    <p class=\"ds-tile-subtitle\">Editorial · 2024 Q4</p>\n    <p class=\"ds-tile-meta\">10 / 14 / 2024</p>\n  </div>\n</div>",
+      "css": ".ds-tile { background-color: var(--color-background, #ffffff); border: 1px solid var(--color-border, rgba(0,0,0,0.12)); border-radius: 12px; overflow: hidden; box-shadow: rgba(0,0,0,0.04) 0 4px 18px, rgba(0,0,0,0.02) 0 0.8px 2.925px; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); width: 240px; } .ds-tile:hover { border-color: var(--color-border-strong, rgba(0,0,0,0.2)); box-shadow: rgba(0,0,0,0.04) 0 14px 28px, rgba(0,0,0,0.05) 0 23px 52px; } .ds-tile-button { display: block; width: 100%; padding: 0; margin: 0; background: none; border: none; text-align: left; cursor: pointer; } .ds-tile-button:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--color-accent, #0075de); } .ds-tile-frame { position: relative; aspect-ratio: 1 / 1; background-color: var(--color-surface, #f6f5f4); } .ds-tile-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; } .ds-tile-overlays { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 4px; } .ds-tile-badge { display: inline-flex; align-items: center; padding: 2px 10px; font-family: Inter, sans-serif; font-size: 12px; font-weight: 600; background-color: var(--color-surface, #f6f5f4); color: var(--color-text-secondary, #4a4642); border: 1px solid var(--color-border, rgba(0,0,0,0.12)); border-radius: 9999px; backdrop-filter: blur(4px); } .ds-tile-body { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 2px; } .ds-tile-title { font-family: Inter, sans-serif; font-size: 14px; font-weight: 500; color: var(--color-text-primary, rgba(0,0,0,0.95)); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-tile-subtitle { font-family: Inter, sans-serif; font-size: 13px; font-weight: 400; color: var(--color-text-secondary, #4a4642); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-tile-meta { font-family: Inter, sans-serif; font-size: 12px; color: var(--color-text-tertiary, #847f7a); margin: 0; }"
+    },
+    {
+      "name": "Job Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Status-driven card for a single background job. Card primitive on the outside; status pills, an optional severity badge, and a progress strip on the inside.",
+      "html": "<div class=\"ds-job\">\n  <div class=\"ds-job-header\">\n    <div class=\"ds-job-titleblock\">\n      <h3 class=\"ds-job-type\">matching</h3>\n      <p class=\"ds-job-id\">a1b2c3d4</p>\n    </div>\n    <div class=\"ds-job-status\">\n      <span class=\"ds-job-pill\">Running</span>\n    </div>\n  </div>\n  <div class=\"ds-job-progress\">\n    <div class=\"ds-job-progress-row\">\n      <span>Scoring matches&hellip;</span>\n      <span class=\"ds-job-progress-pct\">62%</span>\n    </div>\n    <div class=\"ds-job-progress-track\">\n      <div class=\"ds-job-progress-fill\" style=\"width: 62%;\"></div>\n    </div>\n  </div>\n  <div class=\"ds-job-time\">2 min ago</div>\n</div>",
+      "css": ".ds-job { background-color: var(--color-background, #ffffff); border: 1px solid var(--color-border, rgba(0,0,0,0.12)); border-radius: 12px; padding: 16px; box-shadow: rgba(0,0,0,0.04) 0 4px 18px, rgba(0,0,0,0.02) 0 0.8px 2.925px; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); width: 280px; cursor: pointer; } .ds-job:hover { border-color: var(--color-border-strong, rgba(0,0,0,0.2)); box-shadow: rgba(0,0,0,0.04) 0 14px 28px, rgba(0,0,0,0.05) 0 23px 52px; } .ds-job-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; gap: 12px; } .ds-job-titleblock { min-width: 0; } .ds-job-type { font-family: Inter, sans-serif; font-size: 16px; font-weight: 600; color: var(--color-text-primary, rgba(0,0,0,0.95)); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-job-id { font-family: Inter, sans-serif; font-size: 13px; color: var(--color-text-tertiary, #847f7a); font-variant-numeric: tabular-nums; margin: 2px 0 0; } .ds-job-pill { display: inline-flex; align-items: center; padding: 2px 10px; font-family: Inter, sans-serif; font-size: 12px; font-weight: 600; background-color: rgba(98, 196, 152, 0.12); color: var(--color-success, #1aae39); border: 1px solid rgba(98, 196, 152, 0.30); border-radius: 9999px; } .ds-job-progress { margin-top: 8px; } .ds-job-progress-row { display: flex; justify-content: space-between; font-family: Inter, sans-serif; font-size: 13px; color: var(--color-text-secondary, #4a4642); margin-bottom: 4px; } .ds-job-progress-pct { font-variant-numeric: tabular-nums; } .ds-job-progress-track { width: 100%; height: 6px; background-color: var(--color-border, rgba(0,0,0,0.12)); border-radius: 9999px; overflow: hidden; } .ds-job-progress-fill { height: 100%; background-color: var(--color-accent, #0075de); border-radius: 9999px; transition: width 200ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-job-time { margin-top: 12px; font-family: Inter, sans-serif; font-size: 12px; color: var(--color-text-tertiary, #847f7a); }"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Single-line text field with a label above. Border promotes on hover, replaced by a 2px ring on focus.",
+      "html": "<label class=\"ds-field\">\n  <span class=\"ds-field-label\">Search catalog</span>\n  <input class=\"ds-input\" type=\"text\" placeholder=\"Try: editorial portraits 2024\">\n</label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; } .ds-field-label { font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 14px; font-weight: 500; color: var(--color-text-secondary, #4a4642); } .ds-input { background-color: var(--color-background, #ffffff); color: var(--color-text-primary, rgba(0,0,0,0.95)); font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 16px; font-weight: 400; padding: 8px 12px; border: 1px solid var(--color-border, rgba(0,0,0,0.12)); border-radius: 8px; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-input::placeholder { color: var(--color-text-tertiary, #847f7a); } .ds-input:hover { border-color: var(--color-border-strong, rgba(0,0,0,0.2)); } .ds-input:focus { outline: none; border-color: transparent; box-shadow: 0 0 0 2px var(--color-accent, #0075de); } .ds-input:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Badge (default)",
+      "kind": "chip",
+      "refersTo": "badge-default",
+      "description": "The neutral pill badge. Cream surface, ink-mid text, hairline border. Used for counts, captions, meta tags.",
+      "html": "<span class=\"ds-badge ds-badge-default\">12 unmatched</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; padding: 2px 10px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 12px; font-weight: 600; border-radius: 9999px; border: 1px solid; line-height: 1.33; } .ds-badge-default { background-color: var(--color-surface, #f6f5f4); color: var(--color-text-secondary, #4a4642); border-color: var(--color-border, rgba(0,0,0,0.12)); }"
+    },
+    {
+      "name": "Badge (accent)",
+      "kind": "chip",
+      "refersTo": "badge-accent",
+      "description": "The blue-tinted accent badge. Reserved for one-of-a-kind callouts and active filter labels.",
+      "html": "<span class=\"ds-badge ds-badge-accent\">Top match</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; padding: 2px 10px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 12px; font-weight: 600; border-radius: 9999px; border: 1px solid; line-height: 1.33; } .ds-badge-accent { background-color: var(--color-accent-light, #f2f9ff); color: var(--color-accent, #0075de); border-color: rgba(0, 117, 222, 0.20); }"
+    },
+    {
+      "name": "Score Pill",
+      "kind": "chip",
+      "refersTo": "badge-default",
+      "description": "Numeric 1–10 score with optional prefix label. Threshold band: green ≥ 7, yellow ≥ 5, red < 5. Tabular-nums on the digit so columns align.",
+      "html": "<div style=\"display: flex; gap: 8px; flex-wrap: wrap;\">\n  <span class=\"ds-score ds-score-high\"><span class=\"ds-score-label\">Identity</span><span class=\"ds-score-value\">8.5</span></span>\n  <span class=\"ds-score ds-score-mid\"><span class=\"ds-score-label\">Street</span><span class=\"ds-score-value\">6</span></span>\n  <span class=\"ds-score ds-score-low\"><span class=\"ds-score-value\">3</span></span>\n  <span class=\"ds-score ds-score-empty\"><span class=\"ds-score-label\">Best</span><span class=\"ds-score-value\">&mdash;</span></span>\n</div>",
+      "css": ".ds-score { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; font-family: Inter, sans-serif; font-size: 12px; border-radius: 9999px; line-height: 1.33; } .ds-score-label { font-weight: 400; opacity: 0.8; } .ds-score-value { font-weight: 600; font-variant-numeric: tabular-nums; } .ds-score-high { background-color: rgba(26, 174, 57, 0.10); color: rgba(26, 100, 36, 1); } .ds-score-mid { background-color: rgba(221, 91, 0, 0.10); color: rgba(140, 60, 0, 1); } .ds-score-low { background-color: rgba(224, 62, 62, 0.10); color: rgba(140, 38, 38, 1); } .ds-score-empty { background-color: var(--color-surface, #f6f5f4); color: var(--color-text-secondary, #4a4642); }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "badge-default",
+      "description": "Removable filter pill: a default badge with a ghost-button × on the trailing edge. Single-click remove, no confirm.",
+      "html": "<span class=\"ds-chip\">\n  <span class=\"ds-chip-label\">portrait</span>\n  <button class=\"ds-chip-remove\" type=\"button\" aria-label=\"Remove filter portrait\">\n    <svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" aria-hidden=\"true\"><path d=\"M2 2 L10 10 M10 2 L2 10\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>\n  </button>\n</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 12px; font-weight: 600; background-color: var(--color-surface, #f6f5f4); color: var(--color-text-secondary, #4a4642); border: 1px solid var(--color-border, rgba(0,0,0,0.12)); border-radius: 9999px; line-height: 1.33; } .ds-chip-label { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ds-chip-remove { width: 20px; height: 20px; padding: 0; background: transparent; border: none; color: var(--color-text-secondary, #4a4642); border-radius: 9999px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-chip-remove:hover { color: var(--color-text-primary, rgba(0,0,0,0.95)); background-color: var(--color-surface-hover, #f1f0ed); }"
+    },
+    {
+      "name": "Tab Nav",
+      "kind": "nav",
+      "refersTo": "tab-nav-active",
+      "description": "Horizontal text tab strip with a 1px hairline underline. Active tab gets a 3px workbench-blue bottom border and matching text color; inactive tabs sit at 60% opacity.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\">\n  <button class=\"ds-tab ds-tab-active\" role=\"tab\" aria-selected=\"true\">Insights</button>\n  <button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Images</button>\n  <button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Search</button>\n  <button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Analytics</button>\n</div>",
+      "css": ".ds-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--color-border, rgba(0,0,0,0.12)); } .ds-tab { padding: 8px 16px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 14px; font-weight: 600; color: var(--color-text-primary, rgba(0,0,0,0.95)); opacity: 0.6; background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap; } .ds-tab:hover { opacity: 1; border-bottom-color: var(--color-border-strong, rgba(0,0,0,0.2)); } .ds-tab-active { opacity: 1; color: var(--color-accent, #0075de); border-bottom-color: var(--color-accent, #0075de); }"
+    },
+    {
+      "name": "Top Nav",
+      "kind": "nav",
+      "refersTo": "tab-nav-active",
+      "description": "Sticky 64px-tall top bar. Brand mark on the left (text only), pill nav links beside it, theme toggle on the far right. Active link uses a workbench-blue fill instead of an underline.",
+      "html": "<header class=\"ds-topnav\">\n  <div class=\"ds-topnav-inner\">\n    <div class=\"ds-topnav-left\">\n      <h1 class=\"ds-brand\">Lightroom Tagger</h1>\n      <nav class=\"ds-topnav-links\">\n        <a class=\"ds-navlink ds-navlink-active\" href=\"#\">Insights</a>\n        <a class=\"ds-navlink\" href=\"#\">Images</a>\n        <a class=\"ds-navlink\" href=\"#\">Search</a>\n        <a class=\"ds-navlink\" href=\"#\">Identity</a>\n      </nav>\n    </div>\n    <button class=\"ds-theme-toggle\" aria-label=\"Toggle theme\">\n      <svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z\"/></svg>\n    </button>\n  </div>\n</header>",
+      "css": ".ds-topnav { position: sticky; top: 0; z-index: 50; background-color: var(--color-background, #ffffff); border-bottom: 1px solid var(--color-border, rgba(0,0,0,0.12)); } .ds-topnav-inner { max-width: 80rem; margin: 0 auto; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; height: 64px; } .ds-topnav-left { display: flex; align-items: center; gap: 32px; } .ds-brand { font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 18px; font-weight: 600; color: var(--color-text-primary, rgba(0,0,0,0.95)); margin: 0; } .ds-topnav-links { display: flex; align-items: center; gap: 4px; } .ds-navlink { padding: 6px 12px; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 14px; font-weight: 500; color: var(--color-text-secondary, #4a4642); border-radius: 8px; text-decoration: none; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-navlink:hover { background-color: var(--color-surface, #f6f5f4); color: var(--color-text-primary, rgba(0,0,0,0.95)); } .ds-navlink-active { background-color: var(--color-accent, #0075de); color: #ffffff; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.04); } .ds-navlink-active:hover { background-color: var(--color-accent, #0075de); color: #ffffff; } .ds-theme-toggle { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; background-color: var(--color-surface, #f6f5f4); color: var(--color-text-primary, rgba(0,0,0,0.95)); border: 1px solid var(--color-border, rgba(0,0,0,0.12)); border-radius: 8px; cursor: pointer; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-theme-toggle:hover { background-color: var(--color-surface-hover, #f1f0ed); border-color: var(--color-border-strong, rgba(0,0,0,0.2)); }"
+    },
+    {
+      "name": "Page States",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "The three full-page states (Loading / Empty / Error) share one shape: centered text on text-center py-12, no card, no icon. Differentiation is by color and copy. Intentionally bare — should look like a polite note in the gutter, not a card.",
+      "html": "<div style=\"display: flex; flex-direction: column; gap: 32px; max-width: 480px; margin: 0 auto;\">\n  <div class=\"ds-state\"><p class=\"ds-state-message\">Loading photos&hellip;</p></div>\n  <div class=\"ds-state\"><p class=\"ds-state-message\">No matches yet.</p><p class=\"ds-state-hint\">Run matching to see suggestions.</p></div>\n  <div class=\"ds-state\"><p class=\"ds-state-error\">Error: connection refused</p></div>\n</div>",
+      "css": ".ds-state { text-align: center; padding: 48px 16px; } .ds-state-message { font-family: Inter, sans-serif; font-size: 16px; color: var(--color-text-secondary, #4a4642); margin: 0; } .ds-state-hint { font-family: Inter, sans-serif; font-size: 14px; color: var(--color-text-tertiary, #847f7a); margin: 8px 0 0; } .ds-state-error { font-family: Inter, sans-serif; font-size: 16px; color: var(--color-error, #e03e3e); margin: 0; }"
+    },
+    {
+      "name": "Modal",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Centered dialog panel over a translucent scrim. Uses the Card vocabulary at rounded.card with shadow-deep and the firm hairline. lg padding (24px) on body. Ghost-button × close in the header. Footer actions reverse the visual hierarchy — secondary on the left, primary action on the right.",
+      "html": "<div class=\"ds-modal-scrim\">\n  <div class=\"ds-modal\" role=\"dialog\" aria-labelledby=\"ds-modal-title\">\n    <div class=\"ds-modal-header\">\n      <h2 id=\"ds-modal-title\" class=\"ds-modal-title\">Reject match</h2>\n      <button class=\"ds-modal-close\" type=\"button\" aria-label=\"Close\">\n        <svg width=\"14\" height=\"14\" viewBox=\"0 0 12 12\" aria-hidden=\"true\"><path d=\"M2 2 L10 10 M10 2 L2 10\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>\n      </button>\n    </div>\n    <div class=\"ds-modal-body\">\n      <p>This will permanently reject the suggested match between <strong>DSC_4821.NEF</strong> and the catalog entry <strong>portrait_oct_24.jpg</strong>. The pair will not be re-suggested.</p>\n    </div>\n    <div class=\"ds-modal-actions\">\n      <button class=\"ds-btn-secondary\">Cancel</button>\n      <button class=\"ds-btn-danger\">Reject match</button>\n    </div>\n  </div>\n</div>",
+      "css": ".ds-modal-scrim { position: relative; min-height: 360px; display: flex; align-items: center; justify-content: center; background-color: rgba(0,0,0,0.40); padding: 24px; } .ds-modal { background-color: var(--color-background, #ffffff); border: 1px solid var(--color-border-strong, rgba(0,0,0,0.20)); border-radius: 12px; box-shadow: rgba(0,0,0,0.01) 0 1px 3px, rgba(0,0,0,0.02) 0 3px 7px, rgba(0,0,0,0.02) 0 7px 15px, rgba(0,0,0,0.04) 0 14px 28px, rgba(0,0,0,0.05) 0 23px 52px; max-width: 440px; width: 100%; overflow: hidden; } .ds-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px 0; } .ds-modal-title { font-family: Inter, sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -0.25px; color: var(--color-text-primary, rgba(0,0,0,0.95)); margin: 0; } .ds-modal-close { width: 28px; height: 28px; padding: 0; background: transparent; border: none; color: var(--color-text-secondary, #4a4642); border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); } .ds-modal-close:hover { background-color: var(--color-surface, #f6f5f4); color: var(--color-text-primary, rgba(0,0,0,0.95)); } .ds-modal-body { padding: 12px 24px 0; font-family: Inter, sans-serif; font-size: 16px; color: var(--color-text-secondary, #4a4642); line-height: 1.5; } .ds-modal-body p { margin: 0; } .ds-modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 24px; }  .ds-modal-actions .ds-btn-secondary, .ds-modal-actions .ds-btn-danger { font-size: 14px; padding: 8px 16px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Matte Board",
+    "overview": "This surface is the matte board around a printed photograph — warm-paper cream, deliberate restraint, a frame whose only job is to make the print readable. A photographer arrives here from Lightroom, already saturated with their own images, and the tool's job is to recede. The matte does not compete with the print.\n\nThat metaphor sets every choice. Color: warm neutrals (cream #f6f5f4, paper #ffffff, dark-mode-warm #31302e) with a single workbench blue accent that earns its rarity by appearing only on interactive elements. Borders: 1px hairlines (12% / 20% opacity) in the same key as the surface. Shadows: four-stop ambient halos that read as paper-on-paper depth, never as UI elevation. Typography: Inter at four standard weights with aggressive negative letter-spacing on display sizes — tight, modern, editorial, but unornamented.\n\nThe full dark mode is not a developer-tool dark mode. It inherits the same warm undertones and turns the room down rather than turning it cold. #31302e is a warm dark surface, not slate; #4A9EFF is the accent's softened night cousin, not a neon.\n\nThe system explicitly rejects: dark-first developer-tool aesthetics (Linear / Vercel / Supabase neon-on-charcoal), gradient-hero-metric SaaS landing pages, dense Bloomberg-terminal data grids, cards-everywhere Notion clones, and every tell of 'AI tool from 2024-2025' — gradient text, glassmorphism, neon accent on dark, animated mesh backgrounds.",
+    "keyCharacteristics": [
+      "Light-first interface with full dark-mode parity in the same warm key",
+      "One blue accent, used on ≤10% of any screen, exclusively for interaction",
+      "Hairline 1px borders (12% / 20% opacity) instead of card chrome",
+      "Four-stop ambient shadows with sub-0.05 max opacity — felt, not seen",
+      "Inter 400 / 500 / 600 / 700 only, with tight negative tracking on display sizes",
+      "8px base grid; rounded.base 8px / rounded.card 12px / pill on chips",
+      "Photos are always the loudest thing on screen; UI is the matte around them"
+    ],
+    "rules": [
+      {
+        "name": "The Matte Rule",
+        "body": "The UI is the matte board; the photo is the print. If a UI element has stronger visual presence than the photos it surrounds, the element is wrong. Strip the chrome before adding more accent.",
+        "section": "overview"
+      },
+      {
+        "name": "The One Voice Rule",
+        "body": "Workbench Blue (accent) is the only chromatic accent in the system. It appears on ≤10% of any screen. There is no second brand color, no purple/pink/teal flourish, no decorative gradient. Adding a second hue is a regression.",
+        "section": "colors"
+      },
+      {
+        "name": "The Paper Rule",
+        "body": "Pure #000 and pure #fff are forbidden in dark mode. Both modes carry warm undertones; the dark surface is #31302e, not #1f2937 Tailwind slate. If an element looks blue-cool in dark mode, the token is wrong.",
+        "section": "colors"
+      },
+      {
+        "name": "The Hairline Rule",
+        "body": "Every divider is 1px. Borders thicker than 1px are reserved for the active tab indicator (3px bottom-border) and primary/danger button outlines (2px, color-matched to background).",
+        "section": "colors"
+      },
+      {
+        "name": "The Negative Tracking Rule",
+        "body": "Display, Headline, Title, and Subtitle carry negative letter-spacing in proportion to size — never positive, never zero, never the browser default. Removing the tracking flattens the visual identity.",
+        "section": "typography"
+      },
+      {
+        "name": "The Weight Pair Rule",
+        "body": "Hierarchy is built from weight contrast (400 ↔ 700) and size, not from color shifts. Don't lighten the ink to soften emphasis when a weight drop will do it.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sub-0.05 Rule",
+        "body": "No shadow stop in this system has opacity above 0.05. If a shadow needs to be louder to register, the answer is to promote the border, not deepen the shadow.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Always-Bordered Rule",
+        "body": "Cards carry both a hairline border AND a soft shadow. Borderless cards drift; shadowless cards flatten. The pair is the elevation grammar.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use the four CSS variable token families exclusively for color: --color-{background|surface|surface-hover}, --color-text-{primary|secondary|tertiary}, --color-{border|border-strong}, --color-{accent|accent-hover|accent-light} plus --color-{success|warning|error}. They flip cleanly between :root and .dark.",
+      "Do carry inline style={{ backgroundColor: 'var(--color-...)' }} on the primary button and on Card backgrounds — Tailwind class-order has bitten this codebase before.",
+      "Do lead with the lightest treatment that conveys the intent (ghost > secondary > primary). Primary buttons are scarce on this surface by design.",
+      "Do keep accent at ≤10% of any screen. If a screen feels under-accented, the answer is more whitespace, not more blue.",
+      "Do pair every card with a 1px border hairline AND shadow-card. Never one without the other.",
+      "Do preserve negative letter-spacing on Display / Headline / Title / Subtitle. The tracking is the typographic identity.",
+      "Do use Inter 400 / 500 / 600 / 700 — and only those four weights.",
+      "Do make photos the loudest thing on screen. Strip chrome around image grids; let TileGrid and the photos themselves carry the layout.",
+      "Do centralize derived UI on shared types (e.g. image.stack_* → ImageTile) so consumers stay clean. See .cursor/rules/shared-derivation.mdc."
+    ],
+    "donts": [
+      "Don't introduce a second accent color. The system has one accent. Purple, teal, pink, and orange flourish-accents are forbidden — the existing palette already covers status (semantic) and emphasis (accent).",
+      "Don't use pure #000 or pure #fff outside the light-mode background token. Both modes carry warm undertones; cold neutrals break the room.",
+      "Don't raise any shadow stop above 0.05 opacity. If the elevation isn't reading, promote the border to border-strong first.",
+      "Don't apply gradient backgrounds, gradient text (background-clip: text), glassmorphism (backdrop-filter: blur), or animated mesh backgrounds. None of these belong here.",
+      "Don't use border-left or border-right greater than 1px as a colored stripe accent. If a card needs emphasis, use the accent badge or a leading icon — never the side stripe.",
+      "Don't stack cards inside cards. Nested bg-bg + shadow-card reads as a UI bug.",
+      "Don't widen body line length past ~75ch. The 8-column max-w-7xl container plus generous gutters is the answer; don't fight the gutters with full-bleed text.",
+      "Don't reach for raw Tailwind palette classes (text-gray-500, bg-blue-600, text-red-600) for the four primary surface roles — backgrounds, text, borders, accents. Use the semantic token classes (bg-bg, text-text-secondary, border-border, bg-accent). The narrow exception is tinted semantic state surfaces (a green-tinted background for a success badge, a red-tinted alert panel): the project currently uses raw Tailwind for those tints by convention because the CSS variables don't yet expose tinted semantic surfaces. New semantic-state components should follow the Badge pattern — raw tint background + semantic text + semantic border — rather than going fully raw.",
+      "Don't invent a developer-tool dark mode. The dark theme is the same warm room with the lights down — not a charcoal-and-neon refactor.",
+      "Don't add a positive letter-spacing tracking step to display type. The tracking goes more negative as size goes up, never the reverse."
+    ]
+  }
+}

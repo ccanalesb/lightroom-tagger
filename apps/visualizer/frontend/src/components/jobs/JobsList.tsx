@@ -1,5 +1,6 @@
 import type { Job } from '../../types/job'
 import { JobCard } from './JobCard'
+import { EmptyState } from '../ui/page-states/EmptyState'
 import { MSG_NO_JOBS } from '../../constants/strings'
 
 interface JobsListProps {
@@ -9,7 +10,7 @@ interface JobsListProps {
 
 export function JobsList({ jobs, onJobClick }: JobsListProps) {
   if (jobs.length === 0) {
-    return <div className="text-center py-12 text-gray-500">{MSG_NO_JOBS}</div>
+    return <EmptyState message={MSG_NO_JOBS} />
   }
 
   return (

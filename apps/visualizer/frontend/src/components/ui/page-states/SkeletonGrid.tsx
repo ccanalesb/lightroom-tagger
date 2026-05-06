@@ -17,11 +17,11 @@ export function SkeletonGrid({ count = 12, className = TILE_GRID_CLASS }: Skelet
 
 function CardSkeleton() {
   return (
-    <div className="border rounded-lg overflow-hidden bg-white">
-      <div className="aspect-square bg-gray-200 animate-pulse" />
+    <div className="border border-border rounded-card overflow-hidden bg-bg">
+      <div className="aspect-square bg-border animate-pulse" />
       <div className="p-2 space-y-1">
-        <div className="h-3 bg-gray-200 rounded animate-pulse" />
-        <div className="h-2 bg-gray-200 rounded w-2/3 animate-pulse" />
+        <div className="h-3 bg-border rounded animate-pulse" />
+        <div className="h-2 bg-border rounded w-2/3 animate-pulse" />
       </div>
     </div>
   );
