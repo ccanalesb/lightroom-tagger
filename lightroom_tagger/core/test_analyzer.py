@@ -27,9 +27,9 @@ def test_analyze_image_returns_all_signals():
         'subjects': [],
         'best_perspective': 'street',
     }
-    with patch('lightroom_tagger.core.analyzer.compute_phash', return_value='a1b2c3d4e5f6g7h8'), \
-         patch('lightroom_tagger.core.analyzer.extract_exif', return_value={'camera': 'Canon EOS R5'}), \
-         patch('lightroom_tagger.core.analyzer.describe_image', return_value=mock_desc):
+    with patch('lightroom_tagger.core.analyzer._legacy.compute_phash', return_value='a1b2c3d4e5f6g7h8'), \
+         patch('lightroom_tagger.core.analyzer._legacy.extract_exif', return_value={'camera': 'Canon EOS R5'}), \
+         patch('lightroom_tagger.core.analyzer._legacy.describe_image', return_value=mock_desc):
 
         result = analyze_image('/fake/path.jpg')
 
@@ -41,8 +41,8 @@ def test_analyze_image_returns_all_signals():
 
 def test_describe_image_uses_configured_agent():
     """Should use local or external agent based on config."""
-    with patch('lightroom_tagger.core.analyzer.run_local_agent', return_value='local desc') as local_mock, \
-         patch('lightroom_tagger.core.analyzer.run_external_agent', return_value='external desc') as ext_mock:
+    with patch('lightroom_tagger.core.analyzer._legacy.run_local_agent', return_value='local desc') as local_mock, \
+         patch('lightroom_tagger.core.analyzer._legacy.run_external_agent', return_value='external desc') as ext_mock:
 
         # Test local agent
         describe_image('/fake/path.jpg', agent_type='local')
@@ -55,9 +55,9 @@ def test_describe_image_uses_configured_agent():
 
 def test_compare_with_vision_returns_result():
     """Vision comparison should return dict with verdict and confidence."""
-    with patch('lightroom_tagger.core.analyzer.compress_image', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer.get_viewable_path', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer.run_vision_ollama',
+    with patch('lightroom_tagger.core.analyzer._legacy.compress_image', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer._legacy.get_viewable_path', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer._legacy.run_vision_ollama',
                return_value={'confidence': 90, 'verdict': 'SAME', 'reasoning': 'test'}):
 
         result = compare_with_vision('/tmp/local.jpg', '/tmp/insta.jpg')
@@ -130,9 +130,9 @@ def test_parse_vision_response_fallback():
 
 def test_compare_with_vision_returns_dict():
     """Vision comparison returns dict with confidence and verdict."""
-    with patch('lightroom_tagger.core.analyzer.compress_image', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer.get_viewable_path', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer.run_vision_ollama',
+    with patch('lightroom_tagger.core.analyzer._legacy.compress_image', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer._legacy.get_viewable_path', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer._legacy.run_vision_ollama',
                return_value={'confidence': 85, 'verdict': 'SAME'}):
 
         result = compare_with_vision('/tmp/local.jpg', '/tmp/insta.jpg')
@@ -248,9 +248,9 @@ def test_compare_with_vision_uses_compression():
             compressed_paths.append(result)
             return result
 
-        with patch('lightroom_tagger.core.analyzer.get_viewable_path', side_effect=lambda x: x), \
-             patch('lightroom_tagger.core.analyzer.compress_image', side_effect=track_compress), \
-             patch('lightroom_tagger.core.analyzer.run_vision_ollama',
+        with patch('lightroom_tagger.core.analyzer._legacy.get_viewable_path', side_effect=lambda x: x), \
+             patch('lightroom_tagger.core.analyzer._legacy.compress_image', side_effect=track_compress), \
+             patch('lightroom_tagger.core.analyzer._legacy.run_vision_ollama',
                    return_value={'confidence': 90, 'verdict': 'SAME', 'reasoning': ''}):
 
             result = compare_with_vision(local_path, insta_path)
@@ -268,9 +268,9 @@ def test_compare_with_vision_uses_compression():
 
 def test_compare_with_vision_cleans_up_temp_files():
     """Vision comparison should clean up all temporary files."""
-    with patch('lightroom_tagger.core.analyzer.compress_image', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer.get_viewable_path', side_effect=lambda x: x), \
-         patch('lightroom_tagger.core.analyzer.run_vision_ollama',
+    with patch('lightroom_tagger.core.analyzer._legacy.compress_image', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer._legacy.get_viewable_path', side_effect=lambda x: x), \
+         patch('lightroom_tagger.core.analyzer._legacy.run_vision_ollama',
                return_value={'confidence': 90, 'verdict': 'SAME', 'reasoning': ''}):
 
         # Track temp files in a real scenario
@@ -283,6 +283,7 @@ def test_compare_with_vision_cleans_up_temp_files():
 def test_vision_config_environment_variables():
     """Vision compression should respect environment variables."""
     import lightroom_tagger.core.analyzer as analyzer_module
+    import lightroom_tagger.core.analyzer._legacy as legacy_module
 
     # Test default values
     assert analyzer_module.VISION_MAX_DIMENSION == 1024
@@ -296,7 +297,8 @@ def test_vision_config_environment_variables():
         os.environ['VISION_MAX_DIMENSION'] = '2048'
         os.environ['VISION_COMPRESS_QUALITY'] = '90'
 
-        # Reimport to pick up new values
+        # Values are defined at import in _legacy — reload it, then the barrel.
+        importlib.reload(legacy_module)
         importlib.reload(analyzer_module)
 
         assert analyzer_module.VISION_MAX_DIMENSION == 2048
@@ -314,6 +316,7 @@ def test_vision_config_environment_variables():
             os.environ.pop('VISION_COMPRESS_QUALITY', None)
 
         # Reload again to restore
+        importlib.reload(legacy_module)
         importlib.reload(analyzer_module)
 
 
@@ -379,8 +382,8 @@ def test_run_local_agent_calls_ollama():
         'subjects': [],
         'best_perspective': 'street',
     })
-    with patch('lightroom_tagger.core.analyzer.ollama') as mock_ollama, \
-         patch('lightroom_tagger.core.analyzer.get_description_model', return_value='desc-model-test'):
+    with patch('lightroom_tagger.core.analyzer._legacy.ollama') as mock_ollama, \
+         patch('lightroom_tagger.core.analyzer._legacy.get_description_model', return_value='desc-model-test'):
         mock_ollama.chat.return_value = mock_response
         from lightroom_tagger.core.analyzer import run_local_agent
         run_local_agent('/fake/image.jpg')
