@@ -9,7 +9,7 @@ from flask.typing import ResponseReturnValue
 from utils.db import with_db
 from utils.responses import error_bad_request
 
-from api.perspectives import _SLUG_RE
+from utils.perspective_slug import PERSPECTIVE_SLUG_RE as _SLUG_RE
 from lightroom_tagger.core.database import (
     get_current_scores_for_image,
     list_score_history_for_perspective,

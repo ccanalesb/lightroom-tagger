@@ -9,7 +9,7 @@ from flask import Blueprint, jsonify, request
 from utils.db import with_db
 from utils.responses import error_bad_request, error_server_error
 
-from api.images.common import _clamp_pagination
+from utils.pagination import _clamp_pagination
 from lightroom_tagger.core.posting_analytics import (
     get_caption_hashtag_stats,
     get_posting_frequency,

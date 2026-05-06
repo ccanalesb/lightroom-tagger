@@ -13,7 +13,7 @@ from flask.typing import ResponseReturnValue
 from utils.db import with_db
 from utils.responses import error_bad_request, error_server_error
 
-from api.images.common import _clamp_pagination
+from utils.pagination import _clamp_pagination
 from lightroom_tagger.core.identity_service import (
     build_style_fingerprint,
     rank_best_photos,

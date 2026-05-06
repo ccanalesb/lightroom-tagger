@@ -31,7 +31,7 @@ bp = Blueprint("perspectives", __name__)
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
-_SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+from utils.perspective_slug import PERSPECTIVE_SLUG_RE as _SLUG_RE
 _SOURCE_FILENAME_RE = re.compile(r"^[a-zA-Z0-9_\-]+\.md$")
 _MAX_PROMPT_MARKDOWN_BYTES = 256 * 1024
 
