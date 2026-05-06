@@ -23,8 +23,8 @@ from .description_batch import _compute_desc_scores_for_candidates
 from ._legacy import (
     match_batch,
     match_image,
-    score_candidates_with_vision,
 )
+from .score_with_vision import score_candidates_with_vision
 from .text_scores import score_candidates, text_similarity
 from .vision_batch import BATCH_MAX_TOKENS_ESCALATION, _call_batch_chunk
 
