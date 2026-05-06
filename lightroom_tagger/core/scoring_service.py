@@ -21,10 +21,10 @@ import ollama
 from lightroom_tagger.core.analyzer import (
     VIDEO_EXTENSIONS,
     compress_image,
-    get_description_model,
     get_viewable_path,
     run_local_agent,
 )
+from lightroom_tagger.core.config import get_description_model
 from lightroom_tagger.core.vision_cache import get_or_create_cached_image
 from lightroom_tagger.core.database import (
     get_image,

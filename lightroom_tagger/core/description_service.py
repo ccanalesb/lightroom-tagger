@@ -5,7 +5,8 @@ import threading
 from collections.abc import Callable
 from typing import TypedDict
 
-from lightroom_tagger.core.analyzer import VIDEO_EXTENSIONS, describe_image, get_description_model
+from lightroom_tagger.core.analyzer import VIDEO_EXTENSIONS, describe_image
+from lightroom_tagger.core.config import get_description_model
 from lightroom_tagger.core.database import (
     get_image,
     get_image_description,

@@ -64,7 +64,7 @@ def test_score_candidates_includes_vision():
                return_value={'confidence': 100, 'verdict': 'SAME', 'reasoning': ''}), \
          patch('lightroom_tagger.core.analyzer.vision_score', return_value=1.0), \
          patch('lightroom_tagger.core.matcher.store_vision_comparison') as store_mock, \
-         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_vision_model', return_value='gemma3:27b'), \
          patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
          patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
          patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
@@ -111,7 +111,7 @@ def test_score_candidates_stores_actual_provider_model_in_cache():
          patch('lightroom_tagger.core.analyzer.compare_with_vision', return_value=vision_payload), \
          patch('lightroom_tagger.core.analyzer.vision_score', return_value=1.0), \
          patch('lightroom_tagger.core.matcher.store_vision_comparison') as store_mock, \
-         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_vision_model', return_value='gemma3:27b'), \
          patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
          patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
          patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
@@ -157,7 +157,7 @@ def test_score_candidates_uses_cache():
 
     with patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=cached_result), \
          patch('lightroom_tagger.core.analyzer.compare_with_vision') as vision_mock, \
-         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_vision_model', return_value='gemma3:27b'), \
          patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
          patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
          patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
@@ -265,7 +265,7 @@ def test_batch_skips_oversized_cache_misses_with_zero_vision():
          patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
          patch('lightroom_tagger.core.matcher.InstagramCache') as mock_ic, \
          patch('lightroom_tagger.core.provider_registry.ProviderRegistry') as mock_reg, \
-         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='test-model'), \
+         patch('lightroom_tagger.core.matcher.get_vision_model', return_value='test-model'), \
          patch('lightroom_tagger.core.phash.hamming_distance', return_value=0), \
          patch('os.path.exists', return_value=True):
         mock_ic.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
@@ -365,7 +365,7 @@ def test_desc_weight_zero_skips_compare_descriptions_batch():
                return_value={'confidence': 100, 'verdict': 'SAME', 'reasoning': ''}), \
          patch('lightroom_tagger.core.analyzer.vision_score', return_value=1.0), \
          patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
-         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_vision_model', return_value='gemma3:27b'), \
          patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
          patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
          patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
@@ -396,7 +396,7 @@ def test_backward_compat_phash_zero_desc_zero_vision_only_total():
                return_value={'confidence': 85, 'verdict': 'SAME', 'reasoning': ''}), \
          patch('lightroom_tagger.core.analyzer.vision_score', return_value=0.85), \
          patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
-         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_vision_model', return_value='gemma3:27b'), \
          patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
          patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
          patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
@@ -430,7 +430,7 @@ def test_nominal_weighted_merge_all_ones():
                return_value={'confidence': 100, 'verdict': 'SAME', 'reasoning': ''}), \
          patch('lightroom_tagger.core.analyzer.vision_score', return_value=1.0), \
          patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
-         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_vision_model', return_value='gemma3:27b'), \
          patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
          patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
          patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
@@ -464,7 +464,7 @@ def test_skip_undescribed_true_empty_summaries_no_desc_batch_call():
                return_value={'confidence': 50, 'verdict': 'UNCERTAIN', 'reasoning': ''}), \
          patch('lightroom_tagger.core.analyzer.vision_score', return_value=0.5), \
          patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
-         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_vision_model', return_value='gemma3:27b'), \
          patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
          patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
          patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
@@ -512,7 +512,7 @@ def test_description_batch_runs_before_vision_batch():
          patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
          patch('lightroom_tagger.core.matcher.InstagramCache') as mock_ic, \
          patch('lightroom_tagger.core.provider_registry.ProviderRegistry') as mock_reg, \
-         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='m'), \
+         patch('lightroom_tagger.core.matcher.get_vision_model', return_value='m'), \
          patch('lightroom_tagger.core.phash.hamming_distance', return_value=0), \
          patch('os.path.exists', return_value=True):
         mock_ic.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
@@ -552,7 +552,7 @@ def test_all_empty_ai_summary_skip_no_redistribution():
                return_value={'confidence': 100, 'verdict': 'SAME', 'reasoning': ''}), \
          patch('lightroom_tagger.core.analyzer.vision_score', return_value=1.0), \
          patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
-         patch('lightroom_tagger.core.analyzer.get_vision_model', return_value='gemma3:27b'), \
+         patch('lightroom_tagger.core.matcher.get_vision_model', return_value='gemma3:27b'), \
          patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
          patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value=None), \
          patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \

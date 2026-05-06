@@ -13,12 +13,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from lightroom_tagger.core.analyzer import compute_phash
-from lightroom_tagger.core.config import load_config
+from lightroom_tagger.core.config import get_vision_model, load_config
 from lightroom_tagger.core.description_service import (
     describe_instagram_image,
     describe_matched_image,
 )
-from lightroom_tagger.core.analyzer import get_vision_model
 from lightroom_tagger.core.clip_similarity import shortlist_catalog_candidates_by_clip
 from lightroom_tagger.core.database import (
     apply_instagram_match_to_stack_members,

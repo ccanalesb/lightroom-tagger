@@ -1,6 +1,7 @@
 import os
 from collections.abc import Callable
 
+from lightroom_tagger.core.config import get_vision_model
 from lightroom_tagger.core.database import (
     _deserialize_row,
     get_vision_comparison,
@@ -98,8 +99,6 @@ def _compute_desc_scores_for_candidates(
     """Map candidate index -> description similarity 0–1 via compare_descriptions_batch."""
     if desc_weight <= 0:
         return {}
-
-    from lightroom_tagger.core.analyzer import get_vision_model
 
     reference_text = (insta_image.get('ai_summary') or '').strip()
     desc_scores: dict[int, float] = {}
@@ -217,7 +216,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     """
     import os as _os
 
-    from lightroom_tagger.core.analyzer import compare_with_vision, get_vision_model, vision_score
+    from lightroom_tagger.core.analyzer import compare_with_vision, vision_score
     from lightroom_tagger.core.phash import hamming_distance
     from lightroom_tagger.core.exceptions import InvalidRequestError, PayloadTooLargeError, RateLimitError
 
