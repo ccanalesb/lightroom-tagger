@@ -1,15 +1,21 @@
-"""Image analysis facade — barrel re-exports from :mod:`._legacy` (plan 15-03)."""
+"""Image analysis facade — barrel re-exports from submodules and :mod:`._legacy`."""
 # Import order matches ``__all__`` (explicit Phase-14-style barrel contract).
 # ruff: noqa: I001
 
-from ._legacy import (
-    ContextLengthError,
-    DESCRIPTION_PROMPT,
-    MAX_TOKENS_ESCALATION,
+from .image_inspect import compute_phash, extract_exif
+from .image_prep import (
     RAW_EXTENSIONS,
     VIDEO_EXTENSIONS,
     VISION_COMPRESS_QUALITY,
     VISION_MAX_DIMENSION,
+    compress_image,
+    convert_raw_to_jpg,
+    get_viewable_path,
+)
+from ._legacy import (
+    ContextLengthError,
+    DESCRIPTION_PROMPT,
+    MAX_TOKENS_ESCALATION,
     _DESCRIPTION_FALLBACK,
     _broken_provider_models,
     _compare_via_provider,
@@ -18,13 +24,8 @@ from ._legacy import (
     analyze_image,
     build_description_prompt,
     compare_with_vision,
-    compress_image,
-    compute_phash,
-    convert_raw_to_jpg,
     describe_image,
-    extract_exif,
     get_description_model,
-    get_viewable_path,
     get_vision_model,
     load_config,
     parse_description_response,
