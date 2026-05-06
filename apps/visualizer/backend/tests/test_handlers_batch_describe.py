@@ -360,3 +360,62 @@ def test_batch_describe_checkpoint_skips_already_processed_pairs(
     result = runner.complete_job.call_args[0][1]
     assert result['described'] == 1
     assert result['total'] == 2
+
+
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze.fingerprint_batch_describe', return_value='fp-stable-test')
+@patch('lightroom_tagger.core.description_service.describe_matched_image')
+@patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
+@patch('jobs.handlers.analyze.get_job')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
+def test_batch_describe_fingerprint_mismatch_resets_and_reprocesses(
+    _mock_exists,
+    mock_getenv,
+    mock_config,
+    mock_init_db,
+    mock_get_job,
+    mock_get_undescribed,
+    mock_describe,
+    _mock_fp,
+    mock_add_log,
+):
+    from jobs.handlers import handle_batch_describe
+
+    metadata = {
+        'image_type': 'catalog',
+        'date_filter': 'all',
+        'force': False,
+        'max_workers': 1,
+    }
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_db = MagicMock()
+    mock_db.execute.return_value.fetchall.return_value = []
+    mock_init_db.return_value = mock_db
+    mock_get_undescribed.return_value = [{'key': 'img_m'}]
+    mock_describe.return_value = True
+    mock_get_job.return_value = {
+        'status': 'running',
+        'metadata': {
+            'checkpoint': {
+                'checkpoint_version': 1,
+                'job_type': 'batch_describe',
+                'fingerprint': 'fp-stale-old',
+                'processed_pairs': ['img_m|catalog'],
+                'total_at_start': 1,
+            },
+        },
+    }
+
+    runner = _make_runner()
+    handle_batch_describe(runner, 'job-fpm', metadata)
+
+    log_messages = [c.args[3] for c in mock_add_log.call_args_list if len(c.args) >= 4]
+    assert any(
+        'checkpoint mismatch: batch_describe fingerprint changed, starting fresh' in m
+        for m in log_messages
+    ), log_messages
+    mock_describe.assert_called_once()
+    assert mock_describe.call_args[0][1] == 'img_m'
