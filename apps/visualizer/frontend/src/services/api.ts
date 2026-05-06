@@ -452,7 +452,7 @@ export const ImagesAPI = {
   },
 
   chatSearch: (payload: ChatSearchRequest) =>
-    request<ChatSearchResponse>('/images/chat-search', {
+    request<ChatSearchResponse>('/images/search/chat-search', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
