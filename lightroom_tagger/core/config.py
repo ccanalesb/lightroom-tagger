@@ -114,6 +114,18 @@ def load_config(config_path: str = "config.yaml") -> Config:
     return Config(**data)
 
 
+def get_vision_model() -> str:
+    if "VISION_MODEL" in os.environ:
+        return os.environ["VISION_MODEL"]
+    return load_config().vision_model
+
+
+def get_description_model() -> str:
+    if "DESCRIPTION_VISION_MODEL" in os.environ:
+        return os.environ["DESCRIPTION_VISION_MODEL"]
+    return get_vision_model()
+
+
 def update_config_yaml_catalog_path(config_file: str, catalog_path: str) -> None:
     """Write ``catalog_path`` into ``config_file`` YAML, preserving other keys."""
     path = Path(config_file)
