@@ -1,5 +1,6 @@
 """Shared domain exceptions — canonical import surface (ADR-0004)."""
 
+from .db_errors import StackMutationError
 from .provider_errors import (
     AuthenticationError,
     ConnectionError,
@@ -25,5 +26,6 @@ __all__ = (
     "ProviderError",
     "RateLimitError",
     "RETRYABLE_ERRORS",
+    "StackMutationError",
     "TimeoutError",
 )

@@ -85,8 +85,9 @@ from .matches import (
     validate_match,
 )
 
+from lightroom_tagger.core.exceptions import StackMutationError
+
 from .stacks import (
-    StackMutationError,
     catalog_image_stack_row_fields,
     list_catalog_stack_member_keys,
     select_stack_representative_key_for_keys,
