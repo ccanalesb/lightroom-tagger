@@ -20,7 +20,7 @@ from lightroom_tagger.core.analyzer import (
     build_description_prompt,
     parse_vision_response,
 )
-from lightroom_tagger.core.provider_errors import (
+from lightroom_tagger.core.exceptions import (
     AuthenticationError,
     ConnectionError,
     ContextLengthError,

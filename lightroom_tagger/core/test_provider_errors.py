@@ -1,4 +1,4 @@
-from lightroom_tagger.core.provider_errors import (
+from lightroom_tagger.core.exceptions import (
     ProviderError,
     RateLimitError,
     TimeoutError,

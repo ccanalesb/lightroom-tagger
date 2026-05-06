@@ -65,7 +65,7 @@ def get_description(db, image_key):
 @with_db
 def generate_description(db, image_key):
     """Generate AI description for a single image."""
-    from lightroom_tagger.core.provider_errors import (
+    from lightroom_tagger.core.exceptions import (
         AuthenticationError,
         ConnectionError,
         ModelUnavailableError,

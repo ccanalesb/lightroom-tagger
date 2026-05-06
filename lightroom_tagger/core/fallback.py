@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from lightroom_tagger.core.provider_errors import (
+from lightroom_tagger.core.exceptions import (
     RETRYABLE_ERRORS,
     ConnectionError,
     ModelUnavailableError,

@@ -6,7 +6,7 @@ import time
 from typing import Any, Callable, TypeVar
 
 from lightroom_tagger.core import cancel_scope
-from lightroom_tagger.core.provider_errors import (
+from lightroom_tagger.core.exceptions import (
     NOT_RETRYABLE_ERRORS,
     RETRYABLE_ERRORS,
     ProviderError,

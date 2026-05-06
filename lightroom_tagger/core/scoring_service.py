@@ -205,7 +205,7 @@ def score_image_for_perspective(
             if model is None:
                 models = registry.list_models(provider_id)
                 if not models:
-                    from lightroom_tagger.core.provider_errors import ModelUnavailableError
+                    from lightroom_tagger.core.exceptions import ModelUnavailableError
                     raise ModelUnavailableError(
                         f"No models available for provider '{provider_id}' — check provider config",
                         provider=provider_id,

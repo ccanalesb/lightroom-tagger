@@ -7,7 +7,7 @@ import sqlite3
 from collections.abc import Callable
 
 from lightroom_tagger.core.fallback import FallbackDispatcher
-from lightroom_tagger.core.provider_errors import ModelUnavailableError
+from lightroom_tagger.core.exceptions import ModelUnavailableError
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.search_tools import ALL_TOOLS, execute_tool
 from lightroom_tagger.core.vision_client import complete_chat_messages, complete_chat_text

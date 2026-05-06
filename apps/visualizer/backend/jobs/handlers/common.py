@@ -2,7 +2,7 @@
 
 from library_db import require_library_db
 
-from lightroom_tagger.core.provider_errors import AuthenticationError, InvalidRequestError
+from lightroom_tagger.core.exceptions import AuthenticationError, InvalidRequestError
 
 _CHECKPOINT_MAX_ENTRIES = 100_000
 

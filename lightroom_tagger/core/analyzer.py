@@ -8,7 +8,7 @@ from typing import Any
 import ollama
 
 from lightroom_tagger.core.config import load_config
-from lightroom_tagger.core.provider_errors import ContextLengthError
+from lightroom_tagger.core.exceptions import ContextLengthError
 
 RAW_EXTENSIONS = {'.dng', '.raw', '.cr2', '.cr3', '.nef', '.arw', '.rw2', '.orf', '.raf', '.sr2', '.srw', '.x3f'}
 VIDEO_EXTENSIONS = {'.mov', '.mp4', '.avi', '.mkv', '.wmv', '.m4v', '.3gp', '.webm', '.mts', '.m2ts'}
@@ -382,7 +382,7 @@ def _describe_image_via_provider(path: str, provider_id: str,
     if model is None:
         models = registry.list_models(provider_id)
         if not models:
-            from lightroom_tagger.core.provider_errors import ModelUnavailableError
+            from lightroom_tagger.core.exceptions import ModelUnavailableError
             raise ModelUnavailableError(
                 f"No models available for provider '{provider_id}' — check provider config",
                 provider=provider_id,
@@ -598,7 +598,7 @@ def _compare_via_provider(local_path: str, insta_path: str,
     if model is None:
         models = registry.list_models(provider_id)
         if not models:
-            from lightroom_tagger.core.provider_errors import ModelUnavailableError
+            from lightroom_tagger.core.exceptions import ModelUnavailableError
             raise ModelUnavailableError(
                 f"No models available for provider '{provider_id}' — check provider config",
                 provider=provider_id,
@@ -607,7 +607,7 @@ def _compare_via_provider(local_path: str, insta_path: str,
         model = models[0]["id"]
 
     def fn_factory(client, mdl):
-        from lightroom_tagger.core.provider_errors import InvalidRequestError
+        from lightroom_tagger.core.exceptions import InvalidRequestError
 
         provider_key = f"{provider_id}:{mdl}"
         if provider_key in _broken_provider_models:

@@ -27,7 +27,7 @@ from lightroom_tagger.core.database import (
     query_catalog_images_by_keys,
 )
 from lightroom_tagger.core.embedding_service import embed_query_to_vec_blob
-from lightroom_tagger.core.provider_errors import ModelUnavailableError
+from lightroom_tagger.core.exceptions import ModelUnavailableError
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.semantic_search import run_semantic_hybrid_search
 from lightroom_tagger.core.structured_output import StructuredOutputError

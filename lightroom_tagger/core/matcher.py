@@ -166,7 +166,7 @@ def _call_batch_chunk(
       If all escalation levels are exhausted, re-raise so the caller can
       fall back to sequential processing.
     """
-    from lightroom_tagger.core.provider_errors import ContextLengthError, PayloadTooLargeError
+    from lightroom_tagger.core.exceptions import ContextLengthError, PayloadTooLargeError
     from lightroom_tagger.core.vision_client import compare_images_batch
 
     current_tokens = BATCH_MAX_TOKENS_ESCALATION[max_tokens_idx]
@@ -219,7 +219,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
     from lightroom_tagger.core.analyzer import compare_with_vision, get_vision_model, vision_score
     from lightroom_tagger.core.phash import hamming_distance
-    from lightroom_tagger.core.provider_errors import InvalidRequestError, PayloadTooLargeError, RateLimitError
+    from lightroom_tagger.core.exceptions import InvalidRequestError, PayloadTooLargeError, RateLimitError
 
     RATE_LIMIT_ABORT_THRESHOLD = 3
 

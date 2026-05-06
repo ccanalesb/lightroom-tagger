@@ -4,7 +4,7 @@ import tempfile
 from unittest.mock import patch
 
 from lightroom_tagger.core.database import init_database
-from lightroom_tagger.core.provider_errors import RateLimitError
+from lightroom_tagger.core.exceptions import RateLimitError
 
 
 def _make_client(db_path):
