@@ -667,9 +667,9 @@ def get_image_detail(db, image_type, image_key):
         if image_type == "catalog":
             payload, not_found = _build_catalog_detail(db, image_key, score_perspective or None)
         else:
-            from . import _legacy
+            from .instagram import _build_instagram_detail
 
-            payload, not_found = _legacy._build_instagram_detail(db, image_key)
+            payload, not_found = _build_instagram_detail(db, image_key)
         if not_found:
             return error_not_found("image")
         return jsonify(payload)

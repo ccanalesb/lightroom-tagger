@@ -9,11 +9,19 @@ bp = Blueprint("images", __name__)
 
 from ._legacy import legacy_bp
 from .catalog import catalog_bp
+from .instagram import instagram_bp
 from .stacks import stacks_bp
 
 bp.register_blueprint(legacy_bp)
-# /stacks/* before catalog ``/<image_type>/<image_key>`` catch-all.
+bp.register_blueprint(instagram_bp)
 bp.register_blueprint(stacks_bp)
 bp.register_blueprint(catalog_bp)
 
-__all__ = ("bp", "catalog_bp", "nl_catalog_search", "ProviderRegistry", "stacks_bp")
+__all__ = (
+    "bp",
+    "catalog_bp",
+    "instagram_bp",
+    "nl_catalog_search",
+    "ProviderRegistry",
+    "stacks_bp",
+)

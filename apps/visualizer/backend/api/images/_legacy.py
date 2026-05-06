@@ -5,14 +5,13 @@ from collections import OrderedDict
 from datetime import datetime
 from typing import Any
 
-from flask import Blueprint, jsonify, request, send_file
+from flask import Blueprint, jsonify, request
 from pydantic import ValidationError
 from utils.db import with_db
 from utils.responses import (
     error_bad_request,
     error_not_found,
     error_server_error,
-    success_paginated,
 )
 
 from lightroom_tagger.core import nl_catalog_search
@@ -26,8 +25,6 @@ from lightroom_tagger.core.clip_similarity import (
 )
 from lightroom_tagger.core.database import (
     build_description_fts_query,
-    get_image_description,
-    get_instagram_dump_media,
     query_catalog_images,
     query_catalog_images_by_keys,
     reject_match,
@@ -47,22 +44,11 @@ from .catalog import (
 )
 from .common import (
     _clamp_pagination,
-    _extract_source_folder,
-    _filter_by_date,
-    _instagram_thumbnail_roots,
-    _is_path_under_allowed_roots,
 )
 
 legacy_bp = Blueprint("images_legacy", __name__)
 
-_DESC_JSON_COLS = (
-    "composition",
-    "perspectives",
-    "technical",
-    "subjects",
-    "dominant_colors",
-    "mood_tags",
-)
+from .instagram import _deserialize_description, _enrich_instagram_media
 
 
 def _merge_chat_search_metadata(
@@ -98,65 +84,6 @@ def _chat_pin_context(
         return frozenset(keys), {"pin_state": "active"}
     except NoClipEmbeddingError:
         return None, {"pin_state": "inactive", "fallback_reason": "no_clip_embedding"}
-
-
-def _deserialize_description(row: dict) -> dict:
-    """Deserialize JSON columns in an image_descriptions row."""
-    out = dict(row)
-    for col in _DESC_JSON_COLS:
-        val = out.get(col)
-        if isinstance(val, str):
-            try:
-                out[col] = json.loads(val)
-            except (json.JSONDecodeError, TypeError):
-                pass
-    return out
-
-
-def _enrich_instagram_media(media_items, model_lookup=None, desc_lookup=None):
-    """Transform database media items to API response format."""
-    model_lookup = model_lookup or {}
-    desc_lookup = desc_lookup or {}
-    enriched = []
-    for media in media_items:
-        file_path = media.get("file_path", "")
-        source_folder = _extract_source_folder(file_path)
-
-        exif_data = media.get("exif_data")
-        if isinstance(exif_data, str):
-            try:
-                exif_data = json.loads(exif_data)
-            except (json.JSONDecodeError, TypeError):
-                pass
-
-        media_key = media["media_key"]
-        ai_desc = desc_lookup.get((media_key, "instagram"))
-
-        enriched.append(
-            {
-                "key": media_key,
-                "local_path": file_path,
-                "filename": media.get("filename", ""),
-                "instagram_folder": media.get("date_folder", ""),
-                "date_folder": media.get(
-                    "date_folder", ""
-                ),  # Add explicit date_folder for frontend
-                "created_at": media.get("created_at"),  # Add created_at timestamp
-                "source_folder": source_folder,
-                "image_hash": media.get("image_hash"),
-                "description": ai_desc.get("summary", "") if ai_desc else "",  # AI description
-                "caption": media.get("caption", ""),  # Instagram caption
-                "crawled_at": media.get("added_at", ""),
-                "image_index": 1,
-                "total_in_post": 1,
-                "post_url": media.get("post_url"),
-                "exif_data": exif_data,
-                "processed": bool(media.get("processed")),
-                "matched_catalog_key": media.get("matched_catalog_key"),
-                "matched_model": model_lookup.get(media_key),
-            }
-        )
-    return enriched
 
 
 def _extract_images_from_tool_messages(
@@ -209,141 +136,6 @@ def _extract_images_from_tool_messages(
     for img in images:
         img["thumbnail_url"] = f"/api/images/catalog/{img['key']}/thumbnail"
     return images, total
-
-
-@legacy_bp.route("/instagram", methods=["GET"])
-@with_db
-def list_instagram_images(db):
-    """List Instagram images with filtering and pagination."""
-    try:
-        media_items = db.execute("SELECT * FROM instagram_dump_media").fetchall()
-
-        model_lookup = {}
-        score_lookup = {}
-        try:
-            for row in db.execute(
-                "SELECT insta_key, model_used, total_score, score FROM matches"
-            ).fetchall():
-                model_lookup[row["insta_key"]] = row["model_used"]
-                raw = row.get("total_score") or row.get("score") or 0
-                key = row["insta_key"]
-                if raw and (key not in score_lookup or raw > score_lookup[key]):
-                    score_lookup[key] = float(raw)
-        except sqlite3.OperationalError:
-            pass
-
-        desc_lookup = {}
-        try:
-            for desc in db.execute(
-                "SELECT * FROM image_descriptions WHERE image_type = 'instagram'"
-            ).fetchall():
-                key = (desc.get("image_key"), desc.get("image_type"))
-                desc_lookup[key] = _deserialize_description(desc)
-        except sqlite3.OperationalError:
-            pass
-
-        enriched_images = _enrich_instagram_media(media_items, model_lookup, desc_lookup)
-
-        for img in enriched_images:
-            best = score_lookup.get(img.get("key"))
-            img["match_score"] = best if best else None
-
-        # Get filter parameters
-        date_from = request.args.get("date_from", "")
-        date_to = request.args.get("date_to", "")
-        date_folder = request.args.get("date_folder", "")
-
-        # Apply filters
-        enriched_images = _filter_by_date(enriched_images, date_folder, date_from, date_to)
-
-        sort_date_raw = (request.args.get("sort_by_date") or "").strip().lower()
-        if sort_date_raw and sort_date_raw not in ("newest", "oldest"):
-            return error_bad_request("sort_by_date must be newest or oldest")
-        sort_reverse = sort_date_raw != "oldest"
-
-        # Sort by date folder (month). Tiebreak by key (set by
-        # ``_enrich_instagram_media`` from the underlying ``media_key``) so
-        # rows within the same month have a deterministic order matching the
-        # chosen direction.
-        enriched_images.sort(
-            key=lambda x: (x.get("instagram_folder") or "", x.get("key") or ""),
-            reverse=sort_reverse,
-        )
-
-        # Pagination
-        limit, offset = _clamp_pagination(
-            request.args.get("limit", 50, type=int),
-            request.args.get("offset", 0, type=int),
-        )
-        total = len(enriched_images)
-
-        paginated = enriched_images[offset : offset + limit]
-
-        # Build custom response with 'images' key for backward compatibility
-        success_paginated(paginated, total, offset, limit)
-        # success_paginated returns (response, status) tuple, need to modify the response
-        # Let's construct manually for compatibility
-        return jsonify(
-            {
-                "total": total,
-                "images": paginated,
-                "pagination": {
-                    "offset": offset,
-                    "limit": limit,
-                    "current_page": (offset // limit) + 1,
-                    "total_pages": (total + limit - 1) // limit,
-                    "has_more": (offset + limit) < total,
-                },
-            }
-        )
-    except Exception as e:
-        return error_server_error(str(e))
-
-
-@legacy_bp.route("/instagram/months", methods=["GET"])
-@with_db
-def get_instagram_months(db):
-    """Get unique months available in Instagram images."""
-    try:
-        media_items = db.execute("SELECT * FROM instagram_dump_media").fetchall()
-        months = set()
-        for media in media_items:
-            date_folder = media.get("date_folder", "")
-            if date_folder:
-                months.add(date_folder)
-        return jsonify({"months": sorted(months, reverse=True)})
-    except Exception as e:
-        return error_server_error(str(e))
-
-
-@legacy_bp.route("/instagram/<path:image_key>/thumbnail", methods=["GET"])
-@with_db
-def get_instagram_thumbnail(db, image_key):
-    """Get thumbnail for Instagram image."""
-    try:
-        media_items = db.execute(
-            "SELECT * FROM instagram_dump_media WHERE media_key = ?",
-            (image_key,),
-        ).fetchall()
-
-        if not media_items:
-            return error_not_found("image")
-
-        media = media_items[0]
-        local_path = media.get("file_path")
-
-        if not local_path or not os.path.exists(local_path):
-            return error_not_found("file")
-
-        allowed_insta = _instagram_thumbnail_roots()
-        if not allowed_insta or not _is_path_under_allowed_roots(local_path, allowed_insta):
-            return error_not_found("file")
-
-        return send_file(local_path, mimetype="image/jpeg")
-    except Exception as e:
-        return error_server_error(str(e))
-
-
 
 
 @legacy_bp.route("/nl-search", methods=["POST"])
@@ -661,46 +453,6 @@ def chat_search_images(db):
         return error_server_error(str(e))
 
 
-@legacy_bp.route("/dump-media", methods=["GET"])
-@with_db
-def list_dump_media(db):
-    """List dump media with optional filtering."""
-    try:
-        processed = request.args.get("processed")
-        matched = request.args.get("matched")
-        limit, offset = _clamp_pagination(
-            request.args.get("limit", 50, type=int),
-            request.args.get("offset", 0, type=int),
-        )
-
-        if processed == "true":
-            media = db.execute("SELECT * FROM instagram_dump_media WHERE processed = 1").fetchall()
-        elif processed == "false":
-            media = db.execute("SELECT * FROM instagram_dump_media WHERE processed = 0").fetchall()
-        elif matched == "true":
-            media = db.execute(
-                "SELECT * FROM instagram_dump_media WHERE matched_catalog_key IS NOT NULL"
-            ).fetchall()
-        elif matched == "false":
-            media = db.execute(
-                "SELECT * FROM instagram_dump_media WHERE matched_catalog_key IS NULL"
-            ).fetchall()
-        else:
-            media = db.execute("SELECT * FROM instagram_dump_media").fetchall()
-
-        total = len(media)
-        paginated = media[offset : offset + limit]
-
-        return jsonify(
-            {
-                "total": total,
-                "media": paginated,
-            }
-        )
-    except Exception as e:
-        return error_server_error(str(e))
-
-
 @legacy_bp.route("/matches", methods=["GET"])
 @with_db
 def list_matches(db):
@@ -997,45 +749,3 @@ def reject_match_endpoint(db, catalog_key, insta_key):
     except Exception as e:
         return error_server_error(str(e))
 
-
-def _build_instagram_detail(db, image_key):
-    """Build the instagram detail payload; returns (payload_dict, 404_flag)."""
-    row = get_instagram_dump_media(db, image_key)
-    if not row:
-        return None, True
-
-    out = dict(row)
-    out["image_type"] = "instagram"
-    # Normalize to the same ``key`` alias catalog uses.
-    out["key"] = row.get("media_key") or image_key
-    # Parity with ``_enrich_instagram_media`` so the detail modal renders
-    # the same folder / source fields the list tiles would have.
-    out["instagram_folder"] = row.get("date_folder") or ""
-    out["source_folder"] = _extract_source_folder(row.get("file_path") or "")
-    out["local_path"] = row.get("file_path") or ""
-    out["processed"] = bool(row.get("processed"))
-    out["matched_catalog_key"] = row.get("matched_catalog_key")
-
-    desc_row = get_image_description(db, image_key)
-    if desc_row and desc_row.get("image_type") == "instagram":
-        out["ai_analyzed"] = True
-        out["description_summary"] = desc_row.get("summary") or ""
-        out["description_best_perspective"] = desc_row.get("best_perspective") or ""
-        persp = desc_row.get("perspectives")
-        out["description_perspectives"] = persp if isinstance(persp, dict) else {}
-    else:
-        out["ai_analyzed"] = False
-        out["description_summary"] = None
-        out["description_best_perspective"] = None
-        out["description_perspectives"] = None
-
-    # Instagram rows have no identity scoring (catalog-only by design).
-    out["identity_aggregate_score"] = None
-    out["identity_perspectives_covered"] = 0
-    out["identity_eligible"] = False
-    out["identity_per_perspective"] = []
-    out["catalog_perspective_score"] = None
-    out["catalog_score_perspective"] = None
-    out["available_score_perspectives"] = []
-
-    return out, False
