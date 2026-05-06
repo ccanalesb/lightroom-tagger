@@ -70,6 +70,14 @@ def get_job_runner() -> JobRunner | None:
     return _job_runner
 
 
+def _invalid_polymorphic_image_detail(bad_type: str, image_key: str):  # noqa: ARG001 — URL contract
+    """404-catch for ``/api/images/<non-family>/<key>``; keeps legacy 400 from pre-split."""
+    from api.images.catalog import _DETAIL_IMAGE_TYPES
+    from utils.responses import error_bad_request
+
+    return error_bad_request(f"invalid image_type; expected one of {_DETAIL_IMAGE_TYPES}")
+
+
 def create_app():
     global db, socketio, job_processor_thread, job_processor_running
     app = Flask(__name__)
@@ -120,7 +128,6 @@ def create_app():
         analytics,
         descriptions,
         identity,
-        images,
         jobs,
         lt_config,
         perspectives,
@@ -128,8 +135,32 @@ def create_app():
         scores,
         system,
     )
+    from api.images import catalog_bp, instagram_bp, matches_bp, search_bp, stacks_bp
+    from api.images.catalog import list_catalog_similarity_groups
+    from api.images.instagram import list_dump_media
+
     app.register_blueprint(jobs.bp, url_prefix='/api/jobs')
-    app.register_blueprint(images.bp, url_prefix='/api/images')
+    app.register_blueprint(catalog_bp, url_prefix='/api/images/catalog')
+    app.register_blueprint(stacks_bp, url_prefix='/api/images/stacks')
+    app.register_blueprint(instagram_bp, url_prefix='/api/images/instagram')
+    app.register_blueprint(matches_bp, url_prefix='/api/images/matches')
+    app.register_blueprint(search_bp, url_prefix='/api/images/search')
+
+    app.add_url_rule(
+        '/api/images/catalog-similarity-groups',
+        view_func=list_catalog_similarity_groups,
+        methods=['GET'],
+    )
+    app.add_url_rule('/api/images/dump-media', view_func=list_dump_media, methods=['GET'])
+
+    # Legacy invalid detail shape: ``/api/images/<bad_type>/<image_key>`` for ``bad_type`` not a
+    # mounted family. Registered after family blueprints so real paths like ``/api/images/catalog/<key>``
+    # resolve to ``catalog_bp``.
+    app.add_url_rule(
+        '/api/images/<string:bad_type>/<path:image_key>',
+        view_func=_invalid_polymorphic_image_detail,
+        methods=['GET'],
+    )
     app.register_blueprint(analytics.bp, url_prefix='/api/analytics')
     app.register_blueprint(descriptions.bp, url_prefix='/api/descriptions')
     app.register_blueprint(providers.bp, url_prefix='/api/providers')
