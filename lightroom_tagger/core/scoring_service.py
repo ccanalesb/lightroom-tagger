@@ -16,15 +16,11 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
-import ollama
-
 from lightroom_tagger.core.analyzer import (
     VIDEO_EXTENSIONS,
     compress_image,
     get_viewable_path,
-    run_local_agent,
 )
-from lightroom_tagger.core.config import get_description_model
 from lightroom_tagger.core.vision_cache import get_or_create_cached_image
 from lightroom_tagger.core.database import (
     get_image,
@@ -95,16 +91,6 @@ def delete_scores_for_version(
     )
 
 
-def _ollama_complete_text_for_repair(*, system: str, user: str, **_kwargs: Any) -> str:
-    response = ollama.chat(
-        model=get_description_model(),
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-    )
-    content = getattr(response.message, "content", None) if response and response.message else None
-    return content or ""
 
 
 def score_image_for_perspective(
@@ -199,47 +185,58 @@ def score_image_for_perspective(
             log_callback("info", msg)
 
     try:
-        if provider_id is not None:
-            registry = ProviderRegistry()
-            dispatcher = FallbackDispatcher(registry)
-            if model is None:
-                models = registry.list_models(provider_id)
-                if not models:
-                    from lightroom_tagger.core.exceptions import ModelUnavailableError
-                    raise ModelUnavailableError(
-                        f"No models available for provider '{provider_id}' — check provider config",
-                        provider=provider_id,
-                        model=None,
-                    )
-                use_model = models[0]["id"]
-            else:
-                use_model = model
+        registry = ProviderRegistry()
+        resolved_pid = provider_id
+        use_model = model
+        if resolved_pid is None:
+            desc_defaults = registry.defaults.get("description", {}) or {}
+            resolved_pid = desc_defaults.get("provider")
+            if use_model is None:
+                use_model = desc_defaults.get("model")
+            if resolved_pid is None and registry.fallback_order:
+                resolved_pid = registry.fallback_order[0]
 
-            def fn_factory(client: Any, mdl: str) -> Callable[[], str]:
-                return lambda: generate_description(
-                    client,
-                    mdl,
-                    compressed,
-                    log_callback=log_callback,
-                    user_prompt=user_prompt,
+        if resolved_pid is None:
+            from lightroom_tagger.core.exceptions import ModelUnavailableError
+            raise ModelUnavailableError(
+                "No provider configured for scoring — set defaults.description in providers.json",
+                provider=None,
+                model=None,
+            )
+
+        dispatcher = FallbackDispatcher(registry)
+        if use_model is None:
+            models = registry.list_models(resolved_pid)
+            if not models:
+                from lightroom_tagger.core.exceptions import ModelUnavailableError
+                raise ModelUnavailableError(
+                    f"No models available for provider '{resolved_pid}' — check provider config",
+                    provider=resolved_pid,
+                    model=None,
                 )
+            use_model = models[0]["id"]
 
-            raw, actual_provider, actual_model = dispatcher.call_with_fallback(
-                operation="score",
-                fn_factory=fn_factory,
-                provider_id=provider_id,
-                model=use_model,
+        def fn_factory(client: Any, mdl: str) -> Callable[[], str]:
+            return lambda: generate_description(
+                client,
+                mdl,
+                compressed,
                 log_callback=log_callback,
+                user_prompt=user_prompt,
             )
-            client = registry.get_client(actual_provider)
-            llm_fixer = make_score_json_llm_fixer(
-                functools.partial(complete_chat_text, client, actual_model),
-            )
-            model_label = f"{actual_provider}:{actual_model}"
-        else:
-            raw = run_local_agent(compressed, user_prompt=user_prompt)
-            llm_fixer = make_score_json_llm_fixer(_ollama_complete_text_for_repair)
-            model_label = f"ollama:{get_description_model()}"
+
+        raw, actual_provider, actual_model = dispatcher.call_with_fallback(
+            operation="score",
+            fn_factory=fn_factory,
+            provider_id=resolved_pid,
+            model=use_model,
+            log_callback=log_callback,
+        )
+        client = registry.get_client(actual_provider)
+        llm_fixer = make_score_json_llm_fixer(
+            functools.partial(complete_chat_text, client, actual_model),
+        )
+        model_label = f"{actual_provider}:{actual_model}"
 
         parsed, repaired = parse_score_response_with_retry(
             raw,

@@ -35,7 +35,6 @@ from .vision_compare import (
 from ._legacy import (
     analyze_image,
     run_external_agent,
-    run_local_agent,
 )
 
 __all__ = (
@@ -66,6 +65,5 @@ __all__ = (
     "parse_description_response",
     "parse_vision_response",
     "run_external_agent",
-    "run_local_agent",
     "vision_score",
 )

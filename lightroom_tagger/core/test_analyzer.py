@@ -379,26 +379,6 @@ def test_parse_description_response_handles_garbage():
     assert result['best_perspective'] == ''
 
 
-def test_run_local_agent_calls_ollama():
-    from unittest.mock import MagicMock
-    mock_response = MagicMock()
-    mock_response.message.content = json.dumps({
-        'summary': 'test',
-        'composition': {},
-        'perspectives': {},
-        'technical': {},
-        'subjects': [],
-        'best_perspective': 'street',
-    })
-    with patch('lightroom_tagger.core.analyzer._legacy.ollama') as mock_ollama, \
-         patch('lightroom_tagger.core.analyzer._legacy.get_description_model', return_value='desc-model-test'):
-        mock_ollama.chat.return_value = mock_response
-        from lightroom_tagger.core.analyzer import run_local_agent
-        run_local_agent('/fake/image.jpg')
-    mock_ollama.chat.assert_called_once()
-    call_kwargs = mock_ollama.chat.call_args
-    assert call_kwargs[1]['model'] == 'desc-model-test'
-
 
 def test_get_description_model_prefers_env_override():
     from lightroom_tagger.core.analyzer import get_description_model
