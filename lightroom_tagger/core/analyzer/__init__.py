@@ -2,6 +2,14 @@
 # Import order matches ``__all__`` (explicit Phase-14-style barrel contract).
 # ruff: noqa: I001
 
+from .description import (
+    DESCRIPTION_PROMPT,
+    _DESCRIPTION_FALLBACK,
+    _describe_image_via_provider,
+    build_description_prompt,
+    describe_image,
+    parse_description_response,
+)
 from .image_inspect import compute_phash, extract_exif
 from .image_prep import (
     RAW_EXTENSIONS,
@@ -14,21 +22,15 @@ from .image_prep import (
 )
 from ._legacy import (
     ContextLengthError,
-    DESCRIPTION_PROMPT,
     MAX_TOKENS_ESCALATION,
-    _DESCRIPTION_FALLBACK,
     _broken_provider_models,
     _compare_via_provider,
-    _describe_image_via_provider,
     _model_min_tokens,
     analyze_image,
-    build_description_prompt,
     compare_with_vision,
-    describe_image,
     get_description_model,
     get_vision_model,
     load_config,
-    parse_description_response,
     parse_vision_response,
     run_external_agent,
     run_local_agent,

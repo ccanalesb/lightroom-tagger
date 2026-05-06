@@ -39,18 +39,23 @@ def test_analyze_image_returns_all_signals():
     assert result['structured_description'] == mock_desc
 
 
-def test_describe_image_uses_configured_agent():
-    """Should use local or external agent based on config."""
-    with patch('lightroom_tagger.core.analyzer._legacy.run_local_agent', return_value='local desc') as local_mock, \
-         patch('lightroom_tagger.core.analyzer._legacy.run_external_agent', return_value='external desc') as ext_mock:
+def test_describe_image_routes_through_provider_when_explicit_provider():
+    with patch(
+        'lightroom_tagger.core.analyzer.description._describe_image_via_provider',
+        return_value={'summary': 'from provider'},
+    ) as pipe:
+        describe_image('/fake/path.jpg', agent_type='local', provider_id='test-provider')
+    pipe.assert_called_once()
+    assert pipe.call_args[0][1] == 'test-provider'
 
-        # Test local agent
-        describe_image('/fake/path.jpg', agent_type='local')
-        local_mock.assert_called_once()
 
-        # Test external agent
-        describe_image('/fake/path.jpg', agent_type='external')
-        ext_mock.assert_called_once()
+def test_describe_image_external_skips_provider_pipeline():
+    with patch(
+        'lightroom_tagger.core.analyzer.description._describe_image_via_provider',
+    ) as pipe:
+        out = describe_image('/fake/path.jpg', agent_type='external')
+    pipe.assert_not_called()
+    assert out.get('summary') == ''
 
 
 def test_compare_with_vision_returns_result():
