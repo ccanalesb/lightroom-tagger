@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Backend Health & E2E Coverage
-status: Milestone complete
-last_updated: "2026-05-06T18:12:02.547Z"
+status: Ready to execute
+last_updated: "2026-05-06T18:33:56.453Z"
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 16
+  total_plans: 23
   completed_plans: 16
-  percent: 100
+  percent: 70
 ---
 
 # Planning state
