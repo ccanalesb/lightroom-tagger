@@ -1,9 +1,7 @@
-import os
 from collections.abc import Callable
 
 from lightroom_tagger.core.config import get_vision_model
 from lightroom_tagger.core.database import (
-    _deserialize_row,
     get_vision_comparison,
     store_match,
     store_vision_comparison,
@@ -15,72 +13,6 @@ from lightroom_tagger.core.vision_cache import (
     get_or_create_cached_image,
 )
 from lightroom_tagger.core.vision_client import compare_descriptions_batch
-
-
-def query_by_exif(db, insta_exif: dict, date_window_days: int = 7) -> list[dict]:
-    """Query catalog by EXIF (camera, lens, date within window)."""
-    camera = insta_exif.get('camera')
-    lens = insta_exif.get('lens')
-
-    if not camera and not lens:
-        return []
-
-    if camera and lens:
-        sql = (
-            "SELECT * FROM images WHERE "
-            "json_extract(exif, '$.camera') = ? AND json_extract(exif, '$.lens') = ?"
-        )
-        params = (camera, lens)
-    elif camera:
-        sql = "SELECT * FROM images WHERE json_extract(exif, '$.camera') = ?"
-        params = (camera,)
-    else:
-        sql = "SELECT * FROM images WHERE json_extract(exif, '$.lens') = ?"
-        params = (lens,)
-
-    rows = db.execute(sql, params).fetchall()
-    return [_deserialize_row(r) for r in rows]
-
-def score_candidates(insta_image: dict, candidates: list, phash_weight: float = 0.5, desc_weight: float = 0.5) -> list[dict]:
-    """Score candidates by phash distance + description similarity."""
-    from lightroom_tagger.core.phash import hamming_distance
-
-    results = []
-
-    for candidate in candidates:
-        phash_dist = hamming_distance(insta_image.get('image_hash', ''), candidate.get('image_hash', ''))
-        phash_score = max(0, 1 - (phash_dist / 16)) # Normalize to 0-1
-
-        desc_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
-
-        total_score_val = (phash_weight * phash_score) + (desc_weight * desc_sim)
-
-        results.append({
-            'catalog_key': candidate.get('key'),
-            'insta_key': insta_image.get('key'),
-            'phash_distance': phash_dist,
-            'phash_score': phash_score,
-            'desc_similarity': desc_sim,
-            'total_score': total_score_val
-        })
-
-    return sorted(results, key=lambda x: x['total_score'], reverse=True)
-
-def text_similarity(text1: str, text2: str) -> float:
-    """Simple text similarity using common words."""
-    if not text1 or not text2:
-        return 0.0
-
-    words1 = set(text1.lower().split())
-    words2 = set(text2.lower().split())
-
-    if not words1 or not words2:
-        return 0.0
-
-    intersection = len(words1 & words2)
-    union = len(words1 | words2)
-
-    return intersection / union if union > 0 else 0.0
 
 
 BATCH_MAX_TOKENS_ESCALATION = [4096, 32768, 65536]
@@ -708,47 +640,3 @@ def match_batch(db, insta_images: list, threshold: float = 0.7,
         'total_matches': total_matches,
         'total_candidates': total_candidates
     }
-
-
-def find_candidates_by_date(db, insta_image: dict, days_before: int = 90) -> list:
-    """Find catalog candidates within date window before Instagram posting."""
-    from datetime import datetime, timedelta
-    from lightroom_tagger.core.analyzer import VIDEO_EXTENSIONS
-
-    date_folder = insta_image.get('date_folder', '')
-    if len(date_folder) != 6:
-        return []
-
-    post_year = int(date_folder[:4])
-    post_month = int(date_folder[4:6])
-    post_date = datetime(post_year, post_month, 15)
-    window_start = post_date - timedelta(days=days_before)
-
-    candidates = []
-    sql = (
-        "SELECT i.*, COALESCE(d.summary, '') AS ai_summary "
-        "FROM images i "
-        "LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog' "
-        "WHERE i.instagram_posted = 0"
-    )
-    for row in db.execute(sql).fetchall():
-        row_dict = dict(row)
-        img = _deserialize_row(row_dict)
-        img["ai_summary"] = str(row_dict.get("ai_summary") or "")
-        filepath = img.get('filepath', '')
-        if filepath:
-            ext = os.path.splitext(filepath)[1].lower()
-            if ext in VIDEO_EXTENSIONS:
-                continue
-        date_taken = img.get('date_taken', '')
-        if not date_taken:
-            continue
-        try:
-            img_date = datetime.fromisoformat(date_taken.replace('Z', '+00:00'))
-            if window_start <= img_date <= post_date:
-                candidates.append(img)
-        except Exception:
-            continue
-
-    candidates.sort(key=lambda c: c.get('date_taken', ''), reverse=True)
-    return candidates

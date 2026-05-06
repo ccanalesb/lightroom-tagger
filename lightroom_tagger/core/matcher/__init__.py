@@ -1,29 +1,33 @@
 """Instagram ↔ catalog matching: candidates, scoring, vision batch path, orchestration."""
 
-from ._legacy import (
-    BATCH_MAX_TOKENS_ESCALATION,
-    Callable,
-    InstagramCache,
-    ProviderRegistry,
-    _call_batch_chunk,
-    _compute_desc_scores_for_candidates,
+import os
+from collections.abc import Callable
+
+from lightroom_tagger.core.config import get_vision_model
+from lightroom_tagger.core.database import (
     _deserialize_row,
-    compare_descriptions_batch,
-    find_candidates_by_date,
-    get_cached_phash,
-    get_or_create_cached_image,
     get_vision_comparison,
-    get_vision_model,
-    match_batch,
-    match_image,
-    os,
-    query_by_exif,
-    score_candidates,
-    score_candidates_with_vision,
     store_match,
     store_vision_comparison,
-    text_similarity,
 )
+from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.vision_cache import (
+    InstagramCache,
+    get_cached_phash,
+    get_or_create_cached_image,
+)
+from lightroom_tagger.core.vision_client import compare_descriptions_batch
+
+from .candidates import find_candidates_by_date, query_by_exif
+from ._legacy import (
+    BATCH_MAX_TOKENS_ESCALATION,
+    _call_batch_chunk,
+    _compute_desc_scores_for_candidates,
+    match_batch,
+    match_image,
+    score_candidates_with_vision,
+)
+from .text_scores import score_candidates, text_similarity
 
 __all__ = [
     "BATCH_MAX_TOKENS_ESCALATION",
