@@ -96,6 +96,80 @@ def test_batch_score_checkpoint_skips_already_processed_triplets(
 
 
 @patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze.fingerprint_batch_score', return_value='fp-score-stable')
+@patch('jobs.handlers.analyze._score_single_image')
+@patch('jobs.handlers.analyze.get_job')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
+def test_batch_score_fingerprint_mismatch_resets_and_reprocesses(
+    _mock_exists,
+    mock_getenv,
+    mock_config,
+    mock_init_db,
+    mock_get_job,
+    mock_score,
+    _mock_fp,
+    mock_add_log,
+):
+    from jobs.handlers import handle_batch_score
+
+    metadata = {
+        'image_type': 'catalog',
+        'date_filter': 'all',
+        'force': False,
+        'max_workers': 1,
+        'perspective_slugs': ['p1'],
+    }
+
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_db = MagicMock()
+
+    def _exec(sql, params=()):
+        m = MagicMock()
+        q = ' '.join(sql.split())
+        if 'FROM images' in q and 'image_scores' not in q:
+            m.fetchall.return_value = [{'key': 'img1'}]
+        elif 'image_scores' in q:
+            m.fetchall.return_value = []
+        else:
+            m.fetchall.return_value = []
+        return m
+
+    mock_db.execute.side_effect = _exec
+    mock_init_db.return_value = mock_db
+
+    mock_get_job.return_value = {
+        'status': 'running',
+        'metadata': {
+            'checkpoint': {
+                'checkpoint_version': 1,
+                'job_type': 'batch_score',
+                'fingerprint': 'fp-score-stale-old',
+                'processed_triplets': ['img1|catalog|p1'],
+                'total_at_start': 1,
+            },
+        },
+    }
+    mock_score.return_value = ('scored', True, None)
+
+    runner = _make_runner()
+    handle_batch_score(runner, 'job-fpm-score', metadata)
+
+    log_messages = [c.args[3] for c in mock_add_log.call_args_list if len(c.args) >= 4]
+    assert any(
+        'checkpoint mismatch: batch_score fingerprint changed, starting fresh' in m
+        for m in log_messages
+    ), log_messages
+    mock_score.assert_called_once()
+    runner.complete_job.assert_called_once()
+    res = runner.complete_job.call_args[0][1]
+    assert res['scored'] == 1
+    assert res['total'] == 1
+
+
+@patch('jobs.handlers.analyze.add_job_log')
 @patch('jobs.handlers.analyze._score_single_image')
 @patch('jobs.handlers.analyze.init_database')
 @patch('jobs.handlers.analyze.load_config')
