@@ -1,10 +1,11 @@
 ---
 phase: 15
 slug: service-modules-boundary-policy
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-05-06
+validated: 2026-05-06
 ---
 
 # Phase 15 — Validation Strategy
@@ -100,10 +101,37 @@ Until those tasks land, omit `bash scripts/check_core_file_sizes.sh` and `pytest
 
 ## Validation sign-off
 
-- [ ] All tasks have an automated command in the map above (or explicit manual-only row)
-- [ ] Sampling continuity: architecture/size checks run only after **15-07-T03/T04**
-- [ ] No watch-mode flags
-- [ ] Feedback latency ~30s where practical
-- [ ] `nyquist_compliant: true` and `wave_0_complete: true` (or agreed definitions) set in frontmatter when phase is closed
+- [x] All tasks have an automated command in the map above (or explicit manual-only row)
+- [x] Sampling continuity: architecture/size checks run only after **15-07-T03/T04**
+- [x] No watch-mode flags
+- [x] Feedback latency ~30s where practical
+- [x] `nyquist_compliant: true` and `wave_0_complete: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** 2026-05-06 — validated by gsd-validate-phase audit
+
+---
+
+## Validation Audit 2026-05-06
+
+| Metric | Count |
+|--------|-------|
+| Tasks audited | 25 |
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+| Status | NYQUIST-COMPLIANT ✓ |
+
+**Evidence collected:**
+
+| Check | Result |
+|-------|--------|
+| `pytest` 25 core test files (test_provider_errors, test_database_stacks, test_fallback, test_retry, test_vision_client, test_matcher, test_analyzer, test_description_service, test_scoring_service, test_identity_service, test_architecture) | 133 passed ✓ |
+| All import-level checks (exceptions, config, analyzer, matcher, identity_service) | All OK ✓ |
+| `pytest lightroom_tagger/core/ apps/visualizer/backend/tests/ -x -q` | 611 passed ✓ |
+| `pytest lightroom_tagger/core/test_architecture.py -x -q` | 3 passed ✓ |
+| `bash scripts/check_core_file_sizes.sh` | exits 0 ✓ |
+| `make check-core-sizes` | exits 0 ✓ |
+| `docs/architecture.md` exists with required headings + flowchart + 400-line rule + sibling api rule | All present ✓ |
+| `pyproject.toml` boundary policy comment above `[tool.ruff]` | Found ✓ |
+| Legacy symbol scan (`analyze_image`, `run_local_agent`, `run_vision_ollama`) | Zero hits ✓ |
+| `15-03-SUMMARY.md` checklist file | Exists ✓ |
