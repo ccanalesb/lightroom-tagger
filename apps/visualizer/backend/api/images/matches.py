@@ -23,7 +23,7 @@ from .instagram import _deserialize_description, _enrich_instagram_media
 matches_bp = Blueprint("images_matches", __name__)
 
 
-@matches_bp.route("/matches", methods=["GET"])
+@matches_bp.route("", methods=["GET"])
 @with_db
 def list_matches(db):
     """List matches grouped by Instagram image.
@@ -270,7 +270,7 @@ def list_matches(db):
         return error_server_error(str(e))
 
 
-@matches_bp.route("/matches/<path:catalog_key>/<path:insta_key>/validate", methods=["PATCH"])
+@matches_bp.route("/<path:catalog_key>/<path:insta_key>/validate", methods=["PATCH"])
 @with_db
 def toggle_match_validation(db, catalog_key, insta_key):
     """Toggle human validation on a match."""
@@ -292,7 +292,7 @@ def toggle_match_validation(db, catalog_key, insta_key):
         return error_server_error(str(e))
 
 
-@matches_bp.route("/matches/<path:catalog_key>/<path:insta_key>/reject", methods=["PATCH"])
+@matches_bp.route("/<path:catalog_key>/<path:insta_key>/reject", methods=["PATCH"])
 @with_db
 def reject_match_endpoint(db, catalog_key, insta_key):
     """Reject a match: delete it and blocklist the pair."""

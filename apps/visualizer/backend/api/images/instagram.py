@@ -133,7 +133,7 @@ def _build_instagram_detail(db, image_key):
     return out, False
 
 
-@instagram_bp.route("/instagram", methods=["GET"])
+@instagram_bp.route("", methods=["GET"])
 @with_db
 def list_instagram_images(db):
     """List Instagram images with filtering and pagination."""
@@ -212,7 +212,7 @@ def list_instagram_images(db):
         return error_server_error(str(e))
 
 
-@instagram_bp.route("/instagram/months", methods=["GET"])
+@instagram_bp.route("/months", methods=["GET"])
 @with_db
 def get_instagram_months(db):
     """Get unique months available in Instagram images."""
@@ -228,7 +228,7 @@ def get_instagram_months(db):
         return error_server_error(str(e))
 
 
-@instagram_bp.route("/instagram/<path:image_key>/thumbnail", methods=["GET"])
+@instagram_bp.route("/<path:image_key>/thumbnail", methods=["GET"])
 @with_db
 def get_instagram_thumbnail(db, image_key):
     """Get thumbnail for Instagram image."""
@@ -256,7 +256,6 @@ def get_instagram_thumbnail(db, image_key):
         return error_server_error(str(e))
 
 
-@instagram_bp.route("/dump-media", methods=["GET"])
 @with_db
 def list_dump_media(db):
     """List dump media with optional filtering."""
@@ -296,9 +295,27 @@ def list_dump_media(db):
         return error_server_error(str(e))
 
 
+@instagram_bp.route("/<path:image_key>", methods=["GET"])
+@with_db
+def get_instagram_image_detail(db, image_key):
+    """Single instagram image detail for the consolidated image-view modal."""
+    score_perspective = (request.args.get("score_perspective") or "").strip()
+    if score_perspective:
+        return error_bad_request("score_perspective is only valid for catalog images")
+    try:
+        payload, not_found = _build_instagram_detail(db, image_key)
+        if not_found:
+            return error_not_found("image")
+        return jsonify(payload)
+    except Exception as e:
+        return error_server_error(str(e))
+
+
 __all__ = (
     "instagram_bp",
     "_build_instagram_detail",
     "_deserialize_description",
     "_enrich_instagram_media",
+    "get_instagram_image_detail",
+    "list_dump_media",
 )

@@ -337,7 +337,7 @@ def _build_catalog_detail(db, image_key, score_perspective):
     return out, False
 
 
-@catalog_bp.route("/catalog/<path:image_key>/thumbnail", methods=["GET"])
+@catalog_bp.route("/<path:image_key>/thumbnail", methods=["GET"])
 @with_db
 def get_catalog_thumbnail(db, image_key):
     """Get thumbnail for catalog image, creating cache if needed."""
@@ -389,7 +389,7 @@ def get_catalog_thumbnail(db, image_key):
         return error_server_error(str(e))
 
 
-@catalog_bp.route("/catalog/months", methods=["GET"])
+@catalog_bp.route("/months", methods=["GET"])
 @with_db
 def get_catalog_months(db):
     """Get available year-months from catalog images based on date_taken."""
@@ -406,7 +406,8 @@ def get_catalog_months(db):
         return error_server_error(str(e))
 
 
-@catalog_bp.route("/catalog", methods=["GET"])
+@catalog_bp.route("", methods=["GET"])
+@catalog_bp.route("/", methods=["GET"])
 @with_db
 def list_catalog_images(db):
     """List catalog images with optional filtering and SQL-level pagination."""
@@ -518,7 +519,7 @@ def list_catalog_images(db):
         return error_server_error(str(e))
 
 
-@catalog_bp.route("/catalog/<path:image_key>/similar", methods=["GET"])
+@catalog_bp.route("/<path:image_key>/similar", methods=["GET"])
 @with_db
 def get_catalog_image_similar(db, image_key: str):
     """CLIP-only visual neighbors; same catalog row shape + ``similarity`` / ``why_matched``."""
@@ -578,7 +579,6 @@ def get_catalog_image_similar(db, image_key: str):
         return error_server_error(str(e))
 
 
-@catalog_bp.route("/catalog-similarity-groups", methods=["GET"])
 @with_db
 def list_catalog_similarity_groups(db):
     """Reviewable catalog visual similarity groups materialized by batch jobs."""
@@ -650,26 +650,16 @@ def list_catalog_similarity_groups(db):
         return error_server_error(str(e))
 
 
-@catalog_bp.route("/<string:image_type>/<path:image_key>", methods=["GET"])
+@catalog_bp.route("/<path:image_key>", methods=["GET"])
 @with_db
-def get_image_detail(db, image_type, image_key):
-    """Single-image detail payload — used by the consolidated image-view modal."""
-    if image_type not in _DETAIL_IMAGE_TYPES:
-        return error_bad_request(f"invalid image_type; expected one of {_DETAIL_IMAGE_TYPES}")
-
+def get_catalog_image_detail(db, image_key):
+    """Single catalog image detail for the consolidated image-view modal."""
     score_perspective = (request.args.get("score_perspective") or "").strip()
     if score_perspective and not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(score_perspective):
         return error_bad_request("invalid score_perspective slug")
-    if score_perspective and image_type != "catalog":
-        return error_bad_request("score_perspective is only valid for catalog images")
 
     try:
-        if image_type == "catalog":
-            payload, not_found = _build_catalog_detail(db, image_key, score_perspective or None)
-        else:
-            from .instagram import _build_instagram_detail
-
-            payload, not_found = _build_instagram_detail(db, image_key)
+        payload, not_found = _build_catalog_detail(db, image_key, score_perspective or None)
         if not_found:
             return error_not_found("image")
         return jsonify(payload)
@@ -679,10 +669,12 @@ def get_image_detail(db, image_type, image_key):
 
 __all__ = (
     "catalog_bp",
+    "_DETAIL_IMAGE_TYPES",
     "_CATALOG_SCORE_PERSPECTIVE_SLUG_RE",
     "_clip_similarity_why_matched_line",
     "_effective_catalog_nl_kwargs",
     "_parse_clip_similar_catalog_params",
     "_query_catalog_rows_for_stack_member_keys",
     "_rows_to_catalog_api_images",
+    "list_catalog_similarity_groups",
 )

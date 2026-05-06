@@ -20,7 +20,7 @@ from .catalog import _query_catalog_rows_for_stack_member_keys, _rows_to_catalog
 stacks_bp = Blueprint("images_stacks", __name__)
 
 
-@stacks_bp.route("/stacks/<int:stack_id>/members", methods=["GET"])
+@stacks_bp.route("/<int:stack_id>/members", methods=["GET"])
 @with_db
 def get_stack_members(db, stack_id: int):
     """Members of a burst stack as catalog-shaped rows (representative + collapsed rules)."""
@@ -55,7 +55,7 @@ def get_stack_members(db, stack_id: int):
         return error_server_error(str(e))
 
 
-@stacks_bp.route("/stacks/<int:stack_id>/split-member", methods=["POST"])
+@stacks_bp.route("/<int:stack_id>/split-member", methods=["POST"])
 @with_db
 def post_stack_split_member(db, stack_id: int):
     """Remove a member from a stack (solo image) or dissolve a two-member stack."""
@@ -81,7 +81,7 @@ def post_stack_split_member(db, stack_id: int):
         return error_server_error(str(e))
 
 
-@stacks_bp.route("/stacks/<int:target_stack_id>/merge", methods=["POST"])
+@stacks_bp.route("/<int:target_stack_id>/merge", methods=["POST"])
 @with_db
 def post_stack_merge(db, target_stack_id: int):
     """Merge *source_stack_id* into *target_stack_id* (all members moved, source row deleted)."""
@@ -111,7 +111,7 @@ def post_stack_merge(db, target_stack_id: int):
         return error_server_error(str(e))
 
 
-@stacks_bp.route("/stacks/<int:stack_id>/representative", methods=["POST"])
+@stacks_bp.route("/<int:stack_id>/representative", methods=["POST"])
 @with_db
 def post_stack_representative(db, stack_id: int):
     """Change which catalog key is the stack representative (must be a current member)."""
