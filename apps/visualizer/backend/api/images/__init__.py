@@ -1,8 +1,18 @@
-"""Images REST API — umbrella blueprint and package exports."""
+"""Images REST API — umbrella blueprint composes family blueprints."""
+
+from flask import Blueprint
 
 from lightroom_tagger.core import nl_catalog_search
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 
-from ._legacy import bp
+bp = Blueprint("images", __name__)
 
-__all__ = ("bp", "nl_catalog_search", "ProviderRegistry")
+from ._legacy import legacy_bp
+from .catalog import catalog_bp
+
+# Register legacy (static paths like /instagram/months) before catalog catch-all
+# ``/<image_type>/<image_key>``.
+bp.register_blueprint(legacy_bp)
+bp.register_blueprint(catalog_bp)
+
+__all__ = ("bp", "catalog_bp", "nl_catalog_search", "ProviderRegistry")
