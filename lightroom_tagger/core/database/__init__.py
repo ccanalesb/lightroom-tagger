@@ -140,17 +140,20 @@ from .embeddings import (
     _sort_catalog_key_rows_newest_first,
 )
 
+from .similarity import (
+    clear_catalog_similarity_results,
+    insert_catalog_similarity_group,
+    list_clip_embedded_catalog_keys_newest_first,
+)
+
 from ._legacy import (
     VISION_CACHE_OVERSIZED_SENTINEL,
-    clear_catalog_similarity_results,
     get_cache_stats,
     get_vision_cached_image,
     get_vision_comparison,
     init_vision_cache_table,
     init_vision_comparisons_table,
-    insert_catalog_similarity_group,
     is_vision_cache_valid,
-    list_clip_embedded_catalog_keys_newest_first,
     store_vision_cached_image,
     store_vision_comparison,
 )
