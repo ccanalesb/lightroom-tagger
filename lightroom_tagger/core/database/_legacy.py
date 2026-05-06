@@ -337,7 +337,7 @@ def seed_perspectives_from_prompts_dir(
     """Insert default perspective rows from ``prompts/perspectives/*.md`` when the table is empty.
 
     Default *prompts_dir* is the repo's ``prompts/perspectives`` directory, resolved from this
-    module's path: ``Path(__file__).resolve().parents[2] / "prompts" / "perspectives"``
+    module's path: ``Path(__file__).resolve().parents[3] / "prompts" / "perspectives"``
     (repo root → ``prompts`` → ``perspectives``). That matches editable installs where the
     package lives under the project root; callers may pass an absolute path when bundling.
 
@@ -348,7 +348,7 @@ def seed_perspectives_from_prompts_dir(
     """
     if prompts_dir is None:
         prompts_dir = str(
-            Path(__file__).resolve().parents[2] / "prompts" / "perspectives"
+            Path(__file__).resolve().parents[3] / "prompts" / "perspectives"
         )
 
     row = conn.execute("SELECT COUNT(*) AS cnt FROM perspectives").fetchone()
