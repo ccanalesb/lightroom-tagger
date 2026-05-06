@@ -109,6 +109,19 @@ from .descriptions import (
     _visual_attr_json,
 )
 
+from .scores import (
+    delete_perspective,
+    get_current_scores_for_image,
+    get_perspective_by_slug,
+    insert_image_score,
+    insert_perspective,
+    list_all_scores_for_image,
+    list_perspectives,
+    list_score_history_for_perspective,
+    supersede_previous_current_scores,
+    update_perspective,
+)
+
 from ._legacy import (
     VISION_CACHE_OVERSIZED_SENTINEL,
     _embeddable_catalog_description_sql,
@@ -119,19 +132,13 @@ from ._legacy import (
     _sort_catalog_key_rows_newest_first,
     clear_catalog_similarity_results,
     count_catalog_images_missing_text_embedding,
-    delete_perspective,
     get_cache_stats,
-    get_current_scores_for_image,
-    get_perspective_by_slug,
     get_vision_cached_image,
     get_vision_comparison,
     init_vision_cache_table,
     init_vision_comparisons_table,
     insert_catalog_similarity_group,
-    insert_image_score,
-    insert_perspective,
     is_vision_cache_valid,
-    list_all_scores_for_image,
     list_catalog_keys_for_clip_embed_force,
     list_catalog_keys_for_text_embed_force,
     list_catalog_keys_needing_clip_embedding,
@@ -139,12 +146,8 @@ from ._legacy import (
     list_clip_embedded_catalog_keys_newest_first,
     list_instagram_dump_keys_for_clip_embed_force,
     list_instagram_dump_keys_needing_clip_embedding,
-    list_perspectives,
-    list_score_history_for_perspective,
     store_vision_cached_image,
     store_vision_comparison,
-    supersede_previous_current_scores,
-    update_perspective,
     upsert_image_clip_embedding,
     upsert_image_text_embedding,
 )
