@@ -1,5 +1,7 @@
 from unittest.mock import patch, MagicMock
 
+from jobs.checkpoint import fingerprint_batch_describe
+
 
 def _make_runner():
     """MagicMock runner with non-truthy is_cancelled (bare MagicMock is truthy when called)."""
@@ -297,3 +299,64 @@ def test_batch_describe_backfill_logs_and_completes_when_no_catalog_matches(
     result = runner.complete_job.call_args[0][1]
     assert result['described'] == 0
     assert result['total'] == 0
+
+
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('lightroom_tagger.core.description_service.describe_matched_image')
+@patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
+@patch('jobs.handlers.analyze.get_job')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
+def test_batch_describe_checkpoint_skips_already_processed_pairs(
+    _mock_exists,
+    mock_getenv,
+    mock_config,
+    mock_init_db,
+    mock_get_job,
+    mock_get_undescribed,
+    mock_describe,
+    _mock_add_log,
+):
+    from jobs.checkpoint import fingerprint_batch_describe
+    from jobs.handlers import handle_batch_describe
+
+    metadata = {
+        'image_type': 'catalog',
+        'date_filter': 'all',
+        'force': False,
+        'max_workers': 1,
+    }
+    imgs = [{'key': 'img_a'}, {'key': 'img_b'}]
+    ordered_pairs = [('img_a', 'catalog'), ('img_b', 'catalog')]
+    fp = fingerprint_batch_describe(metadata, ordered_pairs)
+
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_db = MagicMock()
+    mock_db.execute.return_value.fetchall.return_value = []
+    mock_init_db.return_value = mock_db
+    mock_get_undescribed.return_value = imgs
+    mock_describe.return_value = True
+    mock_get_job.return_value = {
+        'status': 'running',
+        'metadata': {
+            'checkpoint': {
+                'checkpoint_version': 1,
+                'job_type': 'batch_describe',
+                'fingerprint': fp,
+                'processed_pairs': ['img_a|catalog'],
+                'total_at_start': 2,
+            },
+        },
+    }
+
+    runner = _make_runner()
+    handle_batch_describe(runner, 'job-resume', metadata)
+
+    mock_describe.assert_called_once()
+    assert mock_describe.call_args[0][1] == 'img_b'
+    runner.complete_job.assert_called_once()
+    result = runner.complete_job.call_args[0][1]
+    assert result['described'] == 1
+    assert result['total'] == 2
