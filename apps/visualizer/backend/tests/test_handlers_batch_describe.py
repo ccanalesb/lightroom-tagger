@@ -419,6 +419,10 @@ def test_batch_describe_fingerprint_mismatch_resets_and_reprocesses(
     ), log_messages
     mock_describe.assert_called_once()
     assert mock_describe.call_args[0][1] == 'img_m'
+    runner.complete_job.assert_called_once()
+    result = runner.complete_job.call_args[0][1]
+    assert result['described'] == 1
+    assert result['total'] == 1
 
 
 @patch('jobs.handlers.analyze.add_job_log')
