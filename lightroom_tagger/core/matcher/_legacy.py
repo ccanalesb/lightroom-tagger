@@ -125,7 +125,9 @@ def _compute_desc_scores_for_candidates(
         if not text_candidates:
             continue
         try:
-            raw_map = compare_descriptions_batch(
+            from lightroom_tagger.core import matcher as _matcher
+
+            raw_map = _matcher.compare_descriptions_batch(
                 client,
                 requested_model,
                 reference_text,
@@ -216,6 +218,8 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     """
     import os as _os
 
+    from lightroom_tagger.core import matcher as _matcher
+
     from lightroom_tagger.core.analyzer import compare_with_vision, vision_score
     from lightroom_tagger.core.phash import hamming_distance
     from lightroom_tagger.core.exceptions import InvalidRequestError, PayloadTooLargeError, RateLimitError
@@ -228,7 +232,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     rate_limited_count = 0
     insta_filename = _os.path.basename(insta_image.get('local_path', 'unknown'))
 
-    desc_scores_by_idx = _compute_desc_scores_for_candidates(
+    desc_scores_by_idx = _matcher._compute_desc_scores_for_candidates(
         insta_image,
         candidates,
         batch_size,
@@ -240,7 +244,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     )
 
     # Compress Instagram image ONCE before candidate loop (vision stage only)
-    insta_cache = InstagramCache(db)
+    insta_cache = _matcher.InstagramCache(db)
     insta_path = insta_image.get('local_path')
     compressed_insta = None
     if vision_weight > 0 and insta_path:
@@ -262,10 +266,10 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
     if vision_weight == 0:
         insta_key = insta_image.get('key')
-        model_label = f"{provider_id}:{model}" if provider_id and model else get_vision_model()
+        model_label = f"{provider_id}:{model}" if provider_id and model else _matcher.get_vision_model()
         for idx, candidate in enumerate(candidates):
             catalog_key = candidate.get('key')
-            cached_phash = get_cached_phash(db, catalog_key)
+            cached_phash = _matcher.get_cached_phash(db, catalog_key)
             if cached_phash is not None:
                 phash_dist = hamming_distance(insta_image.get('image_hash', ''), cached_phash)
                 cache_hits += 1
@@ -274,7 +278,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 cache_misses += 1
             phash_score_val = max(0, 1 - (phash_dist / 16))
             desc_sim_01 = desc_scores_by_idx.get(idx, 0.0) if desc_weight > 0 else 0.0
-            capt_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
+            capt_sim = _matcher.text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
             desc_sim_display = desc_sim_01 if desc_weight > 0 else capt_sim
             vision_score_val = 0.0
             total_score_val = (
@@ -361,7 +365,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 continue
                 
             try:
-                cached_local_path = get_or_create_cached_image(db, candidate.get('key'), local_path)
+                cached_local_path = _matcher.get_or_create_cached_image(db, candidate.get('key'), local_path)
                 if cached_local_path is None:
                     skipped_oversized += 1
                     continue
@@ -383,7 +387,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         # Build idx->candidate lookup for immediate scoring after each chunk
         candidate_by_idx = {idx: candidate for idx, candidate in enumerate(candidates)}
         insta_key = insta_image.get('key')
-        model_label = f"{provider_id}:{model}" if provider_id and model else get_vision_model()
+        model_label = f"{provider_id}:{model}" if provider_id and model else _matcher.get_vision_model()
 
         def _score_and_store(chunk_results: dict[int, float]):
             """Score chunk results immediately: write to DB and append to results."""
@@ -396,7 +400,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 vision_score_val = vision_score(vision_confidence)
                 vision_result = 'SAME' if vision_confidence >= 80 else 'DIFFERENT' if vision_confidence <= 20 else 'UNCERTAIN'
 
-                cached_phash = get_cached_phash(db, catalog_key)
+                cached_phash = _matcher.get_cached_phash(db, catalog_key)
                 if cached_phash is not None:
                     phash_dist = hamming_distance(insta_image.get('image_hash', ''), cached_phash)
                     nonlocal cache_hits
@@ -408,7 +412,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
                 phash_score_val = max(0, 1 - (phash_dist / 16))
                 desc_sim_01 = desc_scores_by_idx.get(cid, 0.0) if desc_weight > 0 else 0.0
-                capt_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
+                capt_sim = _matcher.text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
                 desc_sim_display = desc_sim_01 if desc_weight > 0 else capt_sim
 
                 total_score_val = (
@@ -417,7 +421,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                     + (vision_weight * vision_score_val)
                 )
 
-                store_vision_comparison(db, catalog_key, insta_key, vision_result, vision_score_val, model_label)
+                _matcher.store_vision_comparison(db, catalog_key, insta_key, vision_result, vision_score_val, model_label)
 
                 results.append({
                     'catalog_key': catalog_key,
@@ -445,7 +449,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 registry = ProviderRegistry()
                 actual_provider_id = provider_id or registry.fallback_order[0]
                 client = registry.get_client(actual_provider_id)
-                requested_model = model or get_vision_model()
+                requested_model = model or _matcher.get_vision_model()
 
                 for chunk_start in range(0, len(batch_candidates), batch_size):
                     if should_cancel is not None and should_cancel():
@@ -457,7 +461,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                     if log_callback:
                         log_callback('debug', f'[{insta_filename}] Batch {chunk_num}/{num_chunks}: {current_chunk_size} candidates')
 
-                    chunk_results = _call_batch_chunk(
+                    chunk_results = _matcher._call_batch_chunk(
                         client, requested_model, compressed_insta, chunk,
                         log_callback, insta_filename, chunk_num, num_chunks,
                     )
@@ -506,7 +510,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             local_path = candidate.get('local_path')
 
             # Use cached pHash if available, otherwise compute or fallback
-            cached_phash = get_cached_phash(db, catalog_key)
+            cached_phash = _matcher.get_cached_phash(db, catalog_key)
             if cached_phash is not None:
                 phash_dist = hamming_distance(insta_image.get('image_hash', ''), cached_phash)
                 cache_hits += 1
@@ -517,21 +521,21 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             phash_score_val = max(0, 1 - (phash_dist / 16))
 
             desc_sim_01 = desc_scores_by_idx.get(idx0, 0.0) if desc_weight > 0 else 0.0
-            capt_sim = text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
+            capt_sim = _matcher.text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
             desc_sim_display = desc_sim_01 if desc_weight > 0 else capt_sim
 
             # Get or create cached compressed image for catalog
             cached_local_path = None
             if local_path:
                 try:
-                    cached_local_path = get_or_create_cached_image(db, catalog_key, local_path)
+                    cached_local_path = _matcher.get_or_create_cached_image(db, catalog_key, local_path)
                 except Exception:
                     if log_callback and idx <= 5:  # Log first few failures
                         log_callback('warning', f'Cache miss for {catalog_key}, will compress on-demand')
 
             # Check vision comparison cache (invalidate if model changed)
-            vision_cached = get_vision_comparison(db, catalog_key, insta_key)
-            base_vision_model = get_vision_model()
+            vision_cached = _matcher.get_vision_comparison(db, catalog_key, insta_key)
+            base_vision_model = _matcher.get_vision_model()
             # Requested label for cache lookup only; pipeline may pick a different default model.
             requested_model_label = (
                 f"{provider_id}:{model or base_vision_model}"
@@ -574,7 +578,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                         am = vision_data.get('_model')
                         model_label = f"{ap}:{am}" if am is not None else f"{ap}:"
 
-                    store_vision_comparison(
+                    _matcher.store_vision_comparison(
                         db, catalog_key, insta_key,
                         vision_result, vision_score_val,
                         model_label,
@@ -657,14 +661,16 @@ def match_image(db, insta_image: dict, threshold: float = 0.7,
                 provider_id: str | None = None,
                 model: str | None = None) -> list[dict]:
     """Match single Instagram image against catalog with vision comparison."""
+    from lightroom_tagger.core import matcher as _matcher
+
     insta_exif = insta_image.get('exif', {})
 
-    candidates = query_by_exif(db, insta_exif)
+    candidates = _matcher.query_by_exif(db, insta_exif)
 
     if not candidates:
         return []
 
-    scored = score_candidates_with_vision(
+    scored = _matcher.score_candidates_with_vision(
         db, insta_image, candidates,
         phash_weight, desc_weight, vision_weight,
         threshold=threshold,
@@ -675,7 +681,7 @@ def match_image(db, insta_image: dict, threshold: float = 0.7,
     # Get best match (highest score) if above threshold
     if scored and scored[0]['total_score'] >= threshold:
         match = scored[0] # Already sorted by score descending
-        store_match(db, match)
+        _matcher.store_match(db, match)
         return [match]
 
     return []
@@ -684,11 +690,13 @@ def match_batch(db, insta_images: list, threshold: float = 0.7,
                 phash_weight: float = 0.4, desc_weight: float = 0.3,
                 vision_weight: float = 0.3) -> dict:
     """Match multiple Instagram images against catalog."""
+    from lightroom_tagger.core import matcher as _matcher
+
     total_matches = 0
     total_candidates = 0
 
     for insta_image in insta_images:
-        matches = match_image(
+        matches = _matcher.match_image(
             db, insta_image, threshold,
             phash_weight, desc_weight, vision_weight
         )
