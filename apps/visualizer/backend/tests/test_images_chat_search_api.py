@@ -102,8 +102,8 @@ def test_chat_search_semantic_fallback(
             ),
         )
 
-    monkeypatch.setattr("api.images._legacy.embed_query_to_vec_blob", lambda _q: fixed_blob)
-    monkeypatch.setattr("api.images._legacy.run_semantic_hybrid_search", fake_hybrid)
+    monkeypatch.setattr("api.images.search.embed_query_to_vec_blob", lambda _q: fixed_blob)
+    monkeypatch.setattr("api.images.search.run_semantic_hybrid_search", fake_hybrid)
 
     r = client.post(
         "/api/images/chat-search", json={"message": "hills in spring"}
@@ -190,10 +190,10 @@ def test_chat_search_pin_active_semantic_passes_restrict_to_keys(
         "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
         lambda *a, **k: "{}",
     )
-    monkeypatch.setattr("api.images._legacy.embed_query_to_vec_blob", lambda _q: b"\xef" * (768 * 4))
-    monkeypatch.setattr("api.images._legacy.run_semantic_hybrid_search", capture_hybrid)
+    monkeypatch.setattr("api.images.search.embed_query_to_vec_blob", lambda _q: b"\xef" * (768 * 4))
+    monkeypatch.setattr("api.images.search.run_semantic_hybrid_search", capture_hybrid)
     monkeypatch.setattr(
-        "api.images._legacy.list_pin_similarity_candidate_keys",
+        "api.images.search.list_pin_similarity_candidate_keys",
         lambda _db, seed: [seed, "neighbor-key"],
     )
     r = client.post(
@@ -239,9 +239,9 @@ def test_chat_search_pin_inactive_no_clip_embedding_falls_back_semantic(
         "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
         lambda *a, **k: "{}",
     )
-    monkeypatch.setattr("api.images._legacy.embed_query_to_vec_blob", lambda _q: b"\xef" * (768 * 4))
-    monkeypatch.setattr("api.images._legacy.run_semantic_hybrid_search", capture_hybrid)
-    monkeypatch.setattr("api.images._legacy.list_pin_similarity_candidate_keys", boom)
+    monkeypatch.setattr("api.images.search.embed_query_to_vec_blob", lambda _q: b"\xef" * (768 * 4))
+    monkeypatch.setattr("api.images.search.run_semantic_hybrid_search", capture_hybrid)
+    monkeypatch.setattr("api.images.search.list_pin_similarity_candidate_keys", boom)
     r = client.post(
         "/api/images/chat-search",
         json={"message": "hills in spring", "pinned_image_key": k},
@@ -267,9 +267,9 @@ def test_chat_search_nl_filter_with_pin_restricts_catalog_query(
         "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
         lambda *a, **k: '{"keyword": "hill"}',
     )
-    monkeypatch.setattr("api.images._legacy.query_catalog_images", capture_query)
+    monkeypatch.setattr("api.images.search.query_catalog_images", capture_query)
     monkeypatch.setattr(
-        "api.images._legacy.list_pin_similarity_candidate_keys",
+        "api.images.search.list_pin_similarity_candidate_keys",
         lambda _db, seed: [seed, "neighbor-key"],
     )
     r = client.post(
@@ -306,8 +306,8 @@ def test_chat_search_pin_inactive_invalid_key_metadata(
         "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
         lambda *a, **k: "{}",
     )
-    monkeypatch.setattr("api.images._legacy.embed_query_to_vec_blob", lambda _q: b"\xef" * (768 * 4))
-    monkeypatch.setattr("api.images._legacy.run_semantic_hybrid_search", capture_hybrid)
+    monkeypatch.setattr("api.images.search.embed_query_to_vec_blob", lambda _q: b"\xef" * (768 * 4))
+    monkeypatch.setattr("api.images.search.run_semantic_hybrid_search", capture_hybrid)
     r = client.post(
         "/api/images/chat-search",
         json={"message": "hills in spring", "pinned_image_key": "not-a-real-catalog-key"},
