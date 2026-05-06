@@ -1,4 +1,4 @@
-from lightroom_tagger.core.analyzer import analyze_image
+from lightroom_tagger.core.analyzer import compute_phash, describe_image, extract_exif
 from lightroom_tagger.core.database import store_instagram_image
 
 
@@ -19,7 +19,15 @@ def crawl_and_analyze(db, username: str, output_dir: str, limit: int = 50) -> di
         local_paths = url_to_path.get(post.post_url, [])
         for local_path in local_paths:
             try:
-                analysis = analyze_image(local_path)
+                phash = compute_phash(local_path)
+                exif = extract_exif(local_path)
+                structured = describe_image(local_path)
+                analysis = {
+                    'phash': phash,
+                    'exif': exif,
+                    'description': structured.get('summary', ''),
+                    'structured_description': structured,
+                }
                 record = {
                     'post_url': post.post_url,
                     'local_path': local_path,

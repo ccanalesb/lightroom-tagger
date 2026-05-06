@@ -32,10 +32,7 @@ from .vision_compare import (
     parse_vision_response,
     vision_score,
 )
-from ._legacy import (
-    analyze_image,
-    run_external_agent,
-)
+from ._legacy import run_external_agent
 
 __all__ = (
     "ContextLengthError",
@@ -50,7 +47,6 @@ __all__ = (
     "_compare_via_provider",
     "_describe_image_via_provider",
     "_model_min_tokens",
-    "analyze_image",
     "build_description_prompt",
     "compare_with_vision",
     "compress_image",

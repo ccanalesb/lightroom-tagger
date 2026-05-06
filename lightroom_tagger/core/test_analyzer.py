@@ -5,7 +5,6 @@ import tempfile
 from unittest.mock import patch
 
 from lightroom_tagger.core.analyzer import (
-    analyze_image,
     compare_with_vision,
     compress_image,
     describe_image,
@@ -13,8 +12,8 @@ from lightroom_tagger.core.analyzer import (
 )
 
 
-def test_analyze_image_returns_all_signals():
-    """Analyzer should return phash, exif, and description."""
+def test_composed_catalog_analysis_returns_all_signals():
+    """Phash, exif, description, and structured description match the former monolithic pipeline."""
     mock_desc = {
         'summary': 'A sunset photo',
         'composition': {},
@@ -27,11 +26,22 @@ def test_analyze_image_returns_all_signals():
         'subjects': [],
         'best_perspective': 'street',
     }
-    with patch('lightroom_tagger.core.analyzer._legacy.compute_phash', return_value='a1b2c3d4e5f6g7h8'), \
-         patch('lightroom_tagger.core.analyzer._legacy.extract_exif', return_value={'camera': 'Canon EOS R5'}), \
-         patch('lightroom_tagger.core.analyzer._legacy.describe_image', return_value=mock_desc):
+    with patch('lightroom_tagger.core.analyzer.compute_phash', return_value='a1b2c3d4e5f6g7h8'), \
+         patch('lightroom_tagger.core.analyzer.extract_exif', return_value={'camera': 'Canon EOS R5'}), \
+         patch('lightroom_tagger.core.analyzer.describe_image', return_value=mock_desc):
 
-        result = analyze_image('/fake/path.jpg')
+        from lightroom_tagger.core.analyzer import compute_phash, describe_image, extract_exif
+
+        path = '/fake/path.jpg'
+        phash = compute_phash(path)
+        exif = extract_exif(path)
+        structured = describe_image(path)
+        result = {
+            'phash': phash,
+            'exif': exif,
+            'description': structured.get('summary', ''),
+            'structured_description': structured,
+        }
 
     assert result['phash'] == 'a1b2c3d4e5f6g7h8'
     assert result['exif']['camera'] == 'Canon EOS R5'

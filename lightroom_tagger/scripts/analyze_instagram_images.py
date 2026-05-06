@@ -3,7 +3,7 @@
 
 from pathlib import Path
 
-from lightroom_tagger.core.analyzer import analyze_image
+from lightroom_tagger.core.analyzer import compute_phash, describe_image, extract_exif
 from lightroom_tagger.core.database import (
     init_database,
     init_instagram_table,
@@ -49,7 +49,15 @@ def main():
     for i, img_info in enumerate(images, 1):
         print(f"\n[{i}/{len(images)}] Analyzing: {img_info['filename']}")
 
-        analysis = analyze_image(img_info['local_path'])
+        phash = compute_phash(img_info['local_path'])
+        exif = extract_exif(img_info['local_path'])
+        structured = describe_image(img_info['local_path'])
+        analysis = {
+            'phash': phash,
+            'exif': exif,
+            'description': structured.get('summary', ''),
+            'structured_description': structured,
+        }
 
         record = {
             'post_url': img_info['post_url'],

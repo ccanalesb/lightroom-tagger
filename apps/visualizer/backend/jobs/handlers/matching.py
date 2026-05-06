@@ -319,7 +319,7 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
     """Enrich catalog with metadata."""
     import os
 
-    from lightroom_tagger.core.analyzer import analyze_image
+    from lightroom_tagger.core.analyzer import compute_phash, describe_image, extract_exif
     from lightroom_tagger.core.config import load_config
     from lightroom_tagger.core.database import (
         get_catalog_images_needing_analysis,
@@ -392,7 +392,15 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
                 if key in processed_ck:
                     continue
 
-                analysis = analyze_image(filepath)
+                phash = compute_phash(filepath)
+                exif = extract_exif(filepath)
+                structured = describe_image(filepath)
+                analysis = {
+                    'phash': phash,
+                    'exif': exif,
+                    'description': structured.get('summary', ''),
+                    'structured_description': structured,
+                }
 
                 enriched_record = {
                     'key': key,
