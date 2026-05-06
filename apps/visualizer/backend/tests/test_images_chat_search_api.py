@@ -1,4 +1,4 @@
-"""Tests for POST /api/images/chat-search (NL + semantic; LLM mocked)."""
+"""Tests for POST /api/images/search/chat-search (NL + semantic; LLM mocked)."""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def test_chat_search_nl_filter_path(
         lambda *a, **k: '{"keyword": "mountain"}',
     )
     r = client.post(
-        "/api/images/chat-search", json={"message": "show mountains"}
+        "/api/images/search/chat-search", json={"message": "show mountains"}
     )
     assert r.status_code == 200
     data = r.get_json()
@@ -106,7 +106,7 @@ def test_chat_search_semantic_fallback(
     monkeypatch.setattr("api.images.search.run_semantic_hybrid_search", fake_hybrid)
 
     r = client.post(
-        "/api/images/chat-search", json={"message": "hills in spring"}
+        "/api/images/search/chat-search", json={"message": "hills in spring"}
     )
     assert r.status_code == 200
     data = r.get_json()
@@ -123,7 +123,7 @@ def test_chat_search_semantic_fallback(
 
 def test_chat_search_empty_message_400(chat_search_client) -> None:
     client, _k = chat_search_client
-    r = client.post("/api/images/chat-search", json={"message": "  "})
+    r = client.post("/api/images/search/chat-search", json={"message": "  "})
     assert r.status_code == 400
     err = r.get_json().get("error", "")
     assert "message" in err.lower() or "non-empty" in err.lower()
@@ -144,7 +144,7 @@ def test_chat_search_multiturn_forwards_current_message_last(
         multi_turn,
     )
     r = client.post(
-        "/api/images/chat-search",
+        "/api/images/search/chat-search",
         json={
             "message": "second",
             "messages": [
@@ -197,7 +197,7 @@ def test_chat_search_pin_active_semantic_passes_restrict_to_keys(
         lambda _db, seed: [seed, "neighbor-key"],
     )
     r = client.post(
-        "/api/images/chat-search",
+        "/api/images/search/chat-search",
         json={"message": "hills in spring", "pinned_image_key": k},
     )
     assert r.status_code == 200
@@ -243,7 +243,7 @@ def test_chat_search_pin_inactive_no_clip_embedding_falls_back_semantic(
     monkeypatch.setattr("api.images.search.run_semantic_hybrid_search", capture_hybrid)
     monkeypatch.setattr("api.images.search.list_pin_similarity_candidate_keys", boom)
     r = client.post(
-        "/api/images/chat-search",
+        "/api/images/search/chat-search",
         json={"message": "hills in spring", "pinned_image_key": k},
     )
     assert r.status_code == 200
@@ -273,7 +273,7 @@ def test_chat_search_nl_filter_with_pin_restricts_catalog_query(
         lambda _db, seed: [seed, "neighbor-key"],
     )
     r = client.post(
-        "/api/images/chat-search",
+        "/api/images/search/chat-search",
         json={"message": "show hills", "pinned_image_key": k},
     )
     assert r.status_code == 200
@@ -309,7 +309,7 @@ def test_chat_search_pin_inactive_invalid_key_metadata(
     monkeypatch.setattr("api.images.search.embed_query_to_vec_blob", lambda _q: b"\xef" * (768 * 4))
     monkeypatch.setattr("api.images.search.run_semantic_hybrid_search", capture_hybrid)
     r = client.post(
-        "/api/images/chat-search",
+        "/api/images/search/chat-search",
         json={"message": "hills in spring", "pinned_image_key": "not-a-real-catalog-key"},
     )
     assert r.status_code == 200
@@ -328,7 +328,7 @@ def test_chat_search_invalid_llm_json_400(
         lambda *a, **k: "not-json",
     )
     r = client.post(
-        "/api/images/chat-search", json={"message": "anything here"}
+        "/api/images/search/chat-search", json={"message": "anything here"}
     )
     assert r.status_code == 400
     err = r.get_json()["error"]

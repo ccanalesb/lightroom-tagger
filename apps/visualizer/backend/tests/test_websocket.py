@@ -23,9 +23,11 @@ def socketio_client():
 
         app.db = init_db(db_path)
 
-        from api import images, jobs, system
+        from api import jobs, system
+        from api.images import instagram_bp
+
         app.register_blueprint(jobs.bp, url_prefix='/api/jobs')
-        app.register_blueprint(images.bp, url_prefix='/api/instagram-images')
+        app.register_blueprint(instagram_bp, url_prefix='/api/instagram-images')
         app.register_blueprint(system.bp, url_prefix='/api')
 
         socketio = SocketIO(app, cors_allowed_origins="*")

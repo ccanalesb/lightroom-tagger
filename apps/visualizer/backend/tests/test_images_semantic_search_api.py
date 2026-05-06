@@ -1,4 +1,4 @@
-"""Tests for POST /api/images/semantic-search (mocked embed + hybrid search)."""
+"""Tests for POST /api/images/search/semantic-search (mocked embed + hybrid search)."""
 
 from __future__ import annotations
 
@@ -104,7 +104,7 @@ def test_semantic_search_returns_metadata_and_row_extras(
     monkeypatch.setattr("api.images.search.run_semantic_hybrid_search", fake_hybrid)
 
     r = client.post(
-        "/api/images/semantic-search",
+        "/api/images/search/semantic-search",
         json={"query": "alpha beta", "limit": 10, "offset": 0},
     )
     assert r.status_code == 200
@@ -136,6 +136,6 @@ def test_semantic_search_rejects_short_query(semantic_search_client, monkeypatch
         lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("should not run")),
     )
 
-    r = client.post("/api/images/semantic-search", json={"query": "a"})
+    r = client.post("/api/images/search/semantic-search", json={"query": "a"})
     assert r.status_code == 400
     assert "error" in r.get_json()
