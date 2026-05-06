@@ -146,7 +146,7 @@ from .similarity import (
     list_clip_embedded_catalog_keys_newest_first,
 )
 
-from ._legacy import (
+from .vision_cache import (
     VISION_CACHE_OVERSIZED_SENTINEL,
     get_cache_stats,
     get_vision_cached_image,
