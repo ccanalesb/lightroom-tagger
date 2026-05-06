@@ -1,8 +1,5 @@
 """Instagram ↔ catalog matching: candidates, scoring, vision batch path, orchestration."""
 
-import os
-from collections.abc import Callable
-
 from lightroom_tagger.core.config import get_vision_model
 from lightroom_tagger.core.database import (
     _deserialize_row,
@@ -27,12 +24,8 @@ from .vision_batch import BATCH_MAX_TOKENS_ESCALATION, _call_batch_chunk
 
 __all__ = [
     "BATCH_MAX_TOKENS_ESCALATION",
-    "Callable",
     "InstagramCache",
     "ProviderRegistry",
-    "_call_batch_chunk",
-    "_compute_desc_scores_for_candidates",
-    "_deserialize_row",
     "compare_descriptions_batch",
     "find_candidates_by_date",
     "get_cached_phash",
@@ -41,7 +34,6 @@ __all__ = [
     "get_vision_model",
     "match_batch",
     "match_image",
-    "os",
     "query_by_exif",
     "score_candidates",
     "score_candidates_with_vision",
