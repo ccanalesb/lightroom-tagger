@@ -19,7 +19,8 @@ from database import (
     make_connection_for_path,
     update_job_status,
 )
-from flask import Flask
+import werkzeug.utils
+from flask import Flask, abort, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO
 
@@ -114,6 +115,21 @@ def create_app():
 
     CORS(app, origins=config.FRONTEND_URL.split(','))
     socketio = SocketIO(app, cors_allowed_origins="*")
+
+    raw_root = os.environ.get("VISUALIZER_E2E_STATIC_DIST", "").strip()
+    if raw_root:
+        static_root_abs = os.path.abspath(raw_root)
+
+        @app.route("/", defaults={"path": ""}, methods=["GET"])
+        @app.route("/<path:path>", methods=["GET"])
+        def _visualizer_e2e_spa(path: str):
+            if path.startswith("api") or path.startswith("socket.io"):
+                abort(404)
+            if path:
+                candidate = werkzeug.utils.safe_join(static_root_abs, path)
+                if candidate is not None and os.path.isfile(candidate):
+                    return send_from_directory(static_root_abs, path)
+            return send_from_directory(static_root_abs, "index.html")
 
     db_path = os.path.join(os.path.dirname(__file__), config.DATABASE_PATH)
     db = init_db(db_path)
