@@ -228,6 +228,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 resume_processed_keys=resume_media or None,
                 on_media_complete=on_media_complete,
                 batch_progress_callback=batch_progress_callback,
+                source_job_id=job_id,
             )
 
             if media_since_prefilter_summary > 0:

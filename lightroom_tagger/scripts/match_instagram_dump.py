@@ -27,6 +27,7 @@ from lightroom_tagger.core.database import (
     get_instagram_by_date_filter,
     get_rejected_pairs,
     get_unprocessed_dump_media,
+    insert_comparison_pool_snapshot,
     init_catalog_table,
     init_database,
     init_instagram_dump_table,
@@ -55,7 +56,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      *, should_cancel: Callable[[], bool] | None = None,
                      resume_processed_keys: set[str] | None = None,
                      on_media_complete: Callable[..., None] | None = None,
-                     batch_progress_callback: Callable[[int, int, int, int], None] | None = None) -> tuple:
+                     batch_progress_callback: Callable[[int, int, int, int], None] | None = None,
+                     source_job_id: str | None = None) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -82,6 +84,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             (no stats increment for skipped rows).
         on_media_complete: If set, invoked as ``(media_key, stats)`` once per finished row
             that completes the loop body (same rows as previously).
+        source_job_id: Optional visualizer job UUID string stored on comparison pool snapshots for offline --job-id filters.
 
     Returns:
         Tuple of (stats dict, matches list)
@@ -176,6 +179,16 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             log_callback('debug', f'[{media_key}] Found {initial_candidate_count} candidates by date, {len(candidates)} after filters')
 
         if not candidates:
+            insert_comparison_pool_snapshot(
+                db=db,
+                insta_key=dump_media['media_key'],
+                source_job_id=source_job_id,
+                threshold=threshold,
+                clip_top_k=clip_top_k,
+                weights=weights,
+                vision_candidates=[],
+                results=[],
+            )
             mark_dump_media_attempted(db, dump_media['media_key'])
             stats['skipped'] += 1
             if log_callback and idx <= 3:
@@ -200,6 +213,16 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             )
 
         if not candidates:
+            insert_comparison_pool_snapshot(
+                db=db,
+                insta_key=dump_media['media_key'],
+                source_job_id=source_job_id,
+                threshold=threshold,
+                clip_top_k=clip_top_k,
+                weights=weights,
+                vision_candidates=[],
+                results=[],
+            )
             mark_dump_media_attempted(db, dump_media['media_key'])
             stats['skipped'] += 1
             if log_callback and idx <= 3:
@@ -338,6 +361,17 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             batch_progress_callback=_make_batch_cb(idx, total),
         )
         stats['vision_judgments_total'] += len(vision_candidates)
+
+        insert_comparison_pool_snapshot(
+            db=db,
+            insta_key=dump_media['media_key'],
+            source_job_id=source_job_id,
+            threshold=threshold,
+            clip_top_k=clip_top_k,
+            weights=weights,
+            vision_candidates=vision_candidates,
+            results=results,
+        )
 
         if should_cancel is not None and should_cancel():
             if log_callback:
