@@ -69,10 +69,11 @@ Items acknowledged and deferred at milestone close on 2026-05-04 (v3.0):
 
 ### Pending Todos
 
-- Count: 3
+- Count: 4
 - `benchmark-embedding-recall.md` — Benchmark DINOv2/CLIP embeddings against user-validated match pairs
 - `2026-04-26-plan-backend-restart-and-compression-fix.md` — Plan backend restart and compression fix
 - `2026-04-26-fixes-for-embed-job-discoverability-and-path-failures.md` — Fixes for embed job discoverability and path failures
+- `2026-05-12-add-catalog-sync-step-to-catalog-cache-build-pipeline.md` — Add catalog sync step to catalog_cache_build pipeline
 
 ### Quick Tasks Completed
 
