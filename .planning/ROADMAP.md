@@ -75,7 +75,7 @@
 - [x] Phase 14: Database & images API split — REFACTOR-02, REFACTOR-03 (completed 2026-05-06)
 - [x] Phase 15: Service modules & boundary policy — REFACTOR-04, REFACTOR-05 (completed 2026-05-06)
 - [x] Phase 16: Recovery & path-failure unit tests — TEST-01, TEST-02 (completed 2026-05-06)
-- [ ] Phase 17: E2E harness bootstrap (CDP + fixture) — TEST-03 *(in progress: 3/4 plans — 17-01, 17-02, 17-03 complete 2026-05-12)*
+- [x] Phase 17: E2E harness bootstrap (CDP + fixture) — TEST-03 *(completed 2026-05-12 — 4/4 plans: 17-01..17-04)*
 - [ ] Phase 18: Critical user flows E2E — E2E-01..E2E-06
 - [ ] Phase 19: Generate read-only HTML comparison-pool report
 

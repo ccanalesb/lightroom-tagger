@@ -28,7 +28,7 @@
 
 - [ ] **TEST-01**: Restart/orphan recovery has focused unit tests — covers resume-after-crash for `batch_analyze`, `batch_describe`, `batch_score`
 - [ ] **TEST-02**: Path-failure handling has unit tests — covers missing file, empty path, unreachable network share, high-failure-rate preflight abort
-- [ ] **TEST-03**: E2E test suite bootstrapped using browser harness (CDP) against a running local stack — framework in place, real catalog fixture used
+- [x] **TEST-03**: E2E test suite bootstrapped using browser harness (CDP) against a running local stack — framework in place, real catalog fixture used *(Phase 17 — 2026-05-12)*
 
 ### E2E Flows
 
@@ -74,7 +74,7 @@
 | OPS-05 | 12 | Pending |
 | TEST-01 | 16 | Pending |
 | TEST-02 | 16 | Pending |
-| TEST-03 | 17 | Pending |
+| TEST-03 | 17 | ✅ Complete (2026-05-12) |
 | E2E-01 | 18 | Pending |
 | E2E-02 | 18 | Pending |
 | E2E-03 | 18 | Pending |
