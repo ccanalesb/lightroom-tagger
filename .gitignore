@@ -66,6 +66,8 @@ Thumbs.db
 logs
 *.log
 *.db
+# Committed E2E library seed (exception to *.db)
+!apps/visualizer/backend/tests/e2e/fixtures/library_seed.db
 instructions.md
 skills-lock.json
 .agents/
