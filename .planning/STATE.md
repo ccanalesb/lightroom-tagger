@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Backend Health & E2E Coverage
-status: Ready to plan
-last_updated: "2026-05-11T03:23:31.437Z"
+status: Executing Phase 17
+last_updated: "2026-05-12T14:12:40.345Z"
 progress:
   total_phases: 1
   completed_phases: 0
@@ -21,16 +21,16 @@ progress:
 | Field | Value |
 |-------|--------|
 | Active milestone | v4.0 Backend Health & E2E Coverage |
-| Phase | **Phase 14** — Database & images API split |
-| Status | Phase 13 complete — ready for Phase 14 |
-| Last activity | 2026-05-05 — Phase 13 handlers split complete (REFACTOR-01) |
+| Phase | **Phase 17** — E2E harness bootstrap |
+| Status | Plan **17-01** complete — next **17-02** |
+| Last activity | 2026-05-12 — 17-01 E2E pytest isolation scaffold (`2860fab`..`e218797`) |
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-04-23)
 
 **Core value:** Know which catalog images are posted on Instagram and get structured artistic critique that helps you understand your photographic voice and posting strategy.
-**Current focus:** Phase 16 — recovery-and-path-failure-unit-tests
+**Current focus:** Phase 17 — e2e-harness-bootstrap
 
 ## Deferred Items
 
@@ -105,6 +105,7 @@ Items acknowledged and deferred at milestone close on 2026-05-04 (v3.0):
 
 ## Last update
 
+- **2026-05-12:** Phase **17** plan **17-01** executed — E2E pytest isolation: `tests/e2e/pytest.ini`, `harness/__init__.py`, `fixtures/README.md`, parent `collect_ignore = ["e2e"]`. Commits `2860fab`, `6dbe45b`, `e218797`. **Decisions:** default `pytest tests/` must never collect `tests/e2e/`; E2E entrypoint `pytest -c tests/e2e/pytest.ini tests/e2e/`. Artifact: `17-01-SUMMARY.md`. **Requirement TEST-03** remains open until fixture + smoke land in later plans.
 - **2026-05-04:** Phase **11** plan **11-01** executed — Catalog Cache / Search pin `strings.ts` exports; `database.py` comments (D-01 stack_size / D-02 `restrict_to_keys`); `handlers.py` D-03 (`vision_judgments_total` / `judgments=` vs LLM calls). Commits `19cf0c8`, `cb5e139`, `7cec335`. Artifact: `11-01-SUMMARY.md`. Verification: `tsc --noEmit`, pytest **663** passed.
 - **2026-04-27:** Phase 8 (v3.0 re-open) planning complete. **6 PLAN.md files** written across **6 waves** under `.planning/phases/08-embedding-prefilter-and-cache-pipeline/`. **Wave 1 — `08-01`** CLIP shortlist core: `shortlist_catalog_candidates_by_clip` helper in `clip_similarity.py` (KNN over-fetch + intersect with allowed candidate keys, hard cap `KNN_K_MAX=500`); insert into `match_dump_media` after the Phase 7 representative-only filter and before `vision_candidates` build (D-03 gates phash/desc/vision); D-03 gating regression test in `test_handlers_single_match.py -k shortlist` mocks `score_candidates_with_vision` and asserts call args ≤ `clip_top_k`. **Wave 2 — `08-02`** `handle_vision_match` plumbing: server-side clamp `clip_top_k` to 1..500, `fingerprint_vision_match(..., clip_top_k=...)` for resume safety, throttled D-07 summary log via `_VISION_MATCH_PREFILTER_SUMMARY_EVERY=40` emitting `date_window_in=N clip_shortlist_out=M judgments=J`, cumulative result keys `clip_prefilter_candidates_in` / `clip_prefilter_shortlist_total` / `vision_judgments_total`. **Wave 3 — `08-03`** Instagram embed extension (D-01): `batch_embed_image` accepts `image_type='catalog_and_instagram'` (or scope flag), new DB list helper for IG dump rows missing CLIP, fingerprint differentiates scope. **Wave 4 — `08-04`** composite cache job (CACHE-01): new `catalog_cache_build` job type registered in `JOB_HANDLERS` and `JOB_TYPES_REQUIRING_CATALOG`, single in-process handler runs embed → stack-detect → catalog-similarity stages with cancel propagation, ordered D-08 stage banners + skip counts, warn-and-proceed on incomplete prior stages, new `test_handlers_catalog_cache_build.py`. **Wave 5 — `08-05`** MatchingTab UI: `clip_top_k` numeric input (default 50, bounds 1..500, copy from `strings.ts`), `JobsAPI.create('vision_match', { clip_top_k, ... })`, **remove** `Catalog Discovery Jobs` card + `CatalogSimilarityGroupsPreview` import + orphan `MATCHING_(CATALOG_DISCOVERY|SIMILARITY_GROUPS)_*` strings, one-line link to `/processing?tab=cache`. **Wave 6 — `08-06`** CatalogCacheTab UI: primary "Build catalog cache" CTA → `catalog_cache_build`, Advanced disclosure **reuses** `apps/visualizer/frontend/src/components/matching/AdvancedOptions.tsx` (D-05 DRY mandate), individual stage triggers + `prepare_catalog`, success affordance to Job Queue. **Locked decisions honored:** D-01..D-08 verified in plan-checker iteration 2. **Out-of-scope confirmed:** no MATCH-03 wider-search fallback, no FAISS, no LLM endpoint, no schema migration, no embedding-model A/B, no stack-construction changes. **Plan-checker:** iteration 1 BLOCK (wave conflict + missing D-03 regression) → iteration 2 PASS_WITH_NOTES (0 BLOCK, 0 HIGH; 2 MEDIUM doc-drift items cleaned inline). **Requirements coverage:** MATCH-02 in 08-01/08-02/08-05; CACHE-01 in 08-03/08-04/08-05/08-06. Artifacts: `08-RESEARCH.md`, `08-VALIDATION.md`, `08-PATTERNS.md`, `08-CONTEXT.md`, `08-UI-SPEC.md`, `08-DISCUSSION-LOG.md`, `08-01-PLAN.md` through `08-06-PLAN.md`.
 - **2026-04-24:** Phase 4 execution complete. 4 plans / 3 waves / 17 code commits + 1 production fix. **Plan 01** (`e79926a`, `201baf9`): `_migrate_image_stacks` in `database.py` — idempotent `image_stacks` + `image_stack_members` DDL with `UNIQUE(image_key)`, `representative_key NOT NULL`, `ON DELETE CASCADE`, `user_modified`/`stack_size` scaffolding. **Plan 02** (`83ab74d`..`67bd744`): `stack_burst_delta_ms: int = 2000` in `Config`/YAML; GET/PUT `/api/config/stack-detection`; `ConfigAPI.getStackDetection`/`putStackDetection`; `StackDetectionSettingsPanel` in `SettingsTab`. **Plan 03** (`bfa3ebc`..`53f4821`): `fingerprint_batch_stack_detect`, `batch_stack_detect` in `JOB_TYPES_REQUIRING_CATALOG`, `handle_batch_stack_detect` with burst grouping, three-tier representative selection, checkpoint v1 resume, `force` full-rebuild, five result keys. **Plan 04** (`d64ca16`..`261acda`): `test_handlers_batch_stack_detect.py` (zero-work, burst, skip, incremental, force, checkpoint resume), config GET/PUT tests, fingerprint stability tests, catalog job-type assertions, INSERT fix. Verification: **56 backend tests pass**, VERIFICATION.md 15/15 passed. Requirement STACK-01 complete.
