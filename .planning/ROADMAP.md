@@ -77,17 +77,20 @@
 - [x] Phase 16: Recovery & path-failure unit tests — TEST-01, TEST-02 (completed 2026-05-06)
 - [x] Phase 17: E2E harness bootstrap (CDP + fixture) — TEST-03 *(completed 2026-05-12 — 4/4 plans: 17-01..17-04)*
 - [ ] Phase 18: Critical user flows E2E — E2E-01..E2E-06
-- [ ] Phase 19: Generate read-only HTML comparison-pool report
+- [x] Phase 19: Generate read-only HTML comparison-pool report (completed 2026-05-12)
 
 ### Phase 19: Generate read-only HTML comparison-pool report
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Generate a read-only offline HTML report for unmatched attempted Instagram rows, showing exact saved comparison-pool snapshots when available and clearly labeled reconstruction when not.
+**Requirements**: Diagnostic phase folded from todo `2026-05-06-generate-read-only-html-comparison-pool-report`
 **Depends on:** Phase 18
-**Plans:** 0 plans
+**Plans:** 4/4 plans complete
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 19 to break down)
+- [x] 19-01 — Comparison pool snapshot schema and persistence API
+- [x] 19-02 — Capture comparison pools in matcher pipeline and job provenance
+- [x] 19-03 — Offline comparison-pool report CLI, HTML layout, compressed assets
+- [x] 19-04 — Reconstruction fallback, automated tests, offline smoke checklist
 
 ---
 
