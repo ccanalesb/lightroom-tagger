@@ -1,4 +1,8 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+from PIL import Image
+
+from lightroom_tagger.core.database import init_database
 from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
 
 
@@ -26,3 +30,102 @@ def test_media_key_filters_to_single_image(
 
     mock_get_unprocessed.assert_not_called()
     assert stats['processed'] == 1
+
+
+def test_match_dump_media_persists_comparison_pool_snapshot(tmp_path):
+    """A scored but unmatched media row persists the full comparison pool."""
+    insta_path = tmp_path / "insta.png"
+    catalog_1 = tmp_path / "catalog-1.png"
+    catalog_2 = tmp_path / "catalog-2.png"
+    Image.new("RGB", (1, 1), color=(255, 0, 0)).save(insta_path)
+    Image.new("RGB", (1, 1), color=(0, 255, 0)).save(catalog_1)
+    Image.new("RGB", (1, 1), color=(0, 0, 255)).save(catalog_2)
+
+    db = init_database(str(tmp_path / "lib.db"))
+    try:
+        db.execute(
+            """
+            INSERT INTO instagram_dump_media (
+                media_key, file_path, filename, date_folder, processed
+            ) VALUES (?, ?, ?, ?, 0)
+            """,
+            ("fixture/1", str(insta_path), "insta.png", "202601"),
+        )
+        db.execute(
+            "INSERT INTO images (key, filepath, date_taken, instagram_posted) VALUES (?, ?, ?, 0)",
+            ("cat/1", str(catalog_1), "2026-01-01T00:00:00"),
+        )
+        db.execute(
+            "INSERT INTO images (key, filepath, date_taken, instagram_posted) VALUES (?, ?, ?, 0)",
+            ("cat/2", str(catalog_2), "2026-01-02T00:00:00"),
+        )
+        db.commit()
+
+        fake_candidates = [
+            {"key": "cat/1", "filepath": str(catalog_1), "phash": "", "description": ""},
+            {"key": "cat/2", "filepath": str(catalog_2), "phash": "", "description": ""},
+        ]
+        fake_results = [
+            {
+                "catalog_key": "cat/1",
+                "total_score": 0.9,
+                "phash_distance": 1,
+                "phash_score": 0.94,
+                "desc_similarity": 0.5,
+                "vision_result": "UNCERTAIN",
+                "vision_score": 0.5,
+                "vision_reasoning": "first",
+                "model_used": "test-model",
+                "rate_limited": False,
+            },
+            {
+                "catalog_key": "cat/2",
+                "total_score": 0.5,
+                "phash_distance": 4,
+                "phash_score": 0.75,
+                "desc_similarity": 0.2,
+                "vision_result": "DIFFERENT",
+                "vision_score": 0.0,
+                "vision_reasoning": "second",
+                "model_used": "test-model",
+                "rate_limited": False,
+            },
+        ]
+
+        with (
+            patch(
+                "lightroom_tagger.scripts.match_instagram_dump.find_candidates_by_date",
+                return_value=fake_candidates,
+            ),
+            patch(
+                "lightroom_tagger.scripts.match_instagram_dump.catalog_key_is_primary_grid_row",
+                return_value=True,
+            ),
+            patch(
+                "lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip",
+                return_value=["cat/1", "cat/2"],
+            ),
+            patch(
+                "lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision",
+                return_value=fake_results,
+            ),
+        ):
+            stats, matches = match_dump_media(
+                db,
+                media_key="fixture/1",
+                threshold=0.99,
+            )
+
+        snapshot_count = db.execute(
+            "SELECT COUNT(*) AS c FROM comparison_pool_snapshots"
+        ).fetchone()["c"]
+        candidate_count = db.execute(
+            "SELECT COUNT(*) AS c FROM comparison_pool_snapshot_candidates"
+        ).fetchone()["c"]
+
+        assert stats["processed"] == 1
+        assert matches == []
+        assert snapshot_count == 1
+        assert candidate_count == 2
+    finally:
+        db.close()

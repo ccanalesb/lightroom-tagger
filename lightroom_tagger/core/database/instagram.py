@@ -210,6 +210,49 @@ def get_instagram_by_date_filter(db: sqlite3.Connection, month: str = None,
     return [_deserialize_row(r) for r in rows]
 
 
+def list_comparison_pool_report_targets(
+    db: sqlite3.Connection,
+    *,
+    month: str | None = None,
+    job_id: str | None = None,
+    media_key: str | None = None,
+    limit: int | None = None,
+) -> list[dict]:
+    """Unmatched attempted dump rows eligible for comparison-pool reports."""
+    clauses = [
+        "processed = 0",
+        "last_attempted_at IS NOT NULL",
+    ]
+    params: dict[str, object] = {}
+    if month is not None:
+        clauses.append("date_folder = :month")
+        params["month"] = month
+    if media_key is not None:
+        clauses.append("media_key = :media_key")
+        params["media_key"] = media_key
+    if job_id is not None:
+        clauses.append(
+            "media_key IN ("
+            "SELECT DISTINCT insta_key "
+            "FROM comparison_pool_snapshots "
+            "WHERE source_job_id = :job_id"
+            ")"
+        )
+        params["job_id"] = job_id
+
+    sql = (
+        "SELECT * FROM instagram_dump_media "
+        f"WHERE {' AND '.join(clauses)} "
+        "ORDER BY last_attempted_at DESC"
+    )
+    if limit is not None:
+        sql += " LIMIT :limit"
+        params["limit"] = int(limit)
+
+    rows = db.execute(sql, params).fetchall()
+    return [_deserialize_row(dict(r)) for r in rows]
+
+
 def mark_dump_media_processed(db: sqlite3.Connection, media_key: str,
                                matched_catalog_key: str = None,
                                vision_result: str = None,
