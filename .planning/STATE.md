@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v4.0
 milestone_name: Backend Health & E2E Coverage
 status: Executing Phase 17
-last_updated: "2026-05-12T14:16:00.000Z"
+last_updated: "2026-05-12T16:05:00.000Z"
 progress:
   total_phases: 1
   completed_phases: 0
@@ -22,8 +22,8 @@ progress:
 |-------|--------|
 | Active milestone | v4.0 Backend Health & E2E Coverage |
 | Phase | **Phase 17** — E2E harness bootstrap |
-| Status | Plan **17-02** complete — next **17-03** |
-| Last activity | 2026-05-12 — 17-02 BrowserSession + `export_fixture` + `library_seed.db` (`b144931`, `5f3ef04`) |
+| Status | Plan **17-03** complete — next **17-04** |
+| Last activity | 2026-05-12 — 17-03 E2E stack fixtures: SPA gate `VISUALIZER_E2E_STATIC_DIST`, `fixtures/factory.py`, session `viz_e2e_base_url` + `browser_session` (`9e38cee`, `238a46d`, `2f2356d`) |
 
 ## Project Reference
 
@@ -105,6 +105,7 @@ Items acknowledged and deferred at milestone close on 2026-05-04 (v3.0):
 
 ## Last update
 
+- **2026-05-12:** Phase **17** plan **17-03** executed — `VISUALIZER_E2E_STATIC_DIST`-gated `_visualizer_e2e_spa` in `app.py`; `tests/e2e/fixtures/factory.py` (`ensure_writable_fixture_library`); `tests/e2e/conftest.py` session fixture: `npm run build` with `VITE_BACKEND_PORT=5099`, temp `init_db` jobs DB + copied library DB, Flask `Popen` on `127.0.0.1:5099`, GET health on `/api/status`, teardown `terminate` / `wait(timeout=5)` / `kill` + `rmtree`. Commits `9e38cee`, `238a46d`, `2f2356d`. Artifact: `17-03-SUMMARY.md`. **TEST-03** still open until **17-04** smoke.
 - **2026-05-12:** Phase **17** plan **17-02** executed — `BrowserSession` (browser-harness stdin: `new_tab`, `wait_for_load`, `js`, `click`); `export_fixture.py` (`--library`, `--catalog-from`); committed `tests/e2e/fixtures/library_seed.db` (5× `e2e_cat_*`); `.gitignore` exception for that path. Commits `b144931`, `5f3ef04`. **`catalog.lrcat`** still **pending developer 17-02-T3** (Lightroom export). Decisions: D-07 honored (no Playwright transport); D-08–D-10 catalog slice deferred to maintainer. Artifact: `17-02-SUMMARY.md`. **TEST-03** still open for Phase 17 completion.
 - **2026-05-12:** Phase **17** plan **17-01** executed — E2E pytest isolation: `tests/e2e/pytest.ini`, `harness/__init__.py`, `fixtures/README.md`, parent `collect_ignore = ["e2e"]`. Commits `2860fab`, `6dbe45b`, `e218797`. **Decisions:** default `pytest tests/` must never collect `tests/e2e/`; E2E entrypoint `pytest -c tests/e2e/pytest.ini tests/e2e/`. Artifact: `17-01-SUMMARY.md`. **Requirement TEST-03** remains open until fixture + smoke land in later plans.
 - **2026-05-04:** Phase **11** plan **11-01** executed — Catalog Cache / Search pin `strings.ts` exports; `database.py` comments (D-01 stack_size / D-02 `restrict_to_keys`); `handlers.py` D-03 (`vision_judgments_total` / `judgments=` vs LLM calls). Commits `19cf0c8`, `cb5e139`, `7cec335`. Artifact: `11-01-SUMMARY.md`. Verification: `tsc --noEmit`, pytest **663** passed.
