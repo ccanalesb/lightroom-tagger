@@ -17,6 +17,7 @@ from .db_init_migrations import (
     _library_db_file_path,
     _migrate_add_column,
     _migrate_catalog_similarity,
+    _migrate_comparison_pool_snapshots,
     _migrate_image_clip_embeddings_vec0,
     _migrate_image_descriptions_fts,
     _migrate_image_stacks,
@@ -208,6 +209,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
     # Stack members reference `images` by key at insert time; `images` is created above.
     _migrate_image_stacks(conn)
     _migrate_catalog_similarity(conn)
+    _migrate_comparison_pool_snapshots(conn)
     seed_perspectives_from_prompts_dir(conn)
     conn.commit()
     return conn

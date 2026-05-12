@@ -257,6 +257,51 @@ def _migrate_catalog_similarity(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_comparison_pool_snapshots(conn: sqlite3.Connection) -> None:
+    """Idempotent snapshot tables for evaluated Instagram comparison pools."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS comparison_pool_snapshots (
+            snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            insta_key TEXT NOT NULL,
+            captured_at TEXT NOT NULL DEFAULT (datetime('now')),
+            source_job_id TEXT,
+            threshold REAL NOT NULL,
+            clip_top_k INTEGER NOT NULL,
+            weights_json TEXT NOT NULL,
+            candidate_count INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_comparison_pool_snapshots_insta_captured
+            ON comparison_pool_snapshots(insta_key, captured_at DESC, snapshot_id DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_comparison_pool_snapshots_source_job
+            ON comparison_pool_snapshots(source_job_id);
+
+        CREATE TABLE IF NOT EXISTS comparison_pool_snapshot_candidates (
+            snapshot_id INTEGER NOT NULL
+                REFERENCES comparison_pool_snapshots(snapshot_id) ON DELETE CASCADE,
+            rank INTEGER NOT NULL,
+            catalog_key TEXT NOT NULL,
+            total_score REAL,
+            phash_distance REAL,
+            phash_score REAL,
+            desc_similarity REAL,
+            vision_result TEXT,
+            vision_score REAL,
+            vision_reasoning TEXT,
+            model_used TEXT,
+            rate_limited INTEGER NOT NULL DEFAULT 0,
+            debug_resolved_path TEXT,
+            PRIMARY KEY (snapshot_id, catalog_key)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_comparison_pool_snapshot_candidates_snapshot_rank
+            ON comparison_pool_snapshot_candidates(snapshot_id, rank);
+        """
+    )
+
+
 def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
     """Remap legacy composite keys to date-truncated form; idempotent via user_version."""
     from .catalog import generate_key
