@@ -374,6 +374,12 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         )
 
         if should_cancel is not None and should_cancel():
+            best = results[0] if results else None
+            mark_dump_media_attempted(
+                db, dump_media['media_key'],
+                vision_result=best.get('vision_result') if best else None,
+                vision_score=best.get('vision_score') if best else None,
+            )
             if log_callback:
                 log_callback('info', 'Matching stopped: cancel requested')
             return stats, matches_found
