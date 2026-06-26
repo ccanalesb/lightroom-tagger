@@ -12,6 +12,7 @@ from lightroom_tagger.core.database import (
     search_by_rating,
     store_images_batch,
 )
+from lightroom_tagger.core.catalog_sync import CatalogSyncError, sync_catalog
 from lightroom_tagger.lightroom.reader import connect_catalog, get_image_count, get_image_records
 
 
@@ -80,6 +81,19 @@ def create_parser() -> argparse.ArgumentParser:
         "--limit",
         type=int,
         help="Limit number of images to process"
+    )
+
+    sync_parser = subparsers.add_parser(
+        "sync",
+        help="Incremental catalog sync — add missing images to library.db",
+    )
+    sync_parser.add_argument(
+        "--catalog",
+        help="Path to .lrcat file (overrides global)",
+    )
+    sync_parser.add_argument(
+        "--db",
+        help="Path to SQLite database (overrides global)",
     )
 
     search_parser = subparsers.add_parser("search", help="Search indexed images")
@@ -250,6 +264,42 @@ def cmd_scan(args, config):
         return 1
 
 
+def cmd_sync(args, config):
+    """Incremental catalog sync — additions only."""
+    catalog_path = args.catalog or config.catalog_path
+    db_path = args.db or config.db_path
+
+    if not catalog_path:
+        print("Error: No catalog path provided. Use --catalog or config.yaml")
+        return 1
+
+    if not Path(catalog_path).exists():
+        print(f"Error: Catalog not found: {catalog_path}")
+        return 1
+
+    if not db_path:
+        print("Error: No database path provided. Use --db or config.yaml")
+        return 1
+
+    print(f"Syncing catalog: {catalog_path}")
+
+    try:
+        db = init_database(db_path)
+        result = sync_catalog(catalog_path, db)
+        db.close()
+        print(
+            f"Added {result.added} images; {result.stale} stale in library "
+            f"(locking_mode={result.locking_mode})"
+        )
+        return 0
+    except CatalogSyncError as e:
+        print(f"Error: {e}")
+        return 1
+    except Exception as e:
+        print(f"Error: {e}")
+        return 1
+
+
 def cmd_search(args, config):
     """Search indexed images."""
     db_path = args.db or config.db_path
@@ -331,6 +381,8 @@ def main():
 
     if args.command == "scan":
         return cmd_scan(args, config)
+    elif args.command == "sync":
+        return cmd_sync(args, config)
     elif args.command == "search":
         return cmd_search(args, config)
     elif args.command == "export":

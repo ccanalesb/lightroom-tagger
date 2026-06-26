@@ -28,6 +28,8 @@
 | **library DB** | `library.db` — the project's own SQLite database (not the Lightroom catalog). Holds indexed images, matches, scores, descriptions, and job state for the CLI path. |
 | **library_write** | Process-wide writer lock + `BEGIN IMMEDIATE` used for all writes to `library.db` to prevent `SQLITE_BUSY` under parallel workers. |
 | **cancel scope** | Thread-local cooperative cancellation. A batch worker registers a `cancel_check` callback for its thread; retry sleeps and fallback dispatcher honour it. Triggered from the visualizer UI (user cancels a job) and intended to work from CLI too. |
+| **scan** | Full re-read of the Lightroom catalog with idempotent upsert into `library.db`. Picks up metadata edits to already-indexed images. |
+| **catalog sync** | Incremental, additions-only refresh: diffs catalog ids against `library.db`, fetches metadata only for missing images. Does not update existing rows or delete stale ones. |
 
 ## Key modules
 
@@ -52,6 +54,7 @@
 | `semantic_search` | Hybrid search: FTS5 BM25 + sqlite-vec KNN + RRF fusion |
 | `search_tools` | LLM function-calling tool schemas and executor for search |
 | `nl_catalog_search` | Natural-language catalog search entry point |
+| `catalog_sync` | Incremental additions-only catalog → library.db refresh (set-difference on ids) |
 | `catalog_nl_filter` | SQL filter builder for NL search queries |
 | `prompt_builder` | Builds scoring and description prompts |
 | `structured_output` | Parses and retries LLM JSON score responses |

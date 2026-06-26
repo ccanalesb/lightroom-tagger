@@ -243,6 +243,13 @@ def get_image_count(conn: sqlite3.Connection) -> int:
     return cursor.fetchone()[0]
 
 
+def list_catalog_file_ids(conn: sqlite3.Connection) -> list[int]:
+    """Return every ``AgLibraryFile.id_local`` in the catalog (cheap set-difference input)."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT f.id_local FROM AgLibraryFile f")
+    return [int(row[0]) for row in cursor.fetchall()]
+
+
 def main():
     """CLI entry point for catalog reading."""
     import argparse

@@ -43,6 +43,8 @@ import {
   CATALOG_CACHE_SIMILARITY_VIEW_ALL,
   CATALOG_CACHE_STACK_DETECT_HELPER,
   CATALOG_CACHE_STACK_DETECT_LABEL,
+  CATALOG_CACHE_SYNC_HELPER,
+  CATALOG_CACHE_SYNC_LABEL,
   CATALOG_CACHE_STAT_CACHED_HELPER,
   CATALOG_CACHE_STAT_CACHED_LABEL,
   CATALOG_CACHE_STAT_MISSING_HELPER,
@@ -77,6 +79,7 @@ async function fetchCacheStats(): Promise<CacheStats> {
 }
 
 type AdvancedBusyKey =
+  | 'sync'
   | 'embed_catalog'
   | 'embed_catalog_ig'
   | 'stack'
@@ -263,6 +266,14 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
             onToggle={() => setShowPipeline(!showPipeline)}
           >
             <div className="space-y-3">
+              <PipelineRow
+                label={CATALOG_CACHE_SYNC_LABEL}
+                helper={CATALOG_CACHE_SYNC_HELPER}
+                lastRun={pipelineStatus.catalog_sync ?? null}
+                disabled={anyBusy}
+                isBusy={advancedBusy === 'sync'}
+                onRun={() => runAdvancedJob('sync', 'catalog_sync', {})}
+              />
               <PipelineRow
                 label={CATALOG_CACHE_EMBED_CATALOG_LABEL}
                 helper={CATALOG_CACHE_EMBED_CATALOG_HELPER}

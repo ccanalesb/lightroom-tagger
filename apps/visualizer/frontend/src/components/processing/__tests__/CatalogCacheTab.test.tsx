@@ -17,6 +17,8 @@ import {
   CATALOG_CACHE_SIMILARITY_PREVIEW_TITLE,
   CATALOG_CACHE_SIMILARITY_TOTAL_GROUPS_LABEL,
   CATALOG_CACHE_STACK_DETECT_LABEL,
+  CATALOG_CACHE_SYNC_HELPER,
+  CATALOG_CACHE_SYNC_LABEL,
   PROCESSING_JOB_QUEUE_ROUTE,
   PROCESSING_OPEN_JOB_QUEUE,
 } from '../../../constants/strings';
@@ -53,6 +55,7 @@ function renderCatalogCacheTab(props: { onOpenJobQueue?: () => void } = {}) {
 }
 
 const EMPTY_PIPELINE_STATUS = {
+  catalog_sync: null,
   embed_catalog: null,
   embed_catalog_and_instagram: null,
   stack_detect: null,
@@ -216,6 +219,26 @@ describe('CatalogCacheTab', () => {
     );
   });
 
+  it('enqueues catalog_sync from pipeline section', async () => {
+    mockCreate.mockResolvedValue({ id: 'job-sync', type: 'catalog_sync' });
+    renderCatalogCacheTab();
+    fireEvent.click(
+      await screen.findByRole('button', { name: new RegExp(CATALOG_CACHE_PIPELINE_TITLE, 'i') }),
+    );
+    fireEvent.click(await screen.findByRole('button', { name: CATALOG_CACHE_SYNC_LABEL }));
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalledWith('catalog_sync', {});
+    });
+  });
+
+  it('renders sync helper copy in pipeline section', async () => {
+    renderCatalogCacheTab();
+    fireEvent.click(
+      await screen.findByRole('button', { name: new RegExp(CATALOG_CACHE_PIPELINE_TITLE, 'i') }),
+    );
+    expect(await screen.findByText(CATALOG_CACHE_SYNC_HELPER)).toBeTruthy();
+  });
+
   it('enqueues batch_embed_image catalog-only from pipeline section', async () => {
     mockCreate.mockResolvedValue({ id: 'job-embed', type: 'batch_embed_image' });
     renderCatalogCacheTab();
@@ -234,10 +257,10 @@ describe('CatalogCacheTab', () => {
       await screen.findByRole('button', { name: new RegExp(CATALOG_CACHE_PIPELINE_TITLE, 'i') }),
     );
     expect(await screen.findByText(CATALOG_CACHE_EMBED_CATALOG_HELPER)).toBeTruthy();
-    // 5 pipeline rows (catalog, catalog+ig, stack, similarity, prepare) all
+    // 6 pipeline rows (sync, catalog, catalog+ig, stack, similarity, prepare) all
     // start with "Never run" until at least one job has been created.
     const neverBadges = await screen.findAllByText(CATALOG_CACHE_LAST_RUN_NEVER);
-    expect(neverBadges.length).toBe(5);
+    expect(neverBadges.length).toBe(6);
   });
 
   it('renders status badge and relative timestamp for last run', async () => {

@@ -11,6 +11,7 @@ from .analyze import (
 from .embed import handle_batch_embed_image, handle_batch_text_embed
 from .instagram import handle_analyze_instagram, handle_instagram_import
 from .matching import handle_enrich_catalog, handle_prepare_catalog, handle_vision_match
+from .catalog import handle_catalog_sync
 from .stacks import (
     handle_batch_catalog_similarity,
     handle_batch_stack_detect,
@@ -32,6 +33,7 @@ JOB_HANDLERS = {
     'batch_catalog_similarity': handle_batch_catalog_similarity,
     'batch_text_embed': handle_batch_text_embed,
     'batch_embed_image': handle_batch_embed_image,
+    'catalog_sync': handle_catalog_sync,
     'catalog_cache_build': handle_catalog_cache_build,
 }
 

@@ -1,7 +1,7 @@
 """Tests for ``GET /api/cache/pipeline-status``.
 
 The endpoint surfaces the most recent run for each Catalog Cache pipeline
-trigger so the UI can display "Last run X ago" next to each button. The six
+trigger so the UI can display "Last run X ago" next to each button. The seven
 buckets share a small set of edge cases:
 
 * No matching job → ``null``
@@ -27,9 +27,12 @@ from database import init_db, update_job_status
 
 
 @pytest.fixture
-def client():
+def client(tmp_path, monkeypatch):
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, 'test.db')
+        lib_path = tmp_path / 'library.db'
+        lib_path.write_bytes(b'')
+        monkeypatch.setenv('LIBRARY_DB', str(lib_path))
         app = create_app()
         app.db = init_db(db_path)
         c = app.test_client()
@@ -49,6 +52,7 @@ def test_pipeline_status_returns_null_for_every_bucket_when_empty(client):
     assert resp.status_code == 200
     body = resp.json
     expected_keys = {
+        'catalog_sync',
         'embed_catalog',
         'embed_catalog_and_instagram',
         'stack_detect',
@@ -62,12 +66,14 @@ def test_pipeline_status_returns_null_for_every_bucket_when_empty(client):
 
 
 def test_pipeline_status_buckets_each_simple_job_type(client):
+    sync = _create(client, 'catalog_sync')
     sd = _create(client, 'batch_stack_detect')
     sim = _create(client, 'batch_catalog_similarity')
     pc = _create(client, 'prepare_catalog')
     chain = _create(client, 'catalog_cache_build')
 
     body = client.get('/api/cache/pipeline-status').json
+    assert body['catalog_sync']['job_id'] == sync
     assert body['stack_detect']['job_id'] == sd
     assert body['catalog_similarity']['job_id'] == sim
     assert body['prepare_catalog']['job_id'] == pc
