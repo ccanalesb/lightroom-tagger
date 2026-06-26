@@ -1,3 +1,5 @@
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { createSandbox, cursor } from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 
@@ -55,5 +57,26 @@ await sandbox.run({
       }
     : { promptFile: "./.sandcastle/review.md" }),
 });
+
+// Step 3 — write the PR description with the cheap model. The agent inspects the
+// branch itself and writes PR_BODY.md in the worktree; we relay it to the repo
+// root so CI can pass `gh pr create --body-file .sandcastle/PR_BODY.md`.
+await sandbox.run({
+  agent: cursor("composer-2.5"),
+  prompt:
+    "Inspect this branch's changes (`git --no-pager log` and `git --no-pager diff`), " +
+    "then write a concise GitHub pull request description as Markdown to a file named " +
+    "PR_BODY.md in the repo root: a one-line summary, a short bullet list of what " +
+    "changed and why, and any testing notes. Do not reference an issue number and do " +
+    "not commit the file. When done, output <promise>COMPLETE</promise>.",
+});
+
+try {
+  const prBody = await readFile(join(sandbox.worktreePath, "PR_BODY.md"), "utf8");
+  await writeFile("./.sandcastle/PR_BODY.md", prBody, "utf8");
+  console.log("wrote .sandcastle/PR_BODY.md");
+} catch {
+  console.log("no PR_BODY.md produced; CI will use its fallback body");
+}
 
 console.log("branch:", branch);

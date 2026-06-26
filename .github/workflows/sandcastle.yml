@@ -61,10 +61,17 @@ jobs:
             exit 1
           fi
           git push origin "$BRANCH"
+          # Use the model-written PR description when present; fall back to the
+          # boilerplate. Always append the issue reference so the PR closes it.
+          NUM=${{ github.event.issue.number }}
+          if [ -s .sandcastle/PR_BODY.md ]; then
+            cp .sandcastle/PR_BODY.md .sandcastle/pr.md
+          else
+            printf 'Automated by Sandcastle for #%s.\n' "$NUM" > .sandcastle/pr.md
+          fi
+          printf '\nCloses #%s\n' "$NUM" >> .sandcastle/pr.md
           gh pr create \
             --head "$BRANCH" \
             --base "${{ github.event.repository.default_branch }}" \
             --title "Sandcastle: ${{ github.event.issue.title }}" \
-            --body "Automated by Sandcastle for #${{ github.event.issue.number }}.
-
-          Closes #${{ github.event.issue.number }}"
+            --body-file .sandcastle/pr.md

@@ -1,3 +1,5 @@
 .env
 logs/
 worktrees/
+PR_BODY.md
+pr.md
