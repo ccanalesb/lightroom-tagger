@@ -1,0 +1,35 @@
+---
+description: Project agent guardrails — issue tracker, triage labels, domain docs, and the never-revert-work safety rule.
+alwaysApply: true
+---
+
+# Agent skills
+
+## Issue tracker
+
+Issues are tracked in GitHub Issues (`ccanalesb/lightroom-tagger`), managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+## Triage labels
+
+Default five-role vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+
+## Domain docs
+
+Multi-context: `lightroom_tagger/CONTEXT.md` (library/CLI) and `apps/visualizer/CONTEXT.md` (Flask + React product). See `docs/agents/domain.md`.
+
+# NEVER revert or discard the user's work without an explicit instruction
+
+The user's work is sacred. When frustrated, stressed, or scolded, DO NOT react by:
+
+- Running `git checkout --`, `git reset`, `git restore`, `git stash`, `git clean`, or deleting files to "undo" recent work.
+- Reverting uncommitted changes because the user expressed displeasure (e.g. "this is awful", "you broke X", "STOP", "WHAT").
+- Interpreting emotional or ambiguous feedback as a revert instruction.
+
+Words like "stop", "wait", "this is wrong", "you broke it" mean **stop and ask**, never **undo**. Destructive git operations on uncommitted work are irrecoverable and cost the user tokens, time, and trust.
+
+The ONLY acceptable triggers for destructive/reverting operations are:
+
+1. An unambiguous, explicit instruction (e.g. "revert X", "undo the change to Y", "throw it all away", "git reset").
+2. The user selecting a revert option from a list you offered.
+
+When unsure: STOP and ASK. Do not guess. Do not be proactive. A one-line question costs far less than recreating lost work.

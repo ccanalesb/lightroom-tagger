@@ -12,12 +12,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
+import json
+import os
 import re
 import sqlite3
 from pathlib import Path
 
 from PIL import Image
 
+from lightroom_tagger.core.analyzer.image_prep import RAW_EXTENSIONS
 from lightroom_tagger.core.clip_similarity import shortlist_catalog_candidates_by_clip
 from lightroom_tagger.core.database import (
     catalog_key_is_primary_grid_row,
@@ -60,7 +63,10 @@ def compress_image_to_jpeg(
     try:
         if not src or not Path(src).exists():
             return False
-        with Image.open(src) as img:
+        viewable_path = _report_viewable_path(src)
+        if not viewable_path:
+            return False
+        with Image.open(viewable_path) as img:
             if img.width > max_dim or img.height > max_dim:
                 ratio = max_dim / max(img.width, img.height)
                 new_size = (max(1, int(img.width * ratio)), max(1, int(img.height * ratio)))
@@ -71,6 +77,18 @@ def compress_image_to_jpeg(
             return True
     except Exception:
         return False
+
+
+def _report_viewable_path(src: str) -> str | None:
+    """Return a viewable source image for reports without slow RAW conversion."""
+    ext = os.path.splitext(src)[1].lower()
+    if ext not in RAW_EXTENSIONS:
+        return src
+    for suffix in (".JPG", ".jpg", ".JPEG", ".jpeg"):
+        sidecar = src.rsplit(".", 1)[0] + suffix
+        if Path(sidecar).exists():
+            return sidecar
+    return None
 
 
 def safe_asset_name(insta_key: str, catalog_key: str, rank: int) -> str:
@@ -91,6 +109,49 @@ def _compress_asset(src: str | None, dest: Path) -> str | None:
     if src and compress_image_to_jpeg(src, str(dest)):
         return _asset_ref(dest)
     return None
+
+
+def _render_snapshot_diagnostics(parent: dict | None) -> str:
+    if not parent:
+        return ""
+    try:
+        diagnostics = json.loads(parent.get("diagnostics_json") or "{}")
+    except (TypeError, json.JSONDecodeError):
+        diagnostics = {}
+    if not diagnostics:
+        return ""
+
+    rows = [
+        ("date window candidates", diagnostics.get("date_window_count")),
+        ("rejected pair drops", diagnostics.get("rejected_filtered_count")),
+        ("non-representative drops", diagnostics.get("non_representative_filtered_count")),
+        ("CLIP input", diagnostics.get("clip_input_count")),
+        ("CLIP output", diagnostics.get("clip_output_count")),
+        ("vision candidates", diagnostics.get("vision_candidate_count")),
+    ]
+    table_rows = "".join(
+        f"<tr><th>{_e(label)}</th><td>{_e(value)}</td></tr>"
+        for label, value in rows
+        if value is not None
+    )
+    dropped_keys = {
+        "rejected_filtered_keys": diagnostics.get("rejected_filtered_keys") or [],
+        "non_representative_filtered_keys": diagnostics.get("non_representative_filtered_keys") or [],
+        "clip_output_keys": diagnostics.get("clip_output_keys") or [],
+    }
+    debug = "\n".join(
+        f"{label}: {', '.join(map(str, values))}"
+        for label, values in dropped_keys.items()
+        if values
+    )
+    debug_html = f"<pre>{_e(debug)}</pre>" if debug else ""
+    return (
+        '<details class="lt-diagnostics">'
+        "<summary>Pipeline diagnostics</summary>"
+        f"<table>{table_rows}</table>"
+        f"{debug_html}"
+        "</details>"
+    )
 
 
 def _catalog_filepath(db: sqlite3.Connection, catalog_key: str) -> str:
@@ -158,7 +219,12 @@ def _render_candidate_tile(
     if reconstructed:
         catalog_path = child.get("local_path") or ""
     else:
-        catalog_path = _catalog_filepath(db, catalog_key)
+        catalog_path = (
+            child.get("asset_path")
+            or child.get("source_path")
+            or child.get("debug_resolved_path")
+            or _catalog_filepath(db, catalog_key)
+        )
     asset_name = safe_asset_name(insta_key, catalog_key, rank)
     asset_ref = _compress_asset(catalog_path, assets_dir / asset_name)
 
@@ -199,6 +265,9 @@ def _render_candidate_tile(
         debug = (
             '<details class="lt-pool-debug">'
             f"<summary>{_e(catalog_key)} debug</summary>"
+            f"<p><strong>captured_asset_path:</strong> {_e(child.get('asset_path'))}</p>"
+            f"<p><strong>source_available:</strong> {_e(child.get('source_available'))}</p>"
+            f"<p><strong>source_path:</strong> {_e(child.get('source_path'))}</p>"
             f"<p><strong>debug_resolved_path:</strong> {_e(child.get('debug_resolved_path'))}</p>"
             f"<pre>{_e(child.get('vision_reasoning'))}</pre>"
             "</details>"
@@ -254,7 +323,8 @@ def write_comparison_pool_report(
             ]
 
         ig_asset = assets_dir / f"ig_insta_{_sha12(insta_key)}.jpg"
-        ig_ref = _compress_asset(row.get("file_path"), ig_asset)
+        ig_src = parent.get("insta_asset_path") if parent else None
+        ig_ref = _compress_asset(ig_src or row.get("file_path"), ig_asset)
         if ig_ref:
             ig_html = f'<img src="{_e(ig_ref)}" alt="Instagram {_e(insta_key)}">'
         else:
@@ -293,6 +363,7 @@ def write_comparison_pool_report(
             '<section class="lt-pool-card">'
             f"{banner}"
             f"<h2>{_e(insta_key)}</h2>"
+            f"{_render_snapshot_diagnostics(parent)}"
             '<div class="lt-instagram-preview">'
             f"{ig_html}"
             "</div>"

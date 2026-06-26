@@ -420,7 +420,7 @@
       "Do preserve negative letter-spacing on Display / Headline / Title / Subtitle. The tracking is the typographic identity.",
       "Do use Inter 400 / 500 / 600 / 700 — and only those four weights.",
       "Do make photos the loudest thing on screen. Strip chrome around image grids; let TileGrid and the photos themselves carry the layout.",
-      "Do centralize derived UI on shared types (e.g. image.stack_* → ImageTile) so consumers stay clean. See .cursor/rules/shared-derivation.mdc."
+      "Do centralize derived UI on shared types (e.g. image.stack_* → ImageTile) so consumers stay clean."
     ],
     "donts": [
       "Don't introduce a second accent color. The system has one accent. Purple, teal, pink, and orange flourish-accents are forbidden — the existing palette already covers status (semantic) and emphasis (accent).",

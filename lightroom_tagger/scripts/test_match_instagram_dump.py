@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock, Mock, patch
 
 from PIL import Image
@@ -122,11 +123,24 @@ def test_match_dump_media_persists_comparison_pool_snapshot(tmp_path):
         candidate_count = db.execute(
             "SELECT COUNT(*) AS c FROM comparison_pool_snapshot_candidates"
         ).fetchone()["c"]
+        snapshot = db.execute(
+            "SELECT diagnostics_json, insta_asset_path FROM comparison_pool_snapshots"
+        ).fetchone()
+        child = db.execute(
+            "SELECT source_path, source_available, asset_path FROM comparison_pool_snapshot_candidates LIMIT 1"
+        ).fetchone()
+        diagnostics = json.loads(snapshot["diagnostics_json"])
 
         assert stats["processed"] == 1
         assert matches == []
         assert snapshot_count == 1
         assert candidate_count == 2
+        assert diagnostics["date_window_count"] == 2
+        assert diagnostics["clip_output_count"] == 2
+        assert snapshot["insta_asset_path"]
+        assert child["source_path"]
+        assert child["source_available"] == 1
+        assert child["asset_path"]
     finally:
         db.close()
 
@@ -208,5 +222,93 @@ def test_match_dump_media_cancel_after_snapshot_marks_attempted(tmp_path):
 
         assert snapshot_count == 1
         assert attempted_at is not None
+    finally:
+        db.close()
+
+
+def test_match_dump_media_diagnostic_only_captures_without_storing_match(tmp_path):
+    """Diagnostic runs backfill evidence without changing match state."""
+    insta_path = tmp_path / "insta.png"
+    catalog_path = tmp_path / "catalog.png"
+    Image.new("RGB", (1, 1), color=(255, 0, 0)).save(insta_path)
+    Image.new("RGB", (1, 1), color=(0, 255, 0)).save(catalog_path)
+
+    db = init_database(str(tmp_path / "lib.db"))
+    try:
+        db.execute(
+            """
+            INSERT INTO instagram_dump_media (
+                media_key, file_path, filename, date_folder, processed
+            ) VALUES (?, ?, ?, ?, 0)
+            """,
+            ("fixture/1", str(insta_path), "insta.png", "202601"),
+        )
+        db.execute(
+            "INSERT INTO images (key, filepath, date_taken, instagram_posted) VALUES (?, ?, ?, 0)",
+            ("cat/1", str(catalog_path), "2026-01-01T00:00:00"),
+        )
+        db.commit()
+
+        fake_candidates = [
+            {"key": "cat/1", "filepath": str(catalog_path), "phash": "", "description": ""},
+        ]
+        fake_results = [
+            {
+                "catalog_key": "cat/1",
+                "total_score": 0.99,
+                "phash_distance": 1,
+                "phash_score": 0.94,
+                "desc_similarity": 0.5,
+                "vision_result": "SAME",
+                "vision_score": 1.0,
+                "vision_reasoning": "diagnostic",
+                "model_used": "test-model",
+                "rate_limited": False,
+            },
+        ]
+
+        with (
+            patch(
+                "lightroom_tagger.scripts.match_instagram_dump.find_candidates_by_date",
+                return_value=fake_candidates,
+            ),
+            patch(
+                "lightroom_tagger.scripts.match_instagram_dump.catalog_key_is_primary_grid_row",
+                return_value=True,
+            ),
+            patch(
+                "lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip",
+                return_value=["cat/1"],
+            ),
+            patch(
+                "lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision",
+                return_value=fake_results,
+            ),
+        ):
+            stats, matches = match_dump_media(
+                db,
+                media_key="fixture/1",
+                threshold=0.7,
+                diagnostic_only=True,
+            )
+
+        media = db.execute(
+            "SELECT processed, last_attempted_at, matched_catalog_key FROM instagram_dump_media WHERE media_key = ?",
+            ("fixture/1",),
+        ).fetchone()
+        match_count = db.execute("SELECT COUNT(*) AS c FROM matches").fetchone()["c"]
+        snapshot_count = db.execute(
+            "SELECT COUNT(*) AS c FROM comparison_pool_snapshots"
+        ).fetchone()["c"]
+
+        assert stats["processed"] == 1
+        assert stats["matched"] == 0
+        assert stats["skipped"] == 1
+        assert matches == []
+        assert media["processed"] == 0
+        assert media["last_attempted_at"] is not None
+        assert media["matched_catalog_key"] is None
+        assert match_count == 0
+        assert snapshot_count == 1
     finally:
         db.close()

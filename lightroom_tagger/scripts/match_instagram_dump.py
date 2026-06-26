@@ -42,6 +42,10 @@ from lightroom_tagger.core.vision_client import generate_description
 from lightroom_tagger.core.path_utils import resolve_catalog_path
 
 
+def _candidate_keys(candidates: list[dict]) -> list[str]:
+    return [str(candidate["key"]) for candidate in candidates if candidate.get("key")]
+
+
 def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      month: str = None, year: str = None, last_months: int = None,
                      progress_callback=None, log_callback=None,
@@ -57,7 +61,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      resume_processed_keys: set[str] | None = None,
                      on_media_complete: Callable[..., None] | None = None,
                      batch_progress_callback: Callable[[int, int, int, int], None] | None = None,
-                     source_job_id: str | None = None) -> tuple:
+                     source_job_id: str | None = None,
+                     diagnostic_only: bool = False) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -85,6 +90,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         on_media_complete: If set, invoked as ``(media_key, stats)`` once per finished row
             that completes the loop body (same rows as previously).
         source_job_id: Optional visualizer job UUID string stored on comparison pool snapshots for offline --job-id filters.
+        diagnostic_only: If True, score and snapshot rows but do not create matches,
+            mark media processed, or write Lightroom updates.
 
     Returns:
         Tuple of (stats dict, matches list)
@@ -152,20 +159,34 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         stats['processed'] += 1
 
         candidates = find_candidates_by_date(db, dump_media, days_before=90)
+        date_window_candidates = list(candidates)
         initial_candidate_count = len(candidates)
 
         if rejected:
+            before_rejected_candidates = list(candidates)
             candidates = [
                 c for c in candidates
                 if (c.get('key'), media_key) not in rejected
             ]
+            rejected_dropped_keys = [
+                str(c.get('key'))
+                for c in before_rejected_candidates
+                if c.get('key') and (c.get('key'), media_key) in rejected
+            ]
+        else:
+            rejected_dropped_keys = []
 
+        before_rep_candidates = list(candidates)
         before_rep_filter = len(candidates)
         candidates = [
             c for c in candidates
             if c.get('key') and catalog_key_is_primary_grid_row(db, c['key'])
         ]
         removed_nr = before_rep_filter - len(candidates)
+        rep_keys = set(_candidate_keys(candidates))
+        non_representative_dropped_keys = [
+            key for key in _candidate_keys(before_rep_candidates) if key not in rep_keys
+        ]
         if removed_nr:
             stats['non_representative_candidates_filtered'] += removed_nr
             if log_callback:
@@ -178,6 +199,18 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         if log_callback and idx <= 3:
             log_callback('debug', f'[{media_key}] Found {initial_candidate_count} candidates by date, {len(candidates)} after filters')
 
+        pool_diagnostics = {
+            'date_window_count': initial_candidate_count,
+            'date_window_keys': _candidate_keys(date_window_candidates),
+            'rejected_filtered_count': len(rejected_dropped_keys),
+            'rejected_filtered_keys': rejected_dropped_keys,
+            'representative_input_count': before_rep_filter,
+            'non_representative_filtered_count': removed_nr,
+            'non_representative_filtered_keys': non_representative_dropped_keys,
+            'representative_output_count': len(candidates),
+            'representative_output_keys': _candidate_keys(candidates),
+        }
+
         if not candidates:
             insert_comparison_pool_snapshot(
                 db=db,
@@ -188,6 +221,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                 weights=weights,
                 vision_candidates=[],
                 results=[],
+                diagnostics=pool_diagnostics,
+                dump_image_path=dump_media.get('file_path'),
             )
             mark_dump_media_attempted(db, dump_media['media_key'])
             stats['skipped'] += 1
@@ -202,6 +237,13 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         )
         row_by_key = {c['key']: c for c in candidates if c.get('key')}
         candidates = [row_by_key[k] for k in short_keys if k in row_by_key]
+        pool_diagnostics.update({
+            'clip_top_k': clip_top_k,
+            'clip_input_count': dw_in,
+            'clip_input_keys': [str(key) for key in cand_keys],
+            'clip_output_count': len(candidates),
+            'clip_output_keys': [str(key) for key in short_keys if key in row_by_key],
+        })
         stats['clip_shortlist_applied'] += 1
         stats['clip_prefilter_candidates_in'] += dw_in
         stats['clip_prefilter_shortlist_total'] += len(candidates)
@@ -222,6 +264,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                 weights=weights,
                 vision_candidates=[],
                 results=[],
+                diagnostics=pool_diagnostics,
+                dump_image_path=dump_media.get('file_path'),
             )
             mark_dump_media_attempted(db, dump_media['media_key'])
             stats['skipped'] += 1
@@ -338,6 +382,10 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                 })
                 candidate['ai_summary'] = summary
             vision_candidates.append(candidate)
+        pool_diagnostics.update({
+            'vision_candidate_count': len(vision_candidates),
+            'vision_candidate_keys': _candidate_keys(vision_candidates),
+        })
 
         def _make_batch_cb(item_idx, item_total):
             def _cb(chunk, num_chunks):
@@ -371,6 +419,8 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             weights=weights,
             vision_candidates=vision_candidates,
             results=results,
+            diagnostics=pool_diagnostics,
+            dump_image_path=dump_media.get('file_path'),
         )
 
         if should_cancel is not None and should_cancel():
@@ -386,7 +436,20 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
 
         above_threshold = [r for r in results if r['total_score'] >= threshold]
 
-        if above_threshold:
+        if diagnostic_only:
+            best = results[0] if results else None
+            mark_dump_media_attempted(
+                db, dump_media['media_key'],
+                vision_result=best.get('vision_result') if best else None,
+                vision_score=best.get('vision_score') if best else None,
+            )
+            stats['skipped'] += 1
+            if log_callback:
+                log_callback(
+                    'info',
+                    f'[{media_key}] Diagnostic-only run captured evidence without storing matches',
+                )
+        elif above_threshold:
             best_match = above_threshold[0]
             matched_catalog_key = best_match['catalog_key']
 
@@ -468,6 +531,10 @@ def main():
     parser.add_argument('--month', help='Filter by month (e.g., 202603)')
     parser.add_argument('--year', help='Filter by year (e.g., 2026)')
     parser.add_argument('--last-months', type=int, help='Filter by last N months')
+    parser.add_argument('--media-key', help='Process one Instagram media key')
+    parser.add_argument('--source-job-id', help='Store this provenance id on snapshots')
+    parser.add_argument('--diagnostic-only', action='store_true',
+                        help='Capture comparison-pool evidence without storing matches')
     parser.add_argument('--reprocess', action='store_true',
                         help='Re-process already processed media')
     parser.add_argument('--no-lightroom', action='store_true',
@@ -489,7 +556,10 @@ def main():
             month=args.month,
             year=args.year,
             last_months=args.last_months,
+            media_key=args.media_key,
             force_reprocess=args.reprocess,
+            source_job_id=args.source_job_id,
+            diagnostic_only=args.diagnostic_only,
         )
 
         print(f"\nProcessed: {stats['processed']}")
@@ -497,7 +567,7 @@ def main():
         print(f"Skipped: {stats['skipped']}")
 
         # Update Lightroom with configured Instagram keyword
-        if matches and not args.no_lightroom:
+        if matches and not args.no_lightroom and not args.diagnostic_only:
             config = load_config()
             catalog_path = config.catalog_path or config.small_catalog_path
             if catalog_path and os.path.exists(catalog_path):

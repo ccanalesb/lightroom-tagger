@@ -267,7 +267,7 @@ The system is **ambient-layered, not flat**. Cards sit at rest with a four-stop 
 
 ### Image Tile (signature component)
 
-The `ImageTile` is the most visible component in the visualizer — it renders the photo grid that *is* the product. It's a card with a thumbnail, a filename / subtitle / metadata stack below, and overlay badges in the top-right corner. Variants drive aspect ratio and body density (catalog dense vs. featured wide vs. instagram square). Stack-representative badge is auto-derived from `image.stack_*` fields and centralized — never duplicate that logic in consumers (see `.cursor/rules/shared-derivation.mdc`).
+The `ImageTile` is the most visible component in the visualizer — it renders the photo grid that *is* the product. It's a card with a thumbnail, a filename / subtitle / metadata stack below, and overlay badges in the top-right corner. Variants drive aspect ratio and body density (catalog dense vs. featured wide vs. instagram square). Stack-representative badge is auto-derived from `image.stack_*` fields and centralized — never duplicate that logic in consumers.
 
 - **Shape:** `rounded.card` (12px), `overflow-hidden`.
 - **Surface:** `bg-bg` background, 1px `border-border` hairline, `shadow-card`.
@@ -335,7 +335,7 @@ The visualizer has two main modals: `JobDetailModal` and `ImageDetailModal`. Bot
 - **Do** preserve negative letter-spacing on Display / Headline / Title / Subtitle. The tracking is the typographic identity.
 - **Do** use Inter 400 / 500 / 600 / 700 — and only those four weights.
 - **Do** make photos the loudest thing on screen. Strip chrome around image grids; let `TileGrid` and the photos themselves carry the layout.
-- **Do** centralize derived UI on shared types (e.g. `image.stack_*` → `ImageTile`) so consumers stay clean. See `.cursor/rules/shared-derivation.mdc`.
+- **Do** centralize derived UI on shared types (e.g. `image.stack_*` → `ImageTile`) so consumers stay clean.
 
 ### Don't:
 

@@ -1,8 +1,4 @@
-"""Catalog identity aggregation: best-photo ranking, style fingerprint, post-next hints.
-
-Design decisions D-40–D-47 are documented in
-``.planning/phases/08-identity-suggestions/08-CONTEXT.md``.
-"""
+"""Catalog identity aggregation: best-photo ranking, style fingerprint, post-next hints."""
 
 from __future__ import annotations
 

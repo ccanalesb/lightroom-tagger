@@ -269,7 +269,9 @@ def _migrate_comparison_pool_snapshots(conn: sqlite3.Connection) -> None:
             threshold REAL NOT NULL,
             clip_top_k INTEGER NOT NULL,
             weights_json TEXT NOT NULL,
-            candidate_count INTEGER NOT NULL DEFAULT 0
+            candidate_count INTEGER NOT NULL DEFAULT 0,
+            diagnostics_json TEXT NOT NULL DEFAULT '{}',
+            insta_asset_path TEXT
         );
 
         CREATE INDEX IF NOT EXISTS idx_comparison_pool_snapshots_insta_captured
@@ -292,6 +294,9 @@ def _migrate_comparison_pool_snapshots(conn: sqlite3.Connection) -> None:
             vision_reasoning TEXT,
             model_used TEXT,
             rate_limited INTEGER NOT NULL DEFAULT 0,
+            source_path TEXT,
+            source_available INTEGER NOT NULL DEFAULT 0,
+            asset_path TEXT,
             debug_resolved_path TEXT,
             PRIMARY KEY (snapshot_id, catalog_key)
         );
@@ -299,6 +304,36 @@ def _migrate_comparison_pool_snapshots(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_comparison_pool_snapshot_candidates_snapshot_rank
             ON comparison_pool_snapshot_candidates(snapshot_id, rank);
         """
+    )
+    _migrate_add_column(
+        conn,
+        "comparison_pool_snapshots",
+        "diagnostics_json",
+        "TEXT NOT NULL DEFAULT '{}'",
+    )
+    _migrate_add_column(
+        conn,
+        "comparison_pool_snapshots",
+        "insta_asset_path",
+        "TEXT",
+    )
+    _migrate_add_column(
+        conn,
+        "comparison_pool_snapshot_candidates",
+        "source_path",
+        "TEXT",
+    )
+    _migrate_add_column(
+        conn,
+        "comparison_pool_snapshot_candidates",
+        "source_available",
+        "INTEGER NOT NULL DEFAULT 0",
+    )
+    _migrate_add_column(
+        conn,
+        "comparison_pool_snapshot_candidates",
+        "asset_path",
+        "TEXT",
     )
 
 

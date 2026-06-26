@@ -27,6 +27,19 @@ python -m lightroom_tagger instagram-sync --db library.db --from-matches \
     --catalog "/path/to/Catalog.lrcat" --keyword "posted"
 ```
 
+### Diagnose Missed Matches
+
+After matching, generate a read-only comparison-pool report for unmatched attempted Instagram rows:
+
+```bash
+python -m lightroom_tagger.scripts.generate_comparison_pool_report \
+    --db library.db \
+    --out /tmp/comparison-pool-report \
+    --limit 25
+```
+
+Open `/tmp/comparison-pool-report/report.html`. See [Comparison Pool Report](docs/comparison-pool-report.md) for filters like `--month`, `--job-id`, and `--media-key`.
+
 ### Parameters Explained
 
 | Command | Parameter | Description |

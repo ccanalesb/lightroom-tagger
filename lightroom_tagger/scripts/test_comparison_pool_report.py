@@ -4,6 +4,7 @@ from PIL import Image
 
 from lightroom_tagger.core.database import init_database, insert_comparison_pool_snapshot
 from lightroom_tagger.scripts.generate_comparison_pool_report import (
+    compress_image_to_jpeg,
     write_comparison_pool_report,
 )
 
@@ -64,7 +65,18 @@ def _insert_report_fixture(db, tmp_path: Path, *, with_snapshot: bool = True) ->
                     "rate_limited": False,
                 }
             ],
+            diagnostics={
+                "date_window_count": 2,
+                "rejected_filtered_count": 0,
+                "non_representative_filtered_count": 1,
+                "clip_input_count": 1,
+                "clip_output_count": 1,
+                "vision_candidate_count": 1,
+                "non_representative_filtered_keys": ["cat/2"],
+            },
+            dump_image_path=str(insta_path),
         )
+    return insta_path, catalog_path
 
 
 def test_comparison_pool_report_writes_html_and_assets(tmp_path):
@@ -86,6 +98,8 @@ def test_comparison_pool_report_writes_html_and_assets(tmp_path):
     assert (tmp_path / "out" / "assets").is_dir()
     html = html_path.read_text()
     assert 'src="assets/' in html
+    assert "Pipeline diagnostics" in html
+    assert "non-representative drops" in html
 
 
 def test_comparison_pool_report_primary_has_no_absolute_paths(tmp_path):
@@ -127,3 +141,39 @@ def test_comparison_pool_report_reconstructed_banner(tmp_path):
         db.close()
 
     assert "Reconstructed — not exact run evidence" in html_path.read_text()
+
+
+def test_comparison_pool_report_uses_captured_assets_when_sources_removed(tmp_path):
+    db = init_database(str(tmp_path / "lib.db"))
+    try:
+        insta_path, catalog_path = _insert_report_fixture(db, tmp_path, with_snapshot=True)
+        insta_path.unlink()
+        catalog_path.unlink()
+        html_path = write_comparison_pool_report(
+            str(tmp_path / "out"),
+            db,
+            month=None,
+            job_id=None,
+            media_key=None,
+            limit=None,
+        )
+    finally:
+        db.close()
+
+    html = html_path.read_text()
+    start = html.index('<main id="lt-primary-comparison-pool">')
+    end = html.index("</main>", start)
+    primary = html[start:end]
+    assert 'src="assets/' in primary
+    assert "image unavailable" not in primary
+
+
+def test_comparison_pool_report_compresses_dng_sidecar_jpeg(tmp_path):
+    raw_path = tmp_path / "catalog.DNG"
+    sidecar_path = tmp_path / "catalog.JPG"
+    dest_path = tmp_path / "asset.jpg"
+    raw_path.write_bytes(b"not a real raw file")
+    _tiny_image(sidecar_path, color=(0, 0, 255))
+
+    assert compress_image_to_jpeg(str(raw_path), str(dest_path))
+    assert dest_path.exists()

@@ -470,5 +470,3 @@ function CatalogSimilarityGroupsPreview({
     </div>
   )
 }
-
-// job-ui-contract: touched with phase 12 backend batch job changes (no UI change)

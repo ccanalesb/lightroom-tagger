@@ -621,7 +621,7 @@ export const CATALOG_CACHE_LAST_RUN_LABEL = (ago: string) => `Last run ${ago}`
 export const CATALOG_CACHE_PREPARE_CATALOG_HELPER =
   "Decodes and compresses every catalog image (RAW → JPEG) so vision matching, description, and scoring jobs don't pay decode cost on the hot path. Optional — runs lazily on first use if skipped."
 
-/** Primary card — latest similarity groups preview (job-ui-contract / WR-08-01). */
+/** Primary card — latest similarity groups preview. */
 export const CATALOG_CACHE_SIMILARITY_PREVIEW_TITLE = 'Latest similarity groups'
 export const CATALOG_CACHE_SIMILARITY_EMPTY =
   'No catalog similarity groups yet. Run catalog similarity from Pipeline stages after Embed Images completes.'

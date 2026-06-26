@@ -1121,8 +1121,7 @@ export type ChatSearchResponse = {
  * list row or detail response). Adapters map API-specific rows into this
  * single type; fields not available from a given source are left undefined.
  *
- * See `.planning/quick/260420-840-consolidate-image-metadata` for the
- * motivation — list endpoints stay lean, the detail endpoint fills every
+ * Motivation: list endpoints stay lean, the detail endpoint fills every
  * field authoritatively when the modal is opened.
  */
 export interface ImageView {

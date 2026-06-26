@@ -44,10 +44,10 @@ def main() -> None:
     )
     parser.add_argument(
         "--out-dir",
-        default=".planning/phases/10-match-02-quantitative-benchmark",
+        default="artifacts/clip-recall-benchmark",
         help=(
             "Directory for 10-recall-data.csv and 10-RECALL.md "
-            "(default: .planning/phases/10-match-02-quantitative-benchmark)"
+            "(default: artifacts/clip-recall-benchmark)"
         ),
     )
     args = parser.parse_args()
