@@ -1,0 +1,70 @@
+name: Sandcastle
+
+# Trigger: a run starts when the "sandcastle" label is added to an issue.
+on:
+  issues:
+    types: [labeled]
+
+# Allow pushing the result branch and opening a PR with the built-in token.
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+# Avoid overlapping runs for the same issue.
+concurrency:
+  group: sandcastle-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    if: github.event.label.name == 'sandcastle'
+    runs-on: ubuntu-latest
+    env:
+      BRANCH: sandcastle/issue-${{ github.event.issue.number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Node deps
+        run: npm ci
+
+      - name: Build sandbox image
+        # --dockerfile makes the build context the repo root, so the Dockerfile
+        # can COPY pyproject.toml + uv.lock to pre-bake deps (.dockerignore keeps
+        # the context to just those files).
+        run: npx @ai-hero/sandcastle docker build-image --dockerfile .sandcastle/Dockerfile
+
+      - name: Run sandcastle pipeline
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          SANDCASTLE_BRANCH: ${{ env.BRANCH }}
+          SANDCASTLE_TASK: |
+            ${{ github.event.issue.title }}
+
+            ${{ github.event.issue.body }}
+        run: |
+          # Sandcastle injects agent env from .sandcastle/.env (gitignored, so
+          # absent in CI). Recreate it from the secret so the sandbox can auth.
+          printf 'CURSOR_API_KEY=%s\n' "$CURSOR_API_KEY" > .sandcastle/.env
+          npx tsx .sandcastle/main.mts
+
+      - name: Push branch and open PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
+            echo "::error::No branch '$BRANCH' was produced by the run."
+            exit 1
+          fi
+          git push origin "$BRANCH"
+          gh pr create \
+            --head "$BRANCH" \
+            --base "${{ github.event.repository.default_branch }}" \
+            --title "Sandcastle: ${{ github.event.issue.title }}" \
+            --body "Automated by Sandcastle for #${{ github.event.issue.number }}.
+
+          Closes #${{ github.event.issue.number }}"

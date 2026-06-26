@@ -5,9 +5,10 @@ RUN apt-get update && apt-get install -y \
   git \
   curl \
   jq \
+  python3 \
+  python3-venv \
+  python3-pip \
   && rm -rf /var/lib/apt/lists/*
-
-# TODO: install your issue tracker's CLI here. See .sandcastle/SETUP_ISSUE_TRACKER.md
 
 # Build-args for UID/GID alignment: sandcastle docker build-image
 # defaults these to the host user's UID/GID so image-built files
@@ -25,12 +26,25 @@ USER ${AGENT_UID}:${AGENT_GID}
 # Install Cursor Agent CLI
 RUN curl https://cursor.com/install -fsS | bash
 
-# Add Cursor CLI to PATH
-ENV PATH="/home/agent/.local/bin:$PATH"
+# Install uv (fast Python package manager) into ~/.local/bin
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Shared venv outside the bind-mounted repo so it never clobbers the host's.
+ENV UV_PROJECT_ENVIRONMENT=/home/agent/venv
+ENV VIRTUAL_ENV=/home/agent/venv
+# venv first so `python`/`pip` resolve to it; then uv + cursor in ~/.local/bin
+ENV PATH="/home/agent/venv/bin:/home/agent/.local/bin:$PATH"
+
+# Pre-bake the project's (heavy) dependencies into the image so every run is
+# fast and offline. Only the dependency manifests are copied here, so this
+# layer is cached across code changes. The editable project itself is installed
+# at runtime via the onSandboxReady hook (deps already satisfied -> fast).
+WORKDIR /home/agent/.deps
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-install-project --extra dev
 
 WORKDIR /home/agent
 
 # In worktree sandbox mode, Sandcastle bind-mounts the git worktree at /home/agent/workspace
 # and overrides the working directory to /home/agent/workspace at container start.
-# Structure your Dockerfile so that /home/agent/workspace can serve as the project root.
 ENTRYPOINT ["sleep", "infinity"]

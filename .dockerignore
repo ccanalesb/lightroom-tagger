@@ -1,0 +1,7 @@
+# Used by `sandcastle docker build-image --dockerfile .sandcastle/Dockerfile`,
+# which uses the repo root as the build context. The Dockerfile only needs the
+# dependency manifests, so exclude everything else (keeps the context tiny and
+# avoids shipping library.db / artifacts / node_modules into the build).
+*
+!pyproject.toml
+!uv.lock
