@@ -107,10 +107,7 @@ def _handle_catalog_sync_inner(
         'library_total': result.library_total,
         'missing_ids_count': result.missing_ids_count,
     }
-    if not chain_mode:
-        runner.complete_job(job_id, payload)
-    else:
-        runner.complete_job(job_id, payload)
+    runner.complete_job(job_id, payload)
     return payload
 
 
