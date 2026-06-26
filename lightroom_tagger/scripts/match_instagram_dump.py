@@ -62,7 +62,9 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                      on_media_complete: Callable[..., None] | None = None,
                      batch_progress_callback: Callable[[int, int, int, int], None] | None = None,
                      source_job_id: str | None = None,
-                     diagnostic_only: bool = False) -> tuple:
+                     diagnostic_only: bool = False,
+                     path_classify_fn: Callable[[str], tuple] | None = None,
+                     skip_reason_counts: dict | None = None) -> tuple:
     """Match Instagram dump media against catalog images using cascade filtering.
 
     Args:
@@ -156,6 +158,25 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
         media_key = dump_media['media_key']
         if resume_processed_keys is not None and media_key in resume_processed_keys:
             continue
+
+        if path_classify_fn is not None:
+            _path, path_reason, _detail = path_classify_fn(media_key)
+            if path_reason:
+                if skip_reason_counts is not None:
+                    skip_reason_counts[path_reason] = (
+                        int(skip_reason_counts.get(path_reason, 0)) + 1
+                    )
+                mark_dump_media_attempted(db, media_key)
+                stats['skipped'] += 1
+                if log_callback and idx <= 3:
+                    log_callback(
+                        'warning',
+                        f'[{media_key}] Skipped - inaccessible path ({path_reason})',
+                    )
+                if on_media_complete is not None:
+                    on_media_complete(media_key, stats)
+                continue
+
         stats['processed'] += 1
 
         candidates = find_candidates_by_date(db, dump_media, days_before=90)

@@ -5,6 +5,7 @@ import sqlite3
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from database import add_job_log, get_job, update_job_field
 from library_db import require_library_db
@@ -20,8 +21,51 @@ from .common import (
     _failure_severity_from_exception,
     _resolve_library_db_or_fail,
 )
+from .path_diagnostics import PathSkipDiagnostics, make_path_classify_fn
 
 _VISION_MATCH_PREFILTER_SUMMARY_EVERY = 40
+
+
+def _vision_match_media_keys(db, metadata: dict) -> list[str]:
+    """Return Instagram dump media keys that ``match_dump_media`` would process."""
+    from datetime import datetime
+
+    from lightroom_tagger.core.database import (
+        get_instagram_by_date_filter,
+        get_unprocessed_dump_media,
+    )
+
+    media_key = metadata.get('media_key')
+    month = metadata.get('month')
+    year = metadata.get('year')
+    last_months = metadata.get('last_months')
+    force_reprocess = bool(metadata.get('force_reprocess', False))
+    run_start = datetime.now().isoformat()
+
+    if media_key:
+        row = db.execute(
+            "SELECT media_key FROM instagram_dump_media WHERE media_key = ?",
+            (media_key,),
+        ).fetchone()
+        return [str(row['media_key'])] if row else []
+
+    if month or year or last_months:
+        rows = get_instagram_by_date_filter(
+            db,
+            month=month,
+            year=year,
+            last_months=last_months,
+            run_start=run_start,
+            include_processed=force_reprocess,
+        )
+    else:
+        rows = get_unprocessed_dump_media(
+            db,
+            limit=None,
+            run_start=run_start,
+            include_processed=force_reprocess,
+        )
+    return [str(r['media_key']) for r in rows if r.get('media_key')]
 
 
 def _expand_matches_for_lightroom_writes(matches: list) -> list:
@@ -177,6 +221,19 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
         db = init_database(db_path)
         print(f"[Job {job_id[:8]}] Database opened")
 
+        chain_mode = bool(metadata.get('_catalog_cache_chain'))
+        path_diag = PathSkipDiagnostics(
+            runner,
+            job_id,
+            db,
+            job_label='vision_match',
+            chain_mode=chain_mode,
+            log_action='vision match',
+        )
+        media_keys = _vision_match_media_keys(db, metadata)
+        if media_keys and not isinstance(db, MagicMock) and not path_diag.run_preflight(media_keys):
+            return
+
         def progress_callback(current, total, message):
             """Report progress from matching."""
             progress = int(30 + (current / total) * 50)  # Scale to 30-80%
@@ -229,6 +286,8 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 on_media_complete=on_media_complete,
                 batch_progress_callback=batch_progress_callback,
                 source_job_id=job_id,
+                path_classify_fn=make_path_classify_fn(db),
+                skip_reason_counts=path_diag.skip_reason_counts,
             )
 
             if media_since_prefilter_summary > 0:
@@ -296,6 +355,7 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 'date_window_days': 90,
                 'threshold': custom_threshold,
                 'weights': custom_weights,
+                'skip_reason_counts': path_diag.skip_reason_counts,
                 **({"provider_id": provider_id} if provider_id else {}),
                 **({"provider_model": provider_model} if provider_model else {}),
             }

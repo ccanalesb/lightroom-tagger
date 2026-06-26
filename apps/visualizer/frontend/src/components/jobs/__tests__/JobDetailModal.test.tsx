@@ -234,4 +234,52 @@ describe('JobDetailModal', () => {
     expect(screen.queryByText(JOB_SKIP_NO_DB_ROW)).toBeNull();
     expect(screen.queryByText(JOB_SKIP_MISSING_FILE)).toBeNull();
   });
+
+  it('renders grouped path diagnostics for batch_describe jobs', async () => {
+    mockGet.mockResolvedValue(
+      makeJob({
+        type: 'batch_describe',
+        result: {
+          described: 0,
+          skipped: 2,
+          failed: 0,
+          total: 2,
+          skip_reason_counts: {
+            no_row: 0,
+            empty_path: 1,
+            unresolved_or_missing: 1,
+            encode_failed: 0,
+          },
+        },
+      }),
+    );
+    render(<JobDetailModal job={makeJob({ type: 'batch_describe' })} onClose={() => {}} />);
+
+    expect(await screen.findByText(JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE)).toBeTruthy();
+    expect(screen.getByText(JOB_SKIP_EMPTY_PATH).parentElement).toHaveTextContent('1');
+    expect(screen.getByText(JOB_SKIP_MISSING_FILE).parentElement).toHaveTextContent('1');
+  });
+
+  it('renders grouped path diagnostics for vision_match jobs', async () => {
+    mockGet.mockResolvedValue(
+      makeJob({
+        type: 'vision_match',
+        result: {
+          processed: 0,
+          matched: 0,
+          skipped: 3,
+          skip_reason_counts: {
+            no_row: 0,
+            empty_path: 0,
+            unresolved_or_missing: 3,
+            encode_failed: 0,
+          },
+        },
+      }),
+    );
+    render(<JobDetailModal job={makeJob({ type: 'vision_match' })} onClose={() => {}} />);
+
+    expect(await screen.findByText(JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE)).toBeTruthy();
+    expect(screen.getByText(JOB_SKIP_MISSING_FILE).parentElement).toHaveTextContent('3');
+  });
 });

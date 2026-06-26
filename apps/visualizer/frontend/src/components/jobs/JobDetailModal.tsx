@@ -50,6 +50,16 @@ const EMBED_REASON_LABELS = {
 
 type EmbedSkipBucketKey = keyof typeof EMBED_REASON_LABELS;
 
+const PATH_DIAGNOSTICS_JOB_TYPES = new Set([
+  'batch_embed_image',
+  'batch_describe',
+  'batch_score',
+  'batch_analyze',
+  'single_describe',
+  'single_score',
+  'vision_match',
+]);
+
 function statusToBadgeVariant(status: Job['status']): BadgeVariant {
   switch (status) {
     case 'completed':
@@ -298,7 +308,7 @@ function JobDetailModalBody({ job, onClose, onJobUpdate }: JobDetailModalProps) 
   }, [displayJob.result]);
 
   const embedReasonCounts = useMemo(() => {
-    if (displayJob.type !== 'batch_embed_image') return null;
+    if (!PATH_DIAGNOSTICS_JOB_TYPES.has(displayJob.type)) return null;
     const rawCounts =
       displayJob.result && typeof displayJob.result === 'object'
         ? (displayJob.result as Record<string, unknown>).skip_reason_counts
