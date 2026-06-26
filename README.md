@@ -412,4 +412,4 @@ opencli instagram images --post_url "<url>" -f json
 
 *Note: To use these commands, the `opencli` daemon must be active and the Chrome extension must be installed and connected in the host browser. Use `opencli doctor --live` to verify bridge connectivity.*
 
-Catalog read vs write surfaces: see docs/CATALOG_READ_WRITE.md
+Catalog read vs write surfaces: see [docs/CATALOG_READ_WRITE.md](docs/CATALOG_READ_WRITE.md). Storage/mount requirements for path-dependent jobs: see [docs/STORAGE_MOUNT_REQUIREMENTS.md](docs/STORAGE_MOUNT_REQUIREMENTS.md).
