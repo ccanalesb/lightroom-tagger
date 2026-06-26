@@ -17,6 +17,7 @@ import {
   CATALOG_CACHE_SIMILARITY_PREVIEW_TITLE,
   CATALOG_CACHE_SIMILARITY_TOTAL_GROUPS_LABEL,
   CATALOG_CACHE_STACK_DETECT_LABEL,
+  PROCESSING_EMBED_CATALOG_QUEUED,
   PROCESSING_JOB_QUEUE_ROUTE,
   PROCESSING_OPEN_JOB_QUEUE,
 } from '../../../constants/strings';
@@ -226,6 +227,17 @@ describe('CatalogCacheTab', () => {
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalledWith('batch_embed_image', { image_type: 'catalog' });
     });
+  });
+
+  it('shows success copy and Open Job Queue after embed enqueue', async () => {
+    mockCreate.mockResolvedValue({ id: 'job-embed', type: 'batch_embed_image' });
+    renderCatalogCacheTab();
+    fireEvent.click(
+      await screen.findByRole('button', { name: new RegExp(CATALOG_CACHE_PIPELINE_TITLE, 'i') }),
+    );
+    fireEvent.click(await screen.findByRole('button', { name: CATALOG_CACHE_EMBED_CATALOG_LABEL }));
+    expect(await screen.findByText(PROCESSING_EMBED_CATALOG_QUEUED)).toBeTruthy();
+    expect(screen.getByRole('button', { name: PROCESSING_OPEN_JOB_QUEUE })).toBeTruthy();
   });
 
   it('renders helper copy and Never run badge when no pipeline jobs exist', async () => {
