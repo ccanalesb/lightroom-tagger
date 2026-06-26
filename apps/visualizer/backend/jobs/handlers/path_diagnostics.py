@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import random
-from typing import Callable
+from collections.abc import Callable
 
 import database
 
@@ -39,7 +39,7 @@ SKIP_REASON_MESSAGES = {
 
 
 def empty_skip_reason_counts() -> dict[str, int]:
-    return {bucket: 0 for bucket in SKIP_REASON_BUCKETS}
+    return dict.fromkeys(SKIP_REASON_BUCKETS, 0)
 
 
 def try_vision_cache(lib_db, image_key: str) -> str | None:
@@ -127,7 +127,7 @@ class PathSkipDiagnostics:
         self.sample_size = PREFLIGHT_SAMPLE_SIZE if sample_size is None else sample_size
         self.fail_ratio = PREFLIGHT_FAIL_RATIO if fail_ratio is None else fail_ratio
         self.skip_reason_counts = empty_skip_reason_counts()
-        self._skip_detail_logged = {bucket: 0 for bucket in SKIP_REASON_BUCKETS}
+        self._skip_detail_logged = dict.fromkeys(SKIP_REASON_BUCKETS, 0)
         self._summary_marker = 0
 
     def classify(self, image_key: str) -> tuple[str | None, str | None, str | None]:
@@ -269,15 +269,6 @@ class PathSkipDiagnostics:
                 ),
             )
             self._skip_detail_logged[reason] = count + 1
-
-
-def classify_path_for_key(
-    lib_db,
-    image_key: str,
-    itype: str,
-) -> tuple[str | None, str | None, str | None]:
-    """Classify path for catalog or Instagram keys used by describe/score jobs."""
-    return classify_path(lib_db, image_key)
 
 
 def make_path_classify_fn(lib_db) -> Callable[[str], tuple[str | None, str | None, str | None]]:

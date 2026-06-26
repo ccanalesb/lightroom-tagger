@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 import database
 from database import get_job
 
@@ -23,11 +21,9 @@ from lightroom_tagger.core.database import (
     list_catalog_keys_needing_text_embedding,
     list_instagram_dump_keys_for_clip_embed_force,
     list_instagram_dump_keys_needing_clip_embedding,
-    resolve_filepath,
     upsert_image_clip_embedding,
     upsert_image_text_embedding,
 )
-from lightroom_tagger.core.vision_cache import get_or_create_cached_image
 from lightroom_tagger.core.embedding_service import (
     TEXT_EMBED_MODEL_ID,
     embed_texts,
