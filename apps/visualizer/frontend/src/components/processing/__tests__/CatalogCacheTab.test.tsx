@@ -12,6 +12,8 @@ import {
   CATALOG_CACHE_EMBED_CATALOG_HELPER,
   CATALOG_CACHE_EMBED_CATALOG_LABEL,
   CATALOG_CACHE_LAST_RUN_NEVER,
+  CATALOG_CACHE_NAS_TROUBLESHOOTING_DOC_URL,
+  CATALOG_CACHE_NAS_TROUBLESHOOTING_LINK_LABEL,
   CATALOG_CACHE_PIPELINE_TITLE,
   CATALOG_CACHE_SIMILARITY_BEST_MATCH_PCT,
   CATALOG_CACHE_SIMILARITY_PREVIEW_TITLE,
@@ -105,6 +107,16 @@ describe('CatalogCacheTab', () => {
   it('renders primary Build catalog cache CTA', async () => {
     renderCatalogCacheTab();
     expect(await screen.findByRole('button', { name: CATALOG_CACHE_BUILD_CTA })).toBeTruthy();
+  });
+
+  it('links NAS troubleshooting copy to storage mount docs', async () => {
+    renderCatalogCacheTab();
+    const link = await screen.findByRole('link', {
+      name: CATALOG_CACHE_NAS_TROUBLESHOOTING_LINK_LABEL,
+    });
+    expect(link).toHaveAttribute('href', CATALOG_CACHE_NAS_TROUBLESHOOTING_DOC_URL);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(screen.getByText(/Network share \(NAS\) paths must be mounted/)).toBeTruthy();
   });
 
   it('enqueues catalog_cache_build from primary CTA', async () => {
