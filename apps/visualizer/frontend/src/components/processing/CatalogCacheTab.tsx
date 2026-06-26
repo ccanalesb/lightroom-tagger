@@ -29,6 +29,9 @@ import {
   CATALOG_CACHE_LAST_RUN_NEVER,
   CATALOG_CACHE_LOCATION_PREFIX,
   CATALOG_CACHE_NAS_TROUBLESHOOTING,
+  CATALOG_CACHE_PIPELINE_JOB_QUEUED,
+  CATALOG_CACHE_NAS_TROUBLESHOOTING_DOC_URL,
+  CATALOG_CACHE_NAS_TROUBLESHOOTING_LINK_LABEL,
   CATALOG_CACHE_PIPELINE_TITLE,
   CATALOG_CACHE_PREPARE_CATALOG_HELPER,
   CATALOG_CACHE_PREPARE_CATALOG_TITLE,
@@ -53,6 +56,7 @@ import {
   CATALOG_CACHE_STAT_SIZE_LABEL,
   CATALOG_CACHE_STAT_TOTAL_HELPER,
   CATALOG_CACHE_STAT_TOTAL_LABEL,
+  PROCESSING_EMBED_CATALOG_QUEUED,
   PROCESSING_JOB_QUEUE_ROUTE,
   PROCESSING_OPEN_JOB_QUEUE,
   MSG_FAILED_START_JOB,
@@ -107,6 +111,7 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
   const [buildStarting, setBuildStarting] = useState(false);
   const [buildSuccess, setBuildSuccess] = useState(false);
   const [buildError, setBuildError] = useState<string | null>(null);
+  const [pipelineQueuedMessage, setPipelineQueuedMessage] = useState<string | null>(null);
   const [advancedBusy, setAdvancedBusy] = useState<AdvancedBusyKey | null>(null);
 
   const anyBusy = buildStarting || advancedBusy !== null;
@@ -141,15 +146,29 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
     }
   }, [onJobEnqueued]);
 
+  const pipelineQueuedMessageForKey = useCallback((key: AdvancedBusyKey): string => {
+    if (key === 'embed_catalog' || key === 'embed_catalog_ig') {
+      return PROCESSING_EMBED_CATALOG_QUEUED;
+    }
+    const labels: Record<Exclude<AdvancedBusyKey, 'embed_catalog' | 'embed_catalog_ig'>, string> = {
+      stack: CATALOG_CACHE_STACK_DETECT_LABEL,
+      similarity: CATALOG_CACHE_SIMILARITY_LABEL,
+      prepare: CATALOG_CACHE_PREPARE_CATALOG_TITLE,
+    };
+    return CATALOG_CACHE_PIPELINE_JOB_QUEUED(labels[key]);
+  }, []);
+
   const runAdvancedJob = useCallback(
     async (key: AdvancedBusyKey, type: string, metadata: Record<string, unknown>) => {
       setAdvancedBusy(key);
+      setPipelineQueuedMessage(null);
       try {
         await JobsAPI.create(type, metadata);
         if (key === 'similarity') {
           invalidateAll(['catalog.similarity.groups']);
         }
         invalidateAll(['catalog.cache.pipeline-status']);
+        setPipelineQueuedMessage(pipelineQueuedMessageForKey(key));
         onJobEnqueued?.();
       } catch (err) {
         const message = err instanceof Error ? err.message : MSG_FAILED_START_JOB;
@@ -158,7 +177,7 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
         setAdvancedBusy(null);
       }
     },
-    [onJobEnqueued],
+    [onJobEnqueued, pipelineQueuedMessageForKey],
   );
 
   const cachePercentage =
@@ -320,6 +339,16 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
                 isBusy={advancedBusy === 'prepare'}
                 onRun={() => runAdvancedJob('prepare', 'prepare_catalog', {})}
               />
+              {pipelineQueuedMessage ? (
+                <div className="rounded-base border border-border bg-surface p-4 space-y-3">
+                  <p className="text-sm text-success" role="status">
+                    {pipelineQueuedMessage}
+                  </p>
+                  <Button variant="secondary" size="sm" type="button" onClick={handleOpenJobQueue}>
+                    {PROCESSING_OPEN_JOB_QUEUE}
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </CollapsibleSection>
 
@@ -334,7 +363,18 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
               <strong>{CATALOG_CACHE_LOCATION_PREFIX}</strong> {stats.cache_dir}
             </p>
           </div>
-          <p className="text-xs text-text-tertiary mt-2">{CATALOG_CACHE_NAS_TROUBLESHOOTING}</p>
+          <p className="text-xs text-text-tertiary mt-2">
+            {CATALOG_CACHE_NAS_TROUBLESHOOTING}{' '}
+            <a
+              href={CATALOG_CACHE_NAS_TROUBLESHOOTING_DOC_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-accent hover:underline"
+            >
+              {CATALOG_CACHE_NAS_TROUBLESHOOTING_LINK_LABEL}
+            </a>
+            .
+          </p>
         </CardContent>
       </Card>
     </div>

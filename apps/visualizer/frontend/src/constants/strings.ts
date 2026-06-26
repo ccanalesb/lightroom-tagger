@@ -585,6 +585,9 @@ export const CATALOG_CACHE_PROGRESS_LABEL = 'Cache Progress'
 export const CATALOG_CACHE_LOCATION_PREFIX = 'Cache Location:'
 export const CATALOG_CACHE_NAS_TROUBLESHOOTING =
   'Network share (NAS) paths must be mounted and readable by the backend host. If the embed job skips most images, verify the catalog path is accessible from the server.'
+export const CATALOG_CACHE_NAS_TROUBLESHOOTING_LINK_LABEL = 'Storage & mount troubleshooting'
+export const CATALOG_CACHE_NAS_TROUBLESHOOTING_DOC_URL =
+  'https://github.com/ccanalesb/lightroom-tagger/blob/main/docs/STORAGE_MOUNT_REQUIREMENTS.md'
 /** Advanced — embed catalog rows only (`image_type: catalog`). */
 /** Disclosure label for the catalog cache pipeline section.
  *
@@ -605,9 +608,11 @@ export const CATALOG_CACHE_PREPARE_CATALOG_TITLE = 'Pre-compress catalog images'
 /** One-sentence explanations shown next to each pipeline trigger so users
  * understand what the job does before clicking. Kept short (≤ ~20 words). */
 export const CATALOG_CACHE_EMBED_CATALOG_HELPER =
-  'Compute CLIP visual embeddings for every catalog image so vision matching can shortlist candidates fast.'
+  'Compute CLIP visual embeddings for every catalog image so vision matching can shortlist candidates fast. Catalog file paths must be readable from the server — mount NAS shares before running.'
 export const CATALOG_CACHE_EMBED_CATALOG_IG_HELPER =
-  'Same as catalog embed, plus Instagram dump images so prefilter works in both directions.'
+  'Same as catalog embed, plus Instagram dump images so prefilter works in both directions. Mount network shares so both catalog and dump paths are reachable.'
+export const CATALOG_CACHE_PIPELINE_JOB_QUEUED = (label: string) =>
+  `${label} job queued. Open Job Queue to monitor progress.`
 export const CATALOG_CACHE_STACK_DETECT_HELPER =
   'Group burst-shot catalog images into stacks by date so only the representative frame goes through matching.'
 export const CATALOG_CACHE_SIMILARITY_HELPER =
