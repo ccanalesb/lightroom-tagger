@@ -110,8 +110,7 @@ def describe_matched_image(db: sqlite3.Connection, catalog_key: str, force: bool
 
     user_prompt = _resolve_description_user_prompt(db, perspective_slugs)
     use_silent_compression = (
-        provider_id is not None
-        and bool(cached_path)
+        bool(cached_path)
         and cached_path == image_for_describe
         and os.path.exists(cached_path)
     )

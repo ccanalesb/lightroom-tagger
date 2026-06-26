@@ -190,6 +190,37 @@ def test_compress_image_creates_temp_file():
             os.unlink(test_path)
 
 
+def test_describe_image_silent_compression_skips_recompress():
+    """Vision-cache resume path must not call compress_image again."""
+    from PIL import Image
+
+    fd, test_path = tempfile.mkstemp(suffix='.jpg')
+    os.close(fd)
+    try:
+        Image.new('RGB', (64, 64)).save(test_path, 'JPEG')
+        mock_desc = {
+            'summary': 'ok',
+            'composition': {},
+            'perspectives': {},
+            'technical': {},
+            'subjects': [],
+            'best_perspective': 'street',
+        }
+        with patch('lightroom_tagger.core.analyzer.description.compress_image') as mock_compress, \
+             patch('lightroom_tagger.core.analyzer.description.get_viewable_path_managed', return_value=(test_path, False)), \
+             patch('lightroom_tagger.core.fallback.FallbackDispatcher') as mock_disp, \
+             patch('lightroom_tagger.core.analyzer.description.ProviderRegistry') as mock_reg, \
+             patch('lightroom_tagger.core.analyzer.description.parse_description_response', return_value=mock_desc):
+            mock_reg.return_value.list_models.return_value = [{'id': 'vision-model'}]
+            mock_disp.return_value.call_with_fallback.return_value = ('{}', 'ollama', 'vision-model')
+            describe_image(test_path, provider_id='ollama', silent_compression=True)
+
+        mock_compress.assert_not_called()
+    finally:
+        if os.path.exists(test_path):
+            os.unlink(test_path)
+
+
 def test_compress_image_silent_suppresses_prints(capsys):
     """silent=True must not emit the `` Compressed:`` stdout line."""
     from PIL import Image
