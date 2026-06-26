@@ -29,6 +29,8 @@ import {
   CATALOG_CACHE_LAST_RUN_NEVER,
   CATALOG_CACHE_LOCATION_PREFIX,
   CATALOG_CACHE_NAS_TROUBLESHOOTING,
+  CATALOG_CACHE_NAS_TROUBLESHOOTING_DOC_URL,
+  CATALOG_CACHE_NAS_TROUBLESHOOTING_LINK_LABEL,
   CATALOG_CACHE_PIPELINE_TITLE,
   CATALOG_CACHE_PREPARE_CATALOG_HELPER,
   CATALOG_CACHE_PREPARE_CATALOG_TITLE,
@@ -323,7 +325,18 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
               <strong>{CATALOG_CACHE_LOCATION_PREFIX}</strong> {stats.cache_dir}
             </p>
           </div>
-          <p className="text-xs text-text-tertiary mt-2">{CATALOG_CACHE_NAS_TROUBLESHOOTING}</p>
+          <p className="text-xs text-text-tertiary mt-2">
+            {CATALOG_CACHE_NAS_TROUBLESHOOTING}{' '}
+            <a
+              href={CATALOG_CACHE_NAS_TROUBLESHOOTING_DOC_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-accent hover:underline"
+            >
+              {CATALOG_CACHE_NAS_TROUBLESHOOTING_LINK_LABEL}
+            </a>
+            .
+          </p>
         </CardContent>
       </Card>
     </div>
