@@ -8,7 +8,6 @@ By default, `sqlite3` URI parameter `mode=ro` is used when opening the catalog f
 - `lightroom_tagger/catalog_reader.py` re-exports the same `connect_catalog` (delegate to the reader).
 - `lightroom_tagger/schema_explorer.py` opens the catalog only through the reader.
 - `lightroom_tagger/lightroom/schema.py` opens the catalog only through the reader.
-- `lightroom_tagger/cli.py` imports `connect_catalog` from the reader for scan workflows.
 - `lightroom_tagger/core/cli.py` imports `connect_catalog` from the reader for scan workflows.
 
 Keyword writeback and repair scripts use a **separate** SQLite connection from the read-only reader.
