@@ -223,9 +223,14 @@ def _describe_image_via_provider(path: str, provider_id: str,
     if viewable_is_temp:
         temp_files.append(viewable)
 
-    compressed = compress_image(viewable, silent=silent_compression)
-    if compressed != viewable:
-        temp_files.append(compressed)
+    # Vision-cache hits are already compressed JPEGs; re-running compress_image
+    # on restart/resume only adds CPU work and noisy stdout during startup.
+    if silent_compression:
+        compressed = viewable
+    else:
+        compressed = compress_image(viewable)
+        if compressed != viewable:
+            temp_files.append(compressed)
 
     try:
         def fn_factory(client, mdl):
