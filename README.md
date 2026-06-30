@@ -10,22 +10,21 @@ pip install pyyaml python-dotenv
 
 ## Quick Start - Instagram Matching Flow
 
-Match Instagram photos to your Lightroom catalog using vision AI:
+Match Instagram photos to your Lightroom catalog using an export dump and vision AI:
 
 ```bash
 # 1. Scan your Lightroom catalog (only needed once)
 python -m lightroom_tagger scan --catalog "/path/to/Catalog.lrcat" --db library.db
 
-# 2. Crawl Instagram images
-python -m lightroom_tagger crawl-instagram --db library.db --output-dir /tmp/instagram_images
+# 2. Import your Instagram data export (Meta data export)
+#    Pass the dump ROOT directory (contains media/, your_instagram_activity/, etc.)
+lightroom-import-dump --db library.db --dump-path "/path/to/instagram-username-date-hash"
 
-# 3. Run vision-based matching
-python -m lightroom_tagger match --db library.db --threshold 0.2
-
-# 4. Write matches to Lightroom (adds keyword to matched images)
-python -m lightroom_tagger instagram-sync --db library.db --from-matches \
-    --catalog "/path/to/Catalog.lrcat" --keyword "posted"
+# 3. Run vision-based matching against dump media
+lightroom-match-dump --db library.db --threshold 0.7
 ```
+
+See the [Visualizer Quick Start](#visualizer-web-ui) below for the full web UI workflow.
 
 ### Diagnose Missed Matches
 
@@ -46,16 +45,10 @@ Open `/tmp/comparison-pool-report/report.html`. See [Comparison Pool Report](doc
 |---------|-----------|-------------|
 | `scan` | `--catalog` | Path to your Lightroom .lrcat file |
 | `scan` | `--db` | Path to SQLite database (will be created) |
-| `crawl-instagram` | `--db` | Database with catalog images |
-| `crawl-instagram` | `--output-dir` | Where to save downloaded Instagram images |
-| `crawl-instagram` | `--limit` | Limit number of posts to download |
-| `match` | `--db` | Database with catalog and Instagram images |
-| `match` | `--threshold` | Minimum score to consider a match (0.0-1.0, default 0.7) |
-| `match` | `--vision-model` | Override vision model (default: gemma3:27b) |
-| `instagram-sync` | `--from-matches` | Read matches from 'matches' table instead of re-matching |
-| `instagram-sync` | `--catalog` | Lightroom catalog to write keywords to |
-| `instagram-sync` | `--keyword` | Keyword to add to matched images |
-| `instagram-sync` | `--dry-run` | Preview changes without applying |
+| `lightroom-import-dump` | `--db` | Database to store dump media metadata |
+| `lightroom-import-dump` | `--dump-path` | Root directory of your Instagram data export |
+| `lightroom-match-dump` | `--db` | Database with catalog and imported dump media |
+| `lightroom-match-dump` | `--threshold` | Minimum score to consider a match (0.0-1.0, default 0.7) |
 
 ### Matching Configuration
 
@@ -133,7 +126,7 @@ SQLite operations for storing and querying indexed images (WAL mode for concurre
 - `search_by_keyword()`, `search_by_rating()`, `search_by_date()` - query filters
 - Unique key format: `{date_taken}_{filename}`
 
-### `lightroom_tagger/cli.py`
+### `lightroom_tagger/core/cli.py`
 Command-line interface with subcommands:
 - `scan` - Scan catalog, index all images to SQLite
 - `search` - Search indexed images by keyword, rating, date, color label
@@ -141,11 +134,8 @@ Command-line interface with subcommands:
 - `init` - Initialize empty database
 - `stats` - Show database statistics
 
-### `lightroom_tagger/tagger.py`
-Main entry point that ties everything together.
-
 ### `lightroom_tagger/__main__.py`
-Enables running as: `python -m lightroom_tagger`
+Enables running as: `python -m lightroom_tagger` (same entry point as `lightroom-tagger`)
 
 ## Configuration
 

@@ -25,25 +25,14 @@ All models support vision capabilities:
 
 ### CLI Usage
 
+Vision and matching workflows use script entry points or the Python API (see below). Configure the provider via `config.yaml` or environment variables, then run matching:
+
 ```bash
-# Use GitHub Copilot with default model (gpt-4o)
-python -m lightroom_tagger.cli describe \
-    --provider github_copilot \
-    --model gpt-4o \
-    /path/to/image.jpg
-
-# Use Claude for creative descriptions
-python -m lightroom_tagger.cli describe \
-    --provider github_copilot \
-    --model claude-sonnet-4.5 \
-    /path/to/image.jpg
-
-# Batch processing with GPT-4o (unlimited!)
-python -m lightroom_tagger.cli batch \
-    --provider github_copilot \
-    --model gpt-4o \
-    --catalog ~/lightroom/catalog.lrcat
+# Match Instagram dump media with vision AI (uses configured provider chain)
+lightroom-match-dump --db library.db --threshold 0.7
 ```
+
+For one-off image descriptions, use the Python API in the next section.
 
 ### Python API Usage
 
@@ -78,20 +67,19 @@ description = generate_description(
 
 **For large batches (1000+ photos):**
 ```bash
-# Use gpt-4o - it's UNLIMITED and excellent
-python -m lightroom_tagger.cli batch \
-    --provider github_copilot \
-    --model gpt-4o \
-    --catalog ~/lightroom/catalog.lrcat
+# Use gpt-4o via config — unlimited and excellent
+lightroom-match-dump --db library.db --threshold 0.7
 ```
 
 **For special photos (portfolio):**
-```bash
-# Use Claude Opus for highest quality descriptions
-python -m lightroom_tagger.cli describe \
-    --provider github_copilot \
-    --model claude-opus-4.5 \
-    /path/to/portfolio/best-shot.jpg
+```python
+# Use Claude Opus for highest quality descriptions (Python API)
+from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.vision_client import generate_description
+
+registry = ProviderRegistry()
+client = registry.get_client('github_copilot')
+generate_description(client=client, model="claude-opus-4.5", image_path="/path/to/portfolio/best-shot.jpg")
 ```
 
 **Budget breakdown:**
@@ -170,11 +158,13 @@ Expected output:
 
 ### Test vision with sample image
 
-```bash
-python -m lightroom_tagger.cli describe \
-    --provider github_copilot \
-    --model gpt-4o \
-    ~/Pictures/test-photo.jpg
+```python
+from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.vision_client import generate_description
+
+registry = ProviderRegistry()
+client = registry.get_client('github_copilot')
+print(generate_description(client=client, model="gpt-4o", image_path="~/Pictures/test-photo.jpg"))
 ```
 
 ---
@@ -312,28 +302,24 @@ Based on testing with lightroom-tagger workload:
 ### Scenario 1: Tagging entire Lightroom catalog
 
 ```bash
-# Tag all untagged photos with GPT-4o (unlimited)
-python -m lightroom_tagger.cli batch \
-    --provider github_copilot \
-    --model gpt-4o \
-    --catalog ~/lightroom/FinalCatalog.lrcat \
-    --filter "rating >= 3"
+# Match dump media against catalog with GPT-4o (unlimited via provider chain)
+lightroom-match-dump --db library.db --threshold 0.7
 
-# No cost concerns! Process 10,000+ photos freely
+# No cost concerns! Process large batches freely
 ```
 
 ### Scenario 2: Portfolio curation
 
-```bash
-# Use Claude Opus for your best 50 portfolio shots
-python -m lightroom_tagger.cli batch \
-    --provider github_copilot \
-    --model claude-opus-4.5 \
-    --catalog ~/lightroom/FinalCatalog.lrcat \
-    --filter "rating = 5 AND collection = 'Portfolio'"
+```python
+# Use Claude Opus for your best portfolio shots (Python API)
+from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.vision_client import generate_description
 
-# Costs: 50 photos × 3x multiplier = 150 premium requests
-# Still within 300/month budget!
+registry = ProviderRegistry()
+client = registry.get_client('github_copilot')
+
+for photo_path in portfolio_paths:
+    generate_description(client=client, model="claude-opus-4.5", image_path=photo_path)
 ```
 
 ### Scenario 3: Mixed strategy
@@ -391,10 +377,13 @@ GitHub Copilot is now available in lightroom-tagger with:
 cd /Users/ccanales/projects/lightroom-tagger
 source .venv/bin/activate
 
-python -m lightroom_tagger.cli describe \
-    --provider github_copilot \
-    --model gpt-4o \
-    ~/Pictures/test.jpg
+python -c "
+from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.vision_client import generate_description
+registry = ProviderRegistry()
+client = registry.get_client('github_copilot')
+print(generate_description(client=client, model='gpt-4o', image_path='~/Pictures/test.jpg'))
+"
 ```
 
 Enjoy unlimited AI-powered photo descriptions! 📸✨

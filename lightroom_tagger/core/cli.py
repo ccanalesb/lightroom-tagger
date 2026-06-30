@@ -171,55 +171,6 @@ def create_parser() -> argparse.ArgumentParser:
         help="Path to SQLite database (overrides global)"
     )
 
-    instagram_parser = subparsers.add_parser("instagram-sync", help="Sync Instagram posts")
-    instagram_parser.add_argument(
-        "--db",
-        help="Path to SQLite database (overrides global)"
-    )
-    instagram_parser.add_argument(
-        "--catalog",
-        help="Lightroom catalog path for writing keywords"
-    )
-    instagram_parser.add_argument(
-        "--instagram-url",
-        help="Instagram profile URL"
-    )
-    instagram_parser.add_argument(
-        "--keyword",
-        help="Keyword to add to posted images"
-    )
-    instagram_parser.add_argument(
-        "--hash-threshold",
-        type=int,
-        default=5,
-        help="Hash similarity threshold (0-32, default 5)"
-    )
-    instagram_parser.add_argument(
-        "--limit",
-        type=int,
-        help="Limit number of Instagram posts to check"
-    )
-    instagram_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Preview changes without applying"
-    )
-    instagram_parser.add_argument(
-        "--output-dir",
-        default="/tmp/instagram_images",
-        help="Directory to download Instagram images"
-    )
-    instagram_parser.add_argument(
-        "--browser",
-        action="store_true",
-        help="Use browser-based scraping (agent-browser) instead of API"
-    )
-    instagram_parser.add_argument(
-        "--login",
-        action="store_true",
-        help="Open browser for manual Instagram login (use with --browser)"
-    )
-
     return parser
 
 
@@ -346,7 +297,6 @@ def cmd_search(args, config):
 from lightroom_tagger.core.cli_cmds_extra import (
     cmd_export,
     cmd_init,
-    cmd_instagram_sync,
     cmd_stats,
 )
 
@@ -391,8 +341,6 @@ def main():
         return cmd_init(args, config)
     elif args.command == "stats":
         return cmd_stats(args, config)
-    elif args.command == "instagram-sync":
-        return cmd_instagram_sync(args, config)
     else:
         parser.print_help()
         return 1
