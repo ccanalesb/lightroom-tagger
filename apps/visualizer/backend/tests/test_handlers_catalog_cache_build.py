@@ -18,21 +18,29 @@ def test_catalog_cache_build_registered_in_job_handlers() -> None:
     assert JOB_HANDLERS['catalog_cache_build'] is handle_catalog_cache_build
 
 
+@patch('jobs.handlers.stacks._resolve_library_db_or_fail', return_value='/tmp/library.db')
 @patch('jobs.handlers.stacks.list_instagram_dump_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks.list_catalog_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks._handle_catalog_similarity_inner')
 @patch('jobs.handlers.stacks._handle_batch_stack_detect_inner')
 @patch('jobs.handlers.stacks._handle_batch_embed_image_inner')
+@patch('jobs.handlers.stacks._handle_catalog_sync_inner')
 def test_chain_runs_stages_in_order(
+    mock_sync: MagicMock,
     mock_embed: MagicMock,
     mock_stack: MagicMock,
     mock_sim: MagicMock,
     _mock_cat_need: MagicMock,
     _mock_ig_need: MagicMock,
+    _mock_db: MagicMock,
 ) -> None:
     from jobs.handlers import handle_catalog_cache_build
 
     order: list[str] = []
+
+    def mark_sync(*_args, **_kwargs) -> dict:
+        order.append('sync')
+        return {'added': 0, 'stale': 0, 'locking_mode': 'EXCLUSIVE'}
 
     def mark_embed(runner: MagicMock, jid: str, metadata: dict) -> None:
         order.append('embed')
@@ -64,6 +72,7 @@ def test_chain_runs_stages_in_order(
             },
         )
 
+    mock_sync.side_effect = mark_sync
     mock_embed.side_effect = mark_embed
     mock_stack.side_effect = mark_stack
     mock_sim.side_effect = mark_sim
@@ -72,24 +81,28 @@ def test_chain_runs_stages_in_order(
 
     handle_catalog_cache_build(runner, 'job-chain', {})
 
-    assert order == ['embed', 'stack', 'similarity']
+    assert order == ['sync', 'embed', 'stack', 'similarity']
     runner.complete_job.assert_called_once()
     payload = runner.complete_job.call_args[0][1]
     assert payload['catalog_cache_build'] is True
-    assert 'embed' in payload and 'stack' in payload and 'similarity' in payload
+    assert 'sync' in payload and 'embed' in payload and 'stack' in payload and 'similarity' in payload
 
 
+@patch('jobs.handlers.stacks._resolve_library_db_or_fail', return_value='/tmp/library.db')
 @patch('jobs.handlers.stacks.list_instagram_dump_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks.list_catalog_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks._handle_catalog_similarity_inner')
 @patch('jobs.handlers.stacks._handle_batch_stack_detect_inner')
 @patch('jobs.handlers.stacks._handle_batch_embed_image_inner')
+@patch('jobs.handlers.stacks._handle_catalog_sync_inner', return_value={'added': 0, 'stale': 0})
 def test_chain_honors_cancel_between_stages(
+    mock_sync: MagicMock,
     mock_embed: MagicMock,
     mock_stack: MagicMock,
     mock_sim: MagicMock,
     _mock_cat_need: MagicMock,
     _mock_ig_need: MagicMock,
+    _mock_db: MagicMock,
 ) -> None:
     from jobs.handlers import handle_catalog_cache_build
 
@@ -119,19 +132,23 @@ def test_chain_honors_cancel_between_stages(
     runner.complete_job.assert_not_called()
 
 
+@patch('jobs.handlers.stacks._resolve_library_db_or_fail', return_value='/tmp/library.db')
 @patch('jobs.handlers.stacks.add_job_log')
 @patch('jobs.handlers.stacks.list_instagram_dump_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks.list_catalog_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks._handle_catalog_similarity_inner')
 @patch('jobs.handlers.stacks._handle_batch_stack_detect_inner')
 @patch('jobs.handlers.stacks._handle_batch_embed_image_inner')
+@patch('jobs.handlers.stacks._handle_catalog_sync_inner', return_value={'added': 0, 'stale': 0})
 def test_stage_banner_logs_include_similarity_stage(
+    mock_sync: MagicMock,
     mock_embed: MagicMock,
     mock_stack: MagicMock,
     mock_sim: MagicMock,
     _mock_cat_need: MagicMock,
     _mock_ig_need: MagicMock,
     mock_log: MagicMock,
+    _mock_db: MagicMock,
 ) -> None:
     from jobs.handlers import handle_catalog_cache_build
 
@@ -155,6 +172,6 @@ def test_catalog_cache_stage_mapped_progress_splits_bar() -> None:
     from jobs.handlers.stacks import _catalog_cache_stage_mapped_progress
 
     assert _catalog_cache_stage_mapped_progress(0, 5) == 5
-    assert _catalog_cache_stage_mapped_progress(2, 100) == 100
+    assert _catalog_cache_stage_mapped_progress(3, 100) == 100
     mid = _catalog_cache_stage_mapped_progress(1, 52)
-    assert 36 <= mid <= 71
+    assert 28 <= mid <= 52

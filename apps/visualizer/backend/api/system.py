@@ -146,6 +146,7 @@ _CACHE_PIPELINE_BUCKETS: tuple[tuple[str, str, dict], ...] = (
     # (bucket_key, job_type, extra_metadata_filter)
     # ``extra_metadata_filter`` keys map to ``json_extract(metadata, '$.<key>')``.
     # ``None`` means "absent or NULL" (legacy jobs without that key).
+    ('catalog_sync', 'catalog_sync', {}),
     ('embed_catalog', 'batch_embed_image', {'image_type': ('catalog', None)}),
     ('embed_catalog_and_instagram', 'batch_embed_image', {'image_type': ('catalog_and_instagram',)}),
     ('stack_detect', 'batch_stack_detect', {}),
@@ -207,6 +208,7 @@ def get_cache_pipeline_status():
 
     One entry per UI button on ``CatalogCacheTab``:
 
+    * ``catalog_sync`` — most recent incremental catalog → library.db sync.
     * ``embed_catalog`` — most recent ``batch_embed_image`` with
       ``metadata.image_type`` of ``catalog`` or absent (legacy default).
     * ``embed_catalog_and_instagram`` — same but ``image_type`` is

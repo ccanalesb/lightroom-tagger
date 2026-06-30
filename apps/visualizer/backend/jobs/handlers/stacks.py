@@ -29,17 +29,21 @@ from .common import (
     _resolve_date_window,
     _resolve_library_db_or_fail,
 )
+from .catalog import _handle_catalog_sync_inner
 from .embed import _handle_batch_embed_image_inner
 
 _CATALOG_SIMILARITY_SUMMARY_EVERY = 500
 _STACK_DETECT_SUMMARY_EVERY = 500
 
 
+_CATALOG_CACHE_STAGE_COUNT = 4
+
+
 def _catalog_cache_stage_mapped_progress(stage_index: int, inner_pct: int) -> int:
-    """Map a standalone handler's 5–100% progress into one third of the composite bar."""
+    """Map a standalone handler's 5–100% progress into one quarter of the composite bar."""
     inner_pct = max(5, min(100, int(inner_pct)))
     span_total = 100 - 5
-    stage_span = span_total / 3.0
+    stage_span = span_total / float(_CATALOG_CACHE_STAGE_COUNT)
     frac = (inner_pct - 5) / span_total if span_total else 0.0
     base = 5 + stage_index * stage_span
     return int(min(100, base + frac * stage_span))
@@ -631,8 +635,32 @@ def _handle_catalog_cache_build_inner(runner, job_id: str, metadata: dict) -> No
         runner.db,
         job_id,
         'info',
-        '[catalog-cache-build] chain_start embed→stack_detect→catalog_similarity',
+        '[catalog-cache-build] chain_start sync→embed→stack_detect→catalog_similarity',
     )
+
+    add_job_log(runner.db, job_id, 'info', '[catalog-cache-build] stage=sync status=start')
+    sr_sync = _CatalogCacheStageRunner(runner, job_id, 0)
+    sync_result = _handle_catalog_sync_inner(sr_sync, job_id, metadata, chain_mode=True) or {}
+
+    if sr_sync.stage_cancelled:
+        runner.finalize_cancelled(job_id)
+        return
+
+    add_job_log(
+        runner.db,
+        job_id,
+        'info' if not sync_result.get('failed') and not sync_result.get('skipped') else 'warning',
+        (
+            '[catalog-cache-build] stage=sync status=complete '
+            f"added={sync_result.get('added', 0)} stale={sync_result.get('stale', 0)} "
+            f"locking_mode={sync_result.get('locking_mode', 'unknown')}"
+            + (f" error={sync_result.get('error')}" if sync_result.get('error') else '')
+        ),
+    )
+
+    if runner.is_cancelled(job_id):
+        runner.finalize_cancelled(job_id)
+        return
 
     embed_meta = dict(metadata)
     embed_meta['image_type'] = 'catalog_and_instagram'
@@ -640,7 +668,7 @@ def _handle_catalog_cache_build_inner(runner, job_id: str, metadata: dict) -> No
     embed_meta['_catalog_cache_chain'] = True
 
     add_job_log(runner.db, job_id, 'info', '[catalog-cache-build] stage=embed status=start')
-    sr_embed = _CatalogCacheStageRunner(runner, job_id, 0)
+    sr_embed = _CatalogCacheStageRunner(runner, job_id, 1)
     _handle_batch_embed_image_inner(sr_embed, job_id, embed_meta)
 
     if sr_embed.stage_cancelled:
@@ -696,7 +724,7 @@ def _handle_catalog_cache_build_inner(runner, job_id: str, metadata: dict) -> No
     stack_meta['_catalog_cache_chain'] = True
 
     add_job_log(runner.db, job_id, 'info', '[catalog-cache-build] stage=stack status=start')
-    sr_stack = _CatalogCacheStageRunner(runner, job_id, 1)
+    sr_stack = _CatalogCacheStageRunner(runner, job_id, 2)
     _handle_batch_stack_detect_inner(sr_stack, job_id, stack_meta)
 
     if sr_stack.stage_cancelled:
@@ -727,7 +755,7 @@ def _handle_catalog_cache_build_inner(runner, job_id: str, metadata: dict) -> No
     sim_meta['_catalog_cache_chain'] = True
 
     add_job_log(runner.db, job_id, 'info', '[catalog-cache-build] stage=similarity status=start')
-    sr_sim = _CatalogCacheStageRunner(runner, job_id, 2)
+    sr_sim = _CatalogCacheStageRunner(runner, job_id, 3)
     _handle_catalog_similarity_inner(sr_sim, job_id, sim_meta)
 
     if sr_sim.stage_cancelled:
@@ -756,6 +784,7 @@ def _handle_catalog_cache_build_inner(runner, job_id: str, metadata: dict) -> No
         {
             'catalog_cache_build': True,
             'fingerprint': fp_chain,
+            'sync': sync_result,
             'embed': embed_result,
             'stack': stk_result,
             'similarity': sim_result,

@@ -595,6 +595,9 @@ export const CATALOG_CACHE_NAS_TROUBLESHOOTING_DOC_URL =
  * exposes pipeline triggers, not vision matching weights/provider/thresholds.
  */
 export const CATALOG_CACHE_PIPELINE_TITLE = 'Pipeline stages'
+export const CATALOG_CACHE_SYNC_LABEL = 'Sync catalog'
+export const CATALOG_CACHE_SYNC_HELPER =
+  'Pull newly imported catalog images into library.db (additions only — does not update ratings or remove stale rows).'
 export const CATALOG_CACHE_EMBED_CATALOG_LABEL = 'Embed catalog images only'
 /** Advanced — embed catalog + Instagram (`image_type: catalog_and_instagram`). */
 export const CATALOG_CACHE_EMBED_CATALOG_IG_LABEL = 'Embed catalog + Instagram images'

@@ -986,6 +986,7 @@ export interface CachePipelineRun {
  * jobs created with ``image_type: 'catalog_and_instagram'``.
  */
 export interface CachePipelineStatus {
+  catalog_sync: CachePipelineRun | null
   embed_catalog: CachePipelineRun | null
   embed_catalog_and_instagram: CachePipelineRun | null
   stack_detect: CachePipelineRun | null
