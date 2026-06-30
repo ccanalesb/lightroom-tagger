@@ -17,7 +17,7 @@ def _make_runner():
     return runner
 
 
-@patch("jobs.handlers.embed.add_job_log")
+@patch("database.add_job_log")
 def test_batch_text_embed_zero_work_completes(_mock_add_log, tmp_path, monkeypatch):
     from jobs.handlers.embed import handle_batch_text_embed
 
@@ -34,7 +34,7 @@ def test_batch_text_embed_zero_work_completes(_mock_add_log, tmp_path, monkeypat
     assert result["total"] == 0
 
 
-@patch("jobs.handlers.embed.add_job_log")
+@patch("database.add_job_log")
 def test_batch_text_embed_writes_vec_row(_mock_add_log, tmp_path, monkeypatch):
     from jobs.handlers.embed import handle_batch_text_embed
 
@@ -88,7 +88,7 @@ def test_batch_text_embed_writes_vec_row(_mock_add_log, tmp_path, monkeypatch):
         verify.close()
 
 
-@patch("jobs.handlers.embed.add_job_log")
+@patch("database.add_job_log")
 def test_batch_text_embed_processes_newest_first(
     _mock_add_log, tmp_path, monkeypatch
 ):

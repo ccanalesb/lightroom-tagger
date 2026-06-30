@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import os
-import random
-
-from database import add_job_log, get_job
+import database
+from database import get_job
 
 from lightroom_tagger.core import cancel_scope
 from lightroom_tagger.core.clip_embedding_service import (
@@ -14,9 +12,7 @@ from lightroom_tagger.core.clip_embedding_service import (
     numpy_to_clip_vec_blob,
 )
 from lightroom_tagger.core.database import (
-    VISION_CACHE_OVERSIZED_SENTINEL,
     build_description_search_document,
-    get_vision_cached_image,
     init_database,
     library_write,
     list_catalog_keys_for_clip_embed_force,
@@ -25,7 +21,6 @@ from lightroom_tagger.core.database import (
     list_catalog_keys_needing_text_embedding,
     list_instagram_dump_keys_for_clip_embed_force,
     list_instagram_dump_keys_needing_clip_embedding,
-    resolve_filepath,
     upsert_image_clip_embedding,
     upsert_image_text_embedding,
 )
@@ -34,8 +29,6 @@ from lightroom_tagger.core.embedding_service import (
     embed_texts,
     numpy_to_vec_blob,
 )
-from lightroom_tagger.core.vision_cache import get_or_create_cached_image
-
 from ..checkpoint import fingerprint_batch_embed_image, fingerprint_batch_text_embed
 
 from .common import (
@@ -44,17 +37,20 @@ from .common import (
     _resolve_date_window,
     _resolve_library_db_or_fail,
 )
+from .path_diagnostics import (
+    PREFLIGHT_FAIL_RATIO,
+    PREFLIGHT_SAMPLE_SIZE,
+    SKIP_DETAIL_LOG_LIMIT,
+    PathSkipDiagnostics,
+    empty_skip_reason_counts,
+)
 
 _BATCH_EMBED_IMAGE_SIZE = 8
-_EMBED_PREFLIGHT_SAMPLE_SIZE = 25
-_EMBED_PREFLIGHT_FAIL_RATIO = 0.5
-_EMBED_SKIP_DETAIL_LOG_LIMIT = 5
-_EMBED_SUMMARY_LOG_EVERY = 250
 
-# Test-only seed override for the embed preflight sampler. Setting this from a
-# test gives deterministic random.sample() output without exposing the seed in
-# production behaviour. ``None`` (default) uses real entropy.
-_PREFLIGHT_RNG_SEED: int | None = None
+# Backward-compatible aliases for existing embed handler tests.
+_EMBED_PREFLIGHT_SAMPLE_SIZE = PREFLIGHT_SAMPLE_SIZE
+_EMBED_PREFLIGHT_FAIL_RATIO = PREFLIGHT_FAIL_RATIO
+_EMBED_SKIP_DETAIL_LOG_LIMIT = SKIP_DETAIL_LOG_LIMIT
 
 
 def handle_batch_text_embed(runner, job_id: str, metadata: dict) -> None:
@@ -80,7 +76,7 @@ def _handle_batch_text_embed_inner(runner, job_id: str, metadata: dict) -> None:
             return
         lib_db = init_database(db_path)
 
-        add_job_log(
+        database.add_job_log(
             runner.db,
             job_id,
             'info',
@@ -126,7 +122,7 @@ def _handle_batch_text_embed_inner(runner, job_id: str, metadata: dict) -> None:
                     if chk.get('fingerprint') == fp:
                         processed_pairs = set(chk.get('processed_pairs') or [])
                     elif chk.get('fingerprint'):
-                        add_job_log(
+                        database.add_job_log(
                             runner.db,
                             job_id,
                             'info',
@@ -216,7 +212,7 @@ def _handle_batch_text_embed_inner(runner, job_id: str, metadata: dict) -> None:
                     ).strip()
             if not text:
                 skipped += 1
-                add_job_log(
+                database.add_job_log(
                     runner.db,
                     job_id,
                     'info',
@@ -298,13 +294,13 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
         chain_mode = bool(metadata.get('_catalog_cache_chain'))
 
         if not chain_mode:
-            add_job_log(
+            database.add_job_log(
                 runner.db,
                 job_id,
                 'info',
                 f'batch_embed_image: model={CLIP_EMBED_MODEL_ID}',
             )
-            add_job_log(
+            database.add_job_log(
                 runner.db,
                 job_id,
                 'info',
@@ -326,7 +322,7 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
 
         force = bool(metadata.get('force', False))
         if not chain_mode:
-            add_job_log(
+            database.add_job_log(
                 runner.db,
                 job_id,
                 'info',
@@ -361,7 +357,7 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 )
             overlap = set(cat_keys) & set(ig_keys)
             if overlap:
-                add_job_log(
+                database.add_job_log(
                     runner.db,
                     job_id,
                     'warning',
@@ -401,7 +397,7 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                         if chk.get('fingerprint') == fp:
                             processed_pairs = set(chk.get('processed_pairs') or [])
                         elif chk.get('fingerprint'):
-                            add_job_log(
+                            database.add_job_log(
                                 runner.db,
                                 job_id,
                                 'info',
@@ -425,12 +421,7 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                     'skipped': 0,
                     'failed': 0,
                     'total': 0,
-                    'skip_reason_counts': {
-                        'no_row': 0,
-                        'empty_path': 0,
-                        'unresolved_or_missing': 0,
-                        'encode_failed': 0,
-                    },
+                    'skip_reason_counts': empty_skip_reason_counts(),
                 },
             )
             return
@@ -438,182 +429,21 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
         embedded = 0
         skipped = 0
         failed = 0
-        # D-07 embed diagnostics (stable keys): no_row → no catalog/dump row;
-        # empty_path → empty filepath; unresolved_or_missing → missing file or
-        # unreachable path; encode_failed → vision-cache/encode path failures.
-        skip_reason_counts = {
-            'no_row': 0,
-            'empty_path': 0,
-            'unresolved_or_missing': 0,
-            'encode_failed': 0,
-        }
+        path_diag = PathSkipDiagnostics(
+            runner,
+            job_id,
+            lib_db,
+            job_label='batch_embed_image',
+            chain_mode=chain_mode,
+            log_action='image embed',
+            sample_size=_EMBED_PREFLIGHT_SAMPLE_SIZE,
+            fail_ratio=_EMBED_PREFLIGHT_FAIL_RATIO,
+        )
         buf_keys: list[str] = []
         buf_paths: list[str] = []
-        skip_detail_logged = {
-            'no_row': 0,
-            'empty_path': 0,
-            'unresolved_or_missing': 0,
-            'encode_failed': 0,
-        }
-        summary_marker = 0
 
-        def _try_vision_cache(image_key: str) -> str | None:
-            """Return the cached compressed JPEG path when it exists on disk.
-
-            Cache-first short-circuit: ``prepare_catalog`` may already have
-            decoded + JPEG-compressed this image, in which case the original
-            RAW/JPG can be missing or unmounted and we still have everything
-            embedding needs. Skips the OVERSIZED sentinel and any row whose
-            ``compressed_path`` no longer exists on disk (stale cache).
-            """
-            cached_row = get_vision_cached_image(lib_db, image_key)
-            if not cached_row:
-                return None
-            comp = str(cached_row.get('compressed_path') or '').strip()
-            if not comp or comp == VISION_CACHE_OVERSIZED_SENTINEL:
-                return None
-            if not os.path.isfile(comp):
-                return None
-            return comp
-
-        def classify_path(image_key: str) -> tuple[str | None, str | None, str | None]:
-            cached_now = _try_vision_cache(image_key)
-            if cached_now is not None:
-                return cached_now, None, None
-
-            row = lib_db.execute(
-                "SELECT filepath FROM images WHERE key = ?",
-                (image_key,),
-            ).fetchone()
-            if row:
-                filepath = str(row['filepath'] or '').strip()
-                if not filepath:
-                    return None, 'empty_path', None
-                resolved = resolve_filepath(filepath)
-                if not resolved or not os.path.isfile(resolved):
-                    return None, 'unresolved_or_missing', (resolved or filepath)
-                cached = get_or_create_cached_image(lib_db, image_key, resolved)
-                if cached and os.path.isfile(cached):
-                    return cached, None, None
-                # Compression/viewable conversion can fail for unsupported sources
-                # (e.g. videos/motion-photo sidecars). Treat as encode failure so
-                # preflight keeps focusing on true path accessibility problems.
-                return None, 'encode_failed', resolved
-
-            row_dm = lib_db.execute(
-                "SELECT file_path FROM instagram_dump_media WHERE media_key = ?",
-                (image_key,),
-            ).fetchone()
-            if row_dm:
-                filepath = str(row_dm['file_path'] or '').strip()
-                if not filepath:
-                    return None, 'empty_path', None
-                resolved = resolve_filepath(filepath)
-                if not resolved or not os.path.isfile(resolved):
-                    return None, 'unresolved_or_missing', (resolved or filepath)
-                cached = get_or_create_cached_image(lib_db, image_key, resolved)
-                if cached and os.path.isfile(cached):
-                    return cached, None, None
-                return None, 'encode_failed', resolved
-
-            return None, 'no_row', None
-
-        def maybe_log_skip_detail(reason: str, message: str) -> None:
-            count = skip_detail_logged.get(reason, 0)
-            if count < _EMBED_SKIP_DETAIL_LOG_LIMIT:
-                add_job_log(runner.db, job_id, 'warning', message)
-                skip_detail_logged[reason] = count + 1
-                return
-            if count == _EMBED_SKIP_DETAIL_LOG_LIMIT:
-                add_job_log(
-                    runner.db,
-                    job_id,
-                    'info',
-                    (
-                        f'additional {reason} skip logs suppressed after '
-                        f'{_EMBED_SKIP_DETAIL_LOG_LIMIT} samples; see skip_reason_counts'
-                    ),
-                )
-                skip_detail_logged[reason] = count + 1
-
-        def maybe_log_summary() -> None:
-            nonlocal summary_marker
-            done = embedded + skipped + failed
-            if done - summary_marker < _EMBED_SUMMARY_LOG_EVERY and done != total_at_start:
-                return
-            summary_marker = done
-            add_job_log(
-                runner.db,
-                job_id,
-                'info',
-                (
-                    f'embed-summary done={done}/{total_at_start} embedded={embedded} '
-                    f'skipped={skipped} failed={failed} '
-                    f'reasons={skip_reason_counts}'
-                ),
-            )
-
-        sample_size = min(len(remaining), _EMBED_PREFLIGHT_SAMPLE_SIZE)
-        if sample_size > 0:
-            sample_failures = {
-                'no_row': 0,
-                'empty_path': 0,
-                'unresolved_or_missing': 0,
-            }
-            sample_examples: dict[str, list[str]] = {
-                'no_row': [],
-                'empty_path': [],
-                'unresolved_or_missing': [],
-            }
-            # Random sample so a sticky inaccessible subdirectory at the head
-            # of the list (e.g. motion-photo lrdata sidecars) doesn't poison
-            # the preflight verdict for an otherwise healthy catalog.
-            # ``random.Random(None)`` seeds from entropy; tests inject an int.
-            preflight_rng = random.Random(_PREFLIGHT_RNG_SEED)
-            sample_keys = (
-                preflight_rng.sample(remaining, sample_size)
-                if len(remaining) > sample_size
-                else list(remaining)
-            )
-            for sample_key in sample_keys:
-                _, sample_reason, sample_detail = classify_path(sample_key)
-                if sample_reason in sample_failures:
-                    sample_failures[sample_reason] += 1
-                    if len(sample_examples[sample_reason]) < 3:
-                        detail = f" ({sample_detail})" if sample_detail else ""
-                        sample_examples[sample_reason].append(f"{sample_key}{detail}")
-            sample_failed_count = (
-                sample_failures['no_row']
-                + sample_failures['empty_path']
-                + sample_failures['unresolved_or_missing']
-            )
-            fail_ratio = sample_failed_count / sample_size
-            if fail_ratio > _EMBED_PREFLIGHT_FAIL_RATIO:
-                preflight_msg = (
-                    f'Embed preflight: {sample_failed_count}/{sample_size} sampled images '
-                    'have missing or inaccessible paths '
-                    f"(no_row={sample_failures['no_row']}, empty_path={sample_failures['empty_path']}, "
-                    f"unresolved_or_missing={sample_failures['unresolved_or_missing']}). "
-                    f"Examples: no_row={sample_examples['no_row']}, "
-                    f"empty_path={sample_examples['empty_path']}, "
-                    f"unresolved_or_missing={sample_examples['unresolved_or_missing']}."
-                )
-                if chain_mode:
-                    add_job_log(
-                        runner.db,
-                        job_id,
-                        'warning',
-                        f'{preflight_msg} Continuing — missing files will be skipped per-image.',
-                    )
-                else:
-                    abort_msg = (
-                        f'{sample_failed_count}/{sample_size} sampled paths unreachable — '
-                        'this usually means your network share is not mounted. '
-                        'Check your mount and retry.'
-                    )
-                    add_job_log(runner.db, job_id, 'error', abort_msg)
-                    runner.fail_job(job_id, abort_msg, severity='critical')
-                    return
+        if not path_diag.run_preflight(remaining):
+            return
 
         def persist_progress() -> bool:
             if len(processed_pairs) > _CHECKPOINT_MAX_ENTRIES:
@@ -643,7 +473,7 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
             try:
                 vecs = encode_images(buf_paths, batch_size=_BATCH_EMBED_IMAGE_SIZE)
             except Exception as enc_err:
-                add_job_log(runner.db, job_id, 'warning',
+                database.add_job_log(runner.db, job_id, 'warning',
                             f'batch encode failed ({enc_err}), retrying one by one')
                 # Fall back to per-image encoding so one bad file doesn't lose the whole batch.
                 import numpy as np
@@ -653,9 +483,10 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                         row_vec = encode_images([path], batch_size=1)
                         vecs_list.append(row_vec[0])
                     except Exception as per_err:
-                        maybe_log_skip_detail(
+                        path_diag.record_skip(
                             'encode_failed',
-                            f'{img_key}: failed to encode ({per_err}), skipping',
+                            img_key,
+                            detail=str(per_err),
                         )
                         vecs_list.append(None)
                 vecs = vecs_list  # type: ignore[assignment]
@@ -665,7 +496,7 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 vec = vecs[j]
                 if vec is None:
                     failed += 1
-                    skip_reason_counts['encode_failed'] += 1
+                    path_diag.skip_reason_counts['encode_failed'] += 1
                     processed_pairs.add(img_key)
                 else:
                     vec_blob = numpy_to_clip_vec_blob(vec)
@@ -677,7 +508,13 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                     return False
                 pct = int(5 + ((embedded + skipped + failed) / max(total_at_start, 1)) * 95)
                 runner.update_progress(job_id, pct, f'Embedded {embedded}/{total_at_start}')
-                maybe_log_summary()
+                path_diag.maybe_log_summary(
+                    embedded + skipped + failed,
+                    total_at_start,
+                    embedded=embedded,
+                    skipped=skipped,
+                    failed=failed,
+                )
             buf_keys.clear()
             buf_paths.clear()
             return True
@@ -686,24 +523,22 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
             if runner.is_cancelled(job_id):
                 runner.finalize_cancelled(job_id)
                 return
-            filepath, skip_reason, skip_detail = classify_path(key)
+            filepath, skip_reason, skip_detail = path_diag.classify(key)
             if skip_reason:
                 skipped += 1
-                skip_reason_counts[skip_reason] += 1
-                reason_msg = {
-                    'no_row': 'catalog/dump row missing',
-                    'empty_path': 'filepath is empty',
-                    'unresolved_or_missing': 'resolved path missing or inaccessible',
-                    'encode_failed': 'compression/viewable image unavailable',
-                }[skip_reason]
-                detail = f" ({skip_detail})" if skip_detail else ""
-                maybe_log_skip_detail(skip_reason, f'{key}: skipped image embed ({reason_msg}){detail}')
+                path_diag.record_skip(skip_reason, key, detail=skip_detail)
                 processed_pairs.add(key)
                 if not persist_progress():
                     return
                 pct = int(5 + ((embedded + skipped) / max(total_at_start, 1)) * 95)
                 runner.update_progress(job_id, pct, f'Embedded {embedded}/{total_at_start} (skipped {skipped})')
-                maybe_log_summary()
+                path_diag.maybe_log_summary(
+                    embedded + skipped + failed,
+                    total_at_start,
+                    embedded=embedded,
+                    skipped=skipped,
+                    failed=failed,
+                )
                 continue
 
             buf_keys.append(key)
@@ -739,7 +574,7 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 'skipped': skipped,
                 'failed': failed,
                 'total': total_at_start,
-                'skip_reason_counts': skip_reason_counts,
+                'skip_reason_counts': path_diag.skip_reason_counts,
             },
         )
     except Exception as e:

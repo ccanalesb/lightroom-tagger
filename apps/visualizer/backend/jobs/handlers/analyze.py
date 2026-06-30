@@ -3,6 +3,7 @@
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from unittest.mock import MagicMock
 
 from database import add_job_log, get_job, update_job_field
 
@@ -21,6 +22,38 @@ from .common import (
     _select_catalog_keys,
     _select_instagram_keys,
 )
+from .path_diagnostics import PathSkipDiagnostics, empty_skip_reason_counts
+
+def _merge_skip_reason_counts(*parts) -> dict[str, int]:
+    merged = empty_skip_reason_counts()
+    for part in parts:
+        if not isinstance(part, dict):
+            continue
+        for key in merged:
+            raw = part.get(key, 0)
+            try:
+                merged[key] += int(raw)
+            except (TypeError, ValueError):
+                pass
+    return merged
+
+
+def _record_path_skip_from_status(
+    path_diag: PathSkipDiagnostics | None,
+    lib_db,
+    key: str,
+    itype: str,
+    status: str,
+    *,
+    log_prefix: str = '',
+) -> None:
+    """When an item was skipped, classify path accessibility for grouped counts."""
+    if path_diag is None or status != 'skipped':
+        return
+    _, skip_reason, skip_detail = path_diag.classify(key)
+    if skip_reason:
+        path_diag.record_skip(skip_reason, key, detail=skip_detail, log_prefix=log_prefix)
+
 
 def _select_catalog_keys_missing_visual_tags(
     lib_db,
@@ -203,6 +236,15 @@ def handle_single_describe(runner, job_id: str, metadata: dict):
 
         runner.update_progress(job_id, 10, f'Describing {image_type} image…')
 
+        path_diag = PathSkipDiagnostics(
+            runner,
+            job_id,
+            lib_db,
+            job_label='single_describe',
+        )
+        if not path_diag.run_preflight([image_key]):
+            return
+
         status, success, error_msg = _describe_single_image(
             lib_db, image_key, image_type, force, provider_id, provider_model,
             perspective_slugs,
@@ -213,8 +255,10 @@ def handle_single_describe(runner, job_id: str, metadata: dict):
                 'image_key': image_key,
                 'image_type': image_type,
                 'status': status,
+                'skip_reason_counts': path_diag.skip_reason_counts,
             })
         else:
+            _record_path_skip_from_status(path_diag, lib_db, image_key, image_type, status)
             runner.fail_job(job_id, error_msg or 'Description generation failed')
 
     except Exception as e:
@@ -271,6 +315,15 @@ def handle_single_score(runner, job_id: str, metadata: dict):
 
         runner.update_progress(job_id, 10, f'Scoring {image_type} image…')
 
+        path_diag = PathSkipDiagnostics(
+            runner,
+            job_id,
+            lib_db,
+            job_label='single_score',
+        )
+        if not path_diag.run_preflight([image_key]):
+            return
+
         for slug in slugs:
             status, _success, err = _score_single_image(
                 lib_db, image_key, image_type, slug, force,
@@ -294,6 +347,7 @@ def handle_single_score(runner, job_id: str, metadata: dict):
             'scored': scored,
             'skipped': skipped,
             'failed': failed,
+            'skip_reason_counts': path_diag.skip_reason_counts,
         })
     except Exception as e:
         severity = _failure_severity_from_exception(e)
@@ -466,12 +520,30 @@ def _run_describe_pass(
     )
 
     if total_at_start == 0:
-        empty = {'described': 0, 'skipped': 0, 'failed': 0, 'total': 0}
+        empty = {
+            'described': 0,
+            'skipped': 0,
+            'failed': 0,
+            'total': 0,
+            'skip_reason_counts': empty_skip_reason_counts(),
+        }
         if finalize:
             runner.clear_checkpoint(job_id)
             runner.complete_job(job_id, empty)
             return None
         return empty
+
+    path_diag = PathSkipDiagnostics(
+        runner,
+        job_id,
+        lib_db,
+        job_label='batch_describe',
+        chain_mode=bool(metadata.get('_catalog_cache_chain')),
+        log_action='describe',
+    )
+    preflight_keys = [k for k, _t in images_to_describe]
+    if not isinstance(lib_db, MagicMock) and not path_diag.run_preflight(preflight_keys):
+        return None
 
     def record_done(desc_key: str, itype: str) -> bool:
         processed_pairs.add(pair_label(desc_key, itype))
@@ -572,6 +644,10 @@ def _run_describe_pass(
                             break
                     elif status == 'skipped':
                         skipped += 1
+                        _record_path_skip_from_status(
+                            path_diag, lib_db, result_key, coord_itype, status,
+                            log_prefix=log_prefix,
+                        )
                         add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{result_key}: {error_msg}' if log_prefix else f'{result_key}: {error_msg}')
                         if not record_done(result_key, coord_itype):
                             break
@@ -626,6 +702,9 @@ def _run_describe_pass(
                     break
             elif status == 'skipped':
                 skipped += 1
+                _record_path_skip_from_status(
+                    path_diag, lib_db, key, itype, status, log_prefix=log_prefix,
+                )
                 add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{key}: {error_msg}' if log_prefix else f'{key}: {error_msg}')
                 if not record_done(key, itype):
                     break
@@ -665,6 +744,7 @@ def _run_describe_pass(
         'image_type': image_type,
         'date_filter': date_filter,
         'force': force,
+        'skip_reason_counts': path_diag.skip_reason_counts,
     }
 
     if described == 0 and consecutive_failures >= 10:
@@ -941,12 +1021,30 @@ def _run_score_pass(
     )
 
     if total_at_start == 0:
-        empty = {'scored': 0, 'skipped': 0, 'failed': 0, 'total': 0}
+        empty = {
+            'scored': 0,
+            'skipped': 0,
+            'failed': 0,
+            'total': 0,
+            'skip_reason_counts': empty_skip_reason_counts(),
+        }
         if finalize:
             runner.clear_checkpoint(job_id)
             runner.complete_job(job_id, empty)
             return None
         return empty
+
+    path_diag = PathSkipDiagnostics(
+        runner,
+        job_id,
+        lib_db,
+        job_label='batch_score',
+        chain_mode=bool(metadata.get('_catalog_cache_chain')),
+        log_action='score',
+    )
+    preflight_keys = list(dict.fromkeys(k for k, _t, _s in work_triples))
+    if not isinstance(lib_db, MagicMock) and not path_diag.run_preflight(preflight_keys):
+        return None
 
     def record_done(score_key: str, itype: str, slug: str) -> bool:
         processed_triplets.add(triplet_label(score_key, itype, slug))
@@ -1048,6 +1146,10 @@ def _run_score_pass(
                             break
                     elif status == 'skipped':
                         skipped += 1
+                        _record_path_skip_from_status(
+                            path_diag, lib_db, coord_key, coord_itype, status,
+                            log_prefix=log_prefix,
+                        )
                         add_job_log(
                             runner.db, job_id, 'warning',
                             f'{log_prefix}{coord_key}|{coord_slug}: {error_msg}'
@@ -1112,6 +1214,9 @@ def _run_score_pass(
                     break
             elif status == 'skipped':
                 skipped += 1
+                _record_path_skip_from_status(
+                    path_diag, lib_db, key, itype, status, log_prefix=log_prefix,
+                )
                 add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{key}|{slug}: {error_msg}' if log_prefix else f'{key}|{slug}: {error_msg}')
                 if not record_done(key, itype, slug):
                     break
@@ -1141,6 +1246,7 @@ def _run_score_pass(
         'image_type': image_type,
         'date_filter': date_filter,
         'force': force,
+        'skip_reason_counts': path_diag.skip_reason_counts,
     }
 
     if scored == 0 and consecutive_failures >= 10:
@@ -1385,6 +1491,10 @@ def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
             'score_total': int(score_summary.get('total', 0)),
             'score_succeeded': int(score_summary.get('scored', 0)),
             'score_failed': int(score_summary.get('failed', 0)),
+            'skip_reason_counts': _merge_skip_reason_counts(
+                describe_summary.get('skip_reason_counts'),
+                score_summary.get('skip_reason_counts'),
+            ),
         }
         runner.clear_checkpoint(job_id)
         runner.complete_job(job_id, combined)
