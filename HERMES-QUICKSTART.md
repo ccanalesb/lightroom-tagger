@@ -78,10 +78,14 @@ This checks:
 # Set token
 export GITHUB_TOKEN=$(grep GITHUB_TOKEN .env.copilot | cut -d= -f2)
 
-# Use Copilot for image description
-python -m lightroom_tagger.cli describe \
-  --image /path/to/test.jpg \
-  --vision-model github_copilot/gpt-4o
+# Use Copilot for image description (Python API)
+python -c "
+from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.vision_client import generate_description
+registry = ProviderRegistry()
+client = registry.get_client('github_copilot')
+print(generate_description(client=client, model='gpt-4o', image_path='/path/to/test.jpg'))
+"
 ```
 
 **Or update config.yaml:**

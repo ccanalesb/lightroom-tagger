@@ -62,12 +62,12 @@
 | `path_utils` | Path resolution helpers |
 | `text_constants` | Shared text/string constants |
 | `cli` | `argparse` CLI entry point (`lightroom-tagger` and friends) |
-| `cli_cmds_extra` | Heavyweight CLI subcommands split out to keep `cli` under size budget |
+| `cli_cmds_extra` | Heavyweight CLI subcommands (`export`, `init`, `stats`) split out to keep `cli` under size budget |
 
 ## Architectural constraints
 
 - **Lightroom catalog is read-only** except for keyword writes via `lr_writer.py`.
 - **One writer at a time** on `library.db`: always use `library_write` context manager for DML; never bare `conn.commit()` in parallel worker paths.
 - **Providers are OpenAI-compatible**: all vision/LLM calls go through `openai.OpenAI` client regardless of backend (Ollama, NIM, OpenRouter).
-- **No Instagram API**: all Instagram data comes from user-provided export dumps. `instagram/crawler.py`, `scraper.py`, and `browser.py` are deprecated dead code — do not use or extend them.
+- **No Instagram API**: all Instagram data comes from user-provided export dumps via `instagram/dump_reader.py` and `instagram/deduplicator.py`. Live-crawl scraper code has been removed.
 - **Tests live next to modules**: `test_*.py` files are co-located under `lightroom_tagger/core/`.
