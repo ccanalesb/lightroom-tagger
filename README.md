@@ -111,13 +111,8 @@ Configuration module that loads settings from `config.yaml` or environment varia
 ### `lightroom_tagger/schema_explorer.py`
 Explores the Lightroom catalog schema. Connects to the SQLite database and lists all tables with their columns. Useful for understanding the catalog structure.
 
-### `lightroom_tagger/catalog_reader.py`
-Reads metadata from the Lightroom catalog. Queries the SQLite database and joins these key tables:
-- `AgLibraryFile` + `AgLibraryFolder` + `AgLibraryRootFolder` - file paths
-- `Adobe_images` - ratings, pick flag, color labels
-- `AgLibraryKeywordImage` + `AgLibraryKeyword` - keywords/tags
-- `AgHarvestedExifMetadata` - EXIF data (camera, lens, date, GPS)
-- `AgLibraryIPTC` - caption, copyright
+### `lightroom_tagger/lightroom/reader.py`
+Reads metadata from the Lightroom catalog. Queries the SQLite database and joins key tables (`AgLibraryFile`, `Adobe_images`, keywords, EXIF, IPTC). Used by `lightroom-tagger scan` and `sync`.
 
 ### `lightroom_tagger/database.py`
 SQLite operations for storing and querying indexed images (WAL mode for concurrency). Provides functions for:
@@ -129,6 +124,8 @@ SQLite operations for storing and querying indexed images (WAL mode for concurre
 ### `lightroom_tagger/core/cli.py`
 Command-line interface with subcommands:
 - `scan` - Scan catalog, index all images to SQLite
+- `sync` - Incremental catalog sync (additions only)
+- `enrich-catalog` - Enrich catalog images or pre-warm vision cache (`--cache-only`)
 - `search` - Search indexed images by keyword, rating, date, color label
 - `export` - Export to JSON or CSV format
 - `init` - Initialize empty database
