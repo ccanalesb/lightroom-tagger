@@ -255,7 +255,7 @@ if __name__ == "__main__":
 
 
     if len(sys.argv) < 3:
-        print("Usage: python lr_writer.py <catalog_path> <keyword> [image_key]")
+        print("Usage: python -m lightroom_tagger.lightroom.writer <catalog_path> <keyword> [image_key]")
         sys.exit(1)
 
     catalog_path = sys.argv[1]

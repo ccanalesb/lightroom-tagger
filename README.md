@@ -111,8 +111,8 @@ Configuration module that loads settings from `config.yaml` or environment varia
 ### `lightroom_tagger/schema_explorer.py`
 Explores the Lightroom catalog schema. Connects to the SQLite database and lists all tables with their columns. Useful for understanding the catalog structure.
 
-### `lightroom_tagger/catalog_reader.py`
-Reads metadata from the Lightroom catalog. Queries the SQLite database and joins these key tables:
+### `lightroom_tagger/lightroom/reader.py`
+Reads metadata from the Lightroom catalog (read-only `connect_catalog`). Queries the SQLite database and joins these key tables:
 - `AgLibraryFile` + `AgLibraryFolder` + `AgLibraryRootFolder` - file paths
 - `Adobe_images` - ratings, pick flag, color labels
 - `AgLibraryKeywordImage` + `AgLibraryKeyword` - keywords/tags
