@@ -115,3 +115,38 @@ def cmd_stats(args, config):
     except Exception as e:
         print(f"Error: {e}")
         return 1
+
+
+def cmd_enrich_catalog(args, config):
+    """Enrich catalog images or pre-warm vision cache."""
+    from lightroom_tagger.core.vision_cache import warm_vision_cache
+    from lightroom_tagger.lightroom.enricher import enrich_catalog_images
+
+    db_path = args.db or config.db_path
+
+    if not db_path:
+        print("Error: No database path provided. Use --db or config.yaml")
+        return 1
+
+    if not Path(db_path).exists():
+        print(f"Error: Database not found: {db_path}")
+        return 1
+
+    catalog_path = args.catalog or config.catalog_path
+
+    try:
+        db = init_database(db_path)
+        if args.cache_only:
+            result = warm_vision_cache(db, limit=args.limit)
+        else:
+            result = enrich_catalog_images(db, catalog_path, limit=args.limit)
+        db.close()
+
+        print(f"Processed: {result['processed']}")
+        print(f"Skipped: {result['skipped']}")
+        print(f"Errors: {result['errors']}")
+        return 0
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return 1

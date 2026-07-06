@@ -8,7 +8,7 @@
 
 | Term | Meaning |
 |---|---|
-| **catalog** | A Lightroom `.lrcat` SQLite file. Read-only except for keyword writes via `lr_writer.py`. |
+| **catalog** | A Lightroom `.lrcat` SQLite file. Read-only except for keyword writes via `lightroom/writer.py`. |
 | **image** / **catalog image** | A photo record in the library DB indexed from the Lightroom catalog. |
 | **instagram dump** | An exported ZIP/directory of Instagram media and metadata provided by the user (no API access). |
 | **match** | The result of pairing a catalog image with an Instagram post, stored in `matches`. Has two states: *proposed* (created by the vision pipeline, `validated_at` is NULL) and *validated* (human-confirmed, `validated_at` is set). Only validated matches drive posting analytics and identity. |
@@ -64,12 +64,13 @@
 | `config` | `load_config` — merges `config.yaml` + env overrides; `get_vision_model`, `get_description_model` |
 | `path_utils` | Path resolution helpers |
 | `text_constants` | Shared text/string constants |
-| `cli` | `argparse` CLI entry point (`lightroom-tagger` and friends) |
-| `cli_cmds_extra` | Heavyweight CLI subcommands (`export`, `init`, `stats`) split out to keep `cli` under size budget |
+| `cli` | Thin CLI engine: global args, `run(argv, config, commands)`, and lightweight handlers (`scan`, `sync`, `search`) |
+| `cli_commands` | Command registry (`Command` dataclass + `COMMANDS` list) — each subcommand's name, flags, and handler declared together |
+| `cli_cmds_extra` | Heavyweight CLI subcommands (`export`, `init`, `stats`, `enrich-catalog`) split out to keep `cli` under size budget |
 
 ## Architectural constraints
 
-- **Lightroom catalog is read-only** except for keyword writes via `lr_writer.py`.
+- **Lightroom catalog is read-only** except for keyword writes via `lightroom/writer.py`.
 - **One writer at a time** on `library.db`: always use `library_write` context manager for DML; never bare `conn.commit()` in parallel worker paths.
 - **Providers are OpenAI-compatible**: all vision/LLM calls go through `openai.OpenAI` client regardless of backend (Ollama, NIM, OpenRouter).
 - **No Instagram API**: all Instagram data comes from user-provided export dumps via `instagram/dump_reader.py` and `instagram/deduplicator.py`. Live-crawl scraper code has been removed.

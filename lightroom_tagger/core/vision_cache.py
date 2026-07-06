@@ -193,3 +193,40 @@ def get_cache_stats(db) -> dict:
     """
     from lightroom_tagger.core.database import get_cache_stats as _get_stats
     return _get_stats(db)
+
+
+def warm_vision_cache(db, limit: int | None = None) -> dict:
+    """Bulk pre-warm vision cache for catalog images missing cache entries.
+
+    Returns:
+        {processed: N, skipped: N, errors: N}
+    """
+    from lightroom_tagger.core.database import get_catalog_images_missing_cache
+    from lightroom_tagger.core.path_utils import resolve_catalog_path
+
+    images = get_catalog_images_missing_cache(db)
+    if limit is not None:
+        images = images[:limit]
+
+    processed = 0
+    skipped = 0
+    errors = 0
+
+    for record in images:
+        key = record.get('key')
+        filepath = record.get('filepath', '')
+        resolved = resolve_catalog_path(filepath)
+        if not key or not resolved:
+            skipped += 1
+            continue
+
+        try:
+            cached_path = get_or_create_cached_image(db, key, resolved)
+            if cached_path is None:
+                skipped += 1
+            else:
+                processed += 1
+        except Exception:
+            errors += 1
+
+    return {'processed': processed, 'skipped': skipped, 'errors': errors}

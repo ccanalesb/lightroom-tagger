@@ -106,3 +106,76 @@ def test_oversized_sentinel_still_valid_for_non_raw(temp_db, tmp_path):
     mtime = os.path.getmtime(p)
     store_vision_cached_image(temp_db, "jpg-big", VISION_CACHE_OVERSIZED_SENTINEL, None, mtime)
     assert is_vision_cache_valid(temp_db, "jpg-big", p) is True
+
+
+def test_warm_vision_cache_processes_missing_entries(temp_db, tmp_path):
+    """Images missing from cache are warmed and counted as processed."""
+    from lightroom_tagger.core.database import store_image
+
+    img1 = tmp_path / "a.jpg"
+    img1.write_bytes(b"x")
+    img2 = tmp_path / "b.jpg"
+    img2.write_bytes(b"y")
+    store_image(temp_db, {
+        'date_taken': '2024-01-01',
+        'filename': 'a.jpg',
+        'filepath': str(img1),
+    })
+    store_image(temp_db, {
+        'date_taken': '2024-01-02',
+        'filename': 'b.jpg',
+        'filepath': str(img2),
+    })
+
+    with patch.object(vc, 'get_or_create_cached_image', side_effect=lambda _db, key, _path: f"/cache/{key}.jpg"):
+        result = vc.warm_vision_cache(temp_db)
+
+    assert result == {'processed': 2, 'skipped': 0, 'errors': 0}
+
+
+def test_warm_vision_cache_skips_unresolvable_paths(temp_db, tmp_path):
+    """Unresolvable file paths are skipped."""
+    from lightroom_tagger.core.database import store_image
+
+    img1 = tmp_path / "a.jpg"
+    img1.write_bytes(b"x")
+    store_image(temp_db, {
+        'date_taken': '2024-01-01',
+        'filename': 'a.jpg',
+        'filepath': str(img1),
+    })
+    store_image(temp_db, {
+        'date_taken': '2024-01-02',
+        'filename': 'b.jpg',
+        'filepath': '/nonexistent/path/b.jpg',
+    })
+
+    with patch.object(vc, 'get_or_create_cached_image', return_value='/cache/warmed.jpg') as mock:
+        result = vc.warm_vision_cache(temp_db)
+
+    assert result['processed'] == 1
+    assert result['skipped'] == 1
+    assert result['errors'] == 0
+    assert mock.call_count == 1
+
+
+def test_warm_vision_cache_honors_limit(temp_db, tmp_path):
+    """Limit caps how many missing-cache images are attempted."""
+    from lightroom_tagger.core.database import store_image
+
+    for i in range(3):
+        img = tmp_path / f"img{i}.jpg"
+        img.write_bytes(b"x")
+        store_image(temp_db, {
+            'date_taken': f'2024-01-0{i + 1}',
+            'filename': f'img{i}.jpg',
+            'filepath': str(img),
+        })
+
+    with patch.object(vc, 'get_or_create_cached_image', return_value='/cache/warmed.jpg') as mock:
+        result = vc.warm_vision_cache(temp_db, limit=2)
+
+    assert mock.call_count == 2
+    assert result['processed'] == 2
+    assert result['skipped'] == 0
+    assert result['errors'] == 0
