@@ -14,10 +14,12 @@ from lightroom_tagger.core.analyzer import compress_image, compute_phash, get_vi
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import (
     VISION_CACHE_OVERSIZED_SENTINEL,
+    get_catalog_images_missing_cache,
     get_vision_cached_image,
     is_vision_cache_valid,
     store_vision_cached_image,
 )
+from lightroom_tagger.core.path_utils import resolve_catalog_path
 
 # Working cached JPEGs are ~50–135KB; larger outputs imply failed compression or oversized originals.
 MAX_CACHED_IMAGE_KB = 512
@@ -193,3 +195,44 @@ def get_cache_stats(db) -> dict:
     """
     from lightroom_tagger.core.database import get_cache_stats as _get_stats
     return _get_stats(db)
+
+
+def warm_vision_cache(db, limit: int | None = None) -> dict:
+    """Warm vision cache entries for catalog images missing from the cache.
+
+    Returns:
+        {processed: N, skipped: N, errors: N}
+    """
+    images = get_catalog_images_missing_cache(db)
+    if limit:
+        images = images[:limit]
+
+    processed = 0
+    skipped = 0
+    errors = 0
+
+    for record in images:
+        key = record.get('key')
+        if not key:
+            skipped += 1
+            continue
+
+        filepath = resolve_catalog_path(record.get('filepath', ''))
+        if not filepath:
+            skipped += 1
+            continue
+
+        try:
+            cached_path = get_or_create_cached_image(db, key, filepath)
+            if cached_path:
+                processed += 1
+            else:
+                errors += 1
+        except Exception:
+            errors += 1
+
+    return {
+        'processed': processed,
+        'skipped': skipped,
+        'errors': errors,
+    }

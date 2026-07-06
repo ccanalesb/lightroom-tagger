@@ -171,6 +171,29 @@ def create_parser() -> argparse.ArgumentParser:
         help="Path to SQLite database (overrides global)"
     )
 
+    enrich_parser = subparsers.add_parser(
+        "enrich-catalog",
+        help="Analyze catalog images or warm the vision cache",
+    )
+    enrich_parser.add_argument(
+        "--db",
+        help="Path to SQLite database (overrides global)",
+    )
+    enrich_parser.add_argument(
+        "--catalog",
+        help="Path to .lrcat file (overrides global; full enrichment only)",
+    )
+    enrich_parser.add_argument(
+        "--limit",
+        type=int,
+        help="Limit number of images to process",
+    )
+    enrich_parser.add_argument(
+        "--cache-only",
+        action="store_true",
+        help="Warm vision cache only (skip full enrichment)",
+    )
+
     return parser
 
 
@@ -295,6 +318,7 @@ def cmd_search(args, config):
 
 
 from lightroom_tagger.core.cli_cmds_extra import (
+    cmd_enrich_catalog,
     cmd_export,
     cmd_init,
     cmd_stats,
@@ -341,6 +365,8 @@ def main():
         return cmd_init(args, config)
     elif args.command == "stats":
         return cmd_stats(args, config)
+    elif args.command == "enrich-catalog":
+        return cmd_enrich_catalog(args, config)
     else:
         parser.print_help()
         return 1

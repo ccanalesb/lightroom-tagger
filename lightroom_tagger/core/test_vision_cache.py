@@ -106,3 +106,56 @@ def test_oversized_sentinel_still_valid_for_non_raw(temp_db, tmp_path):
     mtime = os.path.getmtime(p)
     store_vision_cached_image(temp_db, "jpg-big", VISION_CACHE_OVERSIZED_SENTINEL, None, mtime)
     assert is_vision_cache_valid(temp_db, "jpg-big", p) is True
+
+
+def test_warm_vision_cache_processes_missing_cache_entries(temp_db, tmp_path):
+    """Catalog images missing from cache are warmed and counted as processed."""
+    img_path = tmp_path / "photo.jpg"
+    img_path.write_bytes(b"jpeg")
+    temp_db.execute(
+        "INSERT INTO images (key, filepath, date_taken, filename) VALUES (?, ?, ?, ?)",
+        ("key-warm", str(img_path), "2020-01-01", "photo.jpg"),
+    )
+    temp_db.commit()
+
+    with patch("lightroom_tagger.core.vision_cache.resolve_catalog_path", return_value=str(img_path)):
+        with patch.object(vc, "get_or_create_cached_image", return_value="/cache/key-warm.jpg") as mock_cache:
+            result = vc.warm_vision_cache(temp_db, limit=None)
+
+    assert result == {"processed": 1, "skipped": 0, "errors": 0}
+    mock_cache.assert_called_once_with(temp_db, "key-warm", str(img_path))
+
+
+def test_warm_vision_cache_skips_unresolvable_paths(temp_db):
+    """Unresolvable or missing file paths are skipped without warming."""
+    temp_db.execute(
+        "INSERT INTO images (key, filepath, date_taken, filename) VALUES (?, ?, ?, ?)",
+        ("key-missing", "/nonexistent/path.jpg", "2020-01-01", "x.jpg"),
+    )
+    temp_db.commit()
+
+    with patch("lightroom_tagger.core.vision_cache.resolve_catalog_path", return_value=""):
+        with patch.object(vc, "get_or_create_cached_image") as mock_cache:
+            result = vc.warm_vision_cache(temp_db, limit=None)
+
+    assert result == {"processed": 0, "skipped": 1, "errors": 0}
+    mock_cache.assert_not_called()
+
+
+def test_warm_vision_cache_honors_limit(temp_db, tmp_path):
+    """Limit caps how many missing-cache images are processed."""
+    for i in range(5):
+        img_path = tmp_path / f"p{i}.jpg"
+        img_path.write_bytes(b"x")
+        temp_db.execute(
+            "INSERT INTO images (key, filepath, date_taken, filename) VALUES (?, ?, ?, ?)",
+            (f"key{i}", str(img_path), "2020-01-01", f"p{i}.jpg"),
+        )
+    temp_db.commit()
+
+    with patch("lightroom_tagger.core.vision_cache.resolve_catalog_path", side_effect=lambda fp: fp):
+        with patch.object(vc, "get_or_create_cached_image", return_value="/cache/x.jpg") as mock_cache:
+            result = vc.warm_vision_cache(temp_db, limit=2)
+
+    assert result == {"processed": 2, "skipped": 0, "errors": 0}
+    assert mock_cache.call_count == 2
