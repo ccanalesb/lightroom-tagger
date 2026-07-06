@@ -20,7 +20,7 @@ jobs:
   run:
     if: >-
       contains(fromJSON('["sandcastle","ready-for-agent"]'), github.event.label.name)
-      && !startsWith(github.event.issue.title, 'PRD:')
+      && !startsWith(github.event.issue.title, '[PRD]')
     runs-on: ubuntu-latest
     env:
       BRANCH: sandcastle/issue-${{ github.event.issue.number }}
