@@ -2,7 +2,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from lightroom_tagger.core.config import Config, load_config
+from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import (
     get_all_images,
     init_database,
@@ -85,14 +85,6 @@ def _apply_global_overrides(args, config) -> None:
         config.skip_ai = args.skip_ai
     if args.verbose:
         config.verbose = args.verbose
-
-
-def _has_subcommand(argv, commands) -> bool:
-    names = {command.name for command in commands}
-    for arg in argv:
-        if not arg.startswith("-") and arg in names:
-            return True
-    return False
 
 
 def run(argv, config, commands) -> int:
@@ -244,8 +236,6 @@ def main():
     from lightroom_tagger.core.cli_commands import COMMANDS
 
     argv = sys.argv[1:]
-    if not _has_subcommand(argv, COMMANDS):
-        return run(argv, Config(), COMMANDS)
 
     pre_parser = argparse.ArgumentParser(add_help=False)
     pre_parser.add_argument("--config", default="config.yaml")
