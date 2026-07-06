@@ -30,6 +30,7 @@
 | **cancel scope** | Thread-local cooperative cancellation. A batch worker registers a `cancel_check` callback for its thread; retry sleeps and fallback dispatcher honour it. Triggered from the visualizer UI (user cancels a job) and intended to work from CLI too. |
 | **scan** | Full re-read of the Lightroom catalog with idempotent upsert into `library.db`. Picks up metadata edits to already-indexed images. |
 | **catalog sync** | Incremental, additions-only refresh: diffs catalog ids against `library.db`, fetches metadata only for missing images. Does not update existing rows or delete stale ones. |
+| **command registry** | Explicit list of `Command` entries (`name`, `help`, `add_arguments`, `handler`) in `cli_commands.py`. Parser subcommands and dispatch are both derived from this list — not an `if/elif` chain. |
 
 ## Key modules
 
@@ -64,7 +65,8 @@
 | `config` | `load_config` — merges `config.yaml` + env overrides; `get_vision_model`, `get_description_model` |
 | `path_utils` | Path resolution helpers |
 | `text_constants` | Shared text/string constants |
-| `cli` | `argparse` CLI entry point (`lightroom-tagger` and friends) |
+| `cli` | Thin CLI engine: global args, `run(argv, config, commands)`, and lightweight handlers (`scan`, `sync`, `search`) |
+| `cli_commands` | Command registry (`Command` dataclass + `COMMANDS` list) — each subcommand's name, flags, and handler declared together |
 | `cli_cmds_extra` | Heavyweight CLI subcommands (`export`, `init`, `stats`) split out to keep `cli` under size budget |
 
 ## Architectural constraints
