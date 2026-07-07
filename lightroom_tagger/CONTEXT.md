@@ -64,8 +64,9 @@
 | `config` | `load_config` — merges `config.yaml` + env overrides; `get_vision_model`, `get_description_model` |
 | `path_utils` | Path resolution helpers |
 | `text_constants` | Shared text/string constants |
-| `cli` | `argparse` CLI entry point (`lightroom-tagger` and friends) |
-| `cli_cmds_extra` | Heavyweight CLI subcommands (`export`, `init`, `stats`) split out to keep `cli` under size budget |
+| `cli` | `argparse` CLI entry point (`lightroom-tagger` and friends); `run()` builds parser, applies global overrides, dispatches |
+| `cli_commands` | Explicit command registry (`Command` dataclass + `COMMANDS` list) — each command's name, flags, and handler live in one place |
+| `cli_cmds_extra` | Heavyweight CLI subcommands (`export`, `init`, `stats`, `enrich-catalog`) split out to keep `cli` under size budget |
 
 ## Architectural constraints
 

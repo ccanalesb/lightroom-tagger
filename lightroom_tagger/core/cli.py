@@ -16,11 +16,12 @@ from lightroom_tagger.core.catalog_sync import CatalogSyncError, sync_catalog
 from lightroom_tagger.lightroom.reader import connect_catalog, get_image_count, get_image_records
 
 
-def create_parser() -> argparse.ArgumentParser:
-    """Create argument parser with subcommands."""
+def _build_parser(commands) -> argparse.ArgumentParser:
+    """Build argument parser with global options and registered subcommands."""
     parser = argparse.ArgumentParser(
         prog="lightroom-tagger",
-        description="Read Lightroom catalog, index metadata, store in SQLite"
+        description="Read Lightroom catalog, index metadata, store in SQLite",
+        exit_on_error=False,
     )
 
     parser.add_argument(
@@ -38,7 +39,8 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--workers", "-w",
-        type=int, default=4,
+        type=int,
+        default=4,
         help="Parallel workers (default: 4)"
     )
     parser.add_argument(
@@ -63,138 +65,50 @@ def create_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    scan_parser = subparsers.add_parser("scan", help="Scan catalog, index all images")
-    scan_parser.add_argument(
-        "--catalog",
-        help="Path to .lrcat file (overrides global)"
-    )
-    scan_parser.add_argument(
-        "--db",
-        help="Path to SQLite database (overrides global)"
-    )
-    scan_parser.add_argument(
-        "--workers",
-        type=int,
-        help="Parallel workers"
-    )
-    scan_parser.add_argument(
-        "--limit",
-        type=int,
-        help="Limit number of images to process"
-    )
-
-    sync_parser = subparsers.add_parser(
-        "sync",
-        help="Incremental catalog sync — add missing images to library.db",
-    )
-    sync_parser.add_argument(
-        "--catalog",
-        help="Path to .lrcat file (overrides global)",
-    )
-    sync_parser.add_argument(
-        "--db",
-        help="Path to SQLite database (overrides global)",
-    )
-
-    search_parser = subparsers.add_parser("search", help="Search indexed images")
-    search_parser.add_argument(
-        "--db",
-        help="Path to SQLite database (overrides global)"
-    )
-    search_parser.add_argument(
-        "--keyword",
-        help="Search by keyword"
-    )
-    search_parser.add_argument(
-        "--rating",
-        type=int,
-        help="Minimum rating (0-5)"
-    )
-    search_parser.add_argument(
-        "--color-label",
-        help="Filter by color label"
-    )
-    search_parser.add_argument(
-        "--date-start",
-        help="Start date (ISO format)"
-    )
-    search_parser.add_argument(
-        "--date-end",
-        help="End date (ISO format)"
-    )
-    search_parser.add_argument(
-        "--limit",
-        type=int,
-        help="Limit results"
-    )
-
-    export_parser = subparsers.add_parser("export", help="Export to JSON/CSV")
-    export_parser.add_argument(
-        "--db",
-        help="Path to SQLite database (overrides global)"
-    )
-    export_parser.add_argument(
-        "--output", "-o",
-        required=True,
-        help="Output file path"
-    )
-    export_parser.add_argument(
-        "--format",
-        choices=["json", "csv"],
-        default="json",
-        help="Export format (default: json)"
-    )
-    export_parser.add_argument(
-        "--keyword",
-        help="Export only images matching keyword"
-    )
-    export_parser.add_argument(
-        "--rating",
-        type=int,
-        help="Export only images with minimum rating"
-    )
-    export_parser.add_argument(
-        "--limit",
-        type=int,
-        help="Limit results"
-    )
-
-    init_parser = subparsers.add_parser("init", help="Initialize database")
-    init_parser.add_argument(
-        "--db",
-        help="Path to SQLite database (overrides global)"
-    )
-
-    stats_parser = subparsers.add_parser("stats", help="Show database statistics")
-    stats_parser.add_argument(
-        "--db",
-        help="Path to SQLite database (overrides global)"
-    )
-
-    enrich_parser = subparsers.add_parser(
-        "enrich-catalog",
-        help="Analyze catalog images or warm the vision cache",
-    )
-    enrich_parser.add_argument(
-        "--db",
-        help="Path to SQLite database (overrides global)",
-    )
-    enrich_parser.add_argument(
-        "--catalog",
-        help="Path to .lrcat file (overrides global; full enrichment only)",
-    )
-    enrich_parser.add_argument(
-        "--limit",
-        type=int,
-        help="Limit number of images to process",
-    )
-    enrich_parser.add_argument(
-        "--cache-only",
-        action="store_true",
-        help="Warm vision cache only (skip full enrichment)",
-    )
+    for command in commands:
+        subparser = subparsers.add_parser(command.name, help=command.help)
+        command.add_arguments(subparser)
 
     return parser
+
+
+def _apply_global_overrides(args, config) -> None:
+    if args.catalog:
+        config.catalog_path = args.catalog
+    if args.db:
+        config.db_path = args.db
+    if args.workers:
+        config.workers = args.workers
+    if args.ai_model:
+        config.ai_model = args.ai_model
+    if args.skip_ai:
+        config.skip_ai = args.skip_ai
+    if args.verbose:
+        config.verbose = args.verbose
+
+
+def run(argv, config, commands) -> int:
+    """Parse argv, apply global overrides, and dispatch via the command registry."""
+    parser = _build_parser(commands)
+    try:
+        args = parser.parse_args(argv)
+    except argparse.ArgumentError:
+        parser.print_help()
+        return 1
+
+    if not args.command:
+        parser.print_help()
+        return 1
+
+    _apply_global_overrides(args, config)
+
+    handlers = {command.name: command.handler for command in commands}
+    handler = handlers.get(args.command)
+    if handler is None:
+        parser.print_help()
+        return 1
+
+    return handler(args, config)
 
 
 def cmd_scan(args, config):
@@ -317,59 +231,23 @@ def cmd_search(args, config):
         return 1
 
 
-from lightroom_tagger.core.cli_cmds_extra import (
-    cmd_enrich_catalog,
-    cmd_export,
-    cmd_init,
-    cmd_stats,
-)
-
-
 def main():
     """Main entry point."""
-    parser = create_parser()
-    args = parser.parse_args()
+    from lightroom_tagger.core.cli_commands import COMMANDS
 
-    if not args.command:
-        parser.print_help()
-        return 1
+    argv = sys.argv[1:]
+
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument("--config", default="config.yaml")
+    pre_args, _ = pre_parser.parse_known_args(argv)
 
     try:
-        config = load_config(args.config)
-
-        if args.catalog:
-            config.catalog_path = args.catalog
-        if args.db:
-            config.db_path = args.db
-        if args.workers:
-            config.workers = args.workers
-        if args.ai_model:
-            config.ai_model = args.ai_model
-        if args.skip_ai:
-            config.skip_ai = args.skip_ai
-        if args.verbose:
-            config.verbose = args.verbose
+        config = load_config(pre_args.config)
     except Exception as e:
         print(f"Error loading config: {e}")
         return 1
 
-    if args.command == "scan":
-        return cmd_scan(args, config)
-    elif args.command == "sync":
-        return cmd_sync(args, config)
-    elif args.command == "search":
-        return cmd_search(args, config)
-    elif args.command == "export":
-        return cmd_export(args, config)
-    elif args.command == "init":
-        return cmd_init(args, config)
-    elif args.command == "stats":
-        return cmd_stats(args, config)
-    elif args.command == "enrich-catalog":
-        return cmd_enrich_catalog(args, config)
-    else:
-        parser.print_help()
-        return 1
+    return run(argv, config, COMMANDS)
 
 
 if __name__ == "__main__":
