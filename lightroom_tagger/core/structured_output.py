@@ -42,6 +42,7 @@ class ScoreResponse(BaseModel):
     perspective_slug: str
     score: int = Field(ge=1, le=10)
     rationale: str
+    not_attempted: bool = False
 
 
 def _truncate_preview(text: str, max_len: int = STRUCTURED_OUTPUT_RAW_PREVIEW_MAX_CHARS) -> str:

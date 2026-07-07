@@ -6,13 +6,144 @@ from datetime import datetime, timezone
 
 from lightroom_tagger.core.database import (
     get_current_scores_for_image,
+    get_perspective_by_slug,
     init_database,
     insert_image_score,
+    insert_perspective,
     list_score_history_for_perspective,
     query_catalog_images,
+    seed_perspectives_from_prompts_dir,
     store_image,
     supersede_previous_current_scores,
+    update_perspective,
 )
+
+
+def test_insert_image_score_persists_not_attempted(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    conn.execute(
+        """
+        INSERT INTO perspectives (slug, display_name, description, prompt_markdown)
+        VALUES ('framing', 'Framing', '', '')
+        """
+    )
+    conn.commit()
+    ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    insert_image_score(
+        conn,
+        {
+            "image_key": "2020-01-01_x.jpg",
+            "image_type": "catalog",
+            "perspective_slug": "framing",
+            "score": 5,
+            "rationale": "absent",
+            "prompt_version": "v1",
+            "scored_at": ts,
+            "is_current": 1,
+            "not_attempted": 1,
+        },
+    )
+    conn.commit()
+    rows = get_current_scores_for_image(conn, "2020-01-01_x.jpg", "catalog")
+    assert len(rows) == 1
+    assert rows[0]["not_attempted"] == 1
+
+
+def test_insert_image_score_defaults_not_attempted_zero(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    conn.execute(
+        """
+        INSERT INTO perspectives (slug, display_name, description, prompt_markdown)
+        VALUES ('baseline_persp', 'Baseline', '', '')
+        """
+    )
+    conn.commit()
+    ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    insert_image_score(
+        conn,
+        {
+            "image_key": "2020-01-01_y.jpg",
+            "image_type": "catalog",
+            "perspective_slug": "baseline_persp",
+            "score": 7,
+            "prompt_version": "v1",
+            "scored_at": ts,
+            "is_current": 1,
+        },
+    )
+    conn.commit()
+    rows = get_current_scores_for_image(conn, "2020-01-01_y.jpg", "catalog")
+    assert rows[0]["not_attempted"] == 0
+
+
+def test_insert_perspective_derives_optional_from_markdown_marker(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    insert_perspective(
+        conn, slug="baseline", display_name="Baseline", prompt_markdown="# no marker"
+    )
+    insert_perspective(
+        conn,
+        slug="opt",
+        display_name="Opt",
+        prompt_markdown="<!-- optional: true -->\n# Framing",
+    )
+    conn.commit()
+    assert get_perspective_by_slug(conn, "baseline")["optional"] == 0
+    assert get_perspective_by_slug(conn, "opt")["optional"] == 1
+
+
+def test_update_perspective_re_derives_optional_when_markdown_written(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    insert_perspective(
+        conn, slug="p", display_name="P", prompt_markdown="# plain"
+    )
+    conn.commit()
+    assert get_perspective_by_slug(conn, "p")["optional"] == 0
+
+    # Writing markdown with the marker flips optional on.
+    update_perspective(conn, "p", prompt_markdown="<!-- optional: true -->\n# now optional")
+    conn.commit()
+    assert get_perspective_by_slug(conn, "p")["optional"] == 1
+
+    # Writing markdown without the marker un-sets optional (marker always wins).
+    update_perspective(conn, "p", prompt_markdown="# marker removed")
+    conn.commit()
+    assert get_perspective_by_slug(conn, "p")["optional"] == 0
+
+
+def test_update_perspective_leaves_optional_untouched_without_markdown(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    insert_perspective(
+        conn, slug="p", display_name="P", prompt_markdown="<!-- optional: true -->\n# opt"
+    )
+    conn.commit()
+    assert get_perspective_by_slug(conn, "p")["optional"] == 1
+
+    # Editing a non-markdown field must not disturb the derived optional flag.
+    update_perspective(conn, "p", display_name="Renamed")
+    conn.commit()
+    row = get_perspective_by_slug(conn, "p")
+    assert row["display_name"] == "Renamed"
+    assert row["optional"] == 1
+
+
+def test_seed_detects_optional_marker(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    conn.execute("DELETE FROM perspectives")
+    conn.commit()
+    prompts_dir = tmp_path / "perspectives"
+    prompts_dir.mkdir()
+    (prompts_dir / "framing.md").write_text(
+        "<!-- optional: true -->\n# Framing\nEvaluate the framing device.\n",
+        encoding="utf-8",
+    )
+    (prompts_dir / "street.md").write_text(
+        "# Street\nEvaluate geometry.\n", encoding="utf-8"
+    )
+    seed_perspectives_from_prompts_dir(conn, str(prompts_dir))
+    conn.commit()
+    assert get_perspective_by_slug(conn, "framing")["optional"] == 1
+    assert get_perspective_by_slug(conn, "street")["optional"] == 0
 
 
 def test_should_keep_only_latest_prompt_version_as_current(tmp_path) -> None:

@@ -1,7 +1,20 @@
 """Perspective and image score DB helpers."""
 
+import re
 import sqlite3
 from datetime import datetime, timezone
+
+# The yt-to-photo-prompt-lab exporter marks an optional (excusable) dimension with
+# an HTML comment in the perspective markdown. This marker is the sole source of
+# truth for ``perspectives.optional``: it is re-derived on every write of
+# ``prompt_markdown`` (seed, create, edit, reset-to-default) so a changed marker
+# always wins and cannot drift. See ADR-0005.
+_OPTIONAL_MARKER_RE = re.compile(r"<!--\s*optional\s*:\s*true\s*-->", re.IGNORECASE)
+
+
+def markdown_marks_optional(markdown: str) -> bool:
+    """Whether perspective markdown opts into the excusable (not-attempted) contract."""
+    return bool(_OPTIONAL_MARKER_RE.search(markdown or ""))
 
 # ---------------------------------------------------------------------------
 # Perspectives & image scores (structured scoring)
@@ -55,14 +68,20 @@ def insert_perspective(
     active: bool = True,
     source_filename: str | None = None,
 ) -> None:
-    """Insert a ``perspectives`` row. Caller commits."""
+    """Insert a ``perspectives`` row. Caller commits.
+
+    ``optional`` (excusable) is derived from the ``prompt_markdown`` marker, never
+    passed in: an optional perspective may be scored ``not_attempted`` and such
+    excused rows are excluded from identity aggregation. See ADR-0005.
+    """
     now = datetime.now(timezone.utc).isoformat()
+    optional = markdown_marks_optional(prompt_markdown)
     conn.execute(
         """
         INSERT INTO perspectives (
             slug, display_name, description, prompt_markdown,
-            active, source_filename, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            active, optional, source_filename, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             slug,
@@ -70,6 +89,7 @@ def insert_perspective(
             description,
             prompt_markdown,
             1 if active else 0,
+            1 if optional else 0,
             source_filename,
             now,
             now,
@@ -86,7 +106,12 @@ def update_perspective(
     prompt_markdown: str | None = None,
     active: bool | None = None,
 ) -> bool:
-    """Partially update a perspective by ``slug``. Returns whether a row was updated."""
+    """Partially update a perspective by ``slug``. Returns whether a row was updated.
+
+    ``optional`` is not a parameter: whenever ``prompt_markdown`` is written, it is
+    re-derived from the markdown marker so the marker stays authoritative (a removed
+    marker un-sets optional). Updates that don't touch the markdown leave it. See ADR-0005.
+    """
     fields: list[str] = []
     values: list = []
     if display_name is not None:
@@ -98,6 +123,8 @@ def update_perspective(
     if prompt_markdown is not None:
         fields.append("prompt_markdown = ?")
         values.append(prompt_markdown)
+        fields.append("optional = ?")
+        values.append(1 if markdown_marks_optional(prompt_markdown) else 0)
     if active is not None:
         fields.append("active = ?")
         values.append(1 if active else 0)
@@ -132,8 +159,8 @@ def insert_image_score(conn: sqlite3.Connection, row: dict) -> int:
         INSERT INTO image_scores (
             image_key, image_type, perspective_slug, score, rationale,
             model_used, prompt_version, scored_at, is_current,
-            repaired_from_malformed
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            repaired_from_malformed, not_attempted
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             row["image_key"],
@@ -146,6 +173,7 @@ def insert_image_score(conn: sqlite3.Connection, row: dict) -> int:
             row["scored_at"],
             int(row.get("is_current", 1)),
             int(row.get("repaired_from_malformed", 0)),
+            int(row.get("not_attempted", 0)),
         ),
     )
     last = cursor.lastrowid

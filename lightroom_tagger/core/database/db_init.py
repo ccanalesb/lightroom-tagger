@@ -12,6 +12,7 @@ from pathlib import Path
 import sqlite_vec
 
 from . import library_bootstrap_schema
+from .scores import markdown_marks_optional
 from .db_init_migrations import (
     _backfill_matched_catalog_key_from_validated_matches,
     _library_db_file_path,
@@ -133,15 +134,16 @@ def seed_perspectives_from_prompts_dir(
         text = entry.read_text(encoding="utf-8")
         display_name = slug.replace("_", " ").title()
         description = _perspective_seed_description(text)
+        optional = 1 if markdown_marks_optional(text) else 0
 
         conn.execute(
             """
             INSERT INTO perspectives (
                 slug, display_name, description, prompt_markdown,
-                active, source_filename, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+                active, optional, source_filename, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)
             """,
-            (slug, display_name, description, text, source_filename, now, now),
+            (slug, display_name, description, text, optional, source_filename, now, now),
         )
         inserted += 1
 
@@ -183,6 +185,8 @@ def init_database(db_path: str) -> sqlite3.Connection:
     _migrate_add_column(conn, 'image_descriptions', 'mood_tags', 'TEXT')
     _migrate_add_column(conn, 'image_descriptions', 'has_repetition', 'INTEGER')
     _migrate_add_column(conn, 'image_descriptions', 'description_search_document', 'TEXT')
+    _migrate_add_column(conn, 'perspectives', 'optional', 'INTEGER NOT NULL DEFAULT 0')
+    _migrate_add_column(conn, 'image_scores', 'not_attempted', 'INTEGER NOT NULL DEFAULT 0')
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_dump_media_processed_attempted "
         "ON instagram_dump_media(processed, last_attempted_at)"

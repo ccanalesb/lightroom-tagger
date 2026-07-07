@@ -146,6 +146,7 @@ BASE_LIBRARY_SCHEMA_SQL = '''
             description TEXT NOT NULL DEFAULT '',
             prompt_markdown TEXT NOT NULL DEFAULT '',
             active INTEGER NOT NULL DEFAULT 1,
+            optional INTEGER NOT NULL DEFAULT 0,
             source_filename TEXT,
             updated_at TEXT,
             created_at TEXT
@@ -163,6 +164,7 @@ BASE_LIBRARY_SCHEMA_SQL = '''
             scored_at TEXT NOT NULL,
             is_current INTEGER NOT NULL DEFAULT 1,
             repaired_from_malformed INTEGER NOT NULL DEFAULT 0,
+            not_attempted INTEGER NOT NULL DEFAULT 0,
             CONSTRAINT uq_image_scores_versioned
                 UNIQUE (image_key, image_type, perspective_slug, prompt_version)
         );

@@ -1,10 +1,11 @@
 # image_scores JSON field keys (library DB)
-# image_key, image_type, perspective_slug, score, rationale, model_used, prompt_version, scored_at, is_current, repaired_from_malformed
+# image_key, image_type, perspective_slug, score, rationale, model_used, prompt_version, scored_at, is_current, repaired_from_malformed, not_attempted
 """REST API for the library ``perspectives`` registry.
 
 List responses (``GET /api/perspectives``) expose these fields per row for UIs and
 future catalog consumers: ``id``, ``slug``, ``display_name``, ``description``,
-``active``, ``source_filename``, ``updated_at`` (no ``prompt_markdown`` on the list).
+``active``, ``optional``, ``source_filename``, ``updated_at`` (no ``prompt_markdown`` on
+the list). ``optional`` is read-only — it is derived from the markdown marker on write.
 
 ``image_scores`` rows (same library DB) use the JSON-friendly keys listed in the
 header comment above when exposing score history over HTTP in later phases.
@@ -47,6 +48,7 @@ def _row_list_item(row: dict) -> dict:
         "display_name": row["display_name"],
         "description": row["description"],
         "active": bool(row["active"]),
+        "optional": bool(row.get("optional")),
         "source_filename": row.get("source_filename"),
         "updated_at": row.get("updated_at"),
     }

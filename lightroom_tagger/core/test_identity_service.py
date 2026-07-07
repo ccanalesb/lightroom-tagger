@@ -36,6 +36,7 @@ def _add_score(
     score: int,
     *,
     rationale: str = "",
+    not_attempted: int = 0,
 ) -> None:
     insert_image_score(
         conn,
@@ -49,7 +50,49 @@ def _add_score(
             "prompt_version": "v1",
             "scored_at": "2024-06-15T12:00:00+00:00",
             "is_current": 1,
+            "not_attempted": not_attempted,
         },
+    )
+
+
+def test_aggregate_excludes_excused_perspective(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn)
+    assert len(slugs) >= 2
+    s0, s1 = slugs[0], slugs[1]
+
+    k = store_image(
+        conn,
+        {"date_taken": "2024-01-10", "filename": "mixed.jpg", "instagram_posted": False},
+    )
+    _add_score(conn, k, s0, 8)
+    _add_score(conn, k, s1, 5, not_attempted=1)
+    conn.commit()
+
+    items, _ = compute_image_aggregate_scores(conn, min_perspectives=1)
+    row = next(i for i in items if i["image_key"] == k)
+    assert row["perspectives_covered"] == 1
+    assert row["aggregate_score"] == 8.0
+    assert [p["perspective_slug"] for p in row["per_perspective"]] == [s0]
+
+
+def test_image_with_all_perspectives_excused_is_not_scorable(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn)
+    s0, s1 = slugs[0], slugs[1]
+
+    k = store_image(
+        conn,
+        {"date_taken": "2024-01-11", "filename": "allexcused.jpg", "instagram_posted": False},
+    )
+    _add_score(conn, k, s0, 5, not_attempted=1)
+    _add_score(conn, k, s1, 5, not_attempted=1)
+    conn.commit()
+
+    items, _ = compute_image_aggregate_scores(conn, min_perspectives=1)
+    match = [i for i in items if i["image_key"] == k]
+    assert match == [] or (
+        match[0]["perspectives_covered"] == 0 and match[0]["eligible"] is False
     )
 
 
