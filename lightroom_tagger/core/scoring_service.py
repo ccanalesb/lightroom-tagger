@@ -295,6 +295,7 @@ def score_image_for_perspective(
                     "scored_at": scored_at,
                     "is_current": 1,
                     "repaired_from_malformed": 1 if repaired else 0,
+                    "not_attempted": 1 if parsed.not_attempted else 0,
                 },
             )
         return ("scored", True, None)

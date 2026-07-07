@@ -121,6 +121,86 @@ def test_score_image_persists_row_and_passes_llm_fixer(tmp_path) -> None:
     )
 
 
+def test_score_image_persists_not_attempted_for_optional_perspective(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    insert_perspective(
+        conn,
+        slug="opt_persp",
+        display_name="Optional persp",
+        prompt_markdown="<!-- optional: true -->\nEvaluate the optional technique.",
+        description="",
+    )
+    conn.commit()
+
+    img_path = tmp_path / "2020-01-01_opt.jpg"
+    img_path.write_bytes(b"x")
+    conn.execute(
+        "INSERT INTO images (key, filepath, date_taken, filename) VALUES (?, ?, ?, ?)",
+        ("2020-01-01_opt.jpg", str(img_path), "2020-01-01", "opt.jpg"),
+    )
+    conn.commit()
+
+    raw_json = (
+        '{"perspective_slug": "opt_persp", "score": 5, '
+        '"rationale": "Technique absent.", "not_attempted": true}'
+    )
+
+    captured: dict[str, str] = {}
+
+    def capture_prompt(prow: dict) -> str:
+        from lightroom_tagger.core.prompt_builder import build_scoring_user_prompt as real
+
+        out = real(prow)
+        captured["prompt"] = out
+        return out
+
+    mock_registry = MagicMock()
+    mock_registry.list_models.return_value = [{"id": "vision-model", "vision": True}]
+    mock_registry.get_client.return_value = MagicMock()
+    mock_dispatcher = MagicMock()
+    mock_dispatcher.call_with_fallback.return_value = (raw_json, "ollama", "vision-model")
+
+    with (
+        patch(
+            "lightroom_tagger.core.scoring_service.build_scoring_user_prompt",
+            side_effect=capture_prompt,
+        ),
+        patch(
+            "lightroom_tagger.core.scoring_service.ProviderRegistry",
+            return_value=mock_registry,
+        ),
+        patch(
+            "lightroom_tagger.core.scoring_service.FallbackDispatcher",
+            return_value=mock_dispatcher,
+        ),
+        patch(
+            "lightroom_tagger.core.scoring_service.get_viewable_path_managed",
+            side_effect=lambda p: (p, False),
+        ),
+        patch(
+            "lightroom_tagger.core.scoring_service.compress_image",
+            side_effect=lambda p: p,
+        ),
+    ):
+        status, ok, err = score_image_for_perspective(
+            conn,
+            image_key="2020-01-01_opt.jpg",
+            image_type="catalog",
+            perspective_slug="opt_persp",
+            force=True,
+            provider_id="ollama",
+            model="vision-model",
+            log_callback=None,
+        )
+
+    assert err is None
+    assert status == "scored"
+    assert '"not_attempted"' in captured["prompt"]
+    rows = get_current_scores_for_image(conn, "2020-01-01_opt.jpg", "catalog")
+    assert rows[0]["not_attempted"] == 1
+    assert rows[0]["score"] == 5
+
+
 def test_score_image_skips_video_without_calling_provider(tmp_path) -> None:
     """Video files must short-circuit before the vision dispatcher — otherwise
     compress_image silently returns the raw bytes and the provider spends

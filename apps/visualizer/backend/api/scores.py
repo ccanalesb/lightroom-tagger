@@ -22,6 +22,7 @@ def _normalize_score_row(row: dict) -> dict:
     out = dict(row)
     out["is_current"] = bool(out.get("is_current"))
     out["repaired_from_malformed"] = bool(out.get("repaired_from_malformed"))
+    out["not_attempted"] = bool(out.get("not_attempted"))
     return out
 
 

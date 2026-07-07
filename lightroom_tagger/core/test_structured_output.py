@@ -83,6 +83,19 @@ def test_score_above_ten_rejected() -> None:
         ScoreResponse.model_validate_json('{"perspective_slug":"a","score":11,"rationale":"b"}')
 
 
+def test_not_attempted_defaults_false_when_absent() -> None:
+    m = parse_score_response('{"perspective_slug":"street","score":6,"rationale":"ok"}')
+    assert m.not_attempted is False
+
+
+def test_not_attempted_true_is_parsed() -> None:
+    m = parse_score_response(
+        '{"perspective_slug":"street","score":5,"rationale":"absent","not_attempted":true}'
+    )
+    assert m.not_attempted is True
+    assert m.score == 5
+
+
 def test_repair_log_uses_static_prefix_on_fixer_path() -> None:
     log = MagicMock()
 

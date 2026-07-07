@@ -75,6 +75,34 @@ def test_current_scores_only_includes_is_current_rows(client, library_db_path):
     assert rows[0]["prompt_version"] == "street:v2"
 
 
+def test_current_scores_normalizes_not_attempted_to_bool(client, library_db_path):
+    image_key = "excused/img.jpg"
+    conn = init_database(str(library_db_path))
+    ts = "2024-01-01T00:00:00+00:00"
+    insert_image_score(
+        conn,
+        {
+            "image_key": image_key,
+            "image_type": "catalog",
+            "perspective_slug": "framing",
+            "score": 5,
+            "prompt_version": "framing:v1",
+            "scored_at": ts,
+            "is_current": 1,
+            "not_attempted": 1,
+        },
+    )
+    conn.commit()
+    conn.close()
+
+    enc = "excused%2Fimg.jpg"
+    r = client.get(f"/api/scores/{enc}")
+    assert r.status_code == 200
+    rows = r.get_json()["current"]
+    assert len(rows) == 1
+    assert rows[0]["not_attempted"] is True
+
+
 def test_history_without_perspective_slug_returns_400(client):
     r = client.get("/api/scores/foo.jpg/history")
     assert r.status_code == 400

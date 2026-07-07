@@ -25,6 +25,7 @@ _SCORES_BASE_SQL = """
         ON p.slug = s.perspective_slug AND p.active = 1
     WHERE s.is_current = 1
         AND s.image_type = 'catalog'
+        AND s.not_attempted = 0
 """
 
 _WORD_RE = re.compile(r"[\w']+", flags=re.UNICODE)

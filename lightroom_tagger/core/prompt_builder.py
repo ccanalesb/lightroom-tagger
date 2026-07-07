@@ -115,14 +115,27 @@ def build_scoring_user_prompt(perspective_row: dict) -> str:
     slug = str(perspective_row["slug"])
     display_name = str(perspective_row["display_name"])
     body = str(perspective_row.get("prompt_markdown", "")).strip()
+    optional = bool(perspective_row.get("optional") or 0)
 
-    json_contract = (
-        "Respond with ONLY a single JSON object and no other text. Keys must be exactly:\n"
-        '- "perspective_slug" (string, must equal this slug verbatim)\n'
-        '- "score" (integer from 1 through 10 inclusive)\n'
-        '- "rationale" (concise plain string; no markdown code fences)\n'
+    contract_lines = [
+        "Respond with ONLY a single JSON object and no other text. Keys must be exactly:",
+        '- "perspective_slug" (string, must equal this slug verbatim)',
+        '- "score" (integer from 1 through 10 inclusive)',
+        '- "rationale" (concise plain string; no markdown code fences)',
+    ]
+    if optional:
+        contract_lines.append(
+            '- "not_attempted" (boolean): set true ONLY when this technique is '
+            "genuinely absent from the photograph (not merely executed weakly), so "
+            "the perspective is excused from the overall judgment instead of counted. "
+            "Still provide a numeric score and a rationale explaining the absence. "
+            "When unsure whether the technique is present, score low rather than "
+            "setting not_attempted."
+        )
+    contract_lines.append(
         "Use the full rubric honestly; most images land between 4–6."
     )
+    json_contract = "\n".join(contract_lines)
 
     return (
         "You are scoring one photograph for a single critical perspective. "

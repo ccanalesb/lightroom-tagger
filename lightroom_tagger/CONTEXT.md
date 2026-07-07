@@ -17,19 +17,21 @@
 | **description** | An AI-generated textual description of a catalog image. |
 | **score** | A numeric AI evaluation of an image (catalog or Instagram dump) against a named perspective (e.g. "composition", "light"). Stored in `image_scores`. `image_type` distinguishes catalog vs dump images. `is_current = 1` marks the active score for a version. |
 | **perspective** | A named scoring lens (slug + prompt). Catalog images are scored per-perspective. |
+| **optional perspective** | A perspective whose technique a strong photograph could legitimately skip (`perspectives.optional = 1`). Only optional perspectives may be excused; seeded as optional when the source markdown carries `<!-- optional: true -->` (the export contract from yt-to-photo-prompt-lab). |
+| **excused score** | An `image_scores` row with `not_attempted = 1`: the model judged the perspective's technique genuinely absent (only allowed for optional perspectives). It still carries a numeric score/rationale but is excluded from identity aggregation. Mirrors yt-to-photo-prompt-lab's "not scorable" outcome. |
 | **provider** | An AI model endpoint (Ollama, NVIDIA NIM, OpenRouter, etc.) defined in `providers.json`. |
 | **fallback** | The multi-provider retry chain: `FallbackDispatcher` tries providers in `fallback_order` when one fails. |
 | **phash** | Perceptual hash used for fast image similarity pre-screening before vision comparison. |
 | **stack** | A Lightroom virtual copy group; stack collapse logic deduplicates matched images. |
 | **identity** | Aggregated style fingerprint and best-photo ranking for a photographer, computed from current catalog scores. |
 | **catalog indexing** | The process of reading catalog images that haven't been analyzed yet and computing phash, EXIF, and description for each, storing results in `library.db`. Precedes matching. |
+| **scan** | Full re-read of the catalog → idempotent upsert (by `key`) of *every* image into `library.db` (CLI `lightroom-tagger scan`). Heals everything but re-reads all rows. *Catalog sync* is the incremental counterpart. |
+| **catalog sync** | Incremental refresh of `library.db` from the catalog: set-difference of catalog `id_local` against ids already in `library.db`, fetching+upserting only the missing rows. **Additions-only** — metadata edits to already-synced images are not detected (use a full *scan*), and images removed from the catalog are *logged as stale, never deleted*. Assumes a single configured catalog (`config.yaml` `catalog_path`); cross-catalog `id_local` collisions are unhandled. Runs as a standalone `catalog_sync` job and as the non-fatal stage 0 of `catalog_cache_build`. |
 | **NL filter** | Natural-language catalog search — query the catalog using plain text instead of filters. |
 | **embedding** | CLIP or text vector representation of an image or description, used for semantic search. |
 | **library DB** | `library.db` — the project's own SQLite database (not the Lightroom catalog). Holds indexed images, matches, scores, descriptions, and job state for the CLI path. |
 | **library_write** | Process-wide writer lock + `BEGIN IMMEDIATE` used for all writes to `library.db` to prevent `SQLITE_BUSY` under parallel workers. |
 | **cancel scope** | Thread-local cooperative cancellation. A batch worker registers a `cancel_check` callback for its thread; retry sleeps and fallback dispatcher honour it. Triggered from the visualizer UI (user cancels a job) and intended to work from CLI too. |
-| **scan** | Full re-read of the Lightroom catalog with idempotent upsert into `library.db`. Picks up metadata edits to already-indexed images. |
-| **catalog sync** | Incremental, additions-only refresh: diffs catalog ids against `library.db`, fetches metadata only for missing images. Does not update existing rows or delete stale ones. |
 
 ## Key modules
 
