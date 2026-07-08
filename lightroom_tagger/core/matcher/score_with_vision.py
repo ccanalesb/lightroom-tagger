@@ -33,21 +33,12 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
     RATE_LIMIT_ABORT_THRESHOLD = 3
 
-    r = resolve_model(
-        kind="vision_comparison",
-        provider_id=provider_id,
-        model=model,
-    )
+    r = resolve_model(kind="vision_comparison", provider_id=provider_id, model=model)
     resolved_provider = r.provider_id
     resolved_model = r.model
     registry = r.registry
-
-    def _selection_model_label() -> str:
-        if provider_id and model:
-            return f"{provider_id}:{model}"
-        if provider_id:
-            return f"{provider_id}:{resolved_model}"
-        return resolved_model
+    # Selection label: provider-qualified when a provider was requested, else bare model.
+    selection_model_label = f"{provider_id}:{resolved_model}" if provider_id else resolved_model
 
     results = []
     total_candidates = len(candidates)
@@ -90,7 +81,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
     if vision_weight == 0:
         insta_key = insta_image.get('key')
-        model_label = _selection_model_label()
+        model_label = selection_model_label
         for idx, candidate in enumerate(candidates):
             catalog_key = candidate.get('key')
             cached_phash = _matcher.get_cached_phash(db, catalog_key)
@@ -163,7 +154,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         # Build idx->candidate lookup for immediate scoring after each chunk
         candidate_by_idx = {idx: candidate for idx, candidate in enumerate(candidates)}
         insta_key = insta_image.get('key')
-        model_label = _selection_model_label()
+        model_label = selection_model_label
 
         def _score_and_store(chunk_results: dict[int, float]):
             """Score chunk results immediately: write to DB and append to results."""
@@ -311,7 +302,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             # Check vision comparison cache (invalidate if model changed)
             vision_cached = _matcher.get_vision_comparison(db, catalog_key, insta_key)
             # Requested label for cache lookup only; pipeline may pick a different default model.
-            requested_model_label = _selection_model_label()
+            requested_model_label = selection_model_label
             cache_valid = (
                 vision_cached
                 and vision_cached.get('model_used') == requested_model_label
