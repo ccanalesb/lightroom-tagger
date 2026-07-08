@@ -33,7 +33,7 @@ from lightroom_tagger.core.database import (
 )
 from lightroom_tagger.core.fallback import FallbackDispatcher
 from lightroom_tagger.core.prompt_builder import build_scoring_user_prompt
-from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.provider_resolution import resolve_model
 from lightroom_tagger.core.structured_output import (
     StructuredOutputError,
     parse_score_response_with_retry,
@@ -185,36 +185,16 @@ def score_image_for_perspective(
             log_callback("info", msg)
 
     try:
-        registry = ProviderRegistry()
-        resolved_pid = provider_id
-        use_model = model
-        if resolved_pid is None:
-            desc_defaults = registry.defaults.get("description", {}) or {}
-            resolved_pid = desc_defaults.get("provider")
-            if use_model is None:
-                use_model = desc_defaults.get("model")
-            if resolved_pid is None and registry.fallback_order:
-                resolved_pid = registry.fallback_order[0]
-
-        if resolved_pid is None:
-            from lightroom_tagger.core.exceptions import ModelUnavailableError
-            raise ModelUnavailableError(
-                "No provider configured for scoring — set defaults.description in providers.json",
-                provider=None,
-                model=None,
-            )
+        resolved = resolve_model(
+            kind="description",
+            provider_id=provider_id,
+            model=model,
+        )
+        registry = resolved.registry
+        resolved_pid = resolved.provider_id
+        use_model = resolved.model
 
         dispatcher = FallbackDispatcher(registry)
-        if use_model is None:
-            models = registry.list_models(resolved_pid)
-            if not models:
-                from lightroom_tagger.core.exceptions import ModelUnavailableError
-                raise ModelUnavailableError(
-                    f"No models available for provider '{resolved_pid}' — check provider config",
-                    provider=resolved_pid,
-                    model=None,
-                )
-            use_model = models[0]["id"]
 
         def fn_factory(client: Any, mdl: str) -> Callable[[], str]:
             return lambda: generate_description(
