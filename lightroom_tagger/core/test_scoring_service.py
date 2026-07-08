@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 from lightroom_tagger.core.database import (
@@ -9,10 +10,51 @@ from lightroom_tagger.core.database import (
     init_database,
     insert_perspective,
 )
+from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.provider_resolution import ResolvedModel, resolve_model
 from lightroom_tagger.core.scoring_service import (
     compute_prompt_version,
     score_image_for_perspective,
 )
+
+
+def _fake_registry(
+    *,
+    defaults: dict | None = None,
+    fallback_order: list[str] | None = None,
+) -> MagicMock:
+    registry = MagicMock(spec=ProviderRegistry)
+    registry.defaults = defaults or {}
+    registry.fallback_order = fallback_order or []
+    return registry
+
+
+def _scoring_patches(
+    *,
+    mock_registry: MagicMock,
+    mock_dispatcher: MagicMock,
+    provider_id: str = "ollama",
+    model: str = "vision-model",
+):
+    """Patch resolve_model + vision path helpers for scoring integration tests."""
+    return (
+        patch(
+            "lightroom_tagger.core.scoring_service.resolve_model",
+            return_value=ResolvedModel(provider_id, model, mock_registry),
+        ),
+        patch(
+            "lightroom_tagger.core.scoring_service.FallbackDispatcher",
+            return_value=mock_dispatcher,
+        ),
+        patch(
+            "lightroom_tagger.core.scoring_service.get_viewable_path_managed",
+            side_effect=lambda p: (p, False),
+        ),
+        patch(
+            "lightroom_tagger.core.scoring_service.compress_image",
+            side_effect=lambda p: p,
+        ),
+    )
 
 
 def test_compute_prompt_version_changes_when_prompt_markdown_changes() -> None:
@@ -63,36 +105,22 @@ def test_score_image_persists_row_and_passes_llm_fixer(tmp_path) -> None:
 
         return parse_score_response_with_retry(raw, **kwargs)
 
-    mock_registry = MagicMock()
+    mock_registry = _fake_registry()
     mock_client = MagicMock()
-    mock_registry.list_models.return_value = [{"id": "vision-model", "vision": True}]
     mock_registry.get_client.return_value = mock_client
 
     mock_dispatcher = MagicMock()
     mock_dispatcher.call_with_fallback.return_value = (raw_json, "ollama", "vision-model")
 
-    with (
-        patch(
-            "lightroom_tagger.core.scoring_service.parse_score_response_with_retry",
-            side_effect=assert_fixer_not_none,
-        ),
-        patch(
-            "lightroom_tagger.core.scoring_service.ProviderRegistry",
-            return_value=mock_registry,
-        ),
-        patch(
-            "lightroom_tagger.core.scoring_service.FallbackDispatcher",
-            return_value=mock_dispatcher,
-        ),
-        patch(
-            "lightroom_tagger.core.scoring_service.get_viewable_path_managed",
-            side_effect=lambda p: (p, False),
-        ),
-        patch(
-            "lightroom_tagger.core.scoring_service.compress_image",
-            side_effect=lambda p: p,
-        ),
-    ):
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch(
+                "lightroom_tagger.core.scoring_service.parse_score_response_with_retry",
+                side_effect=assert_fixer_not_none,
+            ),
+        )
+        for p in _scoring_patches(mock_registry=mock_registry, mock_dispatcher=mock_dispatcher):
+            stack.enter_context(p)
         status, ok, err = score_image_for_perspective(
             conn,
             image_key="2020-01-01_test.jpg",
@@ -154,34 +182,20 @@ def test_score_image_persists_not_attempted_for_optional_perspective(tmp_path) -
         captured["prompt"] = out
         return out
 
-    mock_registry = MagicMock()
-    mock_registry.list_models.return_value = [{"id": "vision-model", "vision": True}]
+    mock_registry = _fake_registry()
     mock_registry.get_client.return_value = MagicMock()
     mock_dispatcher = MagicMock()
     mock_dispatcher.call_with_fallback.return_value = (raw_json, "ollama", "vision-model")
 
-    with (
-        patch(
-            "lightroom_tagger.core.scoring_service.build_scoring_user_prompt",
-            side_effect=capture_prompt,
-        ),
-        patch(
-            "lightroom_tagger.core.scoring_service.ProviderRegistry",
-            return_value=mock_registry,
-        ),
-        patch(
-            "lightroom_tagger.core.scoring_service.FallbackDispatcher",
-            return_value=mock_dispatcher,
-        ),
-        patch(
-            "lightroom_tagger.core.scoring_service.get_viewable_path_managed",
-            side_effect=lambda p: (p, False),
-        ),
-        patch(
-            "lightroom_tagger.core.scoring_service.compress_image",
-            side_effect=lambda p: p,
-        ),
-    ):
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch(
+                "lightroom_tagger.core.scoring_service.build_scoring_user_prompt",
+                side_effect=capture_prompt,
+            ),
+        )
+        for p in _scoring_patches(mock_registry=mock_registry, mock_dispatcher=mock_dispatcher):
+            stack.enter_context(p)
         status, ok, err = score_image_for_perspective(
             conn,
             image_key="2020-01-01_opt.jpg",
@@ -199,6 +213,77 @@ def test_score_image_persists_not_attempted_for_optional_perspective(tmp_path) -
     rows = get_current_scores_for_image(conn, "2020-01-01_opt.jpg", "catalog")
     assert rows[0]["not_attempted"] == 1
     assert rows[0]["score"] == 5
+
+
+def test_score_image_honors_description_vision_model_env(tmp_path, monkeypatch) -> None:
+    """Scoring must use resolve_model so DESCRIPTION_VISION_MODEL env is honoured."""
+    monkeypatch.setenv("DESCRIPTION_VISION_MODEL", "env-desc-model")
+
+    conn = init_database(str(tmp_path / "library.db"))
+    insert_perspective(
+        conn,
+        slug="env_persp",
+        display_name="Env test",
+        prompt_markdown="Score it.",
+        description="",
+    )
+    conn.commit()
+
+    img_path = tmp_path / "2020-01-01_env.jpg"
+    img_path.write_bytes(b"x")
+    conn.execute(
+        "INSERT INTO images (key, filepath, date_taken, filename) VALUES (?, ?, ?, ?)",
+        ("2020-01-01_env.jpg", str(img_path), "2020-01-01", "env.jpg"),
+    )
+    conn.commit()
+
+    raw_json = '{"perspective_slug": "env_persp", "score": 7, "rationale": "OK."}'
+    registry = _fake_registry(
+        defaults={"description": {"provider": "ollama", "model": "json-default"}},
+        fallback_order=["ollama"],
+    )
+    registry.get_client.return_value = MagicMock()
+
+    mock_dispatcher = MagicMock()
+    mock_dispatcher.call_with_fallback.return_value = (raw_json, "ollama", "env-desc-model")
+
+    with (
+        patch(
+            "lightroom_tagger.core.provider_resolution.ProviderRegistry",
+            return_value=registry,
+        ),
+        patch(
+            "lightroom_tagger.core.scoring_service.resolve_model",
+            wraps=resolve_model,
+        ),
+        patch(
+            "lightroom_tagger.core.scoring_service.FallbackDispatcher",
+            return_value=mock_dispatcher,
+        ),
+        patch(
+            "lightroom_tagger.core.scoring_service.get_viewable_path_managed",
+            side_effect=lambda p: (p, False),
+        ),
+        patch(
+            "lightroom_tagger.core.scoring_service.compress_image",
+            side_effect=lambda p: p,
+        ),
+    ):
+        status, ok, err = score_image_for_perspective(
+            conn,
+            image_key="2020-01-01_env.jpg",
+            image_type="catalog",
+            perspective_slug="env_persp",
+            force=True,
+            provider_id="ollama",
+            model=None,
+            log_callback=None,
+        )
+
+    assert err is None
+    assert status == "scored"
+    assert ok is True
+    assert mock_dispatcher.call_with_fallback.call_args.kwargs["model"] == "env-desc-model"
 
 
 def test_score_image_skips_video_without_calling_provider(tmp_path) -> None:
@@ -225,6 +310,7 @@ def test_score_image_skips_video_without_calling_provider(tmp_path) -> None:
     conn.commit()
 
     with (
+        patch("lightroom_tagger.core.scoring_service.resolve_model") as mock_resolve,
         patch("lightroom_tagger.core.scoring_service.FallbackDispatcher") as mock_disp,
         patch("lightroom_tagger.core.scoring_service.compress_image") as mock_compress,
     ):
@@ -242,6 +328,7 @@ def test_score_image_skips_video_without_calling_provider(tmp_path) -> None:
     assert status == "skipped"
     assert ok is False
     assert err is not None and "Video file not scorable" in err
+    mock_resolve.assert_not_called()
     mock_disp.assert_not_called()
     mock_compress.assert_not_called()
     # And nothing was written to image_scores
