@@ -1,7 +1,7 @@
 """Description-only batch scoring via compare_descriptions_batch."""
 
-from lightroom_tagger.core.config import get_vision_model
 from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.provider_resolution import resolve_model
 
 
 def _compute_desc_scores_for_candidates(
@@ -13,6 +13,7 @@ def _compute_desc_scores_for_candidates(
     provider_id: str | None,
     model: str | None,
     log_callback,
+    registry: ProviderRegistry | None = None,
 ) -> dict[int, float]:
     """Map candidate index -> description similarity 0–1 via compare_descriptions_batch."""
     if desc_weight <= 0:
@@ -25,10 +26,15 @@ def _compute_desc_scores_for_candidates(
             desc_scores[idx] = 0.0
         return desc_scores
 
-    registry = ProviderRegistry()
-    actual_provider_id = provider_id or registry.fallback_order[0]
-    client = registry.get_client(actual_provider_id)
-    requested_model = model or get_vision_model()
+    r = resolve_model(
+        kind="vision_comparison",
+        provider_id=provider_id,
+        model=model,
+        registry=registry,
+    )
+    actual_provider_id = r.provider_id
+    client = r.registry.get_client(actual_provider_id)
+    requested_model = r.model
 
     for chunk_start in range(0, len(candidates), batch_size):
         chunk_indices = list(range(chunk_start, min(chunk_start + batch_size, len(candidates))))

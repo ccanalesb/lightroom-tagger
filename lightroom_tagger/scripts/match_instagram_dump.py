@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from lightroom_tagger.core.analyzer import compute_phash
-from lightroom_tagger.core.config import get_vision_model, load_config
+from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.description_service import (
     describe_instagram_image,
     describe_matched_image,
@@ -37,7 +37,7 @@ from lightroom_tagger.core.database import (
     store_match,
 )
 from lightroom_tagger.core.matcher import find_candidates_by_date, score_candidates_with_vision
-from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.provider_resolution import resolve_model
 from lightroom_tagger.core.vision_client import generate_description
 from lightroom_tagger.core.path_utils import resolve_catalog_path
 
@@ -313,10 +313,14 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             and dump_image.get('local_path')
             and os.path.exists(dump_image['local_path'])
         ):
-            registry = ProviderRegistry()
-            pid = provider_id or registry.fallback_order[0]
-            client = registry.get_client(pid)
-            model = provider_model or get_vision_model()
+            r = resolve_model(
+                kind="vision_comparison",
+                provider_id=provider_id,
+                model=provider_model,
+            )
+            pid = r.provider_id
+            client = r.registry.get_client(pid)
+            model = r.model
             raw = generate_description(
                 client, model, dump_image['local_path'], log_callback=log_callback,
             )
@@ -370,10 +374,14 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
                 and catalog_path
                 and os.path.exists(catalog_path)
             ):
-                registry = ProviderRegistry()
-                pid = provider_id or registry.fallback_order[0]
-                client = registry.get_client(pid)
-                model = provider_model or get_vision_model()
+                r = resolve_model(
+                    kind="vision_comparison",
+                    provider_id=provider_id,
+                    model=provider_model,
+                )
+                pid = r.provider_id
+                client = r.registry.get_client(pid)
+                model = r.model
                 raw = generate_description(
                     client, model, catalog_path, log_callback=log_callback,
                 )
