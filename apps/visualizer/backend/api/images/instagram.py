@@ -20,8 +20,6 @@ from lightroom_tagger.core.database import (
     get_image_descriptions_by_type,
     get_instagram_dump_media,
     get_instagram_dump_media_filtered,
-    get_matches_model_mapping,
-    get_matches_with_scores,
 )
 
 from .common import (
@@ -158,13 +156,15 @@ def list_instagram_images(db):
     try:
         media_items = get_instagram_dump_media_filtered(db)
 
-        model_lookup = {}
-        score_lookup = {}
-        try:
-            model_lookup = get_matches_model_mapping(db)
-            score_lookup = get_matches_with_scores(db)
-        except sqlite3.OperationalError:
-            pass
+        # NOTE: The pre-seam blueprint read matches via
+        #   SELECT insta_key, model_used, total_score, score FROM matches
+        # The ``matches`` table has never had a ``score`` column, so that query
+        # always raised OperationalError and was silently swallowed, leaving
+        # both lookups empty for every response. This migration preserves that
+        # observable (empty) behavior byte-for-byte rather than "fixing" the
+        # latent bug, which would change the wire output. See issue #77.
+        model_lookup: dict = {}
+        score_lookup: dict = {}
 
         desc_lookup = {}
         try:

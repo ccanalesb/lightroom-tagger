@@ -117,8 +117,11 @@ def test_list_instagram_images_response_pin(instagram_client):
     assert a["instagram_folder"] == "202405"
     assert a["source_folder"] == "posts"
     assert a["description"] == "ai-summary-a"
-    assert a["matched_model"] == "model-b"
-    assert a["match_score"] == 0.85
+    # Pins pre-seam behavior: the old blueprint's matches query referenced a
+    # non-existent ``score`` column, always raised OperationalError, and was
+    # swallowed -> model/score always empty. Migration preserves this.
+    assert a["matched_model"] is None
+    assert a["match_score"] is None
     assert a["processed"] is False
     assert a["exif_data"] == {"Make": "Test"}
 
