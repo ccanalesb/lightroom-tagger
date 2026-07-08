@@ -29,9 +29,25 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     from lightroom_tagger.core.exceptions import InvalidRequestError, PayloadTooLargeError, RateLimitError
     from lightroom_tagger.core.path_utils import normalize_match_filesystem_path
     from lightroom_tagger.core.phash import hamming_distance
-    from lightroom_tagger.core.provider_registry import ProviderRegistry
+    from lightroom_tagger.core.provider_resolution import resolve_model
 
     RATE_LIMIT_ABORT_THRESHOLD = 3
+
+    r = resolve_model(
+        kind="vision_comparison",
+        provider_id=provider_id,
+        model=model,
+    )
+    resolved_provider = r.provider_id
+    resolved_model = r.model
+    registry = r.registry
+
+    def _selection_model_label() -> str:
+        if provider_id and model:
+            return f"{provider_id}:{model}"
+        if provider_id:
+            return f"{provider_id}:{resolved_model}"
+        return resolved_model
 
     results = []
     total_candidates = len(candidates)
@@ -48,6 +64,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         provider_id,
         model,
         log_callback,
+        registry=registry,
     )
 
     # Compress Instagram image ONCE before candidate loop (vision stage only)
@@ -73,7 +90,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
     if vision_weight == 0:
         insta_key = insta_image.get('key')
-        model_label = f"{provider_id}:{model}" if provider_id and model else _matcher.get_vision_model()
+        model_label = _selection_model_label()
         for idx, candidate in enumerate(candidates):
             catalog_key = candidate.get('key')
             cached_phash = _matcher.get_cached_phash(db, catalog_key)
@@ -146,7 +163,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
         # Build idx->candidate lookup for immediate scoring after each chunk
         candidate_by_idx = {idx: candidate for idx, candidate in enumerate(candidates)}
         insta_key = insta_image.get('key')
-        model_label = f"{provider_id}:{model}" if provider_id and model else _matcher.get_vision_model()
+        model_label = _selection_model_label()
 
         def _score_and_store(chunk_results: dict[int, float]):
             """Score chunk results immediately: write to DB and append to results."""
@@ -205,10 +222,9 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             if log_callback:
                 log_callback('info', f'[{insta_filename}] Processing {len(batch_candidates)} candidates in {num_chunks} batches of {batch_size}')
             try:
-                registry = ProviderRegistry()
-                actual_provider_id = provider_id or registry.fallback_order[0]
+                actual_provider_id = resolved_provider
                 client = registry.get_client(actual_provider_id)
-                requested_model = model or _matcher.get_vision_model()
+                requested_model = resolved_model
 
                 for chunk_start in range(0, len(batch_candidates), batch_size):
                     if should_cancel is not None and should_cancel():
@@ -294,19 +310,14 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
             # Check vision comparison cache (invalidate if model changed)
             vision_cached = _matcher.get_vision_comparison(db, catalog_key, insta_key)
-            base_vision_model = _matcher.get_vision_model()
             # Requested label for cache lookup only; pipeline may pick a different default model.
-            requested_model_label = (
-                f"{provider_id}:{model or base_vision_model}"
-                if provider_id
-                else base_vision_model
-            )
+            requested_model_label = _selection_model_label()
             cache_valid = (
                 vision_cached
                 and vision_cached.get('model_used') == requested_model_label
             )
 
-            model_label = base_vision_model
+            model_label = resolved_model
             vision_reasoning = ''
             if cache_valid:
                 vision_result = vision_cached['result']
