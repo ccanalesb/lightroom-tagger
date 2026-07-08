@@ -4,7 +4,13 @@ import sys
 
 import config
 from flask import Blueprint, current_app, has_app_context, jsonify
-from lightroom_tagger.core.database import init_database
+from lightroom_tagger.core.database import (
+    get_all_images,
+    get_all_matches,
+    get_instagram_dump_media_filtered,
+    get_posted_images_count,
+    init_database,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -99,20 +105,11 @@ def get_stats():
 
         db = init_database(db_path)
 
-        images = db.execute("SELECT * FROM images").fetchall()
-        instagram_images = db.execute("SELECT * FROM instagram_dump_media").fetchall()
-
-        posted_row = db.execute(
-            "SELECT COUNT(*) AS cnt FROM images WHERE instagram_posted = 1"
-        ).fetchone()
-        posted_count = int(posted_row["cnt"])
-        matches = db.execute("SELECT * FROM matches").fetchall()
-
         stats = {
-            'catalog_images': len(images),
-            'instagram_images': len(instagram_images),
-            'posted_to_instagram': posted_count,
-            'matches_found': len(matches),
+            'catalog_images': len(get_all_images(db)),
+            'instagram_images': len(get_instagram_dump_media_filtered(db)),
+            'posted_to_instagram': get_posted_images_count(db),
+            'matches_found': len(get_all_matches(db)),
             'db_path': db_path,
         }
 

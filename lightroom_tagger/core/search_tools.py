@@ -4,7 +4,11 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
-from lightroom_tagger.core.database import query_catalog_images
+from lightroom_tagger.core.database import (
+    catalog_schema_facets,
+    get_all_current_perspective_slugs,
+    query_catalog_images,
+)
 
 from lightroom_tagger.core.search_tools_definitions import ALL_TOOLS
 
@@ -32,115 +36,55 @@ def execute_tool(
 def _exec_get_catalog_schema(db: sqlite3.Connection) -> dict[str, Any]:
     """Return available filter fields with live counts so the model can pick
     the right combination of filters without blind trial-and-error."""
-    import json as _json
-
-    total = db.execute("SELECT count(*) as cnt FROM images").fetchone()["cnt"]
-
-    def count(sql: str) -> int:
-        return db.execute(sql).fetchone()["cnt"]
-
-    analyzed = count("SELECT count(*) as cnt FROM image_descriptions WHERE image_type='catalog'")
-    has_rep = count(
-        "SELECT count(*) as cnt FROM image_descriptions WHERE image_type='catalog' AND has_repetition = 1"
-    )
-    rated = count("SELECT count(*) as cnt FROM images WHERE rating >= 1")
-    instagram_posted = count("SELECT count(*) as cnt FROM images WHERE instagram_posted = 1")
-    with_mood = count(
-        "SELECT count(*) as cnt FROM image_descriptions "
-        "WHERE image_type='catalog' AND mood_tags IS NOT NULL AND mood_tags NOT IN ('[]','null','')"
-    )
-    with_colors = count(
-        "SELECT count(*) as cnt FROM image_descriptions "
-        "WHERE image_type='catalog' AND dominant_colors IS NOT NULL AND dominant_colors NOT IN ('[]','null','')"
-    )
-
-    perspectives = [
-        r["perspective_slug"]
-        for r in db.execute(
-            "SELECT DISTINCT perspective_slug FROM image_scores WHERE is_current=1 ORDER BY perspective_slug"
-        ).fetchall()
-    ]
-
-    color_labels = {
-        r["lbl"]: r["cnt"]
-        for r in db.execute(
-            "SELECT LOWER(color_label) as lbl, count(*) as cnt FROM images "
-            "WHERE color_label IS NOT NULL AND color_label != '' GROUP BY LOWER(color_label)"
-        ).fetchall()
-    }
-
-    # Sample of mood tags (most common)
-    mood_counts: dict[str, int] = {}
-    for row in db.execute(
-        "SELECT mood_tags FROM image_descriptions "
-        "WHERE image_type='catalog' AND mood_tags NOT IN ('[]','null','') AND mood_tags IS NOT NULL "
-        "LIMIT 2000"
-    ).fetchall():
-        try:
-            for tag in _json.loads(row["mood_tags"]):
-                mood_counts[tag] = mood_counts.get(tag, 0) + 1
-        except Exception:
-            pass
-    top_moods = sorted(mood_counts, key=lambda t: -mood_counts[t])[:40]
-
-    # Date range
-    date_range = db.execute(
-        "SELECT MIN(date_taken) as min_d, MAX(date_taken) as max_d FROM images WHERE date_taken IS NOT NULL"
-    ).fetchone()
-
+    facets = catalog_schema_facets(db)
     return {
-        "total_catalog_images": total,
-        "analyzed_images": analyzed,
+        "total_catalog_images": facets.total,
+        "analyzed_images": facets.analyzed,
         "date_range": {
-            "earliest": (date_range["min_d"] or "")[:10],
-            "latest": (date_range["max_d"] or "")[:10],
+            "earliest": facets.date_range["earliest"],
+            "latest": facets.date_range["latest"],
             "note": "Use date_from/date_to (YYYY-MM-DD) or month (YYYYMM) to filter by date.",
         },
         "filters": {
             "description_search": {
                 "description": "FTS over AI-generated descriptions. Use visual nouns, NOT genre labels.",
-                "indexed_images": analyzed,
+                "indexed_images": facets.analyzed,
             },
             "mood_tags": {
                 "description": "AI mood/atmosphere tags. Pass array of tags; image matches if it has ANY.",
-                "images_with_mood_tags": with_mood,
-                "top_40_tags": top_moods,
+                "images_with_mood_tags": facets.with_mood,
+                "top_40_tags": facets.top_moods,
             },
             "dominant_colors": {
                 "description": "Hex color codes only (e.g. '#c62828'). Image matches if ANY code present.",
-                "images_with_colors": with_colors,
+                "images_with_colors": facets.with_colors,
             },
             "has_repetition": {
                 "description": "Visual repetition/patterns/symmetry flag.",
-                "images_with_true": has_rep,
+                "images_with_true": facets.has_rep,
             },
             "color_label": {
                 "description": "Lightroom color flag.",
-                "available_values_and_counts": color_labels,
+                "available_values_and_counts": facets.color_labels,
             },
             "score_perspective": {
                 "description": "Quality score perspective. Use with sort_by_score='desc'.",
-                "available_slugs": perspectives,
+                "available_slugs": facets.perspectives,
             },
             "min_rating": {
                 "description": "Lightroom star rating 1–5.",
-                "images_with_any_rating": rated,
+                "images_with_any_rating": facets.rated,
             },
             "posted": {
                 "description": "Instagram posted: true=posted, false=not yet posted.",
-                "images_posted": instagram_posted,
+                "images_posted": facets.posted,
             },
         },
     }
 
 
 def _exec_get_scoring_perspectives(db: sqlite3.Connection) -> dict[str, Any]:
-    rows = db.execute(
-        "SELECT DISTINCT perspective_slug FROM image_scores "
-        "WHERE is_current = 1 ORDER BY perspective_slug"
-    ).fetchall()
-    slugs = [r["perspective_slug"] for r in rows]
-    return {"perspectives": slugs}
+    return {"perspectives": get_all_current_perspective_slugs(db)}
 
 
 def _exec_search_catalog(
