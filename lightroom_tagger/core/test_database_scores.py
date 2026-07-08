@@ -380,3 +380,52 @@ def test_query_catalog_images_min_score_excludes_lower(tmp_path) -> None:
     assert total == 1
     assert rows[0]["key"] == key_high
     assert rows[0]["catalog_perspective_score"] == 9
+
+
+def test_score_read_helpers(tmp_path) -> None:
+    from lightroom_tagger.core.database import (
+        get_all_current_perspective_slugs,
+        get_available_score_perspectives_for_image,
+    )
+
+    conn = init_database(str(tmp_path / "library.db"))
+    key = store_image(conn, {"date_taken": "2024-01-01", "filename": "s.jpg"})
+    for slug in ("alpha", "beta"):
+        conn.execute(
+            "INSERT INTO perspectives (slug, display_name, description, prompt_markdown) "
+            "VALUES (?, ?, '', '')",
+            (slug, slug.title()),
+        )
+    conn.commit()
+    ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    insert_image_score(
+        conn,
+        {
+            "image_key": key,
+            "image_type": "catalog",
+            "perspective_slug": "alpha",
+            "score": 7,
+            "prompt_version": "v1",
+            "scored_at": ts,
+            "is_current": 1,
+        },
+    )
+    insert_image_score(
+        conn,
+        {
+            "image_key": key,
+            "image_type": "catalog",
+            "perspective_slug": "beta",
+            "score": 6,
+            "prompt_version": "v1",
+            "scored_at": ts,
+            "is_current": 0,
+        },
+    )
+    conn.commit()
+
+    assert get_all_current_perspective_slugs(conn) == ["alpha"]
+    assert get_available_score_perspectives_for_image(conn, key) == ["alpha"]
+    assert get_available_score_perspectives_for_image(conn, "missing") == []
+    assert get_all_current_perspective_slugs(init_database(str(tmp_path / "e.db"))) == []
+    conn.close()

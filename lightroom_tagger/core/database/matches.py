@@ -292,3 +292,80 @@ def get_rejected_pairs(db: sqlite3.Connection) -> set[tuple[str, str]]:
     """Return set of (catalog_key, insta_key) pairs in the blocklist."""
     rows = db.execute("SELECT catalog_key, insta_key FROM rejected_matches").fetchall()
     return {(r['catalog_key'], r['insta_key']) for r in rows}
+
+
+def get_all_matches(db: sqlite3.Connection) -> list[dict]:
+    """All match rows, ordered for group display."""
+    rows = db.execute(
+        "SELECT * FROM matches "
+        "ORDER BY insta_key, COALESCE(rank, 1), total_score DESC"
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_validated_catalog_keys(db: sqlite3.Connection) -> set[str]:
+    """Catalog keys that already have a human-validated match."""
+    rows = db.execute(
+        "SELECT DISTINCT catalog_key FROM matches "
+        "WHERE validated_at IS NOT NULL AND catalog_key IS NOT NULL"
+    ).fetchall()
+    return {str(r["catalog_key"]) for r in rows if r.get("catalog_key")}
+
+
+def get_matches_model_mapping(db: sqlite3.Connection) -> dict[str, str | None]:
+    """Map each ``insta_key`` to the last-seen ``model_used`` from its match rows."""
+    mapping: dict[str, str | None] = {}
+    for row in db.execute("SELECT insta_key, model_used FROM matches").fetchall():
+        ik = row.get("insta_key")
+        if ik:
+            mapping[str(ik)] = row.get("model_used")
+    return mapping
+
+
+def get_matches_with_scores(db: sqlite3.Connection) -> dict[str, float]:
+    """Best match score per ``insta_key`` (highest ``total_score`` wins)."""
+    scores: dict[str, float] = {}
+    for row in db.execute(
+        "SELECT insta_key, total_score FROM matches"
+    ).fetchall():
+        ik = row.get("insta_key")
+        if not ik:
+            continue
+        raw = row.get("total_score") or 0
+        if not raw:
+            continue
+        val = float(raw)
+        key = str(ik)
+        if key not in scores or val > scores[key]:
+            scores[key] = val
+    return scores
+
+
+def get_match_validation_status(
+    db: sqlite3.Connection, catalog_key: str, insta_key: str
+) -> dict | None:
+    """Return ``validated_at`` for a match pair, or ``None`` when absent."""
+    row = db.execute(
+        "SELECT validated_at FROM matches WHERE catalog_key = ? AND insta_key = ?",
+        (catalog_key, insta_key),
+    ).fetchone()
+    if not row:
+        return None
+    return {"validated_at": row["validated_at"]}
+
+
+def has_matches_for_insta_key(db: sqlite3.Connection, insta_key: str) -> bool:
+    """Whether any match row exists for *insta_key*."""
+    row = db.execute(
+        "SELECT 1 AS o FROM matches WHERE insta_key = ? LIMIT 1",
+        (insta_key,),
+    ).fetchone()
+    return row is not None
+
+
+def get_rejected_insta_keys(db: sqlite3.Connection) -> list[str]:
+    """Distinct Instagram keys present in the rejected-match blocklist."""
+    rows = db.execute(
+        "SELECT DISTINCT insta_key FROM rejected_matches"
+    ).fetchall()
+    return [str(r["insta_key"]) for r in rows if r.get("insta_key")]

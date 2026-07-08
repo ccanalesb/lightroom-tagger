@@ -349,3 +349,52 @@ def get_instagram_images_needing_analysis(db: sqlite3.Connection) -> list:
         "SELECT * FROM instagram_images WHERE phash IS NULL"
     ).fetchall()
     return [_deserialize_row(r) for r in rows]
+
+
+def get_all_instagram_images(db: sqlite3.Connection) -> list[dict]:
+    """All legacy crawled Instagram image rows."""
+    rows = db.execute("SELECT * FROM instagram_images").fetchall()
+    return [_deserialize_row(r) for r in rows]
+
+
+def get_instagram_dump_media_by_keys(
+    db: sqlite3.Connection,
+    keys: list[str],
+    *,
+    chunk_size: int = 500,
+) -> list[dict]:
+    """Fetch dump-media rows for many keys using chunked ``IN`` queries."""
+    if not keys:
+        return []
+    out: list[dict] = []
+    for i in range(0, len(keys), chunk_size):
+        chunk = keys[i : i + chunk_size]
+        placeholders = ",".join("?" * len(chunk))
+        rows = db.execute(
+            f"SELECT * FROM instagram_dump_media WHERE media_key IN ({placeholders})",
+            chunk,
+        ).fetchall()
+        out.extend(_deserialize_row(r) for r in rows)
+    return out
+
+
+def get_instagram_dump_media_filtered(
+    db: sqlite3.Connection,
+    *,
+    processed: bool | None = None,
+    matched: bool | None = None,
+) -> list[dict]:
+    """Dump-media rows with optional ``processed`` / ``matched_catalog_key`` filters."""
+    clauses: list[str] = []
+    params: list = []
+    if processed is True:
+        clauses.append("processed = 1")
+    elif processed is False:
+        clauses.append("processed = 0")
+    if matched is True:
+        clauses.append("matched_catalog_key IS NOT NULL")
+    elif matched is False:
+        clauses.append("matched_catalog_key IS NULL")
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    rows = db.execute(f"SELECT * FROM instagram_dump_media {where}", params).fetchall()
+    return [_deserialize_row(r) for r in rows]

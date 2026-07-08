@@ -8,6 +8,15 @@ from collections.abc import Sequence
 from lightroom_tagger.core.exceptions import StackMutationError
 
 
+def stack_exists(db: sqlite3.Connection, stack_id: int) -> bool:
+    """Whether an ``image_stacks`` row exists for *stack_id*."""
+    row = db.execute(
+        "SELECT 1 AS o FROM image_stacks WHERE stack_id = ? LIMIT 1",
+        (stack_id,),
+    ).fetchone()
+    return row is not None
+
+
 def list_catalog_stack_member_keys(db: sqlite3.Connection, catalog_key: str) -> list[str]:
     """Return all ``image_key`` values in the stack containing *catalog_key*.
 

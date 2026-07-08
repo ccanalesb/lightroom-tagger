@@ -183,3 +183,23 @@ def test_rank_best_photos_drops_non_representative_with_higher_score(tmp_path) -
     assert rep.get("is_stack_representative") is True
     assert rep.get("stack_member_count") == 2
     assert rep.get("stack_id") is not None
+
+
+def test_stack_exists(tmp_path) -> None:
+    from lightroom_tagger.core.database import stack_exists
+
+    conn = init_database(str(tmp_path / "lib.db"))
+    assert stack_exists(conn, 1) is False
+
+    rep_key = store_image(
+        conn,
+        {"date_taken": "2024-01-01", "filename": "rep.jpg", "filepath": "/rep.jpg"},
+    )
+    mem_key = store_image(
+        conn,
+        {"date_taken": "2024-01-02", "filename": "mem.jpg", "filepath": "/mem.jpg"},
+    )
+    sid = _insert_two_member_stack(conn, rep_key, mem_key)
+    assert stack_exists(conn, sid) is True
+    assert stack_exists(conn, 9999) is False
+    conn.close()

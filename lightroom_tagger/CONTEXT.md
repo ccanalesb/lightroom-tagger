@@ -32,13 +32,14 @@
 | **embedding** | CLIP or text vector representation of an image or description, used for semantic search. |
 | **library DB** | `library.db` — the project's own SQLite database (not the Lightroom catalog). Holds indexed images, matches, scores, descriptions, and job state for the CLI path. |
 | **library_write** | Process-wide writer lock + `BEGIN IMMEDIATE` used for all writes to `library.db` to prevent `SQLITE_BUSY` under parallel workers. |
+| **library-DB read seam** | Typed read helpers in `lightroom_tagger.core.database` — the only supported way for blueprints, tools, and handlers to query `library.db` tables. Returns detached `dict`/scalar/list/set values, never live `sqlite3.Row`. See ADR-0008. |
 | **cancel scope** | Thread-local cooperative cancellation. A batch worker registers a `cancel_check` callback for its thread; retry sleeps and fallback dispatcher honour it. Triggered from the visualizer UI (user cancels a job) and intended to work from CLI too. |
 
 ## Key modules
 
 | Module | Role |
 |---|---|
-| `database` | Library DB schema, migrations, image/score/description/match/stack storage, write serialization |
+| `database` | Library DB schema, migrations, image/score/description/match/stack storage, write serialization, and **read seam** (typed query helpers — all library-DB reads go through this module per ADR-0008) |
 | `matcher` | EXIF-based candidate selection + vision comparison pipeline |
 | `analyzer` | Image preparation (`image_prep`), inspection (`image_inspect`), vision comparison (`vision_compare`), description generation (`description`) |
 | `vision_client` | OpenAI-compatible HTTP client (`compare_images`, `generate_description`, `complete_chat_text`) |
@@ -76,6 +77,7 @@
 
 - **Lightroom catalog is read-only** except for keyword writes via `lightroom/writer.py`.
 - **One writer at a time** on `library.db`: always use `library_write` context manager for DML; never bare `conn.commit()` in parallel worker paths.
+- **Library-DB reads through core.database only**: blueprints, job handlers, CLI tools, and `search_tools` must not issue raw SQL against library tables — use typed helpers from `lightroom_tagger.core.database` (ADR-0008). Helpers return detached rows (`dict`), never live `sqlite3.Row`.
 - **Providers are OpenAI-compatible**: all vision/LLM calls go through `openai.OpenAI` client regardless of backend (Ollama, NIM, OpenRouter).
 - **No Instagram API**: all Instagram data comes from user-provided export dumps via `instagram/dump_reader.py` and `instagram/deduplicator.py`. Live-crawl scraper code has been removed.
 - **Tests live next to modules**: `test_*.py` files are co-located under `lightroom_tagger/core/`.

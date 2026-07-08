@@ -182,3 +182,42 @@ class TestBuildDescriptionFtsQuery(unittest.TestCase):
         m, err = build_description_fts_query("++")
         self.assertIsNone(err)
         self.assertIsNone(m)
+
+
+def test_description_read_helpers(tmp_path) -> None:
+    import sqlite3
+
+    from lightroom_tagger.core.database import (
+        get_all_image_descriptions,
+        get_image_descriptions_by_type,
+        init_database,
+        store_image_description,
+    )
+
+    db = init_database(str(tmp_path / "library.db"))
+    store_image_description(db, {
+        "image_key": "cat-1",
+        "image_type": "catalog",
+        "summary": "Catalog shot",
+        "subjects": ["tree"],
+        "model_used": "m",
+    })
+    store_image_description(db, {
+        "image_key": "ig-1",
+        "image_type": "instagram",
+        "summary": "IG shot",
+        "model_used": "m",
+    })
+
+    all_rows = get_all_image_descriptions(db)
+    assert len(all_rows) == 2
+    assert all(not isinstance(r, sqlite3.Row) for r in all_rows)
+    assert all_rows[0]["subjects"] == ["tree"]
+
+    catalog_only = get_image_descriptions_by_type(db, "catalog")
+    assert len(catalog_only) == 1
+    assert catalog_only[0]["image_key"] == "cat-1"
+
+    assert get_image_descriptions_by_type(db, "instagram")[0]["image_key"] == "ig-1"
+    assert get_all_image_descriptions(init_database(str(tmp_path / "empty.db"))) == []
+    db.close()
