@@ -4,14 +4,14 @@ import os
 import tempfile
 from unittest.mock import MagicMock, patch
 
-from lightroom_tagger.core.provider_registry import ProviderRegistry
-from lightroom_tagger.core.provider_resolution import ResolvedModel, resolve_model
 from lightroom_tagger.core.analyzer import (
     compare_with_vision,
     compress_image,
     describe_image,
     vision_score,
 )
+from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.provider_resolution import ResolvedModel, resolve_model
 
 
 def test_composed_catalog_analysis_returns_all_signals():
