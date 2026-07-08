@@ -260,10 +260,15 @@ def query_catalog_images_by_keys(
     keys: Sequence[str],
     *,
     score_perspective: str | None = None,
+    primary_grid_only: bool = True,
 ) -> list[dict]:
     """Load catalog rows for ``keys`` with the same columns/joins as :func:`query_catalog_images`.
 
     Preserves **input order** via ``ORDER BY CASE i.key WHEN …``. Empty ``keys`` → ``[]``.
+
+    When ``primary_grid_only`` is True (default), non-representative stack members are
+    excluded (same collapse as :func:`query_catalog_images`). Pass False to load every
+    key in *keys*, e.g. burst stack member lists.
     """
     if not keys:
         return []
@@ -306,9 +311,12 @@ def query_catalog_images_by_keys(
         "LEFT JOIN image_stacks AS st ON st.stack_id = m_st.stack_id "
     )
 
-    where_sql = (
-        f"WHERE i.key IN ({ph}) AND (m_st.image_key IS NULL OR i.key = st.representative_key)"
-    )
+    if primary_grid_only:
+        where_sql = (
+            f"WHERE i.key IN ({ph}) AND (m_st.image_key IS NULL OR i.key = st.representative_key)"
+        )
+    else:
+        where_sql = f"WHERE i.key IN ({ph})"
     params = join_bindings + key_list + key_list
 
     rows = db.execute(

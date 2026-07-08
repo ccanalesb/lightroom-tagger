@@ -149,6 +149,12 @@ def catalog_injection_empty_client(tmp_path, monkeypatch):
     return app.test_client()
 
 
+def test_catalog_months_returns_distinct_year_months(catalog_client):
+    resp = catalog_client.get("/api/images/catalog/months")
+    assert resp.status_code == 200
+    assert resp.get_json() == {"months": ["202406", "202401"]}
+
+
 def test_catalog_analyzed_filter_and_embedded_description(catalog_analyzed_client):
     client, image_key = catalog_analyzed_client
 

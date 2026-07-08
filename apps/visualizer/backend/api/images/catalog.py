@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import sqlite3
 from collections.abc import Sequence
 from typing import Any
 
@@ -19,10 +18,14 @@ from lightroom_tagger.core.catalog_nl_filter import (
 )
 from lightroom_tagger.core.clip_similarity import NoClipEmbeddingError, run_clip_similar_for_seed
 from lightroom_tagger.core.database import (
-    _deserialize_row,
     catalog_image_stack_row_fields,
+    get_catalog_months as list_catalog_months,
+    get_catalog_similarity_groups_paginated,
+    get_current_scores_for_image,
     get_image,
     get_image_description,
+    get_similarity_candidates_for_group,
+    get_vision_cached_image,
     query_catalog_images,
     query_catalog_images_by_keys,
 )
@@ -43,59 +46,15 @@ def _clip_similarity_why_matched_line(similarity: float) -> str:
 
 
 def _query_catalog_rows_for_stack_member_keys(
-    db: sqlite3.Connection,
+    db,
     keys: Sequence[str],
     *,
     score_perspective: str | None = None,
 ) -> list[dict]:
     """Catalog-shaped rows for *keys* in input order, **without** primary-grid stack collapse."""
-    if not keys:
-        return []
-    key_list = [str(k) for k in keys]
-    sp = (score_perspective or "").strip()
-    use_score_join = bool(sp)
-
-    ph = ",".join("?" * len(key_list))
-    case_when = " ".join(f"WHEN ? THEN {i}" for i in range(len(key_list)))
-    order_sql = f"ORDER BY CASE i.key {case_when} END"
-
-    select_cols = (
-        "i.*, d.summary AS description_summary, "
-        "d.best_perspective AS description_best_perspective, "
-        "d.perspectives AS description_perspectives_json"
+    return query_catalog_images_by_keys(
+        db, keys, score_perspective=score_perspective, primary_grid_only=False
     )
-    if use_score_join:
-        select_cols += ", s.score AS catalog_perspective_score"
-    select_cols += (
-        ", st.stack_id AS stack_id, st.stack_size AS stack_member_count, "
-        "CASE WHEN st.stack_id IS NOT NULL AND i.key = st.representative_key "
-        "THEN 1 ELSE 0 END AS is_stack_representative"
-    )
-
-    join_sql = (
-        "FROM images i "
-        "LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog' "
-    )
-    join_bindings: list = []
-    if use_score_join:
-        join_sql += (
-            "LEFT JOIN image_scores s ON s.image_key = i.key "
-            "AND s.image_type = 'catalog' AND s.perspective_slug = ? AND s.is_current = 1 "
-        )
-        join_bindings.append(sp)
-    join_sql += (
-        "LEFT JOIN image_stack_members AS m_st ON m_st.image_key = i.key "
-        "LEFT JOIN image_stacks AS st ON st.stack_id = m_st.stack_id "
-    )
-
-    where_sql = f"WHERE i.key IN ({ph})"
-    params = join_bindings + key_list + key_list
-
-    rows = db.execute(
-        f"SELECT {select_cols} {join_sql} {where_sql} {order_sql}",
-        params,
-    ).fetchall()
-    return [_deserialize_row(r) for r in rows]
 
 
 def _parse_clip_similar_catalog_params():
@@ -305,26 +264,19 @@ def _build_catalog_detail(db, image_key, score_perspective):
         out["identity_eligible"] = False
         out["identity_per_perspective"] = []
 
+    score_rows = get_current_scores_for_image(db, image_key, "catalog")
     if score_perspective:
-        score_row = db.execute(
-            "SELECT score FROM image_scores "
-            "WHERE image_key = ? AND image_type = 'catalog' "
-            "AND perspective_slug = ? AND is_current = 1",
-            (image_key, score_perspective),
-        ).fetchone()
-        out["catalog_perspective_score"] = int(score_row["score"]) if score_row else None
+        match = next(
+            (r for r in score_rows if str(r.get("perspective_slug")) == score_perspective),
+            None,
+        )
+        out["catalog_perspective_score"] = int(match["score"]) if match else None
         out["catalog_score_perspective"] = score_perspective
     else:
         out["catalog_perspective_score"] = None
         out["catalog_score_perspective"] = None
 
-    slug_rows = db.execute(
-        "SELECT DISTINCT perspective_slug FROM image_scores "
-        "WHERE image_key = ? AND image_type = 'catalog' AND is_current = 1 "
-        "ORDER BY perspective_slug",
-        (image_key,),
-    ).fetchall()
-    out["available_score_perspectives"] = [str(r["perspective_slug"]) for r in slug_rows]
+    out["available_score_perspectives"] = [str(r["perspective_slug"]) for r in score_rows]
 
     rid = out.get("id")
     if rid is not None and str(rid).strip().isdigit():
@@ -342,21 +294,13 @@ def _build_catalog_detail(db, image_key, score_perspective):
 def get_catalog_thumbnail(db, image_key):
     """Get thumbnail for catalog image, creating cache if needed."""
     try:
-        images = db.execute(
-            "SELECT * FROM images WHERE key = ?",
-            (image_key,),
-        ).fetchall()
-
-        if not images:
+        image = get_image(db, image_key)
+        if not image:
             return error_not_found("image")
 
-        image = images[0]
         allowed_cat = _catalog_thumbnail_roots()
 
-        cached = db.execute(
-            "SELECT compressed_path FROM vision_cache WHERE key = ?",
-            (image_key,),
-        ).fetchone()
+        cached = get_vision_cached_image(db, image_key)
         if cached and cached.get("compressed_path") and os.path.exists(cached["compressed_path"]):
             cp = cached["compressed_path"]
             if not _is_path_under_allowed_roots(cp, allowed_cat):
@@ -394,13 +338,7 @@ def get_catalog_thumbnail(db, image_key):
 def get_catalog_months(db):
     """Get available year-months from catalog images based on date_taken."""
     try:
-        rows = db.execute("""
-            SELECT DISTINCT strftime('%Y%m', date_taken) as month
-            FROM images
-            WHERE date_taken IS NOT NULL
-            ORDER BY month DESC
-        """).fetchall()
-        months = [row["month"] for row in rows if row["month"]]
+        months = list_catalog_months(db)
         return jsonify({"months": months})
     except Exception as e:
         return error_server_error(str(e))
@@ -587,19 +525,7 @@ def list_catalog_similarity_groups(db):
             request.args.get("limit", 20, type=int),
             request.args.get("offset", 0, type=int),
         )
-        total_row = db.execute(
-            "SELECT COUNT(*) AS c FROM catalog_similarity_groups"
-        ).fetchone()
-        total = int(total_row["c"] if total_row else 0)
-        groups = db.execute(
-            """
-            SELECT group_id, seed_key, candidate_count, best_similarity, job_id, created_at
-            FROM catalog_similarity_groups
-            ORDER BY created_at DESC, group_id DESC
-            LIMIT ? OFFSET ?
-            """,
-            (limit, offset),
-        ).fetchall()
+        groups, total = get_catalog_similarity_groups_paginated(db, limit=limit, offset=offset)
 
         items: list[dict] = []
         for group in groups:
@@ -608,15 +534,7 @@ def list_catalog_similarity_groups(db):
             seed_images = _rows_to_catalog_api_images(seed_rows, None)
             if not seed_images:
                 continue
-            candidate_rows = db.execute(
-                """
-                SELECT candidate_key, similarity, rank, why_matched
-                FROM catalog_similarity_candidates
-                WHERE group_id = ?
-                ORDER BY rank ASC, similarity DESC
-                """,
-                (group["group_id"],),
-            ).fetchall()
+            candidate_rows = get_similarity_candidates_for_group(db, int(group["group_id"]))
             candidate_keys = [str(r["candidate_key"]) for r in candidate_rows]
             catalog_rows = query_catalog_images_by_keys(db, candidate_keys)
             candidates = _rows_to_catalog_api_images(catalog_rows, None)
