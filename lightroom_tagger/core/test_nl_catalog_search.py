@@ -205,6 +205,6 @@ def test_run_nl_catalog_filter_llm_no_provider_raises() -> None:
             "lightroom_tagger.core.nl_catalog_search.resolve_model",
             wraps=resolve_model,
         ),
+        pytest.raises(ModelUnavailableError, match="No provider"),
     ):
-        with pytest.raises(ModelUnavailableError, match="No provider"):
-            run_nl_catalog_filter_llm("test", provider_id=None, model=None)
+        run_nl_catalog_filter_llm("test", provider_id=None, model=None)
