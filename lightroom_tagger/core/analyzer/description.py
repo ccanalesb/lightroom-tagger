@@ -8,6 +8,7 @@ from typing import Any
 
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.provider_resolution import resolve_model
 
 from .image_prep import compress_image, get_viewable_path, get_viewable_path_managed
 
@@ -129,20 +130,6 @@ def parse_description_response(raw: str) -> dict:
     return dict(_DESCRIPTION_FALLBACK)
 
 
-def _resolve_default_description_provider(
-    registry: ProviderRegistry,
-    model: str | None,
-) -> tuple[str | None, str | None]:
-    desc_defaults = registry.defaults.get("description", {}) or {}
-    provider_id: str | None = desc_defaults.get("provider")
-    resolved_model = model if model is not None else desc_defaults.get("model")
-    if provider_id is None:
-        order = registry.fallback_order
-        if order:
-            provider_id = order[0]
-    return provider_id, resolved_model
-
-
 def describe_image(path: str, agent_type: str | None = None,
                     provider_id: str | None = None, model: str | None = None,
                     log_callback=None, user_prompt: str | None = None,
@@ -155,43 +142,31 @@ def describe_image(path: str, agent_type: str | None = None,
     structure; ``local`` (default) resolves ``defaults.description`` or
     ``fallback_order`` from ``providers.json``.
     """
-    if provider_id is not None:
-        return _describe_image_via_provider(
-            path,
-            provider_id,
-            model,
-            log_callback,
-            user_prompt=user_prompt,
-            silent_compression=silent_compression,
-        )
+    if provider_id is None:
+        if agent_type is None:
+            try:
+                config = load_config()
+                agent_type = getattr(config, 'agent_type', 'local')
+            except Exception:
+                agent_type = 'local'
 
-    if agent_type is None:
-        try:
-            config = load_config()
-            agent_type = getattr(config, 'agent_type', 'local')
-        except Exception:
-            agent_type = 'local'
+        if agent_type == 'external':
+            return parse_description_response('')
 
-    if agent_type == 'external':
-        return parse_description_response('')
-
-    registry = ProviderRegistry()
-    resolved_pid, resolved_model = _resolve_default_description_provider(registry, model)
-    if resolved_pid is None:
-        from lightroom_tagger.core.exceptions import ModelUnavailableError
-        raise ModelUnavailableError(
-            'No provider configured for image description — set defaults.description in providers.json',
-            provider=None,
-            model=None,
-        )
+    r = resolve_model(
+        kind="description",
+        provider_id=provider_id,
+        model=model,
+    )
 
     return _describe_image_via_provider(
         path,
-        resolved_pid,
-        resolved_model,
+        r.provider_id,
+        r.model,
         log_callback,
         user_prompt=user_prompt,
         silent_compression=silent_compression,
+        registry=r.registry,
     )
 
 
@@ -199,24 +174,23 @@ def _describe_image_via_provider(path: str, provider_id: str,
                                   model: str | None, log_callback=None,
                                   user_prompt: str | None = None,
                                   *,
-                                  silent_compression: bool = False) -> dict:
+                                  silent_compression: bool = False,
+                                  registry: ProviderRegistry | None = None) -> dict:
     """Generate description via the unified provider pipeline."""
     from lightroom_tagger.core.fallback import FallbackDispatcher
     from lightroom_tagger.core.vision_client import generate_description as _gen
 
-    registry = ProviderRegistry()
-    dispatcher = FallbackDispatcher(registry)
+    if registry is None:
+        r = resolve_model(
+            kind="description",
+            provider_id=provider_id,
+            model=model,
+        )
+        registry = r.registry
+        provider_id = r.provider_id
+        model = r.model
 
-    if model is None:
-        models = registry.list_models(provider_id)
-        if not models:
-            from lightroom_tagger.core.exceptions import ModelUnavailableError
-            raise ModelUnavailableError(
-                f"No models available for provider '{provider_id}' — check provider config",
-                provider=provider_id,
-                model=None,
-            )
-        model = models[0]["id"]
+    dispatcher = FallbackDispatcher(registry)
 
     temp_files: list[str] = []
     viewable, viewable_is_temp = get_viewable_path_managed(path)
