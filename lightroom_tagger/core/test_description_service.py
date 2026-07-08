@@ -1,6 +1,48 @@
-from unittest.mock import patch
+from contextlib import ExitStack
+from unittest.mock import MagicMock, patch
 
 from lightroom_tagger.core.database import init_database, store_image, store_image_description, get_image_description
+from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.provider_resolution import ResolvedModel, resolve_model
+
+
+def _fake_registry(
+    *,
+    defaults: dict | None = None,
+    fallback_order: list[str] | None = None,
+) -> MagicMock:
+    registry = MagicMock(spec=ProviderRegistry)
+    registry.defaults = defaults or {}
+    registry.fallback_order = fallback_order or []
+    return registry
+
+
+def _describe_patches(
+    *,
+    mock_registry: MagicMock,
+    mock_dispatcher: MagicMock,
+    provider_id: str = "ollama",
+    model: str = "test-model",
+):
+    """Patch resolve_model + vision path helpers for description integration tests."""
+    return (
+        patch(
+            "lightroom_tagger.core.analyzer.description.resolve_model",
+            return_value=ResolvedModel(provider_id, model, mock_registry),
+        ),
+        patch(
+            "lightroom_tagger.core.fallback.FallbackDispatcher",
+            return_value=mock_dispatcher,
+        ),
+        patch(
+            "lightroom_tagger.core.analyzer.description.get_viewable_path_managed",
+            side_effect=lambda p: (p, False),
+        ),
+        patch(
+            "lightroom_tagger.core.analyzer.description.compress_image",
+            side_effect=lambda p: p,
+        ),
+    )
 
 
 def _shortlist_passthrough(_db, _mk, cand_keys, top_k):
@@ -13,6 +55,103 @@ def _make_db(tmp_path):
 
 
 class TestDescribeMatchedImage:
+    def test_generates_description_end_to_end_with_fake_provider(self, tmp_path):
+        """describe_matched_image runs through describe_image with one injected registry."""
+        import json
+
+        from lightroom_tagger.core.description_service import describe_matched_image
+
+        db = _make_db(tmp_path)
+        filepath = str(tmp_path / 'photo.jpg')
+        open(filepath, 'w').close()
+        catalog_key = store_image(db, {'filepath': filepath, 'filename': 'photo.jpg'})
+
+        raw_json = json.dumps({
+            'summary': 'A street scene',
+            'composition': {'depth': 'shallow'},
+            'perspectives': {'street': {'score': 7}},
+            'technical': {'mood': 'gritty'},
+            'subjects': ['person'],
+            'best_perspective': 'street',
+        })
+        mock_registry = _fake_registry(
+            defaults={"description": {"provider": "ollama", "model": "test-model"}},
+            fallback_order=["ollama"],
+        )
+        mock_dispatcher = MagicMock()
+        mock_dispatcher.call_with_fallback.return_value = (raw_json, "ollama", "test-model")
+
+        with ExitStack() as stack:
+            for p in _describe_patches(
+                mock_registry=mock_registry,
+                mock_dispatcher=mock_dispatcher,
+            ):
+                stack.enter_context(p)
+            result = describe_matched_image(db, catalog_key)
+
+        assert result is True
+        desc = get_image_description(db, catalog_key)
+        assert desc is not None
+        assert desc['summary'] == 'A street scene'
+        assert mock_dispatcher.call_with_fallback.call_args.kwargs["model"] == "test-model"
+
+    def test_describe_matched_image_honors_description_vision_model_env(self, tmp_path, monkeypatch):
+        """describe_image must use resolve_model so DESCRIPTION_VISION_MODEL env is honoured."""
+        import json
+
+        from lightroom_tagger.core.description_service import describe_matched_image
+
+        monkeypatch.setenv("DESCRIPTION_VISION_MODEL", "env-desc-model")
+
+        db = _make_db(tmp_path)
+        filepath = str(tmp_path / 'photo.jpg')
+        open(filepath, 'w').close()
+        catalog_key = store_image(db, {'filepath': filepath, 'filename': 'photo.jpg'})
+
+        raw_json = json.dumps({
+            'summary': 'Env model scene',
+            'composition': {},
+            'perspectives': {},
+            'technical': {},
+            'subjects': [],
+            'best_perspective': 'street',
+        })
+        registry = _fake_registry(
+            defaults={"description": {"provider": "ollama", "model": "json-default"}},
+            fallback_order=["ollama"],
+        )
+        mock_dispatcher = MagicMock()
+        mock_dispatcher.call_with_fallback.return_value = (raw_json, "ollama", "env-desc-model")
+
+        with (
+            patch(
+                "lightroom_tagger.core.provider_resolution.ProviderRegistry",
+                return_value=registry,
+            ),
+            patch(
+                "lightroom_tagger.core.analyzer.description.resolve_model",
+                wraps=resolve_model,
+            ),
+            patch(
+                "lightroom_tagger.core.fallback.FallbackDispatcher",
+                return_value=mock_dispatcher,
+            ),
+            patch(
+                "lightroom_tagger.core.analyzer.description.get_viewable_path_managed",
+                side_effect=lambda p: (p, False),
+            ),
+            patch(
+                "lightroom_tagger.core.analyzer.description.compress_image",
+                side_effect=lambda p: p,
+            ),
+        ):
+            result = describe_matched_image(
+                db, catalog_key, provider_id="ollama", model=None,
+            )
+
+        assert result is True
+        assert mock_dispatcher.call_with_fallback.call_args.kwargs["model"] == "env-desc-model"
+
     def test_generates_description_when_missing(self, tmp_path):
         from lightroom_tagger.core.description_service import describe_matched_image
 
