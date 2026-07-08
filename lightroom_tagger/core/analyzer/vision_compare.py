@@ -9,6 +9,7 @@ from typing import Any
 
 from lightroom_tagger.core.exceptions import ContextLengthError
 from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.provider_resolution import resolve_model
 
 from .image_prep import RAW_EXTENSIONS, VISION_MAX_DIMENSION, compress_image, get_viewable_path_managed
 
@@ -24,27 +25,14 @@ _model_min_tokens: dict[str, int] = {}
 _broken_provider_models: set[str] = set()
 
 
-def _resolve_default_vision_comparison_provider(
-    registry: ProviderRegistry,
-    model: str | None,
-) -> tuple[str | None, str | None]:
-    vc_defaults = registry.defaults.get("vision_comparison", {}) or {}
-    provider_id: str | None = vc_defaults.get("provider")
-    resolved_model = model if model is not None else vc_defaults.get("model")
-    if provider_id is None:
-        order = registry.fallback_order
-        if order:
-            provider_id = order[0]
-    return provider_id, resolved_model
-
-
 def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
                         cached_local_path: str | None = None, compressed_insta_path: str | None = None,
                         provider_id: str | None = None, model: str | None = None) -> dict:
     f"""Compare two images using a vision model with compression.
 
-    When *provider_id* is omitted, resolves ``defaults.vision_comparison`` or the
-    registry ``fallback_order`` (same path as :func:`_compare_via_provider`).
+    When *provider_id* / *model* are omitted, resolves via
+    :func:`lightroom_tagger.core.provider_resolution.resolve_model`
+    (``kind="vision_comparison"``).
 
     Compresses images to max {VISION_MAX_DIMENSION} pixels before comparison
     to reduce bandwidth and processing time. Supports pre-compressed paths
@@ -102,26 +90,17 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
 
         # Step 3: Run vision comparison (always via provider registry)
         assert compressed_local is not None and compressed_insta is not None
-        resolved_pid = provider_id
-        resolved_model = model
-        if resolved_pid is None:
-            registry = ProviderRegistry()
-            resolved_pid, resolved_model = _resolve_default_vision_comparison_provider(
-                registry, resolved_model,
-            )
-        if resolved_pid is None:
-            from lightroom_tagger.core.exceptions import ModelUnavailableError
-            raise ModelUnavailableError(
-                'No provider configured for vision comparison — set defaults.vision_comparison '
-                'in providers.json',
-                provider=None,
-                model=None,
-            )
+        r = resolve_model(
+            kind="vision_comparison",
+            provider_id=provider_id,
+            model=model,
+        )
         result = _compare_via_provider(
             compressed_local,
             compressed_insta,
-            resolved_pid,
-            resolved_model,
+            r.provider_id,
+            r.model,
+            r.registry,
             log_callback,
         )
         return result
@@ -134,7 +113,8 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
 
 
 def _compare_via_provider(local_path: str, insta_path: str,
-                          provider_id: str, model: str | None,
+                          provider_id: str, model: str,
+                          registry: ProviderRegistry,
                           log_callback=None) -> dict:
     """Run vision comparison via the unified provider pipeline.
 
@@ -150,19 +130,7 @@ def _compare_via_provider(local_path: str, insta_path: str,
     from lightroom_tagger.core.fallback import FallbackDispatcher
     from lightroom_tagger.core.vision_client import compare_images as _cmp
 
-    registry = ProviderRegistry()
     dispatcher = FallbackDispatcher(registry)
-
-    if model is None:
-        models = registry.list_models(provider_id)
-        if not models:
-            from lightroom_tagger.core.exceptions import ModelUnavailableError
-            raise ModelUnavailableError(
-                f"No models available for provider '{provider_id}' — check provider config",
-                provider=provider_id,
-                model=None,
-            )
-        model = models[0]["id"]
 
     def fn_factory(client: Any, mdl: str):
         provider_key = f"{provider_id}:{mdl}"
