@@ -260,3 +260,25 @@ def list_all_scores_for_image(
         (image_key, image_type),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def get_all_current_perspective_slugs(conn: sqlite3.Connection) -> list[str]:
+    """Distinct perspective slugs with at least one current score row."""
+    rows = conn.execute(
+        "SELECT DISTINCT perspective_slug FROM image_scores "
+        "WHERE is_current = 1 ORDER BY perspective_slug"
+    ).fetchall()
+    return [str(r["perspective_slug"]) for r in rows]
+
+
+def get_available_score_perspectives_for_image(
+    conn: sqlite3.Connection, image_key: str, image_type: str = "catalog"
+) -> list[str]:
+    """Current-score perspective slugs available for one image."""
+    rows = conn.execute(
+        "SELECT DISTINCT perspective_slug FROM image_scores "
+        "WHERE image_key = ? AND image_type = ? AND is_current = 1 "
+        "ORDER BY perspective_slug",
+        (image_key, image_type),
+    ).fetchall()
+    return [str(r["perspective_slug"]) for r in rows]

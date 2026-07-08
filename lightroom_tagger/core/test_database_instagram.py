@@ -403,3 +403,51 @@ class TestInstagramDumpMedia(unittest.TestCase):
         with_all = get_instagram_by_date_filter(self.db, month='202603',
                                                  include_processed=True)
         self.assertEqual(len(with_all), 2)
+
+
+def test_instagram_read_helpers(tmp_path) -> None:
+    import sqlite3
+
+    from lightroom_tagger.core.database import (
+        get_all_instagram_images,
+        get_instagram_dump_media_by_keys,
+        get_instagram_dump_media_filtered,
+        store_instagram_image,
+    )
+
+    db = init_database(str(tmp_path / "library.db"))
+    store_instagram_dump_media(db, {
+        "media_key": "m1",
+        "file_path": "/a.jpg",
+        "processed": False,
+    })
+    store_instagram_dump_media(db, {
+        "media_key": "m2",
+        "file_path": "/b.jpg",
+        "processed": True,
+        "matched_catalog_key": "cat-1",
+    })
+    store_instagram_image(db, {
+        "local_path": "/legacy.jpg",
+        "post_url": "https://ig/p/1",
+        "filename": "legacy.jpg",
+    })
+
+    all_legacy = get_all_instagram_images(db)
+    assert len(all_legacy) == 1
+    assert not isinstance(all_legacy[0], sqlite3.Row)
+
+    by_keys = get_instagram_dump_media_by_keys(db, ["m1", "m2", "missing"])
+    assert {r["media_key"] for r in by_keys} == {"m1", "m2"}
+
+    unprocessed = get_instagram_dump_media_filtered(db, processed=False)
+    assert [r["media_key"] for r in unprocessed] == ["m1"]
+
+    processed = get_instagram_dump_media_filtered(db, processed=True)
+    assert [r["media_key"] for r in processed] == ["m2"]
+
+    matched = get_instagram_dump_media_filtered(db, matched=True)
+    assert [r["media_key"] for r in matched] == ["m2"]
+
+    assert get_instagram_dump_media_by_keys(db, []) == []
+    db.close()

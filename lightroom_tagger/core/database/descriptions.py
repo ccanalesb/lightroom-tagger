@@ -283,3 +283,40 @@ def get_all_images_with_descriptions(db: sqlite3.Connection,
     rows = db.execute(page_sql, all_params).fetchall()
 
     return [_deserialize_row(r) for r in rows], total
+
+
+def _description_row_to_dict(row: dict) -> dict:
+    """Detach and JSON-decode description columns."""
+    out = dict(row)
+    for col in (
+        "composition",
+        "perspectives",
+        "technical",
+        "subjects",
+        "dominant_colors",
+        "mood_tags",
+    ):
+        val = out.get(col)
+        if isinstance(val, str):
+            try:
+                out[col] = json.loads(val)
+            except (json.JSONDecodeError, TypeError):
+                pass
+    return out
+
+
+def get_all_image_descriptions(db: sqlite3.Connection) -> list[dict]:
+    """All rows from ``image_descriptions``."""
+    rows = db.execute("SELECT * FROM image_descriptions").fetchall()
+    return [_description_row_to_dict(r) for r in rows]
+
+
+def get_image_descriptions_by_type(
+    db: sqlite3.Connection, image_type: str
+) -> list[dict]:
+    """Description rows filtered by ``image_type`` (``catalog`` or ``instagram``)."""
+    rows = db.execute(
+        "SELECT * FROM image_descriptions WHERE image_type = ?",
+        (image_type,),
+    ).fetchall()
+    return [_description_row_to_dict(r) for r in rows]
