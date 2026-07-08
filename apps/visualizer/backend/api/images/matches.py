@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sqlite3
 from collections import OrderedDict
 from datetime import datetime
 
@@ -12,13 +11,23 @@ from utils.db import with_db
 from utils.responses import error_bad_request, error_not_found, error_server_error
 
 from lightroom_tagger.core.database import (
+    get_all_image_descriptions,
+    get_all_images,
+    get_all_instagram_images,
+    get_all_matches,
+    get_instagram_dump_media_by_keys,
+    get_match_validation_status,
+    get_matches_model_mapping,
+    get_rejected_insta_keys,
+    get_validated_catalog_keys,
+    has_matches_for_insta_key,
     reject_match,
     unvalidate_match,
     validate_match,
 )
 
 from .common import _clamp_pagination
-from .instagram import _deserialize_description, _enrich_instagram_media
+from .instagram import _enrich_instagram_media
 
 matches_bp = Blueprint("images_matches", __name__)
 
@@ -35,58 +44,29 @@ def list_matches(db):
     photo can only be claimed by one Instagram post.
     """
     try:
-        matches = db.execute(
-            "SELECT * FROM matches ORDER BY insta_key, COALESCE(rank, 1), total_score DESC"
-        ).fetchall()
-
-        claimed_catalog_keys = {
-            row["catalog_key"]
-            for row in db.execute(
-                "SELECT DISTINCT catalog_key FROM matches "
-                "WHERE validated_at IS NOT NULL AND catalog_key IS NOT NULL"
-            ).fetchall()
-            if row.get("catalog_key")
-        }
+        matches = get_all_matches(db)
+        claimed_catalog_keys = get_validated_catalog_keys(db)
 
         # Build lookup tables for images (avoid N+1 queries)
         instagram_lookup = {}
-        for img in db.execute("SELECT * FROM instagram_images").fetchall():
+        for img in get_all_instagram_images(db):
             instagram_lookup[img.get("key")] = img
 
         catalog_lookup = {}
-        for img in db.execute("SELECT * FROM images").fetchall():
+        for img in get_all_images(db):
             catalog_lookup[img.get("key")] = img
 
         desc_lookup = {}
-        try:
-            for desc in db.execute("SELECT * FROM image_descriptions").fetchall():
-                key = (desc.get("image_key"), desc.get("image_type"))
-                desc_lookup[key] = _deserialize_description(desc)
-        except sqlite3.OperationalError:
-            pass
+        for desc in get_all_image_descriptions(db):
+            key = (desc.get("image_key"), desc.get("image_type"))
+            desc_lookup[key] = desc
 
-        model_lookup = {}
-        try:
-            for row in db.execute("SELECT insta_key, model_used FROM matches").fetchall():
-                model_lookup[row["insta_key"]] = row["model_used"]
-        except sqlite3.OperationalError:
-            pass
+        model_lookup = get_matches_model_mapping(db)
 
         insta_keys = {m.get("insta_key") for m in matches if m.get("insta_key")}
         dump_instagram_by_key = {}
         if insta_keys:
-            keys_list = list(insta_keys)
-            chunk_size = 500
-            dump_rows = []
-            for i in range(0, len(keys_list), chunk_size):
-                chunk = keys_list[i : i + chunk_size]
-                placeholders = ",".join("?" * len(chunk))
-                dump_rows.extend(
-                    db.execute(
-                        f"SELECT * FROM instagram_dump_media WHERE media_key IN ({placeholders})",
-                        chunk,
-                    ).fetchall()
-                )
+            dump_rows = get_instagram_dump_media_by_keys(db, list(insta_keys))
             enriched_dump_list = _enrich_instagram_media(dump_rows, model_lookup, desc_lookup)
             dump_instagram_by_key = {row["key"]: row for row in enriched_dump_list}
 
@@ -151,23 +131,13 @@ def list_matches(db):
 
         insta_keys_with_matches = frozenset(groups.keys())
 
-        try:
-            rejected_inst_keys = [
-                row["insta_key"]
-                for row in db.execute("SELECT DISTINCT insta_key FROM rejected_matches").fetchall()
-                if row.get("insta_key")
-            ]
-        except sqlite3.OperationalError:
-            rejected_inst_keys = []
+        rejected_inst_keys = get_rejected_insta_keys(db)
 
         tombstone_only_keys = []
         for ik in rejected_inst_keys:
             if ik in insta_keys_with_matches:
                 continue
-            still_has = db.execute(
-                "SELECT 1 FROM matches WHERE insta_key = ? LIMIT 1", (ik,)
-            ).fetchone()
-            if not still_has:
+            if not has_matches_for_insta_key(db, ik):
                 tombstone_only_keys.append(ik)
 
         if tombstone_only_keys:
@@ -177,17 +147,7 @@ def list_matches(db):
                 if k not in dump_instagram_by_key and k not in instagram_lookup
             ]
             if keys_to_enrich:
-                chunk_size = 500
-                extra_dump_rows = []
-                for i in range(0, len(keys_to_enrich), chunk_size):
-                    chunk = keys_to_enrich[i : i + chunk_size]
-                    placeholders = ",".join("?" * len(chunk))
-                    extra_dump_rows.extend(
-                        db.execute(
-                            f"SELECT * FROM instagram_dump_media WHERE media_key IN ({placeholders})",
-                            chunk,
-                        ).fetchall()
-                    )
+                extra_dump_rows = get_instagram_dump_media_by_keys(db, keys_to_enrich)
                 for row in _enrich_instagram_media(extra_dump_rows, model_lookup, desc_lookup):
                     dump_instagram_by_key[row["key"]] = row
 
@@ -275,10 +235,7 @@ def list_matches(db):
 def toggle_match_validation(db, catalog_key, insta_key):
     """Toggle human validation on a match."""
     try:
-        match_row = db.execute(
-            "SELECT validated_at FROM matches WHERE catalog_key = ? AND insta_key = ?",
-            (catalog_key, insta_key),
-        ).fetchone()
+        match_row = get_match_validation_status(db, catalog_key, insta_key)
         if not match_row:
             return error_not_found("match")
 
@@ -297,10 +254,7 @@ def toggle_match_validation(db, catalog_key, insta_key):
 def reject_match_endpoint(db, catalog_key, insta_key):
     """Reject a match: delete it and blocklist the pair."""
     try:
-        match_row = db.execute(
-            "SELECT validated_at FROM matches WHERE catalog_key = ? AND insta_key = ?",
-            (catalog_key, insta_key),
-        ).fetchone()
+        match_row = get_match_validation_status(db, catalog_key, insta_key)
         if not match_row:
             return error_not_found("match")
         if match_row["validated_at"]:
