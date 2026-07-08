@@ -12,8 +12,8 @@ from utils.responses import error_bad_request, error_not_found, error_server_err
 
 from lightroom_tagger.core.database import (
     get_all_image_descriptions,
-    get_all_images,
-    get_all_instagram_images,
+    get_all_images_raw,
+    get_all_instagram_images_raw,
     get_all_matches,
     get_instagram_dump_media_by_keys,
     get_match_validation_status,
@@ -49,11 +49,11 @@ def list_matches(db):
 
         # Build lookup tables for images (avoid N+1 queries)
         instagram_lookup = {}
-        for img in get_all_instagram_images(db):
+        for img in get_all_instagram_images_raw(db):
             instagram_lookup[img.get("key")] = img
 
         catalog_lookup = {}
-        for img in get_all_images(db):
+        for img in get_all_images_raw(db):
             catalog_lookup[img.get("key")] = img
 
         desc_lookup = {}

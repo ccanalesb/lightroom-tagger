@@ -37,11 +37,11 @@ _LIST_MATCHES_PIN = {
                         "image_hash": None,
                         "instagram_index": 0,
                         "instagram_post_date": None,
-                        "instagram_posted": False,
+                        "instagram_posted": 1,
                         "instagram_url": None,
                         "iso": "",
                         "key": "cat_pin",
-                        "keywords": [],
+                        "keywords": '["a", "b"]',
                         "lens": "",
                         "phash": None,
                         "pick": 0,
@@ -138,11 +138,11 @@ _LIST_MATCHES_PIN = {
                 "image_hash": None,
                 "instagram_index": 0,
                 "instagram_post_date": None,
-                "instagram_posted": False,
+                "instagram_posted": 1,
                 "instagram_url": None,
                 "iso": "",
                 "key": "cat_pin",
-                "keywords": [],
+                "keywords": '["a", "b"]',
                 "lens": "",
                 "phash": None,
                 "pick": 0,
@@ -208,8 +208,9 @@ def _make_client(db_path):
 
 def _seed_pin_fixture(db):
     db.execute(
-        "INSERT INTO images (key, filename, filepath, date_taken) VALUES (?, ?, ?, ?)",
-        ("cat_pin", "pin.jpg", "/fake/pin.jpg", "2024-06-15T10:00:00"),
+        "INSERT INTO images (key, filename, filepath, date_taken, keywords, instagram_posted) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        ("cat_pin", "pin.jpg", "/fake/pin.jpg", "2024-06-15T10:00:00", '["a", "b"]', 1),
     )
     db.execute(
         "INSERT INTO instagram_dump_media (media_key, filename, file_path, date_folder, processed, created_at) "
