@@ -7,8 +7,7 @@ import sqlite3
 from collections.abc import Callable
 
 from lightroom_tagger.core.fallback import FallbackDispatcher
-from lightroom_tagger.core.exceptions import ModelUnavailableError
-from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.provider_resolution import resolve_model
 from lightroom_tagger.core.search_tools import ALL_TOOLS, execute_tool
 from lightroom_tagger.core.vision_client import complete_chat_messages, complete_chat_text
 
@@ -72,30 +71,8 @@ def run_nl_catalog_filter_llm(
     score_perspective_slugs: list[str] | None = None,
 ) -> str:
     """Call the LLM to produce a JSON string matching :class:`CatalogNlFilter` (no bypass)."""
-    registry = ProviderRegistry()
-    dispatcher = FallbackDispatcher(registry)
-    desc_defaults = registry.defaults.get("description", {}) or {}
-
-    resolved_provider = provider_id if provider_id is not None else desc_defaults.get("provider")
-    if not resolved_provider:
-        raise ModelUnavailableError(
-            "No provider configured for NL filter — set defaults.description.provider",
-            provider=None,
-            model=None,
-        )
-
-    resolved_model: str | None = model
-    if resolved_model is None:
-        resolved_model = desc_defaults.get("model")
-    if resolved_model is None:
-        models = registry.list_models(resolved_provider)
-        if not models:
-            raise ModelUnavailableError(
-                f"No models available for provider {resolved_provider!r} — check provider config",
-                provider=resolved_provider,
-                model=None,
-            )
-        resolved_model = models[0]["id"]
+    r = resolve_model(kind="description", provider_id=provider_id, model=model)
+    dispatcher = FallbackDispatcher(r.registry)
 
     system_prompt = build_nl_catalog_filter_prompt(score_perspective_slugs)
 
@@ -112,8 +89,8 @@ def run_nl_catalog_filter_llm(
     raw, _pid, _mid = dispatcher.call_with_fallback(
         operation="nl_filter",
         fn_factory=fn_factory,
-        provider_id=resolved_provider,
-        model=resolved_model,
+        provider_id=r.provider_id,
+        model=r.model,
         log_callback=log_callback,
     )
     return raw
@@ -128,30 +105,8 @@ def run_nl_catalog_filter_llm_multi_turn(
     score_perspective_slugs: list[str] | None = None,
 ) -> str:
     """Call the LLM with conversation history; returns raw JSON string for :class:`CatalogNlFilter`."""
-    registry = ProviderRegistry()
-    dispatcher = FallbackDispatcher(registry)
-    desc_defaults = registry.defaults.get("description", {}) or {}
-
-    resolved_provider = provider_id if provider_id is not None else desc_defaults.get("provider")
-    if not resolved_provider:
-        raise ModelUnavailableError(
-            "No provider configured for NL filter — set defaults.description.provider",
-            provider=None,
-            model=None,
-        )
-
-    resolved_model: str | None = model
-    if resolved_model is None:
-        resolved_model = desc_defaults.get("model")
-    if resolved_model is None:
-        models = registry.list_models(resolved_provider)
-        if not models:
-            raise ModelUnavailableError(
-                f"No models available for provider {resolved_provider!r} — check provider config",
-                provider=resolved_provider,
-                model=None,
-            )
-        resolved_model = models[0]["id"]
+    r = resolve_model(kind="description", provider_id=provider_id, model=model)
+    dispatcher = FallbackDispatcher(r.registry)
 
     system_prompt = build_nl_catalog_filter_prompt(score_perspective_slugs)
 
@@ -168,8 +123,8 @@ def run_nl_catalog_filter_llm_multi_turn(
     raw, _pid, _mid = dispatcher.call_with_fallback(
         operation="nl_filter",
         fn_factory=fn_factory,
-        provider_id=resolved_provider,
-        model=resolved_model,
+        provider_id=r.provider_id,
+        model=r.model,
         log_callback=log_callback,
     )
     return raw
@@ -236,27 +191,8 @@ def run_tool_calling_search(
     The returned messages list includes tool_call and tool_result turns
     so the frontend can persist them for multi-turn continuity.
     """
-    registry = ProviderRegistry()
-    desc_defaults = registry.defaults.get("description", {}) or {}
-    resolved_provider = provider_id or desc_defaults.get("provider")
-    if not resolved_provider:
-        raise ModelUnavailableError(
-            "No provider configured for tool-calling search",
-            provider=None,
-            model=None,
-        )
-    resolved_model = model or desc_defaults.get("model")
-    if not resolved_model:
-        models = registry.list_models(resolved_provider)
-        if not models:
-            raise ModelUnavailableError(
-                f"No models for provider {resolved_provider!r}",
-                provider=resolved_provider,
-                model=None,
-            )
-        resolved_model = models[0]["id"]
-
-    client = registry.get_client(resolved_provider)
+    r = resolve_model(kind="description", provider_id=provider_id, model=model)
+    client = r.registry.get_client(r.provider_id)
     conv = _messages_for_openai_tool_loop(messages)
 
     _TOOL_SEARCH_SYSTEM = (
@@ -282,7 +218,7 @@ def run_tool_calling_search(
 
     for _round in range(max_tool_rounds):
         response = client.chat.completions.create(
-            model=resolved_model,
+            model=r.model,
             messages=conv,
             tools=ALL_TOOLS,
             tool_choice="auto",
