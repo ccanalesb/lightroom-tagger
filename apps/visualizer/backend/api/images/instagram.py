@@ -15,7 +15,14 @@ from utils.responses import (
     success_paginated,
 )
 
-from lightroom_tagger.core.database import get_image_description, get_instagram_dump_media
+from lightroom_tagger.core.database import (
+    get_image_description,
+    get_image_descriptions_by_type,
+    get_instagram_dump_media,
+    get_instagram_dump_media_filtered,
+    get_matches_model_mapping,
+    get_matches_with_scores,
+)
 
 from .common import (
     _clamp_pagination,
@@ -35,6 +42,17 @@ _DESC_JSON_COLS = (
     "dominant_colors",
     "mood_tags",
 )
+
+
+def _dump_media_wire_row(row: dict) -> dict:
+    """Preserve legacy JSON wire shape for ``list_dump_media`` rows."""
+    out = dict(row)
+    if isinstance(out.get("processed"), bool):
+        out["processed"] = int(out["processed"])
+    exif = out.get("exif_data")
+    if exif is not None and not isinstance(exif, str):
+        out["exif_data"] = json.dumps(exif)
+    return out
 
 
 def _deserialize_description(row: dict) -> dict:
@@ -138,29 +156,21 @@ def _build_instagram_detail(db, image_key):
 def list_instagram_images(db):
     """List Instagram images with filtering and pagination."""
     try:
-        media_items = db.execute("SELECT * FROM instagram_dump_media").fetchall()
+        media_items = get_instagram_dump_media_filtered(db)
 
         model_lookup = {}
         score_lookup = {}
         try:
-            for row in db.execute(
-                "SELECT insta_key, model_used, total_score, score FROM matches"
-            ).fetchall():
-                model_lookup[row["insta_key"]] = row["model_used"]
-                raw = row.get("total_score") or row.get("score") or 0
-                key = row["insta_key"]
-                if raw and (key not in score_lookup or raw > score_lookup[key]):
-                    score_lookup[key] = float(raw)
+            model_lookup = get_matches_model_mapping(db)
+            score_lookup = get_matches_with_scores(db)
         except sqlite3.OperationalError:
             pass
 
         desc_lookup = {}
         try:
-            for desc in db.execute(
-                "SELECT * FROM image_descriptions WHERE image_type = 'instagram'"
-            ).fetchall():
+            for desc in get_image_descriptions_by_type(db, "instagram"):
                 key = (desc.get("image_key"), desc.get("image_type"))
-                desc_lookup[key] = _deserialize_description(desc)
+                desc_lookup[key] = desc
         except sqlite3.OperationalError:
             pass
 
@@ -216,7 +226,7 @@ def list_instagram_images(db):
 def get_instagram_months(db):
     """Get unique months available in Instagram images."""
     try:
-        media_items = db.execute("SELECT * FROM instagram_dump_media").fetchall()
+        media_items = get_instagram_dump_media_filtered(db)
         months = set()
         for media in media_items:
             date_folder = media.get("date_folder", "")
@@ -232,15 +242,9 @@ def get_instagram_months(db):
 def get_instagram_thumbnail(db, image_key):
     """Get thumbnail for Instagram image."""
     try:
-        media_items = db.execute(
-            "SELECT * FROM instagram_dump_media WHERE media_key = ?",
-            (image_key,),
-        ).fetchall()
-
-        if not media_items:
+        media = get_instagram_dump_media(db, image_key)
+        if not media:
             return error_not_found("image")
-
-        media = media_items[0]
         local_path = media.get("file_path")
 
         if not local_path or not os.path.exists(local_path):
@@ -267,22 +271,18 @@ def list_dump_media(db):
         )
 
         if processed == "true":
-            media = db.execute("SELECT * FROM instagram_dump_media WHERE processed = 1").fetchall()
+            media = get_instagram_dump_media_filtered(db, processed=True)
         elif processed == "false":
-            media = db.execute("SELECT * FROM instagram_dump_media WHERE processed = 0").fetchall()
+            media = get_instagram_dump_media_filtered(db, processed=False)
         elif matched == "true":
-            media = db.execute(
-                "SELECT * FROM instagram_dump_media WHERE matched_catalog_key IS NOT NULL"
-            ).fetchall()
+            media = get_instagram_dump_media_filtered(db, matched=True)
         elif matched == "false":
-            media = db.execute(
-                "SELECT * FROM instagram_dump_media WHERE matched_catalog_key IS NULL"
-            ).fetchall()
+            media = get_instagram_dump_media_filtered(db, matched=False)
         else:
-            media = db.execute("SELECT * FROM instagram_dump_media").fetchall()
+            media = get_instagram_dump_media_filtered(db)
 
         total = len(media)
-        paginated = media[offset : offset + limit]
+        paginated = [_dump_media_wire_row(row) for row in media[offset : offset + limit]]
 
         return jsonify(
             {
