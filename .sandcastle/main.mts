@@ -18,6 +18,46 @@ const commitNote =
   "When done and tests pass, stage and commit ALL changes " +
   '(`git add -A && git commit -m "..."`), then output <promise>COMPLETE</promise>.';
 
+// Two-axis review (ported from the code-review skill): Spec = does the diff
+// match what was asked; Standards = does it follow repo conventions + the
+// Fowler smell baseline. The reviewer FIXES issues, it does not just report.
+const reviewGuidance = `You are a senior reviewer. A cheaper coding model just implemented the task (shown below) on this branch. First inspect what it changed (may be uncommitted):
+
+- \`git status -s\`
+- \`git --no-pager diff\`
+
+Review along two independent axes.
+
+## Axis 1 — Spec (does it match what was asked?)
+Compare the diff against the task text. Quote the relevant task line for each finding:
+(a) requirements asked for but missing or only partial;
+(b) behaviour added that the task did NOT ask for (scope creep / dead code);
+(c) requirements that look implemented but are implemented wrong.
+
+## Axis 2 — Standards (does it follow this repo's conventions?)
+Check the diff against the documented conventions in \`docs/architecture.md\` and \`CONTEXT-MAP.md\` (package layout under \`lightroom_tagger/\`, module boundary/size policy, existing patterns). Cite the doc + rule for each violation.
+Then scan for these code smells — judgement calls, not hard rules; a documented repo convention overrides them, and skip anything tooling already enforces:
+- Mysterious Name — name doesn't reveal intent.
+- Duplicated Code — same shape in >1 place → extract.
+- Feature Envy — method reaches into another object's data more than its own.
+- Data Clumps — same fields keep travelling together → bundle into a type.
+- Primitive Obsession — primitive/string standing in for a domain concept.
+- Repeated Switches — same switch/if-cascade recurs → polymorphism/shared map.
+- Shotgun Surgery — one logical change forces scattered edits.
+- Divergent Change — one module edited for several unrelated reasons.
+- Speculative Generality — abstraction/params for needs the spec doesn't have.
+- Message Chains — long a.b().c().d() navigation.
+- Middle Man — class/function that mostly just delegates onward.
+- Refused Bequest — subclass ignores most of what it inherits.
+
+## Tests
+Ensure coverage is adequate and the suite passes: \`python -m pytest -q\`.
+
+## Done
+Fix the issues you find directly and keep fixes minimal. Then stage and commit ALL changes (including the implementer's work if still uncommitted):
+\`git add -A && git commit -m "Review + fixes"\`
+Then output <promise>COMPLETE</promise>.`;
+
 await using sandbox = await createSandbox({
   branch,
   sandbox: docker(),
@@ -48,13 +88,7 @@ await sandbox.run({
 await sandbox.run({
   agent: cursor("claude-opus-4-8-medium"),
   ...(task
-    ? {
-        prompt:
-          "You are a senior reviewer. A cheaper coding model just implemented " +
-          `this task:\n\n${task}\n\nInspect the changes (run \`git status -s\` and ` +
-          "`git --no-pager diff`), check correctness, repo conventions, and tests. " +
-          `Fix any issues and run the test suite. ${commitNote}`,
-      }
+    ? { prompt: `${reviewGuidance}\n\n# Task the implementer worked from\n\n${task}` }
     : { promptFile: "./.sandcastle/review.md" }),
 });
 
