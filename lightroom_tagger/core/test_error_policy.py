@@ -3,9 +3,9 @@
 import pytest
 
 from lightroom_tagger.core.error_policy import (
+    MAX_TOKENS_ESCALATION,
     ContextLengthEscalationPolicy,
     EscalationAction,
-    MAX_TOKENS_ESCALATION,
     NoOpErrorPolicy,
 )
 from lightroom_tagger.core.exceptions import ContextLengthError, RateLimitError
