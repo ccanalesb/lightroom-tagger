@@ -10,6 +10,8 @@ from utils.responses import error_bad_request, error_not_found, error_server_err
 from lightroom_tagger.core.database import (
     StackMutationError,
     library_write,
+    list_stack_member_keys,
+    stack_exists,
     stack_merge_into,
     stack_set_representative,
     stack_split_member_out,
@@ -27,22 +29,10 @@ def get_stack_members(db, stack_id: int):
     try:
         if stack_id < 1:
             return error_not_found("stack")
-        found = db.execute(
-            "SELECT 1 AS o FROM image_stacks WHERE stack_id = ?",
-            (stack_id,),
-        ).fetchone()
-        if not found:
+        if not stack_exists(db, stack_id):
             return error_not_found("stack")
 
-        mem_rows = db.execute(
-            """
-            SELECT image_key FROM image_stack_members
-            WHERE stack_id = ?
-            ORDER BY image_key ASC
-            """,
-            (stack_id,),
-        ).fetchall()
-        keys = [str(r["image_key"]) for r in mem_rows]
+        keys = list_stack_member_keys(db, stack_id)
         if not keys:
             return jsonify({"items": []})
 

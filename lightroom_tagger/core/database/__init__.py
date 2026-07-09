@@ -123,6 +123,7 @@ from lightroom_tagger.core.exceptions import StackMutationError
 from .stacks import (
     catalog_image_stack_row_fields,
     list_catalog_stack_member_keys,
+    list_stack_member_keys,
     select_stack_representative_key_for_keys,
     stack_exists,
     stack_merge_into,
@@ -323,6 +324,7 @@ __all__ = (
     'list_catalog_keys_needing_clip_embedding',
     'list_catalog_keys_needing_text_embedding',
     'list_catalog_stack_member_keys',
+    'list_stack_member_keys',
     'list_clip_embedded_catalog_keys_newest_first',
     'list_comparison_pool_report_targets',
     'list_instagram_dump_keys_for_clip_embed_force',

@@ -23,6 +23,8 @@ from lightroom_tagger.core.clip_similarity import (
 )
 from lightroom_tagger.core.database import (
     build_description_fts_query,
+    get_all_current_perspective_slugs,
+    get_image,
     query_catalog_images,
     query_catalog_images_by_keys,
 )
@@ -67,8 +69,7 @@ def _chat_pin_context(
     pk = str(raw).strip()
     if not pk:
         return None, None
-    row = db.execute("SELECT 1 FROM images WHERE key = ?", (pk,)).fetchone()
-    if not row:
+    if get_image(db, pk) is None:
         return None, {"pin_state": "inactive", "fallback_reason": "invalid_pin_key"}
     try:
         keys = list_pin_similarity_candidate_keys(db, pk)
@@ -335,11 +336,7 @@ def chat_search_images(db):
                 }
             )
 
-        slug_rows = db.execute(
-            "SELECT DISTINCT perspective_slug FROM image_scores "
-            "WHERE is_current = 1 ORDER BY perspective_slug"
-        ).fetchall()
-        available_slugs = [str(r["perspective_slug"]) for r in slug_rows]
+        available_slugs = get_all_current_perspective_slugs(db)
 
         try:
             raw = nl_catalog_search.run_nl_catalog_filter_llm_multi_turn(
