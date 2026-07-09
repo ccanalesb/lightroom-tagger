@@ -80,8 +80,9 @@ def get_similarity_groups_count(db: sqlite3.Connection) -> int:
 
 def get_catalog_similarity_groups_paginated(
     db: sqlite3.Connection, *, limit: int, offset: int
-) -> list[dict]:
-    """Page of similarity group summary rows, newest first."""
+) -> tuple[list[dict], int]:
+    """Page of similarity group summary rows plus total count, newest first."""
+    total = get_similarity_groups_count(db)
     rows = db.execute(
         """
         SELECT group_id, seed_key, candidate_count, best_similarity, job_id, created_at
@@ -91,7 +92,7 @@ def get_catalog_similarity_groups_paginated(
         """,
         (int(limit), int(offset)),
     ).fetchall()
-    return [dict(r) for r in rows]
+    return [dict(r) for r in rows], total
 
 
 def get_similarity_candidates_for_group(

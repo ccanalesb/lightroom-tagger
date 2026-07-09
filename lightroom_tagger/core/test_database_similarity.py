@@ -17,7 +17,7 @@ from lightroom_tagger.core.database import (
 def test_similarity_read_helpers_empty_db(tmp_path) -> None:
     db = init_database(str(tmp_path / "library.db"))
     assert get_similarity_groups_count(db) == 0
-    assert get_catalog_similarity_groups_paginated(db, limit=10, offset=0) == []
+    assert get_catalog_similarity_groups_paginated(db, limit=10, offset=0) == ([], 0)
     db.close()
 
 
@@ -46,7 +46,8 @@ def test_similarity_read_helpers_pagination_and_candidates(tmp_path) -> None:
     )
 
     assert get_similarity_groups_count(db) == 1
-    groups = get_catalog_similarity_groups_paginated(db, limit=5, offset=0)
+    groups, total = get_catalog_similarity_groups_paginated(db, limit=5, offset=0)
+    assert total == 1
     assert len(groups) == 1
     assert groups[0]["seed_key"] == k_seed
     assert not isinstance(groups[0], sqlite3.Row)
@@ -57,5 +58,7 @@ def test_similarity_read_helpers_pagination_and_candidates(tmp_path) -> None:
     assert float(candidates[0]["similarity"]) == 0.91
     assert not isinstance(candidates[0], sqlite3.Row)
 
-    assert get_catalog_similarity_groups_paginated(db, limit=1, offset=1) == []
+    groups_page, total_page = get_catalog_similarity_groups_paginated(db, limit=1, offset=1)
+    assert groups_page == []
+    assert total_page == 1
     db.close()
