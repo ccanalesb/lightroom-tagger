@@ -17,6 +17,19 @@ def stack_exists(db: sqlite3.Connection, stack_id: int) -> bool:
     return row is not None
 
 
+def list_stack_member_keys(db: sqlite3.Connection, stack_id: int) -> list[str]:
+    """Return member ``image_key`` values for *stack_id*, sorted ascending."""
+    rows = db.execute(
+        """
+        SELECT image_key FROM image_stack_members
+        WHERE stack_id = ?
+        ORDER BY image_key ASC
+        """,
+        (stack_id,),
+    ).fetchall()
+    return [str(r["image_key"]) for r in rows]
+
+
 def list_catalog_stack_member_keys(db: sqlite3.Connection, catalog_key: str) -> list[str]:
     """Return all ``image_key`` values in the stack containing *catalog_key*.
 
@@ -28,12 +41,7 @@ def list_catalog_stack_member_keys(db: sqlite3.Connection, catalog_key: str) -> 
     ).fetchone()
     if not row:
         return [catalog_key]
-    stack_id = int(row["stack_id"])
-    rows = db.execute(
-        "SELECT image_key FROM image_stack_members WHERE stack_id = ? ORDER BY image_key",
-        (stack_id,),
-    ).fetchall()
-    return [str(r["image_key"]) for r in rows]
+    return list_stack_member_keys(db, int(row["stack_id"]))
 
 
 def select_stack_representative_key_for_keys(
@@ -76,15 +84,7 @@ def stack_metadata_for_api(db: sqlite3.Connection, stack_id: int) -> dict | None
     ).fetchone()
     if not row:
         return None
-    mem_rows = db.execute(
-        """
-        SELECT image_key FROM image_stack_members
-        WHERE stack_id = ?
-        ORDER BY image_key ASC
-        """,
-        (stack_id,),
-    ).fetchall()
-    member_keys = [str(r["image_key"]) for r in mem_rows]
+    member_keys = list_stack_member_keys(db, stack_id)
     return {
         "stack_id": int(row["stack_id"]),
         "representative_key": str(row["representative_key"]),
