@@ -357,6 +357,18 @@ def get_all_instagram_images(db: sqlite3.Connection) -> list[dict]:
     return [_deserialize_row(r) for r in rows]
 
 
+def get_all_instagram_images_raw(db: sqlite3.Connection) -> list[dict]:
+    """All legacy Instagram image rows as detached dicts WITHOUT normalization.
+
+    The matches API embeds these rows verbatim and must preserve the on-disk
+    representation (``exif`` as a JSON string). Prefer
+    :func:`get_all_instagram_images` elsewhere; this passthrough variant exists
+    only for that byte-for-byte contract.
+    """
+    rows = db.execute("SELECT * FROM instagram_images").fetchall()
+    return [dict(r) for r in rows]
+
+
 def get_instagram_dump_media_by_keys(
     db: sqlite3.Connection,
     keys: list[str],

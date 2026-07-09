@@ -217,6 +217,17 @@ def get_all_images(db: sqlite3.Connection) -> list[dict]:
     rows = db.execute("SELECT * FROM images").fetchall()
     return [_deserialize_row(r) for r in rows]
 
+def get_all_images_raw(db: sqlite3.Connection) -> list[dict]:
+    """All image rows as detached dicts WITHOUT JSON/bool normalization.
+
+    The matches API embeds these rows verbatim in its response and must
+    preserve the on-disk representation (``keywords`` as a JSON string,
+    ``instagram_posted`` as an int). Prefer :func:`get_all_images` everywhere
+    else; this passthrough variant exists only for that byte-for-byte contract.
+    """
+    rows = db.execute("SELECT * FROM images").fetchall()
+    return [dict(r) for r in rows]
+
 def get_image_count(db: sqlite3.Connection) -> int:
     """Get total image count."""
     return db.execute("SELECT COUNT(*) as cnt FROM images").fetchone()['cnt']
