@@ -13,6 +13,7 @@ from lightroom_tagger.core.exceptions import (
 )
 from lightroom_tagger.core import cancel_scope
 from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.error_policy import ErrorPolicy, NoOpErrorPolicy
 from lightroom_tagger.core.retry import CancelledRetryError, retry_with_backoff
 
 LogCallback = Callable[[str, str], None] | None
@@ -42,8 +43,19 @@ def _log_cascade(
 class FallbackDispatcher:
     """Wraps provider calls with retry + automatic cascade."""
 
-    def __init__(self, registry: ProviderRegistry):
+    def __init__(
+        self,
+        registry: ProviderRegistry,
+        error_policy: ErrorPolicy | None = None,
+    ):
         self._registry = registry
+        self._error_policy = (
+            error_policy if error_policy is not None else NoOpErrorPolicy()
+        )
+
+    @property
+    def error_policy(self) -> ErrorPolicy:
+        return self._error_policy
 
     def call_with_fallback(
         self,
