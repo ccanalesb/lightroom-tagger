@@ -203,3 +203,23 @@ def test_stack_exists(tmp_path) -> None:
     assert stack_exists(conn, sid) is True
     assert stack_exists(conn, 9999) is False
     conn.close()
+
+
+def test_list_stack_member_keys(tmp_path) -> None:
+    from lightroom_tagger.core.database import list_stack_member_keys
+
+    conn = init_database(str(tmp_path / "lib.db"))
+    assert list_stack_member_keys(conn, 1) == []
+
+    rep_key = store_image(
+        conn,
+        {"date_taken": "2024-01-01", "filename": "b.jpg", "filepath": "/b.jpg"},
+    )
+    mem_key = store_image(
+        conn,
+        {"date_taken": "2024-01-02", "filename": "a.jpg", "filepath": "/a.jpg"},
+    )
+    sid = _insert_two_member_stack(conn, rep_key, mem_key)
+    assert list_stack_member_keys(conn, sid) == sorted([rep_key, mem_key])
+    assert list_stack_member_keys(conn, 9999) == []
+    conn.close()
