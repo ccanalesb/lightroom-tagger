@@ -7,27 +7,18 @@ import json as _json
 import os
 from typing import Any
 
+from lightroom_tagger.core.error_policy import ContextLengthEscalationPolicy
 from lightroom_tagger.core.exceptions import ContextLengthError
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.provider_resolution import resolve_model
 
 from .image_prep import RAW_EXTENSIONS, VISION_MAX_DIMENSION, compress_image, get_viewable_path_managed
 
-MAX_TOKENS_ESCALATION = [256, 4096, 32768, 65536]
-
-# Shared across calls so that once a model needs higher max_tokens we
-# remember it for subsequent candidates instead of re-discovering every time.
-_model_min_tokens: dict[str, int] = {}
-
-# Models where max_tokens escalation was fully exhausted and still fails.
-# Keyed by "provider:model" — these are skipped immediately to avoid
-# wasting minutes on retries that will never succeed.
-_broken_provider_models: set[str] = set()
-
 
 def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
                         cached_local_path: str | None = None, compressed_insta_path: str | None = None,
-                        provider_id: str | None = None, model: str | None = None) -> dict:
+                        provider_id: str | None = None, model: str | None = None,
+                        error_policy: ContextLengthEscalationPolicy | None = None) -> dict:
     f"""Compare two images using a vision model with compression.
 
     When *provider_id* / *model* are omitted, resolves via
@@ -46,6 +37,7 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
         compressed_insta_path: Pre-compressed Instagram image path (optional)
         provider_id: Provider to use (``None`` → registry defaults)
         model: Model to use with the selected provider (``None`` → provider default)
+        error_policy: Per-run escalation policy (``None`` → new instance per call)
 
     Returns:
         dict with keys ``confidence`` (0-100), ``verdict`` (``SAME`` | ``DIFFERENT`` | ``UNCERTAIN``),
@@ -95,6 +87,7 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
             provider_id=provider_id,
             model=model,
         )
+        policy = error_policy if error_policy is not None else ContextLengthEscalationPolicy()
         result = _compare_via_provider(
             compressed_local,
             compressed_insta,
@@ -102,6 +95,7 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
             r.model,
             r.registry,
             log_callback,
+            error_policy=policy,
         )
         return result
 
@@ -115,7 +109,8 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
 def _compare_via_provider(local_path: str, insta_path: str,
                           provider_id: str, model: str,
                           registry: ProviderRegistry,
-                          log_callback=None) -> dict:
+                          log_callback=None,
+                          error_policy: ContextLengthEscalationPolicy | None = None) -> dict:
     """Run vision comparison via the unified provider pipeline.
 
     Escalates ``max_tokens`` automatically on ``ContextLengthError``
@@ -123,18 +118,18 @@ def _compare_via_provider(local_path: str, insta_path: str,
     thinking.budget_tokens``).  Models that succeed at 256 are never
     affected — escalation only triggers after failure.
 
-    Discovered minimums are cached in ``_model_min_tokens`` so later
+    Discovered minimums are cached on *error_policy* so later
     candidates skip the failing lower values.
     """
     from lightroom_tagger.core.exceptions import InvalidRequestError
     from lightroom_tagger.core.fallback import FallbackDispatcher
     from lightroom_tagger.core.vision_client import compare_images as _cmp
 
-    dispatcher = FallbackDispatcher(registry)
+    policy = error_policy if error_policy is not None else ContextLengthEscalationPolicy()
+    dispatcher = FallbackDispatcher(registry, error_policy=policy)
 
     def fn_factory(client: Any, mdl: str):
-        provider_key = f"{provider_id}:{mdl}"
-        if provider_key in _broken_provider_models:
+        if policy.is_broken(provider_id, mdl):
             def _skip():
                 raise InvalidRequestError(
                     f"{mdl} is broken (max_tokens exhausted in prior call)",
@@ -142,38 +137,23 @@ def _compare_via_provider(local_path: str, insta_path: str,
                 )
             return _skip
 
-        cached_min = _model_min_tokens.get(provider_key, 0)
-        start_idx = 0
-        for i, val in enumerate(MAX_TOKENS_ESCALATION):
-            if val >= cached_min:
-                start_idx = i
-                break
-        state = {"idx": start_idx}
+        state: dict[str, Any] = {"token_index": policy.starting_index(provider_id, mdl)}
 
         def _call():
-            tokens = MAX_TOKENS_ESCALATION[state["idx"]]
+            tokens = policy.max_tokens_at(state["token_index"])
             try:
                 return _cmp(client, mdl, local_path, insta_path,
                             log_callback=log_callback, max_tokens=tokens)
-            except ContextLengthError:
-                if state["idx"] < len(MAX_TOKENS_ESCALATION) - 1:
-                    state["idx"] += 1
-                    next_val = MAX_TOKENS_ESCALATION[state["idx"]]
-                    _model_min_tokens[provider_key] = next_val
-                    if log_callback:
-                        log_callback(
-                            "warning",
-                            f"[compare] Escalating max_tokens to "
-                            f"{next_val} for {mdl}",
-                        )
-                else:
-                    _broken_provider_models.add(provider_key)
-                    if log_callback:
-                        log_callback(
-                            "warning",
-                            f"[compare] max_tokens exhausted at {tokens} "
-                            f"for {mdl}, blacklisting for session",
-                        )
+            except ContextLengthError as exc:
+                policy.on_escalation_error(
+                    exc,
+                    provider_id=provider_id,
+                    model=mdl,
+                    operation="compare",
+                    call_state=state,
+                )
+                if log_callback and state.get("_log_message"):
+                    log_callback("warning", state["_log_message"])
                 raise
 
         return _call

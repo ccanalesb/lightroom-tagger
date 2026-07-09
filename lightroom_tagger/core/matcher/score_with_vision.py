@@ -26,6 +26,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     from lightroom_tagger.core import matcher as _matcher
 
     from lightroom_tagger.core.analyzer import compare_with_vision, vision_score
+    from lightroom_tagger.core.error_policy import ContextLengthEscalationPolicy
     from lightroom_tagger.core.exceptions import InvalidRequestError, PayloadTooLargeError, RateLimitError
     from lightroom_tagger.core.path_utils import normalize_match_filesystem_path
     from lightroom_tagger.core.phash import hamming_distance
@@ -78,6 +79,8 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
     if log_callback:
         log_callback('info', f'[{insta_filename}] Starting vision comparison with {total_candidates} candidates')
+
+    vision_error_policy = ContextLengthEscalationPolicy()
 
     if vision_weight == 0:
         insta_key = insta_image.get('key')
@@ -328,6 +331,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                         compressed_insta_path=compressed_insta,
                         provider_id=provider_id,
                         model=model,
+                        error_policy=vision_error_policy,
                     )
                     vision_result = vision_data['verdict']
                     vision_score_val = vision_score(vision_data['confidence'])

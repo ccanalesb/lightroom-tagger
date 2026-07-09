@@ -25,11 +25,12 @@ from .image_prep import (
     get_viewable_path,
     get_viewable_path_managed,
 )
-from .vision_compare import (
+from lightroom_tagger.core.error_policy import (
+    ContextLengthEscalationPolicy,
     MAX_TOKENS_ESCALATION,
-    _broken_provider_models,
+)
+from .vision_compare import (
     _compare_via_provider,
-    _model_min_tokens,
     compare_with_vision,
     parse_vision_response,
     vision_score,
@@ -37,6 +38,7 @@ from .vision_compare import (
 
 __all__ = (
     "ContextLengthError",
+    "ContextLengthEscalationPolicy",
     "DESCRIPTION_PROMPT",
     "MAX_TOKENS_ESCALATION",
     "RAW_EXTENSIONS",
@@ -44,10 +46,8 @@ __all__ = (
     "VISION_COMPRESS_QUALITY",
     "VISION_MAX_DIMENSION",
     "_DESCRIPTION_FALLBACK",
-    "_broken_provider_models",
     "_compare_via_provider",
     "_describe_image_via_provider",
-    "_model_min_tokens",
     "build_description_prompt",
     "compare_with_vision",
     "compress_image",
