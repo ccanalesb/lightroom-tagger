@@ -1,4 +1,3 @@
-from contextlib import nullcontext
 from unittest.mock import Mock, MagicMock, patch
 
 import lightroom_tagger.core.matcher as matcher_mod
@@ -6,6 +5,10 @@ from lightroom_tagger.core.matcher import match_batch, match_image, score_candid
 from lightroom_tagger.core.matcher.description_batch import _compute_desc_scores_for_candidates
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.provider_resolution import ResolvedModel, resolve_model
+from lightroom_tagger.core.test_vision_helpers import (
+    fake_compare_client,
+    matcher_vision_test_context,
+)
 
 
 def _fake_registry(
@@ -288,10 +291,6 @@ def test_batch_skips_oversized_cache_misses_with_zero_vision():
 
     batches_seen = []
 
-    def mock_batch(client, model, ref, cands, log_callback=None, max_tokens=4096):
-        batches_seen.append(list(cands))
-        return {cid: 50.0 for cid, _ in cands}
-
     def mock_chunk(
         registry,
         provider_id,
@@ -309,21 +308,16 @@ def test_batch_skips_oversized_cache_misses_with_zero_vision():
         batches_seen.append(list(chunk))
         return {cid: 50.0 for cid, _ in chunk}
 
-    chunk_patch = (
-        patch.object(matcher_mod, '_call_batch_chunk', side_effect=mock_chunk)
-        if hasattr(matcher_mod, '_call_batch_chunk')
-        else nullcontext()
-    )
-
-    with patch('lightroom_tagger.core.vision_client.compare_images_batch', side_effect=mock_batch), \
-         chunk_patch, \
-         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', side_effect=fake_goc), \
-         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
-         patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
-         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_ic, \
-         _matcher_resolve_patch(provider_id='ollama', model='test-model'), \
-         patch('lightroom_tagger.core.phash.hamming_distance', return_value=0), \
-         patch('os.path.exists', return_value=True):
+    with (
+        matcher_vision_test_context(provider_id='ollama', model='test-model'),
+        patch.object(matcher_mod, '_call_batch_chunk', side_effect=mock_chunk),
+        patch('lightroom_tagger.core.matcher.get_or_create_cached_image', side_effect=fake_goc),
+        patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None),
+        patch('lightroom_tagger.core.matcher.store_vision_comparison'),
+        patch('lightroom_tagger.core.matcher.InstagramCache') as mock_ic,
+        patch('lightroom_tagger.core.phash.hamming_distance', return_value=0),
+        patch('os.path.exists', return_value=True),
+    ):
         mock_ic.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
         mock_ic.return_value.cleanup.return_value = None
 
@@ -555,19 +549,22 @@ def test_description_batch_runs_before_vision_batch():
         order.append('desc')
         return {0: 90.0, 1: 90.0}
 
-    def vision_side_effect(client, model, ref, cands, log_callback=None, max_tokens=4096):
+    def mock_chunk(*args, **kwargs):
         order.append('vision')
-        return {cid: 80.0 for cid, _ in cands}
+        chunk = args[4] if len(args) > 4 else kwargs.get('chunk', [])
+        return {cid: 80.0 for cid, _ in chunk}
 
-    with patch('lightroom_tagger.core.matcher.compare_descriptions_batch', side_effect=desc_side_effect), \
-         patch('lightroom_tagger.core.vision_client.compare_images_batch', side_effect=vision_side_effect), \
-         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
-         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value='/tmp/small.jpg'), \
-         patch('lightroom_tagger.core.matcher.store_vision_comparison'), \
-         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_ic, \
-         _matcher_resolve_patch(provider_id='ollama', model='m'), \
-         patch('lightroom_tagger.core.phash.hamming_distance', return_value=0), \
-         patch('os.path.exists', return_value=True):
+    with (
+        patch('lightroom_tagger.core.matcher.compare_descriptions_batch', side_effect=desc_side_effect),
+        matcher_vision_test_context(provider_id='ollama', model='m'),
+        patch.object(matcher_mod, '_call_batch_chunk', side_effect=mock_chunk),
+        patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None),
+        patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value='/tmp/small.jpg'),
+        patch('lightroom_tagger.core.matcher.store_vision_comparison'),
+        patch('lightroom_tagger.core.matcher.InstagramCache') as mock_ic,
+        patch('lightroom_tagger.core.phash.hamming_distance', return_value=0),
+        patch('os.path.exists', return_value=True),
+    ):
         mock_ic.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
         mock_ic.return_value.cleanup.return_value = None
         score_candidates_with_vision(
@@ -730,6 +727,7 @@ def test_score_candidates_resolves_model_once_for_all_candidates():
 
 def test_sequential_abort_after_consecutive_rate_limits():
     """Fourth candidate is marked RATE_LIMITED without another API call."""
+    import openai as openai_sdk
     from lightroom_tagger.core.exceptions import RateLimitError
 
     mock_db = Mock()
@@ -745,37 +743,22 @@ def test_sequential_abort_after_consecutive_rate_limits():
     ]
     compare_calls = {'n': 0}
 
-    def compare_side_effect(*args, **kwargs):
+    def create_side_effect(**_kwargs):
         compare_calls['n'] += 1
-        raise RateLimitError('429')
+        raise openai_sdk.RateLimitError('429', response=MagicMock(), body=None)
 
-    registry = _fake_registry(
-        fallback_order=['ollama'],
-        models_by_provider={
-            'ollama': [{'id': 'gemma3:27b', 'vision': True, 'source': 'config'}],
-        },
-    )
-    registry.get_retry_config.return_value = {
-        'max_retries': 0,
-        'backoff_seconds': [],
-        'respect_retry_after': False,
-    }
-    client = MagicMock(_provider_id='ollama')
-    registry.get_client.return_value = client
-    resolved = ResolvedModel('ollama', 'gemma3:27b', registry)
+    client = fake_compare_client(provider_id='ollama', create_side_effect=create_side_effect)
 
-    with patch('lightroom_tagger.core.vision_client.compare_images', side_effect=compare_side_effect), \
-         patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=None), \
-         patch('lightroom_tagger.core.analyzer.vision_score', return_value=0.0), \
-         _matcher_resolve_patch(registry=registry), \
-         patch('lightroom_tagger.core.analyzer.vision_compare.resolve_model', return_value=resolved), \
-         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
-         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value='/tmp/c.jpg'), \
-         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
-         patch('lightroom_tagger.core.analyzer.get_viewable_path_managed', side_effect=lambda p: (p, False)), \
-         patch('lightroom_tagger.core.analyzer.compress_image', side_effect=lambda p: p), \
-         patch('lightroom_tagger.core.phash.hamming_distance', return_value=0), \
-         patch('os.path.exists', return_value=True):
+    with (
+        matcher_vision_test_context(client=client, provider_id='ollama', model='gemma3:27b'),
+        patch('lightroom_tagger.core.vision_client._encode_image', return_value='abc'),
+        patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=None),
+        patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None),
+        patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value='/tmp/c.jpg'),
+        patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache,
+        patch('lightroom_tagger.core.phash.hamming_distance', return_value=0),
+        patch('os.path.exists', return_value=True),
+    ):
         mock_insta_cache.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
         mock_insta_cache.return_value.cleanup.return_value = None
         results = score_candidates_with_vision(
@@ -791,6 +774,7 @@ def test_sequential_abort_after_consecutive_rate_limits():
 
 def test_sequential_abort_after_consecutive_fatal_errors():
     """Loop stops after three fatal errors — remaining candidates are not scored."""
+    import openai as openai_sdk
     from lightroom_tagger.core.exceptions import InvalidRequestError
 
     mock_db = Mock()
@@ -806,37 +790,22 @@ def test_sequential_abort_after_consecutive_fatal_errors():
     ]
     compare_calls = {'n': 0}
 
-    def compare_side_effect(*args, **kwargs):
+    def create_side_effect(**_kwargs):
         compare_calls['n'] += 1
-        raise InvalidRequestError('400 bad request')
+        raise openai_sdk.BadRequestError('400 bad request', response=MagicMock(), body=None)
 
-    registry = _fake_registry(
-        fallback_order=['ollama'],
-        models_by_provider={
-            'ollama': [{'id': 'gemma3:27b', 'vision': True, 'source': 'config'}],
-        },
-    )
-    registry.get_retry_config.return_value = {
-        'max_retries': 0,
-        'backoff_seconds': [],
-        'respect_retry_after': False,
-    }
-    client = MagicMock(_provider_id='ollama')
-    registry.get_client.return_value = client
-    resolved = ResolvedModel('ollama', 'gemma3:27b', registry)
+    client = fake_compare_client(provider_id='ollama', create_side_effect=create_side_effect)
 
-    with patch('lightroom_tagger.core.vision_client.compare_images', side_effect=compare_side_effect), \
-         patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=None), \
-         patch('lightroom_tagger.core.analyzer.vision_score', return_value=0.0), \
-         _matcher_resolve_patch(registry=registry), \
-         patch('lightroom_tagger.core.analyzer.vision_compare.resolve_model', return_value=resolved), \
-         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
-         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value='/tmp/c.jpg'), \
-         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
-         patch('lightroom_tagger.core.analyzer.get_viewable_path_managed', side_effect=lambda p: (p, False)), \
-         patch('lightroom_tagger.core.analyzer.compress_image', side_effect=lambda p: p), \
-         patch('lightroom_tagger.core.phash.hamming_distance', return_value=0), \
-         patch('os.path.exists', return_value=True):
+    with (
+        matcher_vision_test_context(client=client, provider_id='ollama', model='gemma3:27b'),
+        patch('lightroom_tagger.core.vision_client._encode_image', return_value='abc'),
+        patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=None),
+        patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None),
+        patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value='/tmp/c.jpg'),
+        patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache,
+        patch('lightroom_tagger.core.phash.hamming_distance', return_value=0),
+        patch('os.path.exists', return_value=True),
+    ):
         mock_insta_cache.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
         mock_insta_cache.return_value.cleanup.return_value = None
         results = score_candidates_with_vision(
