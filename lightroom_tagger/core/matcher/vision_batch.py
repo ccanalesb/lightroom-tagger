@@ -6,7 +6,6 @@ from collections.abc import Callable
 from typing import Any
 
 from lightroom_tagger.core.error_policy import (
-    BATCH_MAX_TOKENS_ESCALATION,
     EscalationAction,
     VisionBatchErrorPolicy,
 )
@@ -70,21 +69,28 @@ def _call_batch_chunk(
 
     Payload split and max_tokens escalation are driven by
     :class:`~lightroom_tagger.core.error_policy.VisionBatchErrorPolicy`.
-  """
-    from lightroom_tagger.core.exceptions import ContextLengthError, InvalidRequestError, PayloadTooLargeError
+    """
+    from lightroom_tagger.core.exceptions import (
+        ContextLengthError,
+        InvalidRequestError,
+        PayloadTooLargeError,
+    )
     from lightroom_tagger.core.fallback import FallbackDispatcher
     from lightroom_tagger.core.vision_client import compare_images_batch
 
     policy = error_policy if error_policy is not None else VisionBatchErrorPolicy()
     dispatcher = FallbackDispatcher(registry, error_policy=policy)
 
-    call_state: dict[str, Any] = {
-        "candidates": chunk,
-        "token_index": policy.starting_index(provider_id, model),
-    }
-
     def fn_factory(client, mdl):
         attempt_provider = getattr(client, "_provider_id", None) or provider_id
+        # Per-attempt state: each provider/model starts at its own escalation
+        # index (matches the single-compare path in analyzer/vision_compare.py)
+        # so a fallback provider is not seeded with the primary's escalated
+        # token index.
+        call_state: dict[str, Any] = {
+            "candidates": chunk,
+            "token_index": policy.starting_index(attempt_provider, mdl),
+        }
 
         def _call():
             if policy.is_broken(attempt_provider, mdl):

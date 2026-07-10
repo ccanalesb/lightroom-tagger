@@ -27,7 +27,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
     from lightroom_tagger.core.analyzer import compare_with_vision, vision_score
     from lightroom_tagger.core.error_policy import ContextLengthEscalationPolicy, VisionBatchErrorPolicy
-    from lightroom_tagger.core.exceptions import InvalidRequestError, PayloadTooLargeError, RateLimitError
+    from lightroom_tagger.core.exceptions import InvalidRequestError, RateLimitError
     from lightroom_tagger.core.path_utils import normalize_match_filesystem_path
     from lightroom_tagger.core.phash import hamming_distance
     from lightroom_tagger.core.provider_resolution import resolve_model
@@ -48,15 +48,8 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     insta_filename = _os.path.basename(insta_image.get('local_path', 'unknown'))
 
     desc_scores_by_idx = _matcher._compute_desc_scores_for_candidates(
-        insta_image,
-        candidates,
-        batch_size,
-        desc_weight,
-        skip_undescribed,
-        provider_id,
-        model,
-        log_callback,
-        registry=registry,
+        insta_image, candidates, batch_size, desc_weight, skip_undescribed,
+        provider_id, model, log_callback, registry=registry,
     )
 
     # Compress Instagram image ONCE before candidate loop (vision stage only)
@@ -231,16 +224,9 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                         log_callback('debug', f'[{insta_filename}] Batch {chunk_num}/{num_chunks}: {current_chunk_size} candidates')
 
                     chunk_results = _matcher._call_batch_chunk(
-                        registry,
-                        actual_provider_id,
-                        requested_model,
-                        compressed_insta,
-                        chunk,
-                        log_callback,
-                        insta_filename,
-                        chunk_num,
-                        num_chunks,
-                        error_policy=vision_batch_policy,
+                        registry, actual_provider_id, requested_model,
+                        compressed_insta, chunk, log_callback, insta_filename,
+                        chunk_num, num_chunks, error_policy=vision_batch_policy,
                     )
                     _score_and_store(chunk_results)
                     if batch_progress_callback:

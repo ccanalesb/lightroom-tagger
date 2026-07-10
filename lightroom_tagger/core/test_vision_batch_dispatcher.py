@@ -138,3 +138,41 @@ class TestBatchVisionDispatcherFallback:
         assert result == {0: 90.0}
         assert tokens_seen[0] == BATCH_MAX_TOKENS_ESCALATION[0]
         assert tokens_seen[1] == BATCH_MAX_TOKENS_ESCALATION[1]
+
+    @patch("time.sleep")
+    def test_fallback_provider_starts_at_own_token_index(self, mock_sleep):
+        """Primary exhausting its ladder must not seed the fallback provider's
+        starting token index — each attempt seeds from its own provider/model."""
+        registry = _mock_registry(["ollama", "nvidia_nim"])
+        chunk = [(0, "/tmp/a.jpg")]
+        tokens_by_provider: dict[str, list[int]] = {}
+
+        def mock_batch(client, model, ref, cands, log_callback=None, max_tokens=4096):
+            pid = getattr(client, "_provider_id", "unknown")
+            tokens_by_provider.setdefault(pid, []).append(max_tokens)
+            if pid == "ollama":
+                raise ContextLengthError("budget too low")
+            return {cid: 88.0 for cid, _ in cands}
+
+        with patch(
+            "lightroom_tagger.core.vision_client.compare_images_batch",
+            side_effect=mock_batch,
+        ):
+            result = _call_batch_chunk(
+                registry,
+                "ollama",
+                "gemma3:27b",
+                "/tmp/ref.jpg",
+                chunk,
+                None,
+                "insta.jpg",
+                1,
+                1,
+                error_policy=VisionBatchErrorPolicy(),
+            )
+
+        assert result == {0: 88.0}
+        # ollama walks its whole ladder then breaks; nvidia_nim starts fresh
+        # at index 0 instead of inheriting ollama's escalated index.
+        assert tokens_by_provider["ollama"] == BATCH_MAX_TOKENS_ESCALATION
+        assert tokens_by_provider["nvidia_nim"] == [BATCH_MAX_TOKENS_ESCALATION[0]]
