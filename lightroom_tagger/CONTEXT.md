@@ -20,7 +20,8 @@
 | **optional perspective** | A perspective whose technique a strong photograph could legitimately skip (`perspectives.optional = 1`). Only optional perspectives may be excused; seeded as optional when the source markdown carries `<!-- optional: true -->` (the export contract from yt-to-photo-prompt-lab). |
 | **excused score** | An `image_scores` row with `not_attempted = 1`: the model judged the perspective's technique genuinely absent (only allowed for optional perspectives). It still carries a numeric score/rationale but is excluded from identity aggregation. Mirrors yt-to-photo-prompt-lab's "not scorable" outcome. |
 | **provider** | An AI model endpoint (Ollama, NVIDIA NIM, OpenRouter, etc.) defined in `providers.json`. |
-| **resolved model** | A `(provider_id, model)` pair chosen by `provider_resolution.resolve_model()` via the single precedence ladder (explicit arg → env → `providers.json` defaults → `config.yaml` → `fallback_order`). |
+| **resolved model** | A `(provider_id, model)` pair chosen by `provider_resolution.resolve_model()` via the single precedence ladder (explicit arg → env → `providers.json` defaults → `config.yaml` → `fallback_order`). See ADR-0007. |
+| **provider call seam** | All provider/LLM HTTP calls go through `FallbackDispatcher.call_with_fallback` with a `fn_factory` that invokes `vision_client` / `vision_client_batch` helpers — never raw `client.chat.completions.create` at orchestration sites. Escalation (token bump, batch split, abort) is a pluggable `ErrorPolicy`. See ADR-0009. |
 | **fallback** | The multi-provider retry chain: `FallbackDispatcher` tries providers in `fallback_order` when one fails. |
 | **phash** | Perceptual hash used for fast image similarity pre-screening before vision comparison. |
 | **stack** | A Lightroom virtual copy group; stack collapse logic deduplicates matched images. |
@@ -42,12 +43,12 @@
 | `database` | Library DB schema, migrations, image/score/description/match/stack storage, write serialization, and **read seam** (typed query helpers — all library-DB reads go through this module per ADR-0008) |
 | `matcher` | EXIF-based candidate selection + vision comparison pipeline |
 | `analyzer` | Image preparation (`image_prep`), inspection (`image_inspect`), vision comparison (`vision_compare`), description generation (`description`) |
-| `vision_client` | OpenAI-compatible HTTP client (`compare_images`, `generate_description`, `complete_chat_text`) |
+| `vision_client` | OpenAI-compatible HTTP wrappers (`compare_images`, `generate_description`, `complete_chat_text`, `complete_chat_with_tools`) — the only place raw SDK completions live |
 | `vision_client_batch` | Batch compare helpers (loaded after `vision_client` to avoid import cycles) |
 | `provider_registry` | Loads `providers.json`, auto-discovers Ollama models, returns configured `openai.OpenAI` clients |
 | `provider_resolution` | `resolve_model()` — single precedence ladder for provider/model selection; returns `ResolvedModel` with a reusable registry |
 | `exceptions` | Shared error type package — `ProviderError` hierarchy + `StackMutationError` |
-| `fallback` | `FallbackDispatcher` — retry + multi-provider fallback for compare/describe/score |
+| `fallback` | `FallbackDispatcher` — single entry point for all provider/LLM calls (retry + multi-provider fallback) |
 | `retry` | `retry_with_backoff` with `RETRYABLE_ERRORS` / `NOT_RETRYABLE_ERRORS` frozensets |
 | `cancel_scope` | Thread-local cooperative cancellation — workers register a `cancel_check` callback; retry/fallback paths honour it |
 | `scoring_service` | Per-perspective scoring of catalog and Instagram images via vision models |
@@ -78,6 +79,8 @@
 - **Lightroom catalog is read-only** except for keyword writes via `lightroom/writer.py`.
 - **One writer at a time** on `library.db`: always use `library_write` context manager for DML; never bare `conn.commit()` in parallel worker paths.
 - **Library-DB reads through core.database only**: blueprints, job handlers, CLI tools, and `search_tools` must not issue raw SQL against library tables — use typed helpers from `lightroom_tagger.core.database` (ADR-0008). Helpers return detached rows (`dict`), never live `sqlite3.Row`.
+- **Provider/model resolution through `resolve_model` only** (ADR-0007): no ad-hoc precedence ladders at call sites.
+- **Provider/LLM calls through the dispatcher seam only** (ADR-0009): orchestration code uses `FallbackDispatcher.call_with_fallback` with `vision_client` / `vision_client_batch` helpers inside `fn_factory`; no raw `client.chat.completions.create` outside the seam (enforced by `test_provider_call_guardrail.py`).
 - **Providers are OpenAI-compatible**: all vision/LLM calls go through `openai.OpenAI` client regardless of backend (Ollama, NIM, OpenRouter).
 - **No Instagram API**: all Instagram data comes from user-provided export dumps via `instagram/dump_reader.py` and `instagram/deduplicator.py`. Live-crawl scraper code has been removed.
 - **Tests live next to modules**: `test_*.py` files are co-located under `lightroom_tagger/core/`.
