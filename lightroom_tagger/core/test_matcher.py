@@ -303,6 +303,8 @@ def test_batch_skips_oversized_cache_misses_with_zero_vision():
         chunk_num,
         num_chunks,
         error_policy=None,
+        cancel_check=None,
+        abort_tracker=None,
     ):
         batches_seen.append(list(chunk))
         return {cid: 50.0 for cid, _ in chunk}
@@ -724,3 +726,125 @@ def test_score_candidates_resolves_model_once_for_all_candidates():
         )
 
     mock_resolve.assert_called_once()
+
+
+def test_sequential_abort_after_consecutive_rate_limits():
+    """Fourth candidate is marked RATE_LIMITED without another API call."""
+    from lightroom_tagger.core.exceptions import RateLimitError
+
+    mock_db = Mock()
+    insta_image = {
+        'key': 'insta_test',
+        'image_hash': 'a' * 16,
+        'description': 'sunset',
+        'local_path': '/tmp/insta.jpg',
+    }
+    candidates = [
+        {'key': f'cat{i}', 'image_hash': 'a' * 16, 'description': 'd', 'local_path': f'/tmp/c{i}.jpg'}
+        for i in range(4)
+    ]
+    compare_calls = {'n': 0}
+
+    def compare_side_effect(*args, **kwargs):
+        compare_calls['n'] += 1
+        raise RateLimitError('429')
+
+    registry = _fake_registry(
+        fallback_order=['ollama'],
+        models_by_provider={
+            'ollama': [{'id': 'gemma3:27b', 'vision': True, 'source': 'config'}],
+        },
+    )
+    registry.get_retry_config.return_value = {
+        'max_retries': 0,
+        'backoff_seconds': [],
+        'respect_retry_after': False,
+    }
+    client = MagicMock(_provider_id='ollama')
+    registry.get_client.return_value = client
+    resolved = ResolvedModel('ollama', 'gemma3:27b', registry)
+
+    with patch('lightroom_tagger.core.vision_client.compare_images', side_effect=compare_side_effect), \
+         patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=None), \
+         patch('lightroom_tagger.core.analyzer.vision_score', return_value=0.0), \
+         _matcher_resolve_patch(registry=registry), \
+         patch('lightroom_tagger.core.analyzer.vision_compare.resolve_model', return_value=resolved), \
+         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
+         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value='/tmp/c.jpg'), \
+         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
+         patch('lightroom_tagger.core.analyzer.get_viewable_path_managed', side_effect=lambda p: (p, False)), \
+         patch('lightroom_tagger.core.analyzer.compress_image', side_effect=lambda p: p), \
+         patch('lightroom_tagger.core.phash.hamming_distance', return_value=0), \
+         patch('os.path.exists', return_value=True):
+        mock_insta_cache.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
+        mock_insta_cache.return_value.cleanup.return_value = None
+        results = score_candidates_with_vision(
+            mock_db, insta_image, candidates,
+            phash_weight=0.0, desc_weight=0.0, vision_weight=1.0,
+            batch_threshold=999,
+        )
+
+    assert compare_calls['n'] == 3
+    assert len(results) == 4
+    assert all(r['vision_result'] == 'RATE_LIMITED' for r in results)
+
+
+def test_sequential_abort_after_consecutive_fatal_errors():
+    """Loop stops after three fatal errors — remaining candidates are not scored."""
+    from lightroom_tagger.core.exceptions import InvalidRequestError
+
+    mock_db = Mock()
+    insta_image = {
+        'key': 'insta_test',
+        'image_hash': 'a' * 16,
+        'description': 'sunset',
+        'local_path': '/tmp/insta.jpg',
+    }
+    candidates = [
+        {'key': f'cat{i}', 'image_hash': 'a' * 16, 'description': 'd', 'local_path': f'/tmp/c{i}.jpg'}
+        for i in range(5)
+    ]
+    compare_calls = {'n': 0}
+
+    def compare_side_effect(*args, **kwargs):
+        compare_calls['n'] += 1
+        raise InvalidRequestError('400 bad request')
+
+    registry = _fake_registry(
+        fallback_order=['ollama'],
+        models_by_provider={
+            'ollama': [{'id': 'gemma3:27b', 'vision': True, 'source': 'config'}],
+        },
+    )
+    registry.get_retry_config.return_value = {
+        'max_retries': 0,
+        'backoff_seconds': [],
+        'respect_retry_after': False,
+    }
+    client = MagicMock(_provider_id='ollama')
+    registry.get_client.return_value = client
+    resolved = ResolvedModel('ollama', 'gemma3:27b', registry)
+
+    with patch('lightroom_tagger.core.vision_client.compare_images', side_effect=compare_side_effect), \
+         patch('lightroom_tagger.core.matcher.get_vision_comparison', return_value=None), \
+         patch('lightroom_tagger.core.analyzer.vision_score', return_value=0.0), \
+         _matcher_resolve_patch(registry=registry), \
+         patch('lightroom_tagger.core.analyzer.vision_compare.resolve_model', return_value=resolved), \
+         patch('lightroom_tagger.core.matcher.get_cached_phash', return_value=None), \
+         patch('lightroom_tagger.core.matcher.get_or_create_cached_image', return_value='/tmp/c.jpg'), \
+         patch('lightroom_tagger.core.matcher.InstagramCache') as mock_insta_cache, \
+         patch('lightroom_tagger.core.analyzer.get_viewable_path_managed', side_effect=lambda p: (p, False)), \
+         patch('lightroom_tagger.core.analyzer.compress_image', side_effect=lambda p: p), \
+         patch('lightroom_tagger.core.phash.hamming_distance', return_value=0), \
+         patch('os.path.exists', return_value=True):
+        mock_insta_cache.return_value.compress_instagram_image.return_value = '/tmp/insta.jpg'
+        mock_insta_cache.return_value.cleanup.return_value = None
+        results = score_candidates_with_vision(
+            mock_db, insta_image, candidates,
+            phash_weight=0.0, desc_weight=0.0, vision_weight=1.0,
+            batch_threshold=999,
+        )
+
+    assert compare_calls['n'] == 3
+    assert len(results) == 3
+    assert all(r['vision_result'] == 'ERROR' for r in results)

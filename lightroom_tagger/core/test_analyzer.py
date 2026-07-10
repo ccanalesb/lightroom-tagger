@@ -657,3 +657,50 @@ def test_get_description_model_falls_back_to_vision_model_env():
         assert get_description_model() == 'gemma3:27b'
 
 
+@patch("time.sleep")
+def test_cancel_mid_backoff_short_circuits_sequential_compare(mock_sleep):
+    """Sequential compare path honours cancel during retry backoff."""
+    import pytest
+    from lightroom_tagger.core.exceptions import RateLimitError
+    from lightroom_tagger.core.retry import CancelledRetryError
+
+    registry = MagicMock()
+    registry.fallback_order = ["ollama"]
+    registry.list_providers.return_value = [
+        {"id": "ollama", "name": "ollama", "available": True},
+    ]
+    registry.get_client.return_value = MagicMock(_provider_id="ollama")
+    registry.get_retry_config.return_value = {
+        "max_retries": 2,
+        "backoff_seconds": [5],
+        "respect_retry_after": False,
+    }
+    registry.list_models.return_value = [
+        {"id": "gemma3:27b", "vision": True, "source": "config"},
+    ]
+    flag = {"cancel": False}
+
+    def compare_side_effect(*args, **kwargs):
+        flag["cancel"] = True
+        raise RateLimitError("429")
+
+    with patch(
+        "lightroom_tagger.core.analyzer.vision_compare.resolve_model",
+        return_value=ResolvedModel("ollama", "gemma3:27b", registry),
+    ), patch(
+        "lightroom_tagger.core.vision_client.compare_images",
+        side_effect=compare_side_effect,
+    ), patch(
+        "lightroom_tagger.core.analyzer.get_viewable_path_managed",
+        side_effect=lambda p: (p, False),
+    ), patch(
+        "lightroom_tagger.core.analyzer.compress_image",
+        side_effect=lambda p: p,
+    ), patch("os.path.exists", return_value=True):
+        with pytest.raises(CancelledRetryError):
+            compare_with_vision(
+                "/tmp/local.jpg",
+                "/tmp/insta.jpg",
+                cancel_check=lambda: flag["cancel"],
+            )
+

@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from typing import Any, Callable, TypeVar
 
-from lightroom_tagger.core import cancel_scope
+from lightroom_tagger.core.cancel_scope import resolve_cancel_check
 from lightroom_tagger.core.exceptions import (
     NOT_RETRYABLE_ERRORS,
     RETRYABLE_ERRORS,
@@ -71,12 +71,7 @@ def retry_with_backoff(
     backoff: list[float] = retry_config.get("backoff_seconds", [2, 8, 32])
     respect_retry_after: bool = retry_config.get("respect_retry_after", True)
 
-    # Only opt into the thread-local scope when the current thread has one
-    # installed. Otherwise we keep the pre-cancel behaviour exactly —
-    # ``time.sleep(wait)`` called once per attempt — so existing tests and
-    # timing assumptions stay untouched.
-    if cancel_check is None and cancel_scope.has_active_scope():
-        cancel_check = cancel_scope.is_cancelled
+    cancel_check = resolve_cancel_check(cancel_check)
 
     last_error: ProviderError | None = None
 

@@ -68,3 +68,32 @@ def test_broken_callback_is_swallowed():
         # Must not propagate — callers would rather keep processing than
         # crash the whole job on a bad callback.
         assert cancel_scope.is_cancelled() is False
+
+
+def test_resolve_cancel_check_merges_explicit_and_scope():
+    cancel_scope.clear()
+    explicit = {"cancel": False}
+    scope_flag = {"cancel": False}
+
+    check = cancel_scope.resolve_cancel_check(lambda: explicit["cancel"])
+    assert check is not None
+    assert check() is False
+
+    explicit["cancel"] = True
+    assert check() is True
+
+    cancel_scope.clear()
+    explicit = {"cancel": False}
+    check = cancel_scope.resolve_cancel_check(lambda: explicit["cancel"])
+    with cancel_scope.install(lambda: scope_flag["cancel"]):
+        assert check() is False
+        scope_flag["cancel"] = True
+        assert check() is True
+
+    cancel_scope.clear()
+
+
+def test_resolve_cancel_check_returns_none_without_sources():
+    cancel_scope.clear()
+    assert cancel_scope.resolve_cancel_check(None) is None
+    cancel_scope.clear()

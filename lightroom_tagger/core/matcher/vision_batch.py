@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 from lightroom_tagger.core.error_policy import (
+    ConsecutiveAbortTracker,
     EscalationAction,
     VisionBatchErrorPolicy,
 )
@@ -64,6 +65,8 @@ def _call_batch_chunk(
     chunk_num: int,
     num_chunks: int,
     error_policy: VisionBatchErrorPolicy | None = None,
+    cancel_check: Callable[[], bool] | None = None,
+    abort_tracker: ConsecutiveAbortTracker | None = None,
 ) -> dict[int, float]:
     """Call compare_images_batch for a single chunk via FallbackDispatcher.
 
@@ -136,6 +139,8 @@ def _call_batch_chunk(
                             chunk_num,
                             num_chunks,
                             error_policy=policy,
+                            cancel_check=cancel_check,
+                            abort_tracker=abort_tracker,
                         )
                         right = _call_batch_chunk(
                             registry,
@@ -148,6 +153,8 @@ def _call_batch_chunk(
                             chunk_num,
                             num_chunks,
                             error_policy=policy,
+                            cancel_check=cancel_check,
+                            abort_tracker=abort_tracker,
                         )
                         left.update(right)
                         return left
@@ -168,6 +175,8 @@ def _call_batch_chunk(
         provider_id=provider_id,
         model=model,
         log_callback=log_callback,
+        cancel_check=cancel_check,
+        abort_tracker=abort_tracker,
     )
     return result
 
