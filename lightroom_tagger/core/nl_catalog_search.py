@@ -216,15 +216,15 @@ def run_tool_calling_search(
         raise ValueError("tool-calling search requires at least one user message")
     updated_messages: list[dict] = list(messages)
 
-    for _round in range(max_tool_rounds):
-        def fn_factory(client, mdl: str, messages=conv):
-            return lambda: client.chat.completions.create(
-                model=mdl,
-                messages=messages,
-                tools=ALL_TOOLS,
-                tool_choice="auto",
-            )
+    def fn_factory(client, mdl: str):
+        return lambda: client.chat.completions.create(
+            model=mdl,
+            messages=conv,
+            tools=ALL_TOOLS,
+            tool_choice="auto",
+        )
 
+    for _round in range(max_tool_rounds):
         response, _pid, _mid = dispatcher.call_with_fallback(
             operation="tool_search",
             fn_factory=fn_factory,
