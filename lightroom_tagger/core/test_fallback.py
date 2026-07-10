@@ -10,6 +10,7 @@ from lightroom_tagger.core.exceptions import (
     RateLimitError,
 )
 from lightroom_tagger.core.fallback import FallbackDispatcher
+from lightroom_tagger.core.retry import CancelledRetryError
 
 
 def _mock_registry(available_providers=None):
@@ -242,3 +243,36 @@ class TestLogCallback:
         )
         log_messages = " ".join(str(c) for c in log.call_args_list)
         assert "fallback" in log_messages.lower() or "nvidia_nim" in log_messages
+
+
+class TestCancellation:
+    @patch("time.sleep")
+    def test_cancel_mid_backoff_does_not_fallback(self, mock_sleep):
+        registry = _mock_registry()
+        registry.get_retry_config.return_value = {
+            "max_retries": 2,
+            "backoff_seconds": [5],
+            "respect_retry_after": False,
+        }
+        dispatcher = FallbackDispatcher(registry)
+        flag = {"cancel": False}
+        providers_seen: list[str] = []
+
+        def fn_factory(client, model):
+            def fn():
+                flag["cancel"] = True
+                providers_seen.append(getattr(client, "_provider_id", None))
+                raise RateLimitError("429")
+            return fn
+
+        registry.get_client.return_value = MagicMock(_provider_id="ollama")
+
+        with pytest.raises(CancelledRetryError):
+            dispatcher.call_with_fallback(
+                operation="compare",
+                fn_factory=fn_factory,
+                provider_id="ollama",
+                model="gemma3:27b",
+                cancel_check=lambda: flag["cancel"],
+            )
+        assert providers_seen == ["ollama"]

@@ -91,3 +91,26 @@ def clear() -> None:
     tid = threading.get_ident()
     with _lock:
         _checks.pop(tid, None)
+
+
+def resolve_cancel_check(
+    cancel_check: Callable[[], bool] | None = None,
+) -> Callable[[], bool] | None:
+    """Merge an explicit ``cancel_check`` with the thread-local scope.
+
+    When both are present, cancellation is requested if *either* source is
+    truthy.  Scope membership is evaluated on each call so a scope installed
+    after resolution is still honoured.  Returns ``None`` when neither source
+    is active so callers keep legacy non-interruptible behaviour.
+    """
+    if cancel_check is None:
+        if not has_active_scope():
+            return None
+        return is_cancelled
+
+    def _merged() -> bool:
+        if has_active_scope() and is_cancelled():
+            return True
+        return bool(cancel_check())
+
+    return _merged

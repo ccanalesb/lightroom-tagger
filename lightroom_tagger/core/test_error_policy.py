@@ -4,13 +4,16 @@ import pytest
 
 from lightroom_tagger.core.error_policy import (
     BATCH_MAX_TOKENS_ESCALATION,
+    FATAL_ABORT_THRESHOLD,
     MAX_TOKENS_ESCALATION,
+    RATE_LIMIT_ABORT_THRESHOLD,
+    ConsecutiveAbortTracker,
     ContextLengthEscalationPolicy,
     EscalationAction,
     NoOpErrorPolicy,
     VisionBatchErrorPolicy,
 )
-from lightroom_tagger.core.exceptions import ContextLengthError, PayloadTooLargeError, RateLimitError
+from lightroom_tagger.core.exceptions import ContextLengthError, InvalidRequestError, PayloadTooLargeError, RateLimitError
 
 
 class TestNoOpErrorPolicy:
@@ -197,3 +200,45 @@ class TestVisionBatchErrorPolicy:
         assert action == EscalationAction.RETRY
         assert state["token_index"] == 1
         assert policy.max_tokens_at(state["token_index"]) == BATCH_MAX_TOKENS_ESCALATION[1]
+
+
+class TestConsecutiveAbortTracker:
+    def test_rate_limit_abort_after_threshold(self):
+        tracker = ConsecutiveAbortTracker()
+        for _ in range(RATE_LIMIT_ABORT_THRESHOLD):
+            tracker.record_rate_limit()
+        assert tracker.rate_limit_abort_reached is True
+        assert tracker.fatal_abort_reached is False
+
+    def test_fatal_abort_after_threshold(self):
+        tracker = ConsecutiveAbortTracker()
+        for _ in range(FATAL_ABORT_THRESHOLD):
+            tracker.record_fatal()
+        assert tracker.fatal_abort_reached is True
+        assert tracker.rate_limit_abort_reached is False
+
+    def test_success_resets_rate_limit_streak_only(self):
+        tracker = ConsecutiveAbortTracker()
+        tracker.record_rate_limit()
+        tracker.record_fatal()
+        tracker.record_success()
+        assert tracker.consecutive_rate_limits == 0
+        assert tracker.consecutive_fatal == 1
+
+    def test_rate_limit_clears_fatal_streak(self):
+        tracker = ConsecutiveAbortTracker()
+        tracker.record_fatal()
+        tracker.record_fatal()
+        tracker.record_rate_limit()
+        assert tracker.consecutive_fatal == 0
+        assert tracker.consecutive_rate_limits == 1
+
+    def test_dispatch_outcome_classification(self):
+        tracker = ConsecutiveAbortTracker()
+        tracker.record_dispatch_outcome(RateLimitError("429"))
+        assert tracker.consecutive_rate_limits == 1
+        tracker.record_dispatch_outcome(InvalidRequestError("400"))
+        assert tracker.consecutive_fatal == 1
+        assert tracker.consecutive_rate_limits == 0
+        tracker.record_dispatch_outcome(None)
+        assert tracker.consecutive_rate_limits == 0

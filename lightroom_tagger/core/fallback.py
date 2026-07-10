@@ -5,15 +5,21 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from lightroom_tagger.core.cancel_scope import resolve_cancel_check
+from lightroom_tagger.core.error_policy import (
+    ConsecutiveAbortTracker,
+    ErrorPolicy,
+    NoOpErrorPolicy,
+)
 from lightroom_tagger.core.exceptions import (
     RETRYABLE_ERRORS,
     ConnectionError,
+    InvalidRequestError,
     ModelUnavailableError,
     ProviderError,
+    RateLimitError,
 )
-from lightroom_tagger.core import cancel_scope
 from lightroom_tagger.core.provider_registry import ProviderRegistry
-from lightroom_tagger.core.error_policy import ErrorPolicy, NoOpErrorPolicy
 from lightroom_tagger.core.retry import CancelledRetryError, retry_with_backoff
 
 LogCallback = Callable[[str, str], None] | None
@@ -65,6 +71,7 @@ class FallbackDispatcher:
         model: str,
         log_callback: LogCallback = None,
         cancel_check: Callable[[], bool] | None = None,
+        abort_tracker: ConsecutiveAbortTracker | None = None,
     ) -> tuple[Any, str, str]:
         """Execute *fn_factory(client, model)* with retry and fallback.
 
@@ -94,13 +101,7 @@ class FallbackDispatcher:
             raise ProviderError("No available providers for operation")
         last_error: ProviderError | None = None
 
-        # Thread-local fallback keeps cancel working when handlers forget to
-        # pass ``cancel_check`` explicitly — matches the same behaviour in
-        # ``retry_with_backoff`` so both layers share one source of truth.
-        # Only opt in when a scope is actually installed so unit tests that
-        # don't install one keep their deterministic behaviour.
-        if cancel_check is None and cancel_scope.has_active_scope():
-            cancel_check = cancel_scope.is_cancelled
+        cancel_check = resolve_cancel_check(cancel_check)
 
         for index, (pid, mid) in enumerate(attempts):
             # Cancel between providers: without this, a cancel during the
@@ -109,6 +110,9 @@ class FallbackDispatcher:
             # worker checked in again.
             if cancel_check is not None and cancel_check():
                 raise CancelledRetryError("cancel requested before fallback attempt")
+
+            if abort_tracker is not None and abort_tracker.rate_limit_abort_reached:
+                raise RateLimitError("consecutive rate-limit abort threshold reached")
 
             client = self._registry.get_client(pid)
             retry_config = self._registry.get_retry_config(pid)
@@ -121,10 +125,16 @@ class FallbackDispatcher:
                     log_callback=log_callback,
                     cancel_check=cancel_check,
                 )
+                if abort_tracker is not None:
+                    abort_tracker.record_success()
                 return result, pid, mid
             except CancelledRetryError:
                 # Surface cancellation directly — do NOT fall through to
                 # the next provider. ``raise`` keeps the original frame.
+                raise
+            except InvalidRequestError as exc:
+                if abort_tracker is not None:
+                    abort_tracker.record_fatal()
                 raise
             except tuple(RETRYABLE_ERRORS) as exc:
                 last_error = exc  # type: ignore[assignment]
@@ -149,6 +159,8 @@ class FallbackDispatcher:
                 f"No models available for fallback provider(s): "
                 f"{', '.join(empty_fallbacks)}"
             )
+        if abort_tracker is not None and last_error is not None:
+            abort_tracker.record_dispatch_outcome(last_error)
         raise last_error  # type: ignore[misc]
 
     def _build_attempts(

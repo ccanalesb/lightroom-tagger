@@ -10,6 +10,7 @@ from lightroom_tagger.core.error_policy import (
 )
 from lightroom_tagger.core.exceptions import ContextLengthError, PayloadTooLargeError, RateLimitError
 from lightroom_tagger.core.matcher.vision_batch import _call_batch_chunk
+from lightroom_tagger.core.retry import CancelledRetryError
 
 
 def _mock_registry(available_providers=None):
@@ -176,3 +177,37 @@ class TestBatchVisionDispatcherFallback:
         # at index 0 instead of inheriting ollama's escalated index.
         assert tokens_by_provider["ollama"] == BATCH_MAX_TOKENS_ESCALATION
         assert tokens_by_provider["nvidia_nim"] == [BATCH_MAX_TOKENS_ESCALATION[0]]
+
+
+class TestBatchCancellation:
+    @patch("time.sleep")
+    def test_cancel_mid_backoff_short_circuits(self, mock_sleep):
+        registry = _mock_registry(["ollama"])
+        registry.get_retry_config.return_value = {
+            "max_retries": 2,
+            "backoff_seconds": [5],
+            "respect_retry_after": False,
+        }
+        flag = {"cancel": False}
+
+        def mock_batch(client, model, ref, cands, log_callback=None, max_tokens=4096):
+            flag["cancel"] = True
+            raise RateLimitError("429")
+
+        with patch(
+            "lightroom_tagger.core.vision_client.compare_images_batch",
+            side_effect=mock_batch,
+        ):
+            with pytest.raises(CancelledRetryError):
+                _call_batch_chunk(
+                    registry,
+                    "ollama",
+                    "gemma3:27b",
+                    "/tmp/ref.jpg",
+                    [(0, "/tmp/a.jpg")],
+                    None,
+                    "insta.jpg",
+                    1,
+                    1,
+                    cancel_check=lambda: flag["cancel"],
+                )

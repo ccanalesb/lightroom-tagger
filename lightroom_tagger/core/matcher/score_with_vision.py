@@ -26,13 +26,18 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     from lightroom_tagger.core import matcher as _matcher
 
     from lightroom_tagger.core.analyzer import compare_with_vision, vision_score
-    from lightroom_tagger.core.error_policy import ContextLengthEscalationPolicy, VisionBatchErrorPolicy
-    from lightroom_tagger.core.exceptions import InvalidRequestError, RateLimitError
+    from lightroom_tagger.core.cancel_scope import resolve_cancel_check
+    from lightroom_tagger.core.error_policy import (
+        ConsecutiveAbortTracker,
+        ContextLengthEscalationPolicy,
+        FATAL_ABORT_THRESHOLD,
+        VisionBatchErrorPolicy,
+    )
+    from lightroom_tagger.core.exceptions import RateLimitError
     from lightroom_tagger.core.path_utils import normalize_match_filesystem_path
     from lightroom_tagger.core.phash import hamming_distance
     from lightroom_tagger.core.provider_resolution import resolve_model
-
-    RATE_LIMIT_ABORT_THRESHOLD = 3
+    from lightroom_tagger.core.retry import CancelledRetryError
 
     r = resolve_model(kind="vision_comparison", provider_id=provider_id, model=model)
     resolved_provider = r.provider_id
@@ -43,9 +48,9 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
     results = []
     total_candidates = len(candidates)
-    consecutive_rate_limits = 0
-    rate_limited_count = 0
     insta_filename = _os.path.basename(insta_image.get('local_path', 'unknown'))
+    cancel_check = resolve_cancel_check(should_cancel)
+    abort_tracker = ConsecutiveAbortTracker()
 
     desc_scores_by_idx = _matcher._compute_desc_scores_for_candidates(
         insta_image, candidates, batch_size, desc_weight, skip_undescribed,
@@ -214,7 +219,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 requested_model = resolved_model
 
                 for chunk_start in range(0, len(batch_candidates), batch_size):
-                    if should_cancel is not None and should_cancel():
+                    if cancel_check is not None and cancel_check():
                         break
                     chunk = batch_candidates[chunk_start:chunk_start + batch_size]
                     chunk_num = chunk_start // batch_size + 1
@@ -223,11 +228,16 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                     if log_callback:
                         log_callback('debug', f'[{insta_filename}] Batch {chunk_num}/{num_chunks}: {current_chunk_size} candidates')
 
-                    chunk_results = _matcher._call_batch_chunk(
-                        registry, actual_provider_id, requested_model,
-                        compressed_insta, chunk, log_callback, insta_filename,
-                        chunk_num, num_chunks, error_policy=vision_batch_policy,
-                    )
+                    try:
+                        chunk_results = _matcher._call_batch_chunk(
+                            registry, actual_provider_id, requested_model,
+                            compressed_insta, chunk, log_callback, insta_filename,
+                            chunk_num, num_chunks, error_policy=vision_batch_policy,
+                            cancel_check=cancel_check,
+                            abort_tracker=abort_tracker,
+                        )
+                    except CancelledRetryError:
+                        break
                     _score_and_store(chunk_results)
                     if batch_progress_callback:
                         batch_progress_callback(chunk_num, num_chunks)
@@ -253,18 +263,16 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             if catalog_key not in scored_ids:
                 _score_and_store({idx: 0.0})
 
-    if should_cancel is not None and should_cancel():
+    if cancel_check is not None and cancel_check():
         return results
 
     if not use_batch:
         # Sequential fallback
-        consecutive_fatal = 0
-        FATAL_ABORT_THRESHOLD = 3
         for idx0, candidate in enumerate(candidates):
             idx = idx0 + 1
-            if should_cancel is not None and should_cancel():
+            if cancel_check is not None and cancel_check():
                 break
-            if consecutive_fatal >= FATAL_ABORT_THRESHOLD:
+            if abort_tracker.fatal_abort_reached:
                 if log_callback:
                     log_callback('warning', f'[{insta_filename}] Aborting remaining {len(candidates) - idx + 1} candidates after {FATAL_ABORT_THRESHOLD} consecutive fatal errors')
                 break
@@ -311,11 +319,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 vision_result = vision_cached['result']
                 vision_score_val = vision_cached['vision_score']
                 model_label = vision_cached.get('model_used', model_label)
-                consecutive_rate_limits = 0
-            elif consecutive_rate_limits >= RATE_LIMIT_ABORT_THRESHOLD:
-                vision_result = 'RATE_LIMITED'
-                vision_score_val = 0.0
-                rate_limited_count += 1
+                abort_tracker.record_success()
             elif vision_weight > 0 and insta_path and local_path:
                 try:
                     vision_data = compare_with_vision(
@@ -326,44 +330,42 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                         provider_id=provider_id,
                         model=model,
                         error_policy=vision_error_policy,
+                        cancel_check=cancel_check,
+                        abort_tracker=abort_tracker,
                     )
+                except CancelledRetryError:
+                    break
+                except Exception:
+                    if log_callback:
+                        log_callback('error', f'[{insta_filename}] Vision error for {catalog_key}')
+                    vision_result = 'ERROR'
+                    vision_score_val = 0.0
+                    vision_reasoning = ''
+                else:
                     vision_result = vision_data['verdict']
                     vision_score_val = vision_score(vision_data['confidence'])
                     vision_reasoning = (vision_data.get('reasoning') or '').strip()
-                    consecutive_rate_limits = 0
 
-                    if vision_data.get('_provider'):
-                        ap = vision_data['_provider']
-                        am = vision_data.get('_model')
-                        model_label = f"{ap}:{am}" if am is not None else f"{ap}:"
+                    if vision_result == 'RATE_LIMITED' and log_callback:
+                        log_callback(
+                            'warning',
+                            f'[{insta_filename}] Rate limited for {catalog_key} '
+                            f'({abort_tracker.consecutive_rate_limits} consecutive)',
+                        )
+                    elif vision_result == 'ERROR' and log_callback:
+                        log_callback('error', f'[{insta_filename}] Vision error for {catalog_key}')
 
-                    _matcher.store_vision_comparison(
-                        db, catalog_key, insta_key,
-                        vision_result, vision_score_val,
-                        model_label,
-                    )
-                except RateLimitError as e:
-                    consecutive_rate_limits += 1
-                    consecutive_fatal = 0
-                    rate_limited_count += 1
-                    if log_callback:
-                        log_callback('warning', f'[{insta_filename}] Rate limited for {catalog_key} ({consecutive_rate_limits} consecutive)')
-                    vision_result = 'RATE_LIMITED'
-                    vision_score_val = 0.0
-                except InvalidRequestError as e:
-                    consecutive_rate_limits = 0
-                    consecutive_fatal += 1
-                    if log_callback:
-                        log_callback('error', f'[{insta_filename}] Fatal vision error for {catalog_key}: {e}')
-                    vision_result = 'ERROR'
-                    vision_score_val = 0.0
-                except Exception as e:
-                    consecutive_rate_limits = 0
-                    consecutive_fatal = 0
-                    if log_callback:
-                        log_callback('error', f'[{insta_filename}] Vision error for {catalog_key}: {e}')
-                    vision_result = 'ERROR'
-                    vision_score_val = 0.0
+                    if vision_result not in ('RATE_LIMITED', 'ERROR'):
+                        if vision_data.get('_provider'):
+                            ap = vision_data['_provider']
+                            am = vision_data.get('_model')
+                            model_label = f"{ap}:{am}" if am is not None else f"{ap}:"
+
+                        _matcher.store_vision_comparison(
+                            db, catalog_key, insta_key,
+                            vision_result, vision_score_val,
+                            model_label,
+                        )
             else:
                 vision_result = 'UNCERTAIN'
                 vision_score_val = 0.5

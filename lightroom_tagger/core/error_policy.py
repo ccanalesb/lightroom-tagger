@@ -5,10 +5,80 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Protocol, runtime_checkable
 
-from lightroom_tagger.core.exceptions import ContextLengthError, PayloadTooLargeError
+from lightroom_tagger.core.exceptions import (
+    ContextLengthError,
+    InvalidRequestError,
+    PayloadTooLargeError,
+    RateLimitError,
+)
 
 MAX_TOKENS_ESCALATION = [256, 4096, 32768, 65536]
 BATCH_MAX_TOKENS_ESCALATION = [4096, 32768, 65536]
+
+RATE_LIMIT_ABORT_THRESHOLD = 3
+FATAL_ABORT_THRESHOLD = 3
+
+
+class ConsecutiveAbortTracker:
+    """Session-level consecutive rate-limit / fatal counters for vision scoring.
+
+    Owned by the dispatcher and consulted before each dispatch.  The scoring
+    loop reads ``fatal_abort_reached`` to stop orchestrating candidates; it
+    does not re-inspect ``RateLimitError`` / ``InvalidRequestError``.
+    """
+
+    def __init__(
+        self,
+        *,
+        rate_limit_threshold: int = RATE_LIMIT_ABORT_THRESHOLD,
+        fatal_threshold: int = FATAL_ABORT_THRESHOLD,
+    ) -> None:
+        self._rate_limit_threshold = rate_limit_threshold
+        self._fatal_threshold = fatal_threshold
+        self._consecutive_rate_limits = 0
+        self._consecutive_fatal = 0
+
+    @property
+    def consecutive_rate_limits(self) -> int:
+        return self._consecutive_rate_limits
+
+    @property
+    def consecutive_fatal(self) -> int:
+        return self._consecutive_fatal
+
+    @property
+    def rate_limit_abort_reached(self) -> bool:
+        return self._consecutive_rate_limits >= self._rate_limit_threshold
+
+    @property
+    def fatal_abort_reached(self) -> bool:
+        return self._consecutive_fatal >= self._fatal_threshold
+
+    def record_success(self) -> None:
+        self._consecutive_rate_limits = 0
+
+    def record_rate_limit(self) -> None:
+        self._consecutive_rate_limits += 1
+        self._consecutive_fatal = 0
+
+    def record_fatal(self) -> None:
+        self._consecutive_rate_limits = 0
+        self._consecutive_fatal += 1
+
+    def record_transient_error(self) -> None:
+        self._consecutive_rate_limits = 0
+        self._consecutive_fatal = 0
+
+    def record_dispatch_outcome(self, exc: Exception | None) -> None:
+        """Update counters after a dispatch completes (success or final failure)."""
+        if exc is None:
+            self.record_success()
+        elif isinstance(exc, RateLimitError):
+            self.record_rate_limit()
+        elif isinstance(exc, InvalidRequestError):
+            self.record_fatal()
+        else:
+            self.record_transient_error()
 
 
 class EscalationAction(Enum):

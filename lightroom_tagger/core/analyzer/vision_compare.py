@@ -5,9 +5,13 @@ from __future__ import annotations
 import contextlib
 import json as _json
 import os
+from collections.abc import Callable
 from typing import Any
 
-from lightroom_tagger.core.error_policy import ContextLengthEscalationPolicy
+from lightroom_tagger.core.error_policy import (
+    ConsecutiveAbortTracker,
+    ContextLengthEscalationPolicy,
+)
 from lightroom_tagger.core.exceptions import ContextLengthError
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.provider_resolution import resolve_model
@@ -18,7 +22,9 @@ from .image_prep import RAW_EXTENSIONS, VISION_MAX_DIMENSION, compress_image, ge
 def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
                         cached_local_path: str | None = None, compressed_insta_path: str | None = None,
                         provider_id: str | None = None, model: str | None = None,
-                        error_policy: ContextLengthEscalationPolicy | None = None) -> dict:
+                        error_policy: ContextLengthEscalationPolicy | None = None,
+                        cancel_check: Callable[[], bool] | None = None,
+                        abort_tracker: ConsecutiveAbortTracker | None = None) -> dict:
     f"""Compare two images using a vision model with compression.
 
     When *provider_id* / *model* are omitted, resolves via
@@ -96,6 +102,8 @@ def compare_with_vision(local_path: str, insta_path: str, log_callback=None,
             r.registry,
             log_callback,
             error_policy=policy,
+            cancel_check=cancel_check,
+            abort_tracker=abort_tracker,
         )
         return result
 
@@ -110,7 +118,9 @@ def _compare_via_provider(local_path: str, insta_path: str,
                           provider_id: str, model: str,
                           registry: ProviderRegistry,
                           log_callback=None,
-                          error_policy: ContextLengthEscalationPolicy | None = None) -> dict:
+                          error_policy: ContextLengthEscalationPolicy | None = None,
+                          cancel_check: Callable[[], bool] | None = None,
+                          abort_tracker: ConsecutiveAbortTracker | None = None) -> dict:
     """Run vision comparison via the unified provider pipeline.
 
     Escalates ``max_tokens`` automatically on ``ContextLengthError``
@@ -121,8 +131,12 @@ def _compare_via_provider(local_path: str, insta_path: str,
     Discovered minimums are cached on *error_policy* so later
     candidates skip the failing lower values.
     """
-    from lightroom_tagger.core.exceptions import InvalidRequestError
+    from lightroom_tagger.core.exceptions import (
+        InvalidRequestError,
+        RateLimitError,
+    )
     from lightroom_tagger.core.fallback import FallbackDispatcher
+    from lightroom_tagger.core.retry import CancelledRetryError
     from lightroom_tagger.core.vision_client import compare_images as _cmp
 
     policy = error_policy if error_policy is not None else ContextLengthEscalationPolicy()
@@ -158,13 +172,27 @@ def _compare_via_provider(local_path: str, insta_path: str,
 
         return _call
 
-    result, actual_provider, actual_model = dispatcher.call_with_fallback(
-        operation="compare",
-        fn_factory=fn_factory,
-        provider_id=provider_id,
-        model=model,
-        log_callback=log_callback,
-    )
+    try:
+        result, actual_provider, actual_model = dispatcher.call_with_fallback(
+            operation="compare",
+            fn_factory=fn_factory,
+            provider_id=provider_id,
+            model=model,
+            log_callback=log_callback,
+            cancel_check=cancel_check,
+            abort_tracker=abort_tracker,
+        )
+    except RateLimitError:
+        return {'confidence': 0, 'verdict': 'RATE_LIMITED', 'reasoning': ''}
+    except InvalidRequestError:
+        return {'confidence': 0, 'verdict': 'ERROR', 'reasoning': ''}
+    except CancelledRetryError:
+        raise
+    except Exception:
+        if abort_tracker is not None:
+            abort_tracker.record_transient_error()
+        return {'confidence': 0, 'verdict': 'ERROR', 'reasoning': ''}
+
     result["_provider"] = actual_provider
     result["_model"] = actual_model
     return result
