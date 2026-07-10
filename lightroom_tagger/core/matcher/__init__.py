@@ -7,6 +7,7 @@ from lightroom_tagger.core.database import (
     store_match,
     store_vision_comparison,
 )
+from lightroom_tagger.core.error_policy import BATCH_MAX_TOKENS_ESCALATION
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.vision_cache import (
     InstagramCache,
@@ -20,7 +21,7 @@ from .description_batch import _compute_desc_scores_for_candidates
 from .matching import match_batch, match_image
 from .score_with_vision import score_candidates_with_vision
 from .text_scores import score_candidates, text_similarity
-from .vision_batch import BATCH_MAX_TOKENS_ESCALATION, _call_batch_chunk
+from .vision_batch import _call_batch_chunk
 
 __all__ = [
     "BATCH_MAX_TOKENS_ESCALATION",
