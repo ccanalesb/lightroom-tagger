@@ -157,3 +157,31 @@ def test_guardrail_allowlists_vision_client_wrappers() -> None:
 def test_guardrail_scans_nl_catalog_search() -> None:
     assert "lightroom_tagger/core/nl_catalog_search.py" in _iter_scanned_source_files()
     assert not _scan_file("lightroom_tagger/core/nl_catalog_search.py")
+
+
+def _scan_source(source: str, rel_path: str = "fake/module.py") -> list[_RawProviderCallHit]:
+    visitor = _ProviderCallVisitor(rel_path)
+    visitor.visit(ast.parse(source))
+    return visitor.hits
+
+
+def test_detector_flags_raw_completion_call() -> None:
+    """A guardrail that never detects a leak is worthless: prove it catches one."""
+    hits = _scan_source(
+        "def orchestrate(client, model):\n"
+        "    return client.chat.completions.create(model=model, messages=[])\n"
+    )
+    assert len(hits) == 1
+    assert hits[0].function == "orchestrate"
+    assert hits[0].chain.endswith("chat.completions.create")
+
+
+def test_detector_flags_embeddings_and_images_calls() -> None:
+    assert _scan_source("def f(c):\n    return c.embeddings.create(input='x')\n")
+    assert _scan_source("def f(c):\n    return c.images.generate(prompt='x')\n")
+
+
+def test_detector_ignores_non_chat_completions_attr() -> None:
+    """`completions.create` must be gated on the `chat` prefix to avoid false positives."""
+    assert not _scan_source("def f(c):\n    return c.legacy.completions.create()\n")
+    assert not _scan_source("def f(o):\n    return o.save.create(x=1)\n")
