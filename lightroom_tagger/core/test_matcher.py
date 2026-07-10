@@ -17,13 +17,27 @@ def _fake_registry(
     registry = MagicMock(spec=ProviderRegistry)
     registry.defaults = defaults or {}
     registry.fallback_order = fallback_order or ["ollama"]
-    models_by_provider = models_by_provider or {}
+    fallback_order = fallback_order or ["ollama"]
+    if models_by_provider is None:
+        models_by_provider = {
+            pid: [{"id": "test-model", "vision": True, "source": "config"}]
+            for pid in fallback_order
+        }
 
     def list_models(provider_id: str) -> list[dict]:
         return models_by_provider.get(provider_id, [])
 
     registry.list_models.side_effect = list_models
     registry.get_client.return_value = Mock()
+    registry.list_providers.return_value = [
+        {"id": pid, "name": pid, "available": True}
+        for pid in fallback_order
+    ]
+    registry.get_retry_config.return_value = {
+        "max_retries": 0,
+        "backoff_seconds": [],
+        "respect_retry_after": False,
+    }
     return registry
 
 
@@ -33,7 +47,12 @@ def _matcher_resolve_patch(
     model: str = "gemma3:27b",
     registry: MagicMock | None = None,
 ):
-    registry = registry or _fake_registry(fallback_order=[provider_id])
+    registry = registry or _fake_registry(
+        fallback_order=[provider_id],
+        models_by_provider={
+            provider_id: [{"id": model, "vision": True, "source": "config"}],
+        },
+    )
     return patch(
         "lightroom_tagger.core.provider_resolution.resolve_model",
         return_value=ResolvedModel(provider_id, model, registry),
@@ -274,7 +293,8 @@ def test_batch_skips_oversized_cache_misses_with_zero_vision():
         return {cid: 50.0 for cid, _ in cands}
 
     def mock_chunk(
-        client,
+        registry,
+        provider_id,
         model,
         reference_path,
         chunk,
@@ -282,7 +302,7 @@ def test_batch_skips_oversized_cache_misses_with_zero_vision():
         insta_filename,
         chunk_num,
         num_chunks,
-        max_tokens_idx=0,
+        error_policy=None,
     ):
         batches_seen.append(list(chunk))
         return {cid: 50.0 for cid, _ in chunk}

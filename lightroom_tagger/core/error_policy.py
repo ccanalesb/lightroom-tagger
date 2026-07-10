@@ -5,9 +5,10 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Protocol, runtime_checkable
 
-from lightroom_tagger.core.exceptions import ContextLengthError
+from lightroom_tagger.core.exceptions import ContextLengthError, PayloadTooLargeError
 
 MAX_TOKENS_ESCALATION = [256, 4096, 32768, 65536]
+BATCH_MAX_TOKENS_ESCALATION = [4096, 32768, 65536]
 
 
 class EscalationAction(Enum):
@@ -15,6 +16,7 @@ class EscalationAction(Enum):
 
     RETRY = "retry"
     GIVE_UP = "give_up"
+    SPLIT = "split"
 
 
 @runtime_checkable
@@ -120,3 +122,76 @@ class ContextLengthEscalationPolicy:
             f"for {model}, blacklisting for session"
         )
         return EscalationAction.GIVE_UP
+
+
+class VisionBatchErrorPolicy:
+    """Batch vision: context-length ladder plus payload split on 413."""
+
+    def __init__(
+        self,
+        token_ladder: list[int] | None = None,
+        token_policy: ContextLengthEscalationPolicy | None = None,
+    ) -> None:
+        ladder = token_ladder if token_ladder is not None else BATCH_MAX_TOKENS_ESCALATION
+        self._token_policy = (
+            token_policy
+            if token_policy is not None
+            else ContextLengthEscalationPolicy(ladder=ladder)
+        )
+
+    @property
+    def ladder(self) -> list[int]:
+        return self._token_policy.ladder
+
+    @property
+    def model_min_tokens(self) -> dict[str, int]:
+        return self._token_policy.model_min_tokens
+
+    @property
+    def broken_provider_models(self) -> set[str]:
+        return self._token_policy.broken_provider_models
+
+    def provider_key(self, provider_id: str, model: str) -> str:
+        return self._token_policy.provider_key(provider_id, model)
+
+    def is_broken(self, provider_id: str, model: str) -> bool:
+        return self._token_policy.is_broken(provider_id, model)
+
+    def starting_index(self, provider_id: str, model: str) -> int:
+        return self._token_policy.starting_index(provider_id, model)
+
+    def max_tokens_at(self, index: int) -> int:
+        return self._token_policy.max_tokens_at(index)
+
+    def on_escalation_error(
+        self,
+        exc: Exception,
+        *,
+        provider_id: str,
+        model: str,
+        operation: str,
+        call_state: dict[str, Any],
+    ) -> EscalationAction:
+        if isinstance(exc, PayloadTooLargeError):
+            candidates = call_state.get("candidates") or []
+            if len(candidates) <= 1:
+                call_state["_log_message"] = (
+                    f"[{operation}] single-item chunk still too large, skipping"
+                )
+                return EscalationAction.GIVE_UP
+
+            half = len(candidates) // 2
+            call_state["_split_halves"] = (candidates[:half], candidates[half:])
+            call_state["_log_message"] = (
+                f"[{operation}] payload too large, splitting "
+                f"{len(candidates)} -> {half}+{len(candidates) - half}"
+            )
+            return EscalationAction.SPLIT
+
+        return self._token_policy.on_escalation_error(
+            exc,
+            provider_id=provider_id,
+            model=model,
+            operation=operation,
+            call_state=call_state,
+        )

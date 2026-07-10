@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
-BATCH_MAX_TOKENS_ESCALATION = [4096, 32768, 65536]
+from lightroom_tagger.core.error_policy import (
+    BATCH_MAX_TOKENS_ESCALATION,
+    EscalationAction,
+    VisionBatchErrorPolicy,
+)
+from lightroom_tagger.core.provider_registry import ProviderRegistry
 
 
 def _build_compressed_batch_entries(
@@ -49,7 +55,8 @@ def _build_compressed_batch_entries(
 
 
 def _call_batch_chunk(
-    client,
+    registry: ProviderRegistry,
+    provider_id: str,
     model: str,
     reference_path: str,
     chunk: list[tuple[int, str]],
@@ -57,45 +64,106 @@ def _call_batch_chunk(
     insta_filename: str,
     chunk_num: int,
     num_chunks: int,
-    max_tokens_idx: int = 0,
+    error_policy: VisionBatchErrorPolicy | None = None,
 ) -> dict[int, float]:
-    """Call compare_images_batch for a single chunk with adaptive recovery.
+    """Call compare_images_batch for a single chunk via FallbackDispatcher.
 
-    - On PayloadTooLargeError: halve the chunk and retry both halves.
-    - On ContextLengthError: escalate max_tokens and retry the same chunk.
-      If all escalation levels are exhausted, re-raise so the caller can
-      fall back to sequential processing.
-    """
-    from lightroom_tagger.core.exceptions import ContextLengthError, PayloadTooLargeError
+    Payload split and max_tokens escalation are driven by
+    :class:`~lightroom_tagger.core.error_policy.VisionBatchErrorPolicy`.
+  """
+    from lightroom_tagger.core.exceptions import ContextLengthError, InvalidRequestError, PayloadTooLargeError
+    from lightroom_tagger.core.fallback import FallbackDispatcher
     from lightroom_tagger.core.vision_client import compare_images_batch
 
-    current_tokens = BATCH_MAX_TOKENS_ESCALATION[max_tokens_idx]
+    policy = error_policy if error_policy is not None else VisionBatchErrorPolicy()
+    dispatcher = FallbackDispatcher(registry, error_policy=policy)
 
-    try:
-        return compare_images_batch(
-            client, model, reference_path, chunk,
-            log_callback=log_callback, max_tokens=current_tokens,
-        )
-    except PayloadTooLargeError:
-        if len(chunk) <= 1:
-            if log_callback:
-                log_callback('warning', f'[{insta_filename}] Batch {chunk_num}/{num_chunks}: single-item chunk still too large, skipping')
-            return {}
-        half = len(chunk) // 2
-        if log_callback:
-            log_callback('warning', f'[{insta_filename}] Batch {chunk_num}/{num_chunks}: 413 payload too large, splitting {len(chunk)} -> {half}+{len(chunk)-half}')
-        left = _call_batch_chunk(client, model, reference_path, chunk[:half], log_callback, insta_filename, chunk_num, num_chunks, max_tokens_idx)
-        right = _call_batch_chunk(client, model, reference_path, chunk[half:], log_callback, insta_filename, chunk_num, num_chunks, max_tokens_idx)
-        left.update(right)
-        return left
-    except ContextLengthError:
-        if max_tokens_idx < len(BATCH_MAX_TOKENS_ESCALATION) - 1:
-            next_idx = max_tokens_idx + 1
-            next_tokens = BATCH_MAX_TOKENS_ESCALATION[next_idx]
-            if log_callback:
-                log_callback('warning', f'[{insta_filename}] Batch {chunk_num}/{num_chunks}: escalating max_tokens {current_tokens} -> {next_tokens}')
-            return _call_batch_chunk(client, model, reference_path, chunk, log_callback, insta_filename, chunk_num, num_chunks, next_idx)
-        raise
+    call_state: dict[str, Any] = {
+        "candidates": chunk,
+        "token_index": policy.starting_index(provider_id, model),
+    }
+
+    def fn_factory(client, mdl):
+        attempt_provider = getattr(client, "_provider_id", None) or provider_id
+
+        def _call():
+            if policy.is_broken(attempt_provider, mdl):
+                raise InvalidRequestError(
+                    f"{mdl} is broken (max_tokens exhausted in prior call)",
+                    provider=attempt_provider,
+                    model=mdl,
+                )
+
+            tokens = policy.max_tokens_at(call_state["token_index"])
+            try:
+                return compare_images_batch(
+                    client,
+                    mdl,
+                    reference_path,
+                    call_state["candidates"],
+                    log_callback=log_callback,
+                    max_tokens=tokens,
+                )
+            except (ContextLengthError, PayloadTooLargeError) as exc:
+                action = policy.on_escalation_error(
+                    exc,
+                    provider_id=attempt_provider,
+                    model=mdl,
+                    operation="compare_batch",
+                    call_state=call_state,
+                )
+                if log_callback and call_state.get("_log_message"):
+                    prefix = f"[{insta_filename}] Batch {chunk_num}/{num_chunks}: "
+                    log_callback("warning", prefix + call_state["_log_message"])
+
+                if isinstance(exc, PayloadTooLargeError):
+                    if action == EscalationAction.SPLIT:
+                        left_half, right_half = call_state["_split_halves"]
+                        left = _call_batch_chunk(
+                            registry,
+                            attempt_provider,
+                            mdl,
+                            reference_path,
+                            left_half,
+                            log_callback,
+                            insta_filename,
+                            chunk_num,
+                            num_chunks,
+                            error_policy=policy,
+                        )
+                        right = _call_batch_chunk(
+                            registry,
+                            attempt_provider,
+                            mdl,
+                            reference_path,
+                            right_half,
+                            log_callback,
+                            insta_filename,
+                            chunk_num,
+                            num_chunks,
+                            error_policy=policy,
+                        )
+                        left.update(right)
+                        return left
+                    if action == EscalationAction.GIVE_UP:
+                        return {}
+
+                if action == EscalationAction.GIVE_UP:
+                    raise
+                if action == EscalationAction.RETRY:
+                    return _call()
+                raise
+
+        return _call
+
+    result, _, _ = dispatcher.call_with_fallback(
+        operation="compare_batch",
+        fn_factory=fn_factory,
+        provider_id=provider_id,
+        model=model,
+        log_callback=log_callback,
+    )
+    return result
 
 
 def _log_comparison_tail(

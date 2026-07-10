@@ -3,12 +3,14 @@
 import pytest
 
 from lightroom_tagger.core.error_policy import (
+    BATCH_MAX_TOKENS_ESCALATION,
     MAX_TOKENS_ESCALATION,
     ContextLengthEscalationPolicy,
     EscalationAction,
     NoOpErrorPolicy,
+    VisionBatchErrorPolicy,
 )
-from lightroom_tagger.core.exceptions import ContextLengthError, RateLimitError
+from lightroom_tagger.core.exceptions import ContextLengthError, PayloadTooLargeError, RateLimitError
 
 
 class TestNoOpErrorPolicy:
@@ -148,3 +150,50 @@ class TestContextLengthEscalationPolicy:
         assert policy.is_broken(provider_id, model)
         key = policy.provider_key(provider_id, model)
         assert policy.model_min_tokens[key] == MAX_TOKENS_ESCALATION[-1]
+
+
+class TestVisionBatchErrorPolicy:
+    def test_should_split_payload_too_large_chunk(self):
+        policy = VisionBatchErrorPolicy()
+        state = {"candidates": [(0, "/a"), (1, "/b"), (2, "/c"), (3, "/d")]}
+
+        action = policy.on_escalation_error(
+            PayloadTooLargeError("413"),
+            provider_id="ollama",
+            model="gemma",
+            operation="compare_batch",
+            call_state=state,
+        )
+
+        assert action == EscalationAction.SPLIT
+        assert state["_split_halves"] == ([(0, "/a"), (1, "/b")], [(2, "/c"), (3, "/d")])
+
+    def test_should_give_up_on_single_item_payload_too_large(self):
+        policy = VisionBatchErrorPolicy()
+        state = {"candidates": [(0, "/a")]}
+
+        action = policy.on_escalation_error(
+            PayloadTooLargeError("413"),
+            provider_id="ollama",
+            model="gemma",
+            operation="compare_batch",
+            call_state=state,
+        )
+
+        assert action == EscalationAction.GIVE_UP
+
+    def test_should_delegate_context_length_to_token_policy(self):
+        policy = VisionBatchErrorPolicy()
+        state = {"token_index": 0, "candidates": [(0, "/a")]}
+
+        action = policy.on_escalation_error(
+            ContextLengthError("budget"),
+            provider_id="ollama",
+            model="gemma",
+            operation="compare_batch",
+            call_state=state,
+        )
+
+        assert action == EscalationAction.RETRY
+        assert state["token_index"] == 1
+        assert policy.max_tokens_at(state["token_index"]) == BATCH_MAX_TOKENS_ESCALATION[1]
