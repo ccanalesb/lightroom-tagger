@@ -6,13 +6,11 @@ import contextlib
 import json as _json
 import os
 from collections.abc import Callable
-from typing import Any
 
 from lightroom_tagger.core.error_policy import (
     ConsecutiveAbortTracker,
     ContextLengthEscalationPolicy,
 )
-from lightroom_tagger.core.exceptions import ContextLengthError
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.provider_resolution import resolve_model
 
@@ -121,81 +119,17 @@ def _compare_via_provider(local_path: str, insta_path: str,
                           error_policy: ContextLengthEscalationPolicy | None = None,
                           cancel_check: Callable[[], bool] | None = None,
                           abort_tracker: ConsecutiveAbortTracker | None = None) -> dict:
-    """Run vision comparison via the unified provider pipeline.
+    """Run vision comparison via :class:`~lightroom_tagger.core.vision_comparator.VisionComparator`."""
+    from lightroom_tagger.core.vision_comparator import VisionComparator
 
-    Escalates ``max_tokens`` automatically on ``ContextLengthError``
-    (e.g. Claude extended-thinking models that require ``max_tokens >
-    thinking.budget_tokens``).  Models that succeed at 256 are never
-    affected — escalation only triggers after failure.
-
-    Discovered minimums are cached on *error_policy* so later
-    candidates skip the failing lower values.
-    """
-    from lightroom_tagger.core.exceptions import (
-        InvalidRequestError,
-        RateLimitError,
+    comparator = VisionComparator(
+        registry,
+        log_callback=log_callback,
+        cancel_check=cancel_check,
+        abort_tracker=abort_tracker,
+        sequential_policy=error_policy,
     )
-    from lightroom_tagger.core.fallback import FallbackDispatcher
-    from lightroom_tagger.core.retry import CancelledRetryError
-    from lightroom_tagger.core.vision_client import compare_images as _cmp
-
-    policy = error_policy if error_policy is not None else ContextLengthEscalationPolicy()
-    dispatcher = FallbackDispatcher(registry, error_policy=policy)
-
-    def fn_factory(client: Any, mdl: str):
-        if policy.is_broken(provider_id, mdl):
-            def _skip():
-                raise InvalidRequestError(
-                    f"{mdl} is broken (max_tokens exhausted in prior call)",
-                    provider=provider_id, model=mdl,
-                )
-            return _skip
-
-        state: dict[str, Any] = {"token_index": policy.starting_index(provider_id, mdl)}
-
-        def _call():
-            tokens = policy.max_tokens_at(state["token_index"])
-            try:
-                return _cmp(client, mdl, local_path, insta_path,
-                            log_callback=log_callback, max_tokens=tokens)
-            except ContextLengthError as exc:
-                policy.on_escalation_error(
-                    exc,
-                    provider_id=provider_id,
-                    model=mdl,
-                    operation="compare",
-                    call_state=state,
-                )
-                if log_callback and state.get("_log_message"):
-                    log_callback("warning", state["_log_message"])
-                raise
-
-        return _call
-
-    try:
-        result, actual_provider, actual_model = dispatcher.call_with_fallback(
-            operation="compare",
-            fn_factory=fn_factory,
-            provider_id=provider_id,
-            model=model,
-            log_callback=log_callback,
-            cancel_check=cancel_check,
-            abort_tracker=abort_tracker,
-        )
-    except RateLimitError:
-        return {'confidence': 0, 'verdict': 'RATE_LIMITED', 'reasoning': ''}
-    except InvalidRequestError:
-        return {'confidence': 0, 'verdict': 'ERROR', 'reasoning': ''}
-    except CancelledRetryError:
-        raise
-    except Exception:
-        if abort_tracker is not None:
-            abort_tracker.record_transient_error()
-        return {'confidence': 0, 'verdict': 'ERROR', 'reasoning': ''}
-
-    result["_provider"] = actual_provider
-    result["_model"] = actual_model
-    return result
+    return comparator.compare_pair(local_path, insta_path, provider_id, model)
 
 
 def parse_vision_response(raw: str) -> dict:

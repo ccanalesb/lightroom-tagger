@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
 
 from lightroom_tagger.core.error_policy import (
     ConsecutiveAbortTracker,
-    EscalationAction,
     VisionBatchErrorPolicy,
 )
 from lightroom_tagger.core.provider_registry import ProviderRegistry
@@ -68,117 +66,25 @@ def _call_batch_chunk(
     cancel_check: Callable[[], bool] | None = None,
     abort_tracker: ConsecutiveAbortTracker | None = None,
 ) -> dict[int, float]:
-    """Call compare_images_batch for a single chunk via FallbackDispatcher.
+    """Call compare_images_batch for a single chunk via :class:`VisionComparator`."""
+    from lightroom_tagger.core.vision_comparator import VisionComparator
 
-    Payload split and max_tokens escalation are driven by
-    :class:`~lightroom_tagger.core.error_policy.VisionBatchErrorPolicy`.
-    """
-    from lightroom_tagger.core.exceptions import (
-        ContextLengthError,
-        InvalidRequestError,
-        PayloadTooLargeError,
-    )
-    from lightroom_tagger.core.fallback import FallbackDispatcher
-    from lightroom_tagger.core.vision_client import compare_images_batch
-
-    policy = error_policy if error_policy is not None else VisionBatchErrorPolicy()
-    dispatcher = FallbackDispatcher(registry, error_policy=policy)
-
-    def fn_factory(client, mdl):
-        attempt_provider = getattr(client, "_provider_id", None) or provider_id
-        # Per-attempt state: each provider/model starts at its own escalation
-        # index (matches the single-compare path in analyzer/vision_compare.py)
-        # so a fallback provider is not seeded with the primary's escalated
-        # token index.
-        call_state: dict[str, Any] = {
-            "candidates": chunk,
-            "token_index": policy.starting_index(attempt_provider, mdl),
-        }
-
-        def _call():
-            if policy.is_broken(attempt_provider, mdl):
-                raise InvalidRequestError(
-                    f"{mdl} is broken (max_tokens exhausted in prior call)",
-                    provider=attempt_provider,
-                    model=mdl,
-                )
-
-            tokens = policy.max_tokens_at(call_state["token_index"])
-            try:
-                return compare_images_batch(
-                    client,
-                    mdl,
-                    reference_path,
-                    call_state["candidates"],
-                    log_callback=log_callback,
-                    max_tokens=tokens,
-                )
-            except (ContextLengthError, PayloadTooLargeError) as exc:
-                action = policy.on_escalation_error(
-                    exc,
-                    provider_id=attempt_provider,
-                    model=mdl,
-                    operation="compare_batch",
-                    call_state=call_state,
-                )
-                if log_callback and call_state.get("_log_message"):
-                    prefix = f"[{insta_filename}] Batch {chunk_num}/{num_chunks}: "
-                    log_callback("warning", prefix + call_state["_log_message"])
-
-                if isinstance(exc, PayloadTooLargeError):
-                    if action == EscalationAction.SPLIT:
-                        left_half, right_half = call_state["_split_halves"]
-                        left = _call_batch_chunk(
-                            registry,
-                            attempt_provider,
-                            mdl,
-                            reference_path,
-                            left_half,
-                            log_callback,
-                            insta_filename,
-                            chunk_num,
-                            num_chunks,
-                            error_policy=policy,
-                            cancel_check=cancel_check,
-                            abort_tracker=abort_tracker,
-                        )
-                        right = _call_batch_chunk(
-                            registry,
-                            attempt_provider,
-                            mdl,
-                            reference_path,
-                            right_half,
-                            log_callback,
-                            insta_filename,
-                            chunk_num,
-                            num_chunks,
-                            error_policy=policy,
-                            cancel_check=cancel_check,
-                            abort_tracker=abort_tracker,
-                        )
-                        left.update(right)
-                        return left
-                    if action == EscalationAction.GIVE_UP:
-                        return {}
-
-                if action == EscalationAction.GIVE_UP:
-                    raise
-                if action == EscalationAction.RETRY:
-                    return _call()
-                raise
-
-        return _call
-
-    result, _, _ = dispatcher.call_with_fallback(
-        operation="compare_batch",
-        fn_factory=fn_factory,
-        provider_id=provider_id,
-        model=model,
+    comparator = VisionComparator(
+        registry,
         log_callback=log_callback,
         cancel_check=cancel_check,
         abort_tracker=abort_tracker,
+        batch_policy=error_policy,
     )
-    return result
+    return comparator.compare_batch(
+        reference_path,
+        chunk,
+        provider_id,
+        model,
+        insta_filename=insta_filename,
+        chunk_num=chunk_num,
+        num_chunks=num_chunks,
+    )
 
 
 def _log_comparison_tail(

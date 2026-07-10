@@ -2,7 +2,6 @@ import importlib
 import json
 import os
 import tempfile
-from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 from lightroom_tagger.core.analyzer import (
@@ -13,58 +12,11 @@ from lightroom_tagger.core.analyzer import (
 )
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.provider_resolution import ResolvedModel, resolve_model
-
-
-def _fake_registry(
-    *,
-    defaults: dict | None = None,
-    fallback_order: list[str] | None = None,
-) -> MagicMock:
-    registry = MagicMock(spec=ProviderRegistry)
-    registry.defaults = defaults or {}
-    registry.fallback_order = fallback_order or []
-    return registry
-
-
-def _vision_compare_patches(
-    *,
-    mock_registry: MagicMock,
-    mock_dispatcher: MagicMock,
-    provider_id: str = "ollama",
-    model: str = "vision-model",
-    compare_result: dict | None = None,
-    patch_compression: bool = True,
-):
-    """Patch resolve_model + dispatcher for vision_compare integration tests."""
-    if compare_result is None:
-        compare_result = {"confidence": 90, "verdict": "SAME", "reasoning": "test"}
-    mock_dispatcher.call_with_fallback.return_value = (
-        compare_result,
-        provider_id,
-        model,
-    )
-    patches = [
-        patch(
-            "lightroom_tagger.core.analyzer.vision_compare.resolve_model",
-            return_value=ResolvedModel(provider_id, model, mock_registry),
-        ),
-        patch(
-            "lightroom_tagger.core.fallback.FallbackDispatcher",
-            return_value=mock_dispatcher,
-        ),
-        patch(
-            "lightroom_tagger.core.analyzer.vision_compare.get_viewable_path_managed",
-            side_effect=lambda x: (x, False),
-        ),
-    ]
-    if patch_compression:
-        patches.append(
-            patch(
-                "lightroom_tagger.core.analyzer.vision_compare.compress_image",
-                side_effect=lambda x: x,
-            ),
-        )
-    return tuple(patches)
+from lightroom_tagger.core.test_vision_helpers import (
+    fake_compare_client,
+    fake_vision_registry,
+    vision_compare_test_context,
+)
 
 
 def test_composed_catalog_analysis_returns_all_signals():
@@ -130,17 +82,7 @@ def test_describe_image_external_skips_provider_pipeline():
 
 def test_compare_with_vision_returns_result():
     """Vision comparison should return dict with verdict and confidence."""
-    registry = _fake_registry(
-        defaults={"vision_comparison": {"provider": "ollama", "model": "vision-model"}},
-        fallback_order=["ollama"],
-    )
-    mock_dispatcher = MagicMock()
-    with ExitStack() as stack:
-        for p in _vision_compare_patches(
-            mock_registry=registry,
-            mock_dispatcher=mock_dispatcher,
-        ):
-            stack.enter_context(p)
+    with vision_compare_test_context() as (_registry, _client):
         result = compare_with_vision('/tmp/local.jpg', '/tmp/insta.jpg')
 
     assert result['verdict'] in ['SAME', 'DIFFERENT', 'UNCERTAIN']
@@ -213,18 +155,9 @@ def test_parse_vision_response_fallback():
 
 def test_compare_with_vision_returns_dict():
     """Vision comparison returns dict with confidence and verdict."""
-    registry = _fake_registry(
-        defaults={"vision_comparison": {"provider": "ollama", "model": "vision-model"}},
-        fallback_order=["ollama"],
-    )
-    mock_dispatcher = MagicMock()
-    with ExitStack() as stack:
-        for p in _vision_compare_patches(
-            mock_registry=registry,
-            mock_dispatcher=mock_dispatcher,
-            compare_result={"confidence": 85, "verdict": "SAME"},
-        ):
-            stack.enter_context(p)
+    with vision_compare_test_context(
+        compare_result={"confidence": 85, "verdict": "SAME"},
+    ) as (_registry, _client):
         result = compare_with_vision('/tmp/local.jpg', '/tmp/insta.jpg')
 
     assert isinstance(result, dict)
@@ -370,24 +303,21 @@ def test_compare_with_vision_uses_compression():
             compressed_paths.append(result)
             return result
 
-        registry = _fake_registry(
-            defaults={"vision_comparison": {"provider": "ollama", "model": "vision-model"}},
-            fallback_order=["ollama"],
+        registry = fake_vision_registry(
+            fake_compare_client(provider_id="ollama"),
+            provider_id="ollama",
+            model="vision-model",
         )
-        mock_dispatcher = MagicMock()
-        with ExitStack() as stack:
-            stack.enter_context(
-                patch(
-                    'lightroom_tagger.core.analyzer.vision_compare.compress_image',
-                    side_effect=track_compress,
-                ),
-            )
-            for p in _vision_compare_patches(
-                mock_registry=registry,
-                mock_dispatcher=mock_dispatcher,
+        with (
+            patch(
+                'lightroom_tagger.core.analyzer.vision_compare.compress_image',
+                side_effect=track_compress,
+            ),
+            vision_compare_test_context(
+                registry=registry,
                 patch_compression=False,
-            ):
-                stack.enter_context(p)
+            ),
+        ):
             result = compare_with_vision(local_path, insta_path)
 
         # Should have compressed both images
@@ -403,17 +333,7 @@ def test_compare_with_vision_uses_compression():
 
 def test_compare_with_vision_cleans_up_temp_files():
     """Vision comparison should clean up all temporary files."""
-    registry = _fake_registry(
-        defaults={"vision_comparison": {"provider": "ollama", "model": "vision-model"}},
-        fallback_order=["ollama"],
-    )
-    mock_dispatcher = MagicMock()
-    with ExitStack() as stack:
-        for p in _vision_compare_patches(
-            mock_registry=registry,
-            mock_dispatcher=mock_dispatcher,
-        ):
-            stack.enter_context(p)
+    with vision_compare_test_context() as (_registry, _client):
         result = compare_with_vision('/tmp/local.jpg', '/tmp/insta.jpg')
 
     assert result['verdict'] == 'SAME'
@@ -423,16 +343,21 @@ def test_compare_with_vision_honors_vision_model_env(monkeypatch):
     """Vision comparison must use resolve_model so VISION_MODEL env is honoured."""
     monkeypatch.setenv("VISION_MODEL", "env-vision-model")
 
-    registry = _fake_registry(
-        defaults={"vision_comparison": {"provider": "ollama", "model": "json-default"}},
-        fallback_order=["ollama"],
+    registry = MagicMock(spec=ProviderRegistry)
+    registry.defaults = {"vision_comparison": {"provider": "ollama", "model": "json-default"}}
+    registry.fallback_order = ["ollama"]
+    registry.list_providers.return_value = [{"id": "ollama", "name": "ollama", "available": True}]
+    registry.list_models.return_value = [{"id": "env-vision-model", "vision": True, "source": "config"}]
+    registry.get_retry_config.return_value = {
+        "max_retries": 0,
+        "backoff_seconds": [],
+        "respect_retry_after": False,
+    }
+    client = fake_compare_client(
+        provider_id="ollama",
+        compare_result={"confidence": 80, "verdict": "SAME", "reasoning": "ok"},
     )
-    mock_dispatcher = MagicMock()
-    mock_dispatcher.call_with_fallback.return_value = (
-        {"confidence": 80, "verdict": "SAME", "reasoning": "ok"},
-        "ollama",
-        "env-vision-model",
-    )
+    registry.get_client.return_value = client
 
     with (
         patch(
@@ -444,10 +369,6 @@ def test_compare_with_vision_honors_vision_model_env(monkeypatch):
             wraps=resolve_model,
         ),
         patch(
-            "lightroom_tagger.core.fallback.FallbackDispatcher",
-            return_value=mock_dispatcher,
-        ),
-        patch(
             "lightroom_tagger.core.analyzer.vision_compare.compress_image",
             side_effect=lambda p: p,
         ),
@@ -455,6 +376,8 @@ def test_compare_with_vision_honors_vision_model_env(monkeypatch):
             "lightroom_tagger.core.analyzer.vision_compare.get_viewable_path_managed",
             side_effect=lambda p: (p, False),
         ),
+        patch("os.path.exists", return_value=True),
+        patch("lightroom_tagger.core.vision_client._encode_image", return_value="abc"),
     ):
         result = compare_with_vision(
             "/tmp/local.jpg",
@@ -464,7 +387,7 @@ def test_compare_with_vision_honors_vision_model_env(monkeypatch):
         )
 
     assert result["verdict"] == "SAME"
-    assert mock_dispatcher.call_with_fallback.call_args.kwargs["model"] == "env-vision-model"
+    assert result["_model"] == "env-vision-model"
 
 
 def test_vision_config_environment_variables():
@@ -661,42 +584,39 @@ def test_get_description_model_falls_back_to_vision_model_env():
 def test_cancel_mid_backoff_short_circuits_sequential_compare(mock_sleep):
     """Sequential compare path honours cancel during retry backoff."""
     import pytest
-    from lightroom_tagger.core.exceptions import RateLimitError
+    import openai as openai_sdk
     from lightroom_tagger.core.retry import CancelledRetryError
 
-    registry = MagicMock()
-    registry.fallback_order = ["ollama"]
-    registry.list_providers.return_value = [
-        {"id": "ollama", "name": "ollama", "available": True},
-    ]
-    registry.get_client.return_value = MagicMock(_provider_id="ollama")
+    flag = {"cancel": False}
+
+    def create_side_effect(**_kwargs):
+        flag["cancel"] = True
+        raise openai_sdk.RateLimitError("429", response=MagicMock(), body=None)
+
+    client = fake_compare_client(provider_id="ollama", create_side_effect=create_side_effect)
+    registry = fake_vision_registry(client, provider_id="ollama", model="gemma3:27b")
     registry.get_retry_config.return_value = {
         "max_retries": 2,
         "backoff_seconds": [5],
         "respect_retry_after": False,
     }
-    registry.list_models.return_value = [
-        {"id": "gemma3:27b", "vision": True, "source": "config"},
-    ]
-    flag = {"cancel": False}
 
-    def compare_side_effect(*args, **kwargs):
-        flag["cancel"] = True
-        raise RateLimitError("429")
-
-    with patch(
-        "lightroom_tagger.core.analyzer.vision_compare.resolve_model",
-        return_value=ResolvedModel("ollama", "gemma3:27b", registry),
-    ), patch(
-        "lightroom_tagger.core.vision_client.compare_images",
-        side_effect=compare_side_effect,
-    ), patch(
-        "lightroom_tagger.core.analyzer.get_viewable_path_managed",
-        side_effect=lambda p: (p, False),
-    ), patch(
-        "lightroom_tagger.core.analyzer.compress_image",
-        side_effect=lambda p: p,
-    ), patch("os.path.exists", return_value=True):
+    with (
+        patch(
+            "lightroom_tagger.core.analyzer.vision_compare.resolve_model",
+            return_value=ResolvedModel("ollama", "gemma3:27b", registry),
+        ),
+        patch(
+            "lightroom_tagger.core.analyzer.get_viewable_path_managed",
+            side_effect=lambda p: (p, False),
+        ),
+        patch(
+            "lightroom_tagger.core.analyzer.compress_image",
+            side_effect=lambda p: p,
+        ),
+        patch("os.path.exists", return_value=True),
+        patch("lightroom_tagger.core.vision_client._encode_image", return_value="abc"),
+    ):
         with pytest.raises(CancelledRetryError):
             compare_with_vision(
                 "/tmp/local.jpg",

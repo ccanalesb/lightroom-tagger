@@ -12,6 +12,11 @@ from lightroom_tagger.core.exceptions import ContextLengthError, PayloadTooLarge
 from lightroom_tagger.core.matcher.vision_batch import _call_batch_chunk
 from lightroom_tagger.core.retry import CancelledRetryError
 
+_ENCODE_PATCH = patch(
+    "lightroom_tagger.core.vision_client._encode_image",
+    return_value="abc",
+)
+
 
 def _mock_registry(available_providers=None):
     if available_providers is None:
@@ -55,9 +60,12 @@ class TestBatchVisionDispatcherFallback:
                 raise RateLimitError("429")
             return {cid: 85.0 for cid, _ in cands}
 
-        with patch(
-            "lightroom_tagger.core.vision_client.compare_images_batch",
-            side_effect=mock_batch,
+        with (
+            _ENCODE_PATCH,
+            patch(
+                "lightroom_tagger.core.vision_comparator.compare_images_batch",
+                side_effect=mock_batch,
+            ),
         ):
             result = _call_batch_chunk(
                 registry,
@@ -86,9 +94,12 @@ class TestBatchVisionDispatcherFallback:
                 raise PayloadTooLargeError("413 payload too large")
             return {cid: 70.0 for cid, _ in cands}
 
-        with patch(
-            "lightroom_tagger.core.vision_client.compare_images_batch",
-            side_effect=mock_batch,
+        with (
+            _ENCODE_PATCH,
+            patch(
+                "lightroom_tagger.core.vision_comparator.compare_images_batch",
+                side_effect=mock_batch,
+            ),
         ):
             result = _call_batch_chunk(
                 registry,
@@ -119,9 +130,12 @@ class TestBatchVisionDispatcherFallback:
                 raise ContextLengthError("budget too low")
             return {cid: 90.0 for cid, _ in cands}
 
-        with patch(
-            "lightroom_tagger.core.vision_client.compare_images_batch",
-            side_effect=mock_batch,
+        with (
+            _ENCODE_PATCH,
+            patch(
+                "lightroom_tagger.core.vision_comparator.compare_images_batch",
+                side_effect=mock_batch,
+            ),
         ):
             result = _call_batch_chunk(
                 registry,
@@ -155,9 +169,12 @@ class TestBatchVisionDispatcherFallback:
                 raise ContextLengthError("budget too low")
             return {cid: 88.0 for cid, _ in cands}
 
-        with patch(
-            "lightroom_tagger.core.vision_client.compare_images_batch",
-            side_effect=mock_batch,
+        with (
+            _ENCODE_PATCH,
+            patch(
+                "lightroom_tagger.core.vision_comparator.compare_images_batch",
+                side_effect=mock_batch,
+            ),
         ):
             result = _call_batch_chunk(
                 registry,
@@ -194,9 +211,12 @@ class TestBatchCancellation:
             flag["cancel"] = True
             raise RateLimitError("429")
 
-        with patch(
-            "lightroom_tagger.core.vision_client.compare_images_batch",
-            side_effect=mock_batch,
+        with (
+            _ENCODE_PATCH,
+            patch(
+                "lightroom_tagger.core.vision_comparator.compare_images_batch",
+                side_effect=mock_batch,
+            ),
         ):
             with pytest.raises(CancelledRetryError):
                 _call_batch_chunk(
