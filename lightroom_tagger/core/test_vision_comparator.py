@@ -116,6 +116,18 @@ class TestVisionComparatorBatch:
         assert tokens_seen[1] == BATCH_MAX_TOKENS_ESCALATION[1]
 
 
+class TestFakeCompareClient:
+    def test_batch_prompt_without_confidences_does_not_crash(self):
+        """A batch prompt with no configured batch_confidences yields empty results."""
+        client = fake_compare_client(provider_id="ollama")
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": "Candidates to compare: ..."}],
+        )
+        import json
+
+        assert json.loads(response.choices[0].message.content) == {"results": []}
+
+
 class TestVisionComparatorSequential:
     @patch("time.sleep")
     def test_cancel_mid_backoff_short_circuits(self, mock_sleep):
@@ -138,9 +150,11 @@ class TestVisionComparatorSequential:
         registry.get_client.return_value.chat.completions.create.side_effect = _create
         comparator = VisionComparator(registry, cancel_check=lambda: flag["cancel"])
 
-        with patch("lightroom_tagger.core.vision_client._encode_image", return_value="abc"):
-            with pytest.raises(CancelledRetryError):
-                comparator.compare_pair("/tmp/a.jpg", "/tmp/b.jpg", "ollama", "gemma3:27b")
+        with (
+            patch("lightroom_tagger.core.vision_client._encode_image", return_value="abc"),
+            pytest.raises(CancelledRetryError),
+        ):
+            comparator.compare_pair("/tmp/a.jpg", "/tmp/b.jpg", "ollama", "gemma3:27b")
 
 
 def _batch_response(confidences: dict[int, float]):

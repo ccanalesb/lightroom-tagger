@@ -81,14 +81,18 @@ def fake_compare_client(
                     if isinstance(part, dict) and part.get("type") == "text":
                         content += str(part.get("text", ""))
 
+        is_batch_prompt = (
+            "Candidates to compare" in content
+            or "REQUIRED OUTPUT FORMAT" in content
+            or (batch_confidences is not None and len(messages) > 1)
+        )
         response = MagicMock()
         choice = MagicMock()
-        if "Candidates to compare" in content or "REQUIRED OUTPUT FORMAT" in content and batch_confidences is not None:
+        if is_batch_prompt and batch_confidences is not None:
             results = [{"id": cid, "confidence": conf} for cid, conf in batch_confidences.items()]
             choice.message.content = json.dumps({"results": results})
-        elif batch_confidences is not None and len(messages) > 1:
-            results = [{"id": cid, "confidence": conf} for cid, conf in batch_confidences.items()]
-            choice.message.content = json.dumps({"results": results})
+        elif is_batch_prompt:
+            choice.message.content = json.dumps({"results": []})
         else:
             choice.message.content = json.dumps(
                 {
