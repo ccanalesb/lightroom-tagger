@@ -192,7 +192,7 @@ def run_tool_calling_search(
     so the frontend can persist them for multi-turn continuity.
     """
     r = resolve_model(kind="description", provider_id=provider_id, model=model)
-    client = r.registry.get_client(r.provider_id)
+    dispatcher = FallbackDispatcher(r.registry)
     conv = _messages_for_openai_tool_loop(messages)
 
     _TOOL_SEARCH_SYSTEM = (
@@ -216,12 +216,21 @@ def run_tool_calling_search(
         raise ValueError("tool-calling search requires at least one user message")
     updated_messages: list[dict] = list(messages)
 
-    for _round in range(max_tool_rounds):
-        response = client.chat.completions.create(
-            model=r.model,
+    def fn_factory(client, mdl: str):
+        return lambda: client.chat.completions.create(
+            model=mdl,
             messages=conv,
             tools=ALL_TOOLS,
             tool_choice="auto",
+        )
+
+    for _round in range(max_tool_rounds):
+        response, _pid, _mid = dispatcher.call_with_fallback(
+            operation="tool_search",
+            fn_factory=fn_factory,
+            provider_id=r.provider_id,
+            model=r.model,
+            log_callback=log_callback,
         )
         msg = response.choices[0].message
 

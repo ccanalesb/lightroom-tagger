@@ -124,6 +124,16 @@ def test_nl_filter_honors_description_vision_model_env(monkeypatch) -> None:
     assert mock_dispatcher.call_with_fallback.call_args.kwargs["model"] == "env-desc-model"
 
 
+def _dispatch_via_fn_factory(mock_client):
+    """Simulate FallbackDispatcher by invoking fn_factory with a fake client."""
+
+    def _call_with_fallback(**kwargs):
+        result = kwargs["fn_factory"](mock_client, kwargs["model"])()
+        return result, kwargs["provider_id"], kwargs["model"]
+
+    return _call_with_fallback
+
+
 def test_run_tool_calling_search_end_to_end(tmp_path) -> None:
     db_path = tmp_path / "library.db"
     conn = init_database(str(db_path))
@@ -132,6 +142,7 @@ def test_run_tool_calling_search_end_to_end(tmp_path) -> None:
         defaults={"description": {"provider": "ollama", "model": "tool-model"}},
         fallback_order=["ollama"],
     )
+    mock_dispatcher = MagicMock()
     mock_client = MagicMock()
     mock_message = MagicMock()
     mock_message.tool_calls = None
@@ -139,11 +150,19 @@ def test_run_tool_calling_search_end_to_end(tmp_path) -> None:
     mock_client.chat.completions.create.return_value.choices = [
         MagicMock(message=mock_message),
     ]
-    registry.get_client.return_value = mock_client
+    mock_dispatcher.call_with_fallback.side_effect = _dispatch_via_fn_factory(
+        mock_client
+    )
 
-    with patch(
-        "lightroom_tagger.core.nl_catalog_search.resolve_model",
-        return_value=ResolvedModel("ollama", "tool-model", registry),
+    with (
+        patch(
+            "lightroom_tagger.core.nl_catalog_search.resolve_model",
+            return_value=ResolvedModel("ollama", "tool-model", registry),
+        ),
+        patch(
+            "lightroom_tagger.core.nl_catalog_search.FallbackDispatcher",
+            return_value=mock_dispatcher,
+        ),
     ):
         text, updated = run_tool_calling_search(
             [{"role": "user", "content": "show sunsets"}],
@@ -152,7 +171,12 @@ def test_run_tool_calling_search_end_to_end(tmp_path) -> None:
 
     assert text == "Found 3 matching photos."
     assert updated[-1] == {"role": "assistant", "content": "Found 3 matching photos."}
-    registry.get_client.assert_called_once_with("ollama")
+    mock_dispatcher.call_with_fallback.assert_called_once()
+    call = mock_dispatcher.call_with_fallback.call_args
+    assert call.kwargs["operation"] == "tool_search"
+    assert call.kwargs["provider_id"] == "ollama"
+    assert call.kwargs["model"] == "tool-model"
+    registry.get_client.assert_not_called()
     create_kwargs = mock_client.chat.completions.create.call_args.kwargs
     assert create_kwargs["model"] == "tool-model"
 
@@ -165,6 +189,7 @@ def test_run_tool_calling_search_honors_vision_model_env(monkeypatch, tmp_path) 
         defaults={"description": {"provider": "ollama", "model": "json-default"}},
         fallback_order=["ollama"],
     )
+    mock_dispatcher = MagicMock()
     mock_client = MagicMock()
     mock_message = MagicMock()
     mock_message.tool_calls = None
@@ -172,7 +197,9 @@ def test_run_tool_calling_search_honors_vision_model_env(monkeypatch, tmp_path) 
     mock_client.chat.completions.create.return_value.choices = [
         MagicMock(message=mock_message),
     ]
-    registry.get_client.return_value = mock_client
+    mock_dispatcher.call_with_fallback.side_effect = _dispatch_via_fn_factory(
+        mock_client
+    )
 
     with (
         patch(
@@ -183,6 +210,10 @@ def test_run_tool_calling_search_honors_vision_model_env(monkeypatch, tmp_path) 
             "lightroom_tagger.core.nl_catalog_search.resolve_model",
             wraps=resolve_model,
         ),
+        patch(
+            "lightroom_tagger.core.nl_catalog_search.FallbackDispatcher",
+            return_value=mock_dispatcher,
+        ),
     ):
         run_tool_calling_search(
             [{"role": "user", "content": "cats"}],
@@ -191,6 +222,7 @@ def test_run_tool_calling_search_honors_vision_model_env(monkeypatch, tmp_path) 
             model=None,
         )
 
+    assert mock_dispatcher.call_with_fallback.call_args.kwargs["model"] == "env-vision-model"
     assert mock_client.chat.completions.create.call_args.kwargs["model"] == "env-vision-model"
 
 
