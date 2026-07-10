@@ -142,9 +142,6 @@ def _compare_via_provider(local_path: str, insta_path: str,
     policy = error_policy if error_policy is not None else ContextLengthEscalationPolicy()
     dispatcher = FallbackDispatcher(registry, error_policy=policy)
 
-    if abort_tracker is not None and abort_tracker.rate_limit_abort_reached:
-        return {'confidence': 0, 'verdict': 'RATE_LIMITED', 'reasoning': ''}
-
     def fn_factory(client: Any, mdl: str):
         if policy.is_broken(provider_id, mdl):
             def _skip():
