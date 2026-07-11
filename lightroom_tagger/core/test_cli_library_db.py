@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import sqlite3
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -15,7 +14,6 @@ from lightroom_tagger.core.cli_library_db import (
     with_library_db,
 )
 from lightroom_tagger.core.config import Config
-
 
 _MISSING_DB_PATH_MSG = "No database path provided. Use --db or config.yaml"
 
@@ -116,16 +114,62 @@ def test_with_library_db_maps_body_exception_and_closes_connection(tmp_path, cap
         captured_conn.execute("SELECT 1")
 
 
-@patch("lightroom_tagger.core.cli_library_db.managed_library_db")
-def test_with_library_db_require_path_false_skips_missing_guard(mock_managed):
-    mock_conn = MagicMock(spec=sqlite3.Connection)
-    mock_managed.return_value.__enter__.return_value = mock_conn
-    mock_managed.return_value.__exit__.return_value = False
+def test_with_library_db_missing_path_returns_error_before_opening(capsys):
+    @with_library_db(must_exist=False)
+    def handler(args, config, db):  # pragma: no cover - must not run
+        raise AssertionError("handler must not run without a db path")
 
-    @with_library_db(require_path=False)
-    def handler(args, config, db):
-        assert db is mock_conn
-        return 0
+    exit_code = handler(_args(None), _config(""))
 
-    assert handler(_args(None), _config("")) == 0
-    mock_managed.assert_called_once_with("")
+    assert exit_code == 1
+    assert _MISSING_DB_PATH_MSG in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "must_exist_true_handler",
+    ["cmd_search", "cmd_export", "cmd_stats", "cmd_enrich_catalog"],
+)
+def test_registered_must_exist_handlers_reject_absent_db(
+    must_exist_true_handler, tmp_path, capsys
+):
+    """search/export/stats/enrich_catalog keep the absent-DB guard."""
+    from lightroom_tagger.core import cli, cli_cmds_extra
+
+    handler = getattr(cli, must_exist_true_handler, None) or getattr(
+        cli_cmds_extra, must_exist_true_handler
+    )
+    missing = str(tmp_path / "missing.db")
+    args = argparse.Namespace(
+        db=missing,
+        keyword=None,
+        rating=None,
+        color_label=None,
+        date_start=None,
+        date_end=None,
+        limit=None,
+        output=str(tmp_path / "out.json"),
+        format="json",
+        cache_only=False,
+        catalog=None,
+    )
+
+    exit_code = handler(args, _config(""))
+
+    assert exit_code == 1
+    assert f"Database not found: {missing}" in capsys.readouterr().out
+
+
+def test_registered_sync_allows_absent_db(tmp_path, capsys):
+    """sync's allow-missing behavior: absent DB is not rejected by a guard."""
+    from lightroom_tagger.core.cli import cmd_sync
+
+    catalog = tmp_path / "catalog.lrcat"
+    catalog.write_text("")
+    missing = str(tmp_path / "missing.db")
+    args = argparse.Namespace(db=missing, catalog=str(catalog))
+
+    exit_code = cmd_sync(args, _config(""))
+
+    out = capsys.readouterr().out
+    assert "Database not found" not in out
+    assert exit_code in (0, 1)

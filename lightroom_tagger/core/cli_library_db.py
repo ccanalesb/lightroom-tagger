@@ -38,8 +38,6 @@ def map_cli_errors(handler: Callable[..., int]) -> Callable[..., int]:
     def wrapper(*args, **kwargs) -> int:
         try:
             return handler(*args, **kwargs)
-        except CliError as exc:
-            return _handle_cli_failure(exc)
         except Exception as exc:
             return _handle_cli_failure(exc)
 
@@ -49,24 +47,16 @@ def map_cli_errors(handler: Callable[..., int]) -> Callable[..., int]:
 def with_library_db(
     *,
     must_exist: bool = False,
-    require_path: bool = True,
 ) -> Callable[[Callable[..., int]], Callable[..., int]]:
     """Open a managed library DB, invoke ``handler(args, config, db)``, map errors."""
 
     def decorator(handler: Callable[..., int]) -> Callable[..., int]:
+        @map_cli_errors
         @functools.wraps(handler)
         def wrapper(args, config) -> int:
-            try:
-                if require_path:
-                    db_path = resolve_library_db_path(args, config, must_exist=must_exist)
-                else:
-                    db_path = args.db or config.db_path
-                with managed_library_db(db_path) as db:
-                    return handler(args, config, db)
-            except CliError as exc:
-                return _handle_cli_failure(exc)
-            except Exception as exc:
-                return _handle_cli_failure(exc)
+            db_path = resolve_library_db_path(args, config, must_exist=must_exist)
+            with managed_library_db(db_path) as db:
+                return handler(args, config, db)
 
         return wrapper
 

@@ -2,6 +2,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from lightroom_tagger.core.catalog_sync import sync_catalog
 from lightroom_tagger.core.cli_library_db import (
     CliError,
     map_cli_errors,
@@ -18,7 +19,6 @@ from lightroom_tagger.core.database import (
     search_by_rating,
     store_images_batch,
 )
-from lightroom_tagger.core.catalog_sync import sync_catalog
 from lightroom_tagger.lightroom.reader import get_image_count, get_image_records
 
 
