@@ -11,6 +11,7 @@ from database import (
     update_job_field,
     update_job_status,
 )
+from jobs.transitions import transition_cancel, transition_retry
 from library_db import JOB_TYPES_REQUIRING_CATALOG, describe_library_db
 from utils.responses import success_paginated
 from flask import Blueprint, current_app, jsonify, request
@@ -136,51 +137,38 @@ def get_job_details(job_id):
 
 @bp.route('/<job_id>', methods=['DELETE'])
 def cancel_job(job_id):
+    from api import jobs as jobs_mod
     from app import get_job_runner, socketio
 
     try:
-        job = get_job(current_app.db, job_id)
+        outcome = transition_cancel(
+            current_app.db,
+            job_id,
+            get_job_fn=jobs_mod.get_job,
+            update_status=jobs_mod.update_job_status,
+            add_log=jobs_mod.add_job_log,
+        )
 
-        if not job:
+        if outcome.edge == 'invalid' and outcome.job is None:
             return jsonify({'error': 'Job not found'}), 404
+        if outcome.edge == 'invalid':
+            return jsonify({'error': outcome.reason}), 400
 
-        if job['status'] == 'running':
-            update_job_status(current_app.db, job_id, 'cancelled')
+        if outcome.should_signal_cancel:
             r = get_job_runner()
             if r:
                 r.signal_cancel(job_id)
-            add_job_log(current_app.db, job_id, 'info', 'Cancel requested via API')
-            updated = get_job(current_app.db, job_id)
-            if socketio:
-                socketio.emit('job_updated', _compact_job_payload(updated))
-            return jsonify(_compact_job_payload(updated))
 
-        if job['status'] == 'pending':
-            update_job_status(current_app.db, job_id, 'cancelled')
-            add_job_log(current_app.db, job_id, 'info', 'Cancel requested via API')
-            updated = get_job(current_app.db, job_id)
-            if socketio:
-                socketio.emit('job_updated', _compact_job_payload(updated))
-            return jsonify(_compact_job_payload(updated))
-
-        # Idempotent cancel: a cancel against an already-terminal job returns
-        # the current row with a hint instead of an error, so rapid clicks /
-        # retries from the UI don't produce misleading 400 toasts. Terminal
-        # states are ``cancelled``, ``completed``, and ``failed``.
-        if job['status'] in ('cancelled', 'completed', 'failed'):
-            r = get_job_runner()
-            if job['status'] == 'cancelled' and r:
-                # Make sure the worker's cancel flag is set even if we missed
-                # it the first time (e.g. DB was flipped directly by another
-                # process). Cheap no-op if the job isn't active.
-                r.signal_cancel(job_id)
+        if outcome.edge == 'noop':
             return jsonify({
-                **_compact_job_payload(job),
+                **_compact_job_payload(outcome.job),
                 'cancel_noop': True,
-                'cancel_noop_reason': f"Job is already {job['status']}",
+                'cancel_noop_reason': outcome.reason,
             })
 
-        return jsonify({'error': f"Cannot cancel job in status {job['status']!r}"}), 400
+        if socketio:
+            socketio.emit('job_updated', _compact_job_payload(outcome.job))
+        return jsonify(_compact_job_payload(outcome.job))
     except sqlite3.OperationalError as e:
         if 'locked' in str(e).lower() or 'busy' in str(e).lower():
             return _db_busy_response()
@@ -188,26 +176,24 @@ def cancel_job(job_id):
 
 @bp.route('/<job_id>/retry', methods=['POST'])
 def retry_job(job_id):
+    from api import jobs as jobs_mod
+
     try:
-        job = get_job(current_app.db, job_id)
-
-        if not job:
-            return jsonify({'error': 'Job not found'}), 404
-
-        if job['status'] not in ('failed', 'cancelled'):
-            return jsonify({'error': 'Can only retry failed or cancelled jobs'}), 400
-
-        update_job_status(current_app.db, job_id, 'pending', progress=0, current_step=None)
-        update_job_field(current_app.db, job_id, 'error', None)
-        current_app.db.execute(
-            "UPDATE jobs SET error_severity = NULL WHERE id = ?",
-            (job_id,),
+        outcome = transition_retry(
+            current_app.db,
+            job_id,
+            get_job_fn=jobs_mod.get_job,
+            update_status=jobs_mod.update_job_status,
+            update_field=jobs_mod.update_job_field,
+            add_log=jobs_mod.add_job_log,
         )
-        current_app.db.commit()
-        update_job_field(current_app.db, job_id, 'result', None)
-        add_job_log(current_app.db, job_id, 'info', 'Job queued for retry')
 
-        return jsonify(_compact_job_payload(get_job(current_app.db, job_id)))
+        if outcome.edge == 'invalid' and outcome.job is None:
+            return jsonify({'error': 'Job not found'}), 404
+        if outcome.edge == 'invalid':
+            return jsonify({'error': outcome.reason}), 400
+
+        return jsonify(_compact_job_payload(outcome.job))
     except sqlite3.OperationalError as e:
         if 'locked' in str(e).lower() or 'busy' in str(e).lower():
             return _db_busy_response()
