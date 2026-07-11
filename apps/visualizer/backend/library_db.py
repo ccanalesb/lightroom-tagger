@@ -11,6 +11,9 @@ for a health endpoint or a startup log line, including why resolution failed.
 Job types that cannot run without the catalog should call
 ``require_library_db()``; endpoints that merely inspect state should call
 ``describe_library_db()``.
+
+Catalog requirements for job types are defined in ``jobs.registry.JOB_TYPES``;
+``JOB_TYPES_REQUIRING_CATALOG`` below is derived for backward compatibility.
 """
 from __future__ import annotations
 
@@ -32,28 +35,19 @@ _REPO_ROOT = os.path.abspath(
 _REPO_CONFIG_YAML = os.path.join(_REPO_ROOT, 'config.yaml')
 
 
-# Job types whose handlers open the Lightroom catalog SQLite mirror. Keep this
-# list in sync with ``jobs/handlers.py`` — if a handler calls ``init_database``
-# with ``LIBRARY_DB``, its job type belongs here.
-JOB_TYPES_REQUIRING_CATALOG: frozenset[str] = frozenset(
-    {
-        'vision_match',
-        'enrich_catalog',
-        'prepare_catalog',
-        'batch_describe',
-        'batch_score',
-        'batch_analyze',
-        'batch_stack_detect',
-        'batch_catalog_similarity',
-        'batch_text_embed',
-        'batch_embed_image',
-        'single_describe',
-        'single_score',
-        'instagram_import',
-        'catalog_cache_build',
-        'catalog_sync',
-    }
-)
+_JOB_TYPES_REQUIRING_CATALOG: frozenset[str] | None = None
+
+
+def __getattr__(name: str) -> frozenset[str]:
+    if name == 'JOB_TYPES_REQUIRING_CATALOG':
+        global _JOB_TYPES_REQUIRING_CATALOG
+        if _JOB_TYPES_REQUIRING_CATALOG is None:
+            from jobs.registry import catalog_requiring_job_types
+
+            # DEPRECATED: derived from JOB_TYPES, do not edit
+            _JOB_TYPES_REQUIRING_CATALOG = catalog_requiring_job_types()
+        return _JOB_TYPES_REQUIRING_CATALOG
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
 
 
 @dataclass(frozen=True)
