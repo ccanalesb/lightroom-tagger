@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from typing import Any
 
 from lightroom_tagger.core.clip_embedding_service import CLIP_EMBED_DIM, CLIP_EMBED_MODEL_ID
@@ -295,3 +296,169 @@ def merge_checkpoint_into_metadata(
     out = dict(existing_metadata)
     out["checkpoint"] = {"checkpoint_version": CHECKPOINT_VERSION, **checkpoint_body}
     return out
+
+
+# --- Per-type resume shape extractors (delegates for :func:`load_resume_state`) ---
+
+
+def resume_processed_media_keys(chk: dict[str, Any]) -> set[str]:
+    return set(chk.get("processed_media_keys") or [])
+
+
+def resume_processed_image_keys(chk: dict[str, Any]) -> set[str]:
+    return set(chk.get("processed_image_keys") or [])
+
+
+def resume_processed_pairs(chk: dict[str, Any]) -> set[str]:
+    return set(chk.get("processed_pairs") or [])
+
+
+def resume_processed_triplets(chk: dict[str, Any]) -> set[str]:
+    return set(chk.get("processed_triplets") or [])
+
+
+# --- Per-type checkpoint body builders (paired with resume loaders on ``JOB_TYPES``) ---
+
+
+def build_vision_match_checkpoint_body(
+    *, fingerprint: str, processed: set[str], **_: Any
+) -> dict[str, Any]:
+    return {
+        "job_type": "vision_match",
+        "fingerprint": fingerprint,
+        "processed_media_keys": sorted(processed),
+    }
+
+
+def build_enrich_catalog_checkpoint_body(
+    *, fingerprint: str, processed: set[str], **_: Any
+) -> dict[str, Any]:
+    return {
+        "job_type": "enrich_catalog",
+        "fingerprint": fingerprint,
+        "processed_image_keys": sorted(processed),
+    }
+
+
+def build_prepare_catalog_checkpoint_body(
+    *, fingerprint: str, processed: set[str], **_: Any
+) -> dict[str, Any]:
+    return {
+        "job_type": "prepare_catalog",
+        "fingerprint": fingerprint,
+        "processed_image_keys": sorted(processed),
+    }
+
+
+def build_batch_describe_checkpoint_body(
+    *, fingerprint: str, processed: set[str], total_at_start: int, **_: Any
+) -> dict[str, Any]:
+    return {
+        "job_type": "batch_describe",
+        "fingerprint": fingerprint,
+        "processed_pairs": sorted(processed),
+        "total_at_start": total_at_start,
+    }
+
+
+def build_batch_score_checkpoint_body(
+    *, fingerprint: str, processed: set[str], total_at_start: int, **_: Any
+) -> dict[str, Any]:
+    return {
+        "job_type": "batch_score",
+        "fingerprint": fingerprint,
+        "processed_triplets": sorted(processed),
+        "total_at_start": total_at_start,
+    }
+
+
+def build_batch_text_embed_checkpoint_body(
+    *, fingerprint: str, processed: set[str], total_at_start: int, **_: Any
+) -> dict[str, Any]:
+    return {
+        "job_type": "batch_text_embed",
+        "fingerprint": fingerprint,
+        "processed_pairs": sorted(processed),
+        "total_at_start": total_at_start,
+    }
+
+
+def build_batch_embed_image_checkpoint_body(
+    *, fingerprint: str, processed: set[str], total_at_start: int, **_: Any
+) -> dict[str, Any]:
+    return {
+        "job_type": "batch_embed_image",
+        "fingerprint": fingerprint,
+        "processed_pairs": sorted(processed),
+        "total_at_start": total_at_start,
+    }
+
+
+def build_batch_stack_detect_checkpoint_body(
+    *, fingerprint: str, processed: set[str], total_at_start: int, **_: Any
+) -> dict[str, Any]:
+    return {
+        "job_type": "batch_stack_detect",
+        "fingerprint": fingerprint,
+        "processed_image_keys": sorted(processed),
+        "total_at_start": total_at_start,
+    }
+
+
+def job_type_entry(name: str) -> Any:
+    """Return the ``JobType`` registry entry (lazy import avoids handler cycles)."""
+    from .registry import JOB_TYPES_BY_NAME
+
+    return JOB_TYPES_BY_NAME[name]
+
+
+def load_resume_state(
+    job_type: str,
+    metadata: dict[str, Any],
+    current_fingerprint: str,
+    log: Callable[[str], None],
+    *,
+    nested_sub_key: str | None = None,
+    nested_root_job_type: str | None = None,
+    mismatch_message: str | None = None,
+) -> set[str]:
+    """Load processed-set resume state from ``metadata['checkpoint']``.
+
+    Performs ``checkpoint_version``, ``job_type``, and fingerprint ceremony once.
+    Delegates processed-set extraction to the registry entry's ``resume_loader``.
+
+    For nested ``batch_analyze`` sub-stages, pass ``nested_sub_key`` (``'describe'`` or
+    ``'score'``), ``nested_root_job_type='batch_analyze'``, and a stage-specific
+    ``mismatch_message`` override.
+    """
+    from .registry import JOB_TYPES_BY_NAME
+
+    entry = JOB_TYPES_BY_NAME.get(job_type)
+    if entry is None or entry.resume_loader is None:
+        return set()
+
+    chk = metadata.get("checkpoint")
+    if not isinstance(chk, dict):
+        return set()
+    if chk.get("checkpoint_version") != CHECKPOINT_VERSION:
+        return set()
+
+    if nested_sub_key is not None:
+        if nested_root_job_type is None or chk.get("job_type") != nested_root_job_type:
+            return set()
+        sub = chk.get(nested_sub_key)
+        if not isinstance(sub, dict):
+            return set()
+        effective = sub
+        msg = mismatch_message
+    else:
+        if chk.get("job_type") != job_type:
+            return set()
+        effective = chk
+        msg = mismatch_message or entry.checkpoint_mismatch_message
+
+    if effective.get("fingerprint") == current_fingerprint:
+        return entry.resume_loader(effective)
+    if effective.get("fingerprint") and msg:
+        log(msg)
+    return set()

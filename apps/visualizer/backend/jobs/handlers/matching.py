@@ -14,7 +14,7 @@ from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import init_database
 from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
 
-from ..checkpoint import fingerprint_catalog_keys, fingerprint_vision_match
+from ..checkpoint import fingerprint_catalog_keys, fingerprint_vision_match, job_type_entry, load_resume_state
 
 from .common import (
     _CHECKPOINT_MAX_ENTRIES,
@@ -141,29 +141,17 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             **({"provider_model": provider_model} if provider_model else {}),
         })
 
-        resume_media: set[str] = set()
         row_vm = get_job(runner.db, job_id)
-        if row_vm:
-            meta_vm = row_vm.get('metadata') or {}
-            if isinstance(meta_vm, dict):
-                chk_vm = meta_vm.get('checkpoint')
-                if (
-                    isinstance(chk_vm, dict)
-                    and chk_vm.get('checkpoint_version') == 1
-                    and chk_vm.get('job_type') == 'vision_match'
-                ):
-                    if chk_vm.get('fingerprint') == fp_vm:
-                        resume_media = set(chk_vm.get('processed_media_keys') or [])
-                    else:
-                        add_job_log(
-                            runner.db,
-                            job_id,
-                            'info',
-                            'checkpoint mismatch: vision_match fingerprint changed, starting fresh',
-                        )
+        resume_media = load_resume_state(
+            'vision_match',
+            (row_vm.get('metadata') or {}) if row_vm and isinstance(row_vm.get('metadata'), dict) else {},
+            fp_vm,
+            lambda msg: add_job_log(runner.db, job_id, 'info', msg),
+        )
 
         done_media: set[str] = set(resume_media)
         media_since_prefilter_summary = 0
+        jt_vision_match = job_type_entry('vision_match')
         # Coordinator thread only: on_media_complete calls runner.persist_checkpoint (not workers).
 
         # judgments= log field / vision_judgments_total count shortlisted catalog candidates through score_candidates_with_vision, not LLM HTTP requests — keep names for parsers.
@@ -199,11 +187,10 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
                 return
             runner.persist_checkpoint(
                 job_id,
-                {
-                    'job_type': 'vision_match',
-                    'fingerprint': fp_vm,
-                    'processed_media_keys': sorted(done_media),
-                },
+                jt_vision_match.build_checkpoint_body(
+                    fingerprint=fp_vm,
+                    processed=done_media,
+                ),
             )
             if stats_snap is not None:
                 media_since_prefilter_summary += 1
@@ -411,26 +398,14 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
         total = len(catalog_images)
         catalog_keys = sorted(k for k in (r.get('key') for r in catalog_images) if k)
         fp_en = fingerprint_catalog_keys(total=total, keys=catalog_keys)
-        processed_ck: set[str] = set()
         row_en = get_job(runner.db, job_id)
-        if row_en:
-            meta_en = row_en.get('metadata') or {}
-            if isinstance(meta_en, dict):
-                chk_en = meta_en.get('checkpoint')
-                if (
-                    isinstance(chk_en, dict)
-                    and chk_en.get('checkpoint_version') == 1
-                    and chk_en.get('job_type') == 'enrich_catalog'
-                ):
-                    if chk_en.get('fingerprint') == fp_en:
-                        processed_ck = set(chk_en.get('processed_image_keys') or [])
-                    else:
-                        add_job_log(
-                            runner.db,
-                            job_id,
-                            'info',
-                            'checkpoint mismatch: enrich_catalog fingerprint changed, starting fresh',
-                        )
+        processed_ck = load_resume_state(
+            'enrich_catalog',
+            (row_en.get('metadata') or {}) if row_en and isinstance(row_en.get('metadata'), dict) else {},
+            fp_en,
+            lambda msg: add_job_log(runner.db, job_id, 'info', msg),
+        )
+        jt_enrich_catalog = job_type_entry('enrich_catalog')
 
         processed = 0
         skipped = 0
@@ -497,11 +472,10 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
                 # Single-threaded handler: safe to call runner.persist_checkpoint each iteration.
                 runner.persist_checkpoint(
                     job_id,
-                    {
-                        'job_type': 'enrich_catalog',
-                        'fingerprint': fp_en,
-                        'processed_image_keys': sorted(processed_ck),
-                    },
+                    jt_enrich_catalog.build_checkpoint_body(
+                        fingerprint=fp_en,
+                        processed=processed_ck,
+                    ),
                 )
 
                 if (i + 1) % 10 == 0 or i == total - 1:
@@ -591,26 +565,14 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
         images = get_all_catalog_images(lib_db)
         catalog_keys_pr = sorted(k for k in (img.get('key') for img in images) if k)
         fp_pr = fingerprint_catalog_keys(total=len(images), keys=catalog_keys_pr)
-        processed_prep: set[str] = set()
         row_pr = get_job(runner.db, job_id)
-        if row_pr:
-            meta_pr = row_pr.get('metadata') or {}
-            if isinstance(meta_pr, dict):
-                chk_pr = meta_pr.get('checkpoint')
-                if (
-                    isinstance(chk_pr, dict)
-                    and chk_pr.get('checkpoint_version') == 1
-                    and chk_pr.get('job_type') == 'prepare_catalog'
-                ):
-                    if chk_pr.get('fingerprint') == fp_pr:
-                        processed_prep = set(chk_pr.get('processed_image_keys') or [])
-                    else:
-                        add_job_log(
-                            runner.db,
-                            job_id,
-                            'info',
-                            'checkpoint mismatch: prepare_catalog fingerprint changed, starting fresh',
-                        )
+        processed_prep = load_resume_state(
+            'prepare_catalog',
+            (row_pr.get('metadata') or {}) if row_pr and isinstance(row_pr.get('metadata'), dict) else {},
+            fp_pr,
+            lambda msg: add_job_log(runner.db, job_id, 'info', msg),
+        )
+        jt_prepare_catalog = job_type_entry('prepare_catalog')
 
         def _prepare_image_pending(img: dict) -> bool:
             k = img.get('key')
@@ -705,11 +667,10 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
                         # Coordinator thread (as_completed): runner.persist_checkpoint only here.
                         runner.persist_checkpoint(
                             job_id,
-                            {
-                                'job_type': 'prepare_catalog',
-                                'fingerprint': fp_pr,
-                                'processed_image_keys': sorted(processed_prep),
-                            },
+                            jt_prepare_catalog.build_checkpoint_body(
+                                fingerprint=fp_pr,
+                                processed=processed_prep,
+                            ),
                         )
 
                     if completed % 10 == 0 or completed == total_run:

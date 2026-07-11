@@ -92,7 +92,12 @@ def test_derived_catalog_set_matches_legacy_set():
 
 def test_checkpoint_fields_are_all_present_or_all_none():
     for jt in JOB_TYPES:
-        fields = (jt.fingerprint, jt.resume_loader, jt.build_checkpoint_body)
+        fields = (
+            jt.fingerprint,
+            jt.resume_loader,
+            jt.build_checkpoint_body,
+            jt.checkpoint_mismatch_message,
+        )
         assert all(f is None for f in fields) or all(
             f is not None for f in fields
         ), f'{jt.name}: checkpoint fields must be uniformly None or present'
@@ -104,6 +109,7 @@ def test_composite_job_types_have_no_checkpoint_fields():
         assert jt.fingerprint is None
         assert jt.resume_loader is None
         assert jt.build_checkpoint_body is None
+        assert jt.checkpoint_mismatch_message is None
 
 
 def test_analyze_instagram_does_not_require_catalog():

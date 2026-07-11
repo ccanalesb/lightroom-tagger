@@ -29,7 +29,12 @@ from lightroom_tagger.core.embedding_service import (
     embed_texts,
     numpy_to_vec_blob,
 )
-from ..checkpoint import fingerprint_batch_embed_image, fingerprint_batch_text_embed
+from ..checkpoint import (
+    fingerprint_batch_embed_image,
+    fingerprint_batch_text_embed,
+    job_type_entry,
+    load_resume_state,
+)
 
 from .common import (
     _CHECKPOINT_MAX_ENTRIES,
@@ -108,26 +113,14 @@ def _handle_batch_text_embed_inner(runner, job_id: str, metadata: dict) -> None:
         def pair_label(key: str, itype: str) -> str:
             return f'{key}|{itype}'
 
-        processed_pairs: set[str] = set()
         row_job = get_job(runner.db, job_id)
-        if row_job:
-            meta_job = row_job.get('metadata') or {}
-            if isinstance(meta_job, dict):
-                chk = meta_job.get('checkpoint')
-                if (
-                    isinstance(chk, dict)
-                    and chk.get('checkpoint_version') == 1
-                    and chk.get('job_type') == 'batch_text_embed'
-                ):
-                    if chk.get('fingerprint') == fp:
-                        processed_pairs = set(chk.get('processed_pairs') or [])
-                    elif chk.get('fingerprint'):
-                        database.add_job_log(
-                            runner.db,
-                            job_id,
-                            'info',
-                            'checkpoint mismatch: batch_text_embed fingerprint changed, starting fresh',
-                        )
+        processed_pairs = load_resume_state(
+            'batch_text_embed',
+            (row_job.get('metadata') or {}) if row_job and isinstance(row_job.get('metadata'), dict) else {},
+            fp,
+            lambda msg: database.add_job_log(runner.db, job_id, 'info', msg),
+        )
+        jt_batch_text_embed = job_type_entry('batch_text_embed')
 
         remaining = [(k, t) for k, t in full_list if pair_label(k, t) not in processed_pairs]
         runner.update_progress(
@@ -159,12 +152,11 @@ def _handle_batch_text_embed_inner(runner, job_id: str, metadata: dict) -> None:
                 return False
             runner.persist_checkpoint(
                 job_id,
-                {
-                    'job_type': 'batch_text_embed',
-                    'fingerprint': fp,
-                    'processed_pairs': sorted(processed_pairs),
-                    'total_at_start': total_at_start,
-                },
+                jt_batch_text_embed.build_checkpoint_body(
+                    fingerprint=fp,
+                    processed=processed_pairs,
+                    total_at_start=total_at_start,
+                ),
             )
             return True
 
@@ -383,26 +375,15 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
         )
 
         processed_pairs: set[str] = set()
+        jt_batch_embed_image = job_type_entry('batch_embed_image')
         if not chain_mode:
             row_job = get_job(runner.db, job_id)
-            if row_job:
-                meta_job = row_job.get('metadata') or {}
-                if isinstance(meta_job, dict):
-                    chk = meta_job.get('checkpoint')
-                    if (
-                        isinstance(chk, dict)
-                        and chk.get('checkpoint_version') == 1
-                        and chk.get('job_type') == 'batch_embed_image'
-                    ):
-                        if chk.get('fingerprint') == fp:
-                            processed_pairs = set(chk.get('processed_pairs') or [])
-                        elif chk.get('fingerprint'):
-                            database.add_job_log(
-                                runner.db,
-                                job_id,
-                                'info',
-                                'checkpoint mismatch: batch_embed_image fingerprint changed, starting fresh',
-                            )
+            processed_pairs = load_resume_state(
+                'batch_embed_image',
+                (row_job.get('metadata') or {}) if row_job and isinstance(row_job.get('metadata'), dict) else {},
+                fp,
+                lambda msg: database.add_job_log(runner.db, job_id, 'info', msg),
+            )
 
         remaining = [k for k in full_list if k not in processed_pairs]
         runner.update_progress(
@@ -457,12 +438,11 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 return True
             runner.persist_checkpoint(
                 job_id,
-                {
-                    'job_type': 'batch_embed_image',
-                    'fingerprint': fp,
-                    'processed_pairs': sorted(processed_pairs),
-                    'total_at_start': total_at_start,
-                },
+                jt_batch_embed_image.build_checkpoint_body(
+                    fingerprint=fp,
+                    processed=processed_pairs,
+                    total_at_start=total_at_start,
+                ),
             )
             return True
 

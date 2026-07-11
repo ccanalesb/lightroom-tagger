@@ -21,7 +21,7 @@ from lightroom_tagger.core.database import (
     list_instagram_dump_keys_needing_clip_embedding,
 )
 
-from ..checkpoint import fingerprint_batch_stack_detect, fingerprint_catalog_cache_build
+from ..checkpoint import fingerprint_batch_stack_detect, fingerprint_catalog_cache_build, job_type_entry, load_resume_state
 
 from .common import (
     _CHECKPOINT_MAX_ENTRIES,
@@ -392,26 +392,15 @@ def _handle_batch_stack_detect_inner(runner, job_id: str, metadata: dict) -> Non
         chain_mode = bool(metadata.get('_catalog_cache_chain'))
 
         processed_image_keys: set[str] = set()
+        jt_batch_stack_detect = job_type_entry('batch_stack_detect')
         if not chain_mode:
             row_job = get_job(runner.db, job_id)
-            if row_job:
-                meta_job = row_job.get('metadata') or {}
-                if isinstance(meta_job, dict):
-                    chk = meta_job.get('checkpoint')
-                    if (
-                        isinstance(chk, dict)
-                        and chk.get('checkpoint_version') == 1
-                        and chk.get('job_type') == 'batch_stack_detect'
-                    ):
-                        if chk.get('fingerprint') == fp:
-                            processed_image_keys = set(chk.get('processed_image_keys') or [])
-                        elif chk.get('fingerprint'):
-                            add_job_log(
-                                runner.db,
-                                job_id,
-                                'info',
-                                'checkpoint mismatch: batch_stack_detect fingerprint changed, starting fresh',
-                            )
+            processed_image_keys = load_resume_state(
+                'batch_stack_detect',
+                (row_job.get('metadata') or {}) if row_job and isinstance(row_job.get('metadata'), dict) else {},
+                fp,
+                lambda msg: add_job_log(runner.db, job_id, 'info', msg),
+            )
 
         if total_at_start == 0:
             runner.update_progress(job_id, 5, 'No catalog images in stack-detect work list')
@@ -515,12 +504,11 @@ def _handle_batch_stack_detect_inner(runner, job_id: str, metadata: dict) -> Non
                 return True
             runner.persist_checkpoint(
                 job_id,
-                {
-                    'job_type': 'batch_stack_detect',
-                    'fingerprint': fp,
-                    'processed_image_keys': sorted(processed_image_keys),
-                    'total_at_start': total_at_start,
-                },
+                jt_batch_stack_detect.build_checkpoint_body(
+                    fingerprint=fp,
+                    processed=processed_image_keys,
+                    total_at_start=total_at_start,
+                ),
             )
             return True
 
