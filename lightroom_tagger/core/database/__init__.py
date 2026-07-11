@@ -1,5 +1,10 @@
 """Library database — barrel re-exports from split scaffold (plan 14-01)."""
 
+from lightroom_tagger.core.managed_connections import (
+    managed_catalog,
+    managed_library_db,
+)
+
 from .db_init import (
     _backfill_matched_catalog_key_from_validated_matches,
     _deserialize_row,
@@ -331,6 +336,8 @@ __all__ = (
     'list_instagram_dump_keys_needing_clip_embedding',
     'list_perspectives',
     'list_score_history_for_perspective',
+    'managed_catalog',
+    'managed_library_db',
     'markdown_marks_optional',
     'mark_dump_media_attempted',
     'mark_dump_media_processed',
