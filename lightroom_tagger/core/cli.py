@@ -2,18 +2,24 @@ import argparse
 import sys
 from pathlib import Path
 
+from lightroom_tagger.core.cli_library_db import (
+    CliError,
+    map_cli_errors,
+    with_library_db,
+)
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import (
     get_all_images,
-    init_database,
+    managed_catalog,
+    managed_library_db,
     search_by_color_label,
     search_by_date,
     search_by_keyword,
     search_by_rating,
     store_images_batch,
 )
-from lightroom_tagger.core.catalog_sync import CatalogSyncError, sync_catalog
-from lightroom_tagger.lightroom.reader import connect_catalog, get_image_count, get_image_records
+from lightroom_tagger.core.catalog_sync import sync_catalog
+from lightroom_tagger.lightroom.reader import get_image_count, get_image_records
 
 
 def _build_parser(commands) -> argparse.ArgumentParser:
@@ -111,24 +117,21 @@ def run(argv, config, commands) -> int:
     return handler(args, config)
 
 
+@map_cli_errors
 def cmd_scan(args, config):
     """Scan catalog and index images."""
     catalog_path = args.catalog or config.catalog_path
-    db_path = args.db or config.db_path
     workers = args.workers or config.workers
 
     if not catalog_path:
-        print("Error: No catalog path provided. Use --catalog or config.yaml")
-        return 1
+        raise CliError("No catalog path provided. Use --catalog or config.yaml")
 
     if not Path(catalog_path).exists():
-        print(f"Error: Catalog not found: {catalog_path}")
-        return 1
+        raise CliError(f"Catalog not found: {catalog_path}")
 
     print(f"Scanning catalog: {catalog_path}")
 
-    try:
-        conn = connect_catalog(catalog_path)
+    with managed_catalog(catalog_path) as conn:
         total_in_catalog = get_image_count(conn)
 
         if args.verbose:
@@ -136,99 +139,67 @@ def cmd_scan(args, config):
 
         limit = args.limit
         records = get_image_records(conn, limit=limit, workers=workers)
-        conn.close()
 
-        print(f"Retrieved {len(records)} image records")
+    print(f"Retrieved {len(records)} image records")
 
-        db = init_database(db_path)
+    db_path = args.db or config.db_path
+    with managed_library_db(db_path) as db:
         count = store_images_batch(db, records)
-        db.close()
 
-        print(f"Indexed {count} images to {db_path}")
-        return 0
-
-    except Exception as e:
-        print(f"Error: {e}")
-        return 1
+    print(f"Indexed {count} images to {db_path}")
+    return 0
 
 
+@map_cli_errors
 def cmd_sync(args, config):
     """Incremental catalog sync — additions only."""
     catalog_path = args.catalog or config.catalog_path
-    db_path = args.db or config.db_path
 
     if not catalog_path:
-        print("Error: No catalog path provided. Use --catalog or config.yaml")
-        return 1
+        raise CliError("No catalog path provided. Use --catalog or config.yaml")
 
     if not Path(catalog_path).exists():
-        print(f"Error: Catalog not found: {catalog_path}")
-        return 1
+        raise CliError(f"Catalog not found: {catalog_path}")
 
-    if not db_path:
-        print("Error: No database path provided. Use --db or config.yaml")
-        return 1
+    return _cmd_sync_with_db(args, config)
 
+
+@with_library_db(must_exist=False)
+def _cmd_sync_with_db(args, config, db):
+    catalog_path = args.catalog or config.catalog_path
     print(f"Syncing catalog: {catalog_path}")
-
-    try:
-        db = init_database(db_path)
-        result = sync_catalog(catalog_path, db)
-        db.close()
-        print(
-            f"Added {result.added} images; {result.stale} stale in library "
-            f"(locking_mode={result.locking_mode})"
-        )
-        return 0
-    except CatalogSyncError as e:
-        print(f"Error: {e}")
-        return 1
-    except Exception as e:
-        print(f"Error: {e}")
-        return 1
+    result = sync_catalog(catalog_path, db)
+    print(
+        f"Added {result.added} images; {result.stale} stale in library "
+        f"(locking_mode={result.locking_mode})"
+    )
+    return 0
 
 
-def cmd_search(args, config):
+@with_library_db(must_exist=True)
+def cmd_search(args, config, db):
     """Search indexed images."""
-    db_path = args.db or config.db_path
+    results = []
 
-    if not db_path:
-        print("Error: No database path provided. Use --db or config.yaml")
-        return 1
+    if args.keyword:
+        results = search_by_keyword(db, args.keyword)
+    elif args.rating is not None:
+        results = search_by_rating(db, args.rating)
+    elif args.color_label:
+        results = search_by_color_label(db, args.color_label)
+    elif args.date_start:
+        results = search_by_date(db, args.date_start, args.date_end)
+    else:
+        results = get_all_images(db)
 
-    if not Path(db_path).exists():
-        print(f"Error: Database not found: {db_path}")
-        return 1
+    if args.limit:
+        results = results[:args.limit]
 
-    try:
-        db = init_database(db_path)
-        results = []
+    print(f"Found {len(results)} images")
+    for record in results:
+        print(f"  {record.get('key')}: {record.get('filename')} (rating: {record.get('rating')})")
 
-        if args.keyword:
-            results = search_by_keyword(db, args.keyword)
-        elif args.rating is not None:
-            results = search_by_rating(db, args.rating)
-        elif args.color_label:
-            results = search_by_color_label(db, args.color_label)
-        elif args.date_start:
-            results = search_by_date(db, args.date_start, args.date_end)
-        else:
-            results = get_all_images(db)
-
-        if args.limit:
-            results = results[:args.limit]
-
-        db.close()
-
-        print(f"Found {len(results)} images")
-        for record in results:
-            print(f"  {record.get('key')}: {record.get('filename')} (rating: {record.get('rating')})")
-
-        return 0
-
-    except Exception as e:
-        print(f"Error: {e}")
-        return 1
+    return 0
 
 
 def main():
