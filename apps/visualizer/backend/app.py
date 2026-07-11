@@ -257,7 +257,7 @@ def _job_processor():
     """Background thread that processes pending jobs."""
     global socketio, job_processor_running, _job_runner
 
-    from jobs.handlers import JOB_HANDLERS
+    from jobs.registry import get_job_handler
     from jobs.runner import JobRunner
 
     # Own connection, owned by this thread. Sharing the Flask-thread ``db``
@@ -327,7 +327,7 @@ def _job_processor():
                         continue
                     _running_job_ids.add(job_id)
 
-                handler = JOB_HANDLERS.get(job_type)
+                handler = get_job_handler(job_type)
                 _processor_heartbeat(
                     current_job_id=job_id,
                     current_job_started_at=time.time(),
