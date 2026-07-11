@@ -10,7 +10,10 @@ from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import init_database
 from lightroom_tagger.scripts.import_instagram_dump import import_dump
 
+from .db_lifecycle import make_managed_library_db
 from .common import _failure_severity_from_exception
+
+managed_library_db = make_managed_library_db(globals())
 
 
 def handle_analyze_instagram(runner, job_id: str, metadata: dict):
@@ -54,16 +57,13 @@ def handle_instagram_import(runner, job_id: str, metadata: dict):
         skip_dedup = bool(metadata.get('skip_dedup', False))
         reimport = bool(metadata.get('reimport', False))
 
-        db = init_database(db_path)
-        try:
+        with managed_library_db(db_path) as db:
             imported = import_dump(
                 db,
                 str(dump_path),
                 skip_existing=not reimport,
                 skip_dedup=skip_dedup,
             )
-        finally:
-            db.close()
 
         runner.update_progress(job_id, 100, 'Complete')
         runner.complete_job(
