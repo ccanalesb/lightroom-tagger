@@ -38,6 +38,10 @@ def can_retry(job: dict) -> bool:
     return job['status'] in RETRYABLE_STATUSES
 
 
+# The DB helpers are accepted as keyword args (defaulting to the ``database``
+# module functions) so the API route can forward its own module-level names.
+# That keeps existing route tests working — they monkeypatch
+# ``api.jobs.update_job_status`` to simulate a locked DB.
 def transition_cancel(
     db,
     job_id: str,
@@ -70,6 +74,9 @@ def transition_cancel(
             should_signal_cancel=(status == 'cancelled'),
         )
 
+    # Defensive fallback: unreachable for the known status set (cancellable +
+    # terminal cover all statuses), kept to mirror the original route and guard
+    # against an unexpected status ever reaching here.
     return Outcome(
         edge='invalid',
         job=job,
