@@ -16,15 +16,14 @@ from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
 
 from .db_lifecycle import make_managed_library_db
 from ..checkpoint import fingerprint_catalog_keys, fingerprint_vision_match, job_type_entry, load_resume_state
-
-managed_library_db = make_managed_library_db(globals())
-
 from .common import (
     _CHECKPOINT_MAX_ENTRIES,
     _failure_severity_from_exception,
     _resolve_library_db_or_fail,
 )
 from .path_diagnostics import PathSkipDiagnostics, make_path_classify_fn
+
+managed_library_db = make_managed_library_db(lambda p: init_database(p))
 
 _VISION_MATCH_PREFILTER_SUMMARY_EVERY = 40
 

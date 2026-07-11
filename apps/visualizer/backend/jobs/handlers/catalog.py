@@ -18,7 +18,7 @@ from lightroom_tagger.core.database import init_database
 from .db_lifecycle import make_managed_library_db
 from .common import _failure_severity_from_exception, _resolve_library_db_or_fail
 
-managed_library_db = make_managed_library_db(globals())
+managed_library_db = make_managed_library_db(lambda p: init_database(p))
 
 
 def _resolve_catalog_path(metadata: dict) -> str | None:

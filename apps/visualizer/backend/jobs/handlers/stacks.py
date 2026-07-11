@@ -39,7 +39,7 @@ _STACK_DETECT_SUMMARY_EVERY = 500
 
 _CATALOG_CACHE_STAGE_COUNT = 4
 
-managed_library_db = make_managed_library_db(globals())
+managed_library_db = make_managed_library_db(lambda p: init_database(p))
 
 
 def _catalog_cache_stage_mapped_progress(stage_index: int, inner_pct: int) -> int:

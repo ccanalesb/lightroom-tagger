@@ -13,7 +13,7 @@ from lightroom_tagger.scripts.import_instagram_dump import import_dump
 from .db_lifecycle import make_managed_library_db
 from .common import _failure_severity_from_exception
 
-managed_library_db = make_managed_library_db(globals())
+managed_library_db = make_managed_library_db(lambda p: init_database(p))
 
 
 def handle_analyze_instagram(runner, job_id: str, metadata: dict):

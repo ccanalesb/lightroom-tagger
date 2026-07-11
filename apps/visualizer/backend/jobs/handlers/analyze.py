@@ -13,9 +13,6 @@ from lightroom_tagger.core.database import init_database
 
 from .db_lifecycle import make_managed_library_db
 from ..checkpoint import fingerprint_batch_describe, fingerprint_batch_score, job_type_entry, load_resume_state
-
-managed_library_db = make_managed_library_db(globals())
-
 from .common import (
     _CHECKPOINT_MAX_ENTRIES,
     _CATALOG_NOT_VIDEO_SQL,
@@ -26,6 +23,8 @@ from .common import (
     _select_instagram_keys,
 )
 from .path_diagnostics import PathSkipDiagnostics, empty_skip_reason_counts
+
+managed_library_db = make_managed_library_db(lambda p: init_database(p))
 
 def _merge_skip_reason_counts(*parts) -> dict[str, int]:
     merged = empty_skip_reason_counts()

@@ -58,7 +58,7 @@ _EMBED_PREFLIGHT_SAMPLE_SIZE = PREFLIGHT_SAMPLE_SIZE
 _EMBED_PREFLIGHT_FAIL_RATIO = PREFLIGHT_FAIL_RATIO
 _EMBED_SKIP_DETAIL_LOG_LIMIT = SKIP_DETAIL_LOG_LIMIT
 
-managed_library_db = make_managed_library_db(globals())
+managed_library_db = make_managed_library_db(lambda p: init_database(p))
 
 
 def handle_batch_text_embed(runner, job_id: str, metadata: dict) -> None:
