@@ -9,7 +9,11 @@ from collections.abc import Callable
 from lightroom_tagger.core.fallback import FallbackDispatcher
 from lightroom_tagger.core.provider_resolution import resolve_model
 from lightroom_tagger.core.search_tools import ALL_TOOLS, execute_tool
-from lightroom_tagger.core.vision_client import complete_chat_messages, complete_chat_text
+from lightroom_tagger.core.vision_client import (
+    complete_chat_messages,
+    complete_chat_text,
+    complete_chat_with_tools,
+)
 
 LogCallback = Callable[[str, str], None] | None
 
@@ -217,8 +221,9 @@ def run_tool_calling_search(
     updated_messages: list[dict] = list(messages)
 
     def fn_factory(client, mdl: str):
-        return lambda: client.chat.completions.create(
-            model=mdl,
+        return lambda: complete_chat_with_tools(
+            client,
+            mdl,
             messages=conv,
             tools=ALL_TOOLS,
             tool_choice="auto",

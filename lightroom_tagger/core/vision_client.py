@@ -295,6 +295,38 @@ def complete_chat_messages(
     return response.choices[0].message.content or ""
 
 
+def complete_chat_with_tools(
+    client: openai_sdk.OpenAI,
+    model: str,
+    *,
+    messages: list[Any],
+    tools: list[Any],
+    tool_choice: str | dict[str, Any] = "auto",
+    max_tokens: int | None = None,
+    temperature: float | None = None,
+) -> Any:
+    """Chat completion with tool schemas. Returns the raw SDK ChatCompletion."""
+    kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": cast(Any, messages),
+        "tools": tools,
+        "tool_choice": tool_choice,
+    }
+    if max_tokens is not None:
+        kwargs["max_tokens"] = max_tokens
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+    if "claude" in model.lower():
+        kwargs["extra_body"] = {"reasoning_effort": "none"}
+
+    try:
+        return client.chat.completions.create(**kwargs)
+    except Exception as exc:
+        raise _map_openai_error(
+            exc, provider=getattr(client, "_provider_id", None), model=model
+        ) from exc
+
+
 def make_score_json_llm_fixer(
     complete_text_fn: Callable[..., str],
     **kwargs: Any,
