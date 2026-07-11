@@ -28,11 +28,8 @@ def test_managed_library_db_closes_after_block(tmp_path):
 
 def test_managed_library_db_closes_on_exception(tmp_path):
     db_path = str(tmp_path / "library.db")
-    conn = None
-    with pytest.raises(RuntimeError):
-        with managed_library_db(db_path) as conn:
-            raise RuntimeError("boom")
-    assert conn is not None
+    with pytest.raises(RuntimeError), managed_library_db(db_path) as conn:
+        raise RuntimeError("boom")
     with pytest.raises(sqlite3.ProgrammingError):
         conn.execute("SELECT 1")
 
@@ -75,9 +72,8 @@ def test_managed_catalog_closes_on_exception(mock_connect_catalog):
     mock_conn = MagicMock(spec=sqlite3.Connection)
     mock_connect_catalog.return_value = mock_conn
 
-    with pytest.raises(RuntimeError):
-        with managed_catalog("/given/catalog.lrcat"):
-            raise RuntimeError("boom")
+    with pytest.raises(RuntimeError), managed_catalog("/given/catalog.lrcat"):
+        raise RuntimeError("boom")
 
     mock_conn.close.assert_called_once()
 
