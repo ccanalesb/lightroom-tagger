@@ -1,15 +1,26 @@
 """Tests for job metadata checkpoint helpers and JobRunner persistence."""
 
+import json
 import os
 import tempfile
 
 from database import create_job, get_job, init_db
 from jobs.checkpoint import (
     CHECKPOINT_VERSION,
+    build_batch_describe_checkpoint_body,
+    build_batch_embed_image_checkpoint_body,
+    build_batch_score_checkpoint_body,
+    build_batch_stack_detect_checkpoint_body,
+    build_batch_text_embed_checkpoint_body,
+    build_enrich_catalog_checkpoint_body,
+    build_prepare_catalog_checkpoint_body,
+    build_vision_match_checkpoint_body,
     fingerprint_batch_describe,
     fingerprint_batch_score,
     fingerprint_batch_stack_detect,
     fingerprint_batch_text_embed,
+    load_resume_state,
+    job_type_entry,
 )
 from jobs.runner import JobRunner
 
@@ -137,3 +148,248 @@ def test_persist_checkpoint_round_trip_and_clear() -> None:
         row2 = get_job(db, job_id)
         assert row2 is not None
         assert row2["metadata"].get("checkpoint") is None
+
+
+def _checkpoint_metadata(job_type: str, fingerprint: str, **fields) -> dict:
+    return {
+        "checkpoint": {
+            "checkpoint_version": CHECKPOINT_VERSION,
+            "job_type": job_type,
+            "fingerprint": fingerprint,
+            **fields,
+        }
+    }
+
+
+def test_load_resume_state_returns_processed_set_on_match() -> None:
+    logs: list[str] = []
+    meta = _checkpoint_metadata(
+        "batch_describe",
+        "fp-ok",
+        processed_pairs=["k1|catalog", "k2|instagram"],
+        total_at_start=2,
+    )
+    result = load_resume_state(
+        "batch_describe",
+        meta,
+        "fp-ok",
+        logs.append,
+    )
+    assert result == {"k1|catalog", "k2|instagram"}
+    assert logs == []
+
+
+def test_load_resume_state_version_mismatch_returns_empty() -> None:
+    logs: list[str] = []
+    meta = {
+        "checkpoint": {
+            "checkpoint_version": 0,
+            "job_type": "batch_describe",
+            "fingerprint": "fp-ok",
+            "processed_pairs": ["k1|catalog"],
+        }
+    }
+    assert load_resume_state("batch_describe", meta, "fp-ok", logs.append) == set()
+    assert logs == []
+
+
+def test_load_resume_state_job_type_mismatch_returns_empty() -> None:
+    logs: list[str] = []
+    meta = _checkpoint_metadata(
+        "batch_score",
+        "fp-ok",
+        processed_triplets=["k1|catalog|slug"],
+        total_at_start=1,
+    )
+    assert load_resume_state("batch_describe", meta, "fp-ok", logs.append) == set()
+    assert logs == []
+
+
+def test_load_resume_state_fingerprint_drift_logs_per_handler_message() -> None:
+    cases = [
+        (
+            "vision_match",
+            {"processed_media_keys": ["mk1"]},
+            "checkpoint mismatch: vision_match fingerprint changed, starting fresh",
+        ),
+        (
+            "enrich_catalog",
+            {"processed_image_keys": ["ik1"]},
+            "checkpoint mismatch: enrich_catalog fingerprint changed, starting fresh",
+        ),
+        (
+            "prepare_catalog",
+            {"processed_image_keys": ["ik1"]},
+            "checkpoint mismatch: prepare_catalog fingerprint changed, starting fresh",
+        ),
+        (
+            "batch_describe",
+            {"processed_pairs": ["k1|catalog"], "total_at_start": 1},
+            "checkpoint mismatch: batch_describe fingerprint changed, starting fresh",
+        ),
+        (
+            "batch_score",
+            {"processed_triplets": ["k1|catalog|slug"], "total_at_start": 1},
+            "checkpoint mismatch: batch_score fingerprint changed, starting fresh",
+        ),
+        (
+            "batch_text_embed",
+            {"processed_pairs": ["k1|catalog"], "total_at_start": 1},
+            "checkpoint mismatch: batch_text_embed fingerprint changed, starting fresh",
+        ),
+        (
+            "batch_embed_image",
+            {"processed_pairs": ["k1"], "total_at_start": 1},
+            "checkpoint mismatch: batch_embed_image fingerprint changed, starting fresh",
+        ),
+        (
+            "batch_stack_detect",
+            {"processed_image_keys": ["k1"], "total_at_start": 1},
+            "checkpoint mismatch: batch_stack_detect fingerprint changed, starting fresh",
+        ),
+    ]
+    for job_type, extra, expected_msg in cases:
+        logs: list[str] = []
+        meta = _checkpoint_metadata(job_type, "fp-stale", **extra)
+        assert load_resume_state(job_type, meta, "fp-current", logs.append) == set()
+        assert logs == [expected_msg], f"{job_type}: {logs!r}"
+
+
+def test_load_resume_state_nested_batch_analyze_describe() -> None:
+    logs: list[str] = []
+    meta = {
+        "checkpoint": {
+            "checkpoint_version": CHECKPOINT_VERSION,
+            "job_type": "batch_analyze",
+            "stage": "describe",
+            "describe": {
+                "fingerprint": "fp-stale",
+                "processed_pairs": ["k1|catalog"],
+                "total_at_start": 1,
+            },
+            "score": {},
+        }
+    }
+    assert (
+        load_resume_state(
+            "batch_describe",
+            meta,
+            "fp-current",
+            logs.append,
+            nested_sub_key="describe",
+            nested_root_job_type="batch_analyze",
+            mismatch_message=(
+                "checkpoint mismatch: batch_analyze describe fingerprint changed, "
+                "starting describe fresh"
+            ),
+        )
+        == set()
+    )
+    assert logs == [
+        "checkpoint mismatch: batch_analyze describe fingerprint changed, starting describe fresh"
+    ]
+
+
+def test_build_checkpoint_body_matches_hand_rolled_payloads() -> None:
+    fp = "abc123"
+    processed = {"b", "a"}
+    total = 7
+    cases = [
+        (
+            build_vision_match_checkpoint_body,
+            {
+                "job_type": "vision_match",
+                "fingerprint": fp,
+                "processed_media_keys": ["a", "b"],
+            },
+            {"fingerprint": fp, "processed": processed},
+        ),
+        (
+            build_enrich_catalog_checkpoint_body,
+            {
+                "job_type": "enrich_catalog",
+                "fingerprint": fp,
+                "processed_image_keys": ["a", "b"],
+            },
+            {"fingerprint": fp, "processed": processed},
+        ),
+        (
+            build_prepare_catalog_checkpoint_body,
+            {
+                "job_type": "prepare_catalog",
+                "fingerprint": fp,
+                "processed_image_keys": ["a", "b"],
+            },
+            {"fingerprint": fp, "processed": processed},
+        ),
+        (
+            build_batch_describe_checkpoint_body,
+            {
+                "job_type": "batch_describe",
+                "fingerprint": fp,
+                "processed_pairs": ["a", "b"],
+                "total_at_start": total,
+            },
+            {"fingerprint": fp, "processed": processed, "total_at_start": total},
+        ),
+        (
+            build_batch_score_checkpoint_body,
+            {
+                "job_type": "batch_score",
+                "fingerprint": fp,
+                "processed_triplets": ["a", "b"],
+                "total_at_start": total,
+            },
+            {"fingerprint": fp, "processed": processed, "total_at_start": total},
+        ),
+        (
+            build_batch_text_embed_checkpoint_body,
+            {
+                "job_type": "batch_text_embed",
+                "fingerprint": fp,
+                "processed_pairs": ["a", "b"],
+                "total_at_start": total,
+            },
+            {"fingerprint": fp, "processed": processed, "total_at_start": total},
+        ),
+        (
+            build_batch_embed_image_checkpoint_body,
+            {
+                "job_type": "batch_embed_image",
+                "fingerprint": fp,
+                "processed_pairs": ["a", "b"],
+                "total_at_start": total,
+            },
+            {"fingerprint": fp, "processed": processed, "total_at_start": total},
+        ),
+        (
+            build_batch_stack_detect_checkpoint_body,
+            {
+                "job_type": "batch_stack_detect",
+                "fingerprint": fp,
+                "processed_image_keys": ["a", "b"],
+                "total_at_start": total,
+            },
+            {"fingerprint": fp, "processed": processed, "total_at_start": total},
+        ),
+    ]
+    for builder, expected, kwargs in cases:
+        built = builder(**kwargs)
+        assert built == expected
+        assert json.dumps(built, sort_keys=True) == json.dumps(expected, sort_keys=True)
+
+
+def test_registry_build_checkpoint_body_delegates_to_helpers() -> None:
+    fp = "fp"
+    processed = {"x"}
+    jt = job_type_entry("batch_describe")
+    assert jt.build_checkpoint_body(
+        fingerprint=fp,
+        processed=processed,
+        total_at_start=3,
+    ) == {
+        "job_type": "batch_describe",
+        "fingerprint": fp,
+        "processed_pairs": ["x"],
+        "total_at_start": 3,
+    }

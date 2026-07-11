@@ -11,7 +11,7 @@ from lightroom_tagger.core import cancel_scope
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import init_database
 
-from ..checkpoint import fingerprint_batch_describe, fingerprint_batch_score
+from ..checkpoint import fingerprint_batch_describe, fingerprint_batch_score, job_type_entry, load_resume_state
 
 from .common import (
     _CHECKPOINT_MAX_ENTRIES,
@@ -444,42 +444,37 @@ def _run_describe_pass(
     images_to_describe: list[tuple[str, str]] = list(selection)
     total_at_start = len(images_to_describe)
     fp_bd = fingerprint_batch_describe(metadata, images_to_describe)
-    processed_pairs: set[str] = set()
+    jt_batch_describe = job_type_entry('batch_describe')
+
+    def _log_describe_mismatch(msg: str) -> None:
+        add_job_log(
+            runner.db,
+            job_id,
+            'info',
+            f'{log_prefix}{msg}' if log_prefix else msg,
+        )
+
     if nested_analyze_checkpoint:
-        nested_chk = _analyze_load_checkpoint(runner, job_id)
-        describe_obj = nested_chk.get('describe') if isinstance(nested_chk, dict) else None
-        if isinstance(describe_obj, dict):
-            if describe_obj.get('fingerprint') == fp_bd:
-                processed_pairs = set(describe_obj.get('processed_pairs') or [])
-            elif describe_obj.get('fingerprint'):
-                add_job_log(
-                    runner.db,
-                    job_id,
-                    'info',
-                    'checkpoint mismatch: batch_analyze describe fingerprint changed, starting describe fresh',
-                )
+        row_nested = get_job(runner.db, job_id)
+        meta_nested = (row_nested.get('metadata') or {}) if row_nested and isinstance(row_nested.get('metadata'), dict) else {}
+        processed_pairs = load_resume_state(
+            'batch_describe',
+            meta_nested,
+            fp_bd,
+            _log_describe_mismatch,
+            nested_sub_key='describe',
+            nested_root_job_type='batch_analyze',
+            mismatch_message='checkpoint mismatch: batch_analyze describe fingerprint changed, starting describe fresh',
+        )
     else:
         row_bd = get_job(runner.db, job_id)
-        if row_bd:
-            meta_bd = row_bd.get('metadata') or {}
-            if isinstance(meta_bd, dict):
-                chk_bd = meta_bd.get('checkpoint')
-                if (
-                    isinstance(chk_bd, dict)
-                    and chk_bd.get('checkpoint_version') == 1
-                    and chk_bd.get('job_type') == 'batch_describe'
-                ):
-                    if chk_bd.get('fingerprint') == fp_bd:
-                        processed_pairs = set(chk_bd.get('processed_pairs') or [])
-                    else:
-                        add_job_log(
-                            runner.db,
-                            job_id,
-                            'info',
-                            f'{log_prefix}checkpoint mismatch: batch_describe fingerprint changed, starting fresh'
-                            if log_prefix else
-                            'checkpoint mismatch: batch_describe fingerprint changed, starting fresh',
-                        )
+        meta_bd = (row_bd.get('metadata') or {}) if row_bd and isinstance(row_bd.get('metadata'), dict) else {}
+        processed_pairs = load_resume_state(
+            'batch_describe',
+            meta_bd,
+            fp_bd,
+            _log_describe_mismatch,
+        )
 
     def pair_label(key: str, itype: str) -> str:
         return f'{key}|{itype}'
@@ -574,7 +569,11 @@ def _run_describe_pass(
         else:
             runner.persist_checkpoint(
                 job_id,
-                {'job_type': 'batch_describe', **describe_payload},
+                jt_batch_describe.build_checkpoint_body(
+                    fingerprint=fp_bd,
+                    processed=processed_pairs,
+                    total_at_start=total_at_start,
+                ),
             )
         return True
 
@@ -933,42 +932,37 @@ def _run_score_pass(
     ]
     total_at_start = len(work_triples)
     fp_bs = fingerprint_batch_score(metadata, work_triples)
-    processed_triplets: set[str] = set()
+    jt_batch_score = job_type_entry('batch_score')
+
+    def _log_score_mismatch(msg: str) -> None:
+        add_job_log(
+            runner.db,
+            job_id,
+            'info',
+            f'{log_prefix}{msg}' if log_prefix else msg,
+        )
+
     if nested_analyze_checkpoint:
-        nested_chk = _analyze_load_checkpoint(runner, job_id)
-        score_obj = nested_chk.get('score') if isinstance(nested_chk, dict) else None
-        if isinstance(score_obj, dict):
-            if score_obj.get('fingerprint') == fp_bs:
-                processed_triplets = set(score_obj.get('processed_triplets') or [])
-            elif score_obj.get('fingerprint'):
-                add_job_log(
-                    runner.db,
-                    job_id,
-                    'info',
-                    'checkpoint mismatch: batch_analyze score fingerprint changed, starting score fresh',
-                )
+        row_nested = get_job(runner.db, job_id)
+        meta_nested = (row_nested.get('metadata') or {}) if row_nested and isinstance(row_nested.get('metadata'), dict) else {}
+        processed_triplets = load_resume_state(
+            'batch_score',
+            meta_nested,
+            fp_bs,
+            _log_score_mismatch,
+            nested_sub_key='score',
+            nested_root_job_type='batch_analyze',
+            mismatch_message='checkpoint mismatch: batch_analyze score fingerprint changed, starting score fresh',
+        )
     else:
         row_bs = get_job(runner.db, job_id)
-        if row_bs:
-            meta_bs = row_bs.get('metadata') or {}
-            if isinstance(meta_bs, dict):
-                chk_bs = meta_bs.get('checkpoint')
-                if (
-                    isinstance(chk_bs, dict)
-                    and chk_bs.get('checkpoint_version') == 1
-                    and chk_bs.get('job_type') == 'batch_score'
-                ):
-                    if chk_bs.get('fingerprint') == fp_bs:
-                        processed_triplets = set(chk_bs.get('processed_triplets') or [])
-                    else:
-                        add_job_log(
-                            runner.db,
-                            job_id,
-                            'info',
-                            f'{log_prefix}checkpoint mismatch: batch_score fingerprint changed, starting fresh'
-                            if log_prefix else
-                            'checkpoint mismatch: batch_score fingerprint changed, starting fresh',
-                        )
+        meta_bs = (row_bs.get('metadata') or {}) if row_bs and isinstance(row_bs.get('metadata'), dict) else {}
+        processed_triplets = load_resume_state(
+            'batch_score',
+            meta_bs,
+            fp_bs,
+            _log_score_mismatch,
+        )
 
     def triplet_label(key: str, itype: str, slug: str) -> str:
         return f'{key}|{itype}|{slug}'
@@ -1075,7 +1069,11 @@ def _run_score_pass(
         else:
             runner.persist_checkpoint(
                 job_id,
-                {'job_type': 'batch_score', **score_payload},
+                jt_batch_score.build_checkpoint_body(
+                    fingerprint=fp_bs,
+                    processed=processed_triplets,
+                    total_at_start=total_at_start,
+                ),
             )
         return True
 
