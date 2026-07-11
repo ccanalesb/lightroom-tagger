@@ -11,7 +11,9 @@ The visualizer is the web product that surfaces library data to the user. It con
 | **job** | A background task (e.g. run matching, score images, generate descriptions). Stored in `visualizer.db`. Has a lifecycle: `pending → running → completed / failed / cancelled`. |
 | **job runner** | `JobRunner` in `jobs/runner.py` — coordinates job lifecycle, progress hooks, cancellation events, and thread-local DB connections for worker threads. |
 | **job processor** | Daemon thread started at app startup that drains the job queue and dispatches to handlers. |
-| **handler** | A function in `jobs/handlers.py` that implements a specific job type (e.g. `handle_single_match`, `handle_describe`). |
+| **handler** | A function in `jobs/handlers/` (one module per job family) that implements a specific job type (e.g. `handle_vision_match`, `handle_batch_describe`). |
+| **job-type registry** | `jobs/registry.py` — explicit `JOB_TYPES` list (`JobType` dataclass) co-locating handler, catalog requirement, and checkpoint helpers per type. Single registration surface; mirrors ADR-0006. See ADR-0010. |
+| **job transitions seam** | `jobs/transitions.py` — pure cancel/retry status legality and `update_job_status` targets. Routes delegate via `transition_cancel` / `transition_retry`; no status-rule literals in `api/jobs.py`. See ADR-0010. |
 | **checkpoint** | Persisted job progress snapshot merged into job metadata so interrupted jobs can resume. |
 | **emit_progress** | SocketIO callback passed into job runner and handlers to push real-time progress to the frontend. |
 | **visualizer DB** | `visualizer.db` — SQLite database holding jobs, logs, and visualizer-specific state. Separate from `library.db`. |
@@ -34,7 +36,9 @@ The visualizer is the web product that surfaces library data to the user. It con
 | `database.py` | Visualizer DB schema and helpers (jobs, logs, checkpoints) |
 | `library_db.py` | Thin wrapper for opening `library.db` connections from the backend |
 | `jobs/runner.py` | `JobRunner` — lifecycle, cancellation, thread-local DB, progress hooks |
-| `jobs/handlers.py` | Per-job-type handler functions |
+| `jobs/registry.py` | Explicit `JOB_TYPES` registry — dispatch, catalog requirement, checkpoint co-location |
+| `jobs/handlers/` | Per-job-family handler modules (`analyze`, `matching`, `embed`, …) |
+| `jobs/transitions.py` | Pure cancel/retry state machine (`transition_cancel`, `transition_retry`) |
 | `jobs/checkpoint.py` | Checkpoint merge logic |
 | `api/jobs.py` | REST endpoints for job CRUD and cancellation |
 | `api/images.py` | Image listing, detail, thumbnail endpoints |
@@ -69,3 +73,5 @@ The visualizer is the web product that surfaces library data to the user. It con
 - **`sys.path` includes repo root**: `app.py` inserts the monorepo root so `lightroom_tagger.*` imports resolve from the backend.
 - **Dev proxy**: Vite proxies `/api` and `/socket.io` to `localhost:5001`; don't hardcode backend URLs in frontend code.
 - **Design system**: all UI work must follow `apps/visualizer/frontend/DESIGN.md` (Tailwind semantic classes, 8px grid, Inter font, single blue accent).
+- **Job-type knowledge through `JOB_TYPES` only** (ADR-0010): dispatch (`get_job_handler`), catalog gating (`catalog_requiring_job_types` / `JOB_TYPES_REQUIRING_CATALOG`), and checkpoint helpers are registry projections — no second handler map or catalog frozenset (enforced by `test_job_registry_guardrail.py`).
+- **Job status transitions through `jobs/transitions.py` only** (ADR-0010): `api/jobs.py` delegates cancel/retry to `transition_cancel` / `transition_retry`; no cancellable/retryable status sets or `update_job_status` targets in routes (enforced by `test_job_transitions_guardrail.py`).
