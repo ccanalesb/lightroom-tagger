@@ -34,6 +34,8 @@
 | **library DB** | `library.db` — the project's own SQLite database (not the Lightroom catalog). Holds indexed images, matches, scores, descriptions, and job state for the CLI path. |
 | **library_write** | Process-wide writer lock + `BEGIN IMMEDIATE` used for all writes to `library.db` to prevent `SQLITE_BUSY` under parallel workers. |
 | **library-DB read seam** | Typed read helpers in `lightroom_tagger.core.database` — the only supported way for blueprints, tools, and handlers to query `library.db` tables. Returns detached `dict`/scalar/list/set values, never live `sqlite3.Row`. See ADR-0008. |
+| **library-DB lifecycle seam** | Open/close `library.db` through `managed_library_db(path)` (or CLI `with_library_db` / handler `make_managed_library_db`) — never hand-roll `init_database(...)` + manual `close()` at orchestration sites. See ADR-0011. |
+| **catalog lifecycle seam** | Open/close a `.lrcat` read connection through `managed_catalog(path)` — never hand-roll `connect_catalog(...)` + manual `close()` at orchestration sites. See ADR-0011. |
 | **cancel scope** | Thread-local cooperative cancellation. A batch worker registers a `cancel_check` callback for its thread; retry sleeps and fallback dispatcher honour it. Triggered from the visualizer UI (user cancels a job) and intended to work from CLI too. |
 
 ## Key modules
@@ -73,12 +75,24 @@
 | `cli` | `argparse` CLI entry point (`lightroom-tagger` and friends); `run()` builds parser, applies global overrides, dispatches |
 | `cli_commands` | Explicit command registry (`Command` dataclass + `COMMANDS` list) — each command's name, flags, and handler live in one place |
 | `cli_cmds_extra` | Heavyweight CLI subcommands (`export`, `init`, `stats`, `enrich-catalog`) split out to keep `cli` under size budget |
+| `cli_library_db` | CLI adapter — `resolve_library_db_path`, `with_library_db`, and `CliError` mapping to exit code 1 |
+| `managed_connections` | `managed_library_db` and `managed_catalog` lifecycle context managers (ADR-0011) |
+
+## Error-handling layers
+
+Four distinct error surfaces — do not conflate them:
+
+1. **CLI** → `print("Error: …")` + `return 1` (`cli_library_db.map_cli_errors`, `CliError`).
+2. **HTTP/API** (visualizer) → `utils/responses.py` helpers (`error_not_found`, `error_bad_request`, …).
+3. **Provider/LLM dispatch** → `ErrorPolicy` retry/escalation ladder on `FallbackDispatcher` (issue #81, parent #54; ADR-0009).
+4. **Domain error types** → `lightroom_tagger.core.exceptions` (`ProviderError` hierarchy, `StackMutationError`, …; ADR-0004).
 
 ## Architectural constraints
 
 - **Lightroom catalog is read-only** except for keyword writes via `lightroom/writer.py`.
 - **One writer at a time** on `library.db`: always use `library_write` context manager for DML; never bare `conn.commit()` in parallel worker paths.
 - **Library-DB reads through core.database only**: blueprints, job handlers, CLI tools, and `search_tools` must not issue raw SQL against library tables — use typed helpers from `lightroom_tagger.core.database` (ADR-0008). Helpers return detached rows (`dict`), never live `sqlite3.Row`.
+- **Library-DB and catalog lifecycle through managed context managers only** (ADR-0011): use `managed_library_db` / `managed_catalog` (or CLI `with_library_db` / handler `make_managed_library_db`); no hand-rolled `init_database(...)` or `connect_catalog(...)` + manual `close()` at orchestration sites (enforced by `test_db_lifecycle_guardrail.py`).
 - **Provider/model resolution through `resolve_model` only** (ADR-0007): no ad-hoc precedence ladders at call sites.
 - **Provider/LLM calls through the dispatcher seam only** (ADR-0009): orchestration code uses `FallbackDispatcher.call_with_fallback` with `vision_client` / `vision_client_batch` helpers inside `fn_factory`; no raw `client.chat.completions.create` outside the seam (enforced by `test_provider_call_guardrail.py`).
 - **Providers are OpenAI-compatible**: all vision/LLM calls go through `openai.OpenAI` client regardless of backend (Ollama, NIM, OpenRouter).
