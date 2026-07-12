@@ -91,11 +91,10 @@ type AdvancedBusyKey =
   | 'prepare';
 
 export interface CatalogCacheTabProps {
-  onJobEnqueued?: () => void;
   onOpenJobQueue?: () => void;
 }
 
-export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheTabProps) {
+export function CatalogCacheTab({ onOpenJobQueue }: CatalogCacheTabProps) {
   const [showPipeline, setShowPipeline] = useState(false);
   const [listRev, setListRev] = useState(0);
   const stats = useQuery(['catalog.cache.stats', listRev] as const, fetchCacheStats);
@@ -137,14 +136,13 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
     try {
       await JobsAPI.create('catalog_cache_build', {});
       setBuildSuccess(true);
-      onJobEnqueued?.();
     } catch (err) {
       const message = err instanceof Error ? err.message : MSG_FAILED_START_JOB;
       setBuildError(message);
     } finally {
       setBuildStarting(false);
     }
-  }, [onJobEnqueued]);
+  }, []);
 
   const pipelineQueuedMessageForKey = useCallback((key: AdvancedBusyKey): string => {
     if (key === 'embed_catalog' || key === 'embed_catalog_ig') {
@@ -169,7 +167,6 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
         }
         invalidateAll(['catalog.cache.pipeline-status']);
         setPipelineQueuedMessage(pipelineQueuedMessageForKey(key));
-        onJobEnqueued?.();
       } catch (err) {
         const message = err instanceof Error ? err.message : MSG_FAILED_START_JOB;
         alert(`${MSG_FAILED_START_JOB}: ${message}`);
@@ -177,7 +174,7 @@ export function CatalogCacheTab({ onJobEnqueued, onOpenJobQueue }: CatalogCacheT
         setAdvancedBusy(null);
       }
     },
-    [onJobEnqueued, pipelineQueuedMessageForKey],
+    [pipelineQueuedMessageForKey],
   );
 
   const cachePercentage =
