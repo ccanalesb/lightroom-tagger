@@ -60,10 +60,12 @@ The visualizer is the web product that surfaces library data to the user. It con
 | `src/pages/` | Page components: Dashboard, Images, Processing, Analytics, Identity, Search |
 | `src/components/` | Shared UI components |
 | `src/services/` | API client (`api.ts`) and WebSocket service |
-| `src/hooks/` | Custom hooks (e.g. `useJobSocket`) |
+| `src/hooks/` | Custom hooks (e.g. `useJobSocket` — invalidates `jobs.list` on server-emitted `job_created`) |
 | `src/stores/` | Zustand stores (minimal — mainly WebSocket state) |
 | `src/constants/` | UI strings and other constants |
 | `src/types/` | Shared TypeScript types |
+
+The server emits `job_created` on job creation (`POST /jobs`); `useJobSocket` owns the resulting `jobs.list` invalidation.
 
 ## Architectural constraints
 
