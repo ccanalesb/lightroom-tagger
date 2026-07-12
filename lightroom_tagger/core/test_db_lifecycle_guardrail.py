@@ -30,9 +30,6 @@ _ALLOWLISTED_FUNCTIONS: frozenset[tuple[str, str]] = frozenset(
 )
 
 _OPEN_FUNCS: frozenset[str] = frozenset({"init_database", "connect_catalog"})
-_MANAGED_CM_NAMES: frozenset[str] = frozenset(
-    {"managed_library_db", "managed_catalog"}
-)
 
 _CLI_TARGET_PATHS: tuple[str, ...] = (
     "lightroom_tagger/core/cli.py",
@@ -113,15 +110,6 @@ class _HandRolledLifecycleVisitor(ast.NodeVisitor):
         self._opened = {}
         self.generic_visit(node)
         self._opened = saved
-
-    def visit_With(self, node: ast.With) -> None:
-        for item in node.items:
-            ctx = item.context_expr
-            if isinstance(ctx, ast.Call) and _call_name(ctx) in _MANAGED_CM_NAMES:
-                continue
-            if isinstance(ctx, ast.Name) and ctx.id in _MANAGED_CM_NAMES:
-                continue
-        self.generic_visit(node)
 
     def visit_Assign(self, node: ast.Assign) -> None:
         opener = _is_open_call(node.value)
