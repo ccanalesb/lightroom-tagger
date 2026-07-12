@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
+import { invalidateAll } from '../../data';
+import type { Job } from '../../types/job';
 import { useJobSocket } from '../useJobSocket';
 
 const mockSocket = {
@@ -25,6 +27,7 @@ vi.mock('../../stores/socketStore', () => ({
 vi.mock('../../data', () => ({
   invalidate: vi.fn(),
   invalidateAll: vi.fn(),
+  patchMatching: vi.fn(),
 }));
 
 describe('useJobSocket', () => {
@@ -79,5 +82,22 @@ describe('useJobSocket', () => {
     const { result } = renderHook(() => useJobSocket({}));
     expect(typeof result.current.refreshJobList).toBe('function');
     expect(result.current.jobListRevision).toBe(0);
+  });
+
+  it('should invalidate jobs.list and bump revision on job_created', () => {
+    const { result } = renderHook(() => useJobSocket({}));
+
+    const createdHandler = mockSocket.on.mock.calls.find(
+      ([name]: [string]) => name === 'job_created',
+    )?.[1] as (job: Job) => void;
+    expect(createdHandler).toBeDefined();
+
+    const job = { id: 'job-new', status: 'pending', type: 'vision_match' } as Job;
+    act(() => {
+      createdHandler(job);
+    });
+
+    expect(invalidateAll).toHaveBeenCalledWith(['jobs.list']);
+    expect(result.current.jobListRevision).toBe(1);
   });
 });

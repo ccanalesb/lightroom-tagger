@@ -1,6 +1,7 @@
 import os
 import sys
 import tempfile
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -8,6 +9,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 from app import create_app
 from database import init_db
+
+
+@pytest.fixture
+def mock_socketio(monkeypatch):
+    mock = MagicMock()
+    import app as app_mod
+
+    monkeypatch.setattr(app_mod, 'socketio', mock)
+    return mock
 
 
 @pytest.fixture
@@ -36,6 +46,21 @@ def test_create_job(client):
     assert response.status_code == 201
     assert 'id' in response.json
     assert response.json['status'] == 'pending'
+
+
+def test_create_job_emits_socketio(client, mock_socketio):
+    response = client.post(
+        '/api/jobs/',
+        json={'type': 'analyze_instagram', 'metadata': {}},
+    )
+    assert response.status_code == 201
+    job_id = response.json['id']
+    mock_socketio.emit.assert_called_once()
+    assert mock_socketio.emit.call_args[0][0] == 'job_created'
+    payload = mock_socketio.emit.call_args[0][1]
+    assert payload['id'] == job_id
+    assert payload['status'] == 'pending'
+    assert payload == response.json
 
 def test_create_instagram_import_job(client):
     response = client.post(

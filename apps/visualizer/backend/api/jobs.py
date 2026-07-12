@@ -102,6 +102,10 @@ def create_new_job():
             return _db_busy_response()
         raise
 
+    from app import socketio
+
+    if socketio:
+        socketio.emit('job_created', _compact_job_payload(job))
     return jsonify(_compact_job_payload(job)), 201
 
 @bp.route('/<job_id>', methods=['GET'])
