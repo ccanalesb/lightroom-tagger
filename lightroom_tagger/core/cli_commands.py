@@ -14,6 +14,10 @@ from lightroom_tagger.core.cli_cmds_extra import (
     cmd_stats,
 )
 
+# Registry handlers expose ``(args, config) -> int``. Library-DB commands are
+# wrapped by ``@with_library_db`` (or ``@map_cli_errors`` + manual DB open for
+# ``scan``) so dispatch stays ADR-0006-compatible while bodies take ``db``.
+
 
 @dataclass(frozen=True)
 class Command:
