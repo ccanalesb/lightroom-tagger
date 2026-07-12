@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 # an HTML comment in the perspective markdown. This marker is the sole source of
 # truth for ``perspectives.optional``: it is re-derived on every write of
 # ``prompt_markdown`` (seed, create, edit, reset-to-default) so a changed marker
-# always wins and cannot drift. See ADR-0005.
+# always wins and cannot drift. See ADR-0012.
 _OPTIONAL_MARKER_RE = re.compile(r"<!--\s*optional\s*:\s*true\s*-->", re.IGNORECASE)
 
 
@@ -72,7 +72,7 @@ def insert_perspective(
 
     ``optional`` (excusable) is derived from the ``prompt_markdown`` marker, never
     passed in: an optional perspective may be scored ``not_attempted`` and such
-    excused rows are excluded from identity aggregation. See ADR-0005.
+    excused rows are excluded from identity aggregation. See ADR-0012.
     """
     now = datetime.now(timezone.utc).isoformat()
     optional = markdown_marks_optional(prompt_markdown)
@@ -110,7 +110,7 @@ def update_perspective(
 
     ``optional`` is not a parameter: whenever ``prompt_markdown`` is written, it is
     re-derived from the markdown marker so the marker stays authoritative (a removed
-    marker un-sets optional). Updates that don't touch the markdown leave it. See ADR-0005.
+    marker un-sets optional). Updates that don't touch the markdown leave it. See ADR-0012.
     """
     fields: list[str] = []
     values: list = []

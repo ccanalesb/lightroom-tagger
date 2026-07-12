@@ -1,4 +1,4 @@
-# ADR-0005: Excusable (not-attempted) perspectives
+# ADR-0012: Excusable (not-attempted) perspectives
 
 **Status:** Accepted  
 **Date:** 2026-07-02
