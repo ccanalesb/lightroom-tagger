@@ -18,6 +18,7 @@ The visualizer is the web product that surfaces library data to the user. It con
 | **emit_progress** | SocketIO callback passed into job runner and handlers to push real-time progress to the frontend. |
 | **visualizer DB** | `visualizer.db` — SQLite database holding jobs, logs, and visualizer-specific state. Separate from `library.db`. |
 | **library DB** | `library.db` — the shared library database (images, scores, descriptions, matches). The visualizer reads/writes this via the `lightroom_tagger` library. |
+| **library-DB lifecycle seam** | Job handlers open `library.db` via `make_managed_library_db` in `jobs/handlers/db_lifecycle.py` (backed by `init_database`); never hand-roll `init_database(...)` + manual `close()` in handler bodies. See ADR-0011. |
 | **blueprint** | A Flask blueprint under `apps/visualizer/backend/api/`. One per domain area (jobs, images, descriptions, providers, scores, analytics, identity, system). |
 | **response helpers** | `utils/responses.py` — `error_not_found`, `error_bad_request`, `success_paginated`, etc. Always use these for consistent JSON shapes. |
 | **WebSocket / SocketIO** | Real-time job progress pushed from backend to frontend via Flask-SocketIO + socket.io-client. |
@@ -75,3 +76,4 @@ The visualizer is the web product that surfaces library data to the user. It con
 - **Design system**: all UI work must follow `apps/visualizer/frontend/DESIGN.md` (Tailwind semantic classes, 8px grid, Inter font, single blue accent).
 - **Job-type knowledge through `JOB_TYPES` only** (ADR-0010): dispatch (`get_job_handler`), catalog gating (`catalog_requiring_job_types` / `JOB_TYPES_REQUIRING_CATALOG`), and checkpoint helpers are registry projections — no second handler map or catalog frozenset (enforced by `test_job_registry_guardrail.py`).
 - **Job status transitions through `jobs/transitions.py` only** (ADR-0010): `api/jobs.py` delegates cancel/retry to `transition_cancel` / `transition_retry`; no cancellable/retryable status sets or `update_job_status` targets in routes (enforced by `test_job_transitions_guardrail.py`).
+- **Library-DB lifecycle through `make_managed_library_db` only** (ADR-0011): handler modules bind one module-level CM via `jobs/handlers/db_lifecycle.py`; no hand-rolled `init_database(...)` + manual `close()` in handler orchestration (enforced by `test_db_lifecycle_guardrail.py`).
