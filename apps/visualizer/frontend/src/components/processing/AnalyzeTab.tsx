@@ -95,12 +95,7 @@ export function buildDateMetadata(
   return base;
 }
 
-export interface AnalyzeTabProps {
-  onJobEnqueued?: () => void;
-}
-
-export function AnalyzeTab(props: AnalyzeTabProps = {}) {
-  const { onJobEnqueued } = props;
+export function AnalyzeTab() {
   const { options, updateOption } = useMatchOptions();
   const [imageType, setImageType] = useState<ImageType>('both');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
@@ -225,7 +220,6 @@ export function AnalyzeTab(props: AnalyzeTabProps = {}) {
       try {
         const job = await JobsAPI.create(jobType, metadata);
         showStatus('success', successMessage, job.id);
-        onJobEnqueued?.();
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Unknown error';
         showStatus('error', `${ANALYZE_JOB_FAILED_PREFIX} ${msg}`);
@@ -234,7 +228,7 @@ export function AnalyzeTab(props: AnalyzeTabProps = {}) {
         submitInFlightRef.current = false;
       }
     },
-    [showStatus, onJobEnqueued],
+    [showStatus],
   );
 
   const startAnalyze = useCallback(() => {

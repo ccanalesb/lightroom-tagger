@@ -127,7 +127,7 @@ export function ProcessingPage() {
           )}
         >
           <Suspense fallback={tabSuspenseFallback}>
-            <MatchingTab onJobEnqueued={refreshJobList} />
+            <MatchingTab />
           </Suspense>
         </ErrorBoundary>
       ),
@@ -142,7 +142,7 @@ export function ProcessingPage() {
           )}
         >
           <Suspense fallback={tabSuspenseFallback}>
-            <AnalyzeTab onJobEnqueued={refreshJobList} />
+            <AnalyzeTab />
           </Suspense>
         </ErrorBoundary>
       ),
@@ -184,7 +184,7 @@ export function ProcessingPage() {
           )}
         >
           <Suspense fallback={tabSuspenseFallback}>
-            <CatalogCacheTab onJobEnqueued={refreshJobList} onOpenJobQueue={openJobQueueTab} />
+            <CatalogCacheTab onOpenJobQueue={openJobQueueTab} />
           </Suspense>
         </ErrorBoundary>
       ),
