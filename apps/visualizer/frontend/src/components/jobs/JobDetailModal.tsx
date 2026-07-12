@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   JOB_CONFIG_DATE_WINDOW,
   JOB_CONFIG_METHOD,
@@ -33,7 +33,7 @@ import {
 } from '../../constants/strings';
 import { ErrorBoundary, useQuery } from '../../data';
 import { JobsAPI } from '../../services/api';
-import { useSocketStore } from '../../stores/socketStore';
+import { useJobSocket } from '../../hooks/useJobSocket';
 import type { Job } from '../../types/job';
 import { formatDateTime } from '../../utils/date';
 import { Badge } from '../ui/badges';
@@ -210,7 +210,24 @@ function JobDetailModalBody({ job, onClose, onJobUpdate }: JobDetailModalProps) 
   useEffect(() => {
     logsExpandedRef.current = logsExpanded;
   }, [logsExpanded]);
-  const socket = useSocketStore((state) => state.socket);
+  const handleJobUpdate = useCallback(
+    (updatedJob: Job) => {
+      if (updatedJob.id !== job.id) return;
+      if (logsExpandedRef.current) {
+        setLocalJob(updatedJob);
+      } else {
+        setLocalJob((prev) => ({
+          ...updatedJob,
+          logs: prev.logs,
+          logs_total: updatedJob.logs_total ?? updatedJob.logs?.length ?? prev.logs_total,
+        }));
+      }
+      onJobUpdate?.(updatedJob);
+    },
+    [job.id, onJobUpdate],
+  );
+
+  const { socket } = useJobSocket({ onJobUpdated: handleJobUpdate });
 
   useEffect(() => {
     setLocalJob(queried);
@@ -239,27 +256,10 @@ function JobDetailModalBody({ job, onClose, onJobUpdate }: JobDetailModalProps) 
 
     socket.emit('subscribe_job', { job_id: job.id });
 
-    const handleJobUpdate = (updatedJob: Job) => {
-      if (updatedJob.id !== job.id) return;
-      if (logsExpandedRef.current) {
-        setLocalJob(updatedJob);
-      } else {
-        setLocalJob((prev) => ({
-          ...updatedJob,
-          logs: prev.logs,
-          logs_total: updatedJob.logs_total ?? updatedJob.logs?.length ?? prev.logs_total,
-        }));
-      }
-      onJobUpdate?.(updatedJob);
-    };
-
-    socket.on('job_updated', handleJobUpdate);
-
     return () => {
       socket.emit('unsubscribe_job', { job_id: job.id });
-      socket.off('job_updated', handleJobUpdate);
     };
-  }, [socket, job.id, onJobUpdate]);
+  }, [socket, job.id]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {

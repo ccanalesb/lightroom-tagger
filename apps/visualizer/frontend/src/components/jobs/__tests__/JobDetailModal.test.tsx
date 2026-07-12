@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import { deleteMatching } from '../../../data/cache';
 import { JobDetailModal } from '../JobDetailModal';
 import type { Job } from '../../../types/job';
@@ -18,8 +18,15 @@ vi.mock('../../../services/api', () => ({
   },
 }));
 
-vi.mock('../../../stores/socketStore', () => ({
-  useSocketStore: () => null,
+const mockEmit = vi.fn();
+const mockSocket = { emit: mockEmit };
+let capturedOnJobUpdated: ((job: Job) => void) | undefined;
+
+vi.mock('../../../hooks/useJobSocket', () => ({
+  useJobSocket: (opts: { onJobUpdated?: (job: Job) => void }) => {
+    capturedOnJobUpdated = opts.onJobUpdated;
+    return { socket: mockSocket, connected: true };
+  },
 }));
 
 
@@ -46,6 +53,8 @@ describe('JobDetailModal', () => {
   beforeEach(() => {
     deleteMatching(() => true);
     mockGet.mockReset();
+    mockEmit.mockReset();
+    capturedOnJobUpdated = undefined;
   });
   afterEach(() => {
     vi.clearAllMocks();
@@ -281,5 +290,116 @@ describe('JobDetailModal', () => {
 
     expect(await screen.findByText(JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE)).toBeTruthy();
     expect(screen.getByText(JOB_SKIP_MISSING_FILE).parentElement).toHaveTextContent('3');
+  });
+
+  it('emits subscribe_job on open and unsubscribe_job on close', async () => {
+    mockGet.mockResolvedValue(makeJob());
+    const { unmount } = render(<JobDetailModal job={makeJob()} onClose={() => {}} />);
+    await waitFor(() => {
+      expect(mockEmit).toHaveBeenCalledWith('subscribe_job', { job_id: 'job-1' });
+    });
+    unmount();
+    expect(mockEmit).toHaveBeenCalledWith('unsubscribe_job', { job_id: 'job-1' });
+  });
+
+  it('updates displayed job data when job_updated arrives via useJobSocket', async () => {
+    const pendingJob = makeJob({ status: 'pending', progress: 0, current_step: null });
+    mockGet.mockResolvedValue(pendingJob);
+    render(<JobDetailModal job={pendingJob} onClose={() => {}} />);
+    await waitFor(() => {
+      expect(mockEmit).toHaveBeenCalledWith('subscribe_job', { job_id: 'job-1' });
+    });
+    expect(capturedOnJobUpdated).toBeDefined();
+
+    act(() => {
+      capturedOnJobUpdated!(
+        makeJob({
+          status: 'running',
+          progress: 0.42,
+          current_step: 'Embedding images',
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/running/i)).toBeTruthy();
+      expect(screen.getByText('42%')).toBeTruthy();
+      expect(screen.getByText('Embedding images')).toBeTruthy();
+    });
+  });
+
+  it('preserves local logs on job_updated when logs are not expanded', async () => {
+    const initialLogs = Array.from({ length: 20 }, (_, i) => ({
+      timestamp: new Date().toISOString(),
+      level: 'info' as const,
+      message: `initial-${i}`,
+    }));
+    mockGet.mockResolvedValue(
+      makeJob({
+        logs: initialLogs,
+        logs_total: 50,
+      }),
+    );
+    render(<JobDetailModal job={makeJob()} onClose={() => {}} />);
+    await waitFor(() => {
+      expect(screen.getByText('initial-0')).toBeTruthy();
+    });
+
+    act(() => {
+      capturedOnJobUpdated!(
+        makeJob({
+          logs: [{ timestamp: new Date().toISOString(), level: 'info', message: 'socket-log' }],
+          logs_total: 51,
+          status: 'running',
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/running/i)).toBeTruthy();
+    });
+    expect(screen.getByText('initial-0')).toBeTruthy();
+    expect(screen.queryByText('socket-log')).toBeNull();
+  });
+
+  it('replaces logs on job_updated when logs are expanded', async () => {
+    const truncatedJob = makeJob({
+      logs: Array.from({ length: 20 }, (_, i) => ({
+        timestamp: new Date().toISOString(),
+        level: 'info' as const,
+        message: `m${i}`,
+      })),
+      logs_total: 50,
+    });
+    const fullJob = makeJob({
+      logs: Array.from({ length: 50 }, (_, i) => ({
+        timestamp: new Date().toISOString(),
+        level: 'info' as const,
+        message: `full-${i}`,
+      })),
+      logs_total: 50,
+    });
+    mockGet.mockResolvedValueOnce(truncatedJob).mockResolvedValueOnce(fullJob);
+    render(<JobDetailModal job={makeJob()} onClose={() => {}} />);
+    const showAll = await screen.findByText(/Show all 50 logs/);
+    fireEvent.click(showAll);
+    await waitFor(() => {
+      expect(screen.getByText('full-0')).toBeTruthy();
+    });
+
+    act(() => {
+      capturedOnJobUpdated!(
+        makeJob({
+          logs: [{ timestamp: new Date().toISOString(), level: 'info', message: 'live-log' }],
+          logs_total: 51,
+          status: 'running',
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('live-log')).toBeTruthy();
+    });
+    expect(screen.queryByText('full-0')).toBeNull();
   });
 });
