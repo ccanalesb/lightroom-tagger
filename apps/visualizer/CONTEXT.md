@@ -65,7 +65,7 @@ The visualizer is the web product that surfaces library data to the user. It con
 | `src/constants/` | UI strings and other constants |
 | `src/types/` | Shared TypeScript types |
 
-The server emits `job_created` on job creation (`POST /jobs`); `useJobSocket` owns the resulting `jobs.list` invalidation. No component hand-bubbles a job-list-refresh callback (e.g. an `onJobEnqueued` prop) outside `useJobSocket` — refresh-on-enqueue is driven by the server's `job_created` event.
+The server emits `job_created` on job creation (`POST /jobs`); `useJobSocket` owns the resulting `jobs.list` invalidation. No component hand-bubbles a job-list-refresh callback (e.g. an `onJobEnqueued` prop) outside `useJobSocket` — refresh-on-enqueue is driven by the server's `job_created` event. No component subscribes to job socket events (`job_created` / `job_updated` / `jobs_recovered`) outside `useJobSocket`. Per-job `subscribe_job` / `unsubscribe_job` emits are the one allowed exception (job-instance scoped, not fan-out).
 
 ## Architectural constraints
 
