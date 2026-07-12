@@ -11,8 +11,8 @@ from lightroom_tagger.core import cancel_scope
 from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import init_database
 
+from .db_lifecycle import make_managed_library_db
 from ..checkpoint import fingerprint_batch_describe, fingerprint_batch_score, job_type_entry, load_resume_state
-
 from .common import (
     _CHECKPOINT_MAX_ENTRIES,
     _CATALOG_NOT_VIDEO_SQL,
@@ -23,6 +23,8 @@ from .common import (
     _select_instagram_keys,
 )
 from .path_diagnostics import PathSkipDiagnostics, empty_skip_reason_counts
+
+managed_library_db = make_managed_library_db(lambda p: init_database(p))
 
 def _merge_skip_reason_counts(*parts) -> dict[str, int]:
     merged = empty_skip_reason_counts()
@@ -210,7 +212,6 @@ def _describe_single_image(
 
 def handle_single_describe(runner, job_id: str, metadata: dict):
     """Generate an AI description for a single image, run as an async job."""
-    lib_db = None
     try:
         image_key = metadata.get('image_key')
         image_type = metadata.get('image_type', 'catalog')
@@ -226,47 +227,43 @@ def handle_single_describe(runner, job_id: str, metadata: dict):
         db_path = _resolve_library_db_or_fail(runner, job_id)
         if db_path is None:
             return
-        lib_db = init_database(db_path)
+        with managed_library_db(db_path) as lib_db:
+            raw_ps = metadata.get('perspective_slugs')
+            if isinstance(raw_ps, list) and len(raw_ps) > 0:
+                perspective_slugs = [str(x) for x in raw_ps]
+            else:
+                perspective_slugs = None
 
-        raw_ps = metadata.get('perspective_slugs')
-        if isinstance(raw_ps, list) and len(raw_ps) > 0:
-            perspective_slugs = [str(x) for x in raw_ps]
-        else:
-            perspective_slugs = None
+            runner.update_progress(job_id, 10, f'Describing {image_type} image…')
 
-        runner.update_progress(job_id, 10, f'Describing {image_type} image…')
+            path_diag = PathSkipDiagnostics(
+                runner,
+                job_id,
+                lib_db,
+                job_label='single_describe',
+            )
+            if not path_diag.run_preflight([image_key]):
+                return
 
-        path_diag = PathSkipDiagnostics(
-            runner,
-            job_id,
-            lib_db,
-            job_label='single_describe',
-        )
-        if not path_diag.run_preflight([image_key]):
-            return
+            status, success, error_msg = _describe_single_image(
+                lib_db, image_key, image_type, force, provider_id, provider_model,
+                perspective_slugs,
+            )
 
-        status, success, error_msg = _describe_single_image(
-            lib_db, image_key, image_type, force, provider_id, provider_model,
-            perspective_slugs,
-        )
-
-        if success:
-            runner.complete_job(job_id, {
-                'image_key': image_key,
-                'image_type': image_type,
-                'status': status,
-                'skip_reason_counts': path_diag.skip_reason_counts,
-            })
-        else:
-            _record_path_skip_from_status(path_diag, lib_db, image_key, image_type, status)
-            runner.fail_job(job_id, error_msg or 'Description generation failed')
+            if success:
+                runner.complete_job(job_id, {
+                    'image_key': image_key,
+                    'image_type': image_type,
+                    'status': status,
+                    'skip_reason_counts': path_diag.skip_reason_counts,
+                })
+            else:
+                _record_path_skip_from_status(path_diag, lib_db, image_key, image_type, status)
+                runner.fail_job(job_id, error_msg or 'Description generation failed')
 
     except Exception as e:
         severity = _failure_severity_from_exception(e)
         runner.fail_job(job_id, str(e), severity=severity)
-    finally:
-        if lib_db:
-            lib_db.close()
 
 
 def handle_single_score(runner, job_id: str, metadata: dict):
@@ -274,7 +271,6 @@ def handle_single_score(runner, job_id: str, metadata: dict):
 
     Fails the job if **any** requested perspective returns hard ``failed`` (skips are OK).
     """
-    lib_db = None
     try:
         image_key = metadata.get('image_key')
         image_type = metadata.get('image_type', 'catalog')
@@ -293,68 +289,65 @@ def handle_single_score(runner, job_id: str, metadata: dict):
         db_path = _resolve_library_db_or_fail(runner, job_id)
         if db_path is None:
             return
-        lib_db = init_database(db_path)
+        with managed_library_db(db_path) as lib_db:
 
-        raw_ps = metadata.get('perspective_slugs')
-        if isinstance(raw_ps, list) and len(raw_ps) > 0:
-            slugs = [str(x) for x in raw_ps]
-        else:
-            from lightroom_tagger.core.database import list_perspectives
-            slugs = [r['slug'] for r in list_perspectives(lib_db, active_only=True)]
-
-        if not slugs:
-            runner.fail_job(job_id, 'No perspectives to score (provide perspective_slugs or activate perspectives)')
-            return
-
-        def log_callback(level, message):
-            add_job_log(runner.db, job_id, level, message)
-
-        scored = 0
-        skipped = 0
-        failed = 0
-
-        runner.update_progress(job_id, 10, f'Scoring {image_type} image…')
-
-        path_diag = PathSkipDiagnostics(
-            runner,
-            job_id,
-            lib_db,
-            job_label='single_score',
-        )
-        if not path_diag.run_preflight([image_key]):
-            return
-
-        for slug in slugs:
-            status, _success, err = _score_single_image(
-                lib_db, image_key, image_type, slug, force,
-                provider_id, provider_model, log_callback,
-            )
-            if status == 'scored':
-                scored += 1
-            elif status == 'skipped':
-                skipped += 1
+            raw_ps = metadata.get('perspective_slugs')
+            if isinstance(raw_ps, list) and len(raw_ps) > 0:
+                slugs = [str(x) for x in raw_ps]
             else:
-                failed += 1
-                runner.fail_job(
-                    job_id,
-                    err or f'Scoring failed for perspective {slug!r}',
-                )
+                from lightroom_tagger.core.database import list_perspectives
+                slugs = [r['slug'] for r in list_perspectives(lib_db, active_only=True)]
+
+            if not slugs:
+                runner.fail_job(job_id, 'No perspectives to score (provide perspective_slugs or activate perspectives)')
                 return
 
-        runner.complete_job(job_id, {
-            'image_key': image_key,
-            'image_type': image_type,
-            'scored': scored,
-            'skipped': skipped,
-            'failed': failed,
-            'skip_reason_counts': path_diag.skip_reason_counts,
-        })
+            def log_callback(level, message):
+                add_job_log(runner.db, job_id, level, message)
+
+            scored = 0
+            skipped = 0
+            failed = 0
+
+            runner.update_progress(job_id, 10, f'Scoring {image_type} image…')
+
+            path_diag = PathSkipDiagnostics(
+                runner,
+                job_id,
+                lib_db,
+                job_label='single_score',
+            )
+            if not path_diag.run_preflight([image_key]):
+                return
+
+            for slug in slugs:
+                status, _success, err = _score_single_image(
+                    lib_db, image_key, image_type, slug, force,
+                    provider_id, provider_model, log_callback,
+                )
+                if status == 'scored':
+                    scored += 1
+                elif status == 'skipped':
+                    skipped += 1
+                else:
+                    failed += 1
+                    runner.fail_job(
+                        job_id,
+                        err or f'Scoring failed for perspective {slug!r}',
+                    )
+                    return
+
+            runner.complete_job(job_id, {
+                'image_key': image_key,
+                'image_type': image_type,
+                'scored': scored,
+                'skipped': skipped,
+                'failed': failed,
+                'skip_reason_counts': path_diag.skip_reason_counts,
+            })
     except Exception as e:
         severity = _failure_severity_from_exception(e)
         runner.fail_job(job_id, str(e), severity=severity)
-    finally:
-        if lib_db:
-            lib_db.close()
 
 
 def _map_job_progress(progress_range: tuple[float, float], pct: int) -> int:
@@ -596,8 +589,7 @@ def _run_describe_pass(
             caught inside a 32s retry sleep wouldn't notice a cancel until
             the sleep finished.
             """
-            worker_db = init_database(db_path)
-            try:
+            with managed_library_db(db_path) as worker_db:
                 with cancel_scope.install(lambda: runner.is_cancelled(job_id)):
                     status, success, error_msg = _describe_single_image(
                         worker_db, key, itype, describe_force, desc_provider_id, desc_provider_model,
@@ -605,8 +597,6 @@ def _run_describe_pass(
                         telemetry,
                     )
                 return (key, status, error_msg)
-            finally:
-                worker_db.close()
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
@@ -776,96 +766,95 @@ def handle_batch_describe(runner, job_id: str, metadata: dict):
 
 
 def _handle_batch_describe_inner(runner, job_id: str, metadata: dict):
-    lib_db = None
     old_model_env = os.environ.get('DESCRIPTION_VISION_MODEL')
     try:
         config = load_config()
         db_path = _resolve_library_db_or_fail(runner, job_id)
         if db_path is None:
             return
-        lib_db = init_database(db_path)
+        with managed_library_db(db_path) as lib_db:
 
-        image_type = metadata.get('image_type', 'both')  # catalog, instagram, both
-        force = metadata.get('force', False)
+            image_type = metadata.get('image_type', 'both')  # catalog, instagram, both
+            force = metadata.get('force', False)
 
-        # ``last_months`` (int) and ``year`` ('YYYY') now win over the legacy
-        # ``date_filter`` string; see ``_resolve_date_window`` for details.
-        months, year = _resolve_date_window(metadata)
-        min_rating_raw = metadata.get('min_rating')
-        min_rating = None
-        if min_rating_raw is not None:
-            try:
-                min_rating = int(min_rating_raw)
-            except (TypeError, ValueError):
-                min_rating = None
+            # ``last_months`` (int) and ``year`` ('YYYY') now win over the legacy
+            # ``date_filter`` string; see ``_resolve_date_window`` for details.
+            months, year = _resolve_date_window(metadata)
+            min_rating_raw = metadata.get('min_rating')
+            min_rating = None
+            if min_rating_raw is not None:
+                try:
+                    min_rating = int(min_rating_raw)
+                except (TypeError, ValueError):
+                    min_rating = None
 
-        from lightroom_tagger.core.database import (
-            get_undescribed_catalog_images,
-            get_undescribed_instagram_images,
-        )
+            from lightroom_tagger.core.database import (
+                get_undescribed_catalog_images,
+                get_undescribed_instagram_images,
+            )
 
-        backfill_visual_tags = bool(metadata.get('backfill_visual_tags', False))
+            backfill_visual_tags = bool(metadata.get('backfill_visual_tags', False))
 
-        images_to_describe: list[tuple[str, str]] = []  # (key, type)
+            images_to_describe: list[tuple[str, str]] = []  # (key, type)
 
-        if image_type in ('catalog', 'both'):
-            if backfill_visual_tags:
-                # Catalog only for this mode (D-18); re-describe rows missing visual tags.
-                images_to_describe += _select_catalog_keys_missing_visual_tags(
+            if image_type in ('catalog', 'both'):
+                if backfill_visual_tags:
+                    # Catalog only for this mode (D-18); re-describe rows missing visual tags.
+                    images_to_describe += _select_catalog_keys_missing_visual_tags(
+                        lib_db,
+                        months=months,
+                        year=year,
+                        min_rating=min_rating,
+                    )
+                elif force or year is not None:
+                    # ``year`` is a new window that the undescribed-only helper
+                    # doesn't know about yet, so we run the raw SQL path for both
+                    # ``force`` and ``year`` (joining in the description filter
+                    # manually when ``force`` is off).
+                    images_to_describe += _select_catalog_keys(
+                        lib_db,
+                        months=months,
+                        year=year,
+                        min_rating=min_rating,
+                        undescribed_only=not force,
+                    )
+                else:
+                    images_to_describe += [
+                        (img['key'], 'catalog')
+                        for img in get_undescribed_catalog_images(
+                            lib_db, months=months, min_rating=min_rating
+                        )
+                    ]
+
+            if image_type in ('instagram', 'both'):
+                # Always route through _select_instagram_keys so the COALESCE/date_folder
+                # fallback applies consistently regardless of force/year flags.
+                images_to_describe += _select_instagram_keys(
                     lib_db,
                     months=months,
                     year=year,
-                    min_rating=min_rating,
-                )
-            elif force or year is not None:
-                # ``year`` is a new window that the undescribed-only helper
-                # doesn't know about yet, so we run the raw SQL path for both
-                # ``force`` and ``year`` (joining in the description filter
-                # manually when ``force`` is off).
-                images_to_describe += _select_catalog_keys(
-                    lib_db,
-                    months=months,
-                    year=year,
-                    min_rating=min_rating,
                     undescribed_only=not force,
                 )
-            else:
-                images_to_describe += [
-                    (img['key'], 'catalog')
-                    for img in get_undescribed_catalog_images(
-                        lib_db, months=months, min_rating=min_rating
-                    )
-                ]
 
-        if image_type in ('instagram', 'both'):
-            # Always route through _select_instagram_keys so the COALESCE/date_folder
-            # fallback applies consistently regardless of force/year flags.
-            images_to_describe += _select_instagram_keys(
-                lib_db,
-                months=months,
-                year=year,
-                undescribed_only=not force,
-            )
+            if backfill_visual_tags and not images_to_describe:
+                add_job_log(
+                    runner.db,
+                    job_id,
+                    'info',
+                    'Backfill visual tags: no images matched the current scope '
+                    '(no catalog rows with missing color/mood data in the date/rating window, or no work selected).',
+                )
 
-        if backfill_visual_tags and not images_to_describe:
-            add_job_log(
-                runner.db,
+            _run_describe_pass(
+                runner,
                 job_id,
-                'info',
-                'Backfill visual tags: no images matched the current scope '
-                '(no catalog rows with missing color/mood data in the date/rating window, or no work selected).',
+                metadata,
+                lib_db,
+                images_to_describe,
+                db_path=db_path,
+                progress_range=(0, 100),
+                log_prefix="",
             )
-
-        _run_describe_pass(
-            runner,
-            job_id,
-            metadata,
-            lib_db,
-            images_to_describe,
-            db_path=db_path,
-            progress_range=(0, 100),
-            log_prefix="",
-        )
     except Exception as e:
         severity = _failure_severity_from_exception(e)
         runner.fail_job(job_id, str(e), severity=severity)
@@ -874,8 +863,6 @@ def _handle_batch_describe_inner(runner, job_id: str, metadata: dict):
             os.environ['DESCRIPTION_VISION_MODEL'] = old_model_env
         else:
             os.environ.pop('DESCRIPTION_VISION_MODEL', None)
-        if lib_db:
-            lib_db.close()
 
 
 def _run_score_pass(
@@ -1099,16 +1086,13 @@ def _run_score_pass(
             # sleeps and fallback cascades observe ``runner.is_cancelled``.
             # See ``process_image_worker`` in ``_run_describe_pass`` for
             # the matching pattern.
-            worker_db = init_database(db_path)
-            try:
+            with managed_library_db(db_path) as worker_db:
                 with cancel_scope.install(lambda: runner.is_cancelled(job_id)):
                     return _score_single_image(
                         worker_db, key, itype, slug, force,
                         score_provider_id, score_provider_model,
                         _worker_log_callback,
                     )
-            finally:
-                worker_db.close()
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
@@ -1277,65 +1261,61 @@ def handle_batch_score(runner, job_id: str, metadata: dict):
 
 
 def _handle_batch_score_inner(runner, job_id: str, metadata: dict):
-    lib_db = None
     try:
         config = load_config()
         db_path = _resolve_library_db_or_fail(runner, job_id)
         if db_path is None:
             return
-        lib_db = init_database(db_path)
+        with managed_library_db(db_path) as lib_db:
 
-        image_type = metadata.get('image_type', 'both')
+            image_type = metadata.get('image_type', 'both')
 
-        months, year = _resolve_date_window(metadata)
-        min_rating_raw = metadata.get('min_rating')
-        min_rating = None
-        if min_rating_raw is not None:
-            try:
-                min_rating = int(min_rating_raw)
-            except (TypeError, ValueError):
-                min_rating = None
-        # ``handle_batch_score`` always rescans the full candidate set
-        # (scoring isn't gated on missing descriptions the same way describe
-        # is), so ``undescribed_only=False`` matches the previous SQL exactly —
-        # both the ``force`` and non-``force`` arms had identical selection.
+            months, year = _resolve_date_window(metadata)
+            min_rating_raw = metadata.get('min_rating')
+            min_rating = None
+            if min_rating_raw is not None:
+                try:
+                    min_rating = int(min_rating_raw)
+                except (TypeError, ValueError):
+                    min_rating = None
+            # ``handle_batch_score`` always rescans the full candidate set
+            # (scoring isn't gated on missing descriptions the same way describe
+            # is), so ``undescribed_only=False`` matches the previous SQL exactly —
+            # both the ``force`` and non-``force`` arms had identical selection.
 
-        images_for_scores: list[tuple[str, str]] = []
+            images_for_scores: list[tuple[str, str]] = []
 
-        if image_type in ('catalog', 'both'):
-            images_for_scores += _select_catalog_keys(
+            if image_type in ('catalog', 'both'):
+                images_for_scores += _select_catalog_keys(
+                    lib_db,
+                    months=months,
+                    year=year,
+                    min_rating=min_rating,
+                    undescribed_only=False,
+                )
+
+            if image_type in ('instagram', 'both'):
+                images_for_scores += _select_instagram_keys(
+                    lib_db,
+                    months=months,
+                    year=year,
+                    undescribed_only=False,
+                )
+
+            _run_score_pass(
+                runner,
+                job_id,
+                metadata,
                 lib_db,
-                months=months,
-                year=year,
-                min_rating=min_rating,
-                undescribed_only=False,
+                images_for_scores,
+                db_path=db_path,
+                progress_range=(0, 100),
+                log_prefix="",
             )
-
-        if image_type in ('instagram', 'both'):
-            images_for_scores += _select_instagram_keys(
-                lib_db,
-                months=months,
-                year=year,
-                undescribed_only=False,
-            )
-
-        _run_score_pass(
-            runner,
-            job_id,
-            metadata,
-            lib_db,
-            images_for_scores,
-            db_path=db_path,
-            progress_range=(0, 100),
-            log_prefix="",
-        )
 
     except Exception as e:
         severity = _failure_severity_from_exception(e)
         runner.fail_job(job_id, str(e), severity=severity)
-    finally:
-        if lib_db:
-            lib_db.close()
 
 
 def handle_batch_analyze(runner, job_id: str, metadata: dict):
@@ -1353,149 +1333,148 @@ def handle_batch_analyze(runner, job_id: str, metadata: dict):
 
 
 def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
-    lib_db = None
     old_model_env = os.environ.get('DESCRIPTION_VISION_MODEL')
     try:
         config = load_config()
         db_path = _resolve_library_db_or_fail(runner, job_id)
         if db_path is None:
             return
-        lib_db = init_database(db_path)
+        with managed_library_db(db_path) as lib_db:
 
-        image_type = metadata.get('image_type', 'both')
-        force = bool(metadata.get('force_describe', False))
+            image_type = metadata.get('image_type', 'both')
+            force = bool(metadata.get('force_describe', False))
 
-        months, year = _resolve_date_window(metadata)
-        min_rating_raw = metadata.get('min_rating')
-        min_rating = None
-        if min_rating_raw is not None:
-            try:
-                min_rating = int(min_rating_raw)
-            except (TypeError, ValueError):
-                min_rating = None
+            months, year = _resolve_date_window(metadata)
+            min_rating_raw = metadata.get('min_rating')
+            min_rating = None
+            if min_rating_raw is not None:
+                try:
+                    min_rating = int(min_rating_raw)
+                except (TypeError, ValueError):
+                    min_rating = None
 
-        from lightroom_tagger.core.database import (
-            get_undescribed_catalog_images,
-            get_undescribed_instagram_images,
-        )
-
-        backfill_visual_tags = bool(metadata.get('backfill_visual_tags', False))
-
-        shared_selection: list[tuple[str, str]] = []
-
-        if image_type in ('catalog', 'both'):
-            if backfill_visual_tags:
-                shared_selection += _select_catalog_keys_missing_visual_tags(
-                    lib_db,
-                    months=months,
-                    year=year,
-                    min_rating=min_rating,
-                )
-            elif force or year is not None:
-                shared_selection += _select_catalog_keys(
-                    lib_db,
-                    months=months,
-                    year=year,
-                    min_rating=min_rating,
-                    undescribed_only=not force,
-                )
-            else:
-                shared_selection += [
-                    (img['key'], 'catalog')
-                    for img in get_undescribed_catalog_images(
-                        lib_db, months=months, min_rating=min_rating
-                    )
-                ]
-
-        if image_type in ('instagram', 'both'):
-            if force or year is not None:
-                shared_selection += _select_instagram_keys(
-                    lib_db,
-                    months=months,
-                    year=year,
-                    undescribed_only=not force,
-                )
-            else:
-                shared_selection += [
-                    (img['media_key'], 'instagram')
-                    for img in get_undescribed_instagram_images(lib_db, months=months)
-                ]
-
-        if backfill_visual_tags and not shared_selection:
-            add_job_log(
-                runner.db,
-                job_id,
-                'info',
-                'Backfill visual tags: no images matched the current scope '
-                '(no catalog rows with missing color/mood data in the date/rating window, or no work selected).',
+            from lightroom_tagger.core.database import (
+                get_undescribed_catalog_images,
+                get_undescribed_instagram_images,
             )
 
-        metadata_for_describe = {**metadata, 'force': bool(metadata.get('force_describe', False))}
-        metadata_for_score = {**metadata, 'force': bool(metadata.get('force_score', False))}
+            backfill_visual_tags = bool(metadata.get('backfill_visual_tags', False))
 
-        describe_fp = fingerprint_batch_describe(metadata_for_describe, shared_selection)
-        loaded_chk = _analyze_load_checkpoint(runner, job_id)
-        skip_describe = False
-        if loaded_chk.get('stage') == 'score':
-            describe_sub = loaded_chk.get('describe') or {}
-            if isinstance(describe_sub, dict) and describe_sub.get('fingerprint') == describe_fp:
-                skip_describe = True
+            shared_selection: list[tuple[str, str]] = []
 
-        describe_summary: dict | None = None
-        if skip_describe:
-            describe_summary = {
-                'described': 0,
-                'skipped': 0,
-                'failed': 0,
-                'total': int((loaded_chk.get('describe') or {}).get('total_at_start') or 0),
-            }
-        else:
-            update_job_field(runner.db, job_id, 'current_step', 'Describing')
-            describe_summary = _run_describe_pass(
+            if image_type in ('catalog', 'both'):
+                if backfill_visual_tags:
+                    shared_selection += _select_catalog_keys_missing_visual_tags(
+                        lib_db,
+                        months=months,
+                        year=year,
+                        min_rating=min_rating,
+                    )
+                elif force or year is not None:
+                    shared_selection += _select_catalog_keys(
+                        lib_db,
+                        months=months,
+                        year=year,
+                        min_rating=min_rating,
+                        undescribed_only=not force,
+                    )
+                else:
+                    shared_selection += [
+                        (img['key'], 'catalog')
+                        for img in get_undescribed_catalog_images(
+                            lib_db, months=months, min_rating=min_rating
+                        )
+                    ]
+
+            if image_type in ('instagram', 'both'):
+                if force or year is not None:
+                    shared_selection += _select_instagram_keys(
+                        lib_db,
+                        months=months,
+                        year=year,
+                        undescribed_only=not force,
+                    )
+                else:
+                    shared_selection += [
+                        (img['media_key'], 'instagram')
+                        for img in get_undescribed_instagram_images(lib_db, months=months)
+                    ]
+
+            if backfill_visual_tags and not shared_selection:
+                add_job_log(
+                    runner.db,
+                    job_id,
+                    'info',
+                    'Backfill visual tags: no images matched the current scope '
+                    '(no catalog rows with missing color/mood data in the date/rating window, or no work selected).',
+                )
+
+            metadata_for_describe = {**metadata, 'force': bool(metadata.get('force_describe', False))}
+            metadata_for_score = {**metadata, 'force': bool(metadata.get('force_score', False))}
+
+            describe_fp = fingerprint_batch_describe(metadata_for_describe, shared_selection)
+            loaded_chk = _analyze_load_checkpoint(runner, job_id)
+            skip_describe = False
+            if loaded_chk.get('stage') == 'score':
+                describe_sub = loaded_chk.get('describe') or {}
+                if isinstance(describe_sub, dict) and describe_sub.get('fingerprint') == describe_fp:
+                    skip_describe = True
+
+            describe_summary: dict | None = None
+            if skip_describe:
+                describe_summary = {
+                    'described': 0,
+                    'skipped': 0,
+                    'failed': 0,
+                    'total': int((loaded_chk.get('describe') or {}).get('total_at_start') or 0),
+                }
+            else:
+                update_job_field(runner.db, job_id, 'current_step', 'Describing')
+                describe_summary = _run_describe_pass(
+                    runner,
+                    job_id,
+                    metadata_for_describe,
+                    lib_db,
+                    shared_selection,
+                    db_path=db_path,
+                    progress_range=(0, 50),
+                    log_prefix='[describe] ',
+                    finalize=False,
+                    nested_analyze_checkpoint=True,
+                )
+                if describe_summary is None:
+                    return
+
+            update_job_field(runner.db, job_id, 'current_step', 'Scoring')
+            score_summary = _run_score_pass(
                 runner,
                 job_id,
-                metadata_for_describe,
+                metadata_for_score,
                 lib_db,
                 shared_selection,
                 db_path=db_path,
-                progress_range=(0, 50),
-                log_prefix='[describe] ',
+                progress_range=(50, 100),
+                log_prefix='[score] ',
                 finalize=False,
                 nested_analyze_checkpoint=True,
             )
-            if describe_summary is None:
+            if score_summary is None:
                 return
 
-        update_job_field(runner.db, job_id, 'current_step', 'Scoring')
-        score_summary = _run_score_pass(
-            runner,
-            job_id,
-            metadata_for_score,
-            lib_db,
-            shared_selection,
-            db_path=db_path,
-            progress_range=(50, 100),
-            log_prefix='[score] ',
-            finalize=False,
-            nested_analyze_checkpoint=True,
-        )
-        if score_summary is None:
-            return
-
-        combined = {
-            'describe_total': int(describe_summary.get('total', 0)),
-            'describe_succeeded': int(describe_summary.get('described', 0)),
-            'describe_failed': int(describe_summary.get('failed', 0)),
-            'score_total': int(score_summary.get('total', 0)),
-            'score_succeeded': int(score_summary.get('scored', 0)),
-            'score_failed': int(score_summary.get('failed', 0)),
-            'skip_reason_counts': _merge_skip_reason_counts(
-                describe_summary.get('skip_reason_counts'),
-                score_summary.get('skip_reason_counts'),
-            ),
-        }
-        runner.clear_checkpoint(job_id)
-        runner.complete_job(job_id, combined)
+            combined = {
+                'describe_total': int(describe_summary.get('total', 0)),
+                'describe_succeeded': int(describe_summary.get('described', 0)),
+                'describe_failed': int(describe_summary.get('failed', 0)),
+                'score_total': int(score_summary.get('total', 0)),
+                'score_succeeded': int(score_summary.get('scored', 0)),
+                'score_failed': int(score_summary.get('failed', 0)),
+                'skip_reason_counts': _merge_skip_reason_counts(
+                    describe_summary.get('skip_reason_counts'),
+                    score_summary.get('skip_reason_counts'),
+                ),
+            }
+            runner.clear_checkpoint(job_id)
+            runner.complete_job(job_id, combined)
 
     except Exception as e:
         severity = _failure_severity_from_exception(e)
@@ -1505,5 +1484,3 @@ def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
             os.environ['DESCRIPTION_VISION_MODEL'] = old_model_env
         else:
             os.environ.pop('DESCRIPTION_VISION_MODEL', None)
-        if lib_db:
-            lib_db.close()

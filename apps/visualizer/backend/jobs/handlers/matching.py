@@ -14,14 +14,16 @@ from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.database import init_database
 from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
 
+from .db_lifecycle import make_managed_library_db
 from ..checkpoint import fingerprint_catalog_keys, fingerprint_vision_match, job_type_entry, load_resume_state
-
 from .common import (
     _CHECKPOINT_MAX_ENTRIES,
     _failure_severity_from_exception,
     _resolve_library_db_or_fail,
 )
 from .path_diagnostics import PathSkipDiagnostics, make_path_classify_fn
+
+managed_library_db = make_managed_library_db(lambda p: init_database(p))
 
 _VISION_MATCH_PREFILTER_SUMMARY_EVERY = 40
 
@@ -205,33 +207,32 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
         config = load_config()
         print(f"[Job {job_id[:8]}] Config loaded in {time.time() - start_time:.2f}s")
 
-        db = init_database(db_path)
-        print(f"[Job {job_id[:8]}] Database opened")
+        with managed_library_db(db_path) as db:
+            print(f"[Job {job_id[:8]}] Database opened")
 
-        chain_mode = bool(metadata.get('_catalog_cache_chain'))
-        path_diag = PathSkipDiagnostics(
-            runner,
-            job_id,
-            db,
-            job_label='vision_match',
-            chain_mode=chain_mode,
-            log_action='vision match',
-        )
-        media_keys = _vision_match_media_keys(db, metadata)
-        if media_keys and not isinstance(db, MagicMock) and not path_diag.run_preflight(media_keys):
-            return
+            chain_mode = bool(metadata.get('_catalog_cache_chain'))
+            path_diag = PathSkipDiagnostics(
+                runner,
+                job_id,
+                db,
+                job_label='vision_match',
+                chain_mode=chain_mode,
+                log_action='vision match',
+            )
+            media_keys = _vision_match_media_keys(db, metadata)
+            if media_keys and not isinstance(db, MagicMock) and not path_diag.run_preflight(media_keys):
+                return
 
-        def progress_callback(current, total, message):
-            """Report progress from matching."""
-            progress = int(30 + (current / total) * 50)  # Scale to 30-80%
-            runner.update_progress(job_id, progress, message)
+            def progress_callback(current, total, message):
+                """Report progress from matching."""
+                progress = int(30 + (current / total) * 50)  # Scale to 30-80%
+                runner.update_progress(job_id, progress, message)
 
-        def log_callback(level, message):
-            """Add detailed log entry to job."""
-            from database import add_job_log
-            add_job_log(runner.db, job_id, level, message)
+            def log_callback(level, message):
+                """Add detailed log entry to job."""
+                from database import add_job_log
+                add_job_log(runner.db, job_id, level, message)
 
-        try:
             # Get date filters and custom options from metadata
             month = metadata.get('month')
             year = metadata.get('year')
@@ -352,9 +353,6 @@ def handle_vision_match(runner, job_id: str, metadata: dict):
             runner.clear_checkpoint(job_id)
             runner.complete_job(job_id, result_payload)
 
-        finally:
-            db.close()
-
     except Exception as e:
         if runner.is_cancelled(job_id):
             runner.finalize_cancelled(job_id)
@@ -372,7 +370,6 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
     from lightroom_tagger.core.database import (
         get_catalog_images_needing_analysis,
         init_catalog_table,
-        init_database,
     )
     from lightroom_tagger.core.vision_cache import get_or_create_cached_image
 
@@ -383,124 +380,120 @@ def handle_enrich_catalog(runner, job_id: str, metadata: dict):
     if db_path is None:
         return
 
-    db = None
     try:
-        db = init_database(db_path)
-        init_catalog_table(db)
+        with managed_library_db(db_path) as db:
+            init_catalog_table(db)
 
-        catalog_images = get_catalog_images_needing_analysis(db)
+            catalog_images = get_catalog_images_needing_analysis(db)
 
-        if not catalog_images:
-            from lightroom_tagger.core.database import get_all_images
-            all_images = get_all_images(db)
-            catalog_images = [img for img in all_images if not img.get('analyzed_at')]
+            if not catalog_images:
+                from lightroom_tagger.core.database import get_all_images
+                all_images = get_all_images(db)
+                catalog_images = [img for img in all_images if not img.get('analyzed_at')]
 
-        total = len(catalog_images)
-        catalog_keys = sorted(k for k in (r.get('key') for r in catalog_images) if k)
-        fp_en = fingerprint_catalog_keys(total=total, keys=catalog_keys)
-        row_en = get_job(runner.db, job_id)
-        processed_ck = load_resume_state(
-            'enrich_catalog',
-            (row_en.get('metadata') or {}) if row_en and isinstance(row_en.get('metadata'), dict) else {},
-            fp_en,
-            lambda msg: add_job_log(runner.db, job_id, 'info', msg),
-        )
-        jt_enrich_catalog = job_type_entry('enrich_catalog')
+            total = len(catalog_images)
+            catalog_keys = sorted(k for k in (r.get('key') for r in catalog_images) if k)
+            fp_en = fingerprint_catalog_keys(total=total, keys=catalog_keys)
+            row_en = get_job(runner.db, job_id)
+            processed_ck = load_resume_state(
+                'enrich_catalog',
+                (row_en.get('metadata') or {}) if row_en and isinstance(row_en.get('metadata'), dict) else {},
+                fp_en,
+                lambda msg: add_job_log(runner.db, job_id, 'info', msg),
+            )
+            jt_enrich_catalog = job_type_entry('enrich_catalog')
 
-        processed = 0
-        skipped = 0
-        errors = 0
+            processed = 0
+            skipped = 0
+            errors = 0
 
-        runner.update_progress(job_id, 20, f'Found {total} images to enrich')
+            runner.update_progress(job_id, 20, f'Found {total} images to enrich')
 
-        for i, record in enumerate(catalog_images):
-            if runner.is_cancelled(job_id):
-                runner.finalize_cancelled(job_id)
-                return
-            try:
-                key = record.get('key')
-                filepath = record.get('filepath')
-
-                if not key or not filepath:
-                    skipped += 1
-                    continue
-
-                if key in processed_ck:
-                    continue
-
-                phash = compute_phash(filepath)
-                exif = extract_exif(filepath)
-                structured = describe_image(filepath)
-                analysis = {
-                    'phash': phash,
-                    'exif': exif,
-                    'description': structured.get('summary', ''),
-                    'structured_description': structured,
-                }
-
-                enriched_record = {
-                    'key': key,
-                    'filepath': filepath,
-                    'analyzed_at': analysis.get('analyzed_at', 'unknown'),
-                    'phash': analysis.get('phash'),
-                    'exif': analysis.get('exif', {}),
-                    'catalog_path': record.get('catalog_path', ''),
-                    'date_taken': record.get('date_taken', ''),
-                    'filename': record.get('filename', ''),
-                    'rating': record.get('rating', 0),
-                    'keywords': record.get('keywords', []),
-                    'color_label': record.get('color_label', ''),
-                    'title': record.get('title', ''),
-                    'description': analysis.get('description', record.get('description', '')),
-                }
-
-                from lightroom_tagger.core.database import store_catalog_image
-                store_catalog_image(db, enriched_record)
-
-                if config.vision_cache_enabled:
-                    get_or_create_cached_image(db, key, filepath)
-
-                processed += 1
-                processed_ck.add(key)
-                if len(processed_ck) > _CHECKPOINT_MAX_ENTRIES:
-                    runner.fail_job(
-                        job_id,
-                        'checkpoint too large: exceeds 100000 entries',
-                        severity='error',
-                    )
+            for i, record in enumerate(catalog_images):
+                if runner.is_cancelled(job_id):
+                    runner.finalize_cancelled(job_id)
                     return
-                # Single-threaded handler: safe to call runner.persist_checkpoint each iteration.
-                runner.persist_checkpoint(
-                    job_id,
-                    jt_enrich_catalog.build_checkpoint_body(
-                        fingerprint=fp_en,
-                        processed=processed_ck,
-                    ),
-                )
+                try:
+                    key = record.get('key')
+                    filepath = record.get('filepath')
 
-                if (i + 1) % 10 == 0 or i == total - 1:
-                    progress = int(20 + (processed / total) * 70)
-                    runner.update_progress(job_id, progress, f'Processed {processed}/{total} images')
+                    if not key or not filepath:
+                        skipped += 1
+                        continue
 
-            except Exception as e:
-                errors += 1
-                print(f"Error processing image {i + 1}: {e}")
+                    if key in processed_ck:
+                        continue
 
-        runner.clear_checkpoint(job_id)
-        runner.complete_job(job_id, {
-            'processed': processed,
-            'skipped': skipped,
-            'errors': errors,
-            'method': 'enrich_catalog',
-            'limit': metadata.get('limit')
-        })
+                    phash = compute_phash(filepath)
+                    exif = extract_exif(filepath)
+                    structured = describe_image(filepath)
+                    analysis = {
+                        'phash': phash,
+                        'exif': exif,
+                        'description': structured.get('summary', ''),
+                        'structured_description': structured,
+                    }
+
+                    enriched_record = {
+                        'key': key,
+                        'filepath': filepath,
+                        'analyzed_at': analysis.get('analyzed_at', 'unknown'),
+                        'phash': analysis.get('phash'),
+                        'exif': analysis.get('exif', {}),
+                        'catalog_path': record.get('catalog_path', ''),
+                        'date_taken': record.get('date_taken', ''),
+                        'filename': record.get('filename', ''),
+                        'rating': record.get('rating', 0),
+                        'keywords': record.get('keywords', []),
+                        'color_label': record.get('color_label', ''),
+                        'title': record.get('title', ''),
+                        'description': analysis.get('description', record.get('description', '')),
+                    }
+
+                    from lightroom_tagger.core.database import store_catalog_image
+                    store_catalog_image(db, enriched_record)
+
+                    if config.vision_cache_enabled:
+                        get_or_create_cached_image(db, key, filepath)
+
+                    processed += 1
+                    processed_ck.add(key)
+                    if len(processed_ck) > _CHECKPOINT_MAX_ENTRIES:
+                        runner.fail_job(
+                            job_id,
+                            'checkpoint too large: exceeds 100000 entries',
+                            severity='error',
+                        )
+                        return
+                    # Single-threaded handler: safe to call runner.persist_checkpoint each iteration.
+                    runner.persist_checkpoint(
+                        job_id,
+                        jt_enrich_catalog.build_checkpoint_body(
+                            fingerprint=fp_en,
+                            processed=processed_ck,
+                        ),
+                    )
+
+                    if (i + 1) % 10 == 0 or i == total - 1:
+                        progress = int(20 + (processed / total) * 70)
+                        runner.update_progress(job_id, progress, f'Processed {processed}/{total} images')
+
+                except Exception as e:
+                    errors += 1
+                    print(f"Error processing image {i + 1}: {e}")
+
+            runner.clear_checkpoint(job_id)
+            runner.complete_job(job_id, {
+                'processed': processed,
+                'skipped': skipped,
+                'errors': errors,
+                'method': 'enrich_catalog',
+                'limit': metadata.get('limit')
+            })
 
     except Exception as e:
         severity = _failure_severity_from_exception(e)
         runner.fail_job(job_id, str(e), severity=severity)
-    finally:
-        if db is not None:
-            db.close()
 
 
 def handle_prepare_catalog(runner, job_id: str, metadata: dict):
@@ -512,7 +505,6 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
     from lightroom_tagger.core.database import (
         get_all_catalog_images,
         get_cache_stats,
-        init_database,
     )
     from lightroom_tagger.core.vision_cache import get_or_create_cached_image
 
@@ -522,190 +514,186 @@ def handle_prepare_catalog(runner, job_id: str, metadata: dict):
     if db_path is None:
         return
 
-    lib_db = None
     try:
-        lib_db = init_database(db_path)
+        with managed_library_db(db_path) as lib_db:
 
-        # Update metadata with configuration
-        config = load_config()
-        cache_dir = config.vision_cache_dir
+            # Update metadata with configuration
+            config = load_config()
+            cache_dir = config.vision_cache_dir
 
-        update_job_field(runner.db, job_id, 'metadata', {
-            **metadata,
-            'cache_dir': cache_dir,
-            'method': 'prepare_catalog_cache',
-        })
-
-        def log_callback(level, message):
-            from database import add_job_log
-            add_job_log(runner.db, job_id, level, message)
-
-        # Get cache stats from library DB
-        cache_stats_before = get_cache_stats(lib_db)
-        total_images = cache_stats_before['total']
-        already_cached = cache_stats_before['cached']
-
-        log_callback('info', f"Cache directory: {cache_dir}")
-        log_callback('info', f"Using library DB: {db_path}")
-        log_callback('info', f"Cache status: {already_cached}/{total_images} images cached ({cache_stats_before['cache_size_mb']:.1f}MB)")
-
-        if total_images == 0:
-            runner.clear_checkpoint(job_id)
-            runner.complete_job(job_id, {
-                'cached': 0,
-                'already_cached': 0,
-                'failed': 0,
-                'total': 0,
-                'cache_size_mb': 0,
-                'message': 'No catalog images found'
+            update_job_field(runner.db, job_id, 'metadata', {
+                **metadata,
+                'cache_dir': cache_dir,
+                'method': 'prepare_catalog_cache',
             })
-            return
 
-        # Get all catalog images from library DB
-        images = get_all_catalog_images(lib_db)
-        catalog_keys_pr = sorted(k for k in (img.get('key') for img in images) if k)
-        fp_pr = fingerprint_catalog_keys(total=len(images), keys=catalog_keys_pr)
-        row_pr = get_job(runner.db, job_id)
-        processed_prep = load_resume_state(
-            'prepare_catalog',
-            (row_pr.get('metadata') or {}) if row_pr and isinstance(row_pr.get('metadata'), dict) else {},
-            fp_pr,
-            lambda msg: add_job_log(runner.db, job_id, 'info', msg),
-        )
-        jt_prepare_catalog = job_type_entry('prepare_catalog')
+            def log_callback(level, message):
+                from database import add_job_log
+                add_job_log(runner.db, job_id, level, message)
 
-        def _prepare_image_pending(img: dict) -> bool:
-            k = img.get('key')
-            if not k:
-                return True
-            return k not in processed_prep
+            # Get cache stats from library DB
+            cache_stats_before = get_cache_stats(lib_db)
+            total_images = cache_stats_before['total']
+            already_cached = cache_stats_before['cached']
 
-        pending_images = [img for img in images if _prepare_image_pending(img)]
+            log_callback('info', f"Cache directory: {cache_dir}")
+            log_callback('info', f"Using library DB: {db_path}")
+            log_callback('info', f"Cache status: {already_cached}/{total_images} images cached ({cache_stats_before['cache_size_mb']:.1f}MB)")
 
-        def process_single_image(image, db_path):
-            """Each thread gets its own DB connection."""
-            filepath = image.get('filepath')
-            key = image.get('key')
-            if not filepath or not key:
-                return ('failed', key or 'unknown', 'Missing filepath or key')
-            if not os.path.exists(filepath):
-                return ('failed', key, f'File not found: {filepath}')
+            if total_images == 0:
+                runner.clear_checkpoint(job_id)
+                runner.complete_job(job_id, {
+                    'cached': 0,
+                    'already_cached': 0,
+                    'failed': 0,
+                    'total': 0,
+                    'cache_size_mb': 0,
+                    'message': 'No catalog images found'
+                })
+                return
 
-            thread_db = sqlite3.connect(db_path)
-            thread_db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=False))
-            thread_db.execute("PRAGMA journal_mode=WAL")
-            # Match ``init_database`` — 30s busy_timeout + synchronous=NORMAL
-            # to survive parallel-writer contention on the library DB.
-            thread_db.execute("PRAGMA busy_timeout=30000")
-            thread_db.execute("PRAGMA synchronous=NORMAL")
-            try:
-                from lightroom_tagger.core.database import is_vision_cache_valid
+            # Get all catalog images from library DB
+            images = get_all_catalog_images(lib_db)
+            catalog_keys_pr = sorted(k for k in (img.get('key') for img in images) if k)
+            fp_pr = fingerprint_catalog_keys(total=len(images), keys=catalog_keys_pr)
+            row_pr = get_job(runner.db, job_id)
+            processed_prep = load_resume_state(
+                'prepare_catalog',
+                (row_pr.get('metadata') or {}) if row_pr and isinstance(row_pr.get('metadata'), dict) else {},
+                fp_pr,
+                lambda msg: add_job_log(runner.db, job_id, 'info', msg),
+            )
+            jt_prepare_catalog = job_type_entry('prepare_catalog')
 
-                if is_vision_cache_valid(thread_db, key, filepath):
-                    return ('already_cached', key)
-                compressed_path = get_or_create_cached_image(thread_db, key, filepath)
-                if compressed_path:
-                    size_kb = os.path.getsize(compressed_path) / 1024
-                    return ('newly_cached', key, size_kb)
-                return ('failed', key, 'Compression returned None')
-            except Exception as e:
-                return ('failed', key, str(e))
-            finally:
-                thread_db.close()
+            def _prepare_image_pending(img: dict) -> bool:
+                k = img.get('key')
+                if not k:
+                    return True
+                return k not in processed_prep
 
-        newly_cached = 0
-        already_cached_count = 0
-        failed_count = 0
-        total = len(images)
-        total_run = len(pending_images)
+            pending_images = [img for img in images if _prepare_image_pending(img)]
 
-        max_workers = min(4, os.cpu_count() or 2)
-        if pending_images:
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {
-                    executor.submit(process_single_image, img, db_path): img
-                    for img in pending_images
-                }
-                for completed, _future in enumerate(as_completed(futures), start=1):
-                    if runner.is_cancelled(job_id):
-                        add_job_log(
-                            runner.db,
-                            job_id,
-                            'info',
-                            'Prepare catalog cache stopped: cancel requested',
-                        )
-                        break
-                    result = _future.result()
-                    kind = result[0]
-                    if kind == 'already_cached':
-                        already_cached_count += 1
-                    elif kind == 'newly_cached':
-                        newly_cached += 1
-                    elif kind == 'failed':
-                        failed_count += 1
-                        err_key = result[1]
-                        err_msg = result[2] if len(result) > 2 else 'unknown'
-                        log_callback('error', f"Failed to cache {err_key}: {err_msg}")
+            def process_single_image(image, db_path):
+                """Each thread gets its own DB connection."""
+                filepath = image.get('filepath')
+                key = image.get('key')
+                if not filepath or not key:
+                    return ('failed', key or 'unknown', 'Missing filepath or key')
+                if not os.path.exists(filepath):
+                    return ('failed', key, f'File not found: {filepath}')
 
-                    res_key = result[1] if len(result) > 1 else None
-                    if kind in ('already_cached', 'newly_cached') and res_key and res_key != 'unknown':
-                        processed_prep.add(res_key)
-                        if len(processed_prep) > _CHECKPOINT_MAX_ENTRIES:
+                thread_db = sqlite3.connect(db_path)
+                thread_db.row_factory = lambda c, r: dict(zip([col[0] for col in c.description], r, strict=False))
+                thread_db.execute("PRAGMA journal_mode=WAL")
+                # Match ``init_database`` — 30s busy_timeout + synchronous=NORMAL
+                # to survive parallel-writer contention on the library DB.
+                thread_db.execute("PRAGMA busy_timeout=30000")
+                thread_db.execute("PRAGMA synchronous=NORMAL")
+                try:
+                    from lightroom_tagger.core.database import is_vision_cache_valid
+
+                    if is_vision_cache_valid(thread_db, key, filepath):
+                        return ('already_cached', key)
+                    compressed_path = get_or_create_cached_image(thread_db, key, filepath)
+                    if compressed_path:
+                        size_kb = os.path.getsize(compressed_path) / 1024
+                        return ('newly_cached', key, size_kb)
+                    return ('failed', key, 'Compression returned None')
+                except Exception as e:
+                    return ('failed', key, str(e))
+                finally:
+                    thread_db.close()
+
+            newly_cached = 0
+            already_cached_count = 0
+            failed_count = 0
+            total = len(images)
+            total_run = len(pending_images)
+
+            max_workers = min(4, os.cpu_count() or 2)
+            if pending_images:
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = {
+                        executor.submit(process_single_image, img, db_path): img
+                        for img in pending_images
+                    }
+                    for completed, _future in enumerate(as_completed(futures), start=1):
+                        if runner.is_cancelled(job_id):
                             add_job_log(
                                 runner.db,
                                 job_id,
-                                'error',
-                                'checkpoint too large: exceeds maximum entry limit',
+                                'info',
+                                'Prepare catalog cache stopped: cancel requested',
                             )
-                            runner.fail_job(
-                                job_id,
-                                'checkpoint too large: exceeds 100000 entries',
-                                severity='error',
-                            )
-                            runner.signal_cancel(job_id)
                             break
-                        # Coordinator thread (as_completed): runner.persist_checkpoint only here.
-                        runner.persist_checkpoint(
-                            job_id,
-                            jt_prepare_catalog.build_checkpoint_body(
-                                fingerprint=fp_pr,
-                                processed=processed_prep,
-                            ),
-                        )
+                        result = _future.result()
+                        kind = result[0]
+                        if kind == 'already_cached':
+                            already_cached_count += 1
+                        elif kind == 'newly_cached':
+                            newly_cached += 1
+                        elif kind == 'failed':
+                            failed_count += 1
+                            err_key = result[1]
+                            err_msg = result[2] if len(result) > 2 else 'unknown'
+                            log_callback('error', f"Failed to cache {err_key}: {err_msg}")
 
-                    if completed % 10 == 0 or completed == total_run:
-                        progress = int(10 + (completed / total_run) * 85)
-                        runner.update_progress(
-                            job_id, progress, f'Processed {completed}/{total_run} images'
-                        )
+                        res_key = result[1] if len(result) > 1 else None
+                        if kind in ('already_cached', 'newly_cached') and res_key and res_key != 'unknown':
+                            processed_prep.add(res_key)
+                            if len(processed_prep) > _CHECKPOINT_MAX_ENTRIES:
+                                add_job_log(
+                                    runner.db,
+                                    job_id,
+                                    'error',
+                                    'checkpoint too large: exceeds maximum entry limit',
+                                )
+                                runner.fail_job(
+                                    job_id,
+                                    'checkpoint too large: exceeds 100000 entries',
+                                    severity='error',
+                                )
+                                runner.signal_cancel(job_id)
+                                break
+                            # Coordinator thread (as_completed): runner.persist_checkpoint only here.
+                            runner.persist_checkpoint(
+                                job_id,
+                                jt_prepare_catalog.build_checkpoint_body(
+                                    fingerprint=fp_pr,
+                                    processed=processed_prep,
+                                ),
+                            )
 
-        if runner.is_cancelled(job_id):
-            runner.finalize_cancelled(job_id)
-            return
+                        if completed % 10 == 0 or completed == total_run:
+                            progress = int(10 + (completed / total_run) * 85)
+                            runner.update_progress(
+                                job_id, progress, f'Processed {completed}/{total_run} images'
+                            )
 
-        row_prep_done = get_job(runner.db, job_id)
-        if row_prep_done and row_prep_done.get('status') == 'failed':
-            return
+            if runner.is_cancelled(job_id):
+                runner.finalize_cancelled(job_id)
+                return
 
-        # Get final cache stats from library DB
-        cache_stats_after = get_cache_stats(lib_db)
-        log_callback('info', f"Complete: {newly_cached} newly cached, {already_cached_count} already cached, {failed_count} failed")
-        log_callback('info', f"Total cache size: {cache_stats_after['cache_size_mb']:.1f}MB")
+            row_prep_done = get_job(runner.db, job_id)
+            if row_prep_done and row_prep_done.get('status') == 'failed':
+                return
 
-        runner.clear_checkpoint(job_id)
-        runner.complete_job(job_id, {
-            'cached': newly_cached,
-            'already_cached': already_cached_count,
-            'failed': failed_count,
-            'total': total,
-            'cache_size_mb': cache_stats_after['cache_size_mb'],
-            'parallel_workers': max_workers,
-            'cache_dir': cache_dir
-        })
+            # Get final cache stats from library DB
+            cache_stats_after = get_cache_stats(lib_db)
+            log_callback('info', f"Complete: {newly_cached} newly cached, {already_cached_count} already cached, {failed_count} failed")
+            log_callback('info', f"Total cache size: {cache_stats_after['cache_size_mb']:.1f}MB")
+
+            runner.clear_checkpoint(job_id)
+            runner.complete_job(job_id, {
+                'cached': newly_cached,
+                'already_cached': already_cached_count,
+                'failed': failed_count,
+                'total': total,
+                'cache_size_mb': cache_stats_after['cache_size_mb'],
+                'parallel_workers': max_workers,
+                'cache_dir': cache_dir
+            })
 
     except Exception as e:
         severity = _failure_severity_from_exception(e)
         runner.fail_job(job_id, str(e), severity=severity)
-    finally:
-        if lib_db:
-            lib_db.close()
