@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from lightroom_tagger.core.matcher.score_formula import (
+    ScoreWeights,
     compute_total_score,
     normalize_phash_score,
 )
@@ -50,12 +51,14 @@ def test_normalize_phash_score_intermediate() -> None:
 
 
 def test_compute_total_score_default_weights() -> None:
-    total = compute_total_score(1.0, 0.8, 0.6, 0.4, 0.3, 0.3)
+    weights = ScoreWeights(0.4, 0.3, 0.3)
+    total = compute_total_score(1.0, 0.8, 0.6, weights)
     assert total == pytest.approx(0.4 + 0.24 + 0.18)
 
 
 def test_compute_total_score_vision_weight_zero() -> None:
-    total = compute_total_score(1.0, 0.5, 0.9, 0.4, 0.3, 0.0)
+    weights = ScoreWeights(0.4, 0.3, 0.0)
+    total = compute_total_score(1.0, 0.5, 0.9, weights)
     assert total == pytest.approx(0.4 + 0.15)
 
 
@@ -167,10 +170,11 @@ def test_formula_module_is_pure() -> None:
         for node in ast.walk(tree)
         if isinstance(node, ast.Import)
     }
+    allowed_from = frozenset({'__future__', 'dataclasses'})
     import_froms = {
         node.module
         for node in ast.walk(tree)
-        if isinstance(node, ast.ImportFrom) and node.module and node.module != "__future__"
+        if isinstance(node, ast.ImportFrom) and node.module and node.module not in allowed_from
     }
     assert not imports
     assert not import_froms

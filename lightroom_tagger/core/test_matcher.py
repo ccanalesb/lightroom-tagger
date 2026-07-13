@@ -1,7 +1,7 @@
 from unittest.mock import Mock, MagicMock, patch
 
 import lightroom_tagger.core.matcher as matcher_mod
-from lightroom_tagger.core.matcher import match_batch, match_image, score_candidates_with_vision, find_candidates_by_date
+from lightroom_tagger.core.matcher import ScoreWeights, match_batch, match_image, score_candidates_with_vision, find_candidates_by_date
 from lightroom_tagger.core.matcher.description_batch import _compute_desc_scores_for_candidates
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.provider_resolution import ResolvedModel, resolve_model
@@ -131,7 +131,7 @@ def test_score_candidates_includes_vision():
 
         results = score_candidates_with_vision(
             mock_db, insta_image, candidates,
-            phash_weight=0.4, desc_weight=0.3, vision_weight=0.3
+            weights=ScoreWeights(0.4, 0.3, 0.3)
         )
 
     assert len(results) == 1
@@ -178,7 +178,7 @@ def test_score_candidates_stores_actual_provider_model_in_cache():
 
         results = score_candidates_with_vision(
             mock_db, insta_image, candidates,
-            phash_weight=0.4, desc_weight=0.3, vision_weight=0.3,
+            weights=ScoreWeights(0.4, 0.3, 0.3),
             provider_id='ollama',
             model=None,
         )
@@ -224,7 +224,7 @@ def test_score_candidates_uses_cache():
 
         results = score_candidates_with_vision(
             mock_db, insta_image, candidates,
-            phash_weight=0.4, desc_weight=0.3, vision_weight=0.3
+            weights=ScoreWeights(0.4, 0.3, 0.3)
         )
 
     assert len(results) == 1
@@ -261,7 +261,7 @@ def test_score_candidates_does_not_cache_on_vision_error():
 
         results = score_candidates_with_vision(
             mock_db, insta_image, candidates,
-            phash_weight=0.4, desc_weight=0.3, vision_weight=0.3,
+            weights=ScoreWeights(0.4, 0.3, 0.3),
         )
 
     assert len(results) == 1
@@ -386,7 +386,7 @@ def test_vision_weight_zero_skips_compare_images_and_compression():
         mock_ic.return_value.cleanup.return_value = None
         score_candidates_with_vision(
             mock_db, insta_image, candidates,
-            phash_weight=0.4, desc_weight=0.3, vision_weight=0.0,
+            weights=ScoreWeights(0.4, 0.3, 0.0),
             batch_threshold=1,
             batch_size=10,
         )
@@ -422,7 +422,7 @@ def test_desc_weight_zero_skips_compare_descriptions_batch():
         mock_insta_cache.return_value.cleanup.return_value = None
         score_candidates_with_vision(
             mock_db, insta_image, candidates,
-            phash_weight=0.0, desc_weight=0.0, vision_weight=1.0,
+            weights=ScoreWeights(0.0, 0.0, 1.0),
         )
     mock_desc.assert_not_called()
 
@@ -453,7 +453,7 @@ def test_backward_compat_phash_zero_desc_zero_vision_only_total():
         mock_insta_cache.return_value.cleanup.return_value = None
         results = score_candidates_with_vision(
             mock_db, insta_image, candidates,
-            phash_weight=0.0, desc_weight=0.0, vision_weight=1.0,
+            weights=ScoreWeights(0.0, 0.0, 1.0),
         )
     assert len(results) == 1
     assert abs(results[0]['total_score'] - results[0]['vision_score']) < 1e-9
@@ -487,7 +487,7 @@ def test_nominal_weighted_merge_all_ones():
         mock_insta_cache.return_value.cleanup.return_value = None
         results = score_candidates_with_vision(
             mock_db, insta_image, candidates,
-            phash_weight=0.4, desc_weight=0.3, vision_weight=0.3,
+            weights=ScoreWeights(0.4, 0.3, 0.3),
         )
     assert len(results) == 1
     assert abs(results[0]['total_score'] - 1.0) < 1e-9
@@ -522,7 +522,7 @@ def test_skip_undescribed_true_empty_summaries_no_desc_batch_call():
         mock_insta_cache.return_value.cleanup.return_value = None
         results = score_candidates_with_vision(
             mock_db, insta_image, candidates,
-            phash_weight=0.0, desc_weight=0.3, vision_weight=0.7,
+            weights=ScoreWeights(0.0, 0.3, 0.7),
             skip_undescribed=True,
         )
     mock_desc.assert_not_called()
@@ -569,7 +569,7 @@ def test_description_batch_runs_before_vision_batch():
         mock_ic.return_value.cleanup.return_value = None
         score_candidates_with_vision(
             mock_db, insta_image, candidates,
-            phash_weight=0.2, desc_weight=0.3, vision_weight=0.5,
+            weights=ScoreWeights(0.2, 0.3, 0.5),
             batch_size=10,
             batch_threshold=1,
             provider_id='ollama',
@@ -610,7 +610,7 @@ def test_all_empty_ai_summary_skip_no_redistribution():
         mock_insta_cache.return_value.cleanup.return_value = None
         results = score_candidates_with_vision(
             mock_db, insta_image, candidates,
-            phash_weight=0.0, desc_weight=0.3, vision_weight=0.7,
+            weights=ScoreWeights(0.0, 0.3, 0.7),
             skip_undescribed=True,
         )
     mock_desc.assert_not_called()
@@ -719,7 +719,7 @@ def test_score_candidates_resolves_model_once_for_all_candidates():
         mock_insta_cache.return_value.cleanup.return_value = None
         score_candidates_with_vision(
             mock_db, insta_image, candidates,
-            phash_weight=0.4, desc_weight=0.0, vision_weight=0.6,
+            weights=ScoreWeights(0.4, 0.0, 0.6),
         )
 
     mock_resolve.assert_called_once()
@@ -763,7 +763,7 @@ def test_sequential_abort_after_consecutive_rate_limits():
         mock_insta_cache.return_value.cleanup.return_value = None
         results = score_candidates_with_vision(
             mock_db, insta_image, candidates,
-            phash_weight=0.0, desc_weight=0.0, vision_weight=1.0,
+            weights=ScoreWeights(0.0, 0.0, 1.0),
             batch_threshold=999,
         )
 
@@ -810,7 +810,7 @@ def test_sequential_abort_after_consecutive_fatal_errors():
         mock_insta_cache.return_value.cleanup.return_value = None
         results = score_candidates_with_vision(
             mock_db, insta_image, candidates,
-            phash_weight=0.0, desc_weight=0.0, vision_weight=1.0,
+            weights=ScoreWeights(0.0, 0.0, 1.0),
             batch_threshold=999,
         )
 

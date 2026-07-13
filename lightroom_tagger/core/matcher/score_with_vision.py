@@ -2,13 +2,14 @@
 
 from collections.abc import Callable
 
-from .score_formula import compute_total_score, normalize_phash_score
+from .score_formula import ScoreWeights, compute_total_score, normalize_phash_score
 from .vision_batch import _build_compressed_batch_entries, _log_comparison_tail
+
+_DEFAULT_WEIGHTS = ScoreWeights(0.4, 0.3, 0.3)
 
 
 def score_candidates_with_vision(db, insta_image: dict, candidates: list,
-                                 phash_weight: float = 0.4, desc_weight: float = 0.3,
-                                 vision_weight: float = 0.3,
+                                 weights: ScoreWeights = _DEFAULT_WEIGHTS,
                                  threshold: float = 0.7,
                                  log_callback=None,
                                  provider_id: str | None = None,
@@ -55,7 +56,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     abort_tracker = ConsecutiveAbortTracker()
 
     desc_scores_by_idx = _matcher._compute_desc_scores_for_candidates(
-        insta_image, candidates, batch_size, desc_weight, skip_undescribed,
+        insta_image, candidates, batch_size, weights.desc, skip_undescribed,
         provider_id, model, log_callback, registry=registry,
     )
 
@@ -63,7 +64,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     insta_cache = _matcher.InstagramCache(db)
     insta_path = insta_image.get('local_path')
     compressed_insta = None
-    if vision_weight > 0 and insta_path:
+    if weights.vision > 0 and insta_path:
         try:
             compressed_insta = insta_cache.compress_instagram_image(insta_path)
             if log_callback:
@@ -83,7 +84,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
     vision_error_policy = ContextLengthEscalationPolicy()
     vision_batch_policy = VisionBatchErrorPolicy()
 
-    if vision_weight == 0:
+    if weights.vision == 0:
         insta_key = insta_image.get('key')
         model_label = selection_model_label
         for idx, candidate in enumerate(candidates):
@@ -96,13 +97,13 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 phash_dist = hamming_distance(insta_image.get('image_hash', ''), candidate.get('image_hash', ''))
                 cache_misses += 1
             phash_score_val = normalize_phash_score(phash_dist)
-            desc_sim_01 = desc_scores_by_idx.get(idx, 0.0) if desc_weight > 0 else 0.0
+            desc_sim_01 = desc_scores_by_idx.get(idx, 0.0) if weights.desc > 0 else 0.0
             capt_sim = _matcher.text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
-            desc_sim_display = desc_sim_01 if desc_weight > 0 else capt_sim
+            desc_sim_display = desc_sim_01 if weights.desc > 0 else capt_sim
             vision_score_val = 0.0
             total_score_val = compute_total_score(
                 phash_score_val, desc_sim_01, vision_score_val,
-                phash_weight, desc_weight, vision_weight,
+                weights,
             )
             if batch_progress_callback:
                 batch_progress_callback(idx + 1, total_candidates)
@@ -181,13 +182,13 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                     cache_misses += 1
 
                 phash_score_val = normalize_phash_score(phash_dist)
-                desc_sim_01 = desc_scores_by_idx.get(cid, 0.0) if desc_weight > 0 else 0.0
+                desc_sim_01 = desc_scores_by_idx.get(cid, 0.0) if weights.desc > 0 else 0.0
                 capt_sim = _matcher.text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
-                desc_sim_display = desc_sim_01 if desc_weight > 0 else capt_sim
+                desc_sim_display = desc_sim_01 if weights.desc > 0 else capt_sim
 
                 total_score_val = compute_total_score(
                     phash_score_val, desc_sim_01, vision_score_val,
-                    phash_weight, desc_weight, vision_weight,
+                    weights,
                 )
 
                 _matcher.store_vision_comparison(db, catalog_key, insta_key, vision_result, vision_score_val, model_label)
@@ -291,9 +292,9 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
             phash_score_val = normalize_phash_score(phash_dist)
 
-            desc_sim_01 = desc_scores_by_idx.get(idx0, 0.0) if desc_weight > 0 else 0.0
+            desc_sim_01 = desc_scores_by_idx.get(idx0, 0.0) if weights.desc > 0 else 0.0
             capt_sim = _matcher.text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
-            desc_sim_display = desc_sim_01 if desc_weight > 0 else capt_sim
+            desc_sim_display = desc_sim_01 if weights.desc > 0 else capt_sim
 
             # Get or create cached compressed image for catalog
             cached_local_path = None
@@ -320,7 +321,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 vision_score_val = vision_cached['vision_score']
                 model_label = vision_cached.get('model_used', model_label)
                 abort_tracker.record_success()
-            elif vision_weight > 0 and insta_path and local_path:
+            elif weights.vision > 0 and insta_path and local_path:
                 try:
                     vision_data = compare_with_vision(
                         local_path, insta_path,
@@ -372,7 +373,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
 
             total_score_val = compute_total_score(
                 phash_score_val, desc_sim_01, vision_score_val,
-                phash_weight, desc_weight, vision_weight,
+                weights,
             )
 
             if log_callback and vision_result != 'UNCERTAIN':
