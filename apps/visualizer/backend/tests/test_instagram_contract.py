@@ -75,3 +75,35 @@ def test_image_view_round_trip_from_instagram_detail_builder(instagram_contract_
 def test_instagram_image_rejects_wrong_shape():
     with pytest.raises(Exception):
         validate_instagram_image({"key": "only-key"})
+
+
+def test_instagram_list_accepts_null_caption_and_description(tmp_path, monkeypatch):
+    """Regression: explicit DB nulls must not 500 under spectree response validation."""
+    db_path = str(tmp_path / "library.db")
+    conn = init_database(db_path)
+    store_instagram_dump_media(
+        conn,
+        {
+            "media_key": "202406/bbb",
+            "file_path": "/dump/media/posts/202406/bbb.jpg",
+            "filename": "bbb.jpg",
+            "date_folder": "202406",
+            "caption": None,
+            "created_at": "2024-06-01T10:00:00",
+            "added_at": "2024-06-02T11:00:00",
+            "post_url": "https://example/p/b",
+            "image_hash": "hash-b",
+            "processed": False,
+        },
+    )
+    conn.close()
+    monkeypatch.setattr("utils.db.LIBRARY_DB", db_path)
+    client = create_app().test_client()
+
+    response = client.get("/api/images/instagram")
+    assert response.status_code == 200
+    payload = response.get_json()
+    validated = InstagramListResponse.model_validate(payload)
+    null_row = next(img for img in validated.images if img.key == "202406/bbb")
+    assert null_row.caption is None
+    assert null_row.description in (None, "")

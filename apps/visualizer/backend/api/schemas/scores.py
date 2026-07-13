@@ -15,8 +15,8 @@ class ImageScoreRow(BaseModel):
     image_type: str
     perspective_slug: str
     score: int
-    rationale: str = ''
-    model_used: str = ''
+    rationale: str | None = None
+    model_used: str | None = None
     prompt_version: str
     scored_at: str
     is_current: bool

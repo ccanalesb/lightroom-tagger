@@ -115,3 +115,25 @@ def test_scores_current_empty_round_trip(client):
 def test_image_score_row_rejects_wrong_shape():
     with pytest.raises(Exception):
         validate_image_score_row({"image_key": "only-key"})
+
+
+def test_image_score_row_accepts_null_rationale_and_model_used():
+    row = {
+        "id": 2,
+        "image_key": "nullable.jpg",
+        "image_type": "catalog",
+        "perspective_slug": "street",
+        "score": 6,
+        "rationale": None,
+        "model_used": None,
+        "prompt_version": "street:v1",
+        "scored_at": "2024-01-01T00:00:00+00:00",
+        "is_current": 1,
+        "repaired_from_malformed": 0,
+        "not_attempted": 0,
+    }
+    payload = _normalize_score_row(row)
+    validated = ImageScoreRow.model_validate(validate_image_score_row(payload))
+    assert validated.rationale is None
+    assert validated.model_used is None
+    assert validated.not_attempted is False

@@ -96,3 +96,42 @@ def test_rows_to_catalog_api_images_round_trip(catalog_contract_client):
 def test_catalog_image_rejects_wrong_shape():
     with pytest.raises(Exception):
         validate_catalog_image({"bogus": 1})
+
+
+def test_catalog_list_accepts_null_metadata_fields(tmp_path, monkeypatch):
+    """Regression: catalog rows with explicit null columns must round-trip."""
+    db_path = str(tmp_path / "library.db")
+    conn = init_database(db_path)
+    store_image(
+        conn,
+        {
+            "date_taken": None,
+            "filename": None,
+            "rating": None,
+            "id": "200",
+            "caption": None,
+            "title": None,
+            "description": None,
+            "copyright": None,
+            "aperture": None,
+            "camera_make": None,
+            "camera_model": None,
+            "focal_length": None,
+            "iso": None,
+            "lens": None,
+            "shutter_speed": None,
+            "catalog_path": None,
+        },
+    )
+    conn.close()
+    monkeypatch.setattr("utils.db.LIBRARY_DB", db_path)
+    client = create_app().test_client()
+
+    response = client.get("/api/images/catalog")
+    assert response.status_code == 200
+    payload = response.get_json()
+    validated = CatalogListResponse.model_validate(payload)
+    null_row = next(img for img in validated.images if img.id == 200)
+    assert null_row.caption is None
+    assert null_row.filename is None
+    assert null_row.aperture is None
