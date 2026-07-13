@@ -41,10 +41,8 @@ jobs:
         run: npx tsc --noEmit
 
       # Scope grows per contract slice: this gate guards the *migrated* surface
-      # (Jobs today). Each future slice (V2 providers, V3 images, ...) appends
-      # its group's tests here as it lands. Running the full suite is out of
-      # scope for the contract gate and pulls in unrelated CI-portability
-      # failures (e.g. providers github_copilot models 404 in CI — owned by V2).
+      # (Jobs + Perspectives + Providers today). Each future slice appends its
+      # group's tests here as it lands. Kept in sync with .sandcastle/ci-drift-gate.yml.
       - name: Backend contract tests (spectree response validation, migrated groups)
         working-directory: apps/visualizer/backend
-        run: python -m pytest tests/test_job_contract.py tests/test_jobs_api.py tests/test_job_transition_routes.py -q
+        run: python -m pytest tests/test_job_contract.py tests/test_jobs_api.py tests/test_job_transition_routes.py tests/test_perspectives_contract.py tests/test_perspectives_api.py tests/test_providers_contract.py tests/test_providers_api.py -q
