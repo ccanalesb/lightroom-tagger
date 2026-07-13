@@ -6,9 +6,22 @@ import re
 from typing import Literal, cast
 
 from flask import Blueprint, jsonify, request
+from spectree import Response
 from utils.db import with_db
 from utils.responses import error_bad_request, error_server_error
 
+from api.openapi import spec
+from api.schemas.analytics import (
+    CaptionStatsQuery,
+    CaptionStatsResponse,
+    PostingFrequencyQuery,
+    PostingFrequencyResponse,
+    PostingHeatmapQuery,
+    PostingHeatmapResponse,
+    UnpostedCatalogQuery,
+    UnpostedCatalogResponse,
+)
+from api.schemas.jobs import ErrorBody
 from utils.pagination import _clamp_pagination
 from lightroom_tagger.core.posting_analytics import (
     get_caption_hashtag_stats,
@@ -31,6 +44,11 @@ def _parse_required_iso_date(label: str) -> str | None:
 
 @bp.route("/posting-frequency", methods=["GET"])
 @with_db
+@spec.validate(
+    query=PostingFrequencyQuery,
+    resp=Response(HTTP_200=PostingFrequencyResponse, HTTP_400=ErrorBody),
+    tags=['analytics'],
+)
 def posting_frequency(db):
     """Bucket counts of validated posts (see ``get_posting_frequency``)."""
     try:
@@ -56,6 +74,11 @@ def posting_frequency(db):
 
 @bp.route("/posting-heatmap", methods=["GET"])
 @with_db
+@spec.validate(
+    query=PostingHeatmapQuery,
+    resp=Response(HTTP_200=PostingHeatmapResponse, HTTP_400=ErrorBody),
+    tags=['analytics'],
+)
 def posting_heatmap(db):
     """Day-of-week × hour heatmap for validated posts."""
     try:
@@ -72,6 +95,11 @@ def posting_heatmap(db):
 
 @bp.route("/caption-stats", methods=["GET"])
 @with_db
+@spec.validate(
+    query=CaptionStatsQuery,
+    resp=Response(HTTP_200=CaptionStatsResponse, HTTP_400=ErrorBody),
+    tags=['analytics'],
+)
 def caption_stats(db):
     """Caption length and hashtag aggregates for validated posts."""
     try:
@@ -88,6 +116,11 @@ def caption_stats(db):
 
 @bp.route("/unposted-catalog", methods=["GET"])
 @with_db
+@spec.validate(
+    query=UnpostedCatalogQuery,
+    resp=Response(HTTP_200=UnpostedCatalogResponse, HTTP_400=ErrorBody),
+    tags=['analytics'],
+)
 def unposted_catalog(db):
     """Paginated catalog images with ``instagram_posted = 0`` (matches catalog filters)."""
     try:
