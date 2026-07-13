@@ -220,19 +220,72 @@ def test_enricher_uses_run_description_vision_op():
     mock_run.assert_called_once_with('/a.jpg')
 
 
-def test_matching_handler_enrich_uses_run_description_vision_op():
-    with patch('lightroom_tagger.core.analyzer.run_description_vision_op') as mock_run:
-        mock_run.return_value = {'summary': 'scene'}
-        from lightroom_tagger.core.analyzer import run_description_vision_op as imported
-        structured = imported('/tmp/x.jpg')
-    mock_run.assert_called_once_with('/tmp/x.jpg')
-    assert structured['summary'] == 'scene'
+def test_matching_handler_enrich_uses_run_description_vision_op(tmp_path):
+    """handle_enrich_catalog must run the description core op per image and
+    persist its summary."""
+    import sys
+
+    backend = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        'apps', 'visualizer', 'backend',
+    )
+    if backend not in sys.path:
+        sys.path.insert(0, backend)
+
+    from jobs.handlers.matching import handle_enrich_catalog
+
+    from lightroom_tagger.core.database import (
+        get_image,
+        init_catalog_table,
+        init_database,
+        store_catalog_image,
+    )
+
+    db_path = str(tmp_path / 'library.db')
+    db = init_database(db_path)
+    init_catalog_table(db)
+    filepath = str(tmp_path / 'photo.jpg')
+    open(filepath, 'w').close()
+    store_catalog_image(db, {'key': 'CAT1', 'filepath': filepath, 'filename': 'photo.jpg'})
+    db.close()
+
+    runner = MagicMock()
+    runner.db = MagicMock()
+    runner.is_cancelled.return_value = False
+
+    with patch('jobs.handlers.matching._resolve_library_db_or_fail', return_value=db_path), \
+         patch('jobs.handlers.matching.get_job', return_value=None), \
+         patch('jobs.handlers.matching.load_resume_state', return_value=set()), \
+         patch('jobs.handlers.matching.add_job_log'), \
+         patch('lightroom_tagger.core.config.load_config', return_value=MagicMock(vision_cache_enabled=False)), \
+         patch('lightroom_tagger.core.analyzer.compute_phash', return_value='phash'), \
+         patch('lightroom_tagger.core.analyzer.extract_exif', return_value={}), \
+         patch('lightroom_tagger.core.analyzer.run_description_vision_op', return_value={'summary': 'scene'}) as mock_run:
+        handle_enrich_catalog(runner, 'job-enrich', {})
+
+    mock_run.assert_called_once_with(filepath)
+    verify = init_database(db_path)
+    assert get_image(verify, 'CAT1')['description'] == 'scene'
+    verify.close()
 
 
-def test_analyze_instagram_images_uses_run_description_vision_op():
-    with patch('lightroom_tagger.scripts.analyze_instagram_images.run_description_vision_op') as mock_run:
-        mock_run.return_value = {'summary': 'ig'}
-        from lightroom_tagger.scripts import analyze_instagram_images as mod
-        structured = mod.run_description_vision_op('/tmp/ig.jpg')
-    mock_run.assert_called_once_with('/tmp/ig.jpg')
-    assert structured['summary'] == 'ig'
+def test_analyze_instagram_images_uses_run_description_vision_op(tmp_path):
+    """The analyze_instagram_images script must route describe through the core op."""
+    from lightroom_tagger.scripts import analyze_instagram_images as mod
+
+    img = tmp_path / 'ig.jpg'
+    img.write_text('')
+
+    with patch.object(mod, 'init_database', return_value=MagicMock()), \
+         patch.object(mod, 'init_instagram_table'), \
+         patch.object(mod, 'store_instagram_image', return_value='IG1'), \
+         patch.object(mod, 'scan_instagram_folder', return_value=[{
+             'post_id': 'p1', 'local_path': str(img), 'filename': 'ig.jpg',
+             'post_url': 'https://instagram.com/p/p1/',
+         }]), \
+         patch.object(mod, 'compute_phash', return_value='phash'), \
+         patch.object(mod, 'extract_exif', return_value={}), \
+         patch.object(mod, 'run_description_vision_op', return_value={'summary': 'ig'}) as mock_run:
+        mod.main()
+
+    mock_run.assert_called_once_with(str(img))

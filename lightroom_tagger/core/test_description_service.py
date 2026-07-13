@@ -61,7 +61,7 @@ def _make_db(tmp_path):
 
 class TestDescribeMatchedImage:
     def test_generates_description_end_to_end_with_fake_provider(self, tmp_path):
-        """describe_matched_image runs through describe_image with one injected registry."""
+        """describe_matched_image runs through the vision op with one injected registry."""
         import json
 
         from lightroom_tagger.core.description_service import describe_matched_image
@@ -101,7 +101,7 @@ class TestDescribeMatchedImage:
         assert mock_dispatcher.call_with_fallback.call_args.kwargs["model"] == "test-model"
 
     def test_describe_matched_image_honors_description_vision_model_env(self, tmp_path, monkeypatch):
-        """describe_image must use resolve_model so DESCRIPTION_VISION_MODEL env is honoured."""
+        """the vision op must use resolve_model so DESCRIPTION_VISION_MODEL env is honoured."""
         import json
 
         from lightroom_tagger.core.description_service import describe_matched_image
@@ -239,7 +239,7 @@ class TestDescribeMatchedImage:
         assert not result.wrote
 
     def test_skips_video_without_calling_provider(self, tmp_path):
-        """Video files must never reach describe_image — the vision pipeline
+        """Video files must never reach the vision op — the vision pipeline
         cannot process them and would otherwise wedge the worker pool on
         multi-minute retry backoffs."""
         from lightroom_tagger.core.description_service import describe_matched_image
