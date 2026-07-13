@@ -116,6 +116,244 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/images/catalog/{image_key}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get thumbnail for catalog image, creating cache if needed. */
+        get: operations["get__api_images_catalog_{image_key}_thumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/catalog/months": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get available year-months from catalog images based on date_taken. */
+        get: operations["get__api_images_catalog_months"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/catalog/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List catalog images with optional filtering and SQL-level pagination. */
+        get: operations["get__api_images_catalog_"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List catalog images with optional filtering and SQL-level pagination. */
+        get: operations["get__api_images_catalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/catalog/{image_key}/similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** CLIP-only visual neighbors; same catalog row shape + ``similarity`` / ``why_matched``. */
+        get: operations["get__api_images_catalog_{image_key}_similar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/catalog/{image_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Single catalog image detail for the consolidated image-view modal. */
+        get: operations["get__api_images_catalog_{image_key}"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/stacks/{stack_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Members of a burst stack as catalog-shaped rows (representative + collapsed rules). */
+        get: operations["get__api_images_stacks_{stack_id}_members"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/stacks/{stack_id}/split-member": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove a member from a stack (solo image) or dissolve a two-member stack. */
+        post: operations["post__api_images_stacks_{stack_id}_split-member"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/stacks/{target_stack_id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Merge *source_stack_id* into *target_stack_id* (all members moved, source row deleted). */
+        post: operations["post__api_images_stacks_{target_stack_id}_merge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/stacks/{stack_id}/representative": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change which catalog key is the stack representative (must be a current member). */
+        post: operations["post__api_images_stacks_{stack_id}_representative"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/instagram": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Instagram images with filtering and pagination. */
+        get: operations["get__api_images_instagram"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/instagram/months": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get unique months available in Instagram images. */
+        get: operations["get__api_images_instagram_months"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/instagram/{image_key}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get thumbnail for Instagram image. */
+        get: operations["get__api_images_instagram_{image_key}_thumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/instagram/{image_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Single instagram image detail for the consolidated image-view modal. */
+        get: operations["get__api_images_instagram_{image_key}"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/images/matches": {
         parameters: {
             query?: never;
@@ -168,6 +406,74 @@ export interface paths {
         head?: never;
         /** Reject a match: delete it and blocklist the pair. */
         patch: operations["patch__api_images_matches_{catalog_key}_{insta_key}_reject"];
+        trace?: never;
+    };
+    "/api/images/search/nl-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Natural language → LLM filter JSON → same row shape as GET /api/images/catalog. */
+        post: operations["post__api_images_search_nl-search"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/search/semantic-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hybrid FTS + embedding search with RRF; same catalog row shape as NL search + score / why_matched / thumbnail_url. */
+        post: operations["post__api_images_search_semantic-search"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/search/chat-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Multi-turn NL-first cascade: structured catalog filters or semantic hybrid fallback. */
+        post: operations["post__api_images_search_chat-search"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/catalog-similarity-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reviewable catalog visual similarity groups materialized by batch jobs. */
+        get: operations["get__api_images_catalog-similarity-groups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/providers/": {
@@ -308,6 +614,60 @@ export interface paths {
         put?: never;
         /** models <POST> */
         post: operations["post__api_providers_{provider_id}_models"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/config/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** get_catalog <GET> */
+        get: operations["get__api_config_catalog"];
+        /** put_catalog <PUT> */
+        put: operations["put__api_config_catalog"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/config/instagram-dump": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** get_instagram_dump <GET> */
+        get: operations["get__api_config_instagram-dump"];
+        /** put_instagram_dump <PUT> */
+        put: operations["put__api_config_instagram-dump"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/config/stack-detection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** get_stack_detection <GET> */
+        get: operations["get__api_config_stack-detection"];
+        /** put_stack_detection <PUT> */
+        put: operations["put__api_config_stack-detection"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -580,6 +940,65 @@ export interface components {
              */
             last_error: string | null;
         };
+        /** ConfigCatalogGetResponse */
+        "ConfigCatalogGetResponse.ab1fa53": {
+            /** Catalog Path */
+            catalog_path: string;
+            /** Resolved Path */
+            resolved_path: string;
+            /** Exists */
+            exists: boolean;
+        };
+        /** ConfigCatalogPutRequest */
+        "ConfigCatalogPutRequest.ab1fa53": {
+            /** Catalog Path */
+            catalog_path: string;
+        };
+        /** ConfigCatalogPutResponse */
+        "ConfigCatalogPutResponse.ab1fa53": {
+            /** Catalog Path */
+            catalog_path: string;
+            /** Ok */
+            ok: boolean;
+        };
+        /** ConfigInstagramDumpGetResponse */
+        "ConfigInstagramDumpGetResponse.ab1fa53": {
+            /** Instagram Dump Path */
+            instagram_dump_path: string;
+            /** Resolved Path */
+            resolved_path: string;
+            /** Exists */
+            exists: boolean;
+        };
+        /** ConfigInstagramDumpPutRequest */
+        "ConfigInstagramDumpPutRequest.ab1fa53": {
+            /** Instagram Dump Path */
+            instagram_dump_path: string;
+        };
+        /** ConfigInstagramDumpPutResponse */
+        "ConfigInstagramDumpPutResponse.ab1fa53": {
+            /** Instagram Dump Path */
+            instagram_dump_path: string;
+            /** Ok */
+            ok: boolean;
+        };
+        /** ConfigStackDetectionGetResponse */
+        "ConfigStackDetectionGetResponse.ab1fa53": {
+            /** Stack Burst Delta Ms */
+            stack_burst_delta_ms: number;
+        };
+        /** ConfigStackDetectionPutRequest */
+        "ConfigStackDetectionPutRequest.ab1fa53": {
+            /** Stack Burst Delta Ms */
+            stack_burst_delta_ms: number;
+        };
+        /** ConfigStackDetectionPutResponse */
+        "ConfigStackDetectionPutResponse.ab1fa53": {
+            /** Stack Burst Delta Ms */
+            stack_burst_delta_ms: number;
+            /** Ok */
+            ok: boolean;
+        };
         /**
          * PerspectiveListResponse
          * @description ``GET /api/perspectives/`` response body.
@@ -689,6 +1108,373 @@ export interface components {
              */
             vision: boolean | null;
         };
+        /** CatalogMonthsResponse */
+        "CatalogMonthsResponse.573ec44": {
+            /** Months */
+            months: string[];
+        };
+        /** CatalogListResponse */
+        "CatalogListResponse.573ec44": {
+            /** Total */
+            total: number;
+            /** Images */
+            images: components["schemas"]["CatalogListResponse.573ec44.CatalogImage"][];
+        };
+        /** CatalogSimilarResponse */
+        "CatalogSimilarResponse.573ec44": {
+            /** Images */
+            images: components["schemas"]["CatalogSimilarResponse.573ec44.CatalogImage"][];
+            /** Total */
+            total: number;
+            meta: components["schemas"]["CatalogSimilarResponse.573ec44.ClipSimilarMeta"];
+        };
+        /** CatalogSimilarityGroupsResponse */
+        "CatalogSimilarityGroupsResponse.573ec44": {
+            /** Items */
+            items: components["schemas"]["CatalogSimilarityGroupsResponse.573ec44.CatalogSimilarityGroup"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * ImageView
+         * @description ``GET /api/images/<image_type>/<image_key>`` consolidated detail shape.
+         */
+        "ImageView.573ec44": {
+            /**
+             * Image Type
+             * @enum {string}
+             */
+            image_type: "catalog" | "instagram";
+            /** Key */
+            key: string;
+            /**
+             * Id
+             * @default null
+             */
+            id: number | null;
+            /**
+             * Filename
+             * @default null
+             */
+            filename: string | null;
+            /**
+             * Filepath
+             * @default null
+             */
+            filepath: string | null;
+            /**
+             * Local Path
+             * @default null
+             */
+            local_path: string | null;
+            /**
+             * Date Taken
+             * @default null
+             */
+            date_taken: string | null;
+            /**
+             * Created At
+             * @default null
+             */
+            created_at: string | null;
+            /**
+             * Rating
+             * @default null
+             */
+            rating: number | null;
+            /**
+             * Pick
+             * @default null
+             */
+            pick: boolean | null;
+            /**
+             * Color Label
+             * @default null
+             */
+            color_label: string | null;
+            /**
+             * Keywords
+             * @default null
+             */
+            keywords: string[] | null;
+            /**
+             * Title
+             * @default null
+             */
+            title: string | null;
+            /**
+             * Caption
+             * @default null
+             */
+            caption: string | null;
+            /**
+             * Copyright
+             * @default null
+             */
+            copyright: string | null;
+            /**
+             * Width
+             * @default null
+             */
+            width: number | null;
+            /**
+             * Height
+             * @default null
+             */
+            height: number | null;
+            /**
+             * Instagram Posted
+             * @default null
+             */
+            instagram_posted: boolean | null;
+            /**
+             * Instagram Url
+             * @default null
+             */
+            instagram_url: string | null;
+            /**
+             * Post Url
+             * @default null
+             */
+            post_url: string | null;
+            /**
+             * Image Hash
+             * @default null
+             */
+            image_hash: string | null;
+            /**
+             * Stack Id
+             * @default null
+             */
+            stack_id: number | null;
+            /**
+             * Stack Member Count
+             * @default null
+             */
+            stack_member_count: number | null;
+            /**
+             * Is Stack Representative
+             * @default null
+             */
+            is_stack_representative: boolean | null;
+            /**
+             * Instagram Folder
+             * @default null
+             */
+            instagram_folder: string | null;
+            /**
+             * Date Folder
+             * @default null
+             */
+            date_folder: string | null;
+            /**
+             * Source Folder
+             * @default null
+             */
+            source_folder: string | null;
+            /**
+             * Matched Catalog Key
+             * @default null
+             */
+            matched_catalog_key: string | null;
+            /**
+             * Processed
+             * @default null
+             */
+            processed: boolean | null;
+            /**
+             * Ai Analyzed
+             * @default null
+             */
+            ai_analyzed: boolean | null;
+            /**
+             * Description Summary
+             * @default null
+             */
+            description_summary: string | null;
+            /**
+             * Description Best Perspective
+             * @default null
+             */
+            description_best_perspective: string | null;
+            /**
+             * Description Perspectives
+             * @default null
+             */
+            description_perspectives: {
+                [key: string]: components["schemas"]["ImageView.573ec44.PerspectiveScore"] | unknown;
+            } | null;
+            /**
+             * Catalog Perspective Score
+             * @default null
+             */
+            catalog_perspective_score: number | null;
+            /**
+             * Catalog Score Perspective
+             * @default null
+             */
+            catalog_score_perspective: string | null;
+            /**
+             * Available Score Perspectives
+             * @default null
+             */
+            available_score_perspectives: string[] | null;
+            /**
+             * Identity Aggregate Score
+             * @default null
+             */
+            identity_aggregate_score: number | null;
+            /**
+             * Identity Perspectives Covered
+             * @default null
+             */
+            identity_perspectives_covered: number | null;
+            /**
+             * Identity Eligible
+             * @default null
+             */
+            identity_eligible: boolean | null;
+            /** Identity Per Perspective */
+            identity_per_perspective?: components["schemas"]["ImageView.573ec44.IdentityPerPerspectiveScore"][];
+            /**
+             * Analyzed At
+             * @default null
+             */
+            analyzed_at: string | null;
+            /**
+             * Aperture
+             * @default null
+             */
+            aperture: string | null;
+            /**
+             * Camera Make
+             * @default null
+             */
+            camera_make: string | null;
+            /**
+             * Camera Model
+             * @default null
+             */
+            camera_model: string | null;
+            /**
+             * Catalog Path
+             * @default null
+             */
+            catalog_path: string | null;
+            /**
+             * Description
+             * @default null
+             */
+            description: string | null;
+            /**
+             * Exif
+             * @default null
+             */
+            exif: string | null;
+            /**
+             * Exif Data
+             * @default null
+             */
+            exif_data: unknown | null;
+            /**
+             * File Size
+             * @default null
+             */
+            file_size: number | null;
+            /**
+             * Focal Length
+             * @default null
+             */
+            focal_length: string | null;
+            /**
+             * Gps Latitude
+             * @default null
+             */
+            gps_latitude: number | null;
+            /**
+             * Gps Longitude
+             * @default null
+             */
+            gps_longitude: number | null;
+            /**
+             * Instagram Index
+             * @default null
+             */
+            instagram_index: number | null;
+            /**
+             * Instagram Post Date
+             * @default null
+             */
+            instagram_post_date: string | null;
+            /**
+             * Iso
+             * @default null
+             */
+            iso: string | null;
+            /**
+             * Lens
+             * @default null
+             */
+            lens: string | null;
+            /**
+             * Phash
+             * @default null
+             */
+            phash: string | null;
+            /**
+             * Shutter Speed
+             * @default null
+             */
+            shutter_speed: string | null;
+            /**
+             * Added At
+             * @default null
+             */
+            added_at: string | null;
+            /**
+             * File Path
+             * @default null
+             */
+            file_path: string | null;
+            /**
+             * Last Attempted At
+             * @default null
+             */
+            last_attempted_at: string | null;
+            /**
+             * Media Key
+             * @default null
+             */
+            media_key: string | null;
+            /**
+             * Processed At
+             * @default null
+             */
+            processed_at: string | null;
+            /**
+             * Vision Result
+             * @default null
+             */
+            vision_result: string | null;
+            /**
+             * Vision Score
+             * @default null
+             */
+            vision_score: number | null;
+        };
+        /** InstagramListResponse */
+        "InstagramListResponse.2d55088": {
+            /** Total */
+            total: number;
+            /** Images */
+            images: components["schemas"]["InstagramListResponse.2d55088.InstagramImage"][];
+            pagination: components["schemas"]["InstagramListResponse.2d55088.PaginationMeta"];
+        };
+        /** InstagramMonthsResponse */
+        "InstagramMonthsResponse.2d55088": {
+            /** Months */
+            months: string[];
+        };
         /**
          * MatchesListResponse
          * @description ``GET /api/images/matches`` response body.
@@ -736,6 +1522,185 @@ export interface components {
              * @constant
              */
             rejected: false;
+        };
+        /** NlSearchRequest */
+        "NlSearchRequest.2fa5250": {
+            /** Query */
+            query: string;
+            /**
+             * Limit
+             * @default null
+             */
+            limit: number | null;
+            /**
+             * Offset
+             * @default null
+             */
+            offset: number | null;
+            /**
+             * Provider Id
+             * @default null
+             */
+            provider_id: string | null;
+            /**
+             * Model
+             * @default null
+             */
+            model: string | null;
+        };
+        /** NlSearchResponse */
+        "NlSearchResponse.2fa5250": {
+            /** Filters */
+            filters: {
+                [key: string]: unknown;
+            };
+            /** Total */
+            total: number;
+            /** Images */
+            images: components["schemas"]["NlSearchResponse.2fa5250.CatalogImage"][];
+        };
+        /** SemanticSearchRequest */
+        "SemanticSearchRequest.2fa5250": {
+            /** Query */
+            query: string;
+            /**
+             * Limit
+             * @default null
+             */
+            limit: number | null;
+            /**
+             * Offset
+             * @default null
+             */
+            offset: number | null;
+            /**
+             * Score Perspective
+             * @default null
+             */
+            score_perspective: string | null;
+        };
+        /** SemanticSearchResponse */
+        "SemanticSearchResponse.2fa5250": {
+            /** Total */
+            total: number;
+            /** Images */
+            images: components["schemas"]["SemanticSearchResponse.2fa5250.CatalogImage"][];
+            metadata: components["schemas"]["SemanticSearchResponse.2fa5250.SemanticSearchMetadata"];
+        };
+        /** ChatSearchRequest */
+        "ChatSearchRequest.2fa5250": {
+            /** Message */
+            message: string;
+            /**
+             * Messages
+             * @default null
+             */
+            messages: components["schemas"]["ChatSearchRequest.2fa5250.ChatSearchMessage"][] | null;
+            /**
+             * Limit
+             * @default null
+             */
+            limit: number | null;
+            /**
+             * Offset
+             * @default null
+             */
+            offset: number | null;
+            /**
+             * Provider Id
+             * @default null
+             */
+            provider_id: string | null;
+            /**
+             * Model
+             * @default null
+             */
+            model: string | null;
+            /**
+             * Score Perspective
+             * @default null
+             */
+            score_perspective: string | null;
+            /**
+             * Pinned Image Key
+             * @default null
+             */
+            pinned_image_key: string | null;
+        };
+        /** ChatSearchResponse */
+        "ChatSearchResponse.2fa5250": {
+            /**
+             * Search Mode
+             * @enum {string}
+             */
+            search_mode: "nl_filter" | "semantic" | "tool_calling";
+            /** Total */
+            total: number;
+            /** Images */
+            images: components["schemas"]["ChatSearchResponse.2fa5250.ChatSearchResultImage"][];
+            /**
+             * Filters
+             * @default null
+             */
+            filters: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Metadata
+             * @default null
+             */
+            metadata: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Messages
+             * @default null
+             */
+            messages: components["schemas"]["ChatSearchResponse.2fa5250.ChatSearchMessage"][] | null;
+            /**
+             * Assistant Message
+             * @default null
+             */
+            assistant_message: string | null;
+        };
+        /** StackMembersResponse */
+        "StackMembersResponse.b12c71e": {
+            /** Items */
+            items: components["schemas"]["StackMembersResponse.b12c71e.CatalogImage"][];
+        };
+        /** StackSplitMemberRequest */
+        "StackSplitMemberRequest.b12c71e": {
+            /** Image Key */
+            image_key: string;
+        };
+        /** StackSplitMemberResponse */
+        "StackSplitMemberResponse.b12c71e": {
+            /** Split Out Key */
+            split_out_key: string;
+            /** @default null */
+            remaining_stack: components["schemas"]["StackSplitMemberResponse.b12c71e.StackMetadata"] | null;
+            /** Dissolved */
+            dissolved: boolean;
+        };
+        /** StackMergeRequest */
+        "StackMergeRequest.b12c71e": {
+            /** Source Stack Id */
+            source_stack_id: number;
+        };
+        /** StackMergeResponse */
+        "StackMergeResponse.b12c71e": {
+            stack: components["schemas"]["StackMergeResponse.b12c71e.StackMetadata"];
+            /** Merged Stack Id */
+            merged_stack_id: number;
+        };
+        /** StackRepresentativeRequest */
+        "StackRepresentativeRequest.b12c71e": {
+            /** Image Key */
+            image_key: string;
+        };
+        /** StackRepresentativeResponse */
+        "StackRepresentativeResponse.b12c71e": {
+            stack: components["schemas"]["StackRepresentativeResponse.b12c71e.StackMetadata"];
         };
         /**
          * Job
@@ -1086,6 +2051,931 @@ export interface components {
             vision: boolean | null;
         };
         /**
+         * CatalogImage
+         * @description Catalog list / search row shape (``query_catalog_images`` + API transforms).
+         */
+        "CatalogListResponse.573ec44.CatalogImage": {
+            /** Key */
+            key: string;
+            /**
+             * Id
+             * @default null
+             */
+            id: number | null;
+            /**
+             * Filename
+             * @default
+             */
+            filename: string;
+            /**
+             * Filepath
+             * @default
+             */
+            filepath: string;
+            /**
+             * Date Taken
+             * @default
+             */
+            date_taken: string;
+            /**
+             * Rating
+             * @default 0
+             */
+            rating: number;
+            /**
+             * Pick
+             * @default false
+             */
+            pick: boolean;
+            /**
+             * Color Label
+             * @default
+             */
+            color_label: string;
+            /** Keywords */
+            keywords?: string[];
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Caption
+             * @default
+             */
+            caption: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Copyright
+             * @default
+             */
+            copyright: string;
+            /**
+             * Width
+             * @default null
+             */
+            width: number | null;
+            /**
+             * Height
+             * @default null
+             */
+            height: number | null;
+            /**
+             * Instagram Posted
+             * @default false
+             */
+            instagram_posted: boolean;
+            /**
+             * Instagram Url
+             * @default null
+             */
+            instagram_url: string | null;
+            /**
+             * Image Hash
+             * @default null
+             */
+            image_hash: string | null;
+            /**
+             * Image Type
+             * @default null
+             */
+            image_type: ("catalog" | "instagram") | null;
+            /**
+             * Ai Analyzed
+             * @default false
+             */
+            ai_analyzed: boolean;
+            /**
+             * Description Summary
+             * @default null
+             */
+            description_summary: string | null;
+            /**
+             * Description Best Perspective
+             * @default null
+             */
+            description_best_perspective: string | null;
+            /**
+             * Description Perspectives
+             * @default null
+             */
+            description_perspectives: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Catalog Perspective Score
+             * @default null
+             */
+            catalog_perspective_score: number | null;
+            /**
+             * Catalog Score Perspective
+             * @default null
+             */
+            catalog_score_perspective: string | null;
+            /**
+             * Stack Id
+             * @default null
+             */
+            stack_id: number | null;
+            /**
+             * Stack Member Count
+             * @default null
+             */
+            stack_member_count: number | null;
+            /**
+             * Is Stack Representative
+             * @default false
+             */
+            is_stack_representative: boolean;
+            /**
+             * Analyzed At
+             * @default null
+             */
+            analyzed_at: string | null;
+            /**
+             * Aperture
+             * @default
+             */
+            aperture: string;
+            /**
+             * Camera Make
+             * @default
+             */
+            camera_make: string;
+            /**
+             * Camera Model
+             * @default
+             */
+            camera_model: string;
+            /**
+             * Catalog Path
+             * @default
+             */
+            catalog_path: string;
+            /**
+             * Exif
+             * @default null
+             */
+            exif: string | null;
+            /**
+             * File Size
+             * @default null
+             */
+            file_size: number | null;
+            /**
+             * Focal Length
+             * @default
+             */
+            focal_length: string;
+            /**
+             * Gps Latitude
+             * @default null
+             */
+            gps_latitude: number | null;
+            /**
+             * Gps Longitude
+             * @default null
+             */
+            gps_longitude: number | null;
+            /**
+             * Instagram Index
+             * @default 0
+             */
+            instagram_index: number;
+            /**
+             * Instagram Post Date
+             * @default null
+             */
+            instagram_post_date: string | null;
+            /**
+             * Iso
+             * @default
+             */
+            iso: string;
+            /**
+             * Lens
+             * @default
+             */
+            lens: string;
+            /**
+             * Phash
+             * @default null
+             */
+            phash: string | null;
+            /**
+             * Shutter Speed
+             * @default
+             */
+            shutter_speed: string;
+            /**
+             * Similarity
+             * @default null
+             */
+            similarity: number | null;
+            /**
+             * Why Matched
+             * @default null
+             */
+            why_matched: string | null;
+            /**
+             * Thumbnail Url
+             * @default null
+             */
+            thumbnail_url: string | null;
+            /**
+             * Score
+             * @default null
+             */
+            score: number | null;
+        };
+        /**
+         * CatalogImage
+         * @description Catalog list / search row shape (``query_catalog_images`` + API transforms).
+         */
+        "CatalogSimilarResponse.573ec44.CatalogImage": {
+            /** Key */
+            key: string;
+            /**
+             * Id
+             * @default null
+             */
+            id: number | null;
+            /**
+             * Filename
+             * @default
+             */
+            filename: string;
+            /**
+             * Filepath
+             * @default
+             */
+            filepath: string;
+            /**
+             * Date Taken
+             * @default
+             */
+            date_taken: string;
+            /**
+             * Rating
+             * @default 0
+             */
+            rating: number;
+            /**
+             * Pick
+             * @default false
+             */
+            pick: boolean;
+            /**
+             * Color Label
+             * @default
+             */
+            color_label: string;
+            /** Keywords */
+            keywords?: string[];
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Caption
+             * @default
+             */
+            caption: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Copyright
+             * @default
+             */
+            copyright: string;
+            /**
+             * Width
+             * @default null
+             */
+            width: number | null;
+            /**
+             * Height
+             * @default null
+             */
+            height: number | null;
+            /**
+             * Instagram Posted
+             * @default false
+             */
+            instagram_posted: boolean;
+            /**
+             * Instagram Url
+             * @default null
+             */
+            instagram_url: string | null;
+            /**
+             * Image Hash
+             * @default null
+             */
+            image_hash: string | null;
+            /**
+             * Image Type
+             * @default null
+             */
+            image_type: ("catalog" | "instagram") | null;
+            /**
+             * Ai Analyzed
+             * @default false
+             */
+            ai_analyzed: boolean;
+            /**
+             * Description Summary
+             * @default null
+             */
+            description_summary: string | null;
+            /**
+             * Description Best Perspective
+             * @default null
+             */
+            description_best_perspective: string | null;
+            /**
+             * Description Perspectives
+             * @default null
+             */
+            description_perspectives: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Catalog Perspective Score
+             * @default null
+             */
+            catalog_perspective_score: number | null;
+            /**
+             * Catalog Score Perspective
+             * @default null
+             */
+            catalog_score_perspective: string | null;
+            /**
+             * Stack Id
+             * @default null
+             */
+            stack_id: number | null;
+            /**
+             * Stack Member Count
+             * @default null
+             */
+            stack_member_count: number | null;
+            /**
+             * Is Stack Representative
+             * @default false
+             */
+            is_stack_representative: boolean;
+            /**
+             * Analyzed At
+             * @default null
+             */
+            analyzed_at: string | null;
+            /**
+             * Aperture
+             * @default
+             */
+            aperture: string;
+            /**
+             * Camera Make
+             * @default
+             */
+            camera_make: string;
+            /**
+             * Camera Model
+             * @default
+             */
+            camera_model: string;
+            /**
+             * Catalog Path
+             * @default
+             */
+            catalog_path: string;
+            /**
+             * Exif
+             * @default null
+             */
+            exif: string | null;
+            /**
+             * File Size
+             * @default null
+             */
+            file_size: number | null;
+            /**
+             * Focal Length
+             * @default
+             */
+            focal_length: string;
+            /**
+             * Gps Latitude
+             * @default null
+             */
+            gps_latitude: number | null;
+            /**
+             * Gps Longitude
+             * @default null
+             */
+            gps_longitude: number | null;
+            /**
+             * Instagram Index
+             * @default 0
+             */
+            instagram_index: number;
+            /**
+             * Instagram Post Date
+             * @default null
+             */
+            instagram_post_date: string | null;
+            /**
+             * Iso
+             * @default
+             */
+            iso: string;
+            /**
+             * Lens
+             * @default
+             */
+            lens: string;
+            /**
+             * Phash
+             * @default null
+             */
+            phash: string | null;
+            /**
+             * Shutter Speed
+             * @default
+             */
+            shutter_speed: string;
+            /**
+             * Similarity
+             * @default null
+             */
+            similarity: number | null;
+            /**
+             * Why Matched
+             * @default null
+             */
+            why_matched: string | null;
+            /**
+             * Thumbnail Url
+             * @default null
+             */
+            thumbnail_url: string | null;
+            /**
+             * Score
+             * @default null
+             */
+            score: number | null;
+        };
+        /** ClipSimilarMeta */
+        "CatalogSimilarResponse.573ec44.ClipSimilarMeta": {
+            /** Clip Model Id */
+            clip_model_id: string;
+            /** Clip Embed Dim */
+            clip_embed_dim: number;
+            /** Knn Fetched */
+            knn_fetched: number;
+            /**
+             * Knn K Used
+             * @default null
+             */
+            knn_k_used: number | null;
+        };
+        /**
+         * CatalogImage
+         * @description Catalog list / search row shape (``query_catalog_images`` + API transforms).
+         */
+        "CatalogSimilarityGroupsResponse.573ec44.CatalogImage": {
+            /** Key */
+            key: string;
+            /**
+             * Id
+             * @default null
+             */
+            id: number | null;
+            /**
+             * Filename
+             * @default
+             */
+            filename: string;
+            /**
+             * Filepath
+             * @default
+             */
+            filepath: string;
+            /**
+             * Date Taken
+             * @default
+             */
+            date_taken: string;
+            /**
+             * Rating
+             * @default 0
+             */
+            rating: number;
+            /**
+             * Pick
+             * @default false
+             */
+            pick: boolean;
+            /**
+             * Color Label
+             * @default
+             */
+            color_label: string;
+            /** Keywords */
+            keywords?: string[];
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Caption
+             * @default
+             */
+            caption: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Copyright
+             * @default
+             */
+            copyright: string;
+            /**
+             * Width
+             * @default null
+             */
+            width: number | null;
+            /**
+             * Height
+             * @default null
+             */
+            height: number | null;
+            /**
+             * Instagram Posted
+             * @default false
+             */
+            instagram_posted: boolean;
+            /**
+             * Instagram Url
+             * @default null
+             */
+            instagram_url: string | null;
+            /**
+             * Image Hash
+             * @default null
+             */
+            image_hash: string | null;
+            /**
+             * Image Type
+             * @default null
+             */
+            image_type: ("catalog" | "instagram") | null;
+            /**
+             * Ai Analyzed
+             * @default false
+             */
+            ai_analyzed: boolean;
+            /**
+             * Description Summary
+             * @default null
+             */
+            description_summary: string | null;
+            /**
+             * Description Best Perspective
+             * @default null
+             */
+            description_best_perspective: string | null;
+            /**
+             * Description Perspectives
+             * @default null
+             */
+            description_perspectives: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Catalog Perspective Score
+             * @default null
+             */
+            catalog_perspective_score: number | null;
+            /**
+             * Catalog Score Perspective
+             * @default null
+             */
+            catalog_score_perspective: string | null;
+            /**
+             * Stack Id
+             * @default null
+             */
+            stack_id: number | null;
+            /**
+             * Stack Member Count
+             * @default null
+             */
+            stack_member_count: number | null;
+            /**
+             * Is Stack Representative
+             * @default false
+             */
+            is_stack_representative: boolean;
+            /**
+             * Analyzed At
+             * @default null
+             */
+            analyzed_at: string | null;
+            /**
+             * Aperture
+             * @default
+             */
+            aperture: string;
+            /**
+             * Camera Make
+             * @default
+             */
+            camera_make: string;
+            /**
+             * Camera Model
+             * @default
+             */
+            camera_model: string;
+            /**
+             * Catalog Path
+             * @default
+             */
+            catalog_path: string;
+            /**
+             * Exif
+             * @default null
+             */
+            exif: string | null;
+            /**
+             * File Size
+             * @default null
+             */
+            file_size: number | null;
+            /**
+             * Focal Length
+             * @default
+             */
+            focal_length: string;
+            /**
+             * Gps Latitude
+             * @default null
+             */
+            gps_latitude: number | null;
+            /**
+             * Gps Longitude
+             * @default null
+             */
+            gps_longitude: number | null;
+            /**
+             * Instagram Index
+             * @default 0
+             */
+            instagram_index: number;
+            /**
+             * Instagram Post Date
+             * @default null
+             */
+            instagram_post_date: string | null;
+            /**
+             * Iso
+             * @default
+             */
+            iso: string;
+            /**
+             * Lens
+             * @default
+             */
+            lens: string;
+            /**
+             * Phash
+             * @default null
+             */
+            phash: string | null;
+            /**
+             * Shutter Speed
+             * @default
+             */
+            shutter_speed: string;
+            /**
+             * Similarity
+             * @default null
+             */
+            similarity: number | null;
+            /**
+             * Why Matched
+             * @default null
+             */
+            why_matched: string | null;
+            /**
+             * Thumbnail Url
+             * @default null
+             */
+            thumbnail_url: string | null;
+            /**
+             * Score
+             * @default null
+             */
+            score: number | null;
+        };
+        /** CatalogSimilarityGroup */
+        "CatalogSimilarityGroupsResponse.573ec44.CatalogSimilarityGroup": {
+            /** Group Id */
+            group_id: number;
+            seed: components["schemas"]["CatalogSimilarityGroupsResponse.573ec44.CatalogImage"];
+            /** Candidates */
+            candidates: components["schemas"]["CatalogSimilarityGroupsResponse.573ec44.CatalogImage"][];
+            /** Candidate Count */
+            candidate_count: number;
+            /** Best Similarity */
+            best_similarity: number;
+            /**
+             * Job Id
+             * @default null
+             */
+            job_id: string | null;
+            /**
+             * Created At
+             * @default null
+             */
+            created_at: string | null;
+        };
+        /** IdentityPerPerspectiveScore */
+        "ImageView.573ec44.IdentityPerPerspectiveScore": {
+            /** Perspective Slug */
+            perspective_slug: string;
+            /** Display Name */
+            display_name: string;
+            /** Score */
+            score: number;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Model Used */
+            model_used: string;
+            /** Scored At */
+            scored_at: string;
+            /** Rationale Preview */
+            rationale_preview: string;
+        };
+        /**
+         * PerspectiveScore
+         * @description Nested perspective line item in image descriptions.
+         */
+        "ImageView.573ec44.PerspectiveScore": {
+            /** Analysis */
+            analysis: string;
+            /** Score */
+            score: number;
+        };
+        /** InstagramExifData */
+        "InstagramListResponse.2d55088.InstagramExifData": {
+            /**
+             * Latitude
+             * @default null
+             */
+            latitude: number | null;
+            /**
+             * Longitude
+             * @default null
+             */
+            longitude: number | null;
+            /**
+             * Date Time Original
+             * @default null
+             */
+            date_time_original: string | null;
+            /**
+             * Device Id
+             * @default null
+             */
+            device_id: string | null;
+            /**
+             * Lens Model
+             * @default null
+             */
+            lens_model: string | null;
+            /**
+             * Iso
+             * @default null
+             */
+            iso: number | null;
+            /**
+             * Aperture
+             * @default null
+             */
+            aperture: string | null;
+            /**
+             * Shutter Speed
+             * @default null
+             */
+            shutter_speed: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** InstagramImage */
+        "InstagramListResponse.2d55088.InstagramImage": {
+            /** Key */
+            key: string;
+            /** Local Path */
+            local_path: string;
+            /** Filename */
+            filename: string;
+            /** Instagram Folder */
+            instagram_folder: string;
+            /** Source Folder */
+            source_folder: string;
+            /** Date Folder */
+            date_folder: string;
+            /** Crawled At */
+            crawled_at: string;
+            /** Image Index */
+            image_index: number;
+            /** Total In Post */
+            total_in_post: number;
+            /**
+             * Post Url
+             * @default null
+             */
+            post_url: string | null;
+            /**
+             * Created At
+             * @default null
+             */
+            created_at: string | null;
+            /**
+             * Image Hash
+             * @default null
+             */
+            image_hash: string | null;
+            /**
+             * Phash
+             * @default null
+             */
+            phash: string | null;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Caption
+             * @default
+             */
+            caption: string;
+            /**
+             * Processed
+             * @default null
+             */
+            processed: boolean | null;
+            /**
+             * Matched Catalog Key
+             * @default null
+             */
+            matched_catalog_key: string | null;
+            /**
+             * Matched Model
+             * @default null
+             */
+            matched_model: string | null;
+            /**
+             * Match Score
+             * @default null
+             */
+            match_score: number | null;
+            /**
+             * Exif Data
+             * @default null
+             */
+            exif_data: {
+                [key: string]: unknown;
+            } | components["schemas"]["InstagramListResponse.2d55088.InstagramExifData"] | null;
+        };
+        /** PaginationMeta */
+        "InstagramListResponse.2d55088.PaginationMeta": {
+            /** Offset */
+            offset: number;
+            /** Limit */
+            limit: number;
+            /** Current Page */
+            current_page: number;
+            /** Total Pages */
+            total_pages: number;
+            /** Has More */
+            has_more: boolean;
+        };
+        /**
          * Match
          * @description Enriched match row from ``GET /api/images/matches``.
          */
@@ -1212,6 +3102,1055 @@ export interface components {
             instagram_image: {
                 [key: string]: unknown;
             } | null;
+        };
+        /**
+         * CatalogImage
+         * @description Catalog list / search row shape (``query_catalog_images`` + API transforms).
+         */
+        "NlSearchResponse.2fa5250.CatalogImage": {
+            /** Key */
+            key: string;
+            /**
+             * Id
+             * @default null
+             */
+            id: number | null;
+            /**
+             * Filename
+             * @default
+             */
+            filename: string;
+            /**
+             * Filepath
+             * @default
+             */
+            filepath: string;
+            /**
+             * Date Taken
+             * @default
+             */
+            date_taken: string;
+            /**
+             * Rating
+             * @default 0
+             */
+            rating: number;
+            /**
+             * Pick
+             * @default false
+             */
+            pick: boolean;
+            /**
+             * Color Label
+             * @default
+             */
+            color_label: string;
+            /** Keywords */
+            keywords?: string[];
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Caption
+             * @default
+             */
+            caption: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Copyright
+             * @default
+             */
+            copyright: string;
+            /**
+             * Width
+             * @default null
+             */
+            width: number | null;
+            /**
+             * Height
+             * @default null
+             */
+            height: number | null;
+            /**
+             * Instagram Posted
+             * @default false
+             */
+            instagram_posted: boolean;
+            /**
+             * Instagram Url
+             * @default null
+             */
+            instagram_url: string | null;
+            /**
+             * Image Hash
+             * @default null
+             */
+            image_hash: string | null;
+            /**
+             * Image Type
+             * @default null
+             */
+            image_type: ("catalog" | "instagram") | null;
+            /**
+             * Ai Analyzed
+             * @default false
+             */
+            ai_analyzed: boolean;
+            /**
+             * Description Summary
+             * @default null
+             */
+            description_summary: string | null;
+            /**
+             * Description Best Perspective
+             * @default null
+             */
+            description_best_perspective: string | null;
+            /**
+             * Description Perspectives
+             * @default null
+             */
+            description_perspectives: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Catalog Perspective Score
+             * @default null
+             */
+            catalog_perspective_score: number | null;
+            /**
+             * Catalog Score Perspective
+             * @default null
+             */
+            catalog_score_perspective: string | null;
+            /**
+             * Stack Id
+             * @default null
+             */
+            stack_id: number | null;
+            /**
+             * Stack Member Count
+             * @default null
+             */
+            stack_member_count: number | null;
+            /**
+             * Is Stack Representative
+             * @default false
+             */
+            is_stack_representative: boolean;
+            /**
+             * Analyzed At
+             * @default null
+             */
+            analyzed_at: string | null;
+            /**
+             * Aperture
+             * @default
+             */
+            aperture: string;
+            /**
+             * Camera Make
+             * @default
+             */
+            camera_make: string;
+            /**
+             * Camera Model
+             * @default
+             */
+            camera_model: string;
+            /**
+             * Catalog Path
+             * @default
+             */
+            catalog_path: string;
+            /**
+             * Exif
+             * @default null
+             */
+            exif: string | null;
+            /**
+             * File Size
+             * @default null
+             */
+            file_size: number | null;
+            /**
+             * Focal Length
+             * @default
+             */
+            focal_length: string;
+            /**
+             * Gps Latitude
+             * @default null
+             */
+            gps_latitude: number | null;
+            /**
+             * Gps Longitude
+             * @default null
+             */
+            gps_longitude: number | null;
+            /**
+             * Instagram Index
+             * @default 0
+             */
+            instagram_index: number;
+            /**
+             * Instagram Post Date
+             * @default null
+             */
+            instagram_post_date: string | null;
+            /**
+             * Iso
+             * @default
+             */
+            iso: string;
+            /**
+             * Lens
+             * @default
+             */
+            lens: string;
+            /**
+             * Phash
+             * @default null
+             */
+            phash: string | null;
+            /**
+             * Shutter Speed
+             * @default
+             */
+            shutter_speed: string;
+            /**
+             * Similarity
+             * @default null
+             */
+            similarity: number | null;
+            /**
+             * Why Matched
+             * @default null
+             */
+            why_matched: string | null;
+            /**
+             * Thumbnail Url
+             * @default null
+             */
+            thumbnail_url: string | null;
+            /**
+             * Score
+             * @default null
+             */
+            score: number | null;
+        };
+        /**
+         * CatalogImage
+         * @description Catalog list / search row shape (``query_catalog_images`` + API transforms).
+         */
+        "SemanticSearchResponse.2fa5250.CatalogImage": {
+            /** Key */
+            key: string;
+            /**
+             * Id
+             * @default null
+             */
+            id: number | null;
+            /**
+             * Filename
+             * @default
+             */
+            filename: string;
+            /**
+             * Filepath
+             * @default
+             */
+            filepath: string;
+            /**
+             * Date Taken
+             * @default
+             */
+            date_taken: string;
+            /**
+             * Rating
+             * @default 0
+             */
+            rating: number;
+            /**
+             * Pick
+             * @default false
+             */
+            pick: boolean;
+            /**
+             * Color Label
+             * @default
+             */
+            color_label: string;
+            /** Keywords */
+            keywords?: string[];
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Caption
+             * @default
+             */
+            caption: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Copyright
+             * @default
+             */
+            copyright: string;
+            /**
+             * Width
+             * @default null
+             */
+            width: number | null;
+            /**
+             * Height
+             * @default null
+             */
+            height: number | null;
+            /**
+             * Instagram Posted
+             * @default false
+             */
+            instagram_posted: boolean;
+            /**
+             * Instagram Url
+             * @default null
+             */
+            instagram_url: string | null;
+            /**
+             * Image Hash
+             * @default null
+             */
+            image_hash: string | null;
+            /**
+             * Image Type
+             * @default null
+             */
+            image_type: ("catalog" | "instagram") | null;
+            /**
+             * Ai Analyzed
+             * @default false
+             */
+            ai_analyzed: boolean;
+            /**
+             * Description Summary
+             * @default null
+             */
+            description_summary: string | null;
+            /**
+             * Description Best Perspective
+             * @default null
+             */
+            description_best_perspective: string | null;
+            /**
+             * Description Perspectives
+             * @default null
+             */
+            description_perspectives: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Catalog Perspective Score
+             * @default null
+             */
+            catalog_perspective_score: number | null;
+            /**
+             * Catalog Score Perspective
+             * @default null
+             */
+            catalog_score_perspective: string | null;
+            /**
+             * Stack Id
+             * @default null
+             */
+            stack_id: number | null;
+            /**
+             * Stack Member Count
+             * @default null
+             */
+            stack_member_count: number | null;
+            /**
+             * Is Stack Representative
+             * @default false
+             */
+            is_stack_representative: boolean;
+            /**
+             * Analyzed At
+             * @default null
+             */
+            analyzed_at: string | null;
+            /**
+             * Aperture
+             * @default
+             */
+            aperture: string;
+            /**
+             * Camera Make
+             * @default
+             */
+            camera_make: string;
+            /**
+             * Camera Model
+             * @default
+             */
+            camera_model: string;
+            /**
+             * Catalog Path
+             * @default
+             */
+            catalog_path: string;
+            /**
+             * Exif
+             * @default null
+             */
+            exif: string | null;
+            /**
+             * File Size
+             * @default null
+             */
+            file_size: number | null;
+            /**
+             * Focal Length
+             * @default
+             */
+            focal_length: string;
+            /**
+             * Gps Latitude
+             * @default null
+             */
+            gps_latitude: number | null;
+            /**
+             * Gps Longitude
+             * @default null
+             */
+            gps_longitude: number | null;
+            /**
+             * Instagram Index
+             * @default 0
+             */
+            instagram_index: number;
+            /**
+             * Instagram Post Date
+             * @default null
+             */
+            instagram_post_date: string | null;
+            /**
+             * Iso
+             * @default
+             */
+            iso: string;
+            /**
+             * Lens
+             * @default
+             */
+            lens: string;
+            /**
+             * Phash
+             * @default null
+             */
+            phash: string | null;
+            /**
+             * Shutter Speed
+             * @default
+             */
+            shutter_speed: string;
+            /**
+             * Similarity
+             * @default null
+             */
+            similarity: number | null;
+            /**
+             * Why Matched
+             * @default null
+             */
+            why_matched: string | null;
+            /**
+             * Thumbnail Url
+             * @default null
+             */
+            thumbnail_url: string | null;
+            /**
+             * Score
+             * @default null
+             */
+            score: number | null;
+        };
+        /** SemanticSearchMetadata */
+        "SemanticSearchResponse.2fa5250.SemanticSearchMetadata": {
+            /** Missing Embeddings Count */
+            missing_embeddings_count: number;
+            /** Semantic Index Empty */
+            semantic_index_empty: boolean;
+            /** Rrf K */
+            rrf_k: number;
+            /** Fts No Match */
+            fts_no_match: boolean;
+        };
+        /** ChatSearchMessage */
+        "ChatSearchRequest.2fa5250.ChatSearchMessage": {
+            /** Role */
+            role: string;
+            /**
+             * Content
+             * @default null
+             */
+            content: string | null;
+            /**
+             * Tool Calls
+             * @default null
+             */
+            tool_calls: unknown[] | null;
+            /**
+             * Tool Call Id
+             * @default null
+             */
+            tool_call_id: string | null;
+        };
+        /** ChatSearchMessage */
+        "ChatSearchResponse.2fa5250.ChatSearchMessage": {
+            /** Role */
+            role: string;
+            /**
+             * Content
+             * @default null
+             */
+            content: string | null;
+            /**
+             * Tool Calls
+             * @default null
+             */
+            tool_calls: unknown[] | null;
+            /**
+             * Tool Call Id
+             * @default null
+             */
+            tool_call_id: string | null;
+        };
+        /** ChatSearchResultImage */
+        "ChatSearchResponse.2fa5250.ChatSearchResultImage": {
+            /** Key */
+            key: string;
+            /**
+             * Id
+             * @default null
+             */
+            id: number | null;
+            /**
+             * Filename
+             * @default
+             */
+            filename: string;
+            /**
+             * Filepath
+             * @default
+             */
+            filepath: string;
+            /**
+             * Date Taken
+             * @default
+             */
+            date_taken: string;
+            /**
+             * Rating
+             * @default 0
+             */
+            rating: number;
+            /**
+             * Pick
+             * @default false
+             */
+            pick: boolean;
+            /**
+             * Color Label
+             * @default
+             */
+            color_label: string;
+            /** Keywords */
+            keywords?: string[];
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Caption
+             * @default
+             */
+            caption: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Copyright
+             * @default
+             */
+            copyright: string;
+            /**
+             * Width
+             * @default null
+             */
+            width: number | null;
+            /**
+             * Height
+             * @default null
+             */
+            height: number | null;
+            /**
+             * Instagram Posted
+             * @default false
+             */
+            instagram_posted: boolean;
+            /**
+             * Instagram Url
+             * @default null
+             */
+            instagram_url: string | null;
+            /**
+             * Image Hash
+             * @default null
+             */
+            image_hash: string | null;
+            /**
+             * Image Type
+             * @default null
+             */
+            image_type: ("catalog" | "instagram") | null;
+            /**
+             * Ai Analyzed
+             * @default false
+             */
+            ai_analyzed: boolean;
+            /**
+             * Description Summary
+             * @default null
+             */
+            description_summary: string | null;
+            /**
+             * Description Best Perspective
+             * @default null
+             */
+            description_best_perspective: string | null;
+            /**
+             * Description Perspectives
+             * @default null
+             */
+            description_perspectives: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Catalog Perspective Score
+             * @default null
+             */
+            catalog_perspective_score: number | null;
+            /**
+             * Catalog Score Perspective
+             * @default null
+             */
+            catalog_score_perspective: string | null;
+            /**
+             * Stack Id
+             * @default null
+             */
+            stack_id: number | null;
+            /**
+             * Stack Member Count
+             * @default null
+             */
+            stack_member_count: number | null;
+            /**
+             * Is Stack Representative
+             * @default false
+             */
+            is_stack_representative: boolean;
+            /**
+             * Analyzed At
+             * @default null
+             */
+            analyzed_at: string | null;
+            /**
+             * Aperture
+             * @default
+             */
+            aperture: string;
+            /**
+             * Camera Make
+             * @default
+             */
+            camera_make: string;
+            /**
+             * Camera Model
+             * @default
+             */
+            camera_model: string;
+            /**
+             * Catalog Path
+             * @default
+             */
+            catalog_path: string;
+            /**
+             * Exif
+             * @default null
+             */
+            exif: string | null;
+            /**
+             * File Size
+             * @default null
+             */
+            file_size: number | null;
+            /**
+             * Focal Length
+             * @default
+             */
+            focal_length: string;
+            /**
+             * Gps Latitude
+             * @default null
+             */
+            gps_latitude: number | null;
+            /**
+             * Gps Longitude
+             * @default null
+             */
+            gps_longitude: number | null;
+            /**
+             * Instagram Index
+             * @default 0
+             */
+            instagram_index: number;
+            /**
+             * Instagram Post Date
+             * @default null
+             */
+            instagram_post_date: string | null;
+            /**
+             * Iso
+             * @default
+             */
+            iso: string;
+            /**
+             * Lens
+             * @default
+             */
+            lens: string;
+            /**
+             * Phash
+             * @default null
+             */
+            phash: string | null;
+            /**
+             * Shutter Speed
+             * @default
+             */
+            shutter_speed: string;
+            /**
+             * Similarity
+             * @default null
+             */
+            similarity: number | null;
+            /**
+             * Why Matched
+             * @default null
+             */
+            why_matched: string | null;
+            /**
+             * Thumbnail Url
+             * @default null
+             */
+            thumbnail_url: string | null;
+            /**
+             * Score
+             * @default null
+             */
+            score: number | null;
+        };
+        /**
+         * CatalogImage
+         * @description Catalog list / search row shape (``query_catalog_images`` + API transforms).
+         */
+        "StackMembersResponse.b12c71e.CatalogImage": {
+            /** Key */
+            key: string;
+            /**
+             * Id
+             * @default null
+             */
+            id: number | null;
+            /**
+             * Filename
+             * @default
+             */
+            filename: string;
+            /**
+             * Filepath
+             * @default
+             */
+            filepath: string;
+            /**
+             * Date Taken
+             * @default
+             */
+            date_taken: string;
+            /**
+             * Rating
+             * @default 0
+             */
+            rating: number;
+            /**
+             * Pick
+             * @default false
+             */
+            pick: boolean;
+            /**
+             * Color Label
+             * @default
+             */
+            color_label: string;
+            /** Keywords */
+            keywords?: string[];
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Caption
+             * @default
+             */
+            caption: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Copyright
+             * @default
+             */
+            copyright: string;
+            /**
+             * Width
+             * @default null
+             */
+            width: number | null;
+            /**
+             * Height
+             * @default null
+             */
+            height: number | null;
+            /**
+             * Instagram Posted
+             * @default false
+             */
+            instagram_posted: boolean;
+            /**
+             * Instagram Url
+             * @default null
+             */
+            instagram_url: string | null;
+            /**
+             * Image Hash
+             * @default null
+             */
+            image_hash: string | null;
+            /**
+             * Image Type
+             * @default null
+             */
+            image_type: ("catalog" | "instagram") | null;
+            /**
+             * Ai Analyzed
+             * @default false
+             */
+            ai_analyzed: boolean;
+            /**
+             * Description Summary
+             * @default null
+             */
+            description_summary: string | null;
+            /**
+             * Description Best Perspective
+             * @default null
+             */
+            description_best_perspective: string | null;
+            /**
+             * Description Perspectives
+             * @default null
+             */
+            description_perspectives: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Catalog Perspective Score
+             * @default null
+             */
+            catalog_perspective_score: number | null;
+            /**
+             * Catalog Score Perspective
+             * @default null
+             */
+            catalog_score_perspective: string | null;
+            /**
+             * Stack Id
+             * @default null
+             */
+            stack_id: number | null;
+            /**
+             * Stack Member Count
+             * @default null
+             */
+            stack_member_count: number | null;
+            /**
+             * Is Stack Representative
+             * @default false
+             */
+            is_stack_representative: boolean;
+            /**
+             * Analyzed At
+             * @default null
+             */
+            analyzed_at: string | null;
+            /**
+             * Aperture
+             * @default
+             */
+            aperture: string;
+            /**
+             * Camera Make
+             * @default
+             */
+            camera_make: string;
+            /**
+             * Camera Model
+             * @default
+             */
+            camera_model: string;
+            /**
+             * Catalog Path
+             * @default
+             */
+            catalog_path: string;
+            /**
+             * Exif
+             * @default null
+             */
+            exif: string | null;
+            /**
+             * File Size
+             * @default null
+             */
+            file_size: number | null;
+            /**
+             * Focal Length
+             * @default
+             */
+            focal_length: string;
+            /**
+             * Gps Latitude
+             * @default null
+             */
+            gps_latitude: number | null;
+            /**
+             * Gps Longitude
+             * @default null
+             */
+            gps_longitude: number | null;
+            /**
+             * Instagram Index
+             * @default 0
+             */
+            instagram_index: number;
+            /**
+             * Instagram Post Date
+             * @default null
+             */
+            instagram_post_date: string | null;
+            /**
+             * Iso
+             * @default
+             */
+            iso: string;
+            /**
+             * Lens
+             * @default
+             */
+            lens: string;
+            /**
+             * Phash
+             * @default null
+             */
+            phash: string | null;
+            /**
+             * Shutter Speed
+             * @default
+             */
+            shutter_speed: string;
+            /**
+             * Similarity
+             * @default null
+             */
+            similarity: number | null;
+            /**
+             * Why Matched
+             * @default null
+             */
+            why_matched: string | null;
+            /**
+             * Thumbnail Url
+             * @default null
+             */
+            thumbnail_url: string | null;
+            /**
+             * Score
+             * @default null
+             */
+            score: number | null;
+        };
+        /** StackMetadata */
+        "StackSplitMemberResponse.b12c71e.StackMetadata": {
+            /** Stack Id */
+            stack_id: number;
+            /** Representative Key */
+            representative_key: string;
+            /** Stack Member Count */
+            stack_member_count: number;
+            /** Member Keys */
+            member_keys: string[];
+        };
+        /** StackMetadata */
+        "StackMergeResponse.b12c71e.StackMetadata": {
+            /** Stack Id */
+            stack_id: number;
+            /** Representative Key */
+            representative_key: string;
+            /** Stack Member Count */
+            stack_member_count: number;
+            /** Member Keys */
+            member_keys: string[];
+        };
+        /** StackMetadata */
+        "StackRepresentativeResponse.b12c71e.StackMetadata": {
+            /** Stack Id */
+            stack_id: number;
+            /** Representative Key */
+            representative_key: string;
+            /** Stack Member Count */
+            stack_member_count: number;
+            /** Member Keys */
+            member_keys: string[];
         };
     };
     responses: never;
@@ -1545,6 +4484,586 @@ export interface operations {
             };
         };
     };
+    "get__api_images_catalog_{image_key}_thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    get__api_images_catalog_months: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogMonthsResponse.573ec44"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    get__api_images_catalog_: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogListResponse.573ec44"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    get__api_images_catalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogListResponse.573ec44"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_images_catalog_{image_key}_similar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogSimilarResponse.573ec44"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_images_catalog_{image_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageView.573ec44"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_images_stacks_{stack_id}_members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stack_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StackMembersResponse.b12c71e"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "post__api_images_stacks_{stack_id}_split-member": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stack_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StackSplitMemberRequest.b12c71e"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StackSplitMemberResponse.b12c71e"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "post__api_images_stacks_{target_stack_id}_merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                target_stack_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StackMergeRequest.b12c71e"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StackMergeResponse.b12c71e"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "post__api_images_stacks_{stack_id}_representative": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stack_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StackRepresentativeRequest.b12c71e"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StackRepresentativeResponse.b12c71e"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    get__api_images_instagram: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstagramListResponse.2d55088"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    get__api_images_instagram_months: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstagramMonthsResponse.2d55088"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_images_instagram_{image_key}_thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_images_instagram_{image_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageView.573ec44"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
     get__api_images_matches: {
         parameters: {
             query?: never;
@@ -1661,6 +5180,161 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MatchRejectConflictResponse.595c1c1"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "post__api_images_search_nl-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NlSearchRequest.2fa5250"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NlSearchResponse.2fa5250"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "post__api_images_search_semantic-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SemanticSearchRequest.2fa5250"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SemanticSearchResponse.2fa5250"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "post__api_images_search_chat-search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatSearchRequest.2fa5250"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSearchResponse.2fa5250"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_images_catalog-similarity-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogSimilarityGroupsResponse.573ec44"];
                 };
             };
             /** @description Unprocessable Content */
@@ -2130,6 +5804,219 @@ export interface operations {
             };
             /** @description Conflict */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    get__api_config_catalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigCatalogGetResponse.ab1fa53"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    put__api_config_catalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigCatalogPutRequest.ab1fa53"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigCatalogPutResponse.ab1fa53"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_config_instagram-dump": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigInstagramDumpGetResponse.ab1fa53"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "put__api_config_instagram-dump": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigInstagramDumpPutRequest.ab1fa53"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigInstagramDumpPutResponse.ab1fa53"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_config_stack-detection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigStackDetectionGetResponse.ab1fa53"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "put__api_config_stack-detection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigStackDetectionPutRequest.ab1fa53"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigStackDetectionPutResponse.ab1fa53"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

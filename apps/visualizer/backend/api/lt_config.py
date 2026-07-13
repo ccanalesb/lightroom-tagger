@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
+from spectree import Response
 from lightroom_tagger.core.config import (
     load_config,
     update_config_yaml_catalog_path,
@@ -10,15 +11,34 @@ from lightroom_tagger.core.config import (
 )
 from utils.responses import error_bad_request
 
+from api.openapi import spec
+from api.schemas.config import (
+    ConfigCatalogGetResponse,
+    ConfigCatalogPutRequest,
+    ConfigCatalogPutResponse,
+    ConfigInstagramDumpGetResponse,
+    ConfigInstagramDumpPutRequest,
+    ConfigInstagramDumpPutResponse,
+    ConfigStackDetectionGetResponse,
+    ConfigStackDetectionPutRequest,
+    ConfigStackDetectionPutResponse,
+)
+from api.schemas.jobs import ErrorBody
+
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 assert os.path.isfile(os.path.join(REPO_ROOT, "pyproject.toml")), "lt_config REPO_ROOT must be repository root"
 
 LT_CONFIG_YAML = os.path.join(REPO_ROOT, "config.yaml")
 
+
 bp = Blueprint("lt_config", __name__)
 
 
 @bp.route('/catalog', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=ConfigCatalogGetResponse),
+    tags=['config'],
+)
 def get_catalog():
     cfg = load_config(LT_CONFIG_YAML)
     raw = cfg.catalog_path or ""
@@ -34,6 +54,11 @@ def get_catalog():
 
 
 @bp.route('/catalog', methods=['PUT'])
+@spec.validate(
+    json=ConfigCatalogPutRequest,
+    resp=Response(HTTP_200=ConfigCatalogPutResponse, HTTP_400=ErrorBody),
+    tags=['config'],
+)
 def put_catalog():
     data = request.get_json(silent=True)
     if data is None or "catalog_path" not in data:
@@ -51,6 +76,10 @@ def put_catalog():
 
 
 @bp.route('/instagram-dump', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=ConfigInstagramDumpGetResponse),
+    tags=['config'],
+)
 def get_instagram_dump():
     cfg = load_config(LT_CONFIG_YAML)
     raw = cfg.instagram_dump_path or ""
@@ -66,6 +95,11 @@ def get_instagram_dump():
 
 
 @bp.route('/instagram-dump', methods=['PUT'])
+@spec.validate(
+    json=ConfigInstagramDumpPutRequest,
+    resp=Response(HTTP_200=ConfigInstagramDumpPutResponse, HTTP_400=ErrorBody),
+    tags=['config'],
+)
 def put_instagram_dump():
     data = request.get_json(silent=True)
     if data is None or "instagram_dump_path" not in data:
@@ -81,12 +115,21 @@ def put_instagram_dump():
 
 
 @bp.route('/stack-detection', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=ConfigStackDetectionGetResponse),
+    tags=['config'],
+)
 def get_stack_detection():
     cfg = load_config(LT_CONFIG_YAML)
     return jsonify({"stack_burst_delta_ms": int(cfg.stack_burst_delta_ms)})
 
 
 @bp.route('/stack-detection', methods=['PUT'])
+@spec.validate(
+    json=ConfigStackDetectionPutRequest,
+    resp=Response(HTTP_200=ConfigStackDetectionPutResponse, HTTP_400=ErrorBody),
+    tags=['config'],
+)
 def put_stack_detection():
     data = request.get_json(silent=True)
     if data is None or "stack_burst_delta_ms" not in data:

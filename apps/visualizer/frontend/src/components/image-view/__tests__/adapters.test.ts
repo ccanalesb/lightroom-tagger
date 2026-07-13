@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import type {
-  CatalogImage,
+  CatalogImageInput,
   IdentityBestPhotoItem,
-  InstagramImage,
+  InstagramImageInput,
   Match,
   PostNextCandidate,
   UnpostedCatalogItem,
@@ -18,7 +18,7 @@ import {
 
 describe('image-view adapters', () => {
   it('fromCatalogListRow does NOT zero identity fields when they are absent', () => {
-    const row: CatalogImage = {
+    const row: CatalogImageInput = {
       id: 1,
       key: 'k',
       filename: 'f.jpg',
@@ -115,7 +115,7 @@ describe('image-view adapters', () => {
   })
 
   it('fromInstagramRow keeps image_type=instagram and omits identity fields', () => {
-    const row: InstagramImage = {
+    const row: InstagramImageInput = {
       key: 'ig-1',
       local_path: '/tmp/ig.jpg',
       filename: 'ig.jpg',
@@ -137,7 +137,7 @@ describe('image-view adapters', () => {
   })
 
   it('fromInstagramRow sets ai_analyzed true when description is non-empty after trim', () => {
-    const base: Omit<InstagramImage, 'description'> = {
+    const base: Omit<InstagramImageInput, 'description'> = {
       key: 'ig-2',
       local_path: '/tmp/x.jpg',
       filename: 'x.jpg',
@@ -155,7 +155,7 @@ describe('image-view adapters', () => {
   })
 
   it('fromInstagramRow sets ai_analyzed false when description is missing or blank', () => {
-    const base: Omit<InstagramImage, 'description'> = {
+    const base: Omit<InstagramImageInput, 'description'> = {
       key: 'ig-3',
       local_path: '/tmp/y.jpg',
       filename: 'y.jpg',
@@ -173,7 +173,7 @@ describe('image-view adapters', () => {
   })
 
   it('fromMatchSide instagram uses fromInstagramRow so ai_analyzed follows description', () => {
-    const embedded: InstagramImage = {
+    const embedded: InstagramImageInput = {
       key: 'ig-m',
       local_path: '/tmp/m.jpg',
       filename: 'm.jpg',

@@ -1,4 +1,22 @@
 import { invalidate, invalidateAll, patchMatching } from '../data'
+import type {
+  CatalogImage,
+  CatalogImageInput,
+  CatalogSimilarityGroup,
+  CatalogSimilarityGroupsResponse,
+  IdentityPerPerspectiveScore,
+  ImageDetailResponse,
+  ImageView,
+} from '../types/catalog'
+import type {
+  ConfigCatalogGetResponse,
+  ConfigCatalogPutResponse,
+  ConfigInstagramDumpGetResponse,
+  ConfigInstagramDumpPutResponse,
+  ConfigStackDetectionGetResponse,
+  ConfigStackDetectionPutResponse,
+} from '../types/config'
+import type { InstagramImage, InstagramImageInput, InstagramListResponse } from '../types/instagram'
 import type { Job, JobsGetOptions, JobsHealth, JobsListResponse } from '../types/job'
 import type { Match, MatchGroup, MatchesListResponse } from '../types/matches'
 import type {
@@ -13,9 +31,41 @@ import type {
   ProviderDefaults,
   ProviderModel,
 } from '../types/providers'
+import type {
+  ChatSearchMessage,
+  ChatSearchRequest,
+  ChatSearchResponse,
+  ChatSearchResultImage,
+} from '../types/search'
+import type {
+  StackMergeResponse,
+  StackRepresentativeResponse,
+  StackSplitMemberResponse,
+} from '../types/stacks'
 import { API_DEFAULT_URL } from '../constants/strings'
 
-export type { Job, JobsGetOptions, JobsHealth, JobsListResponse }
+export type {
+  CatalogImage,
+  CatalogImageInput,
+  CatalogSimilarityGroup,
+  CatalogSimilarityGroupsResponse,
+  ChatSearchMessage,
+  ChatSearchRequest,
+  ChatSearchResponse,
+  ChatSearchResultImage,
+  IdentityPerPerspectiveScore,
+  ImageDetailResponse,
+  ImageView,
+  InstagramImage,
+  InstagramImageInput,
+  Job,
+  JobsGetOptions,
+  JobsHealth,
+  JobsListResponse,
+  StackMergeResponse,
+  StackRepresentativeResponse,
+  StackSplitMemberResponse,
+}
 export type { Match, MatchGroup, MatchesListResponse }
 export type {
   DescriptionModel,
@@ -182,10 +232,10 @@ export const JobsAPI = {
 
 export const ConfigAPI = {
   getCatalog: () =>
-    request<{ catalog_path: string; resolved_path: string; exists: boolean }>('/config/catalog'),
+    request<ConfigCatalogGetResponse>('/config/catalog'),
 
   putCatalog: async (catalogPath: string) => {
-    const result = await request<{ catalog_path: string; ok: boolean }>('/config/catalog', {
+    const result = await request<ConfigCatalogPutResponse>('/config/catalog', {
       method: 'PUT',
       body: JSON.stringify({ catalog_path: catalogPath }),
     })
@@ -198,14 +248,10 @@ export const ConfigAPI = {
   },
 
   getInstagramDump: () =>
-    request<{
-      instagram_dump_path: string
-      resolved_path: string
-      exists: boolean
-    }>('/config/instagram-dump'),
+    request<ConfigInstagramDumpGetResponse>('/config/instagram-dump'),
 
   putInstagramDump: async (instagramDumpPath: string) => {
-    const result = await request<{ instagram_dump_path: string; ok: boolean }>(
+    const result = await request<ConfigInstagramDumpPutResponse>(
       '/config/instagram-dump',
       {
         method: 'PUT',
@@ -218,10 +264,10 @@ export const ConfigAPI = {
   },
 
   getStackDetection: () =>
-    request<{ stack_burst_delta_ms: number }>('/config/stack-detection'),
+    request<ConfigStackDetectionGetResponse>('/config/stack-detection'),
 
   putStackDetection: async (stackBurstDeltaMs: number) => {
-    const result = await request<{ stack_burst_delta_ms: number; ok: boolean }>(
+    const result = await request<ConfigStackDetectionPutResponse>(
       '/config/stack-detection',
       {
         method: 'PUT',
@@ -304,29 +350,6 @@ export const SystemAPI = {
     request<CachePipelineStatus>('/cache/pipeline-status'),
 }
 
-/** STACK-05 mutation responses (`/api/images/stacks/...`). */
-export interface StackMetadata {
-  stack_id: number
-  representative_key: string
-  stack_member_count: number
-  member_keys: string[]
-}
-
-export interface StackSplitMemberResponse {
-  split_out_key: string
-  remaining_stack: StackMetadata | null
-  dissolved: boolean
-}
-
-export interface StackMergeResponse {
-  stack: StackMetadata
-  merged_stack_id: number
-}
-
-export interface StackRepresentativeResponse {
-  stack: StackMetadata
-}
-
 export const ImagesAPI = {
   listInstagram: (params?: {
     limit?: number
@@ -343,11 +366,7 @@ export const ImagesAPI = {
     if (params?.date_from) searchParams.set('date_from', params.date_from)
     if (params?.date_to) searchParams.set('date_to', params.date_to)
     if (params?.sort_by_date) searchParams.set('sort_by_date', params.sort_by_date)
-    return request<{
-      total: number;
-      images: InstagramImage[];
-      pagination: PaginationMeta;
-    }>(`/images/instagram?${searchParams.toString()}`)
+    return request<InstagramListResponse>(`/images/instagram?${searchParams.toString()}`)
   },
 
   getInstagramMonths: () =>
@@ -781,16 +800,6 @@ export const AnalyticsAPI = {
 
 // --- Identity (Phase 8) — GET /api/identity/best-photos, /api/identity/style-fingerprint, /api/identity/suggestions
 
-export interface IdentityPerPerspectiveScore {
-  perspective_slug: string
-  display_name: string
-  score: number
-  prompt_version: string
-  model_used: string
-  scored_at: string
-  rationale_preview: string
-}
-
 export interface IdentityBestPhotoItem {
   image_key: string
   image_type?: 'catalog' | 'instagram'
@@ -976,194 +985,6 @@ export interface CachePipelineStatus {
   catalog_cache_build: CachePipelineRun | null
   prepare_catalog: CachePipelineRun | null
 }
-
-export interface InstagramImage {
-  post_url?: string // Optional - not available in dump
-  local_path: string
-  filename: string
-  instagram_folder: string
-  source_folder: string // posts, archived_posts, etc.
-  date_folder: string // YYYYMM format (e.g., '202404' for April 2024)
-  created_at?: string // ISO timestamp when posted to Instagram (may be empty)
-  image_hash?: string // Visual perceptual hash for duplicate detection
-  phash?: string
-  description?: string // AI-generated description
-  caption?: string // Original Instagram caption
-  key: string
-  crawled_at: string
-  image_index: number
-  total_in_post: number
-  processed?: boolean
-  matched_catalog_key?: string
-  matched_model?: string
-  match_score?: number
-  exif_data?: {
-    latitude?: number
-    longitude?: number
-    date_time_original?: string
-    device_id?: string
-    lens_model?: string
-    iso?: number
-    aperture?: string
-    shutter_speed?: string
-  }
-}
-
-export interface CatalogImage {
-  id: number | null
-  key: string
-  filename: string
-  filepath: string
-  date_taken: string
-  rating: number
-  pick: boolean
-  color_label: string
-  keywords: string[]
-  title: string
-  caption: string
-  copyright: string
-  width: number
-  height: number
-  instagram_posted: boolean
-  image_type?: 'catalog' | 'instagram'
-  instagram_url?: string
-  image_hash?: string
-  ai_analyzed?: boolean
-  description_summary?: string | null
-  description_best_perspective?: string | null
-  description_perspectives?: ImageDescription['perspectives']
-  /** Present when catalog list was requested with score_perspective. */
-  catalog_perspective_score?: number | null
-  catalog_score_perspective?: string
-  /** Burst stack (06-01+); null when not in a stack. */
-  stack_id?: number | null
-  stack_member_count?: number | null
-  is_stack_representative?: boolean | null
-  /** From GET …/similar only (CLIP cosine-derived). */
-  similarity?: number
-  why_matched?: string
-  thumbnail_url?: string
-}
-
-export type CatalogSimilarityGroup = {
-  group_id: number
-  seed: CatalogImage
-  candidates: CatalogImage[]
-  candidate_count: number
-  best_similarity: number
-  job_id?: string | null
-  created_at?: string | null
-}
-
-export type CatalogSimilarityGroupsResponse = {
-  items: CatalogSimilarityGroup[]
-  total: number
-}
-
-/** OpenAI-style chat messages for tool-calling search (request + response). */
-export type ChatSearchMessage = {
-  role: string
-  content: string | null
-  tool_calls?: unknown[]
-  tool_call_id?: string
-}
-
-export type ChatSearchRequest = {
-  message: string
-  messages?: ChatSearchMessage[]
-  limit?: number
-  offset?: number
-  provider_id?: string
-  model?: string
-  score_perspective?: string
-  /** CLIP-similar candidate set for intersection-first chat search (NLS-06). */
-  pinned_image_key?: string
-}
-
-export type ChatSearchResultImage = CatalogImage & {
-  /** Present on the semantic path — RRF/hybrid score for this result. */
-  score?: number
-  /** Present on the semantic path — short "why matched" explanation. */
-  why_matched?: string
-  /** Present on the semantic path — URL for thumbnail. */
-  thumbnail_url?: string
-}
-
-export type ChatSearchResponse = {
-  search_mode: 'nl_filter' | 'semantic' | 'tool_calling'
-  total: number
-  images: ChatSearchResultImage[]
-  filters?: Record<string, unknown> | null
-  metadata?: Record<string, unknown> | null
-  messages?: ChatSearchMessage[]
-  assistant_message?: string
-}
-
-/**
- * Superset frontend shape for any image the UI renders (Catalog or Instagram,
- * list row or detail response). Adapters map API-specific rows into this
- * single type; fields not available from a given source are left undefined.
- *
- * Motivation: list endpoints stay lean, the detail endpoint fills every
- * field authoritatively when the modal is opened.
- */
-export interface ImageView {
-  image_type: 'catalog' | 'instagram'
-  key: string
-  id?: number | null
-  filename?: string
-  filepath?: string
-  local_path?: string
-  date_taken?: string
-  created_at?: string
-  rating?: number
-  pick?: boolean
-  color_label?: string
-  keywords?: string[]
-  title?: string
-  caption?: string
-  copyright?: string
-  width?: number
-  height?: number
-  instagram_posted?: boolean
-  instagram_url?: string
-  post_url?: string
-  image_hash?: string
-
-  /** Burst stack (catalog list / detail when present). */
-  stack_id?: number | null
-  stack_member_count?: number | null
-  is_stack_representative?: boolean | null
-
-  // Instagram-only metadata (present on detail responses for image_type='instagram').
-  instagram_folder?: string
-  date_folder?: string
-  source_folder?: string
-  matched_catalog_key?: string | null
-  processed?: boolean
-
-  // AI description fields (same source on both image_types).
-  ai_analyzed?: boolean
-  description_summary?: string | null
-  description_best_perspective?: string | null
-  description_perspectives?: ImageDescription['perspectives'] | null
-
-  // Catalog-perspective score fields (populated only when a specific
-  // perspective slug is requested via `?score_perspective=...`).
-  catalog_perspective_score?: number | null
-  catalog_score_perspective?: string | null
-  /** Every persisted current score perspective for this image; detail-only. */
-  available_score_perspectives?: string[]
-
-  // Identity aggregate fields (catalog-only; always empty for Instagram rows).
-  identity_aggregate_score?: number | null
-  identity_perspectives_covered?: number
-  identity_eligible?: boolean
-  identity_per_perspective?: IdentityPerPerspectiveScore[]
-}
-
-/** Shape returned by `GET /api/images/<image_type>/<image_key>`. */
-export type ImageDetailResponse = ImageView
 
 export interface ImageDescription {
   image_key: string

@@ -3,9 +3,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { SearchPage } from '../SearchPage'
 import { SEARCH_PIN_FALLBACK_REASON_NO_CLIP_EMBEDDING } from '../../constants/strings'
-import { ImagesAPI, ProvidersAPI, type CatalogImage } from '../../services/api'
+import { ImagesAPI, ProvidersAPI, type CatalogImageInput, type ChatSearchResultImage } from '../../services/api'
 
-const sampleImage: CatalogImage = {
+const sampleImage = {
   id: 1,
   key: '2024-01-15_sample.jpg',
   filename: 'sample.jpg',
@@ -21,9 +21,9 @@ const sampleImage: CatalogImage = {
   width: 800,
   height: 600,
   instagram_posted: false,
-}
+} satisfies CatalogImageInput
 
-const sampleImageB: CatalogImage = {
+const sampleImageB = {
   ...sampleImage,
   id: 2,
   key: '2024-01-16_other.jpg',
@@ -50,7 +50,7 @@ describe('SearchPage', () => {
     vi.spyOn(ImagesAPI, 'chatSearch').mockResolvedValue({
       search_mode: 'nl_filter',
       total: 1,
-      images: [sampleImage],
+      images: [sampleImage as unknown as ChatSearchResultImage],
       filters: { keyword: 'test' },
     })
   })
@@ -92,7 +92,7 @@ describe('SearchPage', () => {
     vi.mocked(ImagesAPI.chatSearch).mockResolvedValue({
       search_mode: 'nl_filter',
       total: 2,
-      images: [sampleImage, sampleImageB],
+      images: [sampleImage, sampleImageB] as unknown as ChatSearchResultImage[],
       filters: {},
       metadata: { pin_state: 'active' },
     })
@@ -132,7 +132,7 @@ describe('SearchPage', () => {
     vi.mocked(ImagesAPI.chatSearch).mockResolvedValue({
       search_mode: 'nl_filter',
       total: 2,
-      images: [sampleImage, sampleImageB],
+      images: [sampleImage, sampleImageB] as unknown as ChatSearchResultImage[],
       filters: {},
     })
 
@@ -173,7 +173,7 @@ describe('SearchPage', () => {
       .mockResolvedValueOnce({
         search_mode: 'nl_filter',
         total: 1,
-        images: [sampleImage],
+        images: [sampleImage as unknown as ChatSearchResultImage],
         filters: {},
       })
       .mockResolvedValueOnce({
@@ -225,20 +225,20 @@ describe('SearchPage', () => {
       .mockResolvedValueOnce({
         search_mode: 'nl_filter',
         total: 2,
-        images: [sampleImage, sampleImageB],
+        images: [sampleImage, sampleImageB] as unknown as ChatSearchResultImage[],
         filters: {},
       })
       .mockResolvedValueOnce({
         search_mode: 'nl_filter',
         total: 2,
-        images: [sampleImage, sampleImageB],
+        images: [sampleImage, sampleImageB] as unknown as ChatSearchResultImage[],
         filters: {},
         metadata: { pin_state: 'active' },
       })
       .mockResolvedValueOnce({
         search_mode: 'nl_filter',
         total: 2,
-        images: [sampleImage, sampleImageB],
+        images: [sampleImage, sampleImageB] as unknown as ChatSearchResultImage[],
         filters: {},
         metadata: { pin_state: 'active' },
       })

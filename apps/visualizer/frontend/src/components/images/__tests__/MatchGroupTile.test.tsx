@@ -2,9 +2,9 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { MatchGroupTile } from '../MatchGroupTile'
 import { MATCH_VALIDATED, msgMatchGroupCandidates } from '../../../constants/strings'
-import type { CatalogImage, InstagramImage, MatchGroup } from '../../../services/api'
+import type { CatalogImageInput, InstagramImageInput, MatchGroup } from '../../../services/api'
 
-function instagramFixture(overrides: Partial<InstagramImage> = {}): InstagramImage {
+function instagramFixture(overrides: Partial<InstagramImageInput> = {}): InstagramImageInput {
   return {
     key: 'ig-key-1',
     local_path: '/media/ig',
@@ -19,7 +19,7 @@ function instagramFixture(overrides: Partial<InstagramImage> = {}): InstagramIma
   }
 }
 
-function catalogFixture(filename: string, key = 'cat-key'): CatalogImage {
+function catalogFixture(filename: string, key = 'cat-key'): CatalogImageInput {
   return {
     id: null,
     key,

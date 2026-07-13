@@ -9,8 +9,19 @@ from collections.abc import Sequence
 from typing import Any
 
 from flask import Blueprint, jsonify, request, send_file
+from spectree import Response
 from utils.db import with_db
 from utils.responses import error_bad_request, error_not_found, error_server_error
+
+from api.openapi import spec
+from api.schemas.catalog import (
+    CatalogListResponse,
+    CatalogMonthsResponse,
+    CatalogSimilarResponse,
+    CatalogSimilarityGroupsResponse,
+    ImageView,
+)
+from api.schemas.jobs import ErrorBody
 
 from lightroom_tagger.core.catalog_nl_filter import (
     CatalogNlFilter,
@@ -291,6 +302,10 @@ def _build_catalog_detail(db, image_key, score_perspective):
 
 @catalog_bp.route("/<path:image_key>/thumbnail", methods=["GET"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_404=ErrorBody),
+    tags=['images-catalog'],
+)
 def get_catalog_thumbnail(db, image_key):
     """Get thumbnail for catalog image, creating cache if needed."""
     try:
@@ -335,6 +350,10 @@ def get_catalog_thumbnail(db, image_key):
 
 @catalog_bp.route("/months", methods=["GET"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=CatalogMonthsResponse),
+    tags=['images-catalog'],
+)
 def get_catalog_months(db):
     """Get available year-months from catalog images based on date_taken."""
     try:
@@ -347,6 +366,10 @@ def get_catalog_months(db):
 @catalog_bp.route("", methods=["GET"])
 @catalog_bp.route("/", methods=["GET"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=CatalogListResponse, HTTP_400=ErrorBody),
+    tags=['images-catalog'],
+)
 def list_catalog_images(db):
     """List catalog images with optional filtering and SQL-level pagination."""
     try:
@@ -459,6 +482,10 @@ def list_catalog_images(db):
 
 @catalog_bp.route("/<path:image_key>/similar", methods=["GET"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=CatalogSimilarResponse, HTTP_400=ErrorBody, HTTP_404=ErrorBody),
+    tags=['images-catalog'],
+)
 def get_catalog_image_similar(db, image_key: str):
     """CLIP-only visual neighbors; same catalog row shape + ``similarity`` / ``why_matched``."""
     try:
@@ -518,6 +545,10 @@ def get_catalog_image_similar(db, image_key: str):
 
 
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=CatalogSimilarityGroupsResponse),
+    tags=['images-catalog'],
+)
 def list_catalog_similarity_groups(db):
     """Reviewable catalog visual similarity groups materialized by batch jobs."""
     try:
@@ -570,6 +601,10 @@ def list_catalog_similarity_groups(db):
 
 @catalog_bp.route("/<path:image_key>", methods=["GET"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=ImageView, HTTP_400=ErrorBody, HTTP_404=ErrorBody),
+    tags=['images-catalog'],
+)
 def get_catalog_image_detail(db, image_key):
     """Single catalog image detail for the consolidated image-view modal."""
     score_perspective = (request.args.get("score_perspective") or "").strip()

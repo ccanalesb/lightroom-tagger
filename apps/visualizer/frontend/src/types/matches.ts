@@ -1,5 +1,5 @@
 import type { components } from './api.gen'
-import type { CatalogImage, ImageDescription, InstagramImage } from '../services/api'
+import type { CatalogImageInput, ImageDescription, InstagramImageInput } from '../services/api'
 
 type GenMatch = components['schemas']['MatchesListResponse.595c1c1.Match']
 type GenMatchGroup = components['schemas']['MatchesListResponse.595c1c1.MatchGroup']
@@ -18,8 +18,8 @@ type GenMatchCore = Omit<
 
 /** Generated from backend OpenAPI — see ADR-0013. */
 export type Match = OptionalizeNulls<GenMatchCore> & {
-  instagram_image?: InstagramImage | null
-  catalog_image?: CatalogImage | null
+  instagram_image?: InstagramImageInput | null
+  catalog_image?: CatalogImageInput | null
   catalog_description?: ImageDescription | null
   insta_description?: ImageDescription | null
 }
@@ -28,7 +28,7 @@ type GenMatchGroupCore = Omit<GenMatchGroup, 'instagram_image' | 'candidates' | 
 
 export type MatchGroup = OptionalizeNulls<GenMatchGroupCore> & {
   candidates: Match[]
-  instagram_image?: InstagramImage | null
+  instagram_image?: InstagramImageInput | null
   all_rejected?: boolean
 }
 

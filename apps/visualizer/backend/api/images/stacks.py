@@ -3,9 +3,22 @@
 from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
+from spectree import Response
 
 from utils.db import with_db
 from utils.responses import error_bad_request, error_not_found, error_server_error
+
+from api.openapi import spec
+from api.schemas.jobs import ErrorBody
+from api.schemas.stacks import (
+    StackMembersResponse,
+    StackMergeRequest,
+    StackMergeResponse,
+    StackRepresentativeRequest,
+    StackRepresentativeResponse,
+    StackSplitMemberRequest,
+    StackSplitMemberResponse,
+)
 
 from lightroom_tagger.core.database import (
     StackMutationError,
@@ -24,6 +37,10 @@ stacks_bp = Blueprint("images_stacks", __name__)
 
 @stacks_bp.route("/<int:stack_id>/members", methods=["GET"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=StackMembersResponse, HTTP_404=ErrorBody),
+    tags=['images-stacks'],
+)
 def get_stack_members(db, stack_id: int):
     """Members of a burst stack as catalog-shaped rows (representative + collapsed rules)."""
     try:
@@ -47,6 +64,15 @@ def get_stack_members(db, stack_id: int):
 
 @stacks_bp.route("/<int:stack_id>/split-member", methods=["POST"])
 @with_db
+@spec.validate(
+    json=StackSplitMemberRequest,
+    resp=Response(
+        HTTP_200=StackSplitMemberResponse,
+        HTTP_400=ErrorBody,
+        HTTP_404=ErrorBody,
+    ),
+    tags=['images-stacks'],
+)
 def post_stack_split_member(db, stack_id: int):
     """Remove a member from a stack (solo image) or dissolve a two-member stack."""
     try:
@@ -73,6 +99,15 @@ def post_stack_split_member(db, stack_id: int):
 
 @stacks_bp.route("/<int:target_stack_id>/merge", methods=["POST"])
 @with_db
+@spec.validate(
+    json=StackMergeRequest,
+    resp=Response(
+        HTTP_200=StackMergeResponse,
+        HTTP_400=ErrorBody,
+        HTTP_404=ErrorBody,
+    ),
+    tags=['images-stacks'],
+)
 def post_stack_merge(db, target_stack_id: int):
     """Merge *source_stack_id* into *target_stack_id* (all members moved, source row deleted)."""
     try:
@@ -103,6 +138,15 @@ def post_stack_merge(db, target_stack_id: int):
 
 @stacks_bp.route("/<int:stack_id>/representative", methods=["POST"])
 @with_db
+@spec.validate(
+    json=StackRepresentativeRequest,
+    resp=Response(
+        HTTP_200=StackRepresentativeResponse,
+        HTTP_400=ErrorBody,
+        HTTP_404=ErrorBody,
+    ),
+    tags=['images-stacks'],
+)
 def post_stack_representative(db, stack_id: int):
     """Change which catalog key is the stack representative (must be a current member)."""
     try:
