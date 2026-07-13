@@ -2,6 +2,7 @@ import json
 import os
 
 from flask import Blueprint, jsonify, request
+from spectree import Response
 from lightroom_tagger.core.database import (
     get_all_images_with_descriptions,
     get_image_description,
@@ -10,6 +11,15 @@ from lightroom_tagger.core.description_service import (
     describe_instagram_image,
     describe_matched_image,
 )
+from api.openapi import spec
+from api.schemas.descriptions import (
+    DescriptionGenerateRequest,
+    DescriptionGenerateResponse,
+    DescriptionGetResponse,
+    DescriptionProviderError,
+    DescriptionsListResponse,
+)
+from api.schemas.jobs import ErrorBody
 from utils.db import with_db
 from utils.responses import error_server_error
 
@@ -20,6 +30,10 @@ _JSON_COLS = ('composition', 'perspectives', 'technical', 'subjects')
 
 @bp.route('/', methods=['GET'])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=DescriptionsListResponse),
+    tags=['descriptions'],
+)
 def list_descriptions(db):
     """List images with their AI descriptions."""
     try:
@@ -50,6 +64,10 @@ def list_descriptions(db):
 
 @bp.route('/<path:image_key>', methods=['GET'])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=DescriptionGetResponse),
+    tags=['descriptions'],
+)
 def get_description(db, image_key):
     """Get full description for a single image."""
     try:
@@ -63,6 +81,17 @@ def get_description(db, image_key):
 
 @bp.route('/<path:image_key>/generate', methods=['POST'])
 @with_db
+@spec.validate(
+    json=DescriptionGenerateRequest,
+    resp=Response(
+        HTTP_200=DescriptionGenerateResponse,
+        HTTP_400=ErrorBody,
+        HTTP_401=DescriptionProviderError,
+        HTTP_429=DescriptionProviderError,
+        HTTP_503=DescriptionProviderError,
+    ),
+    tags=['descriptions'],
+)
 def generate_description(db, image_key):
     """Generate AI description for a single image."""
     from lightroom_tagger.core.exceptions import (

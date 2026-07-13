@@ -6,12 +6,12 @@ import {
 import { formatDate } from '../../../utils/date'
 
 interface DescriptionMetaProps {
-  model?: string
-  describedAt?: string
+  model?: string | null
+  describedAt?: string | null
   imageType?: 'catalog' | 'instagram'
   hasDescription?: boolean
-  bestPerspective?: string
-  dateRef?: string
+  bestPerspective?: string | null
+  dateRef?: string | null
 }
 
 export function DescriptionMeta({ model, describedAt, imageType, hasDescription, bestPerspective, dateRef }: DescriptionMetaProps) {

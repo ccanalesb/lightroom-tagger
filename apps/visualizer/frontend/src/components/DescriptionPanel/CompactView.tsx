@@ -1,4 +1,4 @@
-import type { ImageDescription } from '../../services/api'
+import type { ImageDescription, ImageDescriptionPerspectives } from '../../services/api'
 import { DESC_BEST_FIT } from '../../constants/strings'
 import { descriptionScoreColor } from '../../utils/scoreColorClasses'
 import { DESCRIPTION_PERSPECTIVE_LABELS } from './perspectiveLabels'
@@ -9,7 +9,8 @@ interface CompactViewProps {
 
 export function CompactView({ description }: CompactViewProps) {
   const best = description.best_perspective
-  const perspective = best ? description.perspectives[best as keyof typeof description.perspectives] : null
+  const perspectives = description.perspectives as ImageDescriptionPerspectives | undefined
+  const perspective = best && perspectives ? perspectives[best as keyof ImageDescriptionPerspectives] : null
 
   return (
     <div className="space-y-1">
