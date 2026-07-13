@@ -15,16 +15,16 @@
  */
 
 import type {
-  CatalogImage,
+  CatalogImageInput,
   ImageView,
   IdentityBestPhotoItem,
-  InstagramImage,
+  InstagramImageInput,
   Match,
   PostNextCandidate,
   UnpostedCatalogItem,
 } from '../../services/api'
 
-export function fromCatalogListRow(row: CatalogImage): ImageView {
+export function fromCatalogListRow(row: CatalogImageInput): ImageView {
   return {
     image_type: 'catalog',
     key: row.key,
@@ -102,14 +102,14 @@ export function fromPostNextRow(row: PostNextCandidate): ImageView {
   }
 }
 
-export function fromInstagramRow(row: InstagramImage): ImageView {
+export function fromInstagramRow(row: InstagramImageInput): ImageView {
   return {
     image_type: 'instagram',
     key: row.key,
     filename: row.filename,
     local_path: row.local_path,
-    created_at: row.created_at,
-    post_url: row.post_url,
+    created_at: row.created_at ?? null,
+    post_url: row.post_url ?? null,
     caption: row.caption,
     description_summary: row.description ?? null,
     ai_analyzed:

@@ -5,7 +5,7 @@ import {
   ImagesAPI,
   PerspectivesAPI,
   ProvidersAPI,
-  type CatalogImage,
+  type CatalogImageInput,
   type IdentityBestPhotoItem,
   type ImageDetailResponse,
   type UnpostedCatalogItem,
@@ -33,7 +33,7 @@ import {
 
 const SHARED_KEY = 'shared/k1.jpg'
 
-const SHARED_DETAIL: ImageDetailResponse = {
+const SHARED_DETAIL = {
   image_type: 'catalog',
   key: SHARED_KEY,
   filename: 'one.jpg',
@@ -63,9 +63,9 @@ const SHARED_DETAIL: ImageDetailResponse = {
   ],
   ai_analyzed: true,
   description_summary: 'sample',
-}
+} as ImageDetailResponse
 
-const CATALOG_ROW: CatalogImage = {
+const CATALOG_ROW: CatalogImageInput = {
   id: 1,
   key: SHARED_KEY,
   filename: 'one.jpg',

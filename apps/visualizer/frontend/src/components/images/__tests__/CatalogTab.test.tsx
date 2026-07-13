@@ -8,7 +8,7 @@ import {
   FILTER_DESCRIPTION_SEARCH_ARIA,
   formatStackCountBadge,
 } from '../../../constants/strings'
-import type { CatalogImage } from '../../../services/api'
+import type { CatalogImageInput } from '../../../services/api'
 import { deleteMatching } from '../../../data/cache'
 
 const apiMocks = vi.hoisted(() => ({
@@ -35,8 +35,8 @@ vi.mock('../../../services/api', () => ({
   },
 }))
 
-function stackRepAndMember(): { rep: CatalogImage; member: CatalogImage } {
-  const rep: CatalogImage = {
+function stackRepAndMember(): { rep: CatalogImageInput; member: CatalogImageInput } {
+  const rep: CatalogImageInput = {
     id: 1,
     key: 'a/b/seed.jpg',
     filename: 'seed.jpg',
@@ -56,7 +56,7 @@ function stackRepAndMember(): { rep: CatalogImage; member: CatalogImage } {
     stack_member_count: 3,
     is_stack_representative: true,
   }
-  const member: CatalogImage = {
+  const member: CatalogImageInput = {
     ...rep,
     id: 2,
     key: 'a/b/member.jpg',

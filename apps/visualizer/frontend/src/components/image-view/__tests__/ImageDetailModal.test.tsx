@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import type { CatalogImage, ImageDetailResponse } from '../../../services/api'
+import type { CatalogImageInput, ImageDetailResponse, ImageView } from '../../../services/api'
 import { deleteMatching } from '../../../data/cache'
 import {
   CATALOG_STACK_CONFIRM_REP_TITLE,
@@ -32,7 +32,7 @@ vi.mock('../InstagramImageDetailSections', () => ({
 import { ImageDetailModal } from '../ImageDetailModal'
 import { ImagesAPI } from '../../../services/api'
 
-function buildDetail(overrides: Partial<ImageDetailResponse> = {}): ImageDetailResponse {
+function buildDetail(overrides: Partial<ImageView> = {}): ImageDetailResponse {
   return {
     image_type: 'catalog',
     key: 'k1',
@@ -41,10 +41,10 @@ function buildDetail(overrides: Partial<ImageDetailResponse> = {}): ImageDetailR
     identity_aggregate_score: 7.2,
     identity_per_perspective: [],
     ...overrides,
-  }
+  } as ImageDetailResponse
 }
 
-function buildCatalogImage(overrides: Partial<CatalogImage> = {}): CatalogImage {
+function buildCatalogImage(overrides: Partial<CatalogImageInput> = {}): CatalogImageInput {
   return {
     id: 1,
     key: 'k1',
@@ -129,7 +129,7 @@ describe('ImageDetailModal', () => {
           stack_member_count: 2,
           is_stack_representative: false,
         }),
-      ],
+      ] as import('../../../services/api').CatalogImage[],
     })
     const repSpy = vi.spyOn(ImagesAPI, 'setStackRepresentative').mockResolvedValue({
       stack: {
