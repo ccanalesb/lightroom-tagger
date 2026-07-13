@@ -253,10 +253,6 @@ def get_instagram_months(db):
 
 @instagram_bp.route("/<path:image_key>/thumbnail", methods=["GET"])
 @with_db
-@spec.validate(
-    resp=Response(HTTP_404=ErrorBody),
-    tags=['images-instagram'],
-)
 def get_instagram_thumbnail(db, image_key):
     """Get thumbnail for Instagram image."""
     try:
