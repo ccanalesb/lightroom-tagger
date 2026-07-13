@@ -1,8 +1,30 @@
 import { invalidate, invalidateAll, patchMatching } from '../data'
 import type { Job, JobsGetOptions, JobsHealth, JobsListResponse } from '../types/job'
+import type {
+  PerspectiveDetail,
+  PerspectiveScore,
+  PerspectiveSummary,
+} from '../types/perspectives'
+import type {
+  DescriptionModel,
+  DescriptionModelsResponse,
+  Provider,
+  ProviderDefaults,
+  ProviderModel,
+} from '../types/providers'
 import { API_DEFAULT_URL } from '../constants/strings'
 
 export type { Job, JobsGetOptions, JobsHealth, JobsListResponse }
+export type {
+  DescriptionModel,
+  DescriptionModelsResponse,
+  PerspectiveDetail,
+  PerspectiveScore,
+  PerspectiveSummary,
+  Provider,
+  ProviderDefaults,
+  ProviderModel,
+}
 
 const API_URL = import.meta.env.VITE_API_URL || API_DEFAULT_URL
 
@@ -52,21 +74,6 @@ async function requestVoid(path: string, options?: RequestInit): Promise<void> {
     }
     throw new Error(detail)
   }
-}
-
-export interface PerspectiveSummary {
-  id: number
-  slug: string
-  display_name: string
-  description: string
-  active: boolean
-  source_filename: string | null
-  updated_at: string | null
-}
-
-export interface PerspectiveDetail extends PerspectiveSummary {
-  prompt_markdown: string
-  created_at?: string | null
 }
 
 export const PerspectivesAPI = {
@@ -1162,11 +1169,6 @@ export interface ImageView {
 /** Shape returned by `GET /api/images/<image_type>/<image_key>`. */
 export type ImageDetailResponse = ImageView
 
-export interface PerspectiveScore {
-  analysis: string
-  score: number
-}
-
 export interface ImageDescription {
   image_key: string
   image_type: string
@@ -1237,38 +1239,6 @@ export interface DumpMedia {
   matched_catalog_key?: string
   vision_result?: 'SAME' | 'DIFFERENT' | 'UNCERTAIN' | 'NO_MATCH' | 'ERROR'
   vision_score?: number
-}
-
-export interface Provider {
-  id: string
-  name: string
-  available: boolean
-}
-
-export interface ProviderModel {
-  id: string
-  name: string
-  vision: boolean
-  source: 'config' | 'discovered' | 'user'
-}
-
-export interface DescriptionModel {
-  provider_id: string
-  provider_name: string
-  model_id: string
-  model_name: string
-  tool_calling: boolean
-}
-
-export interface DescriptionModelsResponse {
-  models: DescriptionModel[]
-  default_provider: string | null
-  default_model: string | null
-}
-
-export interface ProviderDefaults {
-  vision_comparison: { provider: string; model: string | null }
-  description: { provider: string; model: string | null }
 }
 
 export const ProvidersAPI = {

@@ -17,8 +17,13 @@ import re
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request
+from spectree import Response
 from utils.db import with_db
 from utils.responses import error_bad_request, error_not_found
+
+from api.openapi import spec
+from api.schemas.jobs import ErrorBody
+from api.schemas.perspectives import PerspectiveDetail, PerspectiveListResponse
 
 from lightroom_tagger.core.database import (
     delete_perspective,
@@ -63,6 +68,10 @@ def _row_detail(row: dict) -> dict:
 
 @bp.route("/", methods=["GET"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=PerspectiveListResponse),
+    tags=['perspectives'],
+)
 def list_perspectives_route(db):
     """List perspectives; optional ``active_only=true`` query."""
     active_only = request.args.get("active_only", "").lower() == "true"
@@ -72,6 +81,10 @@ def list_perspectives_route(db):
 
 @bp.route("/<slug>", methods=["GET"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=PerspectiveDetail, HTTP_404=ErrorBody),
+    tags=['perspectives'],
+)
 def get_perspective_route(db, slug: str):
     row = get_perspective_by_slug(db, slug)
     if not row:
@@ -81,6 +94,10 @@ def get_perspective_route(db, slug: str):
 
 @bp.route("/", methods=["POST"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_201=PerspectiveDetail, HTTP_400=ErrorBody),
+    tags=['perspectives'],
+)
 def create_perspective_route(db):
     data = request.get_json(silent=True)
     if not data or not isinstance(data, dict):
@@ -132,6 +149,10 @@ def create_perspective_route(db):
 
 @bp.route("/<slug>", methods=["PUT"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=PerspectiveDetail, HTTP_400=ErrorBody, HTTP_404=ErrorBody),
+    tags=['perspectives'],
+)
 def update_perspective_route(db, slug: str):
     if not get_perspective_by_slug(db, slug):
         return error_not_found("resource")
@@ -184,6 +205,10 @@ def update_perspective_route(db, slug: str):
 
 @bp.route("/<slug>", methods=["DELETE"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_404=ErrorBody),
+    tags=['perspectives'],
+)
 def delete_perspective_route(db, slug: str):
     if not delete_perspective(db, slug):
         return error_not_found("resource")
@@ -193,6 +218,10 @@ def delete_perspective_route(db, slug: str):
 
 @bp.route("/<slug>/reset-default", methods=["POST"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=PerspectiveDetail, HTTP_400=ErrorBody, HTTP_404=ErrorBody),
+    tags=['perspectives'],
+)
 def reset_perspective_default_route(db, slug: str):
     row = get_perspective_by_slug(db, slug)
     if not row:
