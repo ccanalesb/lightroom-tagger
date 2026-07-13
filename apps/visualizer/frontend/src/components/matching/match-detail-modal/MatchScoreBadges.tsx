@@ -19,7 +19,7 @@ interface MatchScoreBadgesProps {
  */
 function visionWasUsed(match: Match): boolean {
   if (match.vision_result === 'SAME' || match.vision_result === 'DIFFERENT') return true;
-  if (match.vision_score !== undefined && match.vision_score > 0) return true;
+  if (match.vision_score != null && match.vision_score > 0) return true;
   return false;
 }
 
@@ -38,14 +38,14 @@ export function MatchScoreBadges({ match }: MatchScoreBadgesProps) {
       </span>
 
       {/* pHash perceptual hash similarity */}
-      {match.phash_score !== undefined && (
+      {match.phash_score != null && (
         <span className="inline-flex items-center px-3 py-1 rounded text-sm font-medium bg-gray-100 text-gray-700">
           {MATCH_DETAIL_PHASH_LABEL} {(match.phash_score * 100).toFixed(0)}%
         </span>
       )}
 
       {/* Description (AI text) similarity — only when a score was produced */}
-      {match.desc_similarity !== undefined && match.desc_similarity > 0 && (
+      {match.desc_similarity != null && match.desc_similarity > 0 && (
         <span className="inline-flex items-center px-3 py-1 rounded text-sm font-medium bg-amber-100 text-amber-800">
           {MATCH_DETAIL_DESC_LABEL} {(match.desc_similarity * 100).toFixed(0)}%
         </span>
@@ -54,14 +54,14 @@ export function MatchScoreBadges({ match }: MatchScoreBadgesProps) {
       {/* Vision verdict badge — only when vision was actually run */}
       {showVision && (
         <span
-          className={`inline-flex items-center px-3 py-1 rounded text-sm font-medium ${visionBadgeClasses(match.vision_result)}`}
+          className={`inline-flex items-center px-3 py-1 rounded text-sm font-medium ${visionBadgeClasses(match.vision_result ?? undefined)}`}
         >
           {MATCH_DETAIL_VISION_LABEL} {match.vision_result}
         </span>
       )}
 
       {/* Vision numeric score — only when vision was actually run */}
-      {showVision && match.vision_score !== undefined && (
+      {showVision && match.vision_score != null && (
         <span className="inline-flex items-center px-3 py-1 rounded text-sm font-medium bg-purple-100 text-purple-800">
           {MATCH_DETAIL_VISION_SCORE_LABEL} {(match.vision_score * 100).toFixed(0)}%
         </span>

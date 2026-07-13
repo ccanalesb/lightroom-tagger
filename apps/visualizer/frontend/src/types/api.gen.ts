@@ -116,6 +116,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/images/matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List matches grouped by Instagram image.
+         * @description Filters out **conflicting candidates**: a row whose ``catalog_key`` is already validated against a *different* ``insta_key`` is dropped from the response. The row stays in the ``matches`` table (preserved for downstream model fine-tuning), but the UI never sees it because a single Lightroom photo can only be claimed by one Instagram post.
+         */
+        get: operations["get__api_images_matches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/matches/{catalog_key}/{insta_key}/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Toggle human validation on a match. */
+        patch: operations["patch__api_images_matches_{catalog_key}_{insta_key}_validate"];
+        trace?: never;
+    };
+    "/api/images/matches/{catalog_key}/{insta_key}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Reject a match: delete it and blocklist the pair. */
+        patch: operations["patch__api_images_matches_{catalog_key}_{insta_key}_reject"];
+        trace?: never;
+    };
     "/api/providers/": {
         parameters: {
             query?: never;
@@ -636,6 +690,54 @@ export interface components {
             vision: boolean | null;
         };
         /**
+         * MatchesListResponse
+         * @description ``GET /api/images/matches`` response body.
+         */
+        "MatchesListResponse.595c1c1": {
+            /** Total */
+            total: number;
+            /** Total Groups */
+            total_groups: number;
+            /** Total Matches */
+            total_matches: number;
+            /** Match Groups */
+            match_groups: components["schemas"]["MatchesListResponse.595c1c1.MatchGroup"][];
+            /** Matches */
+            matches: components["schemas"]["MatchesListResponse.595c1c1.Match"][];
+        };
+        /**
+         * MatchValidateResponse
+         * @description ``PATCH .../validate`` success body.
+         */
+        "MatchValidateResponse.595c1c1": {
+            /** Validated */
+            validated: boolean;
+        };
+        /**
+         * MatchRejectSuccessResponse
+         * @description ``PATCH .../reject`` success body.
+         */
+        "MatchRejectSuccessResponse.595c1c1": {
+            /**
+             * Rejected
+             * @constant
+             */
+            rejected: true;
+        };
+        /**
+         * MatchRejectConflictResponse
+         * @description ``PATCH .../reject`` 409 when the match is already validated.
+         */
+        "MatchRejectConflictResponse.595c1c1": {
+            /** Error */
+            error: string;
+            /**
+             * Rejected
+             * @constant
+             */
+            rejected: false;
+        };
+        /**
          * Job
          * @description Shared by REST job endpoints and ``job_updated`` / ``job_created`` socket emits.
          */
@@ -983,6 +1085,134 @@ export interface components {
              */
             vision: boolean | null;
         };
+        /**
+         * Match
+         * @description Enriched match row from ``GET /api/images/matches``.
+         */
+        "MatchesListResponse.595c1c1.Match": {
+            /** Instagram Key */
+            instagram_key: string;
+            /** Catalog Key */
+            catalog_key: string;
+            /** Score */
+            score: number;
+            /**
+             * Insta Key
+             * @default null
+             */
+            insta_key: string | null;
+            /**
+             * Phash Distance
+             * @default null
+             */
+            phash_distance: number | null;
+            /**
+             * Phash Score
+             * @default null
+             */
+            phash_score: number | null;
+            /**
+             * Desc Similarity
+             * @default null
+             */
+            desc_similarity: number | null;
+            /**
+             * Vision Result
+             * @default null
+             */
+            vision_result: ("SAME" | "DIFFERENT" | "UNCERTAIN") | string | null;
+            /**
+             * Vision Reasoning
+             * @default null
+             */
+            vision_reasoning: string | null;
+            /**
+             * Vision Score
+             * @default null
+             */
+            vision_score: number | null;
+            /**
+             * Total Score
+             * @default null
+             */
+            total_score: number | null;
+            /**
+             * Model Used
+             * @default null
+             */
+            model_used: string | null;
+            /**
+             * Validated At
+             * @default null
+             */
+            validated_at: string | null;
+            /**
+             * Rank
+             * @default null
+             */
+            rank: number | null;
+            /**
+             * Matched At
+             * @default null
+             */
+            matched_at: string | null;
+            /**
+             * Instagram Image
+             * @default null
+             */
+            instagram_image: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Catalog Image
+             * @default null
+             */
+            catalog_image: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Catalog Description
+             * @default null
+             */
+            catalog_description: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Insta Description
+             * @default null
+             */
+            insta_description: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * MatchGroup
+         * @description Grouped candidates for one Instagram key.
+         */
+        "MatchesListResponse.595c1c1.MatchGroup": {
+            /** Instagram Key */
+            instagram_key: string;
+            /** Candidates */
+            candidates: components["schemas"]["MatchesListResponse.595c1c1.Match"][];
+            /** Best Score */
+            best_score: number;
+            /** Candidate Count */
+            candidate_count: number;
+            /** Has Validated */
+            has_validated: boolean;
+            /**
+             * All Rejected
+             * @default false
+             */
+            all_rejected: boolean;
+            /**
+             * Instagram Image
+             * @default null
+             */
+            instagram_image: {
+                [key: string]: unknown;
+            } | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -1302,6 +1532,135 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobsProcessorHealth.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    get__api_images_matches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchesListResponse.595c1c1"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "patch__api_images_matches_{catalog_key}_{insta_key}_validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalog_key: string;
+                insta_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchValidateResponse.595c1c1"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "patch__api_images_matches_{catalog_key}_{insta_key}_reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                catalog_key: string;
+                insta_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchRejectSuccessResponse.595c1c1"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchRejectConflictResponse.595c1c1"];
                 };
             };
             /** @description Unprocessable Content */

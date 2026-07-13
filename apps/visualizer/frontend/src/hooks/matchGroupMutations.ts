@@ -23,7 +23,7 @@ export function applyValidationChange(
     if (group.instagram_key !== match.instagram_key) return group
     const candidates = group.candidates.map((candidate) =>
       candidate.catalog_key === match.catalog_key && candidate.instagram_key === match.instagram_key
-        ? { ...candidate, validated_at: validated ? new Date().toISOString() : undefined }
+        ? { ...candidate, validated_at: validated ? new Date().toISOString() : null }
         : candidate,
     )
     return {

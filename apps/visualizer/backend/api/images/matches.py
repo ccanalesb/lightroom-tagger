@@ -6,7 +6,16 @@ from collections import OrderedDict
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
+from spectree import Response
 
+from api.openapi import spec
+from api.schemas.jobs import ErrorBody
+from api.schemas.matches import (
+    MatchRejectConflictResponse,
+    MatchRejectSuccessResponse,
+    MatchesListResponse,
+    MatchValidateResponse,
+)
 from utils.db import with_db
 from utils.responses import error_bad_request, error_not_found, error_server_error
 
@@ -34,6 +43,10 @@ matches_bp = Blueprint("images_matches", __name__)
 
 @matches_bp.route("", methods=["GET"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=MatchesListResponse, HTTP_400=ErrorBody),
+    tags=['matches'],
+)
 def list_matches(db):
     """List matches grouped by Instagram image.
 
@@ -232,6 +245,10 @@ def list_matches(db):
 
 @matches_bp.route("/<path:catalog_key>/<path:insta_key>/validate", methods=["PATCH"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=MatchValidateResponse, HTTP_404=ErrorBody),
+    tags=['matches'],
+)
 def toggle_match_validation(db, catalog_key, insta_key):
     """Toggle human validation on a match."""
     try:
@@ -251,6 +268,14 @@ def toggle_match_validation(db, catalog_key, insta_key):
 
 @matches_bp.route("/<path:catalog_key>/<path:insta_key>/reject", methods=["PATCH"])
 @with_db
+@spec.validate(
+    resp=Response(
+        HTTP_200=MatchRejectSuccessResponse,
+        HTTP_404=ErrorBody,
+        HTTP_409=MatchRejectConflictResponse,
+    ),
+    tags=['matches'],
+)
 def reject_match_endpoint(db, catalog_key, insta_key):
     """Reject a match: delete it and blocklist the pair."""
     try:
