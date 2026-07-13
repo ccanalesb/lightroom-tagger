@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import eventlet
+
+eventlet.monkey_patch()
+
 import os
 import sys
 import threading
@@ -114,7 +118,7 @@ def create_app():
         print(f"Warning: Could not load NAS config from lightroom-tagger: {e}")
 
     CORS(app, origins=config.FRONTEND_URL.split(','))
-    socketio = SocketIO(app, cors_allowed_origins="*")
+    socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
     raw_root = os.environ.get("VISUALIZER_E2E_STATIC_DIST", "").strip()
     if raw_root:
