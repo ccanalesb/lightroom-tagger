@@ -48,6 +48,17 @@ from api.schemas.jobs import (
     validate_job_payload,
     validate_jobs_recovered_payload,
 )
+from api.schemas.matches import (
+    Match,
+    MatchesListResponse,
+    MatchGroup,
+    MatchRejectConflictResponse,
+    MatchRejectSuccessResponse,
+    MatchValidateResponse,
+    validate_match,
+    validate_match_group,
+    validate_matches_list_response,
+)
 from api.schemas.perspectives import (
     PerspectiveDetail,
     PerspectiveListResponse,
@@ -88,13 +99,19 @@ from api.schemas.providers import (
     ProviderDefaultsEntry,
     ProviderDeletedResponse,
     ProviderHealthResponse,
-    ProviderModel,
     ProviderListResponse,
+    ProviderModel,
     ProviderModelsListResponse,
     ProviderReorderSuccessResponse,
 )
 
 __all__ = [
+    'Match',
+    'MatchGroup',
+    'MatchRejectConflictResponse',
+    'MatchRejectSuccessResponse',
+    'MatchesListResponse',
+    'MatchValidateResponse',
     'CatalogImage',
     'CatalogListResponse',
     'CatalogMonthsResponse',
@@ -169,6 +186,9 @@ __all__ = [
     'validate_instagram_image',
     'validate_job_payload',
     'validate_jobs_recovered_payload',
+    'validate_match',
+    'validate_match_group',
+    'validate_matches_list_response',
     'validate_perspective_detail',
     'validate_perspective_summary',
     'validate_stack_metadata',

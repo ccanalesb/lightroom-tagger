@@ -18,6 +18,7 @@ import type {
 } from '../types/config'
 import type { InstagramImage, InstagramImageInput, InstagramListResponse } from '../types/instagram'
 import type { Job, JobsGetOptions, JobsHealth, JobsListResponse } from '../types/job'
+import type { Match, MatchGroup, MatchesListResponse } from '../types/matches'
 import type {
   PerspectiveDetail,
   PerspectiveScore,
@@ -65,6 +66,7 @@ export type {
   StackRepresentativeResponse,
   StackSplitMemberResponse,
 }
+export type { Match, MatchGroup, MatchesListResponse }
 export type {
   DescriptionModel,
   DescriptionModelsResponse,
@@ -473,13 +475,7 @@ export const MatchingAPI = {
     sp.set('limit', String(limit ?? 50))
     sp.set('offset', String(offset ?? 0))
     if (params?.sort_by_date) sp.set('sort_by_date', params.sort_by_date)
-    return request<{
-      total: number
-      total_groups?: number
-      total_matches?: number
-      match_groups: MatchGroup[]
-      matches: Match[]
-    }>(`/images/matches?${sp.toString()}`)
+    return request<MatchesListResponse>(`/images/matches?${sp.toString()}`)
   },
   validate: async (catalogKey: string, instaKey: string) => {
     const result = await request<{ validated: boolean }>(
@@ -1016,38 +1012,6 @@ export interface ImageDescription {
   best_perspective: string
   model_used: string
   described_at?: string
-}
-
-export interface Match {
-  instagram_key: string
-  catalog_key: string
-  score: number
-  vision_result?: 'SAME' | 'DIFFERENT' | 'UNCERTAIN'
-  /** Model explanation when available (from JSON vision response). */
-  vision_reasoning?: string
-  vision_score?: number
-  phash_score?: number
-  desc_similarity?: number
-  total_score?: number
-  model_used?: string
-  validated_at?: string
-  rank?: number
-  instagram_image?: InstagramImageInput
-  catalog_image?: CatalogImageInput
-  catalog_description?: ImageDescription
-  insta_description?: ImageDescription
-}
-
-/** Match group from `GET /api/images/matches` (`match_groups[]`). */
-export interface MatchGroup {
-  instagram_key: string
-  instagram_image?: InstagramImageInput
-  candidates: Match[]
-  best_score: number
-  candidate_count: number
-  has_validated: boolean
-  /** True when every candidate is rejected and none validated (tombstone group). Omitted on older responses. */
-  all_rejected?: boolean
 }
 
 export interface DumpMedia {
