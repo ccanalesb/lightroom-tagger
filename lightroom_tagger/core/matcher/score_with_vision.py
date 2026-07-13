@@ -1,6 +1,8 @@
 """Two-stage cascade scoring: description similarity plus optional vision comparisons."""
 
 from collections.abc import Callable
+
+from .score_formula import compute_total_score, normalize_phash_score
 from .vision_batch import _build_compressed_batch_entries, _log_comparison_tail
 
 
@@ -93,15 +95,14 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
             else:
                 phash_dist = hamming_distance(insta_image.get('image_hash', ''), candidate.get('image_hash', ''))
                 cache_misses += 1
-            phash_score_val = max(0, 1 - (phash_dist / 16))
+            phash_score_val = normalize_phash_score(phash_dist)
             desc_sim_01 = desc_scores_by_idx.get(idx, 0.0) if desc_weight > 0 else 0.0
             capt_sim = _matcher.text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
             desc_sim_display = desc_sim_01 if desc_weight > 0 else capt_sim
             vision_score_val = 0.0
-            total_score_val = (
-                (phash_weight * phash_score_val)
-                + (desc_weight * desc_sim_01)
-                + (vision_weight * vision_score_val)
+            total_score_val = compute_total_score(
+                phash_score_val, desc_sim_01, vision_score_val,
+                phash_weight, desc_weight, vision_weight,
             )
             if batch_progress_callback:
                 batch_progress_callback(idx + 1, total_candidates)
@@ -179,15 +180,14 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                     nonlocal cache_misses
                     cache_misses += 1
 
-                phash_score_val = max(0, 1 - (phash_dist / 16))
+                phash_score_val = normalize_phash_score(phash_dist)
                 desc_sim_01 = desc_scores_by_idx.get(cid, 0.0) if desc_weight > 0 else 0.0
                 capt_sim = _matcher.text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
                 desc_sim_display = desc_sim_01 if desc_weight > 0 else capt_sim
 
-                total_score_val = (
-                    (phash_weight * phash_score_val)
-                    + (desc_weight * desc_sim_01)
-                    + (vision_weight * vision_score_val)
+                total_score_val = compute_total_score(
+                    phash_score_val, desc_sim_01, vision_score_val,
+                    phash_weight, desc_weight, vision_weight,
                 )
 
                 _matcher.store_vision_comparison(db, catalog_key, insta_key, vision_result, vision_score_val, model_label)
@@ -289,7 +289,7 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 phash_dist = hamming_distance(insta_image.get('image_hash', ''), candidate.get('image_hash', ''))
                 cache_misses += 1
 
-            phash_score_val = max(0, 1 - (phash_dist / 16))
+            phash_score_val = normalize_phash_score(phash_dist)
 
             desc_sim_01 = desc_scores_by_idx.get(idx0, 0.0) if desc_weight > 0 else 0.0
             capt_sim = _matcher.text_similarity(insta_image.get('description', ''), candidate.get('description', ''))
@@ -370,10 +370,9 @@ def score_candidates_with_vision(db, insta_image: dict, candidates: list,
                 vision_result = 'UNCERTAIN'
                 vision_score_val = 0.5
 
-            total_score_val = (
-                (phash_weight * phash_score_val)
-                + (desc_weight * desc_sim_01)
-                + (vision_weight * vision_score_val)
+            total_score_val = compute_total_score(
+                phash_score_val, desc_sim_01, vision_score_val,
+                phash_weight, desc_weight, vision_weight,
             )
 
             if log_callback and vision_result != 'UNCERTAIN':

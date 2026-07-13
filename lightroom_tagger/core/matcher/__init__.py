@@ -20,7 +20,7 @@ from .candidates import find_candidates_by_date, query_by_exif
 from .description_batch import _compute_desc_scores_for_candidates
 from .matching import match_batch, match_image
 from .score_with_vision import score_candidates_with_vision
-from .text_scores import score_candidates, text_similarity
+from .text_scores import text_similarity
 from .vision_batch import _call_batch_chunk
 
 __all__ = [
@@ -36,7 +36,6 @@ __all__ = [
     "match_batch",
     "match_image",
     "query_by_exif",
-    "score_candidates",
     "score_candidates_with_vision",
     "store_match",
     "store_vision_comparison",
