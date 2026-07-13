@@ -7,6 +7,7 @@ import os
 import sqlite3
 
 from flask import Blueprint, jsonify, request, send_file
+from spectree import Response
 from utils.db import with_db
 from utils.responses import (
     error_bad_request,
@@ -14,6 +15,11 @@ from utils.responses import (
     error_server_error,
     success_paginated,
 )
+
+from api.openapi import spec
+from api.schemas.instagram import InstagramListResponse, InstagramMonthsResponse
+from api.schemas.catalog import ImageView
+from api.schemas.jobs import ErrorBody
 
 from lightroom_tagger.core.database import (
     get_image_description,
@@ -151,6 +157,10 @@ def _build_instagram_detail(db, image_key):
 
 @instagram_bp.route("", methods=["GET"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=InstagramListResponse, HTTP_400=ErrorBody),
+    tags=['images-instagram'],
+)
 def list_instagram_images(db):
     """List Instagram images with filtering and pagination."""
     try:
@@ -223,6 +233,10 @@ def list_instagram_images(db):
 
 @instagram_bp.route("/months", methods=["GET"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=InstagramMonthsResponse),
+    tags=['images-instagram'],
+)
 def get_instagram_months(db):
     """Get unique months available in Instagram images."""
     try:
@@ -239,6 +253,10 @@ def get_instagram_months(db):
 
 @instagram_bp.route("/<path:image_key>/thumbnail", methods=["GET"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_404=ErrorBody),
+    tags=['images-instagram'],
+)
 def get_instagram_thumbnail(db, image_key):
     """Get thumbnail for Instagram image."""
     try:
@@ -296,6 +314,10 @@ def list_dump_media(db):
 
 @instagram_bp.route("/<path:image_key>", methods=["GET"])
 @with_db
+@spec.validate(
+    resp=Response(HTTP_200=ImageView, HTTP_400=ErrorBody, HTTP_404=ErrorBody),
+    tags=['images-instagram'],
+)
 def get_instagram_image_detail(db, image_key):
     """Single instagram image detail for the consolidated image-view modal."""
     score_perspective = (request.args.get("score_perspective") or "").strip()

@@ -209,8 +209,8 @@ export function SearchPage() {
         message: trimmed,
         messages: apiHistory,
         limit: 50,
-        provider_id: resolvedModel?.provider_id,
-        model: resolvedModel?.model_id,
+        provider_id: resolvedModel?.provider_id ?? null,
+        model: resolvedModel?.model_id ?? null,
         ...(pinnedImageKey ? { pinned_image_key: pinnedImageKey } : {}),
       })
       const assistantText =

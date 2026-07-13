@@ -8,9 +8,21 @@ from typing import Any
 
 from flask import Blueprint, jsonify, request
 from pydantic import ValidationError
+from spectree import Response
 
 from utils.db import with_db
 from utils.responses import error_bad_request, error_server_error
+
+from api.openapi import spec
+from api.schemas.jobs import ErrorBody
+from api.schemas.search import (
+    ChatSearchRequest,
+    ChatSearchResponse,
+    NlSearchRequest,
+    NlSearchResponse,
+    SemanticSearchRequest,
+    SemanticSearchResponse,
+)
 
 from lightroom_tagger.core import nl_catalog_search
 from lightroom_tagger.core.catalog_nl_filter import (
@@ -132,6 +144,11 @@ def _extract_images_from_tool_messages(
 
 @search_bp.route("/nl-search", methods=["POST"])
 @with_db
+@spec.validate(
+    json=NlSearchRequest,
+    resp=Response(HTTP_200=NlSearchResponse, HTTP_400=ErrorBody),
+    tags=['images-search'],
+)
 def nl_search_images(db):
     """Natural language → LLM filter JSON → same row shape as GET /api/images/catalog."""
     try:
@@ -181,6 +198,11 @@ def nl_search_images(db):
 
 @search_bp.route("/semantic-search", methods=["POST"])
 @with_db
+@spec.validate(
+    json=SemanticSearchRequest,
+    resp=Response(HTTP_200=SemanticSearchResponse, HTTP_400=ErrorBody),
+    tags=['images-search'],
+)
 def semantic_search_images(db):
     """Hybrid FTS + embedding search with RRF; same catalog row shape as NL search + score / why_matched / thumbnail_url."""
     try:
@@ -254,6 +276,11 @@ def semantic_search_images(db):
 
 @search_bp.route("/chat-search", methods=["POST"])
 @with_db
+@spec.validate(
+    json=ChatSearchRequest,
+    resp=Response(HTTP_200=ChatSearchResponse, HTTP_400=ErrorBody),
+    tags=['images-search'],
+)
 def chat_search_images(db):
     """Multi-turn NL-first cascade: structured catalog filters or semantic hybrid fallback."""
     try:
