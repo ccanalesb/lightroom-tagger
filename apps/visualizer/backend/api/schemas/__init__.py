@@ -1,5 +1,25 @@
 """Authoritative pydantic models for API response shapes (OpenAPI source of truth)."""
 
+from api.schemas.analytics import (
+    AnalyticsGranularity,
+    CaptionHashtagMeta,
+    CaptionStatsQuery,
+    CaptionStatsResponse,
+    HeatmapCell,
+    PostingFrequencyBucket,
+    PostingFrequencyMeta,
+    PostingFrequencyQuery,
+    PostingFrequencyResponse,
+    PostingHeatmapMeta,
+    PostingHeatmapQuery,
+    PostingHeatmapResponse,
+    TopHashtagRow,
+    TopWordRow,
+    UnpostedCatalogItem,
+    UnpostedCatalogQuery,
+    UnpostedCatalogResponse,
+    validate_unposted_catalog_item,
+)
 from api.schemas.catalog import (
     CatalogImage,
     CatalogListResponse,
@@ -126,6 +146,23 @@ from api.schemas.providers import (
 )
 
 __all__ = [
+    'AnalyticsGranularity',
+    'CaptionHashtagMeta',
+    'CaptionStatsQuery',
+    'CaptionStatsResponse',
+    'HeatmapCell',
+    'PostingFrequencyBucket',
+    'PostingFrequencyMeta',
+    'PostingFrequencyQuery',
+    'PostingFrequencyResponse',
+    'PostingHeatmapMeta',
+    'PostingHeatmapQuery',
+    'PostingHeatmapResponse',
+    'TopHashtagRow',
+    'TopWordRow',
+    'UnpostedCatalogItem',
+    'UnpostedCatalogQuery',
+    'UnpostedCatalogResponse',
     'Match',
     'MatchGroup',
     'MatchRejectConflictResponse',
@@ -228,4 +265,5 @@ __all__ = [
     'validate_perspective_detail',
     'validate_perspective_summary',
     'validate_stack_metadata',
+    'validate_unposted_catalog_item',
 ]

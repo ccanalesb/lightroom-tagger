@@ -57,8 +57,32 @@ import type {
   StackRepresentativeResponse,
   StackSplitMemberResponse,
 } from '../types/stacks'
+import type {
+  AnalyticsGranularity,
+  CaptionStatsResponse,
+  HeatmapCell,
+  PostingFrequencyBucket,
+  PostingFrequencyMeta,
+  PostingFrequencyResponse,
+  PostingHeatmapMeta,
+  PostingHeatmapResponse,
+  UnpostedCatalogItem,
+  UnpostedCatalogResponse,
+} from '../types/analytics'
 import { API_DEFAULT_URL } from '../constants/strings'
 
+export type {
+  AnalyticsGranularity,
+  CaptionStatsResponse,
+  HeatmapCell,
+  PostingFrequencyBucket,
+  PostingFrequencyMeta,
+  PostingFrequencyResponse,
+  PostingHeatmapMeta,
+  PostingHeatmapResponse,
+  UnpostedCatalogItem,
+  UnpostedCatalogResponse,
+}
 export type {
   DescriptionGenerateResponse,
   DescriptionGetResponse,
@@ -656,88 +680,6 @@ export const ScoresAPI = {
 }
 
 // --- Analytics (Phase 7 /api/analytics) ---
-
-export type AnalyticsGranularity = 'day' | 'week' | 'month'
-
-export interface PostingFrequencyBucket {
-  bucket_start: string
-  count: number
-}
-
-export interface PostingFrequencyMeta {
-  timestamp_source?: string
-  granularity?: string
-  timezone_assumption?: string
-  date_from?: string
-  date_to?: string
-  bucket_expression?: string
-}
-
-export interface PostingFrequencyResponse {
-  buckets: PostingFrequencyBucket[]
-  meta: PostingFrequencyMeta
-}
-
-export interface HeatmapCell {
-  dow: number
-  hour: number
-  count: number
-}
-
-export interface PostingHeatmapMeta {
-  dow_labels?: string[]
-  timezone_assumption?: string
-  timezone_note?: string
-  date_from?: string
-  date_to?: string
-}
-
-export interface PostingHeatmapResponse {
-  cells: HeatmapCell[]
-  meta: PostingHeatmapMeta
-}
-
-export interface CaptionHashtagMeta {
-  timezone_assumption?: string
-  hashtag_pattern?: string
-  timestamp_scope?: string
-}
-
-export interface TopHashtagRow {
-  tag: string
-  count: number
-}
-
-export interface TopWordRow {
-  word: string
-  count: number
-}
-
-export interface CaptionStatsResponse {
-  post_count: number
-  with_caption_count: number
-  avg_caption_len: number
-  median_caption_len: number | null
-  top_hashtags: TopHashtagRow[]
-  posts_with_hashtags: number
-  avg_hashtags_per_post: number
-  top_words: TopWordRow[]
-  meta: CaptionHashtagMeta
-}
-
-/** Lightweight row from `/api/analytics/unposted-catalog` (subset of catalog list). */
-export interface UnpostedCatalogItem {
-  key: string
-  filename: string
-  date_taken: string
-  rating: number
-}
-
-export interface UnpostedCatalogResponse {
-  total: number
-  images: UnpostedCatalogItem[]
-  pagination: PaginationMeta
-}
 
 export const AnalyticsAPI = {
   getPostingFrequency: (params: {
