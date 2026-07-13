@@ -1,9 +1,10 @@
 """High-level match_image / match_batch orchestration against the catalog."""
 
+from .score_formula import DEFAULT_WEIGHTS, ScoreWeights
+
 
 def match_image(db, insta_image: dict, threshold: float = 0.7,
-                phash_weight: float = 0.4, desc_weight: float = 0.3,
-                vision_weight: float = 0.3,
+                weights: ScoreWeights = DEFAULT_WEIGHTS,
                 provider_id: str | None = None,
                 model: str | None = None) -> list[dict]:
     """Match single Instagram image against catalog with vision comparison."""
@@ -18,7 +19,7 @@ def match_image(db, insta_image: dict, threshold: float = 0.7,
 
     scored = _matcher.score_candidates_with_vision(
         db, insta_image, candidates,
-        phash_weight, desc_weight, vision_weight,
+        weights=weights,
         threshold=threshold,
         provider_id=provider_id,
         model=model,
@@ -33,8 +34,7 @@ def match_image(db, insta_image: dict, threshold: float = 0.7,
 
 
 def match_batch(db, insta_images: list, threshold: float = 0.7,
-                phash_weight: float = 0.4, desc_weight: float = 0.3,
-                vision_weight: float = 0.3) -> dict:
+                weights: ScoreWeights = DEFAULT_WEIGHTS) -> dict:
     """Match multiple Instagram images against catalog."""
     from lightroom_tagger.core import matcher as _matcher
 
@@ -44,7 +44,7 @@ def match_batch(db, insta_images: list, threshold: float = 0.7,
     for insta_image in insta_images:
         matches = _matcher.match_image(
             db, insta_image, threshold,
-            phash_weight, desc_weight, vision_weight
+            weights=weights,
         )
         if matches:
             total_matches += 1

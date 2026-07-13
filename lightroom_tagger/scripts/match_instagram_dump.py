@@ -36,7 +36,7 @@ from lightroom_tagger.core.database import (
     store_image_description,
     store_match,
 )
-from lightroom_tagger.core.matcher import find_candidates_by_date, score_candidates_with_vision
+from lightroom_tagger.core.matcher import ScoreWeights, find_candidates_by_date, score_candidates_with_vision
 from lightroom_tagger.core.provider_resolution import resolve_model
 from lightroom_tagger.core.vision_client import generate_description
 from lightroom_tagger.core.path_utils import resolve_catalog_path
@@ -424,9 +424,7 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
 
         results = score_candidates_with_vision(
             db, dump_image, vision_candidates,
-            phash_weight=weights.get('phash', 0.4),
-            desc_weight=weights.get('description', 0.3),
-            vision_weight=weights.get('vision', 0.3),
+            weights=ScoreWeights.from_dict(weights),
             threshold=threshold,
             log_callback=log_callback,
             provider_id=provider_id,
