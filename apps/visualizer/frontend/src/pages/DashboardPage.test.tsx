@@ -11,6 +11,10 @@ import {
   SystemAPI,
 } from '../services/api'
 import {
+  EMPTY_BEST_PHOTOS_META,
+  EMPTY_STYLE_FINGERPRINT_RESPONSE,
+} from '../__test-utils__/identityFixtures'
+import {
   INSIGHTS_PAGE_TITLE,
   INSIGHTS_SECTION_EXPLORE,
   INSIGHTS_SECTION_HIGHLIGHTS,
@@ -29,6 +33,7 @@ describe('DashboardPage', () => {
       db_path: '/tmp/x.db',
     })
     vi.spyOn(IdentityAPI, 'getStyleFingerprint').mockResolvedValue({
+      ...EMPTY_STYLE_FINGERPRINT_RESPONSE,
       per_perspective: [
         {
           perspective_slug: 'street',
@@ -38,15 +43,12 @@ describe('DashboardPage', () => {
         },
       ],
       aggregate_distribution: { '7-10': 2, '4-6': 1, '1-3': 0 },
-      top_rationale_tokens: [],
-      evidence: {},
-      meta: {},
     })
     vi.spyOn(IdentityAPI, 'getBestPhotos').mockImplementation(() =>
       Promise.resolve({
         items: [],
         total: 0,
-        meta: {},
+        meta: EMPTY_BEST_PHOTOS_META,
       }),
     )
     vi.spyOn(AnalyticsAPI, 'getPostingFrequency').mockResolvedValue({

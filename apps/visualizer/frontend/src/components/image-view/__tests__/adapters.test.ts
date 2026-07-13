@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { NULLABLE_BEST_PHOTO_FIELDS } from '../../../__test-utils__/identityFixtures'
 import type {
   CatalogImageInput,
   IdentityBestPhotoItem,
@@ -66,6 +67,7 @@ describe('image-view adapters', () => {
 
   it('fromBestPhotoRow carries identity fields authoritatively', () => {
     const row: IdentityBestPhotoItem = {
+      ...NULLABLE_BEST_PHOTO_FIELDS,
       image_key: 'bk',
       aggregate_score: 8.25,
       perspectives_covered: 3,
@@ -97,6 +99,7 @@ describe('image-view adapters', () => {
 
   it('fromPostNextRow maps identity fields (no eligible flag on this row)', () => {
     const row: PostNextCandidate = {
+      image_type: null,
       image_key: 'pn',
       filename: 'pn.jpg',
       date_taken: '2024-04-04',

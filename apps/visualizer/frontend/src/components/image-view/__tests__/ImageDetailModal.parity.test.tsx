@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, within, cleanup } from '@testing-library/react'
+import { NULLABLE_BEST_PHOTO_FIELDS } from '../../../__test-utils__/identityFixtures'
 import {
   DescriptionsAPI,
   ImagesAPI,
@@ -91,6 +92,7 @@ const UNPOSTED_ROW: UnpostedCatalogItem = {
 }
 
 const BEST_PHOTO_ROW: IdentityBestPhotoItem = {
+  ...NULLABLE_BEST_PHOTO_FIELDS,
   image_key: SHARED_KEY,
   image_type: 'catalog',
   filename: 'one.jpg',
