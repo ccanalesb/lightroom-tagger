@@ -80,6 +80,8 @@ describe('ImageMetadataBadges', () => {
           description_best_perspective: 'street',
           description_perspectives: {
             street: { analysis: '', score: 6 },
+            documentary: null,
+            publisher: null,
           },
         })}
         primaryScoreSource="catalog"

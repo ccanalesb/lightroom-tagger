@@ -25,6 +25,16 @@ from api.schemas.perspectives import (
     validate_perspective_detail,
     validate_perspective_summary,
 )
+from api.schemas.descriptions import (
+    DescriptionGenerateRequest,
+    DescriptionGenerateResponse,
+    DescriptionGetResponse,
+    DescriptionItem,
+    DescriptionsListResponse,
+    ImageDescription,
+    validate_description_item,
+    validate_image_description,
+)
 from api.schemas.providers import (
     DescriptionModel,
     DescriptionModelsResponse,
@@ -39,11 +49,24 @@ from api.schemas.providers import (
     ProviderModelsListResponse,
     ProviderReorderSuccessResponse,
 )
+from api.schemas.scores import (
+    ImageScoreRow,
+    ScoresCurrentResponse,
+    ScoresHistoryResponse,
+    validate_image_score_row,
+)
 
 __all__ = [
+    'DescriptionGenerateRequest',
+    'DescriptionGenerateResponse',
+    'DescriptionGetResponse',
+    'DescriptionItem',
     'DescriptionModel',
     'DescriptionModelsResponse',
+    'DescriptionsListResponse',
     'ErrorBody',
+    'ImageDescription',
+    'ImageScoreRow',
     'FallbackOrderResponse',
     'Job',
     'JobCreateRequest',
@@ -67,7 +90,12 @@ __all__ = [
     'ProviderListResponse',
     'ProviderModelsListResponse',
     'ProviderReorderSuccessResponse',
+    'ScoresCurrentResponse',
+    'ScoresHistoryResponse',
     'build_job_emit_payload',
+    'validate_description_item',
+    'validate_image_description',
+    'validate_image_score_row',
     'compact_job_payload',
     'enrich_job_log_stats',
     'validate_job_payload',

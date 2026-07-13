@@ -48,12 +48,12 @@ export function DescriptionCard({ item, thumbnailUrl, generating, onGenerate, on
         </div>
 
         <DescriptionMeta
-          bestPerspective={item.best_perspective}
+          bestPerspective={item.best_perspective ?? undefined}
           imageType={item.image_type}
           hasDescription={!!item.has_description}
-          model={item.desc_model}
-          describedAt={item.described_at}
-          dateRef={item.date_ref}
+          model={item.desc_model ?? undefined}
+          describedAt={item.described_at ?? undefined}
+          dateRef={item.date_ref ?? undefined}
         />
       </div>
     </div>

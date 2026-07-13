@@ -116,6 +116,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/descriptions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List images with their AI descriptions. */
+        get: operations["get__api_descriptions_"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/descriptions/{image_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get full description for a single image. */
+        get: operations["get__api_descriptions_{image_key}"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/descriptions/{image_key}/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate AI description for a single image. */
+        post: operations["post__api_descriptions_{image_key}_generate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/providers/": {
         parameters: {
             query?: never;
@@ -314,10 +365,105 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/scores/{image_key}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** get_score_history <GET> */
+        get: operations["get__api_scores_{image_key}_history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scores/{image_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** get_current_scores <GET> */
+        get: operations["get__api_scores_{image_key}"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** DescriptionsListResponse */
+        "DescriptionsListResponse.ebaf8eb": {
+            /** Total */
+            total: number;
+            /** Items */
+            items: components["schemas"]["DescriptionsListResponse.ebaf8eb.DescriptionItem"][];
+            pagination: components["schemas"]["DescriptionsListResponse.ebaf8eb.PaginationMeta"];
+        };
+        /**
+         * ValidationError
+         * @description Model of a validation error response.
+         */
+        "ValidationError.6a07bef": components["schemas"]["ValidationError.6a07bef.ValidationErrorElement"][];
+        /** DescriptionGetResponse */
+        "DescriptionGetResponse.ebaf8eb": {
+            description: components["schemas"]["DescriptionGetResponse.ebaf8eb.ImageDescription"] | null;
+        };
+        /** DescriptionGenerateRequest */
+        "DescriptionGenerateRequest.ebaf8eb": {
+            /**
+             * Image Type
+             * @default catalog
+             */
+            image_type: string;
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+            /**
+             * Model
+             * @default null
+             */
+            model: string | null;
+            /**
+             * Provider Id
+             * @default null
+             */
+            provider_id: string | null;
+            /**
+             * Provider Model
+             * @default null
+             */
+            provider_model: string | null;
+        };
+        /** DescriptionGenerateResponse */
+        "DescriptionGenerateResponse.ebaf8eb": {
+            /** Generated */
+            generated: boolean;
+            description: components["schemas"]["DescriptionGenerateResponse.ebaf8eb.ImageDescription"] | null;
+        };
+        /** ErrorBody */
+        "ErrorBody.45d9b59": {
+            /** Error */
+            error: string;
+            /**
+             * Code
+             * @default null
+             */
+            code: string | null;
+        };
         /** JobsListResponse */
         "JobsListResponse.45d9b59": {
             /** Total */
@@ -326,11 +472,6 @@ export interface components {
             data: components["schemas"]["JobsListResponse.45d9b59.Job"][];
             pagination: components["schemas"]["JobsListResponse.45d9b59.PaginationMeta"];
         };
-        /**
-         * ValidationError
-         * @description Model of a validation error response.
-         */
-        "ValidationError.6a07bef": components["schemas"]["ValidationError.6a07bef.ValidationErrorElement"][];
         /** JobCreateRequest */
         "JobCreateRequest.45d9b59": {
             /** Type */
@@ -424,16 +565,6 @@ export interface components {
              * @default null
              */
             cancel_noop_reason: string | null;
-        };
-        /** ErrorBody */
-        "ErrorBody.45d9b59": {
-            /** Error */
-            error: string;
-            /**
-             * Code
-             * @default null
-             */
-            code: string | null;
         };
         /** CatalogUnavailableError */
         "CatalogUnavailableError.45d9b59": {
@@ -635,6 +766,332 @@ export interface components {
              */
             vision: boolean | null;
         };
+        /** ScoresHistoryResponse */
+        "ScoresHistoryResponse.c9bd13d": {
+            /** Image Key */
+            image_key: string;
+            /** Image Type */
+            image_type: string;
+            /** Perspective Slug */
+            perspective_slug: string;
+            /** History */
+            history: components["schemas"]["ScoresHistoryResponse.c9bd13d.ImageScoreRow"][];
+        };
+        /** ScoresCurrentResponse */
+        "ScoresCurrentResponse.c9bd13d": {
+            /** Image Key */
+            image_key: string;
+            /** Image Type */
+            image_type: string;
+            /** Current */
+            current: components["schemas"]["ScoresCurrentResponse.c9bd13d.ImageScoreRow"][];
+        };
+        /** DescriptionItem */
+        "DescriptionsListResponse.ebaf8eb.DescriptionItem": {
+            /** Image Key */
+            image_key: string;
+            /**
+             * Image Type
+             * @enum {string}
+             */
+            image_type: "catalog" | "instagram";
+            /**
+             * Filename
+             * @default null
+             */
+            filename: string | null;
+            /**
+             * Date Ref
+             * @default null
+             */
+            date_ref: string | null;
+            /**
+             * Summary
+             * @default null
+             */
+            summary: string | null;
+            /**
+             * Best Perspective
+             * @default null
+             */
+            best_perspective: string | null;
+            /**
+             * Desc Model
+             * @default null
+             */
+            desc_model: string | null;
+            /**
+             * Described At
+             * @default null
+             */
+            described_at: string | null;
+            /** Has Description */
+            has_description: number;
+        };
+        /** PaginationMeta */
+        "DescriptionsListResponse.ebaf8eb.PaginationMeta": {
+            /** Offset */
+            offset: number;
+            /** Limit */
+            limit: number;
+            /** Current Page */
+            current_page: number;
+            /** Total Pages */
+            total_pages: number;
+            /** Has More */
+            has_more: boolean;
+        };
+        /**
+         * ValidationErrorElement
+         * @description Model of a validation error response element.
+         */
+        "ValidationError.6a07bef.ValidationErrorElement": {
+            /** Missing field name */
+            loc: string[];
+            /** Error message */
+            msg: string;
+            /** Error type */
+            type: string;
+            /**
+             * Error context
+             * @default null
+             */
+            ctx: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** DescriptionComposition */
+        "DescriptionGetResponse.ebaf8eb.DescriptionComposition": {
+            /**
+             * Layers
+             * @default null
+             */
+            layers: string[] | null;
+            /**
+             * Techniques
+             * @default null
+             */
+            techniques: string[] | null;
+            /**
+             * Problems
+             * @default null
+             */
+            problems: string[] | null;
+            /**
+             * Depth
+             * @default null
+             */
+            depth: string | null;
+            /**
+             * Balance
+             * @default null
+             */
+            balance: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** DescriptionPerspectives */
+        "DescriptionGetResponse.ebaf8eb.DescriptionPerspectives": {
+            /** @default null */
+            street: components["schemas"]["DescriptionGetResponse.ebaf8eb.PerspectiveScore"] | null;
+            /** @default null */
+            documentary: components["schemas"]["DescriptionGetResponse.ebaf8eb.PerspectiveScore"] | null;
+            /** @default null */
+            publisher: components["schemas"]["DescriptionGetResponse.ebaf8eb.PerspectiveScore"] | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** DescriptionTechnical */
+        "DescriptionGetResponse.ebaf8eb.DescriptionTechnical": {
+            /**
+             * Dominant Colors
+             * @default null
+             */
+            dominant_colors: string[] | null;
+            /**
+             * Mood
+             * @default null
+             */
+            mood: string | null;
+            /**
+             * Lighting
+             * @default null
+             */
+            lighting: string | null;
+            /**
+             * Time Of Day
+             * @default null
+             */
+            time_of_day: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * ImageDescription
+         * @description Full description row returned by ``GET /api/descriptions/<image_key>``.
+         */
+        "DescriptionGetResponse.ebaf8eb.ImageDescription": {
+            /** Image Key */
+            image_key: string;
+            /** Image Type */
+            image_type: string;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /** @default null */
+            composition: components["schemas"]["DescriptionGetResponse.ebaf8eb.DescriptionComposition"] | null;
+            /** @default null */
+            perspectives: components["schemas"]["DescriptionGetResponse.ebaf8eb.DescriptionPerspectives"] | null;
+            /** @default null */
+            technical: components["schemas"]["DescriptionGetResponse.ebaf8eb.DescriptionTechnical"] | null;
+            /** Subjects */
+            subjects?: string[];
+            /**
+             * Best Perspective
+             * @default
+             */
+            best_perspective: string;
+            /**
+             * Model Used
+             * @default
+             */
+            model_used: string;
+            /**
+             * Described At
+             * @default null
+             */
+            described_at: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * PerspectiveScore
+         * @description Nested perspective line item in image descriptions.
+         */
+        "DescriptionGetResponse.ebaf8eb.PerspectiveScore": {
+            /** Analysis */
+            analysis: string;
+            /** Score */
+            score: number;
+        };
+        /** DescriptionComposition */
+        "DescriptionGenerateResponse.ebaf8eb.DescriptionComposition": {
+            /**
+             * Layers
+             * @default null
+             */
+            layers: string[] | null;
+            /**
+             * Techniques
+             * @default null
+             */
+            techniques: string[] | null;
+            /**
+             * Problems
+             * @default null
+             */
+            problems: string[] | null;
+            /**
+             * Depth
+             * @default null
+             */
+            depth: string | null;
+            /**
+             * Balance
+             * @default null
+             */
+            balance: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** DescriptionPerspectives */
+        "DescriptionGenerateResponse.ebaf8eb.DescriptionPerspectives": {
+            /** @default null */
+            street: components["schemas"]["DescriptionGenerateResponse.ebaf8eb.PerspectiveScore"] | null;
+            /** @default null */
+            documentary: components["schemas"]["DescriptionGenerateResponse.ebaf8eb.PerspectiveScore"] | null;
+            /** @default null */
+            publisher: components["schemas"]["DescriptionGenerateResponse.ebaf8eb.PerspectiveScore"] | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** DescriptionTechnical */
+        "DescriptionGenerateResponse.ebaf8eb.DescriptionTechnical": {
+            /**
+             * Dominant Colors
+             * @default null
+             */
+            dominant_colors: string[] | null;
+            /**
+             * Mood
+             * @default null
+             */
+            mood: string | null;
+            /**
+             * Lighting
+             * @default null
+             */
+            lighting: string | null;
+            /**
+             * Time Of Day
+             * @default null
+             */
+            time_of_day: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * ImageDescription
+         * @description Full description row returned by ``GET /api/descriptions/<image_key>``.
+         */
+        "DescriptionGenerateResponse.ebaf8eb.ImageDescription": {
+            /** Image Key */
+            image_key: string;
+            /** Image Type */
+            image_type: string;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /** @default null */
+            composition: components["schemas"]["DescriptionGenerateResponse.ebaf8eb.DescriptionComposition"] | null;
+            /** @default null */
+            perspectives: components["schemas"]["DescriptionGenerateResponse.ebaf8eb.DescriptionPerspectives"] | null;
+            /** @default null */
+            technical: components["schemas"]["DescriptionGenerateResponse.ebaf8eb.DescriptionTechnical"] | null;
+            /** Subjects */
+            subjects?: string[];
+            /**
+             * Best Perspective
+             * @default
+             */
+            best_perspective: string;
+            /**
+             * Model Used
+             * @default
+             */
+            model_used: string;
+            /**
+             * Described At
+             * @default null
+             */
+            described_at: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * PerspectiveScore
+         * @description Nested perspective line item in image descriptions.
+         */
+        "DescriptionGenerateResponse.ebaf8eb.PerspectiveScore": {
+            /** Analysis */
+            analysis: string;
+            /** Score */
+            score: number;
+        };
         /**
          * Job
          * @description Shared by REST job endpoints and ``job_updated`` / ``job_created`` socket emits.
@@ -744,25 +1201,6 @@ export interface components {
             total_pages: number;
             /** Has More */
             has_more: boolean;
-        };
-        /**
-         * ValidationErrorElement
-         * @description Model of a validation error response element.
-         */
-        "ValidationError.6a07bef.ValidationErrorElement": {
-            /** Missing field name */
-            loc: string[];
-            /** Error message */
-            msg: string;
-            /** Error type */
-            type: string;
-            /**
-             * Error context
-             * @default null
-             */
-            ctx: {
-                [key: string]: unknown;
-            } | null;
         };
         /** JobLog */
         "Job.45d9b59.JobLog": {
@@ -982,6 +1420,96 @@ export interface components {
              * @default null
              */
             vision: boolean | null;
+        };
+        /** ImageScoreRow */
+        "ScoresHistoryResponse.c9bd13d.ImageScoreRow": {
+            /**
+             * Id
+             * @default null
+             */
+            id: number | null;
+            /** Image Key */
+            image_key: string;
+            /** Image Type */
+            image_type: string;
+            /** Perspective Slug */
+            perspective_slug: string;
+            /** Score */
+            score: number;
+            /**
+             * Rationale
+             * @default
+             */
+            rationale: string;
+            /**
+             * Model Used
+             * @default
+             */
+            model_used: string;
+            /**
+             * Prompt Version
+             * @default
+             */
+            prompt_version: string;
+            /** Scored At */
+            scored_at: string;
+            /** Is Current */
+            is_current: boolean;
+            /**
+             * Repaired From Malformed
+             * @default false
+             */
+            repaired_from_malformed: boolean;
+            /**
+             * Not Attempted
+             * @default false
+             */
+            not_attempted: boolean;
+        };
+        /** ImageScoreRow */
+        "ScoresCurrentResponse.c9bd13d.ImageScoreRow": {
+            /**
+             * Id
+             * @default null
+             */
+            id: number | null;
+            /** Image Key */
+            image_key: string;
+            /** Image Type */
+            image_type: string;
+            /** Perspective Slug */
+            perspective_slug: string;
+            /** Score */
+            score: number;
+            /**
+             * Rationale
+             * @default
+             */
+            rationale: string;
+            /**
+             * Model Used
+             * @default
+             */
+            model_used: string;
+            /**
+             * Prompt Version
+             * @default
+             */
+            prompt_version: string;
+            /** Scored At */
+            scored_at: string;
+            /** Is Current */
+            is_current: boolean;
+            /**
+             * Repaired From Malformed
+             * @default false
+             */
+            repaired_from_malformed: boolean;
+            /**
+             * Not Attempted
+             * @default false
+             */
+            not_attempted: boolean;
         };
     };
     responses: never;
@@ -1311,6 +1839,137 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    get__api_descriptions_: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DescriptionsListResponse.ebaf8eb"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_descriptions_{image_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DescriptionGetResponse.ebaf8eb"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "post__api_descriptions_{image_key}_generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DescriptionGenerateRequest.ebaf8eb"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DescriptionGenerateResponse.ebaf8eb"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+            /** @description Too Many Requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
                 };
             };
         };
@@ -2007,6 +2666,86 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_scores_{image_key}_history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoresHistoryResponse.c9bd13d"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_scores_{image_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScoresCurrentResponse.c9bd13d"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

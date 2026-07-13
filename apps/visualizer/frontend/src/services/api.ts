@@ -6,24 +6,44 @@ import type {
   PerspectiveSummary,
 } from '../types/perspectives'
 import type {
+  DescriptionGenerateResponse,
+  DescriptionGetResponse,
+  DescriptionItem,
+  DescriptionsListResponse,
+  ImageDescription,
+} from '../types/descriptions'
+import type {
   DescriptionModel,
   DescriptionModelsResponse,
   Provider,
   ProviderDefaults,
   ProviderModel,
 } from '../types/providers'
+import type {
+  ImageScoreRow,
+  ScoresCurrentResponse,
+  ScoresHistoryResponse,
+} from '../types/scores'
 import { API_DEFAULT_URL } from '../constants/strings'
 
 export type { Job, JobsGetOptions, JobsHealth, JobsListResponse }
 export type {
+  DescriptionGenerateResponse,
+  DescriptionGetResponse,
+  DescriptionItem,
   DescriptionModel,
   DescriptionModelsResponse,
+  DescriptionsListResponse,
+  ImageDescription,
+  ImageScoreRow,
   PerspectiveDetail,
   PerspectiveScore,
   PerspectiveSummary,
   Provider,
   ProviderDefaults,
   ProviderModel,
+  ScoresCurrentResponse,
+  ScoresHistoryResponse,
 }
 
 const API_URL = import.meta.env.VITE_API_URL || API_DEFAULT_URL
@@ -537,29 +557,9 @@ export const MatchingAPI = {
   },
 }
 
-export interface DescriptionItem {
-  image_key: string
-  image_type: 'catalog' | 'instagram'
-  filename?: string
-  date_ref?: string
-  summary?: string
-  best_perspective?: string
-  desc_model?: string
-  described_at?: string
-  has_description: number
-}
-
-export interface PaginationMeta {
-  offset: number
-  limit: number
-  current_page: number
-  total_pages: number
-  has_more: boolean
-}
-
 export const DescriptionsAPI = {
   get: (imageKey: string) =>
-    request<{ description: ImageDescription | null }>(
+    request<DescriptionGetResponse>(
       `/descriptions/${encodeURIComponent(imageKey)}`
     ),
   list: (params?: { image_type?: string; described_only?: boolean; limit?: number; offset?: number }) => {
@@ -568,7 +568,7 @@ export const DescriptionsAPI = {
     if (params?.described_only) sp.set('described_only', 'true')
     if (params?.limit) sp.set('limit', String(params.limit))
     if (params?.offset) sp.set('offset', String(params.offset))
-    return request<{ total: number; items: DescriptionItem[]; pagination: PaginationMeta }>(
+    return request<DescriptionsListResponse>(
       `/descriptions/?${sp.toString()}`
     )
   },
@@ -580,7 +580,7 @@ export const DescriptionsAPI = {
     providerId?: string,
     providerModel?: string,
   ) => {
-    const result = await request<{ generated: boolean; description: ImageDescription | null }>(
+    const result = await request<DescriptionGenerateResponse>(
       `/descriptions/${encodeURIComponent(imageKey)}/generate`,
       {
         method: 'POST',
@@ -600,33 +600,6 @@ export const DescriptionsAPI = {
 }
 
 export type DescriptionListResult = Awaited<ReturnType<typeof DescriptionsAPI.list>>
-
-export interface ImageScoreRow {
-  id?: number
-  image_key: string
-  image_type: string
-  perspective_slug: string
-  score: number
-  rationale: string
-  model_used: string
-  prompt_version: string
-  scored_at: string
-  is_current: boolean
-  repaired_from_malformed: boolean
-}
-
-export interface ScoresCurrentResponse {
-  image_key: string
-  image_type: string
-  current: ImageScoreRow[]
-}
-
-export interface ScoresHistoryResponse {
-  image_key: string
-  image_type: string
-  perspective_slug: string
-  history: ImageScoreRow[]
-}
 
 export const ScoresAPI = {
   getCurrent: (imageKey: string, params?: { image_type?: 'catalog' | 'instagram' }) => {
@@ -649,6 +622,14 @@ export const ScoresAPI = {
       `/scores/${encodeURIComponent(imageKey)}/history?${sp.toString()}`,
     )
   },
+}
+
+export interface PaginationMeta {
+  offset: number
+  limit: number
+  current_page: number
+  total_pages: number
+  has_more: boolean
 }
 
 // --- Analytics (Phase 7 /api/analytics) ---
@@ -927,17 +908,6 @@ export const IdentityAPI = {
   },
 }
 
-export const DumpMediaAPI = {
-  list: (filters?: { processed?: boolean; matched?: boolean; limit?: number; offset?: number }) => {
-    const params = new URLSearchParams()
-    if (filters?.processed !== undefined) params.set('processed', String(filters.processed))
-    if (filters?.matched !== undefined) params.set('matched', String(filters.matched))
-    if (filters?.limit) params.set('limit', String(filters.limit))
-    if (filters?.offset) params.set('offset', String(filters.offset))
-    return request<{ total: number; media: DumpMedia[] }>(`/images/dump-media?${params.toString()}`)
-  },
-}
-
 export interface Stats {
   catalog_images: number
   instagram_images: number
@@ -1169,34 +1139,6 @@ export interface ImageView {
 /** Shape returned by `GET /api/images/<image_type>/<image_key>`. */
 export type ImageDetailResponse = ImageView
 
-export interface ImageDescription {
-  image_key: string
-  image_type: string
-  summary: string
-  composition: {
-    layers?: string[]
-    techniques?: string[]
-    problems?: string[]
-    depth?: string
-    balance?: string
-  }
-  perspectives: {
-    street?: PerspectiveScore
-    documentary?: PerspectiveScore
-    publisher?: PerspectiveScore
-  }
-  technical: {
-    dominant_colors?: string[]
-    mood?: string
-    lighting?: string
-    time_of_day?: string
-  }
-  subjects: string[]
-  best_perspective: string
-  model_used: string
-  described_at?: string
-}
-
 export interface Match {
   instagram_key: string
   catalog_key: string
@@ -1227,18 +1169,6 @@ export interface MatchGroup {
   has_validated: boolean
   /** True when every candidate is rejected and none validated (tombstone group). Omitted on older responses. */
   all_rejected?: boolean
-}
-
-export interface DumpMedia {
-  media_key: string
-  file_path: string
-  filename?: string
-  caption?: string
-  created_at?: string
-  processed: boolean
-  matched_catalog_key?: string
-  vision_result?: 'SAME' | 'DIFFERENT' | 'UNCERTAIN' | 'NO_MATCH' | 'ERROR'
-  vision_score?: number
 }
 
 export const ProvidersAPI = {

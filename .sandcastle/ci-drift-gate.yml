@@ -45,8 +45,8 @@ jobs:
         run: npx tsc --noEmit
 
       # Scope grows per contract slice: this gate guards the *migrated* surface
-      # (Jobs + Perspectives + Providers today). Each future slice appends its
-      # group's tests here as it lands.
+      # (Jobs + Perspectives + Providers + Descriptions + Scores today). Each future
+      # slice appends its group's tests here as it lands.
       - name: Backend contract tests (spectree response validation, migrated groups)
         working-directory: apps/visualizer/backend
-        run: python -m pytest tests/test_job_contract.py tests/test_jobs_api.py tests/test_job_transition_routes.py tests/test_perspectives_contract.py tests/test_perspectives_api.py tests/test_providers_contract.py tests/test_providers_api.py -q
+        run: python -m pytest tests/test_job_contract.py tests/test_jobs_api.py tests/test_job_transition_routes.py tests/test_perspectives_contract.py tests/test_perspectives_api.py tests/test_providers_contract.py tests/test_providers_api.py tests/test_descriptions_contract.py tests/test_descriptions_api.py tests/test_scores_contract.py tests/test_scores_api.py -q

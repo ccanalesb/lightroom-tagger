@@ -5,9 +5,13 @@ import sqlite3
 from typing import Any
 
 from flask import Blueprint, jsonify, request
-from flask.typing import ResponseReturnValue
+from spectree import Response
 from utils.db import with_db
 from utils.responses import error_bad_request
+
+from api.openapi import spec
+from api.schemas.jobs import ErrorBody
+from api.schemas.scores import ScoresCurrentResponse, ScoresHistoryResponse
 
 from utils.perspective_slug import PERSPECTIVE_SLUG_RE as _SLUG_RE
 from lightroom_tagger.core.database import (
@@ -35,7 +39,11 @@ def _image_type_from_request() -> tuple[str | None, Any]:
 
 @bp.route("/<path:image_key>/history", methods=["GET"])
 @with_db
-def get_score_history(db: sqlite3.Connection, image_key: str) -> ResponseReturnValue:
+@spec.validate(
+    resp=Response(HTTP_200=ScoresHistoryResponse, HTTP_400=ErrorBody),
+    tags=['scores'],
+)
+def get_score_history(db: sqlite3.Connection, image_key: str):
     image_type, err = _image_type_from_request()
     if err is not None:
         return err
@@ -60,7 +68,11 @@ def get_score_history(db: sqlite3.Connection, image_key: str) -> ResponseReturnV
 
 @bp.route("/<path:image_key>", methods=["GET"])
 @with_db
-def get_current_scores(db: sqlite3.Connection, image_key: str) -> ResponseReturnValue:
+@spec.validate(
+    resp=Response(HTTP_200=ScoresCurrentResponse, HTTP_400=ErrorBody),
+    tags=['scores'],
+)
+def get_current_scores(db: sqlite3.Connection, image_key: str):
     image_type, err = _image_type_from_request()
     if err is not None:
         return err
