@@ -4,7 +4,22 @@ import sqlite3
 
 from database import add_user_model, delete_user_model, get_user_models
 from flask import Blueprint, current_app, jsonify, request
+from spectree import Response
 
+from api.openapi import spec
+from api.schemas.jobs import ErrorBody
+from api.schemas.providers import (
+    DescriptionModelsResponse,
+    FallbackOrderResponse,
+    Provider,
+    ProviderDefaults,
+    ProviderDeletedResponse,
+    ProviderHealthResponse,
+    ProviderModel,
+    ProviderListResponse,
+    ProviderModelsListResponse,
+    ProviderReorderSuccessResponse,
+)
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 
 bp = Blueprint("providers", __name__)
@@ -15,12 +30,20 @@ def _get_registry() -> ProviderRegistry:
 
 
 @bp.route("/", methods=["GET"])
+@spec.validate(
+    resp=Response(HTTP_200=ProviderListResponse),
+    tags=['providers'],
+)
 def list_providers():
     registry = _get_registry()
     return jsonify(registry.list_providers())
 
 
 @bp.route("/fallback-order", methods=["GET", "PUT"])
+@spec.validate(
+    resp=Response(HTTP_200=FallbackOrderResponse, HTTP_400=ErrorBody),
+    tags=['providers'],
+)
 def fallback_order():
     registry = _get_registry()
     if request.method == "GET":
@@ -36,6 +59,10 @@ def fallback_order():
 
 
 @bp.route("/defaults", methods=["GET", "PUT"])
+@spec.validate(
+    resp=Response(HTTP_200=ProviderDefaults, HTTP_400=ErrorBody),
+    tags=['providers'],
+)
 def defaults():
     registry = _get_registry()
     if request.method == "GET":
@@ -51,6 +78,10 @@ def defaults():
 
 
 @bp.route("/models/description", methods=["GET"])
+@spec.validate(
+    resp=Response(HTTP_200=DescriptionModelsResponse),
+    tags=['providers'],
+)
 def all_description_models():
     """Flat list of all models across all providers, for the NL/description task selector.
 
@@ -101,6 +132,10 @@ def all_description_models():
 
 
 @bp.route("/<provider_id>/health", methods=["GET"])
+@spec.validate(
+    resp=Response(HTTP_200=ProviderHealthResponse, HTTP_404=ErrorBody),
+    tags=['providers'],
+)
 def provider_health(provider_id: str):
     registry = _get_registry()
     try:
@@ -113,6 +148,10 @@ def provider_health(provider_id: str):
 
 
 @bp.route("/<provider_id>/models/<path:model_id>", methods=["DELETE"])
+@spec.validate(
+    resp=Response(HTTP_200=ProviderDeletedResponse, HTTP_404=ErrorBody),
+    tags=['providers'],
+)
 def delete_model(provider_id: str, model_id: str):
     deleted = delete_user_model(current_app.db, provider_id, model_id)
     if deleted:
@@ -128,6 +167,10 @@ def delete_model(provider_id: str, model_id: str):
 
 
 @bp.route("/<provider_id>/models/order", methods=["PUT"])
+@spec.validate(
+    resp=Response(HTTP_200=ProviderReorderSuccessResponse, HTTP_400=ErrorBody, HTTP_404=ErrorBody),
+    tags=['providers'],
+)
 def reorder_models_endpoint(provider_id: str):
     """Reorder models for a provider."""
     registry = _get_registry()
@@ -144,6 +187,16 @@ def reorder_models_endpoint(provider_id: str):
 
 
 @bp.route("/<provider_id>/models", methods=["GET", "POST"])
+@spec.validate(
+    resp=Response(
+        HTTP_200=ProviderModelsListResponse,
+        HTTP_201=ProviderModel,
+        HTTP_400=ErrorBody,
+        HTTP_404=ErrorBody,
+        HTTP_409=ErrorBody,
+    ),
+    tags=['providers'],
+)
 def models(provider_id: str):
     registry = _get_registry()
     if provider_id not in [provider["id"] for provider in registry.list_providers()]:

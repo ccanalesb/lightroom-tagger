@@ -1,9 +1,20 @@
 import sqlite3
+from pathlib import Path
 from unittest.mock import PropertyMock, patch
 
 import pytest
 from app import create_app
 from lightroom_tagger.core.provider_registry import ProviderRegistry
+
+_EXAMPLE_CONFIG = Path(__file__).resolve().parents[4] / "lightroom_tagger" / "core" / "providers.example.json"
+
+
+@pytest.fixture(autouse=True)
+def stable_provider_registry(monkeypatch):
+    """Pin provider routes to the shipped example config for CI portability."""
+    registry = ProviderRegistry(config_path=_EXAMPLE_CONFIG)
+    monkeypatch.setattr("api.providers._get_registry", lambda: registry)
+    return registry
 
 
 @pytest.fixture()
@@ -31,12 +42,12 @@ def client():
 
 
 class TestListProviders:
-    def test_should_return_all_providers(self, client):
+    def test_should_return_all_providers(self, client, stable_provider_registry):
         resp = client.get("/api/providers/")
         assert resp.status_code == 200
         data = resp.get_json()
         ids = {provider["id"] for provider in data}
-        assert ids == {p["id"] for p in ProviderRegistry().list_providers()}
+        assert ids == {p["id"] for p in stable_provider_registry.list_providers()}
 
     def test_should_include_availability_status(self, client):
         resp = client.get("/api/providers/")
@@ -47,11 +58,11 @@ class TestListProviders:
 
 class TestListModels:
     def test_should_return_models_for_provider_with_config_models(self, client):
-        resp = client.get("/api/providers/github_copilot/models")
+        resp = client.get("/api/providers/nvidia_nim/models")
         assert resp.status_code == 200
         data = resp.get_json()
         model_ids = [model["id"] for model in data]
-        assert "gpt-4o" in model_ids
+        assert "meta/llama-4-maverick-17b-128e-instruct" in model_ids
 
     def test_should_return_404_for_unknown_provider(self, client):
         resp = client.get("/api/providers/nonexistent/models")
@@ -59,11 +70,11 @@ class TestListModels:
 
 
 class TestFallbackOrder:
-    def test_should_return_fallback_order(self, client):
+    def test_should_return_fallback_order(self, client, stable_provider_registry):
         resp = client.get("/api/providers/fallback-order")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["order"] == ProviderRegistry().fallback_order
+        assert data["order"] == stable_provider_registry.fallback_order
 
     def test_put_fallback_order_should_update_order(self, client):
         from lightroom_tagger.core.provider_registry import ProviderRegistry
@@ -112,21 +123,13 @@ class TestFallbackOrder:
 
 
 class TestDefaults:
-    def test_should_return_defaults(self, client):
-        """The endpoint returns whatever ``providers.json`` currently ships.
-
-        The concrete provider IDs change over time (e.g. the default
-        description provider migrated from ``ollama`` to ``github_copilot``
-        when Copilot became the preferred host), so this test asserts
-        against the live registry rather than a hardcoded value. The
-        registry itself is covered by ``test_provider_registry.py`` which
-        pins to ``providers.example.json`` for stability.
-        """
+    def test_should_return_defaults(self, client, stable_provider_registry):
+        """The endpoint returns whatever ``providers.example.json`` ships."""
         resp = client.get("/api/providers/defaults")
         assert resp.status_code == 200
         data = resp.get_json()
 
-        expected = ProviderRegistry().defaults
+        expected = stable_provider_registry.defaults
         assert data["vision_comparison"]["provider"] == expected["vision_comparison"]["provider"]
         assert data["description"]["provider"] == expected["description"]["provider"]
 
