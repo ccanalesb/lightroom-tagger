@@ -921,8 +921,6 @@ export const IdentityAPI = {
   },
 }
 
-// --- Analytics (Phase 7 /api/analytics) ---
-
 export interface Stats {
   catalog_images: number
   instagram_images: number
