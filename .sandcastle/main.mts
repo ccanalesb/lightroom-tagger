@@ -16,7 +16,12 @@ const task = process.env.SANDCASTLE_TASK?.trim();
 
 const commitNote =
   "When done and tests pass, stage and commit ALL changes " +
-  '(`git add -A && git commit -m "..."`), then output <promise>COMPLETE</promise>.';
+  '(`git add -A && git commit -m "..."`), then output <promise>COMPLETE</promise>. ' +
+  "IMPORTANT: if you changed any backend response model (`apps/visualizer/backend/api/schemas/**`) " +
+  "or a route's `@spec.validate` decorator, first run " +
+  "`cd apps/visualizer/frontend && npm run generate:api` and commit the regenerated " +
+  "`src/types/api.gen.ts` (a committed CI gate fails on drift). Never put `@spec.validate` " +
+  "on a `send_file`/binary route.";
 
 // Two-axis review (ported from the code-review skill): Spec = does the diff
 // match what was asked; Standards = does it follow repo conventions + the
@@ -53,6 +58,15 @@ Then scan for these code smells — judgement calls, not hard rules; a documente
 ## Tests
 Ensure coverage is adequate and the suite passes: \`python -m pytest -q\`.
 
+## Contract (backend-authoritative OpenAPI → generated TS)
+This repo generates the frontend's types from the backend OpenAPI spec (ADR-0013); the generated file \`apps/visualizer/frontend/src/types/api.gen.ts\` is committed and a CI gate fails on drift. If the diff touches ANY pydantic response model (\`backend/api/schemas/**\`) or a route's \`@spec.validate\` decorator, the committed types may be stale. Verify and FIX before finishing:
+
+- \`cd apps/visualizer/frontend && npm run generate:api\` — regenerate the committed types.
+- \`git diff --exit-code src/types/api.gen.ts\` must be clean afterwards. If it is not, the regen changed the file → **commit the regenerated \`api.gen.ts\`** (this is the #1 cause of gate failures — do not skip it).
+- \`npx tsc --noEmit\` must pass.
+
+Also: never wrap a \`send_file\`/binary/streaming route in \`@spec.validate\` — validation reads the response body and 500s with "direct passthrough mode". Binary endpoints do not belong in the JSON contract.
+
 ## Done
 Fix the issues you find directly and keep fixes minimal. Then stage and commit ALL changes (including the implementer's work if still uncommitted):
 \`git add -A && git commit -m "Review + fixes"\`
@@ -70,6 +84,9 @@ await using sandbox = await createSandbox({
         { command: "git config user.email agent@sandcastle.local" },
         { command: "git config user.name 'Sandcastle Agent'" },
         { command: "uv pip install -e . --no-deps" },
+        // Link the pre-baked frontend deps into the worktree so the contract
+        // check (npm run generate:api + tsc) can run without a per-run npm ci.
+        { command: "ln -sfn /home/agent/.fe-deps/node_modules apps/visualizer/frontend/node_modules" },
       ],
     },
   },

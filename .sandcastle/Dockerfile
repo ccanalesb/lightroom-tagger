@@ -43,6 +43,15 @@ WORKDIR /home/agent/.deps
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --extra dev
 
+# Pre-bake the frontend deps too (same rationale: fast, offline; layer caches on
+# the manifests). Baked outside the bind-mounted workspace; a runtime hook
+# symlinks node_modules into the worktree so the contract check (generate:api +
+# tsc) can run. Skip Playwright's browser download — the check needs none.
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+WORKDIR /home/agent/.fe-deps
+COPY apps/visualizer/frontend/package.json apps/visualizer/frontend/package-lock.json ./
+RUN npm ci --legacy-peer-deps --no-audit --no-fund
+
 WORKDIR /home/agent
 
 # In worktree sandbox mode, Sandcastle bind-mounts the git worktree at /home/agent/workspace
