@@ -1,4 +1,4 @@
-import type { ImageDescription } from '../../services/api'
+import type { ImageDescription, ImageDescriptionComposition, ImageDescriptionTechnical } from '../../services/api'
 import {
   DESC_PANEL_SUMMARY,
   DESC_PANEL_COMPOSITION,
@@ -24,7 +24,10 @@ interface FullViewProps {
 }
 
 export function FullView({ description }: FullViewProps) {
-  const { composition, perspectives, technical, subjects } = description
+  const composition = description.composition as ImageDescriptionComposition | undefined
+  const perspectives = description.perspectives
+  const technical = description.technical as ImageDescriptionTechnical | undefined
+  const { subjects } = description
 
   return (
     <div className="space-y-3 text-sm">
@@ -61,7 +64,7 @@ export function FullView({ description }: FullViewProps) {
           <div className="text-xs text-gray-600 space-y-1">
             {composition.techniques && composition.techniques.length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {composition.techniques.map((t) => (
+                {composition.techniques.map((t: string) => (
                   <span key={t} className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">
                     {underscoreToSpaces(t)}
                   </span>
@@ -70,7 +73,7 @@ export function FullView({ description }: FullViewProps) {
             )}
             {composition.problems && composition.problems.length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {composition.problems.map((p) => (
+                {composition.problems.map((p: string) => (
                   <span key={p} className="bg-red-50 text-red-700 px-1.5 py-0.5 rounded">
                     {p}
                   </span>
@@ -112,7 +115,7 @@ export function FullView({ description }: FullViewProps) {
             {technical.dominant_colors && technical.dominant_colors.length > 0 && (
               <div className="flex items-center gap-1">
                 <span>{DESC_TECHNICAL_COLORS}</span>
-                {technical.dominant_colors.map((c) => (
+                {technical.dominant_colors.map((c: string) => (
                   <span
                     key={c}
                     className="inline-block w-4 h-4 rounded border border-gray-200"
