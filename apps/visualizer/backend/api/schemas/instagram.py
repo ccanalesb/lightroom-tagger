@@ -38,8 +38,8 @@ class InstagramImage(BaseModel):
     created_at: str | None = None
     image_hash: str | None = None
     phash: str | None = None
-    description: str = ''
-    caption: str = ''
+    description: str | None = None
+    caption: str | None = None
     processed: bool | None = None
     matched_catalog_key: str | None = None
     matched_model: str | None = None

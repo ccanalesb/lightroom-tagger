@@ -3382,14 +3382,14 @@ export interface components {
             score: number;
             /**
              * Rationale
-             * @default
+             * @default null
              */
-            rationale: string;
+            rationale: string | null;
             /**
              * Model Used
-             * @default
+             * @default null
              */
-            model_used: string;
+            model_used: string | null;
             /** Prompt Version */
             prompt_version: string;
             /** Scored At */
@@ -3421,14 +3421,14 @@ export interface components {
             score: number;
             /**
              * Rationale
-             * @default
+             * @default null
              */
-            rationale: string;
+            rationale: string | null;
             /**
              * Model Used
-             * @default
+             * @default null
              */
-            model_used: string;
+            model_used: string | null;
             /** Prompt Version */
             prompt_version: string;
             /** Scored At */
@@ -3495,56 +3495,56 @@ export interface components {
             id: number | null;
             /**
              * Filename
-             * @default
+             * @default null
              */
-            filename: string;
+            filename: string | null;
             /**
              * Filepath
-             * @default
+             * @default null
              */
-            filepath: string;
+            filepath: string | null;
             /**
              * Date Taken
-             * @default
+             * @default null
              */
-            date_taken: string;
+            date_taken: string | null;
             /**
              * Rating
-             * @default 0
+             * @default null
              */
-            rating: number;
+            rating: number | null;
             /**
              * Pick
-             * @default false
+             * @default null
              */
-            pick: boolean;
+            pick: boolean | null;
             /**
              * Color Label
-             * @default
+             * @default null
              */
-            color_label: string;
+            color_label: string | null;
             /** Keywords */
             keywords?: string[];
             /**
              * Title
-             * @default
+             * @default null
              */
-            title: string;
+            title: string | null;
             /**
              * Caption
-             * @default
+             * @default null
              */
-            caption: string;
+            caption: string | null;
             /**
              * Description
-             * @default
+             * @default null
              */
-            description: string;
+            description: string | null;
             /**
              * Copyright
-             * @default
+             * @default null
              */
-            copyright: string;
+            copyright: string | null;
             /**
              * Width
              * @default null
@@ -3557,9 +3557,9 @@ export interface components {
             height: number | null;
             /**
              * Instagram Posted
-             * @default false
+             * @default null
              */
-            instagram_posted: boolean;
+            instagram_posted: boolean | null;
             /**
              * Instagram Url
              * @default null
@@ -3577,9 +3577,9 @@ export interface components {
             image_type: ("catalog" | "instagram") | null;
             /**
              * Ai Analyzed
-             * @default false
+             * @default null
              */
-            ai_analyzed: boolean;
+            ai_analyzed: boolean | null;
             /**
              * Description Summary
              * @default null
@@ -3619,9 +3619,9 @@ export interface components {
             stack_member_count: number | null;
             /**
              * Is Stack Representative
-             * @default false
+             * @default null
              */
-            is_stack_representative: boolean;
+            is_stack_representative: boolean | null;
             /**
              * Analyzed At
              * @default null
@@ -3629,24 +3629,24 @@ export interface components {
             analyzed_at: string | null;
             /**
              * Aperture
-             * @default
+             * @default null
              */
-            aperture: string;
+            aperture: string | null;
             /**
              * Camera Make
-             * @default
+             * @default null
              */
-            camera_make: string;
+            camera_make: string | null;
             /**
              * Camera Model
-             * @default
+             * @default null
              */
-            camera_model: string;
+            camera_model: string | null;
             /**
              * Catalog Path
-             * @default
+             * @default null
              */
-            catalog_path: string;
+            catalog_path: string | null;
             /**
              * Exif
              * @default null
@@ -3659,9 +3659,9 @@ export interface components {
             file_size: number | null;
             /**
              * Focal Length
-             * @default
+             * @default null
              */
-            focal_length: string;
+            focal_length: string | null;
             /**
              * Gps Latitude
              * @default null
@@ -3674,9 +3674,9 @@ export interface components {
             gps_longitude: number | null;
             /**
              * Instagram Index
-             * @default 0
+             * @default null
              */
-            instagram_index: number;
+            instagram_index: number | null;
             /**
              * Instagram Post Date
              * @default null
@@ -3684,14 +3684,14 @@ export interface components {
             instagram_post_date: string | null;
             /**
              * Iso
-             * @default
+             * @default null
              */
-            iso: string;
+            iso: string | null;
             /**
              * Lens
-             * @default
+             * @default null
              */
-            lens: string;
+            lens: string | null;
             /**
              * Phash
              * @default null
@@ -3699,9 +3699,9 @@ export interface components {
             phash: string | null;
             /**
              * Shutter Speed
-             * @default
+             * @default null
              */
-            shutter_speed: string;
+            shutter_speed: string | null;
             /**
              * Similarity
              * @default null
@@ -3737,56 +3737,56 @@ export interface components {
             id: number | null;
             /**
              * Filename
-             * @default
+             * @default null
              */
-            filename: string;
+            filename: string | null;
             /**
              * Filepath
-             * @default
+             * @default null
              */
-            filepath: string;
+            filepath: string | null;
             /**
              * Date Taken
-             * @default
+             * @default null
              */
-            date_taken: string;
+            date_taken: string | null;
             /**
              * Rating
-             * @default 0
+             * @default null
              */
-            rating: number;
+            rating: number | null;
             /**
              * Pick
-             * @default false
+             * @default null
              */
-            pick: boolean;
+            pick: boolean | null;
             /**
              * Color Label
-             * @default
+             * @default null
              */
-            color_label: string;
+            color_label: string | null;
             /** Keywords */
             keywords?: string[];
             /**
              * Title
-             * @default
+             * @default null
              */
-            title: string;
+            title: string | null;
             /**
              * Caption
-             * @default
+             * @default null
              */
-            caption: string;
+            caption: string | null;
             /**
              * Description
-             * @default
+             * @default null
              */
-            description: string;
+            description: string | null;
             /**
              * Copyright
-             * @default
+             * @default null
              */
-            copyright: string;
+            copyright: string | null;
             /**
              * Width
              * @default null
@@ -3799,9 +3799,9 @@ export interface components {
             height: number | null;
             /**
              * Instagram Posted
-             * @default false
+             * @default null
              */
-            instagram_posted: boolean;
+            instagram_posted: boolean | null;
             /**
              * Instagram Url
              * @default null
@@ -3819,9 +3819,9 @@ export interface components {
             image_type: ("catalog" | "instagram") | null;
             /**
              * Ai Analyzed
-             * @default false
+             * @default null
              */
-            ai_analyzed: boolean;
+            ai_analyzed: boolean | null;
             /**
              * Description Summary
              * @default null
@@ -3861,9 +3861,9 @@ export interface components {
             stack_member_count: number | null;
             /**
              * Is Stack Representative
-             * @default false
+             * @default null
              */
-            is_stack_representative: boolean;
+            is_stack_representative: boolean | null;
             /**
              * Analyzed At
              * @default null
@@ -3871,24 +3871,24 @@ export interface components {
             analyzed_at: string | null;
             /**
              * Aperture
-             * @default
+             * @default null
              */
-            aperture: string;
+            aperture: string | null;
             /**
              * Camera Make
-             * @default
+             * @default null
              */
-            camera_make: string;
+            camera_make: string | null;
             /**
              * Camera Model
-             * @default
+             * @default null
              */
-            camera_model: string;
+            camera_model: string | null;
             /**
              * Catalog Path
-             * @default
+             * @default null
              */
-            catalog_path: string;
+            catalog_path: string | null;
             /**
              * Exif
              * @default null
@@ -3901,9 +3901,9 @@ export interface components {
             file_size: number | null;
             /**
              * Focal Length
-             * @default
+             * @default null
              */
-            focal_length: string;
+            focal_length: string | null;
             /**
              * Gps Latitude
              * @default null
@@ -3916,9 +3916,9 @@ export interface components {
             gps_longitude: number | null;
             /**
              * Instagram Index
-             * @default 0
+             * @default null
              */
-            instagram_index: number;
+            instagram_index: number | null;
             /**
              * Instagram Post Date
              * @default null
@@ -3926,14 +3926,14 @@ export interface components {
             instagram_post_date: string | null;
             /**
              * Iso
-             * @default
+             * @default null
              */
-            iso: string;
+            iso: string | null;
             /**
              * Lens
-             * @default
+             * @default null
              */
-            lens: string;
+            lens: string | null;
             /**
              * Phash
              * @default null
@@ -3941,9 +3941,9 @@ export interface components {
             phash: string | null;
             /**
              * Shutter Speed
-             * @default
+             * @default null
              */
-            shutter_speed: string;
+            shutter_speed: string | null;
             /**
              * Similarity
              * @default null
@@ -3993,56 +3993,56 @@ export interface components {
             id: number | null;
             /**
              * Filename
-             * @default
+             * @default null
              */
-            filename: string;
+            filename: string | null;
             /**
              * Filepath
-             * @default
+             * @default null
              */
-            filepath: string;
+            filepath: string | null;
             /**
              * Date Taken
-             * @default
+             * @default null
              */
-            date_taken: string;
+            date_taken: string | null;
             /**
              * Rating
-             * @default 0
+             * @default null
              */
-            rating: number;
+            rating: number | null;
             /**
              * Pick
-             * @default false
+             * @default null
              */
-            pick: boolean;
+            pick: boolean | null;
             /**
              * Color Label
-             * @default
+             * @default null
              */
-            color_label: string;
+            color_label: string | null;
             /** Keywords */
             keywords?: string[];
             /**
              * Title
-             * @default
+             * @default null
              */
-            title: string;
+            title: string | null;
             /**
              * Caption
-             * @default
+             * @default null
              */
-            caption: string;
+            caption: string | null;
             /**
              * Description
-             * @default
+             * @default null
              */
-            description: string;
+            description: string | null;
             /**
              * Copyright
-             * @default
+             * @default null
              */
-            copyright: string;
+            copyright: string | null;
             /**
              * Width
              * @default null
@@ -4055,9 +4055,9 @@ export interface components {
             height: number | null;
             /**
              * Instagram Posted
-             * @default false
+             * @default null
              */
-            instagram_posted: boolean;
+            instagram_posted: boolean | null;
             /**
              * Instagram Url
              * @default null
@@ -4075,9 +4075,9 @@ export interface components {
             image_type: ("catalog" | "instagram") | null;
             /**
              * Ai Analyzed
-             * @default false
+             * @default null
              */
-            ai_analyzed: boolean;
+            ai_analyzed: boolean | null;
             /**
              * Description Summary
              * @default null
@@ -4117,9 +4117,9 @@ export interface components {
             stack_member_count: number | null;
             /**
              * Is Stack Representative
-             * @default false
+             * @default null
              */
-            is_stack_representative: boolean;
+            is_stack_representative: boolean | null;
             /**
              * Analyzed At
              * @default null
@@ -4127,24 +4127,24 @@ export interface components {
             analyzed_at: string | null;
             /**
              * Aperture
-             * @default
+             * @default null
              */
-            aperture: string;
+            aperture: string | null;
             /**
              * Camera Make
-             * @default
+             * @default null
              */
-            camera_make: string;
+            camera_make: string | null;
             /**
              * Camera Model
-             * @default
+             * @default null
              */
-            camera_model: string;
+            camera_model: string | null;
             /**
              * Catalog Path
-             * @default
+             * @default null
              */
-            catalog_path: string;
+            catalog_path: string | null;
             /**
              * Exif
              * @default null
@@ -4157,9 +4157,9 @@ export interface components {
             file_size: number | null;
             /**
              * Focal Length
-             * @default
+             * @default null
              */
-            focal_length: string;
+            focal_length: string | null;
             /**
              * Gps Latitude
              * @default null
@@ -4172,9 +4172,9 @@ export interface components {
             gps_longitude: number | null;
             /**
              * Instagram Index
-             * @default 0
+             * @default null
              */
-            instagram_index: number;
+            instagram_index: number | null;
             /**
              * Instagram Post Date
              * @default null
@@ -4182,14 +4182,14 @@ export interface components {
             instagram_post_date: string | null;
             /**
              * Iso
-             * @default
+             * @default null
              */
-            iso: string;
+            iso: string | null;
             /**
              * Lens
-             * @default
+             * @default null
              */
-            lens: string;
+            lens: string | null;
             /**
              * Phash
              * @default null
@@ -4197,9 +4197,9 @@ export interface components {
             phash: string | null;
             /**
              * Shutter Speed
-             * @default
+             * @default null
              */
-            shutter_speed: string;
+            shutter_speed: string | null;
             /**
              * Similarity
              * @default null
@@ -4357,14 +4357,14 @@ export interface components {
             phash: string | null;
             /**
              * Description
-             * @default
+             * @default null
              */
-            description: string;
+            description: string | null;
             /**
              * Caption
-             * @default
+             * @default null
              */
-            caption: string;
+            caption: string | null;
             /**
              * Processed
              * @default null
@@ -4548,56 +4548,56 @@ export interface components {
             id: number | null;
             /**
              * Filename
-             * @default
+             * @default null
              */
-            filename: string;
+            filename: string | null;
             /**
              * Filepath
-             * @default
+             * @default null
              */
-            filepath: string;
+            filepath: string | null;
             /**
              * Date Taken
-             * @default
+             * @default null
              */
-            date_taken: string;
+            date_taken: string | null;
             /**
              * Rating
-             * @default 0
+             * @default null
              */
-            rating: number;
+            rating: number | null;
             /**
              * Pick
-             * @default false
+             * @default null
              */
-            pick: boolean;
+            pick: boolean | null;
             /**
              * Color Label
-             * @default
+             * @default null
              */
-            color_label: string;
+            color_label: string | null;
             /** Keywords */
             keywords?: string[];
             /**
              * Title
-             * @default
+             * @default null
              */
-            title: string;
+            title: string | null;
             /**
              * Caption
-             * @default
+             * @default null
              */
-            caption: string;
+            caption: string | null;
             /**
              * Description
-             * @default
+             * @default null
              */
-            description: string;
+            description: string | null;
             /**
              * Copyright
-             * @default
+             * @default null
              */
-            copyright: string;
+            copyright: string | null;
             /**
              * Width
              * @default null
@@ -4610,9 +4610,9 @@ export interface components {
             height: number | null;
             /**
              * Instagram Posted
-             * @default false
+             * @default null
              */
-            instagram_posted: boolean;
+            instagram_posted: boolean | null;
             /**
              * Instagram Url
              * @default null
@@ -4630,9 +4630,9 @@ export interface components {
             image_type: ("catalog" | "instagram") | null;
             /**
              * Ai Analyzed
-             * @default false
+             * @default null
              */
-            ai_analyzed: boolean;
+            ai_analyzed: boolean | null;
             /**
              * Description Summary
              * @default null
@@ -4672,9 +4672,9 @@ export interface components {
             stack_member_count: number | null;
             /**
              * Is Stack Representative
-             * @default false
+             * @default null
              */
-            is_stack_representative: boolean;
+            is_stack_representative: boolean | null;
             /**
              * Analyzed At
              * @default null
@@ -4682,24 +4682,24 @@ export interface components {
             analyzed_at: string | null;
             /**
              * Aperture
-             * @default
+             * @default null
              */
-            aperture: string;
+            aperture: string | null;
             /**
              * Camera Make
-             * @default
+             * @default null
              */
-            camera_make: string;
+            camera_make: string | null;
             /**
              * Camera Model
-             * @default
+             * @default null
              */
-            camera_model: string;
+            camera_model: string | null;
             /**
              * Catalog Path
-             * @default
+             * @default null
              */
-            catalog_path: string;
+            catalog_path: string | null;
             /**
              * Exif
              * @default null
@@ -4712,9 +4712,9 @@ export interface components {
             file_size: number | null;
             /**
              * Focal Length
-             * @default
+             * @default null
              */
-            focal_length: string;
+            focal_length: string | null;
             /**
              * Gps Latitude
              * @default null
@@ -4727,9 +4727,9 @@ export interface components {
             gps_longitude: number | null;
             /**
              * Instagram Index
-             * @default 0
+             * @default null
              */
-            instagram_index: number;
+            instagram_index: number | null;
             /**
              * Instagram Post Date
              * @default null
@@ -4737,14 +4737,14 @@ export interface components {
             instagram_post_date: string | null;
             /**
              * Iso
-             * @default
+             * @default null
              */
-            iso: string;
+            iso: string | null;
             /**
              * Lens
-             * @default
+             * @default null
              */
-            lens: string;
+            lens: string | null;
             /**
              * Phash
              * @default null
@@ -4752,9 +4752,9 @@ export interface components {
             phash: string | null;
             /**
              * Shutter Speed
-             * @default
+             * @default null
              */
-            shutter_speed: string;
+            shutter_speed: string | null;
             /**
              * Similarity
              * @default null
@@ -4790,56 +4790,56 @@ export interface components {
             id: number | null;
             /**
              * Filename
-             * @default
+             * @default null
              */
-            filename: string;
+            filename: string | null;
             /**
              * Filepath
-             * @default
+             * @default null
              */
-            filepath: string;
+            filepath: string | null;
             /**
              * Date Taken
-             * @default
+             * @default null
              */
-            date_taken: string;
+            date_taken: string | null;
             /**
              * Rating
-             * @default 0
+             * @default null
              */
-            rating: number;
+            rating: number | null;
             /**
              * Pick
-             * @default false
+             * @default null
              */
-            pick: boolean;
+            pick: boolean | null;
             /**
              * Color Label
-             * @default
+             * @default null
              */
-            color_label: string;
+            color_label: string | null;
             /** Keywords */
             keywords?: string[];
             /**
              * Title
-             * @default
+             * @default null
              */
-            title: string;
+            title: string | null;
             /**
              * Caption
-             * @default
+             * @default null
              */
-            caption: string;
+            caption: string | null;
             /**
              * Description
-             * @default
+             * @default null
              */
-            description: string;
+            description: string | null;
             /**
              * Copyright
-             * @default
+             * @default null
              */
-            copyright: string;
+            copyright: string | null;
             /**
              * Width
              * @default null
@@ -4852,9 +4852,9 @@ export interface components {
             height: number | null;
             /**
              * Instagram Posted
-             * @default false
+             * @default null
              */
-            instagram_posted: boolean;
+            instagram_posted: boolean | null;
             /**
              * Instagram Url
              * @default null
@@ -4872,9 +4872,9 @@ export interface components {
             image_type: ("catalog" | "instagram") | null;
             /**
              * Ai Analyzed
-             * @default false
+             * @default null
              */
-            ai_analyzed: boolean;
+            ai_analyzed: boolean | null;
             /**
              * Description Summary
              * @default null
@@ -4914,9 +4914,9 @@ export interface components {
             stack_member_count: number | null;
             /**
              * Is Stack Representative
-             * @default false
+             * @default null
              */
-            is_stack_representative: boolean;
+            is_stack_representative: boolean | null;
             /**
              * Analyzed At
              * @default null
@@ -4924,24 +4924,24 @@ export interface components {
             analyzed_at: string | null;
             /**
              * Aperture
-             * @default
+             * @default null
              */
-            aperture: string;
+            aperture: string | null;
             /**
              * Camera Make
-             * @default
+             * @default null
              */
-            camera_make: string;
+            camera_make: string | null;
             /**
              * Camera Model
-             * @default
+             * @default null
              */
-            camera_model: string;
+            camera_model: string | null;
             /**
              * Catalog Path
-             * @default
+             * @default null
              */
-            catalog_path: string;
+            catalog_path: string | null;
             /**
              * Exif
              * @default null
@@ -4954,9 +4954,9 @@ export interface components {
             file_size: number | null;
             /**
              * Focal Length
-             * @default
+             * @default null
              */
-            focal_length: string;
+            focal_length: string | null;
             /**
              * Gps Latitude
              * @default null
@@ -4969,9 +4969,9 @@ export interface components {
             gps_longitude: number | null;
             /**
              * Instagram Index
-             * @default 0
+             * @default null
              */
-            instagram_index: number;
+            instagram_index: number | null;
             /**
              * Instagram Post Date
              * @default null
@@ -4979,14 +4979,14 @@ export interface components {
             instagram_post_date: string | null;
             /**
              * Iso
-             * @default
+             * @default null
              */
-            iso: string;
+            iso: string | null;
             /**
              * Lens
-             * @default
+             * @default null
              */
-            lens: string;
+            lens: string | null;
             /**
              * Phash
              * @default null
@@ -4994,9 +4994,9 @@ export interface components {
             phash: string | null;
             /**
              * Shutter Speed
-             * @default
+             * @default null
              */
-            shutter_speed: string;
+            shutter_speed: string | null;
             /**
              * Similarity
              * @default null
@@ -5080,56 +5080,56 @@ export interface components {
             id: number | null;
             /**
              * Filename
-             * @default
+             * @default null
              */
-            filename: string;
+            filename: string | null;
             /**
              * Filepath
-             * @default
+             * @default null
              */
-            filepath: string;
+            filepath: string | null;
             /**
              * Date Taken
-             * @default
+             * @default null
              */
-            date_taken: string;
+            date_taken: string | null;
             /**
              * Rating
-             * @default 0
+             * @default null
              */
-            rating: number;
+            rating: number | null;
             /**
              * Pick
-             * @default false
+             * @default null
              */
-            pick: boolean;
+            pick: boolean | null;
             /**
              * Color Label
-             * @default
+             * @default null
              */
-            color_label: string;
+            color_label: string | null;
             /** Keywords */
             keywords?: string[];
             /**
              * Title
-             * @default
+             * @default null
              */
-            title: string;
+            title: string | null;
             /**
              * Caption
-             * @default
+             * @default null
              */
-            caption: string;
+            caption: string | null;
             /**
              * Description
-             * @default
+             * @default null
              */
-            description: string;
+            description: string | null;
             /**
              * Copyright
-             * @default
+             * @default null
              */
-            copyright: string;
+            copyright: string | null;
             /**
              * Width
              * @default null
@@ -5142,9 +5142,9 @@ export interface components {
             height: number | null;
             /**
              * Instagram Posted
-             * @default false
+             * @default null
              */
-            instagram_posted: boolean;
+            instagram_posted: boolean | null;
             /**
              * Instagram Url
              * @default null
@@ -5162,9 +5162,9 @@ export interface components {
             image_type: ("catalog" | "instagram") | null;
             /**
              * Ai Analyzed
-             * @default false
+             * @default null
              */
-            ai_analyzed: boolean;
+            ai_analyzed: boolean | null;
             /**
              * Description Summary
              * @default null
@@ -5204,9 +5204,9 @@ export interface components {
             stack_member_count: number | null;
             /**
              * Is Stack Representative
-             * @default false
+             * @default null
              */
-            is_stack_representative: boolean;
+            is_stack_representative: boolean | null;
             /**
              * Analyzed At
              * @default null
@@ -5214,24 +5214,24 @@ export interface components {
             analyzed_at: string | null;
             /**
              * Aperture
-             * @default
+             * @default null
              */
-            aperture: string;
+            aperture: string | null;
             /**
              * Camera Make
-             * @default
+             * @default null
              */
-            camera_make: string;
+            camera_make: string | null;
             /**
              * Camera Model
-             * @default
+             * @default null
              */
-            camera_model: string;
+            camera_model: string | null;
             /**
              * Catalog Path
-             * @default
+             * @default null
              */
-            catalog_path: string;
+            catalog_path: string | null;
             /**
              * Exif
              * @default null
@@ -5244,9 +5244,9 @@ export interface components {
             file_size: number | null;
             /**
              * Focal Length
-             * @default
+             * @default null
              */
-            focal_length: string;
+            focal_length: string | null;
             /**
              * Gps Latitude
              * @default null
@@ -5259,9 +5259,9 @@ export interface components {
             gps_longitude: number | null;
             /**
              * Instagram Index
-             * @default 0
+             * @default null
              */
-            instagram_index: number;
+            instagram_index: number | null;
             /**
              * Instagram Post Date
              * @default null
@@ -5269,14 +5269,14 @@ export interface components {
             instagram_post_date: string | null;
             /**
              * Iso
-             * @default
+             * @default null
              */
-            iso: string;
+            iso: string | null;
             /**
              * Lens
-             * @default
+             * @default null
              */
-            lens: string;
+            lens: string | null;
             /**
              * Phash
              * @default null
@@ -5284,9 +5284,9 @@ export interface components {
             phash: string | null;
             /**
              * Shutter Speed
-             * @default
+             * @default null
              */
-            shutter_speed: string;
+            shutter_speed: string | null;
             /**
              * Similarity
              * @default null
@@ -5322,56 +5322,56 @@ export interface components {
             id: number | null;
             /**
              * Filename
-             * @default
+             * @default null
              */
-            filename: string;
+            filename: string | null;
             /**
              * Filepath
-             * @default
+             * @default null
              */
-            filepath: string;
+            filepath: string | null;
             /**
              * Date Taken
-             * @default
+             * @default null
              */
-            date_taken: string;
+            date_taken: string | null;
             /**
              * Rating
-             * @default 0
+             * @default null
              */
-            rating: number;
+            rating: number | null;
             /**
              * Pick
-             * @default false
+             * @default null
              */
-            pick: boolean;
+            pick: boolean | null;
             /**
              * Color Label
-             * @default
+             * @default null
              */
-            color_label: string;
+            color_label: string | null;
             /** Keywords */
             keywords?: string[];
             /**
              * Title
-             * @default
+             * @default null
              */
-            title: string;
+            title: string | null;
             /**
              * Caption
-             * @default
+             * @default null
              */
-            caption: string;
+            caption: string | null;
             /**
              * Description
-             * @default
+             * @default null
              */
-            description: string;
+            description: string | null;
             /**
              * Copyright
-             * @default
+             * @default null
              */
-            copyright: string;
+            copyright: string | null;
             /**
              * Width
              * @default null
@@ -5384,9 +5384,9 @@ export interface components {
             height: number | null;
             /**
              * Instagram Posted
-             * @default false
+             * @default null
              */
-            instagram_posted: boolean;
+            instagram_posted: boolean | null;
             /**
              * Instagram Url
              * @default null
@@ -5404,9 +5404,9 @@ export interface components {
             image_type: ("catalog" | "instagram") | null;
             /**
              * Ai Analyzed
-             * @default false
+             * @default null
              */
-            ai_analyzed: boolean;
+            ai_analyzed: boolean | null;
             /**
              * Description Summary
              * @default null
@@ -5446,9 +5446,9 @@ export interface components {
             stack_member_count: number | null;
             /**
              * Is Stack Representative
-             * @default false
+             * @default null
              */
-            is_stack_representative: boolean;
+            is_stack_representative: boolean | null;
             /**
              * Analyzed At
              * @default null
@@ -5456,24 +5456,24 @@ export interface components {
             analyzed_at: string | null;
             /**
              * Aperture
-             * @default
+             * @default null
              */
-            aperture: string;
+            aperture: string | null;
             /**
              * Camera Make
-             * @default
+             * @default null
              */
-            camera_make: string;
+            camera_make: string | null;
             /**
              * Camera Model
-             * @default
+             * @default null
              */
-            camera_model: string;
+            camera_model: string | null;
             /**
              * Catalog Path
-             * @default
+             * @default null
              */
-            catalog_path: string;
+            catalog_path: string | null;
             /**
              * Exif
              * @default null
@@ -5486,9 +5486,9 @@ export interface components {
             file_size: number | null;
             /**
              * Focal Length
-             * @default
+             * @default null
              */
-            focal_length: string;
+            focal_length: string | null;
             /**
              * Gps Latitude
              * @default null
@@ -5501,9 +5501,9 @@ export interface components {
             gps_longitude: number | null;
             /**
              * Instagram Index
-             * @default 0
+             * @default null
              */
-            instagram_index: number;
+            instagram_index: number | null;
             /**
              * Instagram Post Date
              * @default null
@@ -5511,14 +5511,14 @@ export interface components {
             instagram_post_date: string | null;
             /**
              * Iso
-             * @default
+             * @default null
              */
-            iso: string;
+            iso: string | null;
             /**
              * Lens
-             * @default
+             * @default null
              */
-            lens: string;
+            lens: string | null;
             /**
              * Phash
              * @default null
@@ -5526,9 +5526,9 @@ export interface components {
             phash: string | null;
             /**
              * Shutter Speed
-             * @default
+             * @default null
              */
-            shutter_speed: string;
+            shutter_speed: string | null;
             /**
              * Similarity
              * @default null
