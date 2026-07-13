@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from lightroom_tagger.core.analyzer import (
     compare_with_vision,
     compress_image,
-    describe_image,
+    run_description_vision_op,
     vision_score,
 )
 from lightroom_tagger.core.provider_registry import ProviderRegistry
@@ -35,14 +35,14 @@ def test_composed_catalog_analysis_returns_all_signals():
     }
     with patch('lightroom_tagger.core.analyzer.compute_phash', return_value='a1b2c3d4e5f6g7h8'), \
          patch('lightroom_tagger.core.analyzer.extract_exif', return_value={'camera': 'Canon EOS R5'}), \
-         patch('lightroom_tagger.core.analyzer.describe_image', return_value=mock_desc):
+         patch('lightroom_tagger.core.analyzer.run_description_vision_op', return_value=mock_desc):
 
-        from lightroom_tagger.core.analyzer import compute_phash, describe_image, extract_exif
+        from lightroom_tagger.core.analyzer import compute_phash, extract_exif, run_description_vision_op
 
         path = '/fake/path.jpg'
         phash = compute_phash(path)
         exif = extract_exif(path)
-        structured = describe_image(path)
+        structured = run_description_vision_op(path)
         result = {
             'phash': phash,
             'exif': exif,
@@ -54,30 +54,6 @@ def test_composed_catalog_analysis_returns_all_signals():
     assert result['exif']['camera'] == 'Canon EOS R5'
     assert result['description'] == 'A sunset photo'
     assert result['structured_description'] == mock_desc
-
-
-def test_describe_image_routes_through_provider_when_explicit_provider():
-    mock_registry = MagicMock()
-    with patch(
-        'lightroom_tagger.core.analyzer.description.resolve_model',
-        return_value=ResolvedModel('test-provider', 'test-model', mock_registry),
-    ), patch(
-        'lightroom_tagger.core.analyzer.description._describe_image_via_provider',
-        return_value={'summary': 'from provider'},
-    ) as pipe:
-        describe_image('/fake/path.jpg', agent_type='local', provider_id='test-provider')
-    pipe.assert_called_once()
-    assert pipe.call_args[0][1] == 'test-provider'
-    assert pipe.call_args.kwargs.get('registry') is mock_registry
-
-
-def test_describe_image_external_skips_provider_pipeline():
-    with patch(
-        'lightroom_tagger.core.analyzer.description._describe_image_via_provider',
-    ) as pipe:
-        out = describe_image('/fake/path.jpg', agent_type='external')
-    pipe.assert_not_called()
-    assert out.get('summary') == ''
 
 
 def test_compare_with_vision_returns_result():
@@ -193,38 +169,6 @@ def test_compress_image_creates_temp_file():
         # Cleanup
         if compressed_path != test_path and os.path.exists(compressed_path):
             os.unlink(compressed_path)
-    finally:
-        if os.path.exists(test_path):
-            os.unlink(test_path)
-
-
-def test_describe_image_silent_compression_skips_recompress():
-    """Vision-cache resume path must not call compress_image again."""
-    from PIL import Image
-
-    fd, test_path = tempfile.mkstemp(suffix='.jpg')
-    os.close(fd)
-    try:
-        Image.new('RGB', (64, 64)).save(test_path, 'JPEG')
-        mock_desc = {
-            'summary': 'ok',
-            'composition': {},
-            'perspectives': {},
-            'technical': {},
-            'subjects': [],
-            'best_perspective': 'street',
-        }
-        with patch('lightroom_tagger.core.analyzer.description.compress_image') as mock_compress, \
-             patch('lightroom_tagger.core.analyzer.description.get_viewable_path_managed', return_value=(test_path, False)), \
-             patch('lightroom_tagger.core.analyzer.description.resolve_model') as mock_resolve, \
-             patch('lightroom_tagger.core.fallback.FallbackDispatcher') as mock_disp, \
-             patch('lightroom_tagger.core.analyzer.description.parse_description_response', return_value=mock_desc):
-            mock_registry = MagicMock()
-            mock_resolve.return_value = ResolvedModel('ollama', 'vision-model', mock_registry)
-            mock_disp.return_value.call_with_fallback.return_value = ('{}', 'ollama', 'vision-model')
-            describe_image(test_path, provider_id='ollama', silent_compression=True)
-
-        mock_compress.assert_not_called()
     finally:
         if os.path.exists(test_path):
             os.unlink(test_path)
@@ -479,92 +423,6 @@ def test_parse_description_response_handles_garbage():
     result = parse_description_response('This is not JSON at all')
     assert result['summary'] == ''
     assert result['best_perspective'] == ''
-
-
-
-def test_describe_image_honors_description_vision_model_env(monkeypatch):
-    """describe_image must use resolve_model so DESCRIPTION_VISION_MODEL env is honoured."""
-    registry = MagicMock(spec=ProviderRegistry)
-    registry.defaults = {"description": {"provider": "ollama", "model": "json-default"}}
-    registry.fallback_order = ["ollama"]
-
-    mock_dispatcher = MagicMock()
-    mock_dispatcher.call_with_fallback.return_value = (
-        '{"summary": "ok", "composition": {}, "perspectives": {}, '
-        '"technical": {}, "subjects": [], "best_perspective": "street"}',
-        "ollama",
-        "env-desc-model",
-    )
-
-    monkeypatch.setenv("DESCRIPTION_VISION_MODEL", "env-desc-model")
-
-    with (
-        patch(
-            "lightroom_tagger.core.provider_resolution.ProviderRegistry",
-            return_value=registry,
-        ),
-        patch(
-            "lightroom_tagger.core.analyzer.description.resolve_model",
-            wraps=resolve_model,
-        ),
-        patch(
-            "lightroom_tagger.core.fallback.FallbackDispatcher",
-            return_value=mock_dispatcher,
-        ),
-        patch(
-            "lightroom_tagger.core.analyzer.description.get_viewable_path_managed",
-            return_value=("/fake/path.jpg", False),
-        ),
-        patch(
-            "lightroom_tagger.core.analyzer.description.compress_image",
-            side_effect=lambda p: p,
-        ),
-    ):
-        result = describe_image("/fake/path.jpg", provider_id="ollama", model=None)
-
-    assert result["summary"] == "ok"
-    assert mock_dispatcher.call_with_fallback.call_args.kwargs["model"] == "env-desc-model"
-
-
-def test_describe_image_constructs_registry_once(monkeypatch):
-    """ProviderRegistry must be built at most once per describe_image call."""
-    registry = MagicMock(spec=ProviderRegistry)
-    registry.defaults = {"description": {"provider": "ollama", "model": "vision-model"}}
-    registry.fallback_order = ["ollama"]
-
-    mock_dispatcher = MagicMock()
-    mock_dispatcher.call_with_fallback.return_value = (
-        '{"summary": "ok", "composition": {}, "perspectives": {}, '
-        '"technical": {}, "subjects": [], "best_perspective": "street"}',
-        "ollama",
-        "vision-model",
-    )
-
-    with (
-        patch(
-            "lightroom_tagger.core.provider_resolution.ProviderRegistry",
-            return_value=registry,
-        ) as mock_reg_ctor,
-        patch(
-            "lightroom_tagger.core.analyzer.description.resolve_model",
-            wraps=resolve_model,
-        ),
-        patch(
-            "lightroom_tagger.core.fallback.FallbackDispatcher",
-            return_value=mock_dispatcher,
-        ),
-        patch(
-            "lightroom_tagger.core.analyzer.description.get_viewable_path_managed",
-            return_value=("/fake/path.jpg", False),
-        ),
-        patch(
-            "lightroom_tagger.core.analyzer.description.compress_image",
-            side_effect=lambda p: p,
-        ),
-    ):
-        describe_image("/fake/path.jpg", provider_id="ollama")
-
-    mock_reg_ctor.assert_called_once()
 
 
 def test_get_description_model_prefers_env_override():

@@ -135,7 +135,7 @@ def generate_description(db, image_key):
                 'message': f'Unknown provider: {provider_id}',
             }), 400
 
-        if not generated:
+        if not generated.wrote:
             existing = get_image_description(db, image_key)
             if existing:
                 return jsonify({'generated': False, 'description': _deserialize(existing)})

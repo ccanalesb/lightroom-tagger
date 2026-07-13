@@ -2,6 +2,9 @@ import re
 from unittest.mock import MagicMock, patch
 
 from jobs.checkpoint import fingerprint_vision_match
+from lightroom_tagger.core.vision_op import VisionOpOutcome
+
+_SKIPPED = VisionOpOutcome(status='skipped')
 from lightroom_tagger.core.database import (
     init_database,
     store_image,
@@ -169,8 +172,8 @@ def _shortlist_passthrough(_db, _mk, cand_keys, top_k):
     return cand_keys[:top_k]
 
 
-@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False)
-@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=_SKIPPED)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=_SKIPPED)
 @patch('lightroom_tagger.scripts.match_instagram_dump.score_candidates_with_vision')
 @patch('lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip')
 def test_shortlist_gates_score_candidates_with_vision(
@@ -257,8 +260,8 @@ def _score_template_row(rep_key: str, insta_key: str) -> dict:
     }
 
 
-@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False)
-@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=_SKIPPED)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=_SKIPPED)
 @patch(
     'lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip',
     side_effect=_shortlist_passthrough,
@@ -346,8 +349,8 @@ def test_match_dump_media_representative_only_sends_members_to_scoring(
     db.close()
 
 
-@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False)
-@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=_SKIPPED)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=_SKIPPED)
 @patch(
     'lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip',
     side_effect=_shortlist_passthrough,
@@ -461,8 +464,8 @@ def test_match_dump_media_stack_apply_skips_conflicting_member(
     db.close()
 
 
-@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False)
-@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=_SKIPPED)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=_SKIPPED)
 @patch(
     'lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip',
     side_effect=_shortlist_passthrough,

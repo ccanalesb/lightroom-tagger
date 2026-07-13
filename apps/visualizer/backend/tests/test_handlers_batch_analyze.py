@@ -2,6 +2,10 @@
 
 from unittest.mock import MagicMock, patch
 
+from lightroom_tagger.core.vision_op import VisionOpOutcome
+
+_WRITTEN = VisionOpOutcome(status='written')
+
 
 def _make_runner():
     """MagicMock runner with non-truthy is_cancelled (bare MagicMock is truthy when called)."""
@@ -71,7 +75,7 @@ def test_batch_analyze_runs_describe_then_score(
     mock_init_db.return_value = mock_db
 
     mock_get_undescribed.return_value = [{'key': 'img_001'}, {'key': 'img_002'}]
-    mock_describe.return_value = True
+    mock_describe.return_value = _WRITTEN
     mock_score.return_value = ('scored', True, None)
 
     runner = _make_runner()
@@ -122,7 +126,7 @@ def test_batch_analyze_describe_failures_still_invoke_score(
     mock_init_db.return_value = mock_db
 
     mock_get_undescribed.return_value = [{'key': 'img_a'}, {'key': 'img_b'}]
-    mock_describe.side_effect = [True, Exception('transient')]
+    mock_describe.side_effect = [_WRITTEN, Exception('transient')]
     mock_score.return_value = ('scored', True, None)
 
     runner = _make_runner()
@@ -172,7 +176,7 @@ def test_batch_analyze_sets_current_step_describing_then_scoring(
     mock_init_db.return_value = mock_db
 
     mock_get_undescribed.return_value = [{'key': 'img_x'}]
-    mock_describe.return_value = True
+    mock_describe.return_value = _WRITTEN
     mock_score.return_value = ('scored', True, None)
 
     runner = _make_runner()
@@ -225,7 +229,7 @@ def test_batch_analyze_resume_skips_describe_when_stage_score(
     mock_init_db.return_value = mock_db
 
     mock_get_undescribed.return_value = [{'key': 'img_r'}]
-    mock_describe.return_value = True
+    mock_describe.return_value = _WRITTEN
     mock_score.return_value = ('scored', True, None)
 
     mock_get_job.return_value = {
@@ -268,7 +272,7 @@ def test_batch_analyze_resume_skips_describe_when_stage_score(
 @patch('jobs.handlers.analyze.get_job', return_value=None)
 @patch('jobs.handlers.analyze.add_job_log')
 @patch('jobs.handlers.analyze._score_single_image')
-@patch('lightroom_tagger.core.description_service.describe_image')
+@patch('lightroom_tagger.core.vision_op.run_vision_op')
 @patch('lightroom_tagger.core.description_service.get_or_create_cached_image')
 @patch('jobs.handlers.analyze.init_database')
 @patch('jobs.handlers.analyze.load_config')
@@ -313,14 +317,14 @@ def test_batch_analyze_compression_already_done_silent(
     mock_config.return_value = MagicMock(db_path=str(db_file))
     mock_init_db.side_effect = lambda p: lt_init(str(p))
     mock_get_cache.return_value = str(cache_jpg)
-    mock_describe.return_value = {
+    mock_describe.return_value = ({
         'summary': 'x',
         'composition': {},
         'perspectives': {},
         'technical': {},
         'subjects': [],
         'best_perspective': 's',
-    }
+    }, 'ollama', 'test-model')
     mock_score.return_value = ('scored', True, None)
 
     runner = _make_runner()
@@ -374,7 +378,7 @@ def test_batch_analyze_describe_fingerprint_mismatch_resets_pairs(
     mock_init_db.return_value = mock_db
 
     mock_get_undescribed.return_value = [{'key': 'img_m'}]
-    mock_describe.return_value = True
+    mock_describe.return_value = _WRITTEN
     mock_score.return_value = ('scored', True, None)
 
     mock_get_job.return_value = {

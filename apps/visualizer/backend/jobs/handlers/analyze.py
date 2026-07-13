@@ -201,7 +201,7 @@ def _describe_single_image(
                 perspective_slugs=perspective_slugs,
             )
 
-        if result:
+        if result.wrote:
             return ('described', True, None)
         else:
             reason = _diagnose_describe_skip(lib_db, key, itype, force)

@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from lightroom_tagger.core.vision_op import VisionOpOutcome
+
+_SKIPPED = VisionOpOutcome(status='skipped')
+
 from lightroom_tagger.core.database import (
     init_database,
     store_image,
@@ -74,8 +78,8 @@ def _make_stack(db, tmp_path, rep_name: str, member_names: list[str]) -> tuple[s
     return rep_key, [rep_key, *member_keys]
 
 
-@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False)
-@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=_SKIPPED)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=_SKIPPED)
 @patch(
     'lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip',
     side_effect=_shortlist_passthrough,
@@ -157,8 +161,8 @@ def test_integration_vision_match_representative_only_candidates(
     jdb.close()
 
 
-@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False)
-@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=_SKIPPED)
+@patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=_SKIPPED)
 @patch(
     'lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip',
     side_effect=_shortlist_passthrough,
