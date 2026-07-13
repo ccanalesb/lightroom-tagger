@@ -116,6 +116,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/analytics/posting-frequency": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bucket counts of validated posts (see ``get_posting_frequency``). */
+        get: operations["get__api_analytics_posting-frequency"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analytics/posting-heatmap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Day-of-week × hour heatmap for validated posts. */
+        get: operations["get__api_analytics_posting-heatmap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analytics/caption-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Caption length and hashtag aggregates for validated posts. */
+        get: operations["get__api_analytics_caption-stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analytics/unposted-catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Paginated catalog images with ``instagram_posted = 0`` (matches catalog filters). */
+        get: operations["get__api_analytics_unposted-catalog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/providers/": {
         parameters: {
             query?: never;
@@ -318,6 +386,138 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** PostingFrequencyQuery */
+        "PostingFrequencyQuery.21fa20e": {
+            /**
+             * Date From
+             * @default null
+             */
+            date_from: string | null;
+            /**
+             * Date To
+             * @default null
+             */
+            date_to: string | null;
+            /**
+             * Granularity
+             * @default day
+             */
+            granularity: string;
+        };
+        /** PostingFrequencyResponse */
+        "PostingFrequencyResponse.21fa20e": {
+            /** Buckets */
+            buckets: components["schemas"]["PostingFrequencyResponse.21fa20e.PostingFrequencyBucket"][];
+            meta: components["schemas"]["PostingFrequencyResponse.21fa20e.PostingFrequencyMeta"];
+        };
+        /** ErrorBody */
+        "ErrorBody.45d9b59": {
+            /** Error */
+            error: string;
+            /**
+             * Code
+             * @default null
+             */
+            code: string | null;
+        };
+        /**
+         * ValidationError
+         * @description Model of a validation error response.
+         */
+        "ValidationError.6a07bef": components["schemas"]["ValidationError.6a07bef.ValidationErrorElement"][];
+        /** PostingHeatmapQuery */
+        "PostingHeatmapQuery.21fa20e": {
+            /**
+             * Date From
+             * @default null
+             */
+            date_from: string | null;
+            /**
+             * Date To
+             * @default null
+             */
+            date_to: string | null;
+        };
+        /** PostingHeatmapResponse */
+        "PostingHeatmapResponse.21fa20e": {
+            /** Cells */
+            cells: components["schemas"]["PostingHeatmapResponse.21fa20e.HeatmapCell"][];
+            meta: components["schemas"]["PostingHeatmapResponse.21fa20e.PostingHeatmapMeta"];
+        };
+        /** CaptionStatsQuery */
+        "CaptionStatsQuery.21fa20e": {
+            /**
+             * Date From
+             * @default null
+             */
+            date_from: string | null;
+            /**
+             * Date To
+             * @default null
+             */
+            date_to: string | null;
+        };
+        /** CaptionStatsResponse */
+        "CaptionStatsResponse.21fa20e": {
+            /** Post Count */
+            post_count: number;
+            /** With Caption Count */
+            with_caption_count: number;
+            /** Avg Caption Len */
+            avg_caption_len: number;
+            /** Median Caption Len */
+            median_caption_len: number | null;
+            /** Top Hashtags */
+            top_hashtags: components["schemas"]["CaptionStatsResponse.21fa20e.TopHashtagRow"][];
+            /** Posts With Hashtags */
+            posts_with_hashtags: number;
+            /** Avg Hashtags Per Post */
+            avg_hashtags_per_post: number;
+            /** Top Words */
+            top_words: components["schemas"]["CaptionStatsResponse.21fa20e.TopWordRow"][];
+            meta: components["schemas"]["CaptionStatsResponse.21fa20e.CaptionHashtagMeta"];
+        };
+        /** UnpostedCatalogQuery */
+        "UnpostedCatalogQuery.21fa20e": {
+            /**
+             * Month
+             * @default null
+             */
+            month: string | null;
+            /**
+             * Min Rating
+             * @default null
+             */
+            min_rating: number | null;
+            /**
+             * Date From
+             * @default null
+             */
+            date_from: string | null;
+            /**
+             * Date To
+             * @default null
+             */
+            date_to: string | null;
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+        };
+        /** UnpostedCatalogResponse */
+        "UnpostedCatalogResponse.21fa20e": {
+            /** Total */
+            total: number;
+            /** Images */
+            images: components["schemas"]["UnpostedCatalogResponse.21fa20e.UnpostedCatalogItem"][];
+            pagination: components["schemas"]["UnpostedCatalogResponse.21fa20e.PaginationMeta"];
+        };
         /** JobsListResponse */
         "JobsListResponse.45d9b59": {
             /** Total */
@@ -326,11 +526,6 @@ export interface components {
             data: components["schemas"]["JobsListResponse.45d9b59.Job"][];
             pagination: components["schemas"]["JobsListResponse.45d9b59.PaginationMeta"];
         };
-        /**
-         * ValidationError
-         * @description Model of a validation error response.
-         */
-        "ValidationError.6a07bef": components["schemas"]["ValidationError.6a07bef.ValidationErrorElement"][];
         /** JobCreateRequest */
         "JobCreateRequest.45d9b59": {
             /** Type */
@@ -424,16 +619,6 @@ export interface components {
              * @default null
              */
             cancel_noop_reason: string | null;
-        };
-        /** ErrorBody */
-        "ErrorBody.45d9b59": {
-            /** Error */
-            error: string;
-            /**
-             * Code
-             * @default null
-             */
-            code: string | null;
         };
         /** CatalogUnavailableError */
         "CatalogUnavailableError.45d9b59": {
@@ -635,6 +820,158 @@ export interface components {
              */
             vision: boolean | null;
         };
+        /** PostingFrequencyBucket */
+        "PostingFrequencyResponse.21fa20e.PostingFrequencyBucket": {
+            /** Bucket Start */
+            bucket_start: string;
+            /** Count */
+            count: number;
+        };
+        /** PostingFrequencyMeta */
+        "PostingFrequencyResponse.21fa20e.PostingFrequencyMeta": {
+            /**
+             * Timestamp Source
+             * @default null
+             */
+            timestamp_source: string | null;
+            /**
+             * Granularity
+             * @default null
+             */
+            granularity: string | null;
+            /**
+             * Timezone Assumption
+             * @default null
+             */
+            timezone_assumption: string | null;
+            /**
+             * Date From
+             * @default null
+             */
+            date_from: string | null;
+            /**
+             * Date To
+             * @default null
+             */
+            date_to: string | null;
+            /**
+             * Bucket Expression
+             * @default null
+             */
+            bucket_expression: string | null;
+        };
+        /**
+         * ValidationErrorElement
+         * @description Model of a validation error response element.
+         */
+        "ValidationError.6a07bef.ValidationErrorElement": {
+            /** Missing field name */
+            loc: string[];
+            /** Error message */
+            msg: string;
+            /** Error type */
+            type: string;
+            /**
+             * Error context
+             * @default null
+             */
+            ctx: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** HeatmapCell */
+        "PostingHeatmapResponse.21fa20e.HeatmapCell": {
+            /** Dow */
+            dow: number;
+            /** Hour */
+            hour: number;
+            /** Count */
+            count: number;
+        };
+        /** PostingHeatmapMeta */
+        "PostingHeatmapResponse.21fa20e.PostingHeatmapMeta": {
+            /**
+             * Dow Labels
+             * @default null
+             */
+            dow_labels: string[] | null;
+            /**
+             * Timezone Assumption
+             * @default null
+             */
+            timezone_assumption: string | null;
+            /**
+             * Timezone Note
+             * @default null
+             */
+            timezone_note: string | null;
+            /**
+             * Date From
+             * @default null
+             */
+            date_from: string | null;
+            /**
+             * Date To
+             * @default null
+             */
+            date_to: string | null;
+        };
+        /** CaptionHashtagMeta */
+        "CaptionStatsResponse.21fa20e.CaptionHashtagMeta": {
+            /**
+             * Timezone Assumption
+             * @default null
+             */
+            timezone_assumption: string | null;
+            /**
+             * Hashtag Pattern
+             * @default null
+             */
+            hashtag_pattern: string | null;
+            /**
+             * Timestamp Scope
+             * @default null
+             */
+            timestamp_scope: string | null;
+        };
+        /** TopHashtagRow */
+        "CaptionStatsResponse.21fa20e.TopHashtagRow": {
+            /** Tag */
+            tag: string;
+            /** Count */
+            count: number;
+        };
+        /** TopWordRow */
+        "CaptionStatsResponse.21fa20e.TopWordRow": {
+            /** Word */
+            word: string;
+            /** Count */
+            count: number;
+        };
+        /** PaginationMeta */
+        "UnpostedCatalogResponse.21fa20e.PaginationMeta": {
+            /** Offset */
+            offset: number;
+            /** Limit */
+            limit: number;
+            /** Current Page */
+            current_page: number;
+            /** Total Pages */
+            total_pages: number;
+            /** Has More */
+            has_more: boolean;
+        };
+        /** UnpostedCatalogItem */
+        "UnpostedCatalogResponse.21fa20e.UnpostedCatalogItem": {
+            /** Key */
+            key: string;
+            /** Filename */
+            filename: string;
+            /** Date Taken */
+            date_taken: string;
+            /** Rating */
+            rating: number;
+        };
         /**
          * Job
          * @description Shared by REST job endpoints and ``job_updated`` / ``job_created`` socket emits.
@@ -744,25 +1081,6 @@ export interface components {
             total_pages: number;
             /** Has More */
             has_more: boolean;
-        };
-        /**
-         * ValidationErrorElement
-         * @description Model of a validation error response element.
-         */
-        "ValidationError.6a07bef.ValidationErrorElement": {
-            /** Missing field name */
-            loc: string[];
-            /** Error message */
-            msg: string;
-            /** Error type */
-            type: string;
-            /**
-             * Error context
-             * @default null
-             */
-            ctx: {
-                [key: string]: unknown;
-            } | null;
         };
         /** JobLog */
         "Job.45d9b59.JobLog": {
@@ -1302,6 +1620,175 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobsProcessorHealth.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_analytics_posting-frequency": {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+                granularity?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostingFrequencyResponse.21fa20e"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_analytics_posting-heatmap": {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostingHeatmapResponse.21fa20e"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_analytics_caption-stats": {
+        parameters: {
+            query?: {
+                date_from?: string | null;
+                date_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptionStatsResponse.21fa20e"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_analytics_unposted-catalog": {
+        parameters: {
+            query?: {
+                month?: string | null;
+                min_rating?: number | null;
+                date_from?: string | null;
+                date_to?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnpostedCatalogResponse.21fa20e"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
                 };
             };
             /** @description Unprocessable Content */

@@ -51,7 +51,14 @@ describe('DashboardPage', () => {
     )
     vi.spyOn(AnalyticsAPI, 'getPostingFrequency').mockResolvedValue({
       buckets: [{ bucket_start: '2025-01-01', count: 1 }],
-      meta: { timezone_assumption: 'UTC' },
+      meta: {
+        timestamp_source: null,
+        granularity: null,
+        timezone_assumption: 'UTC',
+        date_from: null,
+        date_to: null,
+        bucket_expression: null,
+      },
     })
     vi.spyOn(JobsAPI, 'list').mockResolvedValue({
       total: 0,
