@@ -20,6 +20,9 @@ class ScoreWeights:
         )
 
 
+DEFAULT_WEIGHTS = ScoreWeights(0.4, 0.3, 0.3)
+
+
 def normalize_phash_score(distance: int | float) -> float:
     """Map Hamming distance to a 0–1 score (16-bit hash, clamped at zero)."""
     return max(0, 1 - (distance / 16))

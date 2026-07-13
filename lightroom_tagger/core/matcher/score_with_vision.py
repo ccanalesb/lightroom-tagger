@@ -2,14 +2,12 @@
 
 from collections.abc import Callable
 
-from .score_formula import ScoreWeights, compute_total_score, normalize_phash_score
+from .score_formula import DEFAULT_WEIGHTS, ScoreWeights, compute_total_score, normalize_phash_score
 from .vision_batch import _build_compressed_batch_entries, _log_comparison_tail
-
-_DEFAULT_WEIGHTS = ScoreWeights(0.4, 0.3, 0.3)
 
 
 def score_candidates_with_vision(db, insta_image: dict, candidates: list,
-                                 weights: ScoreWeights = _DEFAULT_WEIGHTS,
+                                 weights: ScoreWeights = DEFAULT_WEIGHTS,
                                  threshold: float = 0.7,
                                  log_callback=None,
                                  provider_id: str | None = None,
