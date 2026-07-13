@@ -6,21 +6,20 @@ import os
 import tempfile
 
 import pytest
-
 from api.schemas.matches import (
     Match,
+    MatchesListResponse,
     MatchGroup,
     MatchRejectConflictResponse,
     MatchRejectSuccessResponse,
-    MatchesListResponse,
     MatchValidateResponse,
     validate_match,
     validate_match_group,
     validate_matches_list_response,
 )
-from lightroom_tagger.core.database import init_database
-
 from tests.test_matches_api_pin import _LIST_MATCHES_PIN, _seed_pin_fixture
+
+from lightroom_tagger.core.database import init_database
 
 
 def test_matches_list_response_round_trip_from_pin():

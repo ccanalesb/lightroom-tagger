@@ -7,18 +7,17 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 from spectree import Response
+from utils.db import with_db
+from utils.responses import error_bad_request, error_not_found, error_server_error
 
 from api.openapi import spec
 from api.schemas.jobs import ErrorBody
 from api.schemas.matches import (
+    MatchesListResponse,
     MatchRejectConflictResponse,
     MatchRejectSuccessResponse,
-    MatchesListResponse,
     MatchValidateResponse,
 )
-from utils.db import with_db
-from utils.responses import error_bad_request, error_not_found, error_server_error
-
 from lightroom_tagger.core.database import (
     get_all_image_descriptions,
     get_all_images_raw,

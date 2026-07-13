@@ -1,16 +1,5 @@
 """Authoritative pydantic models for API response shapes (OpenAPI source of truth)."""
 
-from api.schemas.matches import (
-    Match,
-    MatchGroup,
-    MatchRejectConflictResponse,
-    MatchRejectSuccessResponse,
-    MatchesListResponse,
-    MatchValidateResponse,
-    validate_match,
-    validate_match_group,
-    validate_matches_list_response,
-)
 from api.schemas.jobs import (
     ErrorBody,
     Job,
@@ -27,6 +16,17 @@ from api.schemas.jobs import (
     enrich_job_log_stats,
     validate_job_payload,
     validate_jobs_recovered_payload,
+)
+from api.schemas.matches import (
+    Match,
+    MatchesListResponse,
+    MatchGroup,
+    MatchRejectConflictResponse,
+    MatchRejectSuccessResponse,
+    MatchValidateResponse,
+    validate_match,
+    validate_match_group,
+    validate_matches_list_response,
 )
 from api.schemas.perspectives import (
     PerspectiveDetail,
@@ -45,8 +45,8 @@ from api.schemas.providers import (
     ProviderDefaultsEntry,
     ProviderDeletedResponse,
     ProviderHealthResponse,
-    ProviderModel,
     ProviderListResponse,
+    ProviderModel,
     ProviderModelsListResponse,
     ProviderReorderSuccessResponse,
 )
