@@ -7,6 +7,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+_CONFIG_MODULE_DIR = Path(__file__).resolve().parent
+
+
+def _find_repo_root() -> Path:
+    """Walk up from this module until we find the repository root (pyproject.toml)."""
+    for directory in (_CONFIG_MODULE_DIR, *_CONFIG_MODULE_DIR.parents):
+        if (directory / "pyproject.toml").is_file():
+            return directory
+    raise RuntimeError(
+        "Could not locate repository root (no pyproject.toml found above "
+        f"{_CONFIG_MODULE_DIR})"
+    )
+
+
+REPO_ROOT = _find_repo_root()
+DEFAULT_CONFIG_PATH = REPO_ROOT / "config.yaml"
+
 
 @dataclass
 class Config:
@@ -69,8 +86,8 @@ class Config:
         return path
 
 
-def load_config(config_path: str = "config.yaml") -> Config:
-    config_file = Path(config_path)
+def load_config(config_path: str | None = None) -> Config:
+    config_file = DEFAULT_CONFIG_PATH if config_path is None else Path(config_path)
 
     if config_file.exists():
         with open(config_file) as f:
