@@ -5,3 +5,13 @@
 *
 !pyproject.toml
 !uv.lock
+# Frontend manifests for the pre-baked `npm ci` layer (.sandcastle/Dockerfile, added in #152).
+# `*` also excludes the parent dirs, so walk down re-including each level, then the two files.
+!apps
+apps/*
+!apps/visualizer
+apps/visualizer/*
+!apps/visualizer/frontend
+apps/visualizer/frontend/*
+!apps/visualizer/frontend/package.json
+!apps/visualizer/frontend/package-lock.json
