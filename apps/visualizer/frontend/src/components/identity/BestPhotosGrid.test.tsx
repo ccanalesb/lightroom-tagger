@@ -3,9 +3,14 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import { BestPhotosGrid } from './BestPhotosGrid'
 import { IdentityAPI } from '../../services/api'
 import { invalidateAll } from '../../data'
+import {
+  EMPTY_BEST_PHOTOS_META,
+  NULLABLE_BEST_PHOTO_FIELDS,
+} from '../../__test-utils__/identityFixtures'
 import { IDENTITY_SECTION_BEST_PHOTOS } from '../../constants/strings'
 
 const postedBestPhotoItem = {
+  ...NULLABLE_BEST_PHOTO_FIELDS,
   image_key: 'k1',
   aggregate_score: 8,
   perspectives_covered: 3,
@@ -36,7 +41,7 @@ describe('BestPhotosGrid', () => {
     vi.spyOn(IdentityAPI, 'getBestPhotos').mockResolvedValue({
       items: [postedBestPhotoItem],
       total: 1,
-      meta: {},
+      meta: EMPTY_BEST_PHOTOS_META,
     })
   })
 

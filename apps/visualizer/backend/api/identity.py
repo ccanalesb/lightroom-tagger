@@ -10,9 +10,19 @@ import sqlite3
 
 from flask import Blueprint, jsonify, request
 from flask.typing import ResponseReturnValue
+from spectree import Response
 from utils.db import with_db
 from utils.responses import error_bad_request, error_server_error
 
+from api.openapi import spec
+from api.schemas.identity import (
+    IdentityBestPhotosQuery,
+    IdentityBestPhotosResponse,
+    PostNextSuggestionsQuery,
+    PostNextSuggestionsResponse,
+    StyleFingerprintResponse,
+)
+from api.schemas.jobs import ErrorBody
 from utils.pagination import _clamp_pagination
 from lightroom_tagger.core.identity_service import (
     build_style_fingerprint,
@@ -61,7 +71,12 @@ def _parse_optional_posted() -> tuple[bool | None, ResponseReturnValue | None]:
 
 @bp.route("/best-photos", methods=["GET"])
 @with_db
-def best_photos(db: sqlite3.Connection) -> ResponseReturnValue:
+@spec.validate(
+    query=IdentityBestPhotosQuery,
+    resp=Response(HTTP_200=IdentityBestPhotosResponse, HTTP_400=ErrorBody, HTTP_500=ErrorBody),
+    tags=['identity'],
+)
+def best_photos(db: sqlite3.Connection):
     """Paginated eligible catalog images ranked by aggregate perspective score."""
     try:
         limit, offset = _clamp_pagination(
@@ -93,7 +108,11 @@ def best_photos(db: sqlite3.Connection) -> ResponseReturnValue:
 
 @bp.route("/style-fingerprint", methods=["GET"])
 @with_db
-def style_fingerprint(db: sqlite3.Connection) -> ResponseReturnValue:
+@spec.validate(
+    resp=Response(HTTP_200=StyleFingerprintResponse, HTTP_500=ErrorBody),
+    tags=['identity'],
+)
+def style_fingerprint(db: sqlite3.Connection):
     """Catalog-wide style fingerprint (per-perspective stats, tokens, evidence)."""
     try:
         return jsonify(build_style_fingerprint(db))
@@ -103,7 +122,12 @@ def style_fingerprint(db: sqlite3.Connection) -> ResponseReturnValue:
 
 @bp.route("/suggestions", methods=["GET"])
 @with_db
-def suggestions(db: sqlite3.Connection) -> ResponseReturnValue:
+@spec.validate(
+    query=PostNextSuggestionsQuery,
+    resp=Response(HTTP_200=PostNextSuggestionsResponse, HTTP_400=ErrorBody, HTTP_500=ErrorBody),
+    tags=['identity'],
+)
+def suggestions(db: sqlite3.Connection):
     """What to post next: unposted, coverage-eligible images with reason codes."""
     try:
         limit, offset = _clamp_pagination(

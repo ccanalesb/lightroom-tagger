@@ -4,12 +4,24 @@ import sys
 
 import config
 from flask import Blueprint, current_app, has_app_context, jsonify
+from spectree import Response
 from lightroom_tagger.core.database import (
     get_all_images,
     get_all_matches,
     get_instagram_dump_media_filtered,
     get_posted_images_count,
     init_database,
+)
+
+from api.openapi import spec
+from api.schemas.jobs import ErrorBody
+from api.schemas.system import (
+    CachePipelineStatus,
+    CacheStatus,
+    CatalogCacheReadyResponse,
+    Stats,
+    SystemStatusResponse,
+    VisionModelsResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -21,10 +33,18 @@ sys.path.insert(0, _PROJECT_ROOT)
 bp = Blueprint('system', __name__)
 
 @bp.route('/status', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=SystemStatusResponse),
+    tags=['system'],
+)
 def get_status():
     return jsonify({'status': 'ok'})
 
 @bp.route('/vision-models', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=VisionModelsResponse),
+    tags=['system'],
+)
 def get_vision_models():
     """Get available vision models from all providers (registry + optional user DB rows)."""
     try:
@@ -97,6 +117,10 @@ def get_vision_models():
         })
 
 @bp.route('/stats', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=Stats, HTTP_404=ErrorBody, HTTP_500=ErrorBody),
+    tags=['system'],
+)
 def get_stats():
     try:
         db_path = config.LIBRARY_DB
@@ -120,6 +144,10 @@ def get_stats():
 
 
 @bp.route('/catalog/status', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=CatalogCacheReadyResponse, HTTP_500=ErrorBody),
+    tags=['system'],
+)
 def get_catalog_status():
     """Return whether the catalog vision cache has any prepared entries."""
     try:
@@ -200,6 +228,10 @@ def _last_job_for_bucket(
 
 
 @bp.route('/cache/pipeline-status', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=CachePipelineStatus, HTTP_500=ErrorBody),
+    tags=['system'],
+)
 def get_cache_pipeline_status():
     """Latest run per Catalog Cache pipeline trigger.
 
@@ -232,6 +264,10 @@ def get_cache_pipeline_status():
 
 
 @bp.route('/cache/status', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=CacheStatus, HTTP_404=ErrorBody, HTTP_500=ErrorBody),
+    tags=['system'],
+)
 def get_cache_status():
     """Get vision cache status."""
     try:

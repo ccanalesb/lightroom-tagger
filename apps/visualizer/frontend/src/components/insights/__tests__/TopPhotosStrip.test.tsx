@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { TopPhotosStrip } from '../TopPhotosStrip'
+import { NULLABLE_BEST_PHOTO_FIELDS } from '../../../__test-utils__/identityFixtures'
 import type { IdentityBestPhotoItem } from '../../../services/api'
 
 const item: IdentityBestPhotoItem = {
+  ...NULLABLE_BEST_PHOTO_FIELDS,
   image_key: 'k-dash',
   aggregate_score: 8,
   perspectives_covered: 1,
+  eligible: null,
   per_perspective: [
     {
       perspective_slug: 'street',

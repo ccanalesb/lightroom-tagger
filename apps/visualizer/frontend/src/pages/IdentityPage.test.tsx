@@ -5,6 +5,11 @@ import { IdentityPage } from './IdentityPage'
 import { IdentityAPI } from '../services/api'
 import { invalidateAll } from '../data'
 import {
+  EMPTY_BEST_PHOTOS_META,
+  EMPTY_POST_NEXT_META,
+  EMPTY_STYLE_FINGERPRINT_RESPONSE,
+} from '../__test-utils__/identityFixtures'
+import {
   IDENTITY_BEST_PHOTOS_EMPTY_FALLBACK,
   IDENTITY_FINGERPRINT_EMPTY,
   IDENTITY_PAGE_TITLE,
@@ -20,9 +25,10 @@ describe('IdentityPage', () => {
     vi.spyOn(IdentityAPI, 'getBestPhotos').mockResolvedValue({
       items: [],
       total: 0,
-      meta: {},
+      meta: EMPTY_BEST_PHOTOS_META,
     })
     vi.spyOn(IdentityAPI, 'getStyleFingerprint').mockResolvedValue({
+      ...EMPTY_STYLE_FINGERPRINT_RESPONSE,
       per_perspective: [
         {
           perspective_slug: 'street',
@@ -31,15 +37,11 @@ describe('IdentityPage', () => {
           count_scores: 0,
         },
       ],
-      aggregate_distribution: { '1-3': 0, '4-6': 0, '7-10': 0 },
-      top_rationale_tokens: [],
-      evidence: {},
-      meta: {},
     })
     vi.spyOn(IdentityAPI, 'getSuggestions').mockResolvedValue({
       candidates: [],
       total: 0,
-      meta: {},
+      meta: EMPTY_POST_NEXT_META,
       empty_state: null,
     })
   })
@@ -97,7 +99,7 @@ describe('IdentityPage', () => {
     vi.spyOn(IdentityAPI, 'getBestPhotos').mockResolvedValue({
       items: [],
       total: 0,
-      meta: { coverage_note: 'Custom coverage note from server.' },
+      meta: { ...EMPTY_BEST_PHOTOS_META, coverage_note: 'Custom coverage note from server.' },
     })
 
     render(

@@ -69,6 +69,25 @@ import type {
   UnpostedCatalogItem,
   UnpostedCatalogResponse,
 } from '../types/analytics'
+import type {
+  IdentityBestPhotoItem,
+  IdentityBestPhotosMeta,
+  IdentityBestPhotosResponse,
+  PostNextCandidate,
+  PostNextSuggestionsMeta,
+  PostNextSuggestionsResponse,
+  StyleFingerprintMeta,
+  StyleFingerprintPerPerspective,
+  StyleFingerprintResponse,
+} from '../types/identity'
+import type {
+  CachePipelineRun,
+  CachePipelineStatus,
+  CacheStatus,
+  Stats,
+  SystemStatusResponse,
+  VisionModelsResponse,
+} from '../types/system'
 import { API_DEFAULT_URL } from '../constants/strings'
 
 export type {
@@ -82,6 +101,25 @@ export type {
   PostingHeatmapResponse,
   UnpostedCatalogItem,
   UnpostedCatalogResponse,
+}
+export type {
+  IdentityBestPhotoItem,
+  IdentityBestPhotosMeta,
+  IdentityBestPhotosResponse,
+  PostNextCandidate,
+  PostNextSuggestionsMeta,
+  PostNextSuggestionsResponse,
+  StyleFingerprintMeta,
+  StyleFingerprintPerPerspective,
+  StyleFingerprintResponse,
+}
+export type {
+  CachePipelineRun,
+  CachePipelineStatus,
+  CacheStatus,
+  Stats,
+  SystemStatusResponse,
+  VisionModelsResponse,
 }
 export type {
   DescriptionGenerateResponse,
@@ -384,16 +422,13 @@ function appendCatalogListSearchParams(
 
 export const SystemAPI = {
   status: () =>
-    request<{ status: string }>('/status'),
+    request<SystemStatusResponse>('/status'),
 
   stats: () =>
     request<Stats>('/stats'),
 
   visionModels: () =>
-    request<{
-      models: { name: string; default: boolean; provider_id?: string }[]
-      fallback: boolean
-    }>('/vision-models'),
+    request<VisionModelsResponse>('/vision-models'),
 
   cacheStatus: () =>
     request<CacheStatus>('/cache/status'),
@@ -604,14 +639,6 @@ export const MatchingAPI = {
   },
 }
 
-export interface PaginationMeta {
-  offset: number
-  limit: number
-  current_page: number
-  total_pages: number
-  has_more: boolean
-}
-
 export const DescriptionsAPI = {
   get: (imageKey: string) =>
     request<DescriptionGetResponse>(
@@ -731,94 +758,6 @@ export const AnalyticsAPI = {
 
 // --- Identity (Phase 8) — GET /api/identity/best-photos, /api/identity/style-fingerprint, /api/identity/suggestions
 
-export interface IdentityBestPhotoItem {
-  image_key: string
-  image_type?: 'catalog' | 'instagram'
-  aggregate_score: number
-  perspectives_covered: number
-  eligible?: boolean
-  per_perspective: IdentityPerPerspectiveScore[]
-  filename: string
-  date_taken: string
-  rating: number
-  instagram_posted: boolean
-  stack_id?: number | null
-  stack_member_count?: number | null
-  is_stack_representative?: boolean | null
-}
-
-export interface IdentityBestPhotosMeta {
-  active_perspectives?: string[]
-  weighting?: string
-  min_perspectives_used?: number
-  coverage_rule?: string
-  total_catalog_images?: number
-  eligible_count?: number
-  scored_any_count?: number
-  coverage_note?: string
-}
-
-export interface IdentityBestPhotosResponse {
-  items: IdentityBestPhotoItem[]
-  total: number
-  meta: IdentityBestPhotosMeta
-}
-
-export interface StyleFingerprintPerPerspective {
-  perspective_slug: string
-  mean_score: number | null
-  median_score: number | null
-  count_scores: number
-}
-
-export interface StyleFingerprintMeta {
-  tokenization_note?: string
-  perspectives_included?: string[]
-  weighting?: string
-  scores_are_advisory?: string
-}
-
-export interface StyleFingerprintResponse {
-  per_perspective: StyleFingerprintPerPerspective[]
-  aggregate_distribution: Record<string, number>
-  aggregate_distribution_note?: string
-  top_rationale_tokens: { token: string; count: number }[]
-  evidence: Record<string, string[]>
-  evidence_note?: string
-  meta: StyleFingerprintMeta
-}
-
-export interface PostNextCandidate {
-  image_key: string
-  image_type?: 'catalog' | 'instagram'
-  filename: string
-  date_taken: string
-  rating: number
-  aggregate_score: number
-  perspectives_covered: number
-  per_perspective: IdentityPerPerspectiveScore[]
-  reasons: string[]
-  reason_codes: string[]
-}
-
-export interface PostNextSuggestionsMeta {
-  weighting?: string
-  min_perspectives_used?: number
-  coverage_rule?: string
-  timezone_assumption?: string
-  high_score_rule?: string
-  posted_semantics?: string
-  cadence_gap?: boolean
-  cadence_note?: string
-}
-
-export interface PostNextSuggestionsResponse {
-  candidates: PostNextCandidate[]
-  total: number
-  meta: PostNextSuggestionsMeta
-  empty_state: string | null
-}
-
 export const IdentityAPI = {
   getBestPhotos: (params?: {
     limit?: number
@@ -861,49 +800,6 @@ export const IdentityAPI = {
     const qs = sp.toString()
     return request<PostNextSuggestionsResponse>(`/identity/suggestions${qs ? `?${qs}` : ''}`)
   },
-}
-
-export interface Stats {
-  catalog_images: number
-  instagram_images: number
-  posted_to_instagram: number
-  matches_found: number
-  db_path: string
-}
-
-export interface CacheStatus {
-  total_images: number
-  cached_images: number
-  missing: number
-  cache_size_mb: number
-  cache_dir: string
-}
-
-/** Single bucket payload from ``/api/cache/pipeline-status``. */
-export interface CachePipelineRun {
-  job_id: string
-  type: string
-  status: string
-  created_at: string
-  started_at: string | null
-  completed_at: string | null
-  error: string | null
-}
-
-/** All pipeline-status buckets — one entry per CatalogCacheTab trigger.
- *
- * Each value is ``null`` when no matching job has ever run. Keys are stable
- * and aligned with the UI buttons; ``embed_catalog_and_instagram`` matches
- * jobs created with ``image_type: 'catalog_and_instagram'``.
- */
-export interface CachePipelineStatus {
-  catalog_sync: CachePipelineRun | null
-  embed_catalog: CachePipelineRun | null
-  embed_catalog_and_instagram: CachePipelineRun | null
-  stack_detect: CachePipelineRun | null
-  catalog_similarity: CachePipelineRun | null
-  catalog_cache_build: CachePipelineRun | null
-  prepare_catalog: CachePipelineRun | null
 }
 
 export const ProvidersAPI = {

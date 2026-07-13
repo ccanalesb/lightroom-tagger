@@ -739,6 +739,117 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** get_status <GET> */
+        get: operations["get__api_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vision-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get available vision models from all providers (registry + optional user DB rows). */
+        get: operations["get__api_vision-models"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** get_stats <GET> */
+        get: operations["get__api_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/catalog/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Return whether the catalog vision cache has any prepared entries. */
+        get: operations["get__api_catalog_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cache/pipeline-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Latest run per Catalog Cache pipeline trigger.
+         * @description One entry per UI button on ``CatalogCacheTab``:
+         *
+         *     * ``catalog_sync`` — most recent incremental catalog → library.db sync. * ``embed_catalog`` — most recent ``batch_embed_image`` with   ``metadata.image_type`` of ``catalog`` or absent (legacy default). * ``embed_catalog_and_instagram`` — same but ``image_type`` is   ``catalog_and_instagram``. * ``stack_detect`` — most recent ``batch_stack_detect``. * ``catalog_similarity`` — most recent ``batch_catalog_similarity``. * ``catalog_cache_build`` — most recent composite chain (D-08). * ``prepare_catalog`` — most recent pre-compress run.
+         *
+         *     Each value is ``null`` when no matching job exists, otherwise:
+         *
+         *     ``{ job_id, type, status, created_at, started_at, completed_at, error }``.
+         */
+        get: operations["get__api_cache_pipeline-status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cache/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get vision cache status. */
+        get: operations["get__api_cache_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/config/catalog": {
         parameters: {
             query?: never;
@@ -873,6 +984,57 @@ export interface paths {
         };
         /** get_current_scores <GET> */
         get: operations["get__api_scores_{image_key}"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/identity/best-photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Paginated eligible catalog images ranked by aggregate perspective score. */
+        get: operations["get__api_identity_best-photos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/identity/style-fingerprint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catalog-wide style fingerprint (per-perspective stats, tokens, evidence). */
+        get: operations["get__api_identity_style-fingerprint"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/identity/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What to post next: unposted, coverage-eligible images with reason codes. */
+        get: operations["get__api_identity_suggestions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1077,6 +1239,109 @@ export interface components {
              * @default null
              */
             provider: string | null;
+        };
+        /** IdentityBestPhotosQuery */
+        "IdentityBestPhotosQuery.00d7522": {
+            /**
+             * Limit
+             * @default null
+             */
+            limit: number | null;
+            /**
+             * Offset
+             * @default null
+             */
+            offset: number | null;
+            /**
+             * Min Perspectives
+             * @default null
+             */
+            min_perspectives: number | null;
+            /**
+             * Sort By Date
+             * @default null
+             */
+            sort_by_date: string | null;
+            /**
+             * Posted
+             * @default null
+             */
+            posted: string | null;
+        };
+        /** IdentityBestPhotosResponse */
+        "IdentityBestPhotosResponse.00d7522": {
+            /** Items */
+            items: components["schemas"]["IdentityBestPhotosResponse.00d7522.IdentityBestPhotoItem"][];
+            /** Total */
+            total: number;
+            meta: components["schemas"]["IdentityBestPhotosResponse.00d7522.IdentityBestPhotosMeta"];
+        };
+        /** StyleFingerprintResponse */
+        "StyleFingerprintResponse.00d7522": {
+            /** Per Perspective */
+            per_perspective: components["schemas"]["StyleFingerprintResponse.00d7522.StyleFingerprintPerPerspective"][];
+            /** Aggregate Distribution */
+            aggregate_distribution: {
+                [key: string]: number;
+            };
+            /**
+             * Aggregate Distribution Note
+             * @default null
+             */
+            aggregate_distribution_note: string | null;
+            /** Top Rationale Tokens */
+            top_rationale_tokens: components["schemas"]["StyleFingerprintResponse.00d7522.TopRationaleToken"][];
+            /** Evidence */
+            evidence: {
+                [key: string]: string[];
+            };
+            /**
+             * Evidence Note
+             * @default null
+             */
+            evidence_note: string | null;
+            meta: components["schemas"]["StyleFingerprintResponse.00d7522.StyleFingerprintMeta"];
+        };
+        /** PostNextSuggestionsQuery */
+        "PostNextSuggestionsQuery.00d7522": {
+            /**
+             * Limit
+             * @default null
+             */
+            limit: number | null;
+            /**
+             * Offset
+             * @default null
+             */
+            offset: number | null;
+            /**
+             * Lookback Days Recent
+             * @default null
+             */
+            lookback_days_recent: number | null;
+            /**
+             * Lookback Days Baseline
+             * @default null
+             */
+            lookback_days_baseline: number | null;
+            /**
+             * Sort By Date
+             * @default null
+             */
+            sort_by_date: string | null;
+        };
+        /** PostNextSuggestionsResponse */
+        "PostNextSuggestionsResponse.00d7522": {
+            /** Candidates */
+            candidates: components["schemas"]["PostNextSuggestionsResponse.00d7522.PostNextCandidate"][];
+            /** Total */
+            total: number;
+            meta: components["schemas"]["PostNextSuggestionsResponse.00d7522.PostNextSuggestionsMeta"];
+            /**
+             * Empty State
+             * @default null
+             */
+            empty_state: string | null;
         };
         /** JobsListResponse */
         "JobsListResponse.45d9b59": {
@@ -1464,6 +1729,66 @@ export interface components {
             image_type: "catalog" | "instagram";
             /** Current */
             current: components["schemas"]["ScoresCurrentResponse.c9bd13d.ImageScoreRow"][];
+        };
+        /** SystemStatusResponse */
+        "SystemStatusResponse.36cf89b": {
+            /** Status */
+            status: string;
+        };
+        /** VisionModelsResponse */
+        "VisionModelsResponse.36cf89b": {
+            /** Models */
+            models: components["schemas"]["VisionModelsResponse.36cf89b.VisionModelEntry"][];
+            /** Fallback */
+            fallback: boolean;
+        };
+        /** Stats */
+        "Stats.36cf89b": {
+            /** Catalog Images */
+            catalog_images: number;
+            /** Instagram Images */
+            instagram_images: number;
+            /** Posted To Instagram */
+            posted_to_instagram: number;
+            /** Matches Found */
+            matches_found: number;
+            /** Db Path */
+            db_path: string;
+        };
+        /** CatalogCacheReadyResponse */
+        "CatalogCacheReadyResponse.36cf89b": {
+            /** Cached */
+            cached: boolean;
+        };
+        /** CachePipelineStatus */
+        "CachePipelineStatus.36cf89b": {
+            /** @default null */
+            catalog_sync: components["schemas"]["CachePipelineStatus.36cf89b.CachePipelineRun"] | null;
+            /** @default null */
+            embed_catalog: components["schemas"]["CachePipelineStatus.36cf89b.CachePipelineRun"] | null;
+            /** @default null */
+            embed_catalog_and_instagram: components["schemas"]["CachePipelineStatus.36cf89b.CachePipelineRun"] | null;
+            /** @default null */
+            stack_detect: components["schemas"]["CachePipelineStatus.36cf89b.CachePipelineRun"] | null;
+            /** @default null */
+            catalog_similarity: components["schemas"]["CachePipelineStatus.36cf89b.CachePipelineRun"] | null;
+            /** @default null */
+            catalog_cache_build: components["schemas"]["CachePipelineStatus.36cf89b.CachePipelineRun"] | null;
+            /** @default null */
+            prepare_catalog: components["schemas"]["CachePipelineStatus.36cf89b.CachePipelineRun"] | null;
+        };
+        /** CacheStatus */
+        "CacheStatus.36cf89b": {
+            /** Total Images */
+            total_images: number;
+            /** Cached Images */
+            cached_images: number;
+            /** Missing */
+            missing: number;
+            /** Cache Size Mb */
+            cache_size_mb: number;
+            /** Cache Dir */
+            cache_dir: string;
         };
         /** CatalogMonthsResponse */
         "CatalogMonthsResponse.573ec44": {
@@ -2474,6 +2799,243 @@ export interface components {
             /** Score */
             score: number;
         };
+        /** IdentityBestPhotoItem */
+        "IdentityBestPhotosResponse.00d7522.IdentityBestPhotoItem": {
+            /** Image Key */
+            image_key: string;
+            /**
+             * Image Type
+             * @default null
+             */
+            image_type: ("catalog" | "instagram") | null;
+            /** Aggregate Score */
+            aggregate_score: number;
+            /** Perspectives Covered */
+            perspectives_covered: number;
+            /**
+             * Eligible
+             * @default null
+             */
+            eligible: boolean | null;
+            /** Per Perspective */
+            per_perspective: components["schemas"]["IdentityBestPhotosResponse.00d7522.IdentityPerPerspectiveScore"][];
+            /** Filename */
+            filename: string;
+            /** Date Taken */
+            date_taken: string;
+            /** Rating */
+            rating: number;
+            /** Instagram Posted */
+            instagram_posted: boolean;
+            /**
+             * Stack Id
+             * @default null
+             */
+            stack_id: number | null;
+            /**
+             * Stack Member Count
+             * @default null
+             */
+            stack_member_count: number | null;
+            /**
+             * Is Stack Representative
+             * @default null
+             */
+            is_stack_representative: boolean | null;
+        };
+        /** IdentityBestPhotosMeta */
+        "IdentityBestPhotosResponse.00d7522.IdentityBestPhotosMeta": {
+            /**
+             * Active Perspectives
+             * @default null
+             */
+            active_perspectives: string[] | null;
+            /**
+             * Weighting
+             * @default null
+             */
+            weighting: string | null;
+            /**
+             * Min Perspectives Used
+             * @default null
+             */
+            min_perspectives_used: number | null;
+            /**
+             * Coverage Rule
+             * @default null
+             */
+            coverage_rule: string | null;
+            /**
+             * Total Catalog Images
+             * @default null
+             */
+            total_catalog_images: number | null;
+            /**
+             * Eligible Count
+             * @default null
+             */
+            eligible_count: number | null;
+            /**
+             * Scored Any Count
+             * @default null
+             */
+            scored_any_count: number | null;
+            /**
+             * Coverage Note
+             * @default null
+             */
+            coverage_note: string | null;
+        };
+        /** IdentityPerPerspectiveScore */
+        "IdentityBestPhotosResponse.00d7522.IdentityPerPerspectiveScore": {
+            /** Perspective Slug */
+            perspective_slug: string;
+            /** Display Name */
+            display_name: string;
+            /** Score */
+            score: number;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Model Used */
+            model_used: string;
+            /** Scored At */
+            scored_at: string;
+            /** Rationale Preview */
+            rationale_preview: string;
+        };
+        /** StyleFingerprintMeta */
+        "StyleFingerprintResponse.00d7522.StyleFingerprintMeta": {
+            /**
+             * Tokenization Note
+             * @default null
+             */
+            tokenization_note: string | null;
+            /**
+             * Perspectives Included
+             * @default null
+             */
+            perspectives_included: string[] | null;
+            /**
+             * Weighting
+             * @default null
+             */
+            weighting: string | null;
+            /**
+             * Scores Are Advisory
+             * @default null
+             */
+            scores_are_advisory: string | null;
+        };
+        /** StyleFingerprintPerPerspective */
+        "StyleFingerprintResponse.00d7522.StyleFingerprintPerPerspective": {
+            /** Perspective Slug */
+            perspective_slug: string;
+            /**
+             * Mean Score
+             * @default null
+             */
+            mean_score: number | null;
+            /**
+             * Median Score
+             * @default null
+             */
+            median_score: number | null;
+            /** Count Scores */
+            count_scores: number;
+        };
+        /** TopRationaleToken */
+        "StyleFingerprintResponse.00d7522.TopRationaleToken": {
+            /** Token */
+            token: string;
+            /** Count */
+            count: number;
+        };
+        /** IdentityPerPerspectiveScore */
+        "PostNextSuggestionsResponse.00d7522.IdentityPerPerspectiveScore": {
+            /** Perspective Slug */
+            perspective_slug: string;
+            /** Display Name */
+            display_name: string;
+            /** Score */
+            score: number;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Model Used */
+            model_used: string;
+            /** Scored At */
+            scored_at: string;
+            /** Rationale Preview */
+            rationale_preview: string;
+        };
+        /** PostNextCandidate */
+        "PostNextSuggestionsResponse.00d7522.PostNextCandidate": {
+            /** Image Key */
+            image_key: string;
+            /**
+             * Image Type
+             * @default null
+             */
+            image_type: ("catalog" | "instagram") | null;
+            /** Filename */
+            filename: string;
+            /** Date Taken */
+            date_taken: string;
+            /** Rating */
+            rating: number;
+            /** Aggregate Score */
+            aggregate_score: number;
+            /** Perspectives Covered */
+            perspectives_covered: number;
+            /** Per Perspective */
+            per_perspective: components["schemas"]["PostNextSuggestionsResponse.00d7522.IdentityPerPerspectiveScore"][];
+            /** Reasons */
+            reasons: string[];
+            /** Reason Codes */
+            reason_codes: string[];
+        };
+        /** PostNextSuggestionsMeta */
+        "PostNextSuggestionsResponse.00d7522.PostNextSuggestionsMeta": {
+            /**
+             * Weighting
+             * @default null
+             */
+            weighting: string | null;
+            /**
+             * Min Perspectives Used
+             * @default null
+             */
+            min_perspectives_used: number | null;
+            /**
+             * Coverage Rule
+             * @default null
+             */
+            coverage_rule: string | null;
+            /**
+             * Timezone Assumption
+             * @default null
+             */
+            timezone_assumption: string | null;
+            /**
+             * High Score Rule
+             * @default null
+             */
+            high_score_rule: string | null;
+            /**
+             * Posted Semantics
+             * @default null
+             */
+            posted_semantics: string | null;
+            /**
+             * Cadence Gap
+             * @default null
+             */
+            cadence_gap: boolean | null;
+            /**
+             * Cadence Note
+             * @default null
+             */
+            cadence_note: string | null;
+        };
         /**
          * Job
          * @description Shared by REST job endpoints and ``job_updated`` / ``job_created`` socket emits.
@@ -2880,6 +3442,44 @@ export interface components {
              * @default false
              */
             not_attempted: boolean;
+        };
+        /** VisionModelEntry */
+        "VisionModelsResponse.36cf89b.VisionModelEntry": {
+            /** Name */
+            name: string;
+            /**
+             * Provider Id
+             * @default null
+             */
+            provider_id: string | null;
+            /** Default */
+            default: boolean;
+        };
+        /** CachePipelineRun */
+        "CachePipelineStatus.36cf89b.CachePipelineRun": {
+            /** Job Id */
+            job_id: string;
+            /** Type */
+            type: string;
+            /** Status */
+            status: string;
+            /** Created At */
+            created_at: string;
+            /**
+             * Started At
+             * @default null
+             */
+            started_at: string | null;
+            /**
+             * Completed At
+             * @default null
+             */
+            completed_at: string | null;
+            /**
+             * Error
+             * @default null
+             */
+            error: string | null;
         };
         /**
          * CatalogImage
@@ -6953,6 +7553,234 @@ export interface operations {
             };
         };
     };
+    get__api_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemStatusResponse.36cf89b"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_vision-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VisionModelsResponse.36cf89b"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    get__api_stats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Stats.36cf89b"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+        };
+    };
+    get__api_catalog_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogCacheReadyResponse.36cf89b"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+        };
+    };
+    "get__api_cache_pipeline-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CachePipelineStatus.36cf89b"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+        };
+    };
+    get__api_cache_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CacheStatus.36cf89b"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+        };
+    };
     get__api_config_catalog: {
         parameters: {
             query?: never;
@@ -7478,6 +8306,150 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_identity_best-photos": {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                offset?: number | null;
+                min_perspectives?: number | null;
+                sort_by_date?: string | null;
+                posted?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityBestPhotosResponse.00d7522"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+        };
+    };
+    "get__api_identity_style-fingerprint": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StyleFingerprintResponse.00d7522"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+        };
+    };
+    get__api_identity_suggestions: {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                offset?: number | null;
+                lookback_days_recent?: number | null;
+                lookback_days_baseline?: number | null;
+                sort_by_date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostNextSuggestionsResponse.00d7522"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
                 };
             };
         };
