@@ -116,23 +116,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/images/catalog/{image_key}/thumbnail": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get thumbnail for catalog image, creating cache if needed. */
-        get: operations["get__api_images_catalog_{image_key}_thumbnail"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/images/catalog/months": {
         parameters: {
             query?: never;
@@ -312,23 +295,6 @@ export interface paths {
         };
         /** Get unique months available in Instagram images. */
         get: operations["get__api_images_instagram_months"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/images/instagram/{image_key}/thumbnail": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get thumbnail for Instagram image. */
-        get: operations["get__api_images_instagram_{image_key}_thumbnail"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5915,37 +5881,6 @@ export interface operations {
             };
         };
     };
-    "get__api_images_catalog_{image_key}_thumbnail": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                image_key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
-                };
-            };
-            /** @description Unprocessable Content */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ValidationError.6a07bef"];
-                };
-            };
-        };
-    };
     get__api_images_catalog_months: {
         parameters: {
             query?: never;
@@ -6402,37 +6337,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InstagramMonthsResponse.2d55088"];
-                };
-            };
-            /** @description Unprocessable Content */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ValidationError.6a07bef"];
-                };
-            };
-        };
-    };
-    "get__api_images_instagram_{image_key}_thumbnail": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                image_key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
                 };
             };
             /** @description Unprocessable Content */

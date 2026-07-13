@@ -302,10 +302,6 @@ def _build_catalog_detail(db, image_key, score_perspective):
 
 @catalog_bp.route("/<path:image_key>/thumbnail", methods=["GET"])
 @with_db
-@spec.validate(
-    resp=Response(HTTP_404=ErrorBody),
-    tags=['images-catalog'],
-)
 def get_catalog_thumbnail(db, image_key):
     """Get thumbnail for catalog image, creating cache if needed."""
     try:
