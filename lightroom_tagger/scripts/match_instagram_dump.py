@@ -519,9 +519,9 @@ def match_dump_media(db, threshold: float = 0.7, batch_size: int = None,
             stats['matched'] += 1
             matches_found.append(best_match)
             try:
-                if describe_matched_image(db, matched_catalog_key, force=force_descriptions):
+                if describe_matched_image(db, matched_catalog_key, force=force_descriptions).wrote:
                     stats['descriptions_generated'] += 1
-                if describe_instagram_image(db, dump_media['media_key'], force=force_descriptions):
+                if describe_instagram_image(db, dump_media['media_key'], force=force_descriptions).wrote:
                     stats['descriptions_generated'] += 1
             except Exception as e:
                 msg = f'Description failed for {matched_catalog_key}: {e}'

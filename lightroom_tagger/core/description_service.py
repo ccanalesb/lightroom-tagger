@@ -5,7 +5,7 @@ import threading
 from collections.abc import Callable
 from typing import TypedDict
 
-from lightroom_tagger.core.analyzer import VIDEO_EXTENSIONS, describe_image
+from lightroom_tagger.core.analyzer import VIDEO_EXTENSIONS, build_description_op_spec
 from lightroom_tagger.core.config import get_description_model
 from lightroom_tagger.core.database import (
     get_image,
@@ -17,6 +17,7 @@ from lightroom_tagger.core.database import (
 )
 from lightroom_tagger.core.prompt_builder import build_description_user_prompt
 from lightroom_tagger.core.vision_cache import get_or_create_cached_image
+from lightroom_tagger.core.vision_op import VisionOpOutcome, run_vision_op_persist
 
 LogCallback = Callable[[str, str], None] | None
 
@@ -55,7 +56,7 @@ def _is_non_describable_path(filepath: str | None) -> bool:
 
 
 def _description_structured_is_valid(structured: dict) -> bool:
-    """True if describe_image output is worth persisting (non-empty summary)."""
+    """True if vision-op description output is worth persisting (non-empty summary)."""
     summary = structured.get('summary')
     return isinstance(summary, str) and bool(summary.strip())
 
@@ -75,113 +76,140 @@ def _resolve_description_user_prompt(
     return build_description_user_prompt(rows)
 
 
+def _persist_description_structured(
+    db: sqlite3.Connection,
+    image_key: str,
+    image_type: str,
+    structured: dict,
+    provider: str,
+    model: str,
+) -> None:
+    model_used = structured.pop("_model", None) or model or get_description_model()
+    provider_used = structured.pop("_provider", None) or provider
+    model_label = f"{provider_used}:{model_used}" if provider_used else model_used
+    _store_structured(db, image_key, image_type, structured, model_label)
+
+
+def _run_description_persist(
+    db: sqlite3.Connection,
+    image_key: str,
+    image_type: str,
+    image_path: str,
+    *,
+    provider_id: str | None,
+    model: str | None,
+    log_callback: LogCallback,
+    user_prompt: str | None,
+    silent_compression: bool,
+) -> VisionOpOutcome:
+    spec = build_description_op_spec(
+        image_path,
+        provider_id=provider_id,
+        model=model,
+        log_callback=log_callback,
+        user_prompt=user_prompt,
+        silent_compression=silent_compression,
+    )
+
+    def persist(structured: dict, provider: str, model_used: str) -> None:
+        structured = dict(structured)
+        structured["_provider"] = provider
+        structured["_model"] = model_used
+        _persist_description_structured(db, image_key, image_type, structured, provider, model_used)
+
+    return run_vision_op_persist(
+        spec,
+        accept_result=_description_structured_is_valid,
+        persist=persist,
+    )
+
+
 def describe_matched_image(db: sqlite3.Connection, catalog_key: str, force: bool = False,
                            provider_id: str | None = None,
                            model: str | None = None,
                            log_callback: LogCallback = None,
                            perspective_slugs: list[str] | None = None,
                            *,
-                           telemetry: DescribeTelemetry | None = None) -> bool:
+                           telemetry: DescribeTelemetry | None = None) -> VisionOpOutcome:
     """Generate and store a description for a catalog image if needed.
 
-    Returns True if a non-empty description was stored. Returns False if
-    skipped, missing file, or describe_image produced no usable summary
-    (e.g. model failure / empty fallback) — nothing is persisted in that case.
+    Returns a :class:`VisionOpOutcome`. ``wrote`` is True when a non-empty
+    description was stored. Skipped or failed outcomes leave the DB unchanged.
     """
     if not force and get_image_description(db, catalog_key):
-        return False
+        return VisionOpOutcome(status='skipped', reason='description exists')
 
     image = get_image(db, catalog_key)
     if not image or not image.get('filepath'):
-        return False
+        return VisionOpOutcome(status='skipped', reason='image not found')
 
     filepath = resolve_filepath(image['filepath'])
     if _is_non_describable_path(filepath):
-        # Videos / unsupported container formats cannot be sent to the vision
-        # model: the compressor silently falls back to the raw bytes and the
-        # provider then retries for minutes, wedging the worker pool.
-        return False
+        return VisionOpOutcome(status='skipped', reason='non-describable file type')
     if not os.path.exists(filepath):
-        return False
+        return VisionOpOutcome(status='skipped', reason='file missing')
 
-    # Use vision cache to avoid redundant RAW→JPG conversion + compression
     cached_path = get_or_create_cached_image(db, catalog_key, filepath)
     image_for_describe = cached_path if cached_path and os.path.exists(cached_path) else filepath
-
     user_prompt = _resolve_description_user_prompt(db, perspective_slugs)
     use_silent_compression = (
         bool(cached_path)
         and cached_path == image_for_describe
         and os.path.exists(cached_path)
     )
-    if use_silent_compression:
-        structured = describe_image(
-            image_for_describe,
-            provider_id=provider_id,
-            model=model,
-            log_callback=log_callback,
-            user_prompt=user_prompt,
-            silent_compression=True,
-        )
-        if telemetry is not None:
-            with telemetry['_lock']:
-                telemetry['silent_compression_skips'] += 1
-    else:
-        structured = describe_image(
-            image_for_describe,
-            provider_id=provider_id,
-            model=model,
-            log_callback=log_callback,
-            user_prompt=user_prompt,
-        )
-    if not _description_structured_is_valid(structured):
-        return False
 
-    model_used = structured.pop("_model", None) or get_description_model()
-    provider_used = structured.pop("_provider", None)
-    model_label = f"{provider_used}:{model_used}" if provider_used else model_used
-
-    _store_structured(db, catalog_key, 'catalog', structured, model_label)
-    return True
+    outcome = _run_description_persist(
+        db,
+        catalog_key,
+        'catalog',
+        image_for_describe,
+        provider_id=provider_id,
+        model=model,
+        log_callback=log_callback,
+        user_prompt=user_prompt,
+        silent_compression=use_silent_compression,
+    )
+    if use_silent_compression and telemetry is not None:
+        with telemetry['_lock']:
+            telemetry['silent_compression_skips'] += 1
+    return outcome
 
 
 def describe_instagram_image(db: sqlite3.Connection, media_key: str, force: bool = False,
                              provider_id: str | None = None,
                              model: str | None = None,
                              log_callback: LogCallback = None,
-                             perspective_slugs: list[str] | None = None) -> bool:
+                             perspective_slugs: list[str] | None = None) -> VisionOpOutcome:
     """Generate and store a description for an Instagram image if needed.
 
-    Uses the local file from instagram_dump_media. Returns True if a
+    Uses the local file from instagram_dump_media. ``wrote`` is True when a
     non-empty description was stored.
     """
     if not force and get_image_description(db, media_key):
-        return False
+        return VisionOpOutcome(status='skipped', reason='description exists')
 
     dump_media = get_instagram_dump_media(db, media_key)
     if not dump_media or not dump_media.get('file_path'):
-        return False
+        return VisionOpOutcome(status='skipped', reason='image not found')
 
     filepath = dump_media['file_path']
     if _is_non_describable_path(filepath):
-        return False
+        return VisionOpOutcome(status='skipped', reason='non-describable file type')
     if not os.path.exists(filepath):
-        return False
+        return VisionOpOutcome(status='skipped', reason='file missing')
 
     user_prompt = _resolve_description_user_prompt(db, perspective_slugs)
-    structured = describe_image(
-        filepath, provider_id=provider_id, model=model,
-        log_callback=log_callback, user_prompt=user_prompt,
+    return _run_description_persist(
+        db,
+        media_key,
+        'instagram',
+        filepath,
+        provider_id=provider_id,
+        model=model,
+        log_callback=log_callback,
+        user_prompt=user_prompt,
+        silent_compression=False,
     )
-    if not _description_structured_is_valid(structured):
-        return False
-
-    model_used = structured.pop("_model", None) or get_description_model()
-    provider_used = structured.pop("_provider", None)
-    model_label = f"{provider_used}:{model_used}" if provider_used else model_used
-
-    _store_structured(db, media_key, 'instagram', structured, model_label)
-    return True
 
 
 def _store_structured(

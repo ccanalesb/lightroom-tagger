@@ -1,5 +1,9 @@
 from unittest.mock import patch, MagicMock
 
+from lightroom_tagger.core.vision_op import VisionOpOutcome
+
+_WRITTEN = VisionOpOutcome(status='written')
+
 from jobs.checkpoint import fingerprint_batch_describe
 
 
@@ -52,7 +56,7 @@ def test_batch_describe_should_describe_catalog_images(
     mock_config.return_value = MagicMock(db_path='/tmp/library.db')
     mock_init_db.return_value = MagicMock()
     mock_get.return_value = [{'key': 'img_001'}, {'key': 'img_002'}]
-    mock_describe.return_value = True
+    mock_describe.return_value = _WRITTEN
 
     runner = _make_runner()
 
@@ -80,7 +84,7 @@ def test_batch_describe_should_count_failures(
     mock_config.return_value = MagicMock(db_path='/tmp/library.db')
     mock_init_db.return_value = MagicMock()
     mock_get.return_value = [{'key': 'img_001'}, {'key': 'img_002'}]
-    mock_describe.side_effect = [True, Exception('API error')]
+    mock_describe.side_effect = [_WRITTEN, Exception('API error')]
 
     runner = _make_runner()
 
@@ -248,7 +252,7 @@ def test_batch_describe_backfill_uses_missing_visual_tag_selection(
     mock_config.return_value = MagicMock(db_path='/tmp/library.db')
     mock_init_db.return_value = MagicMock()
     mock_backfill_select.return_value = [('img_001', 'catalog')]
-    mock_describe.return_value = True
+    mock_describe.return_value = _WRITTEN
 
     runner = _make_runner()
 
@@ -337,7 +341,7 @@ def test_batch_describe_checkpoint_skips_already_processed_pairs(
     mock_db.execute.return_value.fetchall.return_value = []
     mock_init_db.return_value = mock_db
     mock_get_undescribed.return_value = imgs
-    mock_describe.return_value = True
+    mock_describe.return_value = _WRITTEN
     mock_get_job.return_value = {
         'status': 'running',
         'metadata': {
@@ -395,7 +399,7 @@ def test_batch_describe_fingerprint_mismatch_resets_and_reprocesses(
     mock_db.execute.return_value.fetchall.return_value = []
     mock_init_db.return_value = mock_db
     mock_get_undescribed.return_value = [{'key': 'img_m'}]
-    mock_describe.return_value = True
+    mock_describe.return_value = _WRITTEN
     mock_get_job.return_value = {
         'status': 'running',
         'metadata': {

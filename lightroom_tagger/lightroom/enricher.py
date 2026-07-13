@@ -1,4 +1,4 @@
-from lightroom_tagger.core.analyzer import compute_phash, describe_image, extract_exif
+from lightroom_tagger.core.analyzer import compute_phash, extract_exif, run_description_vision_op
 from lightroom_tagger.core.database import get_catalog_images_needing_analysis, store_catalog_image
 
 
@@ -24,7 +24,7 @@ def enrich_catalog_images(db, catalog_path: str = None, limit: int = None) -> di
         try:
             phash = compute_phash(filepath)
             exif = extract_exif(filepath)
-            structured = describe_image(filepath)
+            structured = run_description_vision_op(filepath)
             analysis = {
                 'phash': phash,
                 'exif': exif,

@@ -1,5 +1,9 @@
 from unittest.mock import patch
 
+from lightroom_tagger.core.vision_op import VisionOpOutcome
+
+_SKIPPED = VisionOpOutcome(status='skipped')
+
 from lightroom_tagger.core.database import init_database
 from lightroom_tagger.scripts.match_instagram_dump import match_dump_media
 
@@ -42,8 +46,8 @@ def test_stores_multiple_candidates_above_threshold(tmp_path):
          patch('lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip',
                side_effect=lambda _db, _key, cand_keys, _top_k: list(cand_keys)), \
          patch('lightroom_tagger.scripts.match_instagram_dump.compute_phash', return_value='abc'), \
-         patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False), \
-         patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False), \
+         patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=_SKIPPED), \
+         patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=_SKIPPED), \
          patch('lightroom_tagger.scripts.match_instagram_dump.resolve_catalog_path', side_effect=lambda x: x), \
          patch('os.path.exists', return_value=True):
 
@@ -83,8 +87,8 @@ def test_only_best_stored_when_single_above_threshold(tmp_path):
          patch('lightroom_tagger.scripts.match_instagram_dump.shortlist_catalog_candidates_by_clip',
                side_effect=lambda _db, _key, cand_keys, _top_k: list(cand_keys)), \
          patch('lightroom_tagger.scripts.match_instagram_dump.compute_phash', return_value='abc'), \
-         patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=False), \
-         patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=False), \
+         patch('lightroom_tagger.scripts.match_instagram_dump.describe_matched_image', return_value=_SKIPPED), \
+         patch('lightroom_tagger.scripts.match_instagram_dump.describe_instagram_image', return_value=_SKIPPED), \
          patch('lightroom_tagger.scripts.match_instagram_dump.resolve_catalog_path', side_effect=lambda x: x), \
          patch('os.path.exists', return_value=True):
 

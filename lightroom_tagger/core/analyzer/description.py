@@ -6,9 +6,7 @@ import os
 import re
 from typing import Any
 
-from lightroom_tagger.core.config import load_config
 from lightroom_tagger.core.provider_registry import ProviderRegistry
-from lightroom_tagger.core.provider_resolution import resolve_model
 
 from .image_prep import compress_image, get_viewable_path, get_viewable_path_managed
 
@@ -130,83 +128,36 @@ def parse_description_response(raw: str) -> dict:
     return dict(_DESCRIPTION_FALLBACK)
 
 
-def describe_image(path: str, agent_type: str | None = None,
-                    provider_id: str | None = None, model: str | None = None,
-                    log_callback=None, user_prompt: str | None = None,
-                    *,
-                    silent_compression: bool = False) -> dict:
-    """Generate structured description using the provider registry (OpenAI-compat).
-
-    When *provider_id* is given, that provider is used. Otherwise *agent_type*
-    is read from config when omitted: ``external`` returns an empty parsed
-    structure; ``local`` (default) resolves ``defaults.description`` or
-    ``fallback_order`` from ``providers.json``.
-    """
-    if provider_id is None:
-        if agent_type is None:
-            try:
-                config = load_config()
-                agent_type = getattr(config, 'agent_type', 'local')
-            except Exception:
-                agent_type = 'local'
-
-        if agent_type == 'external':
-            return parse_description_response('')
-
-    r = resolve_model(
-        kind="description",
-        provider_id=provider_id,
-        model=model,
-    )
-
-    return _describe_image_via_provider(
-        path,
-        r.provider_id,
-        r.model,
-        log_callback,
-        user_prompt=user_prompt,
-        silent_compression=silent_compression,
-        registry=r.registry,
-    )
-
-
-def _describe_image_via_provider(path: str, provider_id: str,
-                                  model: str | None, log_callback=None,
-                                  user_prompt: str | None = None,
-                                  *,
-                                  silent_compression: bool = False,
-                                  registry: ProviderRegistry | None = None) -> dict:
-    """Generate description via the unified provider pipeline."""
-    from lightroom_tagger.core.fallback import FallbackDispatcher
+def build_description_op_spec(
+    path: str,
+    *,
+    provider_id: str | None = None,
+    model: str | None = None,
+    log_callback=None,
+    user_prompt: str | None = None,
+    silent_compression: bool = False,
+    registry: ProviderRegistry | None = None,
+):
+    """Build a :class:`VisionOpSpec` for the description vision operation."""
     from lightroom_tagger.core.vision_client import generate_description as _gen
-
-    if registry is None:
-        r = resolve_model(
-            kind="description",
-            provider_id=provider_id,
-            model=model,
-        )
-        registry = r.registry
-        provider_id = r.provider_id
-        model = r.model
-
-    dispatcher = FallbackDispatcher(registry)
+    from lightroom_tagger.core.vision_op import VisionOpSpec
 
     temp_files: list[str] = []
-    viewable, viewable_is_temp = get_viewable_path_managed(path)
-    if viewable_is_temp:
-        temp_files.append(viewable)
 
-    # Vision-cache hits are already compressed JPEGs; re-running compress_image
-    # on restart/resume only adds CPU work and noisy stdout during startup.
-    if silent_compression:
-        compressed = viewable
-    else:
-        compressed = compress_image(viewable)
-        if compressed != viewable:
-            temp_files.append(compressed)
+    def prepare_fn_factory():
+        viewable, viewable_is_temp = get_viewable_path_managed(path)
+        if viewable_is_temp:
+            temp_files.append(viewable)
 
-    try:
+        # Vision-cache hits are already compressed JPEGs; re-running compress_image
+        # on restart/resume only adds CPU work and noisy stdout during startup.
+        if silent_compression:
+            compressed = viewable
+        else:
+            compressed = compress_image(viewable)
+            if compressed != viewable:
+                temp_files.append(compressed)
+
         def fn_factory(client, mdl):
             return lambda: _gen(
                 client,
@@ -216,22 +167,54 @@ def _describe_image_via_provider(path: str, provider_id: str,
                 user_prompt=user_prompt,
             )
 
-        raw, actual_provider, actual_model = dispatcher.call_with_fallback(
-            operation="describe",
-            fn_factory=fn_factory,
-            provider_id=provider_id,
-            model=model,
-            log_callback=log_callback,
-        )
-        result = parse_description_response(raw)
-        result["_provider"] = actual_provider
-        result["_model"] = actual_model
-        return result
-    finally:
+        return fn_factory
+
+    def cleanup():
         for f in temp_files:
             if os.path.exists(f):
                 with contextlib.suppress(Exception):
                     os.unlink(f)
+
+    return VisionOpSpec(
+        resolve_kind="description",
+        operation="describe",
+        provider_id=provider_id,
+        model=model,
+        fn_factory=prepare_fn_factory,
+        parse_response=parse_description_response,
+        log_callback=log_callback,
+        registry=registry,
+        _cleanup=cleanup,
+    )
+
+
+def run_description_vision_op(
+    path: str,
+    *,
+    provider_id: str | None = None,
+    model: str | None = None,
+    log_callback=None,
+    user_prompt: str | None = None,
+    silent_compression: bool = False,
+    registry: ProviderRegistry | None = None,
+) -> dict:
+    """Run the description vision op and return the parsed dict with provider metadata."""
+    from lightroom_tagger.core.vision_op import run_vision_op
+
+    spec = build_description_op_spec(
+        path,
+        provider_id=provider_id,
+        model=model,
+        log_callback=log_callback,
+        user_prompt=user_prompt,
+        silent_compression=silent_compression,
+        registry=registry,
+    )
+    parsed, provider, model_used = run_vision_op(spec)
+    result = dict(parsed)
+    result["_provider"] = provider
+    result["_model"] = model_used
+    return result
 
 
 def run_external_agent(_path: str) -> str:

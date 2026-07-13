@@ -1,6 +1,6 @@
 """Score catalog and Instagram-dump images per perspective into ``image_scores``.
 
-Vision + compression follow :func:`lightroom_tagger.core.analyzer._describe_image_via_provider`.
+Vision + compression follow :func:`lightroom_tagger.core.vision_op.run_vision_op`.
 ``FallbackDispatcher.call_with_fallback`` uses ``operation="score"`` as the log label (same
 registry, retry, and fallback order as ``"describe"`` — only the tag string differs).
 """

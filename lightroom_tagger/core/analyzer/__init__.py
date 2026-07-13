@@ -8,10 +8,10 @@ from lightroom_tagger.core.exceptions import ContextLengthError
 from .description import (
     DESCRIPTION_PROMPT,
     _DESCRIPTION_FALLBACK,
-    _describe_image_via_provider,
+    build_description_op_spec,
     build_description_prompt,
-    describe_image,
     parse_description_response,
+    run_description_vision_op,
     run_external_agent,
 )
 from .image_inspect import compute_phash, extract_exif
@@ -47,13 +47,12 @@ __all__ = (
     "VISION_MAX_DIMENSION",
     "_DESCRIPTION_FALLBACK",
     "_compare_via_provider",
-    "_describe_image_via_provider",
+    "build_description_op_spec",
     "build_description_prompt",
     "compare_with_vision",
     "compress_image",
     "compute_phash",
     "convert_raw_to_jpg",
-    "describe_image",
     "extract_exif",
     "get_description_model",
     "get_viewable_path",
@@ -62,6 +61,7 @@ __all__ = (
     "load_config",
     "parse_description_response",
     "parse_vision_response",
+    "run_description_vision_op",
     "run_external_agent",
     "vision_score",
 )

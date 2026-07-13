@@ -4,6 +4,11 @@ from unittest.mock import MagicMock, patch
 from lightroom_tagger.core.database import init_database, store_image, store_image_description, get_image_description
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.provider_resolution import ResolvedModel, resolve_model
+from lightroom_tagger.core.vision_op import VisionOpOutcome
+
+
+def _written() -> VisionOpOutcome:
+    return VisionOpOutcome(status='written')
 
 
 def _fake_registry(
@@ -27,11 +32,11 @@ def _describe_patches(
     """Patch resolve_model + vision path helpers for description integration tests."""
     return (
         patch(
-            "lightroom_tagger.core.analyzer.description.resolve_model",
+            "lightroom_tagger.core.vision_op.resolve_model",
             return_value=ResolvedModel(provider_id, model, mock_registry),
         ),
         patch(
-            "lightroom_tagger.core.fallback.FallbackDispatcher",
+            "lightroom_tagger.core.vision_op.FallbackDispatcher",
             return_value=mock_dispatcher,
         ),
         patch(
@@ -89,7 +94,7 @@ class TestDescribeMatchedImage:
                 stack.enter_context(p)
             result = describe_matched_image(db, catalog_key)
 
-        assert result is True
+        assert result.wrote
         desc = get_image_description(db, catalog_key)
         assert desc is not None
         assert desc['summary'] == 'A street scene'
@@ -129,11 +134,11 @@ class TestDescribeMatchedImage:
                 return_value=registry,
             ),
             patch(
-                "lightroom_tagger.core.analyzer.description.resolve_model",
+                "lightroom_tagger.core.vision_op.resolve_model",
                 wraps=resolve_model,
             ),
             patch(
-                "lightroom_tagger.core.fallback.FallbackDispatcher",
+                "lightroom_tagger.core.vision_op.FallbackDispatcher",
                 return_value=mock_dispatcher,
             ),
             patch(
@@ -149,7 +154,7 @@ class TestDescribeMatchedImage:
                 db, catalog_key, provider_id="ollama", model=None,
             )
 
-        assert result is True
+        assert result.wrote
         assert mock_dispatcher.call_with_fallback.call_args.kwargs["model"] == "env-desc-model"
 
     def test_generates_description_when_missing(self, tmp_path):
@@ -160,16 +165,16 @@ class TestDescribeMatchedImage:
         open(filepath, 'w').close()
         catalog_key = store_image(db, {'filepath': filepath, 'filename': 'photo.jpg'})
 
-        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc, \
+        with patch('lightroom_tagger.core.vision_op.run_vision_op') as mock_run, \
              patch('lightroom_tagger.core.description_service.get_description_model', return_value='test-model'):
-            mock_desc.return_value = {
+            mock_run.return_value = ({
                 'summary': 'A street scene', 'composition': {'depth': 'shallow'},
                 'perspectives': {'street': {'score': 7}}, 'technical': {'mood': 'gritty'},
                 'subjects': ['person'], 'best_perspective': 'street',
-            }
+            }, 'ollama', 'test-model')
             result = describe_matched_image(db, catalog_key)
 
-        assert result is True
+        assert result.wrote
         desc = get_image_description(db, catalog_key)
         assert desc is not None
         assert desc['summary'] == 'A street scene'
@@ -187,11 +192,11 @@ class TestDescribeMatchedImage:
             'subjects': [], 'best_perspective': 'street', 'model_used': 'old',
         })
 
-        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc:
+        with patch('lightroom_tagger.core.vision_op.run_vision_op') as mock_run:
             result = describe_matched_image(db, catalog_key)
 
-        assert result is False
-        mock_desc.assert_not_called()
+        assert not result.wrote
+        mock_run.assert_not_called()
 
     def test_regenerates_when_force_is_true(self, tmp_path):
         from lightroom_tagger.core.description_service import describe_matched_image
@@ -206,15 +211,15 @@ class TestDescribeMatchedImage:
             'subjects': [], 'best_perspective': 'street', 'model_used': 'old',
         })
 
-        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc, \
+        with patch('lightroom_tagger.core.vision_op.run_vision_op') as mock_run, \
              patch('lightroom_tagger.core.description_service.get_description_model', return_value='new-model'):
-            mock_desc.return_value = {
+            mock_run.return_value = ({
                 'summary': 'Updated summary', 'composition': {}, 'perspectives': {},
                 'technical': {}, 'subjects': [], 'best_perspective': 'documentary',
-            }
+            }, 'ollama', 'new-model')
             result = describe_matched_image(db, catalog_key, force=True)
 
-        assert result is True
+        assert result.wrote
         desc = get_image_description(db, catalog_key)
         assert desc['summary'] == 'Updated summary'
 
@@ -223,7 +228,7 @@ class TestDescribeMatchedImage:
 
         db = _make_db(tmp_path)
         result = describe_matched_image(db, 'NONEXISTENT')
-        assert result is False
+        assert not result.wrote
 
     def test_returns_false_when_file_missing(self, tmp_path):
         from lightroom_tagger.core.description_service import describe_matched_image
@@ -231,7 +236,7 @@ class TestDescribeMatchedImage:
         db = _make_db(tmp_path)
         catalog_key = store_image(db, {'filepath': '/no/such/file.jpg', 'filename': 'file.jpg'})
         result = describe_matched_image(db, catalog_key)
-        assert result is False
+        assert not result.wrote
 
     def test_skips_video_without_calling_provider(self, tmp_path):
         """Video files must never reach describe_image — the vision pipeline
@@ -244,12 +249,12 @@ class TestDescribeMatchedImage:
         open(filepath, 'w').close()
         catalog_key = store_image(db, {'filepath': filepath, 'filename': 'clip.mov'})
 
-        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc, \
+        with patch('lightroom_tagger.core.vision_op.run_vision_op') as mock_run, \
              patch('lightroom_tagger.core.description_service.get_or_create_cached_image') as mock_cache:
             result = describe_matched_image(db, catalog_key)
 
-        assert result is False
-        mock_desc.assert_not_called()
+        assert not result.wrote
+        mock_run.assert_not_called()
         mock_cache.assert_not_called()
         assert get_image_description(db, catalog_key) is None
 
@@ -265,24 +270,18 @@ class TestDescribeMatchedImage:
         Image.new('RGB', (2, 2)).save(cached, 'JPEG')
         catalog_key = store_image(db, {'filepath': orig, 'filename': 'photo.jpg'})
 
-        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc, \
+        with patch('lightroom_tagger.core.description_service.build_description_op_spec') as mock_spec, \
+             patch('lightroom_tagger.core.description_service.run_vision_op_persist', return_value=_written()), \
              patch(
                  'lightroom_tagger.core.description_service.get_or_create_cached_image',
                  return_value=cached,
              ), \
              patch('lightroom_tagger.core.description_service.get_description_model', return_value='test-model'):
-            mock_desc.return_value = {
-                'summary': 'A street scene',
-                'composition': {'depth': 'shallow'},
-                'perspectives': {'street': {'score': 7}},
-                'technical': {'mood': 'gritty'},
-                'subjects': ['person'],
-                'best_perspective': 'street',
-            }
+            mock_spec.return_value = MagicMock()
             describe_matched_image(db, catalog_key)
 
-        mock_desc.assert_called_once()
-        _, kwargs = mock_desc.call_args
+        mock_spec.assert_called_once()
+        _, kwargs = mock_spec.call_args
         assert kwargs.get('silent_compression') is True
 
     def test_uses_silent_compression_when_vision_cache_hit_and_provider(self, tmp_path):
@@ -297,24 +296,18 @@ class TestDescribeMatchedImage:
         Image.new('RGB', (2, 2)).save(cached, 'JPEG')
         catalog_key = store_image(db, {'filepath': orig, 'filename': 'photo.jpg'})
 
-        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc, \
+        with patch('lightroom_tagger.core.description_service.build_description_op_spec') as mock_spec, \
+             patch('lightroom_tagger.core.description_service.run_vision_op_persist', return_value=_written()), \
              patch(
                  'lightroom_tagger.core.description_service.get_or_create_cached_image',
                  return_value=cached,
              ), \
              patch('lightroom_tagger.core.description_service.get_description_model', return_value='test-model'):
-            mock_desc.return_value = {
-                'summary': 'A street scene',
-                'composition': {'depth': 'shallow'},
-                'perspectives': {'street': {'score': 7}},
-                'technical': {'mood': 'gritty'},
-                'subjects': ['person'],
-                'best_perspective': 'street',
-            }
+            mock_spec.return_value = MagicMock()
             describe_matched_image(db, catalog_key, provider_id='test-prov')
 
-        mock_desc.assert_called_once()
-        _, kwargs = mock_desc.call_args
+        mock_spec.assert_called_once()
+        _, kwargs = mock_spec.call_args
         assert kwargs.get('silent_compression') is True
 
     def test_skips_video_even_with_force(self, tmp_path):
@@ -327,11 +320,11 @@ class TestDescribeMatchedImage:
         open(filepath, 'w').close()
         catalog_key = store_image(db, {'filepath': filepath, 'filename': 'clip.mp4'})
 
-        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc:
+        with patch('lightroom_tagger.core.vision_op.run_vision_op') as mock_run:
             result = describe_matched_image(db, catalog_key, force=True)
 
-        assert result is False
-        mock_desc.assert_not_called()
+        assert not result.wrote
+        mock_run.assert_not_called()
 
     def test_does_not_store_empty_summary(self, tmp_path):
         from lightroom_tagger.core.description_service import describe_matched_image
@@ -341,14 +334,14 @@ class TestDescribeMatchedImage:
         open(filepath, 'w').close()
         catalog_key = store_image(db, {'filepath': filepath, 'filename': 'photo.jpg'})
 
-        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc:
-            mock_desc.return_value = {
+        with patch('lightroom_tagger.core.vision_op.run_vision_op') as mock_run:
+            mock_run.return_value = ({
                 'summary': '', 'composition': {}, 'perspectives': {},
                 'technical': {}, 'subjects': [], 'best_perspective': '',
-            }
+            }, 'ollama', 'test-model')
             result = describe_matched_image(db, catalog_key)
 
-        assert result is False
+        assert not result.wrote
         assert get_image_description(db, catalog_key) is None
 
     def test_force_does_not_overwrite_with_empty_summary(self, tmp_path):
@@ -364,14 +357,14 @@ class TestDescribeMatchedImage:
             'subjects': [], 'best_perspective': 'street', 'model_used': 'old',
         })
 
-        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc:
-            mock_desc.return_value = {
+        with patch('lightroom_tagger.core.vision_op.run_vision_op') as mock_run:
+            mock_run.return_value = ({
                 'summary': '   ', 'composition': {}, 'perspectives': {},
                 'technical': {}, 'subjects': [], 'best_perspective': '',
-            }
+            }, 'ollama', 'test-model')
             result = describe_matched_image(db, catalog_key, force=True)
 
-        assert result is False
+        assert not result.wrote
         assert get_image_description(db, catalog_key)['summary'] == 'keep me'
 
 
@@ -388,11 +381,11 @@ class TestDescribeInstagramImage:
             'timestamp': None, 'taken_at': None,
         })
 
-        with patch('lightroom_tagger.core.description_service.describe_image') as mock_desc:
+        with patch('lightroom_tagger.core.vision_op.run_vision_op') as mock_run:
             result = describe_instagram_image(db, 'IGVID')
 
-        assert result is False
-        mock_desc.assert_not_called()
+        assert not result.wrote
+        mock_run.assert_not_called()
 
 
 class TestMatchDumpMediaDescriptions:
@@ -413,7 +406,7 @@ class TestMatchDumpMediaDescriptions:
         mock_unprocessed.return_value = [{'media_key': 'IG1', 'file_path': '/ig/1.jpg', 'caption': ''}]
         mock_candidates.return_value = [{'key': 'CAT1', 'filepath': '/p/a.jpg', 'phash': 'abc', 'description': ''}]
         mock_score.return_value = [{'catalog_key': 'CAT1', 'total_score': 0.9, 'vision_result': 'same', 'vision_score': 0.9}]
-        mock_describe.return_value = True
+        mock_describe.return_value = _written()
         mock_shortlist.side_effect = _shortlist_passthrough
 
         with patch('lightroom_tagger.scripts.match_instagram_dump.mark_dump_media_processed'), \
@@ -439,7 +432,7 @@ class TestMatchDumpMediaDescriptions:
         mock_unprocessed.return_value = [{'media_key': 'IG2', 'file_path': '/ig/2.jpg', 'caption': ''}]
         mock_candidates.return_value = [{'key': 'CAT2', 'filepath': '/p/b.jpg', 'phash': 'def', 'description': ''}]
         mock_score.return_value = [{'catalog_key': 'CAT2', 'total_score': 0.85, 'vision_result': 'same', 'vision_score': 0.85}]
-        mock_describe.return_value = True
+        mock_describe.return_value = _written()
         mock_shortlist.side_effect = _shortlist_passthrough
 
         with patch('lightroom_tagger.scripts.match_instagram_dump.mark_dump_media_processed'), \
