@@ -27,6 +27,7 @@ Architectural decision records live in `docs/adr/`:
 | [ADR-0010](../../docs/adr/0010-job-type-registry-and-transitions-seam.md) | Job-type registry + status-transition seam for visualizer jobs |
 | [ADR-0011](../../docs/adr/0011-managed-db-and-catalog-lifecycle-seam.md) | `managed_library_db` / `managed_catalog` lifecycle context managers |
 | [ADR-0012](../../docs/adr/0012-excusable-perspectives.md) | Excusable (not-attempted) perspectives (renumbered from a duplicate 0005) |
+| [ADR-0013](../../docs/adr/0013-backend-authoritative-openapi-contract-seam.md) | Backend-authoritative OpenAPI contract seam; generated frontend types, drift gated in CI |
 
 ## Usage by skills
 
