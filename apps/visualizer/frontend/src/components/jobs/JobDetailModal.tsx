@@ -194,6 +194,21 @@ interface JobDetailModalProps {
   onJobUpdate?: (updatedJob: Job) => void;
 }
 
+function recordBag(value: unknown): Record<string, unknown> | undefined {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return undefined;
+}
+
+function configValue(
+  meta: Record<string, unknown> | undefined,
+  result: Record<string, unknown> | undefined,
+  key: string,
+): unknown {
+  return meta?.[key] ?? result?.[key];
+}
+
 function JobDetailModalBody({ job, onClose, onJobUpdate }: JobDetailModalProps) {
   const queried = useQuery(
     ['jobs.detail', job.id] as const,
@@ -270,6 +285,9 @@ function JobDetailModalBody({ job, onClose, onJobUpdate }: JobDetailModalProps) 
   }, [onClose]);
 
   const displayJob = localJob;
+  const jobMeta = recordBag(displayJob.metadata);
+  const jobResult = recordBag(displayJob.result);
+  const configWeights = recordBag(jobMeta?.weights ?? jobResult?.weights);
 
   const JSON_PREVIEW_LINES = 20;
 
@@ -392,81 +410,76 @@ function JobDetailModalBody({ job, onClose, onJobUpdate }: JobDetailModalProps) 
         </div>
       ) : null}
 
-      {(displayJob.metadata?.method || displayJob.result?.method) && (
+      {Boolean(configValue(jobMeta, jobResult, 'method')) && (
         <div className="rounded-base border border-border bg-surface p-3">
           <h4 className="font-medium text-sm mb-2 text-text">Configuration</h4>
           <div className="text-sm space-y-1 text-text">
-            {(displayJob.metadata?.method || displayJob.result?.method) && (
+            {Boolean(configValue(jobMeta, jobResult, 'method')) && (
               <div className="flex justify-between gap-2">
                 <span className="text-text-secondary">{JOB_CONFIG_METHOD}:</span>
                 <span className="font-medium text-right">
-                  {displayJob.metadata?.method || displayJob.result?.method}
+                  {String(configValue(jobMeta, jobResult, 'method'))}
                 </span>
               </div>
             )}
-            {(displayJob.metadata?.date_window_days || displayJob.result?.date_window_days) && (
+            {Boolean(configValue(jobMeta, jobResult, 'date_window_days')) && (
               <div className="flex justify-between gap-2">
                 <span className="text-text-secondary">{JOB_CONFIG_DATE_WINDOW}:</span>
                 <span className="font-medium">
-                  {displayJob.metadata?.date_window_days || displayJob.result?.date_window_days} days
+                  {String(configValue(jobMeta, jobResult, 'date_window_days'))} days
                 </span>
               </div>
             )}
-            {(displayJob.metadata?.provider_id || displayJob.result?.provider_id) && (
+            {Boolean(configValue(jobMeta, jobResult, 'provider_id')) && (
               <div className="flex justify-between gap-2">
                 <span className="text-text-secondary">Provider:</span>
                 <span className="font-medium font-mono text-right">
-                  {displayJob.metadata?.provider_id || displayJob.result?.provider_id}
-                  {(displayJob.metadata?.provider_model || displayJob.result?.provider_model) &&
-                    ` / ${displayJob.metadata?.provider_model || displayJob.result?.provider_model}`}
+                  {String(configValue(jobMeta, jobResult, 'provider_id'))}
+                  {configValue(jobMeta, jobResult, 'provider_model')
+                    ? ` / ${String(configValue(jobMeta, jobResult, 'provider_model'))}`
+                    : null}
                 </span>
               </div>
             )}
-            {!(displayJob.metadata?.provider_id || displayJob.result?.provider_id) &&
-              (displayJob.metadata?.vision_model || displayJob.result?.vision_model) && (
+            {!configValue(jobMeta, jobResult, 'provider_id') &&
+              Boolean(configValue(jobMeta, jobResult, 'vision_model')) && (
                 <div className="flex justify-between gap-2">
                   <span className="text-text-secondary">{JOB_CONFIG_VISION_MODEL}:</span>
                   <span className="font-medium font-mono text-right">
-                    {displayJob.metadata?.vision_model || displayJob.result?.vision_model}
+                    {String(configValue(jobMeta, jobResult, 'vision_model'))}
                   </span>
                 </div>
               )}
-            {(displayJob.metadata?.threshold || displayJob.result?.threshold) && (
+            {Boolean(configValue(jobMeta, jobResult, 'threshold')) && (
               <div className="flex justify-between gap-2">
                 <span className="text-text-secondary">{JOB_CONFIG_THRESHOLD}:</span>
                 <span className="font-medium">
-                  {displayJob.metadata?.threshold || displayJob.result?.threshold}
+                  {String(configValue(jobMeta, jobResult, 'threshold'))}
                 </span>
               </div>
             )}
-            {(displayJob.metadata?.weights || displayJob.result?.weights) && (
+            {configWeights && (
               <div>
                 <span className="text-text-secondary">{JOB_CONFIG_WEIGHTS}:</span>
                 <div className="mt-1 pl-4 text-xs space-y-0.5">
                   <div>
                     pHash:{' '}
                     {(
-                      (displayJob.metadata?.weights?.phash ??
-                        displayJob.result?.weights?.phash ??
-                        0) * 100
+                      (Number(configWeights.phash) || 0) * 100
                     ).toFixed(0)}
                     %
                   </div>
                   <div>
                     Description:{' '}
                     {(
-                      (displayJob.metadata?.weights?.description ??
-                        displayJob.result?.weights?.description ??
-                        0) * 100
+                      (Number(configWeights.description) || 0) * 100
                     ).toFixed(0)}
                     %
                   </div>
                   <div>
                     Vision:{' '}
                     {(
-                      (displayJob.metadata?.weights?.vision ??
-                        displayJob.result?.weights?.vision ??
-                        0) * 100
+                      (Number(configWeights.vision) || 0) * 100
                     ).toFixed(0)}
                     %
                   </div>

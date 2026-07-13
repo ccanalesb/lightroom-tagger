@@ -186,6 +186,9 @@ def create_app():
     app.register_blueprint(scores.bp, url_prefix='/api/scores')
     app.register_blueprint(identity.bp, url_prefix='/api/identity')
 
+    from api.openapi import spec
+    spec.register(app)
+
     from websocket.events import register_socket_events
     register_socket_events(socketio)
 
@@ -250,7 +253,12 @@ def _recover_orphaned_jobs(db):
             print(f"Recovered orphaned job {job_id}: marked as failed")
 
     if recovered_ids and socketio:
-        socketio.emit('jobs_recovered', {'job_ids': recovered_ids})
+        from api.schemas.jobs import validate_jobs_recovered_payload
+
+        socketio.emit(
+            'jobs_recovered',
+            validate_jobs_recovered_payload({'job_ids': recovered_ids}),
+        )
 
 
 def _job_processor():
@@ -270,6 +278,15 @@ def _job_processor():
     _progress_last_emit: dict[str, float] = {}
     _PROGRESS_THROTTLE_S = 1.0
 
+    from api.schemas.jobs import build_job_emit_payload
+
+    def _emit_job_updated(job_id: str) -> None:
+        if not socketio:
+            return
+        job = get_job(processor_db, job_id)
+        if job:
+            socketio.emit('job_updated', build_job_emit_payload(processor_db, job))
+
     def _throttled_emit_progress(job_id: str, progress: int, step: str) -> None:
         # Long-running handlers may stay inside one job for minutes; refresh
         # heartbeat from progress callbacks so ``/_processor_health`` doesn't
@@ -280,7 +297,7 @@ def _job_processor():
         now = time.time()
         if now - _progress_last_emit.get(job_id, 0) >= _PROGRESS_THROTTLE_S:
             _progress_last_emit[job_id] = now
-            socketio.emit('job_updated', get_job(processor_db, job_id))
+            _emit_job_updated(job_id)
 
     runner = JobRunner(
         processor_db,
@@ -315,9 +332,9 @@ def _job_processor():
 
                 started = runner.start_job(job_id, job_type, metadata)
                 if not started:
-                    socketio.emit('job_updated', get_job(processor_db, job_id)) if socketio else None
+                    _emit_job_updated(job_id)
                     continue
-                socketio.emit('job_updated', get_job(processor_db, job_id)) if socketio else None
+                _emit_job_updated(job_id)
 
                 # Execute handler — guard against duplicate execution if a stale
                 # handler thread from a previous watchdog cycle is still running.
@@ -355,7 +372,7 @@ def _job_processor():
                         current_job_started_at=None,
                     )
 
-                socketio.emit('job_updated', get_job(processor_db, job_id)) if socketio else None
+                _emit_job_updated(job_id)
 
             # Iteration complete (with or without pending jobs) — counts as a
             # healthy tick so ``/_processor_health`` can distinguish

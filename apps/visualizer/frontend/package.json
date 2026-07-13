@@ -9,7 +9,9 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "generate:api": "node scripts/generate-api-types.mjs",
+    "verify:contract": "npm run generate:api && git diff --exit-code src/types/api.gen.ts && tsc --noEmit"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.0",
@@ -36,6 +38,7 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.4",
     "jsdom": "^23.0.1",
+    "openapi-typescript": "^7.13.0",
     "postcss": "^8.4.31",
     "tailwindcss": "^3.3.5",
     "typescript": "^5.2.2",

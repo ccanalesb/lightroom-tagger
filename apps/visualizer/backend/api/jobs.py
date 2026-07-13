@@ -1,5 +1,20 @@
 import sqlite3
 
+from api.openapi import spec
+from api.schemas.jobs import (
+    CatalogUnavailableError,
+    DbBusyError,
+    ErrorBody,
+    Job,
+    JobCreateRequest,
+    JobListResponse,
+    JobsHealth,
+    JobsListResponse,
+    JobsProcessorHealth,
+    build_job_emit_payload,
+    compact_job_payload,
+    validate_job_payload,
+)
 from database import (
     add_job_log,
     count_job_logs,
@@ -13,6 +28,7 @@ from database import (
 )
 from jobs.transitions import transition_cancel, transition_retry
 from library_db import JOB_TYPES_REQUIRING_CATALOG, describe_library_db
+from spectree import Response
 from utils.responses import success_paginated
 from flask import Blueprint, current_app, jsonify, request
 
@@ -30,37 +46,15 @@ def _db_busy_response():
     return jsonify({'error': _DB_BUSY_MESSAGE, 'code': 'db_busy'}), 503
 
 
-_CHECKPOINT_LIST_KEYS = (
-    'processed_pairs',
-    'processed_media_keys',
-    'processed_image_keys',
-    'processed_triplets',
-)
+def _job_response(job: dict, **extra) -> dict:
+    return build_job_emit_payload(current_app.db, job, **extra)
 
-
-def _compact_checkpoint_lists(checkpoint: dict) -> dict:
-    compact = dict(checkpoint)
-    for key in _CHECKPOINT_LIST_KEYS:
-        value = compact.get(key)
-        if isinstance(value, list):
-            compact[f'{key}_count'] = len(value)
-            del compact[key]
-    return compact
-
-
-def _compact_job_payload(job: dict) -> dict:
-    payload = dict(job)
-    metadata = payload.get('metadata')
-    if isinstance(metadata, dict):
-        checkpoint = metadata.get('checkpoint')
-        if isinstance(checkpoint, dict):
-            payload['metadata'] = {
-                **metadata,
-                'checkpoint': _compact_checkpoint_lists(checkpoint),
-            }
-    return payload
 
 @bp.route('/', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=JobsListResponse),
+    tags=['jobs'],
+)
 def list_all_jobs():
     status = request.args.get('status')
     limit = request.args.get('limit', default=50, type=int)
@@ -68,11 +62,22 @@ def list_all_jobs():
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
     jobs = list_jobs(current_app.db, status=status, limit=limit, offset=offset)
-    jobs = [_compact_job_payload(job) for job in jobs]
+    jobs = [validate_job_payload(job) for job in jobs]
     total = count_jobs(current_app.db, status=status)
     return success_paginated(jobs, total=total, offset=offset, limit=limit)
 
+
 @bp.route('/', methods=['POST'])
+@spec.validate(
+    json=JobCreateRequest,
+    resp=Response(
+        HTTP_201=Job,
+        HTTP_400=ErrorBody,
+        HTTP_422=CatalogUnavailableError,
+        HTTP_503=DbBusyError,
+    ),
+    tags=['jobs'],
+)
 def create_new_job():
     data = request.json
 
@@ -104,11 +109,17 @@ def create_new_job():
 
     from app import socketio
 
+    payload = _job_response(job)
     if socketio:
-        socketio.emit('job_created', _compact_job_payload(job))
-    return jsonify(_compact_job_payload(job)), 201
+        socketio.emit('job_created', payload)
+    return jsonify(payload), 201
+
 
 @bp.route('/<job_id>', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=Job, HTTP_404=ErrorBody),
+    tags=['jobs'],
+)
 def get_job_details(job_id):
     # Resolve the tail size **before** loading the job so ``get_job`` only
     # pulls the rows the client actually needs. The frontend's modal view
@@ -137,9 +148,19 @@ def get_job_details(job_id):
     # ``logs_total`` must reflect the *full* log count, not the tail length,
     # so the frontend can render "showing N of M" correctly.
     job['logs_total'] = count_job_logs(current_app.db, job_id)
-    return jsonify(_compact_job_payload(job))
+    return jsonify(_job_response(job))
+
 
 @bp.route('/<job_id>', methods=['DELETE'])
+@spec.validate(
+    resp=Response(
+        HTTP_200=Job,
+        HTTP_400=ErrorBody,
+        HTTP_404=ErrorBody,
+        HTTP_503=DbBusyError,
+    ),
+    tags=['jobs'],
+)
 def cancel_job(job_id):
     from api import jobs as jobs_mod
     from app import get_job_runner, socketio
@@ -164,21 +185,32 @@ def cancel_job(job_id):
                 r.signal_cancel(job_id)
 
         if outcome.edge == 'noop':
-            return jsonify({
-                **_compact_job_payload(outcome.job),
-                'cancel_noop': True,
-                'cancel_noop_reason': outcome.reason,
-            })
+            return jsonify(_job_response(
+                outcome.job,
+                cancel_noop=True,
+                cancel_noop_reason=outcome.reason,
+            ))
 
+        payload = _job_response(outcome.job)
         if socketio:
-            socketio.emit('job_updated', _compact_job_payload(outcome.job))
-        return jsonify(_compact_job_payload(outcome.job))
+            socketio.emit('job_updated', payload)
+        return jsonify(payload)
     except sqlite3.OperationalError as e:
         if 'locked' in str(e).lower() or 'busy' in str(e).lower():
             return _db_busy_response()
         raise
 
+
 @bp.route('/<job_id>/retry', methods=['POST'])
+@spec.validate(
+    resp=Response(
+        HTTP_200=Job,
+        HTTP_400=ErrorBody,
+        HTTP_404=ErrorBody,
+        HTTP_503=DbBusyError,
+    ),
+    tags=['jobs'],
+)
 def retry_job(job_id):
     from api import jobs as jobs_mod
 
@@ -197,7 +229,7 @@ def retry_job(job_id):
         if outcome.edge == 'invalid':
             return jsonify({'error': outcome.reason}), 400
 
-        return jsonify(_compact_job_payload(outcome.job))
+        return jsonify(_job_response(outcome.job))
     except sqlite3.OperationalError as e:
         if 'locked' in str(e).lower() or 'busy' in str(e).lower():
             return _db_busy_response()
@@ -205,12 +237,20 @@ def retry_job(job_id):
 
 
 @bp.route('/active', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=JobListResponse),
+    tags=['jobs'],
+)
 def list_active_jobs():
     jobs = get_active_jobs(current_app.db)
-    return jsonify([_compact_job_payload(job) for job in jobs])
+    return jsonify([validate_job_payload(job) for job in jobs])
 
 
 @bp.route('/health', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=JobsHealth),
+    tags=['jobs'],
+)
 def get_jobs_health():
     """Expose subsystem health so the UI can warn before users enqueue broken jobs.
 
@@ -232,6 +272,10 @@ _PROCESSOR_STALE_AFTER_SECONDS = 15.0
 
 
 @bp.route('/_processor_health', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=JobsProcessorHealth),
+    tags=['jobs'],
+)
 def get_processor_health():
     """Diagnose the background job processor — was it started, is it ticking?
 

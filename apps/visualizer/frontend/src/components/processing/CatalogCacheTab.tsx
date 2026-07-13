@@ -149,6 +149,7 @@ export function CatalogCacheTab({ onOpenJobQueue }: CatalogCacheTabProps) {
       return PROCESSING_EMBED_CATALOG_QUEUED;
     }
     const labels: Record<Exclude<AdvancedBusyKey, 'embed_catalog' | 'embed_catalog_ig'>, string> = {
+      sync: CATALOG_CACHE_SYNC_LABEL,
       stack: CATALOG_CACHE_STACK_DETECT_LABEL,
       similarity: CATALOG_CACHE_SIMILARITY_LABEL,
       prepare: CATALOG_CACHE_PREPARE_CATALOG_TITLE,

@@ -41,7 +41,7 @@ The visualizer is the web product that surfaces library data to the user. It con
 | `jobs/handlers/` | Per-job-family handler modules (`analyze`, `matching`, `embed`, …) |
 | `jobs/transitions.py` | Pure cancel/retry state machine (`transition_cancel`, `transition_retry`) |
 | `jobs/checkpoint.py` | Checkpoint merge logic |
-| `api/jobs.py` | REST endpoints for job CRUD and cancellation |
+| `api/jobs.py` | REST endpoints for job CRUD and cancellation (spectree + pydantic — ADR-0013) |
 | `api/images.py` | Image listing, detail, thumbnail endpoints |
 | `api/descriptions.py` | Description fetch/trigger endpoints |
 | `api/scores.py` | Score endpoints per image/perspective |
@@ -63,7 +63,7 @@ The visualizer is the web product that surfaces library data to the user. It con
 | `src/hooks/` | Custom hooks (e.g. `useJobSocket` — invalidates `jobs.list` on server-emitted `job_created`) |
 | `src/stores/` | Zustand stores (minimal — mainly WebSocket state) |
 | `src/constants/` | UI strings and other constants |
-| `src/types/` | Shared TypeScript types |
+| `src/types/` | Shared TypeScript types; Jobs types generated from backend OpenAPI (`api.gen.ts`, ADR-0013) |
 
 The server emits `job_created` on job creation (`POST /jobs`); `useJobSocket` owns the resulting `jobs.list` invalidation. No component hand-bubbles a job-list-refresh callback (e.g. an `onJobEnqueued` prop) outside `useJobSocket` — refresh-on-enqueue is driven by the server's `job_created` event. No component subscribes to job socket events (`job_created` / `job_updated` / `jobs_recovered`) outside `useJobSocket`. Per-job `subscribe_job` / `unsubscribe_job` emits are the one allowed exception (job-instance scoped, not fan-out).
 
@@ -79,3 +79,4 @@ The server emits `job_created` on job creation (`POST /jobs`); `useJobSocket` ow
 - **Job-type knowledge through `JOB_TYPES` only** (ADR-0010): dispatch (`get_job_handler`), catalog gating (`catalog_requiring_job_types` / `JOB_TYPES_REQUIRING_CATALOG`), and checkpoint helpers are registry projections — no second handler map or catalog frozenset (enforced by `test_job_registry_guardrail.py`).
 - **Job status transitions through `jobs/transitions.py` only** (ADR-0010): `api/jobs.py` delegates cancel/retry to `transition_cancel` / `transition_retry`; no cancellable/retryable status sets or `update_job_status` targets in routes (enforced by `test_job_transitions_guardrail.py`).
 - **Library-DB lifecycle through `make_managed_library_db` only** (ADR-0011): handler modules bind one module-level CM via `jobs/handlers/db_lifecycle.py`; no hand-rolled `init_database(...)` + manual `close()` in handler orchestration (enforced by `test_db_lifecycle_guardrail.py`).
+- **API contract seam — backend-authoritative OpenAPI** (ADR-0013): Jobs response shapes are pydantic models exposed via spectree; frontend Jobs types are generated from OpenAPI (`npm run generate:api` → `src/types/api.gen.ts`); drift is gated in CI (see `.sandcastle/ci-drift-gate.yml`). Coverage is Jobs-only until V7 — other endpoint groups still use hand-written TS until their slices land.
