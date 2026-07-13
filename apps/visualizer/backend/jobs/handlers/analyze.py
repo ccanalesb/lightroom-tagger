@@ -104,9 +104,10 @@ def _score_single_image(
     provider_id,
     provider_model,
     log_callback,
-) -> tuple[str, bool, str | None]:
-    """Score one image for one perspective. Returns ``(status, success, error)``."""
+):
+    """Score one image for one perspective. Returns a :class:`VisionOpOutcome`."""
     from lightroom_tagger.core.scoring_service import score_image_for_perspective
+    from lightroom_tagger.core.vision_op import VisionOpOutcome
 
     try:
         return score_image_for_perspective(
@@ -120,7 +121,7 @@ def _score_single_image(
             log_callback=log_callback,
         )
     except Exception as e:
-        return ('failed', False, str(e))
+        return VisionOpOutcome(status='failed', reason=str(e))
 
 
 def _diagnose_describe_skip(lib_db, key: str, itype: str, force: bool) -> str:
@@ -321,19 +322,19 @@ def handle_single_score(runner, job_id: str, metadata: dict):
                 return
 
             for slug in slugs:
-                status, _success, err = _score_single_image(
+                outcome = _score_single_image(
                     lib_db, image_key, image_type, slug, force,
                     provider_id, provider_model, log_callback,
                 )
-                if status == 'scored':
+                if outcome.wrote:
                     scored += 1
-                elif status == 'skipped':
+                elif outcome.status == 'skipped':
                     skipped += 1
                 else:
                     failed += 1
                     runner.fail_job(
                         job_id,
-                        err or f'Scoring failed for perspective {slug!r}',
+                        outcome.reason or f'Scoring failed for perspective {slug!r}',
                     )
                     return
 
@@ -1120,23 +1121,23 @@ def _run_score_pass(
                     f'Scoring {already_done + completed_parallel}/{total_at_start}',
                 )
                 try:
-                    status, _success, error_msg = future.result()
-                    if status == 'scored':
+                    outcome = future.result()
+                    if outcome.wrote:
                         scored += 1
                         consecutive_failures = 0
                         if not record_done(coord_key, coord_itype, coord_slug):
                             break
-                    elif status == 'skipped':
+                    elif outcome.status == 'skipped':
                         skipped += 1
                         _record_path_skip_from_status(
-                            path_diag, lib_db, coord_key, coord_itype, status,
+                            path_diag, lib_db, coord_key, coord_itype, 'skipped',
                             log_prefix=log_prefix,
                         )
                         add_job_log(
                             runner.db, job_id, 'warning',
-                            f'{log_prefix}{coord_key}|{coord_slug}: {error_msg}'
+                            f'{log_prefix}{coord_key}|{coord_slug}: {outcome.reason}'
                             if log_prefix else
-                            f'{coord_key}|{coord_slug}: {error_msg}',
+                            f'{coord_key}|{coord_slug}: {outcome.reason}',
                         )
                         if not record_done(coord_key, coord_itype, coord_slug):
                             break
@@ -1145,9 +1146,9 @@ def _run_score_pass(
                         consecutive_failures += 1
                         add_job_log(
                             runner.db, job_id, 'warning',
-                            f'{log_prefix}{coord_key}|{coord_slug}: {error_msg}'
+                            f'{log_prefix}{coord_key}|{coord_slug}: {outcome.reason}'
                             if log_prefix else
-                            f'{coord_key}|{coord_slug}: {error_msg}',
+                            f'{coord_key}|{coord_slug}: {outcome.reason}',
                         )
                 except Exception as e:
                     failed += 1
@@ -1184,28 +1185,28 @@ def _run_score_pass(
             def log_callback(level, message):
                 add_job_log(runner.db, job_id, level, f'{log_prefix}{message}' if log_prefix else message)
 
-            status, _success, error_msg = _score_single_image(
+            outcome = _score_single_image(
                 lib_db, key, itype, slug, force,
                 score_provider_id, score_provider_model, log_callback,
             )
 
-            if status == 'scored':
+            if outcome.wrote:
                 scored += 1
                 consecutive_failures = 0
                 if not record_done(key, itype, slug):
                     break
-            elif status == 'skipped':
+            elif outcome.status == 'skipped':
                 skipped += 1
                 _record_path_skip_from_status(
-                    path_diag, lib_db, key, itype, status, log_prefix=log_prefix,
+                    path_diag, lib_db, key, itype, 'skipped', log_prefix=log_prefix,
                 )
-                add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{key}|{slug}: {error_msg}' if log_prefix else f'{key}|{slug}: {error_msg}')
+                add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{key}|{slug}: {outcome.reason}' if log_prefix else f'{key}|{slug}: {outcome.reason}')
                 if not record_done(key, itype, slug):
                     break
             else:
                 failed += 1
                 consecutive_failures += 1
-                add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{key}|{slug}: {error_msg}' if log_prefix else f'{key}|{slug}: {error_msg}')
+                add_job_log(runner.db, job_id, 'warning', f'{log_prefix}{key}|{slug}: {outcome.reason}' if log_prefix else f'{key}|{slug}: {outcome.reason}')
 
             if consecutive_failures >= 10:
                 add_job_log(

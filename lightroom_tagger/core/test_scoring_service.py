@@ -39,19 +39,19 @@ def _scoring_patches(
     """Patch resolve_model + vision path helpers for scoring integration tests."""
     return (
         patch(
-            "lightroom_tagger.core.scoring_service.resolve_model",
+            "lightroom_tagger.core.vision_op.resolve_model",
             return_value=ResolvedModel(provider_id, model, mock_registry),
         ),
         patch(
-            "lightroom_tagger.core.scoring_service.FallbackDispatcher",
+            "lightroom_tagger.core.vision_op.FallbackDispatcher",
             return_value=mock_dispatcher,
         ),
         patch(
-            "lightroom_tagger.core.scoring_service.get_viewable_path_managed",
+            "lightroom_tagger.core.analyzer.scoring.get_viewable_path_managed",
             side_effect=lambda p: (p, False),
         ),
         patch(
-            "lightroom_tagger.core.scoring_service.compress_image",
+            "lightroom_tagger.core.analyzer.scoring.compress_image",
             side_effect=lambda p: p,
         ),
     )
@@ -115,13 +115,13 @@ def test_score_image_persists_row_and_passes_llm_fixer(tmp_path) -> None:
     with ExitStack() as stack:
         stack.enter_context(
             patch(
-                "lightroom_tagger.core.scoring_service.parse_score_response_with_retry",
+                "lightroom_tagger.core.analyzer.scoring.parse_score_response_with_retry",
                 side_effect=assert_fixer_not_none,
             ),
         )
         for p in _scoring_patches(mock_registry=mock_registry, mock_dispatcher=mock_dispatcher):
             stack.enter_context(p)
-        status, ok, err = score_image_for_perspective(
+        outcome = score_image_for_perspective(
             conn,
             image_key="2020-01-01_test.jpg",
             image_type="catalog",
@@ -132,9 +132,8 @@ def test_score_image_persists_row_and_passes_llm_fixer(tmp_path) -> None:
             log_callback=None,
         )
 
-    assert err is None
-    assert status == "scored"
-    assert ok is True
+    assert outcome.reason is None
+    assert outcome.wrote is True
 
     rows = get_current_scores_for_image(conn, "2020-01-01_test.jpg", "catalog")
     assert len(rows) == 1
@@ -196,7 +195,7 @@ def test_score_image_persists_not_attempted_for_optional_perspective(tmp_path) -
         )
         for p in _scoring_patches(mock_registry=mock_registry, mock_dispatcher=mock_dispatcher):
             stack.enter_context(p)
-        status, ok, err = score_image_for_perspective(
+        outcome = score_image_for_perspective(
             conn,
             image_key="2020-01-01_opt.jpg",
             image_type="catalog",
@@ -207,8 +206,8 @@ def test_score_image_persists_not_attempted_for_optional_perspective(tmp_path) -
             log_callback=None,
         )
 
-    assert err is None
-    assert status == "scored"
+    assert outcome.reason is None
+    assert outcome.wrote is True
     assert '"not_attempted"' in captured["prompt"]
     rows = get_current_scores_for_image(conn, "2020-01-01_opt.jpg", "catalog")
     assert rows[0]["not_attempted"] == 1
@@ -253,23 +252,23 @@ def test_score_image_honors_description_vision_model_env(tmp_path, monkeypatch) 
             return_value=registry,
         ),
         patch(
-            "lightroom_tagger.core.scoring_service.resolve_model",
+            "lightroom_tagger.core.vision_op.resolve_model",
             wraps=resolve_model,
         ),
         patch(
-            "lightroom_tagger.core.scoring_service.FallbackDispatcher",
+            "lightroom_tagger.core.vision_op.FallbackDispatcher",
             return_value=mock_dispatcher,
         ),
         patch(
-            "lightroom_tagger.core.scoring_service.get_viewable_path_managed",
+            "lightroom_tagger.core.analyzer.scoring.get_viewable_path_managed",
             side_effect=lambda p: (p, False),
         ),
         patch(
-            "lightroom_tagger.core.scoring_service.compress_image",
+            "lightroom_tagger.core.analyzer.scoring.compress_image",
             side_effect=lambda p: p,
         ),
     ):
-        status, ok, err = score_image_for_perspective(
+        outcome = score_image_for_perspective(
             conn,
             image_key="2020-01-01_env.jpg",
             image_type="catalog",
@@ -280,9 +279,8 @@ def test_score_image_honors_description_vision_model_env(tmp_path, monkeypatch) 
             log_callback=None,
         )
 
-    assert err is None
-    assert status == "scored"
-    assert ok is True
+    assert outcome.reason is None
+    assert outcome.wrote is True
     assert mock_dispatcher.call_with_fallback.call_args.kwargs["model"] == "env-desc-model"
 
 
@@ -310,11 +308,11 @@ def test_score_image_skips_video_without_calling_provider(tmp_path) -> None:
     conn.commit()
 
     with (
-        patch("lightroom_tagger.core.scoring_service.resolve_model") as mock_resolve,
-        patch("lightroom_tagger.core.scoring_service.FallbackDispatcher") as mock_disp,
-        patch("lightroom_tagger.core.scoring_service.compress_image") as mock_compress,
+        patch("lightroom_tagger.core.vision_op.resolve_model") as mock_resolve,
+        patch("lightroom_tagger.core.vision_op.FallbackDispatcher") as mock_disp,
+        patch("lightroom_tagger.core.analyzer.scoring.compress_image") as mock_compress,
     ):
-        status, ok, err = score_image_for_perspective(
+        outcome = score_image_for_perspective(
             conn,
             image_key="2024-06-01_clip",
             image_type="catalog",
@@ -325,12 +323,11 @@ def test_score_image_skips_video_without_calling_provider(tmp_path) -> None:
             log_callback=None,
         )
 
-    assert status == "skipped"
-    assert ok is False
-    assert err is not None and "Video file not scorable" in err
+    assert outcome.status == "skipped"
+    assert outcome.wrote is False
+    assert outcome.reason is not None and "Video file not scorable" in outcome.reason
     mock_resolve.assert_not_called()
     mock_disp.assert_not_called()
     mock_compress.assert_not_called()
-    # And nothing was written to image_scores
     rows = get_current_scores_for_image(conn, "2024-06-01_clip", "catalog")
     assert rows == []

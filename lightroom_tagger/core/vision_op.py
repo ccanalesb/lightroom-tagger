@@ -66,7 +66,11 @@ def run_vision_op(spec: VisionOpSpec) -> tuple[Any, str, str]:
             model=model,
             log_callback=spec.log_callback,
         )
-        return spec.parse_response(raw), actual_provider, actual_model
+        try:
+            parsed = spec.parse_response(raw, actual_provider, actual_model)
+        except TypeError:
+            parsed = spec.parse_response(raw)
+        return parsed, actual_provider, actual_model
     finally:
         if spec._cleanup is not None:
             spec._cleanup()

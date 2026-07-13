@@ -3,6 +3,9 @@
 from unittest.mock import MagicMock, patch
 
 from jobs.checkpoint import fingerprint_batch_score
+from lightroom_tagger.core.vision_op import VisionOpOutcome
+
+_WRITTEN = VisionOpOutcome(status='written')
 
 
 def _make_runner():
@@ -152,7 +155,7 @@ def test_batch_score_fingerprint_mismatch_resets_and_reprocesses(
             },
         },
     }
-    mock_score.return_value = ('scored', True, None)
+    mock_score.return_value = _WRITTEN
 
     runner = _make_runner()
     handle_batch_score(runner, 'job-fpm-score', metadata)
@@ -259,7 +262,7 @@ def test_batch_score_should_call_score_for_each_triplet(
         {'key': 'img2'},
     ]
     mock_init_db.return_value = mock_db
-    mock_score.return_value = ('scored', True, None)
+    mock_score.return_value = _WRITTEN
 
     runner = _make_runner()
 
@@ -319,7 +322,7 @@ def test_batch_score_non_force_never_calls_get_undescribed_catalog_images(
 
     mock_db.execute.side_effect = _execute_side_effect
     mock_init_db.return_value = mock_db
-    mock_score.return_value = ('scored', True, None)
+    mock_score.return_value = _WRITTEN
 
     runner = _make_runner()
 
