@@ -78,14 +78,8 @@ def _rel_path(path: Path) -> str:
     return path.relative_to(_REPO_ROOT).as_posix()
 
 
-def _scan_file_for_formula_leaks(path: Path) -> list[_FormulaLeakHit]:
-    rel = _rel_path(path)
-    if rel == _FORMULA_FILE:
-        return []
-
-    source = path.read_text(encoding="utf-8")
+def _scan_source_for_formula_leaks(rel: str, source: str) -> list[_FormulaLeakHit]:
     hits: list[_FormulaLeakHit] = []
-
     for pattern_name, pattern in (
         ("weighted_sum", _WEIGHTED_SUM_RE),
         ("phash_normalize", _PHASH_NORMALIZE_RE),
@@ -94,8 +88,14 @@ def _scan_file_for_formula_leaks(path: Path) -> list[_FormulaLeakHit]:
             line = source.count("\n", 0, match.start()) + 1
             snippet = match.group(0).replace("\n", " ").strip()
             hits.append(_FormulaLeakHit(rel, line, pattern_name, snippet))
-
     return hits
+
+
+def _scan_file_for_formula_leaks(path: Path) -> list[_FormulaLeakHit]:
+    rel = _rel_path(path)
+    if rel == _FORMULA_FILE:
+        return []
+    return _scan_source_for_formula_leaks(rel, path.read_text(encoding="utf-8"))
 
 
 def _scan_all_matcher_files() -> list[_FormulaLeakHit]:
@@ -154,12 +154,9 @@ def test_detector_allows_formula_module() -> None:
 
 def _scan_file_for_formula_leaks_from_source(source: str) -> list[_FormulaLeakHit]:
     """Scan arbitrary source as if it were a matcher module (not score_formula.py)."""
-    path = _MATCHER_DIR / "_synthetic_leak_probe.py"
-    path.write_text(source, encoding="utf-8")
-    try:
-        return _scan_file_for_formula_leaks(path)
-    finally:
-        path.unlink(missing_ok=True)
+    return _scan_source_for_formula_leaks(
+        "lightroom_tagger/core/matcher/_synthetic_leak_probe.py", source
+    )
 
 
 def test_formula_module_is_pure() -> None:
