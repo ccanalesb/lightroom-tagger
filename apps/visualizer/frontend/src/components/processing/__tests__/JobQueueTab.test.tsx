@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { JobQueueTab } from '../JobQueueTab';
 import type { Job } from '../../../types/job';
+import { JOB_TEST_DEFAULTS } from '../../../types/jobTestDefaults';
 
 vi.mock('../../jobs/JobDetailModal', () => ({
   JobDetailModal: () => null,
@@ -29,6 +30,7 @@ function makeJobs(count: number, offset = 0): Job[] {
     started_at: null,
     completed_at: null,
     metadata: {},
+    ...JOB_TEST_DEFAULTS,
   } as Job));
 }
 

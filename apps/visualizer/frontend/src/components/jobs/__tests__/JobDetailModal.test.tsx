@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import { deleteMatching } from '../../../data/cache';
 import { JobDetailModal } from '../JobDetailModal';
 import type { Job } from '../../../types/job';
+import { JOB_TEST_DEFAULTS } from '../../../types/jobTestDefaults';
 import {
   JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE,
   JOB_SKIP_EMPTY_PATH,
@@ -45,6 +46,7 @@ function makeJob(overrides: Partial<Job> = {}): Job {
     started_at: null,
     completed_at: null,
     metadata: {},
+    ...JOB_TEST_DEFAULTS,
     ...overrides,
   } as Job;
 }

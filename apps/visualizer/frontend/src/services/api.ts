@@ -1,8 +1,8 @@
 import { invalidate, invalidateAll, patchMatching } from '../data'
-import { Job } from '../types/job'
+import type { Job, JobsGetOptions, JobsHealth, JobsListResponse } from '../types/job'
 import { API_DEFAULT_URL } from '../constants/strings'
 
-export type { Job }
+export type { Job, JobsGetOptions, JobsHealth, JobsListResponse }
 
 const API_URL = import.meta.env.VITE_API_URL || API_DEFAULT_URL
 
@@ -119,16 +119,6 @@ export const PerspectivesAPI = {
   },
 }
 
-export interface JobsListResponse {
-  total: number
-  data: Job[]
-  pagination: PaginationMeta
-}
-
-export interface JobsGetOptions {
-  logs_limit?: number
-}
-
 export const JobsAPI = {
   list: (params?: { status?: string; limit?: number; offset?: number }) => {
     const sp = new URLSearchParams()
@@ -179,17 +169,6 @@ export const JobsAPI = {
 
   health: () =>
     request<JobsHealth>('/jobs/health'),
-}
-
-export interface JobsHealth {
-  library_db: {
-    path: string | null
-    source: 'env' | 'config' | 'default' | 'none'
-    exists: boolean
-    reason: string | null
-  }
-  jobs_requiring_catalog: string[]
-  catalog_available: boolean
 }
 
 export const ConfigAPI = {

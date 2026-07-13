@@ -40,7 +40,8 @@ def mock_runner(monkeypatch):
 
 
 def _create(client, status='pending'):
-    resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    resp = client.post('/api/jobs/', json={'type': 'analyze_instagram', 'metadata': {}})
+    assert resp.status_code == 201, resp.json
     job_id = resp.json['id']
     if status != 'pending':
         update_job_status(client.application.db, job_id, status)
@@ -50,6 +51,7 @@ def _create(client, status='pending'):
 @pytest.mark.parametrize('status', ['pending', 'running'])
 def test_cancel_active_job_emits_socketio(client, mock_socketio, mock_runner, status):
     job_id = _create(client, status)
+    mock_socketio.emit.reset_mock()
 
     response = client.delete(f'/api/jobs/{job_id}')
 
@@ -68,6 +70,7 @@ def test_cancel_active_job_emits_socketio(client, mock_socketio, mock_runner, st
 @pytest.mark.parametrize('status', ['cancelled', 'completed', 'failed'])
 def test_cancel_terminal_job_is_noop(client, mock_socketio, mock_runner, status):
     job_id = _create(client, status)
+    mock_socketio.emit.reset_mock()
 
     response = client.delete(f'/api/jobs/{job_id}')
 

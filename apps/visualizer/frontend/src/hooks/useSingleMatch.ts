@@ -47,10 +47,11 @@ export function useSingleMatch(imageKey: string) {
             clearPoll();
             setMatchState("done");
             setMatchError(null);
-            if (job.result) {
+            if (job.result && typeof job.result === 'object') {
+              const result = job.result as { matched?: number; best_score?: number };
               setMatchResult({
-                matched: job.result.matched ?? 0,
-                score: job.result.best_score,
+                matched: result.matched ?? 0,
+                score: result.best_score,
               });
             }
           }

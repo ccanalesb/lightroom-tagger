@@ -25,6 +25,7 @@ def client():
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, 'test.db')
         app = create_app()
+        app.config['PROPAGATE_EXCEPTIONS'] = True
         app.db = init_db(db_path)
         client = app.test_client()
         yield client

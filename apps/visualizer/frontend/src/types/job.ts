@@ -1,26 +1,13 @@
-export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+import type { components } from './api.gen'
 
-export interface JobLog {
-  timestamp: string
-  level: 'info' | 'warning' | 'error'
-  message: string
-}
+/** Generated from backend OpenAPI — see ADR-0013. */
+export type Job = components['schemas']['Job.45d9b59']
+export type JobLog = components['schemas']['Job.45d9b59.JobLog']
+export type JobStatus = Job['status']
+export type JobsListResponse = components['schemas']['JobsListResponse.45d9b59']
+export type JobsHealth = components['schemas']['JobsHealth.45d9b59']
 
-export interface Job {
-  id: string
-  type: string
-  status: JobStatus
-  progress: number
-  current_step: string | null
-  logs: JobLog[]
-  logs_total?: number
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  result: any | null
-  error: string | null
-  error_severity?: 'warning' | 'error' | 'critical' | null
-  created_at: string
-  started_at: string | null
-  completed_at: string | null
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  metadata: Record<string, any>
+/** Client query param for ``GET /api/jobs/:id`` (not part of response schema). */
+export type JobsGetOptions = {
+  logs_limit?: number
 }
