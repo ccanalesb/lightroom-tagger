@@ -14,6 +14,7 @@ import type {
 } from '../types/providers'
 import type {
   AnalyticsGranularity,
+  CaptionHashtagMeta,
   CaptionStatsResponse,
   HeatmapCell,
   PostingFrequencyBucket,
@@ -31,6 +32,7 @@ import { API_DEFAULT_URL } from '../constants/strings'
 export type { Job, JobsGetOptions, JobsHealth, JobsListResponse }
 export type {
   AnalyticsGranularity,
+  CaptionHashtagMeta,
   CaptionStatsResponse,
   HeatmapCell,
   PostingFrequencyBucket,
