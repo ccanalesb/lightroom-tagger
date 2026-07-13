@@ -15,7 +15,7 @@ const specFile = join(frontendRoot, '.openapi', 'openapi.json');
 
 mkdirSync(dirname(specFile), { recursive: true });
 
-const python = process.env.PYTHON ?? join(backendRoot, '..', '..', '..', '.venv', 'bin', 'python');
+const python = process.env.PYTHON ?? 'python3';
 const exportScript = join(backendRoot, 'scripts', 'export_openapi.py');
 
 const specJson = execFileSync(python, [exportScript], {
