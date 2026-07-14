@@ -306,6 +306,38 @@ def test_batch_describe_backfill_logs_and_completes_when_no_catalog_matches(
 
 
 @patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._select_catalog_keys_missing_visual_tags')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
+def test_batch_describe_logs_when_backfill_combined_with_force(
+    _mock_exists, mock_getenv, mock_config, mock_init_db, mock_backfill_select, mock_add_log,
+):
+    from jobs.handlers import handle_batch_describe
+
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_init_db.return_value = MagicMock()
+    mock_backfill_select.return_value = []
+
+    runner = MagicMock()
+    runner.db = MagicMock()
+    runner.is_cancelled.return_value = False
+
+    handle_batch_describe(
+        runner,
+        'test-job',
+        {'image_type': 'catalog', 'backfill_visual_tags': True, 'force': True},
+    )
+
+    assert any(
+        len(call.args) > 3
+        and 'cannot be combined with force regenerate' in (call.args[3] or '')
+        for call in mock_add_log.call_args_list
+    )
+
+
+@patch('jobs.handlers.analyze.add_job_log')
 @patch('lightroom_tagger.core.description_service.describe_matched_image')
 @patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
 @patch('jobs.handlers.analyze.get_job')

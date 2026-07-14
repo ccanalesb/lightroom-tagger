@@ -791,6 +791,8 @@ export const ANALYZE_FORCE_DESCRIBE_LABEL = 'Force regenerate descriptions'
 export const ANALYZE_FORCE_SCORE_LABEL = 'Force regenerate scores'
 export const ANALYZE_BACKFILL_VISUAL_TAGS_LABEL =
   'Backfill visual tags (re-describe images with missing color/mood data)'
+export const ANALYZE_BACKFILL_FORCE_EXCLUSIVE_HINT =
+  'Backfill and force regenerate cannot be combined — only one mode is active at a time.'
 export const ANALYZE_JOB_STARTED =
   'Analyze job started! Check Job Queue tab to monitor progress.'
 export const ANALYZE_DESCRIBE_JOB_STARTED =

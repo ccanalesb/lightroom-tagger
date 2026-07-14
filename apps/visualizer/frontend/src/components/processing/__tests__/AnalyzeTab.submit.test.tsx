@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 
 import { deleteMatching } from '../../../data/cache';
 import { AnalyzeTab } from '../AnalyzeTab';
-import { ANALYZE_BACKFILL_VISUAL_TAGS_LABEL } from '../../../constants/strings';
+import { ANALYZE_BACKFILL_FORCE_EXCLUSIVE_HINT, ANALYZE_BACKFILL_VISUAL_TAGS_LABEL, ANALYZE_FORCE_DESCRIBE_LABEL, ANALYZE_FORCE_SCORE_LABEL } from '../../../constants/strings';
 
 // Minimal MatchOptions provider the component expects. We stub it directly
 // rather than mounting the real provider so the test stays focused on the
@@ -161,5 +161,133 @@ describe('AnalyzeTab submit UX (fix #1)', () => {
     await waitFor(() => expect(mockCreate).toHaveBeenCalled());
     const [, batchMeta] = mockCreate.mock.calls[0] as [string, Record<string, unknown>];
     expect(batchMeta).toMatchObject({ backfill_visual_tags: true });
+    expect(batchMeta.force).not.toBe(true);
+    expect(batchMeta.force_describe).toBeUndefined();
+    expect(batchMeta.force_score).toBeUndefined();
+  });
+});
+
+function metadataHasBackfillWithForce(meta: Record<string, unknown>): boolean {
+  if (meta.backfill_visual_tags !== true) return false;
+  return (
+    meta.force === true ||
+    meta.force_describe === true ||
+    meta.force_score === true
+  );
+}
+
+describe('AnalyzeTab toggle mutual exclusivity', () => {
+  beforeEach(() => {
+    deleteMatching(() => true);
+    mockCreate.mockReset();
+    mockListPerspectives.mockReset();
+    mockGetDefaults.mockReset();
+    mockListPerspectives.mockResolvedValue([
+      { slug: 'street', display_name: 'Street' },
+    ]);
+    mockGetDefaults.mockResolvedValue({ description: { provider: 'ollama', model: 'llava' } });
+    mockCreate.mockResolvedValue({ id: 'job-id', type: 'batch_analyze' });
+  });
+
+  async function openAdvanced() {
+    renderAnalyzeTab();
+    await screen.findByText(/Street/);
+    fireEvent.click(screen.getByRole('button', { name: /Advanced options/i }));
+  }
+
+  it('checking backfill clears and disables both force toggles with a hint', async () => {
+    await openAdvanced();
+
+    const forceDescribe = screen.getByRole('checkbox', { name: ANALYZE_FORCE_DESCRIBE_LABEL });
+    const forceScore = screen.getByRole('checkbox', { name: ANALYZE_FORCE_SCORE_LABEL });
+    const backfill = await screen.findByRole('checkbox', { name: ANALYZE_BACKFILL_VISUAL_TAGS_LABEL });
+
+    fireEvent.click(forceDescribe);
+    fireEvent.click(forceScore);
+    expect(forceDescribe).toBeChecked();
+    expect(forceScore).toBeChecked();
+
+    fireEvent.click(backfill);
+
+    expect(backfill).toBeChecked();
+    expect(forceDescribe).not.toBeChecked();
+    expect(forceScore).not.toBeChecked();
+    expect(forceDescribe).toBeDisabled();
+    expect(forceScore).toBeDisabled();
+    expect(screen.getByText(ANALYZE_BACKFILL_FORCE_EXCLUSIVE_HINT)).toBeTruthy();
+  });
+
+  it('checking force describe clears and disables backfill', async () => {
+    await openAdvanced();
+
+    const forceDescribe = screen.getByRole('checkbox', { name: ANALYZE_FORCE_DESCRIBE_LABEL });
+    const backfill = await screen.findByRole('checkbox', { name: ANALYZE_BACKFILL_VISUAL_TAGS_LABEL });
+
+    fireEvent.click(backfill);
+    expect(backfill).toBeChecked();
+
+    fireEvent.click(forceDescribe);
+
+    expect(forceDescribe).toBeChecked();
+    expect(backfill).not.toBeChecked();
+    expect(backfill).toBeDisabled();
+    expect(screen.getByText(ANALYZE_BACKFILL_FORCE_EXCLUSIVE_HINT)).toBeTruthy();
+  });
+
+  it('checking force score clears and disables backfill', async () => {
+    await openAdvanced();
+
+    const forceScore = screen.getByRole('checkbox', { name: ANALYZE_FORCE_SCORE_LABEL });
+    const backfill = await screen.findByRole('checkbox', { name: ANALYZE_BACKFILL_VISUAL_TAGS_LABEL });
+
+    fireEvent.click(backfill);
+    fireEvent.click(forceScore);
+
+    expect(forceScore).toBeChecked();
+    expect(backfill).not.toBeChecked();
+    expect(backfill).toBeDisabled();
+  });
+
+  it('analyze submit metadata never combines backfill with force flags', async () => {
+    await openAdvanced();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: ANALYZE_FORCE_DESCRIBE_LABEL }));
+    fireEvent.click(screen.getByRole('button', { name: /^Analyze/i }));
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    expect(metadataHasBackfillWithForce(mockCreate.mock.calls[0][1] as Record<string, unknown>)).toBe(false);
+
+    mockCreate.mockClear();
+    fireEvent.click(screen.getByRole('checkbox', { name: ANALYZE_BACKFILL_VISUAL_TAGS_LABEL }));
+    fireEvent.click(screen.getByRole('button', { name: /^Analyze/i }));
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    expect(metadataHasBackfillWithForce(mockCreate.mock.calls[0][1] as Record<string, unknown>)).toBe(false);
+  });
+
+  it('describe-only submit metadata never combines backfill with force', async () => {
+    await openAdvanced();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: ANALYZE_FORCE_DESCRIBE_LABEL }));
+    fireEvent.click(screen.getByRole('button', { name: /Generate Descriptions only/i }));
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    expect(metadataHasBackfillWithForce(mockCreate.mock.calls[0][1] as Record<string, unknown>)).toBe(false);
+
+    mockCreate.mockClear();
+    fireEvent.click(screen.getByRole('checkbox', { name: ANALYZE_BACKFILL_VISUAL_TAGS_LABEL }));
+    fireEvent.click(screen.getByRole('button', { name: /Generate Descriptions only/i }));
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    const meta = mockCreate.mock.calls[0][1] as Record<string, unknown>;
+    expect(metadataHasBackfillWithForce(meta)).toBe(false);
+    expect(meta).toMatchObject({ backfill_visual_tags: true, force: false });
+  });
+
+  it('score-only submit metadata never combines backfill with force', async () => {
+    await openAdvanced();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: ANALYZE_FORCE_SCORE_LABEL }));
+    fireEvent.click(screen.getByRole('button', { name: /Run scoring only/i }));
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    const meta = mockCreate.mock.calls[0][1] as Record<string, unknown>;
+    expect(metadataHasBackfillWithForce(meta)).toBe(false);
+    expect(meta.backfill_visual_tags).toBeUndefined();
   });
 });
