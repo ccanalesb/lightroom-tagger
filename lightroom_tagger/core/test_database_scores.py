@@ -24,7 +24,7 @@ def test_insert_image_score_persists_not_attempted(tmp_path) -> None:
     conn.execute(
         """
         INSERT INTO perspectives (slug, display_name, description, prompt_markdown)
-        VALUES ('framing', 'Framing', '', '')
+        VALUES ('not_attempted_persp', 'Not Attempted', '', '')
         """
     )
     conn.commit()
@@ -34,7 +34,7 @@ def test_insert_image_score_persists_not_attempted(tmp_path) -> None:
         {
             "image_key": "2020-01-01_x.jpg",
             "image_type": "catalog",
-            "perspective_slug": "framing",
+            "perspective_slug": "not_attempted_persp",
             "score": 5,
             "rationale": "absent",
             "prompt_version": "v1",
