@@ -46,7 +46,6 @@ def _run_semantic_search(
     score_perspective: str | None,
     limit: int,
     offset: int,
-    restrict_to_keys: frozenset[str] | None = None,
 ) -> SearchResult:
     qstrip = _validate_semantic_message(message)
 
@@ -57,16 +56,14 @@ def _run_semantic_search(
         raise CatalogSearchInputError("query must contain at least one searchable term")
 
     blob = embed_query_to_vec_blob(qstrip)
-    hybrid_kwargs: dict[str, object] = {
-        "user_query": qstrip,
-        "fts_match": match_str,
-        "query_vec_blob": blob,
-        "limit": limit,
-        "offset": offset,
-    }
-    if restrict_to_keys is not None:
-        hybrid_kwargs["restrict_to_keys"] = restrict_to_keys
-    sem_rows, total, meta = run_semantic_hybrid_search(db, **hybrid_kwargs)
+    sem_rows, total, meta = run_semantic_hybrid_search(
+        db,
+        user_query=qstrip,
+        fts_match=match_str,
+        query_vec_blob=blob,
+        limit=limit,
+        offset=offset,
+    )
 
     keys = [r.image_key for r in sem_rows]
     catalog_rows = query_catalog_images_by_keys(

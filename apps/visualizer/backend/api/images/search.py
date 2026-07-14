@@ -25,11 +25,11 @@ from api.schemas.search import (
 )
 
 from lightroom_tagger.core import nl_catalog_search
-from lightroom_tagger.core.catalog_search import CatalogSearchInputError, search_catalog
 from lightroom_tagger.core.catalog_nl_filter import (
     catalog_nl_filter_to_query_kwargs,
     parse_catalog_nl_filter_from_llm,
 )
+from lightroom_tagger.core.catalog_search import CatalogSearchInputError, search_catalog
 from lightroom_tagger.core.clip_similarity import (
     NoClipEmbeddingError,
     list_pin_similarity_candidate_keys,
