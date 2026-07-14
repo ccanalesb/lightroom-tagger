@@ -29,6 +29,7 @@ import {
   ANALYZE_DESCRIBE_JOB_STARTED,
   ANALYZE_FORCE_DESCRIBE_LABEL,
   ANALYZE_FORCE_SCORE_LABEL,
+  ANALYZE_BACKFILL_FORCE_EXCLUSIVE_HINT,
   ANALYZE_BACKFILL_VISUAL_TAGS_LABEL,
   ANALYZE_JOB_FAILED_PREFIX,
   ANALYZE_JOB_STARTED,
@@ -190,6 +191,24 @@ export function AnalyzeTab() {
     descProviderModel,
     selectedPerspectiveSlugs,
   ]);
+
+  const handleForceDescribeChange = useCallback((checked: boolean) => {
+    setForceDescribe(checked);
+    if (checked) setBackfillVisualTags(false);
+  }, []);
+
+  const handleForceScoreChange = useCallback((checked: boolean) => {
+    setForceScore(checked);
+    if (checked) setBackfillVisualTags(false);
+  }, []);
+
+  const handleBackfillVisualTagsChange = useCallback((checked: boolean) => {
+    setBackfillVisualTags(checked);
+    if (checked) {
+      setForceDescribe(false);
+      setForceScore(false);
+    }
+  }, []);
 
   const buildBatchJobMetadata = useCallback((): Record<string, unknown> => {
     return {
@@ -375,12 +394,13 @@ export function AnalyzeTab() {
                 type="checkbox"
                 id="force-regenerate-describe"
                 checked={forceDescribe}
-                onChange={(e) => setForceDescribe(e.target.checked)}
-                className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
+                disabled={backfillVisualTags}
+                onChange={(e) => handleForceDescribeChange(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0 disabled:opacity-50"
               />
               <label
                 htmlFor="force-regenerate-describe"
-                className="text-sm text-text cursor-pointer"
+                className={`text-sm ${backfillVisualTags ? 'text-text-secondary' : 'text-text cursor-pointer'}`}
               >
                 {ANALYZE_FORCE_DESCRIBE_LABEL}
               </label>
@@ -391,16 +411,23 @@ export function AnalyzeTab() {
                 type="checkbox"
                 id="force-regenerate-score"
                 checked={forceScore}
-                onChange={(e) => setForceScore(e.target.checked)}
-                className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
+                disabled={backfillVisualTags}
+                onChange={(e) => handleForceScoreChange(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0 disabled:opacity-50"
               />
               <label
                 htmlFor="force-regenerate-score"
-                className="text-sm text-text cursor-pointer"
+                className={`text-sm ${backfillVisualTags ? 'text-text-secondary' : 'text-text cursor-pointer'}`}
               >
                 {ANALYZE_FORCE_SCORE_LABEL}
               </label>
             </div>
+
+            {backfillVisualTags && (
+              <p className="text-xs text-text-secondary -mt-2">
+                {ANALYZE_BACKFILL_FORCE_EXCLUSIVE_HINT}
+              </p>
+            )}
 
             <div>
               <button
@@ -437,16 +464,23 @@ export function AnalyzeTab() {
                     type="checkbox"
                     id="backfill-visual-tags"
                     checked={backfillVisualTags}
-                    onChange={(e) => setBackfillVisualTags(e.target.checked)}
-                    className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0"
+                    disabled={forceDescribe || forceScore}
+                    onChange={(e) => handleBackfillVisualTagsChange(e.target.checked)}
+                    className="w-4 h-4 rounded border-border text-accent focus:ring-accent focus:ring-offset-0 disabled:opacity-50"
                   />
                   <label
                     htmlFor="backfill-visual-tags"
-                    className="text-sm text-text cursor-pointer"
+                    className={`text-sm ${forceDescribe || forceScore ? 'text-text-secondary' : 'text-text cursor-pointer'}`}
                   >
                     {ANALYZE_BACKFILL_VISUAL_TAGS_LABEL}
                   </label>
                 </div>
+
+                {(forceDescribe || forceScore) && (
+                  <p className="text-xs text-text-secondary -mt-2">
+                    {ANALYZE_BACKFILL_FORCE_EXCLUSIVE_HINT}
+                  </p>
+                )}
 
                 <div className="pt-4 border-t border-border space-y-3">
                   <h3 className="text-sm font-semibold text-text">

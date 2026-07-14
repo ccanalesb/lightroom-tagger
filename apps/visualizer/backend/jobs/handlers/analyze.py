@@ -26,6 +26,26 @@ from .path_diagnostics import PathSkipDiagnostics, empty_skip_reason_counts
 
 managed_library_db = make_managed_library_db(lambda p: init_database(p))
 
+_BACKFILL_FORCE_CONFLICT_MSG = (
+    'Backfill visual tags cannot be combined with force regenerate; '
+    'force flag(s) are ignored. Only backfill image selection is used.'
+)
+
+
+def _log_backfill_force_conflict_if_any(
+    runner,
+    job_id: str,
+    metadata: dict,
+    *,
+    force_flag_keys: tuple[str, ...],
+) -> None:
+    if not bool(metadata.get('backfill_visual_tags', False)):
+        return
+    if not any(bool(metadata.get(k, False)) for k in force_flag_keys):
+        return
+    add_job_log(runner.db, job_id, 'warning', _BACKFILL_FORCE_CONFLICT_MSG)
+
+
 def _merge_skip_reason_counts(*parts) -> dict[str, int]:
     merged = empty_skip_reason_counts()
     for part in parts:
@@ -795,6 +815,9 @@ def _handle_batch_describe_inner(runner, job_id: str, metadata: dict):
             )
 
             backfill_visual_tags = bool(metadata.get('backfill_visual_tags', False))
+            _log_backfill_force_conflict_if_any(
+                runner, job_id, metadata, force_flag_keys=('force',)
+            )
 
             images_to_describe: list[tuple[str, str]] = []  # (key, type)
 
@@ -1360,6 +1383,12 @@ def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
             )
 
             backfill_visual_tags = bool(metadata.get('backfill_visual_tags', False))
+            _log_backfill_force_conflict_if_any(
+                runner,
+                job_id,
+                metadata,
+                force_flag_keys=('force_describe', 'force_score', 'force'),
+            )
 
             shared_selection: list[tuple[str, str]] = []
 

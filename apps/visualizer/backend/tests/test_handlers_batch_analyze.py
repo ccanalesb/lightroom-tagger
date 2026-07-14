@@ -416,3 +416,38 @@ def test_batch_analyze_describe_fingerprint_mismatch_resets_pairs(
         for m in log_messages
     ), f'expected mismatch log, got: {log_messages!r}'
     mock_describe.assert_called()
+
+
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._select_catalog_keys_missing_visual_tags')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
+def test_batch_analyze_logs_when_backfill_combined_with_force(
+    _mock_exists, _mock_getenv, mock_config, mock_init_db, mock_backfill_select, mock_add_log,
+):
+    from jobs.handlers import handle_batch_analyze
+
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_init_db.return_value = MagicMock()
+    mock_backfill_select.return_value = []
+
+    runner = _make_runner()
+
+    handle_batch_analyze(
+        runner,
+        'job-conflict',
+        {
+            'image_type': 'catalog',
+            'backfill_visual_tags': True,
+            'force_describe': True,
+            'force_score': True,
+        },
+    )
+
+    assert any(
+        len(call.args) > 3
+        and 'cannot be combined with force regenerate' in (call.args[3] or '')
+        for call in mock_add_log.call_args_list
+    )
