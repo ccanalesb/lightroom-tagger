@@ -159,12 +159,12 @@ match_threshold: 0.7
 
 Lightroom catalogs are SQLite databases that typically run in **WAL mode** (Write-Ahead Logging). SQLite's WAL implementation requires shared-memory coordination through files (`*.lrcat-shm`) that often **fail on network filesystems** (SMB/CIFS/NFS) due to locking and mmap incompatibilities.
 
-**This tool works around the issue** by using `PRAGMA locking_mode=EXCLUSIVE` before accessing the catalog. This SQLite-documented mode allows WAL to function without shared-memory support when only one process accesses the database—which matches this tool's single-connection scan workflow.
+**This tool works around the issue** by opening the catalog read-only (SQLite URI `mode=ro`) with NORMAL locking by default. `PRAGMA locking_mode=EXCLUSIVE` is a SQLite-documented mode that lets WAL function without shared-memory support when only one process accesses the database, but it requires a write lock and fails on read-only opens, so it is applied only to legacy read-write connections (with automatic NORMAL fallback if unsupported).
 
 **Requirements for NAS catalogs:**
-- **Close Lightroom Classic** before running long scans (exclusive mode conflicts with Lightroom holding the catalog open)
+- **Close Lightroom Classic** before running long scans if you see `database is locked` (another process holding the catalog open)
 - The catalog must be readable over your network mount
-- Set `LIGHTRoom_CATALOG_LOCKING_MODE=NORMAL` environment variable to disable exclusive mode if needed (e.g., testing on local disk)
+- Set `LIGHTROOM_CATALOG_LOCKING_MODE=EXCLUSIVE` to force exclusive mode (e.g. legacy read-write troubleshooting); the old `LIGHTRoom_CATALOG_LOCKING_MODE` spelling is still honored as an alias
 
 This approach has been validated on macOS with SMB-mounted catalogs and matches techniques that work on WSL/Linux CIFS mounts.
 
@@ -382,7 +382,7 @@ cd frontend && npm test -- --run
 | `ImportError: find_matches from core.hasher` | It's in `core/phash.py`, not `core/hasher.py`. Check `core/__init__.py` |
 | Instagram import finds 0 files | Pass the dump root dir, not `media/`. The reader appends `/media` itself |
 | `externally-managed-environment` on pip install | Use a venv: `python3 -m venv .venv && source .venv/bin/activate` |
-| `unable to open database file` on NAS/SMB `.lrcat` | `connect_catalog` uses `PRAGMA locking_mode=EXCLUSIVE` before reads (SQLite WAL without shared-memory; same idea as workable WSL/SMB setups). If Lightroom has the catalog open and you see `database is locked`, close Classic for the scan. Set `LIGHTRoom_CATALOG_LOCKING_MODE=NORMAL` to opt out. |
+| `unable to open database file` on NAS/SMB `.lrcat` | `connect_catalog` opens read-only with NORMAL locking by default; for legacy read-write opens it uses `PRAGMA locking_mode=EXCLUSIVE` (SQLite WAL without shared-memory; same idea as workable WSL/SMB setups) with automatic NORMAL fallback on I/O errors. If Lightroom has the catalog open and you see `database is locked`, close Classic for the scan. Set `LIGHTROOM_CATALOG_LOCKING_MODE=EXCLUSIVE` (old `LIGHTRoom_…` alias still honored) to force exclusive mode. |
 
 ### OpenCLI Instagram Adapters
 
