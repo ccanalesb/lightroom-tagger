@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from lightroom_tagger.core.error_policy import ErrorPolicy
+from lightroom_tagger.core.error_policy import ConsecutiveAbortTracker, ErrorPolicy
 from lightroom_tagger.core.fallback import FallbackDispatcher
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.provider_resolution import Kind, resolve_model
@@ -41,6 +41,7 @@ class VisionOpSpec:
     log_callback: LogCallback = None
     registry: ProviderRegistry | None = None
     error_policy: ErrorPolicy | None = None
+    abort_tracker: ConsecutiveAbortTracker | None = None
     _cleanup: Callable[[], None] | None = field(default=None, repr=False)
 
 
@@ -88,6 +89,7 @@ def run_vision_op(spec: VisionOpSpec) -> tuple[Any, str, str]:
             provider_id=provider_id,
             model=model,
             log_callback=spec.log_callback,
+            abort_tracker=spec.abort_tracker,
         )
         if _parser_wants_provider_model(spec.parse_response):
             parsed = spec.parse_response(raw, actual_provider, actual_model)

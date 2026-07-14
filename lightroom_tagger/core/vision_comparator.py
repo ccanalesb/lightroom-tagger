@@ -1,32 +1,32 @@
-"""Vision comparison facade — dispatcher + error policy + batch/sequential strategy."""
+"""Vision comparison facade — engine dispatch + error policy + batch/sequential strategy."""
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable
 from typing import Any
 
+from lightroom_tagger.core import cancel_scope
+from lightroom_tagger.core.analyzer.compare import build_compare_batch_op_spec, build_compare_op_spec
 from lightroom_tagger.core.error_policy import (
     ConsecutiveAbortTracker,
     ContextLengthEscalationPolicy,
-    EscalationAction,
     VisionBatchErrorPolicy,
 )
 from lightroom_tagger.core.exceptions import (
-    ContextLengthError,
     InvalidRequestError,
-    PayloadTooLargeError,
     RateLimitError,
 )
-from lightroom_tagger.core.fallback import FallbackDispatcher, LogCallback
+from lightroom_tagger.core.fallback import LogCallback
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.retry import CancelledRetryError
-from lightroom_tagger.core.vision_client import compare_images, compare_images_batch
+from lightroom_tagger.core.vision_op import run_vision_op
 
 
 class VisionComparator:
-    """Thin facade over :class:`FallbackDispatcher` for vision compare paths.
+    """Thin facade over the vision-op engine for vision compare paths.
 
-    Sequential pair compares and batch compares share one dispatcher entry point.
+    Sequential pair compares and batch compares share one dispatch entry point.
     A single candidate batch is handled as a batch of one — callers do not fork
     retry/fallback logic.
     """
@@ -52,6 +52,15 @@ class VisionComparator:
             batch_policy if batch_policy is not None else VisionBatchErrorPolicy()
         )
 
+    def _run_op(self, spec) -> tuple[Any, str, str]:
+        ctx = (
+            cancel_scope.install(self._cancel_check)
+            if self._cancel_check is not None
+            else contextlib.nullcontext()
+        )
+        with ctx:
+            return run_vision_op(spec)
+
     def compare_pair(
         self,
         local_path: str,
@@ -60,57 +69,18 @@ class VisionComparator:
         model: str,
     ) -> dict:
         """Compare one catalog/Instagram pair via ``compare_images``."""
-        policy = self._sequential_policy
-        dispatcher = FallbackDispatcher(self._registry, error_policy=policy)
-
-        def fn_factory(client: Any, mdl: str):
-            if policy.is_broken(provider_id, mdl):
-                def _skip():
-                    raise InvalidRequestError(
-                        f"{mdl} is broken (max_tokens exhausted in prior call)",
-                        provider=provider_id,
-                        model=mdl,
-                    )
-
-                return _skip
-
-            state: dict[str, Any] = {"token_index": policy.starting_index(provider_id, mdl)}
-
-            def _call():
-                tokens = policy.max_tokens_at(state["token_index"])
-                try:
-                    return compare_images(
-                        client,
-                        mdl,
-                        local_path,
-                        insta_path,
-                        log_callback=self._log_callback,
-                        max_tokens=tokens,
-                    )
-                except ContextLengthError as exc:
-                    policy.on_escalation_error(
-                        exc,
-                        provider_id=provider_id,
-                        model=mdl,
-                        operation="compare",
-                        call_state=state,
-                    )
-                    if self._log_callback and state.get("_log_message"):
-                        self._log_callback("warning", state["_log_message"])
-                    raise
-
-            return _call
-
+        spec = build_compare_op_spec(
+            local_path,
+            insta_path,
+            provider_id=provider_id,
+            model=model,
+            log_callback=self._log_callback,
+            registry=self._registry,
+            error_policy=self._sequential_policy,
+            abort_tracker=self._abort_tracker,
+        )
         try:
-            result, actual_provider, actual_model = dispatcher.call_with_fallback(
-                operation="compare",
-                fn_factory=fn_factory,
-                provider_id=provider_id,
-                model=model,
-                log_callback=self._log_callback,
-                cancel_check=self._cancel_check,
-                abort_tracker=self._abort_tracker,
-            )
+            result, actual_provider, actual_model = self._run_op(spec)
         except RateLimitError:
             return {"confidence": 0, "verdict": "RATE_LIMITED", "reasoning": ""}
         except InvalidRequestError:
@@ -141,87 +111,46 @@ class VisionComparator:
         if not candidates:
             return {}
 
-        policy = self._batch_policy
-        dispatcher = FallbackDispatcher(self._registry, error_policy=policy)
+        def split_batch(
+            left_half: list[tuple[int, str]],
+            right_half: list[tuple[int, str]],
+            attempt_provider: str,
+            mdl: str,
+        ) -> dict[int, float]:
+            left = self.compare_batch(
+                reference_path,
+                left_half,
+                attempt_provider,
+                mdl,
+                insta_filename=insta_filename,
+                chunk_num=chunk_num,
+                num_chunks=num_chunks,
+            )
+            right = self.compare_batch(
+                reference_path,
+                right_half,
+                attempt_provider,
+                mdl,
+                insta_filename=insta_filename,
+                chunk_num=chunk_num,
+                num_chunks=num_chunks,
+            )
+            left.update(right)
+            return left
 
-        def fn_factory(client, mdl):
-            attempt_provider = getattr(client, "_provider_id", None) or provider_id
-            call_state: dict[str, Any] = {
-                "candidates": candidates,
-                "token_index": policy.starting_index(attempt_provider, mdl),
-            }
-
-            def _call():
-                if policy.is_broken(attempt_provider, mdl):
-                    raise InvalidRequestError(
-                        f"{mdl} is broken (max_tokens exhausted in prior call)",
-                        provider=attempt_provider,
-                        model=mdl,
-                    )
-
-                tokens = policy.max_tokens_at(call_state["token_index"])
-                try:
-                    return compare_images_batch(
-                        client,
-                        mdl,
-                        reference_path,
-                        call_state["candidates"],
-                        log_callback=self._log_callback,
-                        max_tokens=tokens,
-                    )
-                except (ContextLengthError, PayloadTooLargeError) as exc:
-                    action = policy.on_escalation_error(
-                        exc,
-                        provider_id=attempt_provider,
-                        model=mdl,
-                        operation="compare_batch",
-                        call_state=call_state,
-                    )
-                    if self._log_callback and call_state.get("_log_message"):
-                        prefix = f"[{insta_filename}] Batch {chunk_num}/{num_chunks}: "
-                        self._log_callback("warning", prefix + call_state["_log_message"])
-
-                    if isinstance(exc, PayloadTooLargeError):
-                        if action == EscalationAction.SPLIT:
-                            left_half, right_half = call_state["_split_halves"]
-                            left = self.compare_batch(
-                                reference_path,
-                                left_half,
-                                attempt_provider,
-                                mdl,
-                                insta_filename=insta_filename,
-                                chunk_num=chunk_num,
-                                num_chunks=num_chunks,
-                            )
-                            right = self.compare_batch(
-                                reference_path,
-                                right_half,
-                                attempt_provider,
-                                mdl,
-                                insta_filename=insta_filename,
-                                chunk_num=chunk_num,
-                                num_chunks=num_chunks,
-                            )
-                            left.update(right)
-                            return left
-                        if action == EscalationAction.GIVE_UP:
-                            return {}
-
-                    if action == EscalationAction.GIVE_UP:
-                        raise
-                    if action == EscalationAction.RETRY:
-                        return _call()
-                    raise
-
-            return _call
-
-        result, _, _ = dispatcher.call_with_fallback(
-            operation="compare_batch",
-            fn_factory=fn_factory,
+        spec = build_compare_batch_op_spec(
+            reference_path,
+            candidates,
             provider_id=provider_id,
             model=model,
             log_callback=self._log_callback,
-            cancel_check=self._cancel_check,
+            registry=self._registry,
+            error_policy=self._batch_policy,
+            insta_filename=insta_filename,
+            chunk_num=chunk_num,
+            num_chunks=num_chunks,
+            split_batch=split_batch,
             abort_tracker=self._abort_tracker,
         )
+        result, _, _ = self._run_op(spec)
         return result

@@ -5,6 +5,11 @@
 from lightroom_tagger.core.config import get_description_model, get_vision_model, load_config
 from lightroom_tagger.core.exceptions import ContextLengthError
 
+from .compare import (
+    build_compare_batch_op_spec,
+    build_compare_op_spec,
+    parse_compare_vision_response,
+)
 from .description import (
     DESCRIPTION_PROMPT,
     _DESCRIPTION_FALLBACK,
@@ -48,6 +53,8 @@ __all__ = (
     "VISION_MAX_DIMENSION",
     "_DESCRIPTION_FALLBACK",
     "_compare_via_provider",
+    "build_compare_batch_op_spec",
+    "build_compare_op_spec",
     "build_description_op_spec",
     "build_description_prompt",
     "build_score_op_spec",
@@ -61,6 +68,7 @@ __all__ = (
     "get_viewable_path_managed",
     "get_vision_model",
     "load_config",
+    "parse_compare_vision_response",
     "parse_description_response",
     "parse_score_vision_response",
     "parse_vision_response",
