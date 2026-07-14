@@ -192,23 +192,23 @@ export function AnalyzeTab() {
     selectedPerspectiveSlugs,
   ]);
 
-  const handleForceDescribeChange = useCallback((checked: boolean) => {
+  const handleForceDescribeChange = (checked: boolean) => {
     setForceDescribe(checked);
     if (checked) setBackfillVisualTags(false);
-  }, []);
+  };
 
-  const handleForceScoreChange = useCallback((checked: boolean) => {
+  const handleForceScoreChange = (checked: boolean) => {
     setForceScore(checked);
     if (checked) setBackfillVisualTags(false);
-  }, []);
+  };
 
-  const handleBackfillVisualTagsChange = useCallback((checked: boolean) => {
+  const handleBackfillVisualTagsChange = (checked: boolean) => {
     setBackfillVisualTags(checked);
     if (checked) {
       setForceDescribe(false);
       setForceScore(false);
     }
-  }, []);
+  };
 
   const buildBatchJobMetadata = useCallback((): Record<string, unknown> => {
     return {

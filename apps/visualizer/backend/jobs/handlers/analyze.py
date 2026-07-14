@@ -32,16 +32,10 @@ _BACKFILL_FORCE_CONFLICT_MSG = (
 )
 
 
-def _log_backfill_force_conflict_if_any(
-    runner,
-    job_id: str,
-    metadata: dict,
-    *,
-    force_flag_keys: tuple[str, ...],
-) -> None:
-    if not bool(metadata.get('backfill_visual_tags', False)):
+def _log_backfill_force_conflict_if_any(runner, job_id: str, metadata: dict) -> None:
+    if not metadata.get('backfill_visual_tags'):
         return
-    if not any(bool(metadata.get(k, False)) for k in force_flag_keys):
+    if not any(metadata.get(k) for k in ('force', 'force_describe', 'force_score')):
         return
     add_job_log(runner.db, job_id, 'warning', _BACKFILL_FORCE_CONFLICT_MSG)
 
@@ -815,9 +809,7 @@ def _handle_batch_describe_inner(runner, job_id: str, metadata: dict):
             )
 
             backfill_visual_tags = bool(metadata.get('backfill_visual_tags', False))
-            _log_backfill_force_conflict_if_any(
-                runner, job_id, metadata, force_flag_keys=('force',)
-            )
+            _log_backfill_force_conflict_if_any(runner, job_id, metadata)
 
             images_to_describe: list[tuple[str, str]] = []  # (key, type)
 
@@ -1383,12 +1375,7 @@ def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
             )
 
             backfill_visual_tags = bool(metadata.get('backfill_visual_tags', False))
-            _log_backfill_force_conflict_if_any(
-                runner,
-                job_id,
-                metadata,
-                force_flag_keys=('force_describe', 'force_score', 'force'),
-            )
+            _log_backfill_force_conflict_if_any(runner, job_id, metadata)
 
             shared_selection: list[tuple[str, str]] = []
 
