@@ -90,6 +90,54 @@ def test_run_vision_op_persist_skips_invalid_result():
     assert outcome.status == 'skipped'
 
 
+def test_run_vision_op_parse_response_accepts_provider_and_model():
+    spec = MagicMock()
+    spec.registry = None
+    spec.resolve_kind = 'description'
+    spec.provider_id = 'ollama'
+    spec.model = 'm1'
+    spec.operation = 'score'
+    spec.log_callback = None
+    spec.error_policy = None
+    spec._cleanup = None
+    spec.parse_response = lambda raw, provider, model: (raw, provider, model)
+    spec.fn_factory.return_value = MagicMock()
+
+    with patch('lightroom_tagger.core.vision_op.resolve_model') as mock_resolve, \
+         patch('lightroom_tagger.core.vision_op.FallbackDispatcher') as mock_disp:
+        mock_registry = MagicMock()
+        mock_resolve.return_value = ResolvedModel('ollama', 'm1', mock_registry)
+        mock_disp.return_value.call_with_fallback.return_value = ('parsed', 'ollama', 'm1')
+        parsed, provider, model = run_vision_op(spec)
+
+    assert parsed == ('parsed', 'ollama', 'm1')
+    assert provider == 'ollama'
+    assert model == 'm1'
+
+
+def test_run_vision_op_parse_response_falls_back_to_single_arg():
+    spec = MagicMock()
+    spec.registry = None
+    spec.resolve_kind = 'description'
+    spec.provider_id = 'ollama'
+    spec.model = 'm1'
+    spec.operation = 'describe'
+    spec.log_callback = None
+    spec.error_policy = None
+    spec._cleanup = None
+    spec.parse_response = lambda raw: {'summary': raw}
+    spec.fn_factory.return_value = MagicMock()
+
+    with patch('lightroom_tagger.core.vision_op.resolve_model') as mock_resolve, \
+         patch('lightroom_tagger.core.vision_op.FallbackDispatcher') as mock_disp:
+        mock_registry = MagicMock()
+        mock_resolve.return_value = ResolvedModel('ollama', 'm1', mock_registry)
+        mock_disp.return_value.call_with_fallback.return_value = ('ok', 'ollama', 'm1')
+        parsed, provider, model = run_vision_op(spec)
+
+    assert parsed == {'summary': 'ok'}
+
+
 def test_description_op_spec_silent_compression_skips_recompress():
     """Vision-cache resume path must not call compress_image again."""
     from PIL import Image

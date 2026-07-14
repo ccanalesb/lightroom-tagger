@@ -14,6 +14,7 @@ from .description import (
     run_description_vision_op,
     run_external_agent,
 )
+from .scoring import build_score_op_spec, parse_score_vision_response
 from .image_inspect import compute_phash, extract_exif
 from .image_prep import (
     RAW_EXTENSIONS,
@@ -49,6 +50,7 @@ __all__ = (
     "_compare_via_provider",
     "build_description_op_spec",
     "build_description_prompt",
+    "build_score_op_spec",
     "compare_with_vision",
     "compress_image",
     "compute_phash",
@@ -60,6 +62,7 @@ __all__ = (
     "get_vision_model",
     "load_config",
     "parse_description_response",
+    "parse_score_vision_response",
     "parse_vision_response",
     "run_description_vision_op",
     "run_external_agent",

@@ -76,7 +76,7 @@ def test_batch_analyze_runs_describe_then_score(
 
     mock_get_undescribed.return_value = [{'key': 'img_001'}, {'key': 'img_002'}]
     mock_describe.return_value = _WRITTEN
-    mock_score.return_value = ('scored', True, None)
+    mock_score.return_value = _WRITTEN
 
     runner = _make_runner()
 
@@ -127,7 +127,7 @@ def test_batch_analyze_describe_failures_still_invoke_score(
 
     mock_get_undescribed.return_value = [{'key': 'img_a'}, {'key': 'img_b'}]
     mock_describe.side_effect = [_WRITTEN, Exception('transient')]
-    mock_score.return_value = ('scored', True, None)
+    mock_score.return_value = _WRITTEN
 
     runner = _make_runner()
 
@@ -177,7 +177,7 @@ def test_batch_analyze_sets_current_step_describing_then_scoring(
 
     mock_get_undescribed.return_value = [{'key': 'img_x'}]
     mock_describe.return_value = _WRITTEN
-    mock_score.return_value = ('scored', True, None)
+    mock_score.return_value = _WRITTEN
 
     runner = _make_runner()
 
@@ -230,7 +230,7 @@ def test_batch_analyze_resume_skips_describe_when_stage_score(
 
     mock_get_undescribed.return_value = [{'key': 'img_r'}]
     mock_describe.return_value = _WRITTEN
-    mock_score.return_value = ('scored', True, None)
+    mock_score.return_value = _WRITTEN
 
     mock_get_job.return_value = {
         'status': 'running',
@@ -325,7 +325,7 @@ def test_batch_analyze_compression_already_done_silent(
         'subjects': [],
         'best_perspective': 's',
     }, 'ollama', 'test-model')
-    mock_score.return_value = ('scored', True, None)
+    mock_score.return_value = _WRITTEN
 
     runner = _make_runner()
 
@@ -379,7 +379,7 @@ def test_batch_analyze_describe_fingerprint_mismatch_resets_pairs(
 
     mock_get_undescribed.return_value = [{'key': 'img_m'}]
     mock_describe.return_value = _WRITTEN
-    mock_score.return_value = ('scored', True, None)
+    mock_score.return_value = _WRITTEN
 
     mock_get_job.return_value = {
         'status': 'running',

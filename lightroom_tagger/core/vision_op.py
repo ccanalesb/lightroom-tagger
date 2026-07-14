@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -33,11 +34,33 @@ class VisionOpSpec:
     provider_id: str | None
     model: str | None
     fn_factory: Callable[[], Callable]
-    parse_response: Callable[[str], Any]
+    # Parsers take either ``(raw)`` or ``(raw, provider, model)`` — the extra
+    # provider/model are supplied for ops (e.g. scoring) whose parser needs the
+    # actual fallback-selected provider to build an LLM repair fixer.
+    parse_response: Callable[..., Any]
     log_callback: LogCallback = None
     registry: ProviderRegistry | None = None
     error_policy: ErrorPolicy | None = None
     _cleanup: Callable[[], None] | None = field(default=None, repr=False)
+
+
+def _parser_wants_provider_model(parse_response: Callable[..., Any]) -> bool:
+    """True when *parse_response* accepts the ``(raw, provider, model)`` form.
+
+    Determined by the parser's signature (positional params or ``*args``) rather
+    than catching ``TypeError``, so a genuine ``TypeError`` raised *inside* the
+    parser is never silently swallowed and re-dispatched with the wrong arity.
+    """
+    try:
+        params = inspect.signature(parse_response).parameters.values()
+    except (TypeError, ValueError):
+        return False
+    positional = [
+        p for p in params
+        if p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+    ]
+    has_var_positional = any(p.kind is p.VAR_POSITIONAL for p in params)
+    return has_var_positional or len(positional) >= 3
 
 
 def run_vision_op(spec: VisionOpSpec) -> tuple[Any, str, str]:
@@ -66,7 +89,11 @@ def run_vision_op(spec: VisionOpSpec) -> tuple[Any, str, str]:
             model=model,
             log_callback=spec.log_callback,
         )
-        return spec.parse_response(raw), actual_provider, actual_model
+        if _parser_wants_provider_model(spec.parse_response):
+            parsed = spec.parse_response(raw, actual_provider, actual_model)
+        else:
+            parsed = spec.parse_response(raw)
+        return parsed, actual_provider, actual_model
     finally:
         if spec._cleanup is not None:
             spec._cleanup()

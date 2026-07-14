@@ -1,27 +1,19 @@
 """Score catalog and Instagram-dump images per perspective into ``image_scores``.
 
-Vision + compression follow :func:`lightroom_tagger.core.vision_op.run_vision_op`.
-``FallbackDispatcher.call_with_fallback`` uses ``operation="score"`` as the log label (same
-registry, retry, and fallback order as ``"describe"`` — only the tag string differs).
+Vision + compression route through :func:`lightroom_tagger.core.vision_op.run_vision_op_persist`
+via :func:`lightroom_tagger.core.analyzer.build_score_op_spec`.
 """
 
 from __future__ import annotations
 
-import contextlib
-import functools
 import hashlib
 import os
+import re
 import sqlite3
 from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any
 
-from lightroom_tagger.core.analyzer import (
-    VIDEO_EXTENSIONS,
-    compress_image,
-    get_viewable_path_managed,
-)
-from lightroom_tagger.core.vision_cache import get_or_create_cached_image
+from lightroom_tagger.core.analyzer import VIDEO_EXTENSIONS, build_score_op_spec
 from lightroom_tagger.core.database import (
     get_image,
     get_instagram_dump_media,
@@ -31,18 +23,10 @@ from lightroom_tagger.core.database import (
     resolve_filepath,
     supersede_previous_current_scores,
 )
-from lightroom_tagger.core.fallback import FallbackDispatcher
 from lightroom_tagger.core.prompt_builder import build_scoring_user_prompt
-from lightroom_tagger.core.provider_resolution import resolve_model
-from lightroom_tagger.core.structured_output import (
-    StructuredOutputError,
-    parse_score_response_with_retry,
-)
-from lightroom_tagger.core.vision_client import (
-    complete_chat_text,
-    generate_description,
-    make_score_json_llm_fixer,
-)
+from lightroom_tagger.core.structured_output import StructuredOutputError
+from lightroom_tagger.core.vision_cache import get_or_create_cached_image
+from lightroom_tagger.core.vision_op import VisionOpOutcome, run_vision_op_persist
 
 LogCallback = Callable[[str, str], None] | None
 
@@ -91,6 +75,94 @@ def delete_scores_for_version(
     )
 
 
+def _normalize_perspective_slug(raw_slug: str) -> str:
+    return re.sub(r"\s*\(.*\)\s*$", "", raw_slug.strip()).lower().strip()
+
+
+def _run_score_persist(
+    db: sqlite3.Connection,
+    *,
+    image_key: str,
+    image_type: str,
+    perspective_slug: str,
+    prompt_version: str,
+    force: bool,
+    image_path: str,
+    provider_id: str | None,
+    model: str | None,
+    log_callback: LogCallback,
+    user_prompt: str,
+    silent_compression: bool,
+) -> VisionOpOutcome:
+    spec = build_score_op_spec(
+        image_path,
+        user_prompt=user_prompt,
+        provider_id=provider_id,
+        model=model,
+        log_callback=log_callback,
+        silent_compression=silent_compression,
+    )
+
+    reject_reason: dict[str, str] = {}
+
+    def accept_result(parsed_bundle: tuple) -> bool:
+        parsed, _repaired = parsed_bundle
+        got_slug = _normalize_perspective_slug(parsed.perspective_slug)
+        if got_slug != perspective_slug.strip():
+            if log_callback:
+                log_callback(
+                    "warning",
+                    f"Slug mismatch: model returned {parsed.perspective_slug!r}, "
+                    f"normalized to {got_slug!r}, expected {perspective_slug!r} — skipping",
+                )
+            reject_reason["msg"] = (
+                f"Model returned perspective_slug {parsed.perspective_slug!r}; "
+                f"expected {perspective_slug!r}"
+            )
+            return False
+        return True
+
+    def persist(parsed_bundle: tuple, provider: str, model_used: str) -> None:
+        parsed, repaired = parsed_bundle
+        model_label = f"{provider}:{model_used}"
+        scored_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        with library_write(db, log=log_callback):
+            if force:
+                delete_scores_for_version(
+                    db, image_key, image_type, perspective_slug, prompt_version,
+                )
+            supersede_previous_current_scores(
+                db, image_key, image_type, perspective_slug, prompt_version,
+            )
+            insert_image_score(
+                db,
+                {
+                    "image_key": image_key,
+                    "image_type": image_type,
+                    "perspective_slug": perspective_slug,
+                    "score": parsed.score,
+                    "rationale": parsed.rationale,
+                    "model_used": model_label,
+                    "prompt_version": prompt_version,
+                    "scored_at": scored_at,
+                    "is_current": 1,
+                    "repaired_from_malformed": 1 if repaired else 0,
+                    "not_attempted": 1 if parsed.not_attempted else 0,
+                },
+            )
+
+    outcome = run_vision_op_persist(
+        spec,
+        accept_result=accept_result,
+        persist=persist,
+    )
+    if (
+        outcome.status == "skipped"
+        and outcome.reason == "invalid result"
+        and "msg" in reject_reason
+    ):
+        return VisionOpOutcome(status="failed", reason=reject_reason["msg"])
+    return outcome
 
 
 def score_image_for_perspective(
@@ -103,188 +175,85 @@ def score_image_for_perspective(
     provider_id: str | None,
     model: str | None,
     log_callback: LogCallback = None,
-) -> tuple[str, bool, str | None]:
-    """Score one image for one perspective. Returns ``(status, success, error)`` like describe helpers.
+) -> VisionOpOutcome:
+    """Score one image for one perspective.
 
-    *status* is ``scored``, ``skipped``, or ``failed``. *success* is ``True`` only when a new score row
+    Returns a :class:`VisionOpOutcome`. ``wrote`` is True when a new score row
     was written.
     """
     if image_type == "catalog":
         image = get_image(db, image_key)
         if not image or not image.get("filepath"):
-            return ("skipped", False, "Catalog image missing or has no filepath")
+            return VisionOpOutcome(status="skipped", reason="Catalog image missing or has no filepath")
         filepath = resolve_filepath(str(image["filepath"]))
         if not os.path.exists(filepath):
-            return ("skipped", False, f"Image file not found: {filepath}")
+            return VisionOpOutcome(status="skipped", reason=f"Image file not found: {filepath}")
     elif image_type == "instagram":
         dump = get_instagram_dump_media(db, image_key)
         if not dump or not dump.get("file_path"):
-            return ("skipped", False, "Instagram media missing or has no file_path")
+            return VisionOpOutcome(status="skipped", reason="Instagram media missing or has no file_path")
         filepath = str(dump["file_path"])
         if not os.path.exists(filepath):
-            return ("skipped", False, f"Image file not found: {filepath}")
+            return VisionOpOutcome(status="skipped", reason=f"Image file not found: {filepath}")
     else:
-        return ("failed", False, f"Invalid image_type: {image_type!r}")
+        return VisionOpOutcome(status="failed", reason=f"Invalid image_type: {image_type!r}")
 
-    # Videos (and other unsupported containers) cannot be sent to the vision
-    # model: compress_image silently falls back to the raw bytes and the
-    # provider then spends minutes retrying before giving up, which wedges
-    # the scoring worker pool. Short-circuit early with a clean skip.
     if os.path.splitext(filepath)[1].lower() in VIDEO_EXTENSIONS:
-        return (
-            "skipped",
-            False,
-            f"Video file not scorable: {os.path.basename(filepath)}",
+        return VisionOpOutcome(
+            status="skipped",
+            reason=f"Video file not scorable: {os.path.basename(filepath)}",
         )
 
     prow = get_perspective_by_slug(db, perspective_slug)
     if not prow:
-        return ("failed", False, f"Unknown perspective slug: {perspective_slug!r}")
+        return VisionOpOutcome(status="failed", reason=f"Unknown perspective slug: {perspective_slug!r}")
     if int(prow.get("active") or 0) != 1:
-        return ("failed", False, f"Perspective {perspective_slug!r} is not active")
+        return VisionOpOutcome(status="failed", reason=f"Perspective {perspective_slug!r} is not active")
 
     pv = compute_prompt_version(prow)
 
     if not force and perspective_score_already_current(db, image_key, image_type, perspective_slug, pv):
-        return (
-            "skipped",
-            False,
-            "Score already current for this image, perspective, and prompt version",
+        return VisionOpOutcome(
+            status="skipped",
+            reason="Score already current for this image, perspective, and prompt version",
         )
 
-    # ``force`` DELETE is performed inside the ``library_write`` block below,
-    # not here — that way it shares the writer seat with the UPDATE+INSERT
-    # pair and no worker ever opens an unserialized write transaction on the
-    # library DB.
-
-    temp_files: list[str] = []
-    # Use vision cache for catalog images to avoid redundant RAW→JPG + compress
+    silent_compression = False
     if image_type == "catalog":
         cached = get_or_create_cached_image(db, image_key, filepath)
         if cached and os.path.exists(cached):
-            compressed = cached
+            image_for_score = cached
+            silent_compression = True
         else:
-            viewable, viewable_is_temp = get_viewable_path_managed(filepath)
-            if viewable_is_temp:
-                temp_files.append(viewable)
-            compressed = compress_image(viewable)
-            if compressed != viewable:
-                temp_files.append(compressed)
+            image_for_score = filepath
     else:
-        viewable, viewable_is_temp = get_viewable_path_managed(filepath)
-        if viewable_is_temp:
-            temp_files.append(viewable)
-        compressed = compress_image(viewable)
-        if compressed != viewable:
-            temp_files.append(compressed)
+        image_for_score = filepath
 
     user_prompt = build_scoring_user_prompt(prow)
 
-    def _log_repair(msg: str) -> None:
-        if log_callback is not None:
-            log_callback("info", msg)
-
     try:
-        r = resolve_model(
-            kind="description",
+        return _run_score_persist(
+            db,
+            image_key=image_key,
+            image_type=image_type,
+            perspective_slug=perspective_slug,
+            prompt_version=pv,
+            force=force,
+            image_path=image_for_score,
             provider_id=provider_id,
             model=model,
-        )
-        registry = r.registry
-        resolved_pid = r.provider_id
-        use_model = r.model
-
-        dispatcher = FallbackDispatcher(registry)
-
-        def fn_factory(client: Any, mdl: str) -> Callable[[], str]:
-            return lambda: generate_description(
-                client,
-                mdl,
-                compressed,
-                log_callback=log_callback,
-                user_prompt=user_prompt,
-            )
-
-        raw, actual_provider, actual_model = dispatcher.call_with_fallback(
-            operation="score",
-            fn_factory=fn_factory,
-            provider_id=resolved_pid,
-            model=use_model,
             log_callback=log_callback,
-        )
-        client = registry.get_client(actual_provider)
-        llm_fixer = make_score_json_llm_fixer(
-            functools.partial(complete_chat_text, client, actual_model),
-        )
-        model_label = f"{actual_provider}:{actual_model}"
-
-        parsed, repaired = parse_score_response_with_retry(
-            raw,
-            llm_fixer=llm_fixer,
-            log_repair=_log_repair,
+            user_prompt=user_prompt,
+            silent_compression=silent_compression,
         )
     except StructuredOutputError as exc:
-        return ("failed", False, str(exc))
-    except Exception as exc:
-        return ("failed", False, str(exc))
-    finally:
-        for f in temp_files:
-            if os.path.exists(f):
-                with contextlib.suppress(Exception):
-                    os.unlink(f)
-
-    # Normalize the returned slug: lowercase and strip parenthetical suffixes
-    # e.g. "Documentary" -> "documentary", "Street (street)" -> "street"
-    import re as _re
-    got_slug = _re.sub(r'\s*\(.*\)\s*$', '', parsed.perspective_slug.strip()).lower().strip()
-    if got_slug != perspective_slug.strip():
-        if log_callback:
-            log_callback(
-                "warning",
-                f"Slug mismatch: model returned {parsed.perspective_slug!r}, "
-                f"normalized to {got_slug!r}, expected {perspective_slug!r} — skipping",
-            )
-        return (
-            "failed",
-            False,
-            f"Model returned perspective_slug {parsed.perspective_slug!r}; expected {perspective_slug!r}",
-        )
-
-    scored_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-
-    # All library-DB writes for this image happen atomically inside
-    # ``library_write`` — one process-wide writer seat, one ``BEGIN IMMEDIATE``
-    # transaction, one commit. This both fixes the deferred-read-to-write
-    # upgrade race and serializes workers cooperatively instead of having
-    # them race SQLite's writer lock.
-    try:
-        with library_write(db, log=log_callback):
-            if force:
-                delete_scores_for_version(db, image_key, image_type, perspective_slug, pv)
-            supersede_previous_current_scores(db, image_key, image_type, perspective_slug, pv)
-            insert_image_score(
-                db,
-                {
-                    "image_key": image_key,
-                    "image_type": image_type,
-                    "perspective_slug": perspective_slug,
-                    "score": parsed.score,
-                    "rationale": parsed.rationale,
-                    "model_used": model_label,
-                    "prompt_version": pv,
-                    "scored_at": scored_at,
-                    "is_current": 1,
-                    "repaired_from_malformed": 1 if repaired else 0,
-                    "not_attempted": 1 if parsed.not_attempted else 0,
-                },
-            )
-        return ("scored", True, None)
+        return VisionOpOutcome(status="failed", reason=str(exc))
     except sqlite3.IntegrityError as exc:
         if "UNIQUE constraint" in str(exc):
-            return ("skipped", False, "Score already written by concurrent worker")
-        return ("failed", False, str(exc))
+            return VisionOpOutcome(status="skipped", reason="Score already written by concurrent worker")
+        return VisionOpOutcome(status="failed", reason=str(exc))
     except Exception as exc:
-        return ("failed", False, str(exc))
+        return VisionOpOutcome(status="failed", reason=str(exc))
 
 
 __all__ = [

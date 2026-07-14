@@ -8,6 +8,7 @@ import jobs.handlers.analyze as analyze_mod
 import jobs.handlers.embed as embed_mod
 import jobs.handlers.path_diagnostics as path_diag_mod
 from lightroom_tagger.core.database import init_database, store_image
+from lightroom_tagger.core.vision_op import VisionOpOutcome
 
 
 def _make_runner() -> MagicMock:
@@ -315,7 +316,7 @@ def test_single_score_includes_skip_reason_counts(
     (tmp_path / 'ok.jpg').write_bytes(b'fake')
     conn.close()
 
-    mock_score.return_value = ('scored', True, None)
+    mock_score.return_value = VisionOpOutcome(status='written')
     monkeypatch.setenv('LIBRARY_DB', str(db_path))
     runner = _make_runner()
     handle_single_score(
