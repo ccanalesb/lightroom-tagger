@@ -20,7 +20,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     if (get().socket) return
 
     const socket = io(WS_URL, {
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
       reconnection: true,
     })
 
