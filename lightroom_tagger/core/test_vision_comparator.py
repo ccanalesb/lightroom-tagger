@@ -76,7 +76,7 @@ class TestVisionComparatorBatch:
         with (
             patch("lightroom_tagger.core.vision_client._encode_image", return_value="abc"),
             patch(
-                "lightroom_tagger.core.vision_comparator.compare_images_batch",
+                "lightroom_tagger.core.analyzer.compare.compare_images_batch",
                 side_effect=mock_batch,
             ),
         ):
@@ -105,7 +105,7 @@ class TestVisionComparatorBatch:
         with (
             patch("lightroom_tagger.core.vision_client._encode_image", return_value="abc"),
             patch(
-                "lightroom_tagger.core.vision_comparator.compare_images_batch",
+                "lightroom_tagger.core.analyzer.compare.compare_images_batch",
                 side_effect=mock_batch,
             ),
         ):

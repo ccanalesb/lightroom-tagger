@@ -63,7 +63,7 @@ class TestBatchVisionDispatcherFallback:
         with (
             _ENCODE_PATCH,
             patch(
-                "lightroom_tagger.core.vision_comparator.compare_images_batch",
+                "lightroom_tagger.core.analyzer.compare.compare_images_batch",
                 side_effect=mock_batch,
             ),
         ):
@@ -97,7 +97,7 @@ class TestBatchVisionDispatcherFallback:
         with (
             _ENCODE_PATCH,
             patch(
-                "lightroom_tagger.core.vision_comparator.compare_images_batch",
+                "lightroom_tagger.core.analyzer.compare.compare_images_batch",
                 side_effect=mock_batch,
             ),
         ):
@@ -133,7 +133,7 @@ class TestBatchVisionDispatcherFallback:
         with (
             _ENCODE_PATCH,
             patch(
-                "lightroom_tagger.core.vision_comparator.compare_images_batch",
+                "lightroom_tagger.core.analyzer.compare.compare_images_batch",
                 side_effect=mock_batch,
             ),
         ):
@@ -172,7 +172,7 @@ class TestBatchVisionDispatcherFallback:
         with (
             _ENCODE_PATCH,
             patch(
-                "lightroom_tagger.core.vision_comparator.compare_images_batch",
+                "lightroom_tagger.core.analyzer.compare.compare_images_batch",
                 side_effect=mock_batch,
             ),
         ):
@@ -214,7 +214,7 @@ class TestBatchCancellation:
         with (
             _ENCODE_PATCH,
             patch(
-                "lightroom_tagger.core.vision_comparator.compare_images_batch",
+                "lightroom_tagger.core.analyzer.compare.compare_images_batch",
                 side_effect=mock_batch,
             ),
         ):
