@@ -7,7 +7,10 @@ from collections.abc import Callable
 from typing import Any
 
 from lightroom_tagger.core import cancel_scope
-from lightroom_tagger.core.analyzer.compare import build_compare_batch_op_spec, build_compare_op_spec
+from lightroom_tagger.core.analyzer.compare import (
+    build_compare_batch_op_spec,
+    build_compare_op_spec,
+)
 from lightroom_tagger.core.error_policy import (
     ConsecutiveAbortTracker,
     ContextLengthEscalationPolicy,
