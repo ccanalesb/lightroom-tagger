@@ -2,17 +2,22 @@
 
 from __future__ import annotations
 
-import os
 import sqlite3
 from dataclasses import dataclass
 from typing import Callable
 
 from lightroom_tagger.core.database.catalog import store_images_batch
-from lightroom_tagger.lightroom.reader import connect_catalog, get_image_by_id, list_catalog_file_ids
+from lightroom_tagger.lightroom.reader import (
+    catalog_readonly_uri_enabled,
+    connect_catalog,
+    get_image_by_id,
+    list_catalog_file_ids,
+    resolve_catalog_locking_mode,
+)
 
-CATALOG_LOCK_ACTIONABLE_MSG = (
-    "Cannot read Lightroom catalog (locked or unavailable). "
-    "Close Lightroom Classic or set LIGHTRoom_CATALOG_LOCKING_MODE=NORMAL and retry."
+CATALOG_LOCKED_MSG = (
+    "Cannot read Lightroom catalog: another process holds the catalog open. "
+    "Close Lightroom Classic and retry."
 )
 
 
@@ -31,16 +36,25 @@ class CatalogSyncResult:
 
 
 def _current_locking_mode() -> str:
-    return os.getenv("LIGHTRoom_CATALOG_LOCKING_MODE", "EXCLUSIVE").upper()
+    return resolve_catalog_locking_mode(read_only=catalog_readonly_uri_enabled())
 
 
-def _is_catalog_unavailable_error(exc: BaseException) -> bool:
+def _is_catalog_locked_error(exc: BaseException) -> bool:
+    return "database is locked" in str(exc).lower()
+
+
+def _catalog_sync_error_message(exc: BaseException) -> str:
     msg = str(exc).lower()
-    return (
-        "unable to open database file" in msg
-        or "database is locked" in msg
-        or "disk i/o error" in msg
-    )
+    if "database is locked" in msg:
+        return CATALOG_LOCKED_MSG
+    if "unable to open database file" in msg:
+        return (
+            "Cannot open Lightroom catalog file. On network storage, ensure the "
+            "catalog is reachable. For legacy read-write opens, try "
+            "LIGHTROOM_CATALOG_LOCKING_MODE=EXCLUSIVE. Close Lightroom Classic "
+            "if the catalog is in use."
+        )
+    return f"Cannot read Lightroom catalog: {exc}"
 
 
 def list_library_catalog_ids(lib_db: sqlite3.Connection) -> set[int]:
@@ -80,8 +94,6 @@ def sync_catalog(
 
     Never deletes library rows. Reports stale count (library minus catalog) for logging.
     """
-    locking_mode = _current_locking_mode()
-
     def _log(level: str, message: str) -> None:
         if log is not None:
             log(level, message)
@@ -89,14 +101,16 @@ def sync_catalog(
     try:
         catalog_conn = connect_catalog(catalog_path)
     except (sqlite3.Error, OSError) as exc:
-        raise CatalogSyncError(CATALOG_LOCK_ACTIONABLE_MSG) from exc
+        raise CatalogSyncError(_catalog_sync_error_message(exc)) from exc
+
+    locking_mode = _current_locking_mode()
 
     try:
         try:
             catalog_ids = set(list_catalog_file_ids(catalog_conn))
         except sqlite3.Error as exc:
-            if _is_catalog_unavailable_error(exc):
-                raise CatalogSyncError(CATALOG_LOCK_ACTIONABLE_MSG) from exc
+            if _is_catalog_locked_error(exc):
+                raise CatalogSyncError(CATALOG_LOCKED_MSG) from exc
             raise
     except CatalogSyncError:
         catalog_conn.close()

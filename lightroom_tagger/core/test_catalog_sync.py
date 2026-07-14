@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from lightroom_tagger.core.catalog_sync import (
-    CATALOG_LOCK_ACTIONABLE_MSG,
+    CATALOG_LOCKED_MSG,
     CatalogSyncError,
     list_library_catalog_ids,
     sync_catalog,
@@ -140,7 +140,7 @@ class TestCatalogSync(unittest.TestCase):
         with self.assertRaises(CatalogSyncError) as ctx:
             sync_catalog('/fake/catalog.lrcat', self.db)
 
-        self.assertEqual(str(ctx.exception), CATALOG_LOCK_ACTIONABLE_MSG)
+        self.assertEqual(str(ctx.exception), CATALOG_LOCKED_MSG)
 
 
 if __name__ == '__main__':
