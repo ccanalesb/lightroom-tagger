@@ -23,6 +23,7 @@
 | **provider** | An AI model endpoint (Ollama, NVIDIA NIM, OpenRouter, etc.) defined in `providers.json`. |
 | **resolved model** | A `(provider_id, model)` pair chosen by `provider_resolution.resolve_model()` via the single precedence ladder (explicit arg → env → `providers.json` defaults → `config.yaml` → `fallback_order`). See ADR-0007. |
 | **provider call seam** | All provider/LLM HTTP calls go through `FallbackDispatcher.call_with_fallback` with a `fn_factory` that invokes `vision_client` / `vision_client_batch` helpers — never raw `client.chat.completions.create` at orchestration sites. Escalation (token bump, batch split, abort) is a pluggable `ErrorPolicy`. See ADR-0009. |
+| **vision op** | One provider vision call routed through the vision-op engine (`resolve_model` → `FallbackDispatcher` → parse), optionally persisted via `run_vision_op_persist`. Description, scoring, and compare build `VisionOpSpec` via `analyzer` op-spec helpers. See ADR-0014. |
 | **fallback** | The multi-provider retry chain: `FallbackDispatcher` tries providers in `fallback_order` when one fails. |
 | **phash** | Perceptual hash used for fast image similarity pre-screening before vision comparison. |
 | **stack** | A Lightroom virtual copy group; stack collapse logic deduplicates matched images. |
@@ -52,6 +53,7 @@
 | `provider_resolution` | `resolve_model()` — single precedence ladder for provider/model selection; returns `ResolvedModel` with a reusable registry |
 | `exceptions` | Shared error type package — `ProviderError` hierarchy + `StackMutationError` |
 | `fallback` | `FallbackDispatcher` — single entry point for all provider/LLM calls (retry + multi-provider fallback) |
+| `vision_op` | Vision-op engine — `run_vision_op`, `run_vision_op_persist`, `VisionOpSpec`, `VisionOpOutcome`; single orchestration primitive for description, scoring, and compare (ADR-0014) |
 | `retry` | `retry_with_backoff` with `RETRYABLE_ERRORS` / `NOT_RETRYABLE_ERRORS` frozensets |
 | `cancel_scope` | Thread-local cooperative cancellation — workers register a `cancel_check` callback; retry/fallback paths honour it |
 | `scoring_service` | Per-perspective scoring of catalog and Instagram images via vision models |
@@ -96,6 +98,7 @@ Four distinct error surfaces — do not conflate them:
 - **Library-DB and catalog lifecycle through managed context managers only** (ADR-0011): use `managed_library_db` / `managed_catalog` (or CLI `with_library_db` / handler `make_managed_library_db`); no hand-rolled `init_database(...)` or `connect_catalog(...)` + manual `close()` at orchestration sites (enforced by `test_db_lifecycle_guardrail.py`).
 - **Provider/model resolution through `resolve_model` only** (ADR-0007): no ad-hoc precedence ladders at call sites.
 - **Provider/LLM calls through the dispatcher seam only** (ADR-0009): orchestration code uses `FallbackDispatcher.call_with_fallback` with `vision_client` / `vision_client_batch` helpers inside `fn_factory`; no raw `client.chat.completions.create` outside the seam (enforced by `test_provider_call_guardrail.py`).
+- **Vision-op orchestration through the engine only** (ADR-0014): no inline `resolve_model → FallbackDispatcher → parse` outside `vision_op.py`; callers build `VisionOpSpec` via `analyzer` op-spec helpers and invoke `run_vision_op` / `run_vision_op_persist` (enforced by `test_vision_op_guardrail.py`). `nl_catalog_search` is explicitly excluded (text NL filter + tool loop).
 - **Providers are OpenAI-compatible**: all vision/LLM calls go through `openai.OpenAI` client regardless of backend (Ollama, NIM, OpenRouter).
 - **No Instagram API**: all Instagram data comes from user-provided export dumps via `instagram/dump_reader.py` and `instagram/deduplicator.py`. Live-crawl scraper code has been removed.
 - **Tests live next to modules**: `test_*.py` files are co-located under `lightroom_tagger/core/`.
