@@ -1,17 +1,70 @@
 import json
+import logging
 import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from lightroom_tagger.core.config import load_config
+logger = logging.getLogger(__name__)
+
+_LEGACY_ENV_ALIASES: dict[str, str] = {
+    "LIGHTROOM_CATALOG_READONLY_URI": "LIGHTRoom_CATALOG_READONLY_URI",
+    "LIGHTROOM_CATALOG_LOCKING_MODE": "LIGHTRoom_CATALOG_LOCKING_MODE",
+}
+
+
+def _catalog_env(name: str) -> str | None:
+    """Read a catalog env var, honoring the legacy ``LIGHTRoom_*`` spelling."""
+    value = os.getenv(name)
+    if value is not None:
+        return value
+    legacy = _LEGACY_ENV_ALIASES.get(name)
+    if legacy is not None:
+        return os.getenv(legacy)
+    return None
+
+
+def catalog_readonly_uri_enabled() -> bool:
+    """True when ``connect_catalog`` opens via SQLite URI ``mode=ro`` (default)."""
+    return _catalog_env("LIGHTROOM_CATALOG_READONLY_URI") != "0"
+
+
+def resolve_catalog_locking_mode(*, read_only: bool) -> str:
+    """Effective locking mode for a catalog connection.
+
+    Read-only URI opens default to NORMAL because ``locking_mode=EXCLUSIVE``
+    requires a write lock and fails on some filesystems. Read-write (legacy path)
+    opens default to EXCLUSIVE for WAL-without-shared-memory on NAS/SMB.
+    """
+    raw = _catalog_env("LIGHTROOM_CATALOG_LOCKING_MODE")
+    if raw is not None:
+        return raw.upper()
+    return "NORMAL" if read_only else "EXCLUSIVE"
+
+
+def _apply_locking_mode(conn: sqlite3.Connection, locking_mode: str, *, read_only: bool) -> str:
+    """Apply locking pragma when requested; fall back to NORMAL on read-only I/O errors."""
+    if locking_mode != "EXCLUSIVE":
+        return locking_mode
+    try:
+        conn.execute("PRAGMA locking_mode=EXCLUSIVE")
+        return "EXCLUSIVE"
+    except sqlite3.OperationalError as exc:
+        msg = str(exc).lower()
+        if read_only or "disk i/o error" in msg:
+            logger.warning(
+                "PRAGMA locking_mode=EXCLUSIVE failed (%s); using NORMAL locking",
+                exc,
+            )
+            return "NORMAL"
+        raise
 
 
 def connect_catalog(catalog_path: str) -> sqlite3.Connection:
     """Connect to Lightroom catalog for reading.
 
     By default opens the catalog with a SQLite URI and ``mode=ro`` so browsing
-    and scans cannot mutate the database. Set ``LIGHTRoom_CATALOG_READONLY_URI=0``
+    and scans cannot mutate the database. Set ``LIGHTROOM_CATALOG_READONLY_URI=0``
     to use a plain path connection (legacy / troubleshooting).
 
     **Writes to the catalog must use** ``lightroom_tagger/lightroom/writer.py``
@@ -23,22 +76,23 @@ def connect_catalog(catalog_path: str) -> sqlite3.Connection:
 
     SQLite documents that WAL can still be used without shared memory if
     ``locking_mode=EXCLUSIVE`` is set *before the first page access* (WAL docs,
-    § \"Use of WAL Without Shared-Memory\"). This project uses one connection per
-    scan on that catalog, which matches that mode.
+    § \"Use of WAL Without Shared-Memory\"). That applies to read-write legacy
+    connections; read-only URI opens use NORMAL locking by default.
 
-    Set ``LIGHTRoom_CATALOG_LOCKING_MODE=NORMAL`` to skip this (e.g. local-disk
-    testing). Close Lightroom before long scans if you see ``database is locked``:
-    exclusive mode conflicts with another process holding the catalog open.
+    Set ``LIGHTROOM_CATALOG_LOCKING_MODE=EXCLUSIVE`` to request exclusive mode
+    on read-only opens (with automatic NORMAL fallback when unsupported).
+    Close Lightroom before long scans if you see ``database is locked``: exclusive
+    mode conflicts with another process holding the catalog open.
     """
-    readonly_uri = os.getenv("LIGHTRoom_CATALOG_READONLY_URI")
-    if readonly_uri != "0":
+    read_only = catalog_readonly_uri_enabled()
+    if read_only:
         path_obj = Path(catalog_path).expanduser().resolve()
         db_uri = path_obj.as_uri() + "?mode=ro"
         conn = sqlite3.connect(db_uri, uri=True, timeout=30.0)
     else:
         conn = sqlite3.connect(catalog_path, timeout=30.0)
-    if os.getenv("LIGHTRoom_CATALOG_LOCKING_MODE", "EXCLUSIVE").upper() == "EXCLUSIVE":
-        conn.execute("PRAGMA locking_mode=EXCLUSIVE")
+    locking_mode = resolve_catalog_locking_mode(read_only=read_only)
+    _apply_locking_mode(conn, locking_mode, read_only=read_only)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -253,6 +307,8 @@ def list_catalog_file_ids(conn: sqlite3.Connection) -> list[int]:
 def main():
     """CLI entry point for catalog reading."""
     import argparse
+
+    from lightroom_tagger.core.config import load_config
 
     parser = argparse.ArgumentParser(
         description="Read Lightroom catalog and output image metadata"

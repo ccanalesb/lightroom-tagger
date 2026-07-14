@@ -8,7 +8,7 @@ from database import add_job_log
 
 from lightroom_tagger.core import cancel_scope
 from lightroom_tagger.core.catalog_sync import (
-    CATALOG_LOCK_ACTIONABLE_MSG,
+    CATALOG_LOCKED_MSG,
     CatalogSyncError,
     sync_catalog,
 )
@@ -76,7 +76,7 @@ def _handle_catalog_sync_inner(
                 progress=progress_cb if not chain_mode else None,
             )
         except CatalogSyncError as exc:
-            msg = str(exc) or CATALOG_LOCK_ACTIONABLE_MSG
+            msg = str(exc) or CATALOG_LOCKED_MSG
             if chain_mode:
                 add_job_log(
                     runner.db,
