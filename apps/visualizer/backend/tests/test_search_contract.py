@@ -84,11 +84,11 @@ def test_semantic_search_response_round_trip(search_contract_client, monkeypatch
         return [row], 1, meta
 
     monkeypatch.setattr(
-        "api.images.search.embed_query_to_vec_blob",
+        "lightroom_tagger.core.catalog_search.embed_query_to_vec_blob",
         lambda _q: fixed_blob,
     )
     monkeypatch.setattr(
-        "api.images.search.run_semantic_hybrid_search",
+        "lightroom_tagger.core.catalog_search.run_semantic_hybrid_search",
         fake_hybrid,
     )
     payload = client.post(
