@@ -174,6 +174,8 @@ def _select_catalog_keys(
         if conditions:
             sql += " AND " + " AND ".join(conditions)
 
+    sql += " ORDER BY (i.date_taken IS NULL) DESC, i.date_taken DESC, i.key DESC"
+
     rows = lib_db.execute(sql, tuple(params)).fetchall()
     return [(r['key'], 'catalog') for r in rows]
 
@@ -228,6 +230,10 @@ def _select_instagram_keys(
 
     if conditions:
         sql += " AND " + " AND ".join(conditions)
+
+    sql += (
+        f" ORDER BY ({date_expr} IS NULL) DESC, {date_expr} DESC, m.media_key DESC"
+    )
 
     rows = lib_db.execute(sql, tuple(params)).fetchall()
     return [(r['media_key'], 'instagram') for r in rows]

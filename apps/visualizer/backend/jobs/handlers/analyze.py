@@ -105,6 +105,7 @@ def _select_catalog_keys_missing_visual_tags(
         params.append(min_rating)
     if conditions:
         sql += " AND " + " AND ".join(conditions)
+    sql += " ORDER BY (i.date_taken IS NULL) DESC, i.date_taken DESC, i.key DESC"
     rows = lib_db.execute(sql, tuple(params)).fetchall()
     return [(r['key'], 'catalog') for r in rows]
 
