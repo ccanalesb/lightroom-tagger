@@ -518,3 +518,126 @@ def test_batch_describe_stale_checkpoint_no_work_completes(
     result = runner.complete_job.call_args[0][1]
     assert result['described'] == 0
     assert result['total'] == 1
+
+
+_FAILED_INVALID = VisionOpOutcome(status='failed', reason='invalid result')
+_SKIPPED_EXISTS = VisionOpOutcome(status='skipped', reason='description exists')
+
+
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('lightroom_tagger.core.description_service.describe_matched_image')
+@patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
+@patch('jobs.handlers.analyze.get_job')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
+def test_batch_describe_invalid_model_result_not_checkpointed_reattempted_on_resume(
+    _mock_exists,
+    mock_getenv,
+    mock_config,
+    mock_init_db,
+    mock_get_job,
+    mock_get_undescribed,
+    mock_describe,
+    _mock_add_log,
+):
+    from jobs.checkpoint import fingerprint_batch_describe
+    from jobs.handlers import handle_batch_describe
+
+    metadata = {
+        'image_type': 'catalog',
+        'date_filter': 'all',
+        'force': False,
+        'max_workers': 1,
+    }
+    imgs = [{'key': 'img_a'}, {'key': 'img_b'}]
+    ordered_pairs = [('img_a', 'catalog'), ('img_b', 'catalog')]
+    fp = fingerprint_batch_describe(metadata, ordered_pairs)
+
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_db = MagicMock()
+    mock_db.execute.return_value.fetchall.return_value = []
+    mock_init_db.return_value = mock_db
+    mock_get_undescribed.return_value = imgs
+
+    def describe_side_effect(_db, key, **_kwargs):
+        if key == 'img_a':
+            return _WRITTEN
+        return _FAILED_INVALID
+
+    mock_describe.side_effect = describe_side_effect
+
+    runner = _make_runner()
+    handle_batch_describe(runner, 'job-invalid-first', metadata)
+
+    first_result = runner.complete_job.call_args[0][1]
+    assert first_result['described'] == 1
+    assert first_result['failed'] == 1
+    assert runner.persist_checkpoint.call_count >= 1
+    last_cp = runner.persist_checkpoint.call_args_list[-1][0][1]
+    assert last_cp['processed_pairs'] == ['img_a|catalog']
+    assert 'img_b|catalog' not in last_cp['processed_pairs']
+
+    mock_describe.reset_mock()
+    mock_describe.side_effect = None
+    mock_describe.return_value = _WRITTEN
+    mock_get_job.return_value = {
+        'status': 'running',
+        'metadata': {
+            'checkpoint': {
+                'checkpoint_version': 1,
+                'job_type': 'batch_describe',
+                'fingerprint': fp,
+                'processed_pairs': ['img_a|catalog'],
+                'total_at_start': 2,
+            },
+        },
+    }
+
+    handle_batch_describe(runner, 'job-invalid-resume', metadata)
+
+    mock_describe.assert_called_once()
+    assert mock_describe.call_args[0][1] == 'img_b'
+    resume_result = runner.complete_job.call_args[0][1]
+    assert resume_result['described'] == 1
+    assert resume_result['total'] == 2
+
+
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('lightroom_tagger.core.description_service.describe_matched_image')
+@patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
+def test_batch_describe_legitimate_skip_still_checkpointed(
+    _mock_exists,
+    mock_getenv,
+    mock_config,
+    mock_init_db,
+    mock_get_undescribed,
+    mock_describe,
+    _mock_add_log,
+):
+    from jobs.handlers import handle_batch_describe
+
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_db = MagicMock()
+    mock_db.execute.return_value.fetchall.return_value = []
+    mock_init_db.return_value = mock_db
+    mock_get_undescribed.return_value = [{'key': 'img_skip'}]
+    mock_describe.return_value = _SKIPPED_EXISTS
+
+    runner = _make_runner()
+    handle_batch_describe(
+        runner,
+        'job-skip',
+        {'image_type': 'catalog', 'max_workers': 1},
+    )
+
+    result = runner.complete_job.call_args[0][1]
+    assert result['skipped'] == 1
+    assert result['failed'] == 0
+    last_cp = runner.persist_checkpoint.call_args_list[-1][0][1]
+    assert last_cp['processed_pairs'] == ['img_skip|catalog']

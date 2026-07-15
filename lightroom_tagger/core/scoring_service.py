@@ -156,12 +156,13 @@ def _run_score_persist(
         accept_result=accept_result,
         persist=persist,
     )
-    if (
-        outcome.status == "skipped"
-        and outcome.reason == "invalid result"
-        and "msg" in reject_reason
-    ):
-        return VisionOpOutcome(status="failed", reason=reject_reason["msg"])
+    if outcome.status == "failed" and outcome.reason == "invalid result":
+        if "msg" in reject_reason:
+            return VisionOpOutcome(status="failed", reason=reject_reason["msg"])
+        return VisionOpOutcome(
+            status="failed",
+            reason="model returned empty or invalid score response",
+        )
     return outcome
 
 

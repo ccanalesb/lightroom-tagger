@@ -13,9 +13,11 @@ from lightroom_tagger.core.database import (
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.provider_resolution import ResolvedModel, resolve_model
 from lightroom_tagger.core.scoring_service import (
+    _run_score_persist,
     compute_prompt_version,
     score_image_for_perspective,
 )
+from lightroom_tagger.core.vision_op import VisionOpOutcome
 
 
 def _fake_registry(
@@ -331,3 +333,124 @@ def test_score_image_skips_video_without_calling_provider(tmp_path) -> None:
     mock_compress.assert_not_called()
     rows = get_current_scores_for_image(conn, "2024-06-01_clip", "catalog")
     assert rows == []
+
+
+def test_score_image_fails_with_specific_reason_on_slug_mismatch(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    insert_perspective(
+        conn,
+        slug="expected_slug",
+        display_name="Expected",
+        prompt_markdown="Score it.",
+        description="",
+    )
+    conn.commit()
+
+    img_path = tmp_path / "2020-01-01_slug.jpg"
+    img_path.write_bytes(b"x")
+    conn.execute(
+        "INSERT INTO images (key, filepath, date_taken, filename) VALUES (?, ?, ?, ?)",
+        ("2020-01-01_slug.jpg", str(img_path), "2020-01-01", "slug.jpg"),
+    )
+    conn.commit()
+
+    raw_json = '{"perspective_slug": "wrong_slug", "score": 6, "rationale": "Mismatch."}'
+    mock_registry = _fake_registry()
+    mock_registry.get_client.return_value = MagicMock()
+    mock_dispatcher = MagicMock()
+    mock_dispatcher.call_with_fallback.return_value = (raw_json, "ollama", "vision-model")
+
+    with ExitStack() as stack:
+        for p in _scoring_patches(mock_registry=mock_registry, mock_dispatcher=mock_dispatcher):
+            stack.enter_context(p)
+        outcome = score_image_for_perspective(
+            conn,
+            image_key="2020-01-01_slug.jpg",
+            image_type="catalog",
+            perspective_slug="expected_slug",
+            force=True,
+            provider_id="ollama",
+            model="vision-model",
+            log_callback=None,
+        )
+
+    assert outcome.status == "failed"
+    assert outcome.wrote is False
+    assert "wrong_slug" in (outcome.reason or "")
+    assert "expected_slug" in (outcome.reason or "")
+    assert get_current_scores_for_image(conn, "2020-01-01_slug.jpg", "catalog") == []
+
+
+def test_score_image_fails_on_generic_invalid_model_response(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    insert_perspective(
+        conn,
+        slug="generic_fail",
+        display_name="Generic fail",
+        prompt_markdown="Score it.",
+        description="",
+    )
+    conn.commit()
+
+    img_path = tmp_path / "2020-01-01_generic.jpg"
+    img_path.write_bytes(b"x")
+    conn.execute(
+        "INSERT INTO images (key, filepath, date_taken, filename) VALUES (?, ?, ?, ?)",
+        ("2020-01-01_generic.jpg", str(img_path), "2020-01-01", "generic.jpg"),
+    )
+    conn.commit()
+
+    mock_registry = _fake_registry()
+    mock_registry.get_client.return_value = MagicMock()
+    mock_dispatcher = MagicMock()
+    mock_dispatcher.call_with_fallback.return_value = ("not-json", "ollama", "vision-model")
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch(
+                "lightroom_tagger.core.analyzer.scoring.parse_score_response_with_retry",
+                side_effect=Exception("unparseable"),
+            ),
+        )
+        for p in _scoring_patches(mock_registry=mock_registry, mock_dispatcher=mock_dispatcher):
+            stack.enter_context(p)
+        outcome = score_image_for_perspective(
+            conn,
+            image_key="2020-01-01_generic.jpg",
+            image_type="catalog",
+            perspective_slug="generic_fail",
+            force=True,
+            provider_id="ollama",
+            model="vision-model",
+            log_callback=None,
+        )
+
+    assert outcome.status == "failed"
+    assert outcome.wrote is False
+    assert get_current_scores_for_image(conn, "2020-01-01_generic.jpg", "catalog") == []
+
+
+def test_run_score_persist_surfaces_generic_invalid_as_failed(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    img_path = tmp_path / "img.jpg"
+    img_path.write_bytes(b"x")
+
+    with patch("lightroom_tagger.core.scoring_service.run_vision_op_persist") as mock_persist:
+        mock_persist.return_value = VisionOpOutcome(status="failed", reason="invalid result")
+        outcome = _run_score_persist(
+            conn,
+            image_key="k1",
+            image_type="catalog",
+            perspective_slug="p1",
+            prompt_version="p1:abc",
+            force=True,
+            image_path=str(img_path),
+            provider_id="ollama",
+            model="m1",
+            log_callback=None,
+            user_prompt="prompt",
+            silent_compression=False,
+        )
+
+    assert outcome.status == "failed"
+    assert outcome.reason == "model returned empty or invalid score response"

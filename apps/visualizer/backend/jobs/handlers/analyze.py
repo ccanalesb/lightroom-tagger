@@ -217,11 +217,13 @@ def _describe_single_image(
                 perspective_slugs=perspective_slugs,
             )
 
-        if result.wrote:
+        if result.status == 'written':
             return ('described', True, None)
-        else:
-            reason = _diagnose_describe_skip(lib_db, key, itype, force)
-            return ('skipped', False, reason)
+        if result.status == 'failed':
+            reason = result.reason or 'model returned empty or invalid response'
+            return ('failed', False, reason)
+        reason = _diagnose_describe_skip(lib_db, key, itype, force)
+        return ('skipped', False, reason)
     except Exception as e:
         return ('failed', False, str(e))
 

@@ -116,6 +116,6 @@ def run_vision_op_persist(
 
     parsed, provider, model = run_vision_op(spec)
     if not accept_result(parsed):
-        return VisionOpOutcome(status='skipped', reason='invalid result')
+        return VisionOpOutcome(status='failed', reason='invalid result')
     persist(parsed, provider, model)
     return VisionOpOutcome(status='written')

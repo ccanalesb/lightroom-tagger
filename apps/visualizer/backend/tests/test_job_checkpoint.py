@@ -290,6 +290,35 @@ def test_load_resume_state_nested_batch_analyze_describe() -> None:
     ]
 
 
+def test_load_resume_state_nested_batch_analyze_describe_skips_only_checkpointed_pairs() -> None:
+    """Failed describe units are absent from ``processed_pairs`` and are not resumed as done."""
+    logs: list[str] = []
+    meta = {
+        "checkpoint": {
+            "checkpoint_version": CHECKPOINT_VERSION,
+            "job_type": "batch_analyze",
+            "stage": "describe",
+            "describe": {
+                "fingerprint": "fp-ok",
+                "processed_pairs": ["k_ok|catalog"],
+                "total_at_start": 2,
+            },
+            "score": {},
+        }
+    }
+    result = load_resume_state(
+        "batch_describe",
+        meta,
+        "fp-ok",
+        logs.append,
+        nested_sub_key="describe",
+        nested_root_job_type="batch_analyze",
+    )
+    assert result == {"k_ok|catalog"}
+    assert "k_fail|catalog" not in result
+    assert logs == []
+
+
 def test_build_checkpoint_body_matches_hand_rolled_payloads() -> None:
     fp = "abc123"
     processed = {"b", "a"}

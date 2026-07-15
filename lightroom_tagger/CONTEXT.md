@@ -53,7 +53,7 @@
 | `provider_resolution` | `resolve_model()` — single precedence ladder for provider/model selection; returns `ResolvedModel` with a reusable registry |
 | `exceptions` | Shared error type package — `ProviderError` hierarchy + `StackMutationError` |
 | `fallback` | `FallbackDispatcher` — single entry point for all provider/LLM calls (retry + multi-provider fallback) |
-| `vision_op` | Vision-op engine — `run_vision_op`, `run_vision_op_persist`, `VisionOpSpec`, `VisionOpOutcome`; single orchestration primitive for description, scoring, and compare (ADR-0014) |
+| `vision_op` | Vision-op engine — `run_vision_op`, `run_vision_op_persist`, `VisionOpSpec`, `VisionOpOutcome` (`written` \| `skipped` \| `failed`; model-produced unusable results are `failed`, pre-check skips only are `skipped`; ADR-0014) |
 | `retry` | `retry_with_backoff` with `RETRYABLE_ERRORS` / `NOT_RETRYABLE_ERRORS` frozensets |
 | `cancel_scope` | Thread-local cooperative cancellation — workers register a `cancel_check` callback; retry/fallback paths honour it |
 | `scoring_service` | Per-perspective scoring of catalog and Instagram images via vision models |

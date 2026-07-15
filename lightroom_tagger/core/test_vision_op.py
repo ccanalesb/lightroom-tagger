@@ -63,7 +63,7 @@ def test_run_vision_op_persist_writes_when_accepted():
     assert stored['provider'] == 'ollama'
 
 
-def test_run_vision_op_persist_skips_invalid_result():
+def test_run_vision_op_persist_fails_invalid_result():
     spec = MagicMock()
     spec.registry = None
     spec.resolve_kind = 'description'
@@ -87,7 +87,8 @@ def test_run_vision_op_persist_skips_invalid_result():
             persist=lambda *_a: None,
         )
 
-    assert outcome.status == 'skipped'
+    assert outcome.status == 'failed'
+    assert outcome.reason == 'invalid result'
 
 
 def test_run_vision_op_parse_response_accepts_provider_and_model():
