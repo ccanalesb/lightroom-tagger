@@ -8,7 +8,6 @@ from typing import Any
 
 from flask import Blueprint, jsonify, request
 from spectree import Response
-
 from utils.db import with_db
 from utils.responses import error_bad_request, error_server_error
 
@@ -22,10 +21,13 @@ from api.schemas.search import (
     SemanticSearchRequest,
     SemanticSearchResponse,
 )
-
 from lightroom_tagger.core import nl_catalog_search
-import lightroom_tagger.core.catalog_search as catalog_search_module
-from lightroom_tagger.core.catalog_search import CatalogSearchInputError, search_catalog
+from lightroom_tagger.core.catalog_search import (
+    CatalogSearchInputError,
+    reset_runtime_deps,
+    search_catalog,
+    use_runtime_deps,
+)
 from lightroom_tagger.core.clip_similarity import (
     NoClipEmbeddingError,
     list_pin_similarity_candidate_keys,
@@ -61,31 +63,6 @@ def _merge_chat_search_metadata(
     if pin:
         out.update(pin)
     return out or None
-
-
-def _bind_catalog_search_runtime_deps(
-  *,
-    pin_restrict: frozenset[str] | None,
-) -> None:
-    """Point catalog_search at this module's callables (test patches + pin restrict)."""
-    catalog_search_module.embed_query_to_vec_blob = embed_query_to_vec_blob
-
-    if pin_restrict is not None:
-        def hybrid(db: sqlite3.Connection, **kw: Any):
-            kw = dict(kw)
-            kw["restrict_to_keys"] = pin_restrict
-            return run_semantic_hybrid_search(db, **kw)
-
-        def query(db: sqlite3.Connection, **kw: Any):
-            kw = dict(kw)
-            kw["restrict_to_keys"] = pin_restrict
-            return query_catalog_images(db, **kw)
-
-        catalog_search_module.run_semantic_hybrid_search = hybrid
-        catalog_search_module.query_catalog_images = query
-    else:
-        catalog_search_module.run_semantic_hybrid_search = run_semantic_hybrid_search
-        catalog_search_module.query_catalog_images = query_catalog_images
 
 
 def _score_perspective_from_filters(filters: dict | None) -> str | None:
@@ -386,8 +363,12 @@ def chat_search_images(db):
         if isinstance(score_perspective_arg, tuple):
             return score_perspective_arg
 
-        _bind_catalog_search_runtime_deps(pin_restrict=pin_restrict)
-
+        deps_token = use_runtime_deps(
+            run_semantic_hybrid_search=run_semantic_hybrid_search,
+            embed_query_to_vec_blob=embed_query_to_vec_blob,
+            query_catalog_images=query_catalog_images,
+            restrict_to_keys=pin_restrict,
+        )
         try:
             result = search_catalog(
                 db,
@@ -402,6 +383,8 @@ def chat_search_images(db):
             )
         except CatalogSearchInputError as exc:
             return error_bad_request(str(exc))
+        finally:
+            reset_runtime_deps(deps_token)
 
         if result.mode == "semantic":
             images = _catalog_rows_with_signals(result.images, score_perspective_arg)

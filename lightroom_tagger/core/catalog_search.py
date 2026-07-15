@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import contextvars
 import json
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -28,6 +30,55 @@ from lightroom_tagger.core.structured_output import StructuredOutputError
 
 class CatalogSearchInputError(ValueError):
     """Invalid search input; map to HTTP 400 in the web layer."""
+
+
+@dataclass(frozen=True)
+class _RuntimeDeps:
+    """Per-request dependency overrides injected by the web layer.
+
+    The web layer's test suite patches its own module-level ``run_semantic_hybrid_search`` /
+    ``embed_query_to_vec_blob`` / ``query_catalog_images`` symbols and needs the pin
+    ``restrict_to_keys`` threaded through. We accept those via a greenlet-safe ContextVar
+    instead of mutating this module's globals (which would leak across concurrent requests
+    under eventlet). Pin plumbing proper lands in slice 3.
+    """
+
+    run_semantic_hybrid_search: Callable[..., Any] | None = None
+    embed_query_to_vec_blob: Callable[..., Any] | None = None
+    query_catalog_images: Callable[..., Any] | None = None
+    restrict_to_keys: frozenset[str] | None = None
+
+
+_runtime_deps: contextvars.ContextVar[_RuntimeDeps | None] = contextvars.ContextVar(
+    "catalog_search_runtime_deps", default=None
+)
+
+
+def use_runtime_deps(
+    *,
+    run_semantic_hybrid_search: Callable[..., Any] | None = None,
+    embed_query_to_vec_blob: Callable[..., Any] | None = None,
+    query_catalog_images: Callable[..., Any] | None = None,
+    restrict_to_keys: frozenset[str] | None = None,
+) -> contextvars.Token:
+    """Bind per-request runtime deps for the current greenlet; returns a reset token."""
+    return _runtime_deps.set(
+        _RuntimeDeps(
+            run_semantic_hybrid_search=run_semantic_hybrid_search,
+            embed_query_to_vec_blob=embed_query_to_vec_blob,
+            query_catalog_images=query_catalog_images,
+            restrict_to_keys=restrict_to_keys,
+        )
+    )
+
+
+def reset_runtime_deps(token: contextvars.Token) -> None:
+    """Undo a prior :func:`use_runtime_deps` binding."""
+    _runtime_deps.reset(token)
+
+
+def _deps() -> _RuntimeDeps:
+    return _runtime_deps.get() or _RuntimeDeps()
 
 
 @dataclass(frozen=True)
@@ -83,15 +134,21 @@ def _run_semantic_search(
     if match_str is None:
         raise CatalogSearchInputError("query must contain at least one searchable term")
 
-    blob = embed_query_to_vec_blob(qstrip)
-    sem_rows, total, meta = run_semantic_hybrid_search(
-        db,
-        user_query=qstrip,
-        fts_match=match_str,
-        query_vec_blob=blob,
-        limit=limit,
-        offset=offset,
-    )
+    deps = _deps()
+    embed = deps.embed_query_to_vec_blob or embed_query_to_vec_blob
+    hybrid = deps.run_semantic_hybrid_search or run_semantic_hybrid_search
+
+    blob = embed(qstrip)
+    hybrid_kwargs: dict[str, Any] = {
+        "user_query": qstrip,
+        "fts_match": match_str,
+        "query_vec_blob": blob,
+        "limit": limit,
+        "offset": offset,
+    }
+    if deps.restrict_to_keys is not None:
+        hybrid_kwargs["restrict_to_keys"] = deps.restrict_to_keys
+    sem_rows, total, meta = hybrid(db, **hybrid_kwargs)
 
     keys = [r.image_key for r in sem_rows]
     catalog_rows = query_catalog_images_by_keys(
@@ -173,11 +230,15 @@ def _run_nl_filter_query(
     limit: int,
     offset: int,
 ) -> SearchResult:
+    deps = _deps()
+    query = deps.query_catalog_images or query_catalog_images
     qkwargs = catalog_nl_filter_to_query_kwargs(filters)
     qkwargs["limit"] = limit
     qkwargs["offset"] = offset
+    if deps.restrict_to_keys is not None:
+        qkwargs["restrict_to_keys"] = deps.restrict_to_keys
     try:
-        rows, total = query_catalog_images(db, **qkwargs)
+        rows, total = query(db, **qkwargs)
     except ValueError as err:
         raise CatalogSearchInputError(str(err)) from err
     return SearchResult(
