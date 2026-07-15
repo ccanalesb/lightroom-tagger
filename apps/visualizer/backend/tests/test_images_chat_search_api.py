@@ -27,14 +27,17 @@ def chat_search_client(tmp_path, monkeypatch):
 
     monkeypatch.setattr("utils.db.LIBRARY_DB", db_path)
 
-    import api.images as api_images
+    from lightroom_tagger.core.provider_registry import ProviderRegistry
 
-    _orig_list = api_images.ProviderRegistry.list_providers
+    _orig_list = ProviderRegistry.list_providers
 
     def _list_providers_nl_only(self):
         return [{**p, "tool_calling": False} for p in _orig_list(self)]
 
-    monkeypatch.setattr(api_images.ProviderRegistry, "list_providers", _list_providers_nl_only)
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.ProviderRegistry.list_providers",
+        _list_providers_nl_only,
+    )
 
     app = create_app()
     return app.test_client(), k
@@ -45,7 +48,7 @@ def test_chat_search_nl_filter_path(
 ) -> None:
     client, _k = chat_search_client
     monkeypatch.setattr(
-        "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
+        "lightroom_tagger.core.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
         lambda *a, **k: '{"keyword": "mountain"}',
     )
     r = client.post(
@@ -68,7 +71,7 @@ def test_chat_search_semantic_fallback(
     client, k = chat_search_client
 
     monkeypatch.setattr(
-        "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
+        "lightroom_tagger.core.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
         lambda *a, **k: "{}",
     )
 
@@ -102,8 +105,14 @@ def test_chat_search_semantic_fallback(
             ),
         )
 
-    monkeypatch.setattr("api.images.search.embed_query_to_vec_blob", lambda _q: fixed_blob)
-    monkeypatch.setattr("api.images.search.run_semantic_hybrid_search", fake_hybrid)
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.embed_query_to_vec_blob",
+        lambda _q: fixed_blob,
+    )
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.run_semantic_hybrid_search",
+        fake_hybrid,
+    )
 
     r = client.post(
         "/api/images/search/chat-search", json={"message": "hills in spring"}
@@ -140,7 +149,7 @@ def test_chat_search_multiturn_forwards_current_message_last(
         return '{"keyword": "lake"}'
 
     monkeypatch.setattr(
-        "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
+        "lightroom_tagger.core.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
         multi_turn,
     )
     r = client.post(
@@ -187,13 +196,19 @@ def test_chat_search_pin_active_semantic_passes_restrict_to_keys(
         )
 
     monkeypatch.setattr(
-        "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
+        "lightroom_tagger.core.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
         lambda *a, **k: "{}",
     )
-    monkeypatch.setattr("api.images.search.embed_query_to_vec_blob", lambda _q: b"\xef" * (768 * 4))
-    monkeypatch.setattr("api.images.search.run_semantic_hybrid_search", capture_hybrid)
     monkeypatch.setattr(
-        "api.images.search.list_pin_similarity_candidate_keys",
+        "lightroom_tagger.core.catalog_search.embed_query_to_vec_blob",
+        lambda _q: b"\xef" * (768 * 4),
+    )
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.run_semantic_hybrid_search",
+        capture_hybrid,
+    )
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.list_pin_similarity_candidate_keys",
         lambda _db, seed: [seed, "neighbor-key"],
     )
     r = client.post(
@@ -236,12 +251,21 @@ def test_chat_search_pin_inactive_no_clip_embedding_falls_back_semantic(
         raise NoClipEmbeddingError(seed)
 
     monkeypatch.setattr(
-        "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
+        "lightroom_tagger.core.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
         lambda *a, **k: "{}",
     )
-    monkeypatch.setattr("api.images.search.embed_query_to_vec_blob", lambda _q: b"\xef" * (768 * 4))
-    monkeypatch.setattr("api.images.search.run_semantic_hybrid_search", capture_hybrid)
-    monkeypatch.setattr("api.images.search.list_pin_similarity_candidate_keys", boom)
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.embed_query_to_vec_blob",
+        lambda _q: b"\xef" * (768 * 4),
+    )
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.run_semantic_hybrid_search",
+        capture_hybrid,
+    )
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.list_pin_similarity_candidate_keys",
+        boom,
+    )
     r = client.post(
         "/api/images/search/chat-search",
         json={"message": "hills in spring", "pinned_image_key": k},
@@ -264,12 +288,15 @@ def test_chat_search_nl_filter_with_pin_restricts_catalog_query(
         return ([], 0)
 
     monkeypatch.setattr(
-        "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
+        "lightroom_tagger.core.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
         lambda *a, **k: '{"keyword": "hill"}',
     )
-    monkeypatch.setattr("api.images.search.query_catalog_images", capture_query)
     monkeypatch.setattr(
-        "api.images.search.list_pin_similarity_candidate_keys",
+        "lightroom_tagger.core.catalog_search.query_catalog_images",
+        capture_query,
+    )
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.list_pin_similarity_candidate_keys",
         lambda _db, seed: [seed, "neighbor-key"],
     )
     r = client.post(
@@ -303,11 +330,17 @@ def test_chat_search_pin_inactive_invalid_key_metadata(
         )
 
     monkeypatch.setattr(
-        "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
+        "lightroom_tagger.core.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
         lambda *a, **k: "{}",
     )
-    monkeypatch.setattr("api.images.search.embed_query_to_vec_blob", lambda _q: b"\xef" * (768 * 4))
-    monkeypatch.setattr("api.images.search.run_semantic_hybrid_search", capture_hybrid)
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.embed_query_to_vec_blob",
+        lambda _q: b"\xef" * (768 * 4),
+    )
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.run_semantic_hybrid_search",
+        capture_hybrid,
+    )
     r = client.post(
         "/api/images/search/chat-search",
         json={"message": "hills in spring", "pinned_image_key": "not-a-real-catalog-key"},
@@ -324,7 +357,7 @@ def test_chat_search_invalid_llm_json_400(
 ) -> None:
     client, _k = chat_search_client
     monkeypatch.setattr(
-        "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
+        "lightroom_tagger.core.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
         lambda *a, **k: "not-json",
     )
     r = client.post(

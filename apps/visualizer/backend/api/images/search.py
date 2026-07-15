@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-import sqlite3
 from typing import Any
 
 from flask import Blueprint, jsonify, request
@@ -21,26 +19,7 @@ from api.schemas.search import (
     SemanticSearchRequest,
     SemanticSearchResponse,
 )
-from lightroom_tagger.core import nl_catalog_search
-from lightroom_tagger.core.catalog_search import (
-    CatalogSearchInputError,
-    reset_runtime_deps,
-    search_catalog,
-    use_runtime_deps,
-)
-from lightroom_tagger.core.clip_similarity import (
-    NoClipEmbeddingError,
-    list_pin_similarity_candidate_keys,
-)
-from lightroom_tagger.core.database import (
-    get_image,
-    query_catalog_images,
-    query_catalog_images_by_keys,
-)
-from lightroom_tagger.core.embedding_service import embed_query_to_vec_blob
-from lightroom_tagger.core.exceptions import ModelUnavailableError
-from lightroom_tagger.core.provider_registry import ProviderRegistry
-from lightroom_tagger.core.semantic_search import run_semantic_hybrid_search
+from lightroom_tagger.core.catalog_search import CatalogSearchInputError, search_catalog
 
 from .catalog import (
     _CATALOG_SCORE_PERSPECTIVE_SLUG_RE,
@@ -49,20 +28,6 @@ from .catalog import (
 from .common import _clamp_pagination
 
 search_bp = Blueprint("images_search", __name__)
-
-
-def _merge_chat_search_metadata(
-    base: dict[str, Any] | None,
-    pin: dict[str, Any] | None,
-) -> dict[str, Any] | None:
-    if base is None and pin is None:
-        return None
-    out: dict[str, Any] = {}
-    if base:
-        out.update(base)
-    if pin:
-        out.update(pin)
-    return out or None
 
 
 def _score_perspective_from_filters(filters: dict | None) -> str | None:
@@ -97,78 +62,6 @@ def _catalog_rows_with_signals(
             img["why_matched"] = sig["why_matched"]
             img["thumbnail_url"] = f"/api/images/catalog/{img['key']}/thumbnail"
     return images
-
-
-def _chat_pin_context(
-    db: sqlite3.Connection,
-    body: dict[str, Any],
-) -> tuple[frozenset[str] | None, dict[str, Any] | None]:
-    """Return (restrict_to_keys, pin_metadata). ``None`` restrict → full catalog."""
-    raw = body.get("pinned_image_key")
-    if raw is None:
-        return None, None
-    pk = str(raw).strip()
-    if not pk:
-        return None, None
-    if get_image(db, pk) is None:
-        return None, {"pin_state": "inactive", "fallback_reason": "invalid_pin_key"}
-    try:
-        keys = list_pin_similarity_candidate_keys(db, pk)
-        return frozenset(keys), {"pin_state": "active"}
-    except NoClipEmbeddingError:
-        return None, {"pin_state": "inactive", "fallback_reason": "no_clip_embedding"}
-
-
-def _extract_images_from_tool_messages(
-    messages: list[dict],
-    db: sqlite3.Connection,
-    *,
-    score_perspective_override: str | None = None,
-) -> tuple[list[dict], int]:
-    """Parse the last tool result JSON, re-fetch rows in catalog API shape, ordered like the tool result."""
-    tool_msgs = [
-        m
-        for m in messages
-        if isinstance(m, dict) and str(m.get("role", "")).strip().lower() == "tool"
-    ]
-    if not tool_msgs:
-        return [], 0
-    last = tool_msgs[-1]
-    raw_content = last.get("content")
-    if raw_content is None or not str(raw_content).strip():
-        return [], 0
-    try:
-        payload = json.loads(str(raw_content))
-    except (json.JSONDecodeError, TypeError):
-        return [], 0
-    if not isinstance(payload, dict) or payload.get("error"):
-        return [], 0
-    tool_images = payload.get("images")
-    if not isinstance(tool_images, list):
-        return [], 0
-    total = int(payload.get("total_matched", 0) or 0)
-    keys: list[str] = []
-    sp_from_tool: str | None = None
-    for im in tool_images:
-        if not isinstance(im, dict):
-            continue
-        k = im.get("key")
-        if k is not None and str(k).strip():
-            keys.append(str(k))
-        if sp_from_tool is None and im.get("score_perspective"):
-            spt = str(im["score_perspective"]).strip()
-            if spt:
-                sp_from_tool = spt
-    sp_arg = score_perspective_override if score_perspective_override else sp_from_tool
-    if not keys:
-        return [], total
-    rows = query_catalog_images_by_keys(db, keys, score_perspective=sp_arg)
-    by_key = {r.get("key"): r for r in rows}
-    ordered_rows = [by_key[k] for k in keys if k in by_key]
-    images = _rows_to_catalog_api_images(ordered_rows, sp_arg)
-    for img in images:
-        img["thumbnail_url"] = f"/api/images/catalog/{img['key']}/thumbnail"
-    return images, total
 
 
 def _parse_score_perspective_body(body: dict[str, Any]) -> str | None | tuple:
@@ -315,92 +208,48 @@ def chat_search_images(db):
             )
 
         limit, offset = _clamp_pagination(body.get("limit", 50), body.get("offset", 0))
-        pin_restrict, pin_meta = _chat_pin_context(db, body)
-
-        turns_for_llm = prior + [{"role": "user", "content": message_stripped}]
-
-        registry = ProviderRegistry()
-        all_providers = {p["id"]: p for p in registry.list_providers()}
-        resolved_provider_id = body.get("provider_id") or registry.defaults.get(
-            "description", {}
-        ).get("provider")
-        provider_config = all_providers.get(resolved_provider_id, {})
-        use_tool_calling = bool(provider_config.get("tool_calling", False))
-
-        if use_tool_calling:
-            score_perspective_for_tool = _parse_score_perspective_body(body)
-            if isinstance(score_perspective_for_tool, tuple):
-                return score_perspective_for_tool
-            try:
-                assistant_text, updated_messages = nl_catalog_search.run_tool_calling_search(
-                    turns_for_llm,
-                    provider_id=body.get("provider_id"),
-                    model=body.get("model"),
-                    db=db,
-                    log_callback=None,
-                    restrict_to_keys=pin_restrict,
-                )
-            except (ModelUnavailableError, ValueError) as exc:
-                return error_bad_request(str(exc))
-            images, total = _extract_images_from_tool_messages(
-                updated_messages,
-                db,
-                score_perspective_override=score_perspective_for_tool,
-            )
-            return jsonify(
-                {
-                    "search_mode": "tool_calling",
-                    "total": total,
-                    "images": images,
-                    "filters": None,
-                    "metadata": _merge_chat_search_metadata(None, pin_meta),
-                    "messages": updated_messages,
-                    "assistant_message": assistant_text,
-                }
-            )
 
         score_perspective_arg = _parse_score_perspective_body(body)
         if isinstance(score_perspective_arg, tuple):
             return score_perspective_arg
 
-        deps_token = use_runtime_deps(
-            run_semantic_hybrid_search=run_semantic_hybrid_search,
-            embed_query_to_vec_blob=embed_query_to_vec_blob,
-            query_catalog_images=query_catalog_images,
-            restrict_to_keys=pin_restrict,
-        )
         try:
             result = search_catalog(
                 db,
                 message_stripped,
                 history=prior,
-                mode="auto",
+                pin_key=body.get("pinned_image_key"),
                 provider_id=body.get("provider_id"),
                 model=body.get("model"),
                 score_perspective=score_perspective_arg,
+                mode="auto",
                 limit=limit,
                 offset=offset,
             )
         except CatalogSearchInputError as exc:
             return error_bad_request(str(exc))
-        finally:
-            reset_runtime_deps(deps_token)
 
-        if result.mode == "semantic":
+        if result.mode in ("semantic", "tool_calling"):
             images = _catalog_rows_with_signals(result.images, score_perspective_arg)
+            if result.mode == "tool_calling":
+                for img in images:
+                    img["thumbnail_url"] = f"/api/images/catalog/{img['key']}/thumbnail"
         else:
             sp_from_filter = _score_perspective_from_filters(result.filters)
             images = _rows_to_catalog_api_images(result.images, sp_from_filter)
 
-        return jsonify(
-            {
-                "search_mode": result.mode,
-                "total": result.total,
-                "images": images,
-                "filters": result.filters,
-                "metadata": _merge_chat_search_metadata(result.metadata, pin_meta),
-            }
-        )
+        payload: dict[str, Any] = {
+            "search_mode": result.mode,
+            "total": result.total,
+            "images": images,
+            "filters": result.filters,
+            "metadata": result.metadata,
+        }
+        if result.mode == "tool_calling":
+            payload["messages"] = result.messages
+            payload["assistant_message"] = result.assistant_message
+
+        return jsonify(payload)
     except Exception as e:
         return error_server_error(str(e))
 
