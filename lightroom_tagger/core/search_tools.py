@@ -1,6 +1,7 @@
 """Tool schemas and executor for LLM function-calling search."""
 from __future__ import annotations
 
+import json
 import sqlite3
 from typing import Any
 
@@ -8,6 +9,7 @@ from lightroom_tagger.core.database import (
     catalog_schema_facets,
     get_all_current_perspective_slugs,
     query_catalog_images,
+    query_catalog_images_by_keys,
 )
 
 from lightroom_tagger.core.search_tools_definitions import ALL_TOOLS
@@ -202,3 +204,63 @@ def _rows_to_tool_result(
             item["dominant_colors"] = row["dominant_colors"]
         result.append(item)
     return result
+
+
+def extract_images_from_tool_messages(
+    messages: list[dict],
+    db: sqlite3.Connection,
+    *,
+    score_perspective: str | None = None,
+) -> tuple[list[dict], int]:
+    """Parse the last tool result JSON, re-fetch rows, preserve tool-result ordering."""
+    tool_msgs = [
+        m
+        for m in messages
+        if isinstance(m, dict) and str(m.get("role", "")).strip().lower() == "tool"
+    ]
+    if not tool_msgs:
+        return [], 0
+    raw_content = tool_msgs[-1].get("content")
+    if raw_content is None or not str(raw_content).strip():
+        return [], 0
+    try:
+        payload = json.loads(str(raw_content))
+    except (json.JSONDecodeError, TypeError):
+        return [], 0
+    if not isinstance(payload, dict) or payload.get("error"):
+        return [], 0
+    tool_images = payload.get("images")
+    if not isinstance(tool_images, list):
+        return [], 0
+    total = int(payload.get("total_matched", 0) or 0)
+    keys: list[str] = []
+    sp_from_tool: str | None = None
+    tool_by_key: dict[str, dict[str, Any]] = {}
+    for im in tool_images:
+        if not isinstance(im, dict):
+            continue
+        k = im.get("key")
+        if k is not None and str(k).strip():
+            kstr = str(k)
+            keys.append(kstr)
+            tool_by_key[kstr] = im
+        if sp_from_tool is None and im.get("score_perspective"):
+            spt = str(im["score_perspective"]).strip()
+            if spt:
+                sp_from_tool = spt
+    sp_arg = score_perspective if score_perspective else sp_from_tool
+    if not keys:
+        return [], total
+    rows = query_catalog_images_by_keys(db, keys, score_perspective=sp_arg)
+    by_key = {r.get("key"): r for r in rows}
+    images: list[dict] = []
+    for k in keys:
+        if k not in by_key:
+            continue
+        row = dict(by_key[k])
+        tool_im = tool_by_key.get(k, {})
+        score_val = tool_im.get("score")
+        row["score"] = float(score_val) if score_val is not None else None
+        row["why_matched"] = tool_im.get("why_matched")
+        images.append(row)
+    return images, total

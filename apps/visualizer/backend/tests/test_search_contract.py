@@ -31,14 +31,17 @@ def search_contract_client(tmp_path, monkeypatch):
     conn.close()
     monkeypatch.setattr("utils.db.LIBRARY_DB", db_path)
 
-    import api.images as api_images
+    from lightroom_tagger.core.provider_registry import ProviderRegistry
 
-    _orig_list = api_images.ProviderRegistry.list_providers
+    _orig_list = ProviderRegistry.list_providers
 
     def _list_providers_nl_only(self):
         return [{**p, "tool_calling": False} for p in _orig_list(self)]
 
-    monkeypatch.setattr(api_images.ProviderRegistry, "list_providers", _list_providers_nl_only)
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.ProviderRegistry.list_providers",
+        _list_providers_nl_only,
+    )
     return create_app().test_client()
 
 
@@ -103,7 +106,7 @@ def test_semantic_search_response_round_trip(search_contract_client, monkeypatch
 def test_chat_search_response_round_trip(search_contract_client, monkeypatch):
     client = search_contract_client
     monkeypatch.setattr(
-        "api.images.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
+        "lightroom_tagger.core.nl_catalog_search.run_nl_catalog_filter_llm_multi_turn",
         lambda *a, **k: '{"keyword": "mountain"}',
     )
     payload = client.post(
