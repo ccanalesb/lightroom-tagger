@@ -157,6 +157,7 @@ class TestImageDescriptions(unittest.TestCase):
         from datetime import datetime, timedelta
 
         recent = datetime.now().strftime('%Y-%m-%dT00:00:00')
+        mid = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%dT00:00:00')
         old = (datetime.now() - timedelta(days=400)).strftime('%Y-%m-%dT00:00:00')
         store_instagram_dump_media(self.db, {
             'media_key': 'ig/recent',
@@ -164,6 +165,13 @@ class TestImageDescriptions(unittest.TestCase):
             'filename': 'recent.jpg',
             'date_folder': datetime.now().strftime('%Y%m'),
             'created_at': recent,
+        })
+        store_instagram_dump_media(self.db, {
+            'media_key': 'ig/mid',
+            'file_path': '/ig/mid.jpg',
+            'filename': 'mid.jpg',
+            'date_folder': datetime.now().strftime('%Y%m'),
+            'created_at': mid,
         })
         store_instagram_dump_media(self.db, {
             'media_key': 'ig/stale',
@@ -176,7 +184,7 @@ class TestImageDescriptions(unittest.TestCase):
             img['media_key']
             for img in get_undescribed_instagram_images(self.db, months=12)
         ]
-        self.assertEqual(keys, ['ig/recent'])
+        self.assertEqual(keys, ['ig/recent', 'ig/mid'])
 
     def test_store_image_description_persists_has_repetition_stringly(self):
         store_image_description(self.db, {
