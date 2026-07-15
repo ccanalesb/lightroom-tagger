@@ -2,15 +2,28 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass
+from typing import Any
 
+from pydantic import ValidationError
+
+from lightroom_tagger.core import nl_catalog_search
+from lightroom_tagger.core.catalog_nl_filter import (
+    CatalogNlFilter,
+    catalog_nl_filter_to_query_kwargs,
+    parse_catalog_nl_filter_from_llm,
+)
 from lightroom_tagger.core.database import (
     build_description_fts_query,
+    get_all_current_perspective_slugs,
+    query_catalog_images,
     query_catalog_images_by_keys,
 )
 from lightroom_tagger.core.embedding_service import embed_query_to_vec_blob
 from lightroom_tagger.core.semantic_search import run_semantic_hybrid_search
+from lightroom_tagger.core.structured_output import StructuredOutputError
 
 
 class CatalogSearchInputError(ValueError):
@@ -28,6 +41,21 @@ class SearchResult:
     assistant_message: str | None = None
     messages: list[dict] | None = None
     metadata: dict | None = None
+
+
+def effective_catalog_nl_kwargs(filters: CatalogNlFilter) -> dict[str, Any]:
+    """Drop empty-string / empty-list values so ``{}`` means "no structured filters"."""
+    raw = catalog_nl_filter_to_query_kwargs(filters)
+    out: dict[str, Any] = {}
+    for k, v in raw.items():
+        if v is None:
+            continue
+        if isinstance(v, str) and not v.strip():
+            continue
+        if isinstance(v, list) and len(v) == 0:
+            continue
+        out[k] = v
+    return out
 
 
 def _validate_semantic_message(message: str | None) -> str:
@@ -95,6 +123,71 @@ def _run_semantic_search(
     )
 
 
+def _parse_nl_filter_raw(raw: str) -> CatalogNlFilter:
+    try:
+        return parse_catalog_nl_filter_from_llm(raw)
+    except (json.JSONDecodeError, ValidationError, StructuredOutputError) as exc:
+        raise CatalogSearchInputError(f"NL filter: {exc}") from exc
+
+
+def _run_nl_filter_one_shot_raw(
+    message: str,
+    *,
+    provider_id: str | None,
+    model: str | None,
+) -> str:
+    try:
+        return nl_catalog_search.run_nl_catalog_filter_llm(
+            message,
+            provider_id=provider_id,
+            model=model,
+            log_callback=None,
+        )
+    except (json.JSONDecodeError, ValidationError, StructuredOutputError) as exc:
+        raise CatalogSearchInputError(f"NL filter: {exc}") from exc
+
+
+def _run_nl_filter_multi_turn_raw(
+    turns: list[dict],
+    *,
+    provider_id: str | None,
+    model: str | None,
+    score_perspective_slugs: list[str],
+) -> str:
+    try:
+        return nl_catalog_search.run_nl_catalog_filter_llm_multi_turn(
+            turns,
+            provider_id=provider_id,
+            model=model,
+            log_callback=None,
+            score_perspective_slugs=score_perspective_slugs,
+        )
+    except (json.JSONDecodeError, ValidationError, StructuredOutputError) as exc:
+        raise CatalogSearchInputError(f"NL filter: {exc}") from exc
+
+
+def _run_nl_filter_query(
+    db: sqlite3.Connection,
+    filters: CatalogNlFilter,
+    *,
+    limit: int,
+    offset: int,
+) -> SearchResult:
+    qkwargs = catalog_nl_filter_to_query_kwargs(filters)
+    qkwargs["limit"] = limit
+    qkwargs["offset"] = offset
+    try:
+        rows, total = query_catalog_images(db, **qkwargs)
+    except ValueError as err:
+        raise CatalogSearchInputError(str(err)) from err
+    return SearchResult(
+        images=[dict(row) for row in rows],
+        total=total,
+        mode="nl_filter",
+        filters=filters.model_dump(exclude_none=True),
+    )
+
+
 def search_catalog(
     db: sqlite3.Connection,
     message: str | None,
@@ -108,8 +201,8 @@ def search_catalog(
     offset: int,
     mode: str = "auto",
 ) -> SearchResult:
-    """Run catalog search. Only ``mode='semantic'`` is implemented in slice 1."""
-    _ = (history, pin_key, provider_id, model)
+    """Run catalog search (semantic, nl_filter, or auto NL-first cascade)."""
+    _ = pin_key
 
     if mode == "semantic":
         return _run_semantic_search(
@@ -119,5 +212,38 @@ def search_catalog(
             limit=limit,
             offset=offset,
         )
+
+    if mode == "nl_filter":
+        qstrip = str(message or "").strip()
+        if not qstrip:
+            raise CatalogSearchInputError("query must be non-empty")
+        raw = _run_nl_filter_one_shot_raw(
+            qstrip,
+            provider_id=provider_id,
+            model=model,
+        )
+        filters = _parse_nl_filter_raw(raw)
+        return _run_nl_filter_query(db, filters, limit=limit, offset=offset)
+
+    if mode == "auto":
+        msg_stripped = str(message or "").strip()
+        turns = list(history or []) + [{"role": "user", "content": msg_stripped}]
+        raw = _run_nl_filter_multi_turn_raw(
+            turns,
+            provider_id=provider_id,
+            model=model,
+            score_perspective_slugs=get_all_current_perspective_slugs(db),
+        )
+        filters = _parse_nl_filter_raw(raw)
+        kwargs_eff = effective_catalog_nl_kwargs(filters)
+        if not kwargs_eff:
+            return _run_semantic_search(
+                db,
+                message,
+                score_perspective=score_perspective,
+                limit=limit,
+                offset=offset,
+            )
+        return _run_nl_filter_query(db, filters, limit=limit, offset=offset)
 
     raise NotImplementedError(f"search mode {mode!r} not implemented")
