@@ -199,6 +199,7 @@ def get_undescribed_catalog_images(
     if min_rating is not None:
         sql += " AND i.rating >= ?"
         params.append(min_rating)
+    sql += " ORDER BY (i.date_taken IS NULL) DESC, i.date_taken DESC, i.key DESC"
     rows = db.execute(sql, params).fetchall()
     return [_deserialize_row(r) for r in rows]
 
@@ -225,6 +226,9 @@ def get_undescribed_instagram_images(db: sqlite3.Connection, months: int = None)
     if months:
         sql += " AND m.created_at >= date('now', ?)"
         params.append(f'-{months} months')
+    sql += (
+        " ORDER BY (m.created_at IS NULL) DESC, m.created_at DESC, m.media_key DESC"
+    )
     rows = db.execute(sql, params).fetchall()
     return [_deserialize_row(r) for r in rows]
 

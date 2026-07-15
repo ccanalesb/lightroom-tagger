@@ -77,6 +77,20 @@ def _call(conn, *, months=None, year=None, undescribed_only=False):
     }
 
 
+def _call_ordered(conn, *, months=None, year=None, undescribed_only=False):
+    from jobs.handlers.common import _select_instagram_keys
+
+    return [
+        key
+        for key, kind in _select_instagram_keys(
+            conn,
+            months=months,
+            year=year,
+            undescribed_only=undescribed_only,
+        )
+    ]
+
+
 class TestCreatedAtFallback:
     """Verify that NULL/empty created_at rows are rescued via date_folder."""
 
@@ -183,3 +197,60 @@ class TestNoFilter:
         _insert(conn, 'any/row', created_at=created_at, date_folder=date_folder)
 
         assert _call(conn) == {'any/row'}
+
+
+class TestInstagramKeyOrdering:
+    """Newest-first ordering via the COALESCE(created_at, date_folder) sort key."""
+
+    def test_newest_first_by_created_at(self):
+        conn = _make_db()
+        _insert(conn, 'ig/old', created_at='2024-01-10T00:00:00')
+        _insert(conn, 'ig/new', created_at='2024-06-20T00:00:00')
+
+        assert _call_ordered(conn) == ['ig/new', 'ig/old']
+
+    def test_undated_effective_date_first(self):
+        conn = _make_db()
+        _insert(conn, 'ig/dated', created_at='2024-06-20T00:00:00')
+        _insert(conn, 'ig/undated', date_folder='other', created_at=None)
+
+        keys = _call_ordered(conn)
+        assert keys[0] == 'ig/undated'
+        assert keys[1:] == ['ig/dated']
+
+    def test_date_folder_fallback_sorts_newest_first(self):
+        conn = _make_db()
+        _insert(conn, 'ig/folder-old', date_folder='202401', created_at=None)
+        _insert(conn, 'ig/folder-new', date_folder='202406', created_at=None)
+
+        assert _call_ordered(conn) == ['ig/folder-new', 'ig/folder-old']
+
+    def test_equal_effective_date_tiebreaker_media_key_desc(self):
+        conn = _make_db()
+        _insert(conn, 'ig/aaa', created_at='2024-05-01T00:00:00')
+        _insert(conn, 'ig/zzz', created_at='2024-05-01T00:00:00')
+
+        assert _call_ordered(conn) == ['ig/zzz', 'ig/aaa']
+
+    def test_ordering_under_year_filter_with_date_folder_fallback(self):
+        conn = _make_db()
+        _insert(conn, 'ig/y24-new', date_folder='202408', created_at=None)
+        _insert(conn, 'ig/y24-old', date_folder='202403', created_at=None)
+        _insert(conn, 'ig/y23', date_folder='202312', created_at=None)
+
+        assert _call_ordered(conn, year='2024') == ['ig/y24-new', 'ig/y24-old']
+
+    def test_undescribed_only_preserves_order(self):
+        conn = _make_db()
+        _insert(conn, 'ig/undesc-new', created_at='2024-06-20T00:00:00')
+        _insert(conn, 'ig/undesc-old', created_at='2024-01-01T00:00:00')
+        _insert(conn, 'ig/described', created_at='2024-08-01T00:00:00')
+        conn.execute(
+            "INSERT INTO image_descriptions (image_key, image_type) VALUES (?, 'instagram')",
+            ('ig/described',),
+        )
+
+        assert _call_ordered(conn, undescribed_only=True) == [
+            'ig/undesc-new',
+            'ig/undesc-old',
+        ]
