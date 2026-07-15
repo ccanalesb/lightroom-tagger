@@ -2,6 +2,7 @@ import os
 import tempfile
 from unittest.mock import MagicMock, patch
 
+import httpx
 import openai as openai_sdk
 import pytest
 
@@ -16,6 +17,12 @@ from lightroom_tagger.core.exceptions import (
     TimeoutError,
 )
 from lightroom_tagger.core.vision_client import compare_images, generate_description
+from lightroom_tagger.core.vision_client_ollama import (
+    content_to_native as _ollama_content_to_native,
+)
+from lightroom_tagger.core.vision_client_ollama import (
+    native_chat_url as _ollama_native_chat_url,
+)
 
 
 def _make_mock_client(response_text: str):
@@ -114,6 +121,132 @@ class TestGenerateDescription:
         text_parts = [p for p in content if p.get("type") == "text"]
         assert len(text_parts) == 1
         assert "photo editor" in text_parts[0]["text"]
+
+
+class TestOllamaNativeHelpers:
+    def test_native_url_strips_v1_suffix(self):
+        assert (
+            _ollama_native_chat_url("http://localhost:11434/v1")
+            == "http://localhost:11434/api/chat"
+        )
+
+    def test_native_url_strips_trailing_slash(self):
+        assert (
+            _ollama_native_chat_url("http://localhost:11434/v1/")
+            == "http://localhost:11434/api/chat"
+        )
+
+    def test_native_url_preserves_path_prefix(self):
+        assert (
+            _ollama_native_chat_url("http://host:1234/proxy/v1")
+            == "http://host:1234/proxy/api/chat"
+        )
+
+    def test_content_splits_text_and_base64_images(self):
+        content = [
+            {"type": "text", "text": "describe this"},
+            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,QUJD"}},
+        ]
+        text, images = _ollama_content_to_native(content)
+        assert text == "describe this"
+        assert images == ["QUJD"]
+
+    def test_content_handles_plain_string(self):
+        assert _ollama_content_to_native("hello") == ("hello", [])
+
+    def test_content_collects_multiple_images(self):
+        content = [
+            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,AAA"}},
+            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,BBB"}},
+        ]
+        _, images = _ollama_content_to_native(content)
+        assert images == ["AAA", "BBB"]
+
+
+def _ok_native_response(content: str):
+    resp = MagicMock()
+    resp.raise_for_status.return_value = None
+    resp.json.return_value = {"message": {"content": content}}
+    return resp
+
+
+class TestOllamaNativeRouting:
+    def _ollama_client(self):
+        client = MagicMock()
+        client._provider_id = "ollama"
+        client.base_url = "http://localhost:11434/v1"
+        client.timeout = 120.0
+        return client
+
+    def test_routes_to_native_api_chat_with_thinking_disabled(self, temp_image):
+        client = self._ollama_client()
+        with patch(
+            "lightroom_tagger.core.vision_client_ollama.httpx.post",
+            return_value=_ok_native_response('{"summary": "x"}'),
+        ) as post:
+            out = generate_description(client, "kimi-k2.6:cloud", temp_image)
+
+        assert out == '{"summary": "x"}'
+        # Native path must NOT touch the OpenAI-compat surface.
+        client.chat.completions.create.assert_not_called()
+
+        url = post.call_args.args[0] if post.call_args.args else post.call_args.kwargs["url"]
+        assert url == "http://localhost:11434/api/chat"
+        payload = post.call_args.kwargs["json"]
+        assert payload["think"] is False
+        assert payload["stream"] is False
+        assert payload["model"] == "kimi-k2.6:cloud"
+        assert payload["options"]["num_predict"] == 2048
+        msg = payload["messages"][0]
+        assert len(msg["images"]) == 1
+        assert "photo editor" in msg["content"]
+
+    def test_non_ollama_client_uses_openai_sdk(self, temp_image):
+        client = _make_mock_client('{"summary": "y"}')
+        client._provider_id = "openai"
+        with patch("lightroom_tagger.core.vision_client_ollama.httpx.post") as post:
+            out = generate_description(client, "gpt-4o", temp_image)
+        assert '"summary"' in out
+        client.chat.completions.create.assert_called_once()
+        post.assert_not_called()
+
+    def test_native_connection_error_maps_to_connection_error(self, temp_image):
+        client = self._ollama_client()
+        with patch(
+            "lightroom_tagger.core.vision_client_ollama.httpx.post",
+            side_effect=httpx.ConnectError("refused"),
+        ):
+            with pytest.raises(ConnectionError):
+                generate_description(client, "kimi-k2.6:cloud", temp_image)
+
+    def test_native_timeout_maps_to_timeout_error(self, temp_image):
+        client = self._ollama_client()
+        with patch(
+            "lightroom_tagger.core.vision_client_ollama.httpx.post",
+            side_effect=httpx.ReadTimeout("slow"),
+        ):
+            with pytest.raises(TimeoutError):
+                generate_description(client, "kimi-k2.6:cloud", temp_image)
+
+    def test_native_non_json_body_maps_to_provider_error(self, temp_image):
+        client = self._ollama_client()
+        resp = MagicMock()
+        resp.raise_for_status.return_value = None
+        resp.json.side_effect = ValueError("Expecting value: line 1 column 1")
+        with patch("lightroom_tagger.core.vision_client_ollama.httpx.post", return_value=resp):
+            with pytest.raises(Exception) as exc_info:
+                generate_description(client, "kimi-k2.6:cloud", temp_image)
+        assert "non-JSON" in str(exc_info.value)
+
+    def test_native_error_field_raises_provider_error(self, temp_image):
+        client = self._ollama_client()
+        resp = MagicMock()
+        resp.raise_for_status.return_value = None
+        resp.json.return_value = {"error": "model not found"}
+        with patch("lightroom_tagger.core.vision_client_ollama.httpx.post", return_value=resp):
+            with pytest.raises(Exception) as exc_info:
+                generate_description(client, "missing:model", temp_image)
+        assert "model not found" in str(exc_info.value)
 
 
 class TestErrorMapping:
