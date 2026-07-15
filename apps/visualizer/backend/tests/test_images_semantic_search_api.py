@@ -100,8 +100,12 @@ def test_semantic_search_returns_metadata_and_row_extras(
             ),
         )
 
-    monkeypatch.setattr("api.images.search.embed_query_to_vec_blob", lambda _q: fixed_blob)
-    monkeypatch.setattr("api.images.search.run_semantic_hybrid_search", fake_hybrid)
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.embed_query_to_vec_blob", lambda _q: fixed_blob
+    )
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.run_semantic_hybrid_search", fake_hybrid
+    )
 
     r = client.post(
         "/api/images/search/semantic-search",
@@ -129,10 +133,11 @@ def test_semantic_search_returns_metadata_and_row_extras(
 def test_semantic_search_rejects_short_query(semantic_search_client, monkeypatch):
     client, _k_alpha, _k_beta = semantic_search_client
     monkeypatch.setattr(
-        "api.images.search.embed_query_to_vec_blob", lambda _q: b"\x00" * (768 * 4)
+        "lightroom_tagger.core.catalog_search.embed_query_to_vec_blob",
+        lambda _q: b"\x00" * (768 * 4),
     )
     monkeypatch.setattr(
-        "api.images.search.run_semantic_hybrid_search",
+        "lightroom_tagger.core.catalog_search.run_semantic_hybrid_search",
         lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("should not run")),
     )
 

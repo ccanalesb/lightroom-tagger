@@ -29,6 +29,7 @@ from lightroom_tagger.core.catalog_nl_filter import (
     catalog_nl_filter_to_query_kwargs,
     parse_catalog_nl_filter_from_llm,
 )
+from lightroom_tagger.core.catalog_search import CatalogSearchInputError, search_catalog
 from lightroom_tagger.core.clip_similarity import (
     NoClipEmbeddingError,
     list_pin_similarity_candidate_keys,
@@ -210,14 +211,6 @@ def semantic_search_images(db):
         if not body or not isinstance(body, dict):
             return error_bad_request("JSON body required")
 
-        query = body.get("query")
-        if query is None or not str(query).strip():
-            return error_bad_request("query must be non-empty")
-
-        qstrip = str(query).strip()
-        if len(qstrip) < 2:
-            return error_bad_request("query must be at least 2 characters")
-
         limit, offset = _clamp_pagination(body.get("limit", 50), body.get("offset", 0))
 
         score_perspective_arg = None
@@ -228,46 +221,43 @@ def semantic_search_images(db):
                     return error_bad_request("invalid score_perspective slug")
                 score_perspective_arg = sp
 
-        match_str, fts_err = build_description_fts_query(qstrip)
-        if fts_err is not None:
-            return error_bad_request(fts_err)
-        if match_str is None:
-            return error_bad_request("query must contain at least one searchable term")
+        try:
+            result = search_catalog(
+                db,
+                body.get("query"),
+                mode="semantic",
+                score_perspective=score_perspective_arg,
+                limit=limit,
+                offset=offset,
+            )
+        except CatalogSearchInputError as exc:
+            return error_bad_request(str(exc))
 
-        blob = embed_query_to_vec_blob(qstrip)
-        rows, total, meta = run_semantic_hybrid_search(
-            db,
-            user_query=qstrip,
-            fts_match=match_str,
-            query_vec_blob=blob,
-            limit=limit,
-            offset=offset,
-        )
+        catalog_rows: list[dict] = []
+        signals_by_key: dict[str, dict[str, object]] = {}
+        for row in result.images:
+            r = dict(row)
+            key = r.get("key")
+            if key is not None:
+                signals_by_key[str(key)] = {
+                    "score": r.pop("score", None),
+                    "why_matched": r.pop("why_matched", None),
+                }
+            catalog_rows.append(r)
 
-        keys = [r.image_key for r in rows]
-        catalog_rows = query_catalog_images_by_keys(
-            db, keys, score_perspective=score_perspective_arg
-        )
         images = _rows_to_catalog_api_images(catalog_rows, score_perspective_arg)
-
-        sem_by_key = {r.image_key: r for r in rows}
         for img in images:
-            sem_row = sem_by_key.get(img["key"])
-            if sem_row is not None:
-                img["score"] = float(sem_row.rrf_score)
-                img["why_matched"] = sem_row.why_matched
-                img["thumbnail_url"] = f"/api/images/catalog/{sem_row.image_key}/thumbnail"
+            sig = signals_by_key.get(img["key"])
+            if sig is not None and sig.get("score") is not None:
+                img["score"] = sig["score"]
+                img["why_matched"] = sig["why_matched"]
+                img["thumbnail_url"] = f"/api/images/catalog/{img['key']}/thumbnail"
 
         return jsonify(
             {
-                "total": total,
+                "total": result.total,
                 "images": images,
-                "metadata": {
-                    "missing_embeddings_count": meta.missing_embeddings_count,
-                    "semantic_index_empty": meta.semantic_index_empty,
-                    "rrf_k": meta.rrf_k,
-                    "fts_no_match": meta.fts_no_match,
-                },
+                "metadata": result.metadata,
             }
         )
     except Exception as e:
