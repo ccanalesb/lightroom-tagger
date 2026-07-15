@@ -7,9 +7,7 @@ import sqlite3
 from typing import Any
 
 from flask import Blueprint, jsonify, request
-from pydantic import ValidationError
 from spectree import Response
-
 from utils.db import with_db
 from utils.responses import error_bad_request, error_server_error
 
@@ -23,20 +21,18 @@ from api.schemas.search import (
     SemanticSearchRequest,
     SemanticSearchResponse,
 )
-
 from lightroom_tagger.core import nl_catalog_search
-from lightroom_tagger.core.catalog_nl_filter import (
-    catalog_nl_filter_to_query_kwargs,
-    parse_catalog_nl_filter_from_llm,
+from lightroom_tagger.core.catalog_search import (
+    CatalogSearchInputError,
+    reset_runtime_deps,
+    search_catalog,
+    use_runtime_deps,
 )
-from lightroom_tagger.core.catalog_search import CatalogSearchInputError, search_catalog
 from lightroom_tagger.core.clip_similarity import (
     NoClipEmbeddingError,
     list_pin_similarity_candidate_keys,
 )
 from lightroom_tagger.core.database import (
-    build_description_fts_query,
-    get_all_current_perspective_slugs,
     get_image,
     query_catalog_images,
     query_catalog_images_by_keys,
@@ -45,11 +41,9 @@ from lightroom_tagger.core.embedding_service import embed_query_to_vec_blob
 from lightroom_tagger.core.exceptions import ModelUnavailableError
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 from lightroom_tagger.core.semantic_search import run_semantic_hybrid_search
-from lightroom_tagger.core.structured_output import StructuredOutputError
 
 from .catalog import (
     _CATALOG_SCORE_PERSPECTIVE_SLUG_RE,
-    _effective_catalog_nl_kwargs,
     _rows_to_catalog_api_images,
 )
 from .common import _clamp_pagination
@@ -69,6 +63,40 @@ def _merge_chat_search_metadata(
     if pin:
         out.update(pin)
     return out or None
+
+
+def _score_perspective_from_filters(filters: dict | None) -> str | None:
+    if not filters:
+        return None
+    sp = str(filters.get("score_perspective") or "").strip()
+    return sp or None
+
+
+def _catalog_rows_with_signals(
+    result_images: list[dict],
+    score_perspective_arg: str | None,
+) -> list[dict]:
+    """Map core rows to API images, merging semantic score / why_matched / thumbnail_url."""
+    catalog_rows: list[dict] = []
+    signals_by_key: dict[str, dict[str, object]] = {}
+    for row in result_images:
+        r = dict(row)
+        key = r.get("key")
+        if key is not None:
+            signals_by_key[str(key)] = {
+                "score": r.pop("score", None),
+                "why_matched": r.pop("why_matched", None),
+            }
+        catalog_rows.append(r)
+
+    images = _rows_to_catalog_api_images(catalog_rows, score_perspective_arg)
+    for img in images:
+        sig = signals_by_key.get(img["key"])
+        if sig is not None and sig.get("score") is not None:
+            img["score"] = sig["score"]
+            img["why_matched"] = sig["why_matched"]
+            img["thumbnail_url"] = f"/api/images/catalog/{img['key']}/thumbnail"
+    return images
 
 
 def _chat_pin_context(
@@ -143,6 +171,18 @@ def _extract_images_from_tool_messages(
     return images, total
 
 
+def _parse_score_perspective_body(body: dict[str, Any]) -> str | None | tuple:
+    """Return slug or ``error_bad_request`` response tuple when invalid."""
+    if "score_perspective" not in body or body.get("score_perspective") is None:
+        return None
+    sp = str(body.get("score_perspective") or "").strip()
+    if not sp:
+        return None
+    if not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(sp):
+        return error_bad_request("invalid score_perspective slug")
+    return sp
+
+
 @search_bp.route("/nl-search", methods=["POST"])
 @with_db
 @spec.validate(
@@ -164,32 +204,24 @@ def nl_search_images(db):
         limit, offset = _clamp_pagination(body.get("limit", 50), body.get("offset", 0))
 
         try:
-            raw = nl_catalog_search.run_nl_catalog_filter_llm(
+            result = search_catalog(
+                db,
                 str(query).strip(),
+                mode="nl_filter",
                 provider_id=body.get("provider_id"),
                 model=body.get("model"),
-                log_callback=None,
+                limit=limit,
+                offset=offset,
             )
-            filters = parse_catalog_nl_filter_from_llm(raw)
-        except (json.JSONDecodeError, ValidationError, StructuredOutputError) as exc:
-            return error_bad_request(f"NL filter: {exc}")
+        except CatalogSearchInputError as exc:
+            return error_bad_request(str(exc))
 
-        qkwargs = catalog_nl_filter_to_query_kwargs(filters)
-        qkwargs["limit"] = limit
-        qkwargs["offset"] = offset
-
-        score_perspective_arg = (filters.score_perspective or "").strip() or None
-
-        try:
-            rows, total = query_catalog_images(db, **qkwargs)
-        except ValueError as err:
-            return error_bad_request(str(err))
-
-        images = _rows_to_catalog_api_images(rows, score_perspective_arg)
+        score_perspective_arg = _score_perspective_from_filters(result.filters)
+        images = _rows_to_catalog_api_images(result.images, score_perspective_arg)
         return jsonify(
             {
-                "filters": filters.model_dump(exclude_none=True),
-                "total": total,
+                "filters": result.filters,
+                "total": result.total,
                 "images": images,
             }
         )
@@ -213,13 +245,9 @@ def semantic_search_images(db):
 
         limit, offset = _clamp_pagination(body.get("limit", 50), body.get("offset", 0))
 
-        score_perspective_arg = None
-        if "score_perspective" in body and body.get("score_perspective") is not None:
-            sp = str(body.get("score_perspective") or "").strip()
-            if sp:
-                if not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(sp):
-                    return error_bad_request("invalid score_perspective slug")
-                score_perspective_arg = sp
+        score_perspective_arg = _parse_score_perspective_body(body)
+        if isinstance(score_perspective_arg, tuple):
+            return score_perspective_arg
 
         try:
             result = search_catalog(
@@ -233,25 +261,7 @@ def semantic_search_images(db):
         except CatalogSearchInputError as exc:
             return error_bad_request(str(exc))
 
-        catalog_rows: list[dict] = []
-        signals_by_key: dict[str, dict[str, object]] = {}
-        for row in result.images:
-            r = dict(row)
-            key = r.get("key")
-            if key is not None:
-                signals_by_key[str(key)] = {
-                    "score": r.pop("score", None),
-                    "why_matched": r.pop("why_matched", None),
-                }
-            catalog_rows.append(r)
-
-        images = _rows_to_catalog_api_images(catalog_rows, score_perspective_arg)
-        for img in images:
-            sig = signals_by_key.get(img["key"])
-            if sig is not None and sig.get("score") is not None:
-                img["score"] = sig["score"]
-                img["why_matched"] = sig["why_matched"]
-                img["thumbnail_url"] = f"/api/images/catalog/{img['key']}/thumbnail"
+        images = _catalog_rows_with_signals(result.images, score_perspective_arg)
 
         return jsonify(
             {
@@ -318,13 +328,9 @@ def chat_search_images(db):
         use_tool_calling = bool(provider_config.get("tool_calling", False))
 
         if use_tool_calling:
-            score_perspective_for_tool: str | None = None
-            if "score_perspective" in body and body.get("score_perspective") is not None:
-                sp = str(body.get("score_perspective") or "").strip()
-                if sp:
-                    if not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(sp):
-                        return error_bad_request("invalid score_perspective slug")
-                    score_perspective_for_tool = sp
+            score_perspective_for_tool = _parse_score_perspective_body(body)
+            if isinstance(score_perspective_for_tool, tuple):
+                return score_perspective_for_tool
             try:
                 assistant_text, updated_messages = nl_catalog_search.run_tool_calling_search(
                     turns_for_llm,
@@ -353,105 +359,46 @@ def chat_search_images(db):
                 }
             )
 
-        available_slugs = get_all_current_perspective_slugs(db)
+        score_perspective_arg = _parse_score_perspective_body(body)
+        if isinstance(score_perspective_arg, tuple):
+            return score_perspective_arg
 
+        deps_token = use_runtime_deps(
+            run_semantic_hybrid_search=run_semantic_hybrid_search,
+            embed_query_to_vec_blob=embed_query_to_vec_blob,
+            query_catalog_images=query_catalog_images,
+            restrict_to_keys=pin_restrict,
+        )
         try:
-            raw = nl_catalog_search.run_nl_catalog_filter_llm_multi_turn(
-                turns_for_llm,
+            result = search_catalog(
+                db,
+                message_stripped,
+                history=prior,
+                mode="auto",
                 provider_id=body.get("provider_id"),
                 model=body.get("model"),
-                log_callback=None,
-                score_perspective_slugs=available_slugs,
-            )
-            filters = parse_catalog_nl_filter_from_llm(raw)
-        except (json.JSONDecodeError, ValidationError, StructuredOutputError) as exc:
-            return error_bad_request(f"NL filter: {exc}")
-
-        kwargs_eff = _effective_catalog_nl_kwargs(filters)
-
-        score_perspective_arg = None
-        if "score_perspective" in body and body.get("score_perspective") is not None:
-            sp = str(body.get("score_perspective") or "").strip()
-            if sp:
-                if not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(sp):
-                    return error_bad_request("invalid score_perspective slug")
-                score_perspective_arg = sp
-
-        if not kwargs_eff:
-            qstrip = message_stripped
-            if len(qstrip) < 2:
-                return error_bad_request(
-                    "message must be at least 2 characters for semantic search"
-                )
-
-            match_str, fts_err = build_description_fts_query(qstrip)
-            if fts_err is not None:
-                return error_bad_request(fts_err)
-            if match_str is None:
-                return error_bad_request("query must contain at least one searchable term")
-
-            blob = embed_query_to_vec_blob(qstrip)
-            rows, total, meta = run_semantic_hybrid_search(
-                db,
-                user_query=qstrip,
-                fts_match=match_str,
-                query_vec_blob=blob,
+                score_perspective=score_perspective_arg,
                 limit=limit,
                 offset=offset,
-                restrict_to_keys=pin_restrict,
             )
+        except CatalogSearchInputError as exc:
+            return error_bad_request(str(exc))
+        finally:
+            reset_runtime_deps(deps_token)
 
-            keys = [r.image_key for r in rows]
-            catalog_rows = query_catalog_images_by_keys(
-                db, keys, score_perspective=score_perspective_arg
-            )
-            images = _rows_to_catalog_api_images(catalog_rows, score_perspective_arg)
+        if result.mode == "semantic":
+            images = _catalog_rows_with_signals(result.images, score_perspective_arg)
+        else:
+            sp_from_filter = _score_perspective_from_filters(result.filters)
+            images = _rows_to_catalog_api_images(result.images, sp_from_filter)
 
-            sem_by_key = {r.image_key: r for r in rows}
-            for img in images:
-                sem_row = sem_by_key.get(img["key"])
-                if sem_row is not None:
-                    img["score"] = float(sem_row.rrf_score)
-                    img["why_matched"] = sem_row.why_matched
-                    img["thumbnail_url"] = f"/api/images/catalog/{sem_row.image_key}/thumbnail"
-
-            sem_meta = {
-                "missing_embeddings_count": meta.missing_embeddings_count,
-                "semantic_index_empty": meta.semantic_index_empty,
-                "rrf_k": meta.rrf_k,
-                "fts_no_match": meta.fts_no_match,
-            }
-            return jsonify(
-                {
-                    "search_mode": "semantic",
-                    "total": total,
-                    "images": images,
-                    "filters": None,
-                    "metadata": _merge_chat_search_metadata(sem_meta, pin_meta),
-                }
-            )
-
-        qkwargs = dict(kwargs_eff)
-        qkwargs["limit"] = limit
-        qkwargs["offset"] = offset
-        if pin_restrict is not None:
-            qkwargs["restrict_to_keys"] = pin_restrict
-
-        score_perspective_from_filter = (filters.score_perspective or "").strip() or None
-
-        try:
-            rows, total = query_catalog_images(db, **qkwargs)
-        except ValueError as err:
-            return error_bad_request(str(err))
-
-        images = _rows_to_catalog_api_images(rows, score_perspective_from_filter)
         return jsonify(
             {
-                "search_mode": "nl_filter",
-                "total": total,
+                "search_mode": result.mode,
+                "total": result.total,
                 "images": images,
-                "filters": filters.model_dump(exclude_none=True),
-                "metadata": _merge_chat_search_metadata(None, pin_meta),
+                "filters": result.filters,
+                "metadata": _merge_chat_search_metadata(result.metadata, pin_meta),
             }
         )
     except Exception as e:

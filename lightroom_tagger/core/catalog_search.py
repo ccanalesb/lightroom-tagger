@@ -2,19 +2,83 @@
 
 from __future__ import annotations
 
+import contextvars
+import json
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
+from pydantic import ValidationError
+
+from lightroom_tagger.core import nl_catalog_search
+from lightroom_tagger.core.catalog_nl_filter import (
+    CatalogNlFilter,
+    catalog_nl_filter_to_query_kwargs,
+    parse_catalog_nl_filter_from_llm,
+)
 from lightroom_tagger.core.database import (
     build_description_fts_query,
+    get_all_current_perspective_slugs,
+    query_catalog_images,
     query_catalog_images_by_keys,
 )
 from lightroom_tagger.core.embedding_service import embed_query_to_vec_blob
 from lightroom_tagger.core.semantic_search import run_semantic_hybrid_search
+from lightroom_tagger.core.structured_output import StructuredOutputError
 
 
 class CatalogSearchInputError(ValueError):
     """Invalid search input; map to HTTP 400 in the web layer."""
+
+
+@dataclass(frozen=True)
+class _RuntimeDeps:
+    """Per-request dependency overrides injected by the web layer.
+
+    The web layer's test suite patches its own module-level ``run_semantic_hybrid_search`` /
+    ``embed_query_to_vec_blob`` / ``query_catalog_images`` symbols and needs the pin
+    ``restrict_to_keys`` threaded through. We accept those via a greenlet-safe ContextVar
+    instead of mutating this module's globals (which would leak across concurrent requests
+    under eventlet). Pin plumbing proper lands in slice 3.
+    """
+
+    run_semantic_hybrid_search: Callable[..., Any] | None = None
+    embed_query_to_vec_blob: Callable[..., Any] | None = None
+    query_catalog_images: Callable[..., Any] | None = None
+    restrict_to_keys: frozenset[str] | None = None
+
+
+_runtime_deps: contextvars.ContextVar[_RuntimeDeps | None] = contextvars.ContextVar(
+    "catalog_search_runtime_deps", default=None
+)
+
+
+def use_runtime_deps(
+    *,
+    run_semantic_hybrid_search: Callable[..., Any] | None = None,
+    embed_query_to_vec_blob: Callable[..., Any] | None = None,
+    query_catalog_images: Callable[..., Any] | None = None,
+    restrict_to_keys: frozenset[str] | None = None,
+) -> contextvars.Token:
+    """Bind per-request runtime deps for the current greenlet; returns a reset token."""
+    return _runtime_deps.set(
+        _RuntimeDeps(
+            run_semantic_hybrid_search=run_semantic_hybrid_search,
+            embed_query_to_vec_blob=embed_query_to_vec_blob,
+            query_catalog_images=query_catalog_images,
+            restrict_to_keys=restrict_to_keys,
+        )
+    )
+
+
+def reset_runtime_deps(token: contextvars.Token) -> None:
+    """Undo a prior :func:`use_runtime_deps` binding."""
+    _runtime_deps.reset(token)
+
+
+def _deps() -> _RuntimeDeps:
+    return _runtime_deps.get() or _RuntimeDeps()
 
 
 @dataclass(frozen=True)
@@ -28,6 +92,21 @@ class SearchResult:
     assistant_message: str | None = None
     messages: list[dict] | None = None
     metadata: dict | None = None
+
+
+def effective_catalog_nl_kwargs(filters: CatalogNlFilter) -> dict[str, Any]:
+    """Drop empty-string / empty-list values so ``{}`` means "no structured filters"."""
+    raw = catalog_nl_filter_to_query_kwargs(filters)
+    out: dict[str, Any] = {}
+    for k, v in raw.items():
+        if v is None:
+            continue
+        if isinstance(v, str) and not v.strip():
+            continue
+        if isinstance(v, list) and len(v) == 0:
+            continue
+        out[k] = v
+    return out
 
 
 def _validate_semantic_message(message: str | None) -> str:
@@ -55,15 +134,21 @@ def _run_semantic_search(
     if match_str is None:
         raise CatalogSearchInputError("query must contain at least one searchable term")
 
-    blob = embed_query_to_vec_blob(qstrip)
-    sem_rows, total, meta = run_semantic_hybrid_search(
-        db,
-        user_query=qstrip,
-        fts_match=match_str,
-        query_vec_blob=blob,
-        limit=limit,
-        offset=offset,
-    )
+    deps = _deps()
+    embed = deps.embed_query_to_vec_blob or embed_query_to_vec_blob
+    hybrid = deps.run_semantic_hybrid_search or run_semantic_hybrid_search
+
+    blob = embed(qstrip)
+    hybrid_kwargs: dict[str, Any] = {
+        "user_query": qstrip,
+        "fts_match": match_str,
+        "query_vec_blob": blob,
+        "limit": limit,
+        "offset": offset,
+    }
+    if deps.restrict_to_keys is not None:
+        hybrid_kwargs["restrict_to_keys"] = deps.restrict_to_keys
+    sem_rows, total, meta = hybrid(db, **hybrid_kwargs)
 
     keys = [r.image_key for r in sem_rows]
     catalog_rows = query_catalog_images_by_keys(
@@ -95,6 +180,75 @@ def _run_semantic_search(
     )
 
 
+def _parse_nl_filter_raw(raw: str) -> CatalogNlFilter:
+    try:
+        return parse_catalog_nl_filter_from_llm(raw)
+    except (json.JSONDecodeError, ValidationError, StructuredOutputError) as exc:
+        raise CatalogSearchInputError(f"NL filter: {exc}") from exc
+
+
+def _run_nl_filter_one_shot_raw(
+    message: str,
+    *,
+    provider_id: str | None,
+    model: str | None,
+) -> str:
+    try:
+        return nl_catalog_search.run_nl_catalog_filter_llm(
+            message,
+            provider_id=provider_id,
+            model=model,
+            log_callback=None,
+        )
+    except (json.JSONDecodeError, ValidationError, StructuredOutputError) as exc:
+        raise CatalogSearchInputError(f"NL filter: {exc}") from exc
+
+
+def _run_nl_filter_multi_turn_raw(
+    turns: list[dict],
+    *,
+    provider_id: str | None,
+    model: str | None,
+    score_perspective_slugs: list[str],
+) -> str:
+    try:
+        return nl_catalog_search.run_nl_catalog_filter_llm_multi_turn(
+            turns,
+            provider_id=provider_id,
+            model=model,
+            log_callback=None,
+            score_perspective_slugs=score_perspective_slugs,
+        )
+    except (json.JSONDecodeError, ValidationError, StructuredOutputError) as exc:
+        raise CatalogSearchInputError(f"NL filter: {exc}") from exc
+
+
+def _run_nl_filter_query(
+    db: sqlite3.Connection,
+    filters: CatalogNlFilter,
+    *,
+    limit: int,
+    offset: int,
+) -> SearchResult:
+    deps = _deps()
+    query = deps.query_catalog_images or query_catalog_images
+    qkwargs = catalog_nl_filter_to_query_kwargs(filters)
+    qkwargs["limit"] = limit
+    qkwargs["offset"] = offset
+    if deps.restrict_to_keys is not None:
+        qkwargs["restrict_to_keys"] = deps.restrict_to_keys
+    try:
+        rows, total = query(db, **qkwargs)
+    except ValueError as err:
+        raise CatalogSearchInputError(str(err)) from err
+    return SearchResult(
+        images=[dict(row) for row in rows],
+        total=total,
+        mode="nl_filter",
+        filters=filters.model_dump(exclude_none=True),
+    )
+
+
 def search_catalog(
     db: sqlite3.Connection,
     message: str | None,
@@ -108,8 +262,8 @@ def search_catalog(
     offset: int,
     mode: str = "auto",
 ) -> SearchResult:
-    """Run catalog search. Only ``mode='semantic'`` is implemented in slice 1."""
-    _ = (history, pin_key, provider_id, model)
+    """Run catalog search (semantic, nl_filter, or auto NL-first cascade)."""
+    _ = pin_key
 
     if mode == "semantic":
         return _run_semantic_search(
@@ -119,5 +273,38 @@ def search_catalog(
             limit=limit,
             offset=offset,
         )
+
+    if mode == "nl_filter":
+        qstrip = str(message or "").strip()
+        if not qstrip:
+            raise CatalogSearchInputError("query must be non-empty")
+        raw = _run_nl_filter_one_shot_raw(
+            qstrip,
+            provider_id=provider_id,
+            model=model,
+        )
+        filters = _parse_nl_filter_raw(raw)
+        return _run_nl_filter_query(db, filters, limit=limit, offset=offset)
+
+    if mode == "auto":
+        msg_stripped = str(message or "").strip()
+        turns = list(history or []) + [{"role": "user", "content": msg_stripped}]
+        raw = _run_nl_filter_multi_turn_raw(
+            turns,
+            provider_id=provider_id,
+            model=model,
+            score_perspective_slugs=get_all_current_perspective_slugs(db),
+        )
+        filters = _parse_nl_filter_raw(raw)
+        kwargs_eff = effective_catalog_nl_kwargs(filters)
+        if not kwargs_eff:
+            return _run_semantic_search(
+                db,
+                message,
+                score_perspective=score_perspective,
+                limit=limit,
+                offset=offset,
+            )
+        return _run_nl_filter_query(db, filters, limit=limit, offset=offset)
 
     raise NotImplementedError(f"search mode {mode!r} not implemented")

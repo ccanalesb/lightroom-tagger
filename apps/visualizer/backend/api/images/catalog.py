@@ -23,10 +23,6 @@ from api.schemas.catalog import (
 )
 from api.schemas.jobs import ErrorBody
 
-from lightroom_tagger.core.catalog_nl_filter import (
-    CatalogNlFilter,
-    catalog_nl_filter_to_query_kwargs,
-)
 from lightroom_tagger.core.clip_similarity import NoClipEmbeddingError, run_clip_similar_for_seed
 from lightroom_tagger.core.database import (
     catalog_image_stack_row_fields,
@@ -175,21 +171,6 @@ def _parse_clip_similar_catalog_params():
         "score_perspective_arg": score_perspective_arg,
         "clip_filter_kwargs": clip_filter_kwargs,
     }
-
-
-def _effective_catalog_nl_kwargs(filters: CatalogNlFilter) -> dict[str, Any]:
-    """Drop empty-string / empty-list values so ``{}`` means "no structured filters"."""
-    raw = catalog_nl_filter_to_query_kwargs(filters)
-    out: dict[str, Any] = {}
-    for k, v in raw.items():
-        if v is None:
-            continue
-        if isinstance(v, str) and not v.strip():
-            continue
-        if isinstance(v, list) and len(v) == 0:
-            continue
-        out[k] = v
-    return out
 
 
 def _rows_to_catalog_api_images(rows, score_perspective_arg: str | None) -> list[dict]:
@@ -621,7 +602,6 @@ __all__ = (
     "_DETAIL_IMAGE_TYPES",
     "_CATALOG_SCORE_PERSPECTIVE_SLUG_RE",
     "_clip_similarity_why_matched_line",
-    "_effective_catalog_nl_kwargs",
     "_parse_clip_similar_catalog_params",
     "_query_catalog_rows_for_stack_member_keys",
     "_rows_to_catalog_api_images",
