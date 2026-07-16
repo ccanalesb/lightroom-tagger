@@ -1,4 +1,9 @@
-"""Catalog search front door — unified entry for NL, semantic, and chat paths (ADR-0008)."""
+"""Catalog search front door — unified entry for NL, semantic, and chat paths (ADR-0015).
+
+``search_catalog`` is the only supported orchestration entry for catalog search.
+Underlying runners (NL filter, tool-calling, semantic hybrid, pin similarity) are
+internal to this module — do not call them from the web layer (see ADR-0015).
+"""
 
 from __future__ import annotations
 
@@ -299,7 +304,11 @@ def search_catalog(
     offset: int,
     mode: str = "auto",
 ) -> SearchResult:
-    """Run catalog search (semantic, nl_filter, tool_calling, or auto cascade)."""
+    """Run catalog search (semantic, nl_filter, tool_calling, or auto cascade).
+
+    Single front door for catalog search (ADR-0015). Returns detached core rows
+    and per-row signals via :class:`SearchResult` — never live ``sqlite3.Row``.
+    """
     restrict_to_keys, pin_meta = _resolve_pin_context(db, pin_key)
 
     if mode == "semantic":

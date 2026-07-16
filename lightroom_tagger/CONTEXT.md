@@ -24,6 +24,7 @@
 | **resolved model** | A `(provider_id, model)` pair chosen by `provider_resolution.resolve_model()` via the single precedence ladder (explicit arg → env → `providers.json` defaults → `config.yaml` → `fallback_order`). See ADR-0007. |
 | **provider call seam** | All provider/LLM HTTP calls go through `FallbackDispatcher.call_with_fallback` with a `fn_factory` that invokes `vision_client` / `vision_client_batch` helpers — never raw `client.chat.completions.create` at orchestration sites. Escalation (token bump, batch split, abort) is a pluggable `ErrorPolicy`. See ADR-0009. |
 | **vision op** | One provider vision call routed through the vision-op engine (`resolve_model` → `FallbackDispatcher` → parse), optionally persisted via `run_vision_op_persist`. Description, scoring, and compare build `VisionOpSpec` via `analyzer` op-spec helpers. See ADR-0014. |
+| **search_catalog** / **SearchResult** | Catalog search front door (ADR-0015): `search_catalog` owns strategy routing (one-shot NL filter, multi-turn NL, tool-calling, semantic hybrid) plus library-DB query and pin-to-similarity restriction. Returns detached core image rows and per-row signals (`score`, `why_matched`) via `SearchResult` — not API-shaped envelopes. |
 | **fallback** | The multi-provider retry chain: `FallbackDispatcher` tries providers in `fallback_order` when one fails. |
 | **phash** | Perceptual hash used for fast image similarity pre-screening before vision comparison. |
 | **stack** | A Lightroom virtual copy group; stack collapse logic deduplicates matched images. |
@@ -54,6 +55,7 @@
 | `exceptions` | Shared error type package — `ProviderError` hierarchy + `StackMutationError` |
 | `fallback` | `FallbackDispatcher` — single entry point for all provider/LLM calls (retry + multi-provider fallback) |
 | `vision_op` | Vision-op engine — `run_vision_op`, `run_vision_op_persist`, `VisionOpSpec`, `VisionOpOutcome`; single orchestration primitive for description, scoring, and compare (ADR-0014) |
+| `catalog_search` | Catalog search front door — `search_catalog`, `SearchResult`; routes NL / tool-calling / semantic strategies, runs library-DB queries, applies pin similarity (ADR-0015) |
 | `retry` | `retry_with_backoff` with `RETRYABLE_ERRORS` / `NOT_RETRYABLE_ERRORS` frozensets |
 | `cancel_scope` | Thread-local cooperative cancellation — workers register a `cancel_check` callback; retry/fallback paths honour it |
 | `scoring_service` | Per-perspective scoring of catalog and Instagram images via vision models |
@@ -62,9 +64,9 @@
 | `embedding_service` | Text embedding generation and storage |
 | `clip_embedding_service` | CLIP image embedding generation and storage |
 | `clip_similarity` | Catalog similarity search via CLIP embeddings |
-| `semantic_search` | Hybrid search: FTS5 BM25 + sqlite-vec KNN + RRF fusion |
+| `semantic_search` | Hybrid search: FTS5 BM25 + sqlite-vec KNN + RRF fusion — orchestrated via `catalog_search` for web paths (ADR-0015) |
 | `search_tools` | LLM function-calling tool schemas and executor for search |
-| `nl_catalog_search` | Natural-language catalog search entry point |
+| `nl_catalog_search` | Internal LLM runners for NL filter and tool-calling search — orchestrated only via `catalog_search` (ADR-0015) |
 | `catalog_sync` | Incremental additions-only catalog → library.db refresh (set-difference on ids) |
 | `catalog_nl_filter` | SQL filter builder for NL search queries |
 | `prompt_builder` | Builds scoring and description prompts |
@@ -99,6 +101,7 @@ Four distinct error surfaces — do not conflate them:
 - **Provider/model resolution through `resolve_model` only** (ADR-0007): no ad-hoc precedence ladders at call sites.
 - **Provider/LLM calls through the dispatcher seam only** (ADR-0009): orchestration code uses `FallbackDispatcher.call_with_fallback` with `vision_client` / `vision_client_batch` helpers inside `fn_factory`; no raw `client.chat.completions.create` outside the seam (enforced by `test_provider_call_guardrail.py`).
 - **Vision-op orchestration through the engine only** (ADR-0014): no inline `resolve_model → FallbackDispatcher → parse` outside `vision_op.py`; callers build `VisionOpSpec` via `analyzer` op-spec helpers and invoke `run_vision_op` / `run_vision_op_persist` (enforced by `test_vision_op_guardrail.py`). `nl_catalog_search` is explicitly excluded (text NL filter + tool loop).
+- **Catalog search through the front door only** (ADR-0015): the web layer calls `search_catalog`, never the NL/tool/semantic runners directly (enforced by `test_search_catalog_guardrail.py`).
 - **Providers are OpenAI-compatible**: all vision/LLM calls go through `openai.OpenAI` client regardless of backend (Ollama, NIM, OpenRouter).
 - **No Instagram API**: all Instagram data comes from user-provided export dumps via `instagram/dump_reader.py` and `instagram/deduplicator.py`. Live-crawl scraper code has been removed.
 - **Tests live next to modules**: `test_*.py` files are co-located under `lightroom_tagger/core/`.

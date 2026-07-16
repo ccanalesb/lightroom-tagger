@@ -1,4 +1,8 @@
-"""LLM runner for natural-language → structured catalog filter JSON (text-only)."""
+"""LLM runners for natural-language catalog search (text-only).
+
+Internal to the ``catalog_search`` front door (ADR-0015) — do not call from the
+web layer. Use :func:`lightroom_tagger.core.catalog_search.search_catalog` instead.
+"""
 
 from __future__ import annotations
 
@@ -74,7 +78,10 @@ def run_nl_catalog_filter_llm(
     log_callback: LogCallback = None,
     score_perspective_slugs: list[str] | None = None,
 ) -> str:
-    """Call the LLM to produce a JSON string matching :class:`CatalogNlFilter` (no bypass)."""
+    """Call the LLM to produce a JSON string matching :class:`CatalogNlFilter`.
+
+    Internal to ``catalog_search`` (ADR-0015) — do not call from the web layer.
+    """
     r = resolve_model(kind="description", provider_id=provider_id, model=model)
     dispatcher = FallbackDispatcher(r.registry)
 
@@ -108,7 +115,10 @@ def run_nl_catalog_filter_llm_multi_turn(
     log_callback: LogCallback = None,
     score_perspective_slugs: list[str] | None = None,
 ) -> str:
-    """Call the LLM with conversation history; returns raw JSON string for :class:`CatalogNlFilter`."""
+    """Call the LLM with conversation history; returns raw JSON for :class:`CatalogNlFilter`.
+
+    Internal to ``catalog_search`` (ADR-0015) — do not call from the web layer.
+    """
     r = resolve_model(kind="description", provider_id=provider_id, model=model)
     dispatcher = FallbackDispatcher(r.registry)
 
@@ -190,6 +200,8 @@ def run_tool_calling_search(
     restrict_to_keys: frozenset[str] | None = None,
 ) -> tuple[str, list[dict]]:
     """Run multi-turn tool-calling search loop.
+
+    Internal to ``catalog_search`` (ADR-0015) — do not call from the web layer.
 
     Returns (assistant_text, updated_messages_with_tool_turns).
     The returned messages list includes tool_call and tool_result turns
