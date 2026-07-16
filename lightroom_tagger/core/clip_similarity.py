@@ -71,7 +71,10 @@ def list_pin_similarity_candidate_keys(
 ) -> list[str]:
     """Ordered catalog keys for pin-to-similar chat search: *seed_key* first, then CLIP
     neighbors (primary-grid rows only). Raises :class:`NoClipEmbeddingError` if the
-    seed has no CLIP row."""
+    seed has no CLIP row.
+
+    Internal to ``catalog_search`` (ADR-0015) — do not call from the web layer.
+    """
     blob = get_clip_embedding_blob_for_key(db, seed_key)
     if blob is None:
         raise NoClipEmbeddingError(seed_key)

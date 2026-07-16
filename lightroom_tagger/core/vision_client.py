@@ -29,6 +29,7 @@ from lightroom_tagger.core.exceptions import (
     RateLimitError,
     TimeoutError,
 )
+from lightroom_tagger.core.vision_client_ollama import is_ollama_client, native_chat
 
 COMPARISON_PROMPT = (
     "You are comparing two images to determine if they depict the same photograph "
@@ -187,29 +188,36 @@ def generate_description(
     if user_prompt is not None and user_prompt.strip():
         text_prompt = user_prompt.strip()
 
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=cast(
-                Any,
-                [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": text_prompt},
-                            _image_url_part(img_b64),
-                        ],
-                    }
-                ],
-            ),
-            max_tokens=2048,
-        )
-    except Exception as exc:
-        raise _map_openai_error(
-            exc, provider=getattr(client, "_provider_id", None), model=model
-        ) from exc
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": text_prompt},
+                _image_url_part(img_b64),
+            ],
+        }
+    ]
 
-    raw = response.choices[0].message.content or ""
+    if is_ollama_client(client):
+        # Ollama thinking models (e.g. kimi-k2.6) exhaust the token budget on the
+        # reasoning channel and return empty content through the OpenAI-compat
+        # endpoint, which ignores ``think``. Route to the native API with thinking
+        # disabled so we get the actual JSON back. Harmless no-op for non-thinking
+        # models. See vision_client_ollama for detail.
+        raw = native_chat(client, model, messages, max_tokens=2048, think=False)
+    else:
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=cast(Any, messages),
+                max_tokens=2048,
+            )
+        except Exception as exc:
+            raise _map_openai_error(
+                exc, provider=getattr(client, "_provider_id", None), model=model
+            ) from exc
+
+        raw = response.choices[0].message.content or ""
 
     if log_callback:
         log_callback("debug", f"[describe] {os.path.basename(image_path)} -> {len(raw)} chars")

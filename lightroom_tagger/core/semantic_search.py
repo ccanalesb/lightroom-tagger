@@ -115,7 +115,10 @@ def run_semantic_hybrid_search(
     offset: int,
     restrict_to_keys: frozenset[str] | None = None,
 ) -> tuple[list[SemanticSearchRow], int, SemanticSearchMeta]:
-    """Fuse FTS BM25 ordering with vec KNN (cosine) via RRF; D-09 post-filter when vec index non-empty."""
+    """Fuse FTS BM25 ordering with vec KNN (cosine) via RRF; D-09 post-filter when vec index non-empty.
+
+    Internal to ``catalog_search`` (ADR-0015) — do not call from the web layer.
+    """
     _ = user_query
     missing = count_catalog_images_missing_text_embedding(conn)
     vec_row = conn.execute("SELECT COUNT(*) AS c FROM image_text_embeddings").fetchone()

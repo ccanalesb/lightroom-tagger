@@ -77,15 +77,22 @@ stop_pid_file "frontend" "$FRONTEND_PID_FILE"
 kill_port_if_busy() {
   local port="$1"
   local label="$2"
+  local pids=""
 
-  if ! command -v fuser >/dev/null 2>&1; then
-    echo "$label: 'fuser' not found; skip port cleanup for $port"
+  # Prefer lsof (present on macOS and Linux); fuser's "PORT/tcp" syntax is
+  # Linux-only and silently no-ops on macOS.
+  if command -v lsof >/dev/null 2>&1; then
+    pids="$(lsof -ti "tcp:${port}" -sTCP:LISTEN 2>/dev/null || true)"
+  elif command -v fuser >/dev/null 2>&1; then
+    pids="$(fuser "${port}/tcp" 2>/dev/null || true)"
+  else
+    echo "$label: no 'lsof' or 'fuser'; skip port cleanup for $port"
     return
   fi
 
-  if fuser "${port}/tcp" >/dev/null 2>&1; then
-    fuser -k "${port}/tcp" >/dev/null 2>&1 || true
-    echo "$label: killed process(es) on port $port"
+  if [[ -n "$pids" ]]; then
+    kill $pids 2>/dev/null || true
+    echo "$label: killed process(es) on port $port ($(echo $pids | tr '\n' ' '))"
     wait_for_port_to_clear "$port" "$label"
   else
     echo "$label: port $port already free"
