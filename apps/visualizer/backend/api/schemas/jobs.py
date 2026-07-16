@@ -7,7 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 JobStatus = Literal['pending', 'running', 'completed', 'failed', 'cancelled']
-JobLogLevel = Literal['info', 'warning', 'error']
+JobLogLevel = Literal['debug', 'info', 'warning', 'error']
 ErrorSeverity = Literal['warning', 'error', 'critical']
 LibraryDbSource = Literal['env', 'config', 'default', 'none']
 
