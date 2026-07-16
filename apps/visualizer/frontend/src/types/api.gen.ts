@@ -3095,7 +3095,7 @@ export interface components {
              * Level
              * @enum {string}
              */
-            level: "info" | "warning" | "error";
+            level: "debug" | "info" | "warning" | "error";
             /** Message */
             message: string;
         };
@@ -3120,7 +3120,7 @@ export interface components {
              * Level
              * @enum {string}
              */
-            level: "info" | "warning" | "error";
+            level: "debug" | "info" | "warning" | "error";
             /** Message */
             message: string;
         };
@@ -3234,7 +3234,7 @@ export interface components {
              * Level
              * @enum {string}
              */
-            level: "info" | "warning" | "error";
+            level: "debug" | "info" | "warning" | "error";
             /** Message */
             message: string;
         };
