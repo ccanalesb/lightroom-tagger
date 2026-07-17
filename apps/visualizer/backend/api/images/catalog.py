@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import re
 from collections.abc import Sequence
@@ -17,25 +16,26 @@ from api.openapi import spec
 from api.schemas.catalog import (
     CatalogListResponse,
     CatalogMonthsResponse,
-    CatalogSimilarResponse,
     CatalogSimilarityGroupsResponse,
+    CatalogSimilarResponse,
     ImageView,
 )
 from api.schemas.jobs import ErrorBody
-
 from lightroom_tagger.core.clip_similarity import NoClipEmbeddingError, run_clip_similar_for_seed
 from lightroom_tagger.core.database import (
     catalog_image_stack_row_fields,
-    get_catalog_months as list_catalog_months,
+    get_best_current_catalog_score,
     get_catalog_similarity_groups_paginated,
     get_current_scores_for_image,
-    get_best_current_catalog_score,
     get_image,
     get_image_description,
     get_similarity_candidates_for_group,
     get_vision_cached_image,
     query_catalog_images,
     query_catalog_images_by_keys,
+)
+from lightroom_tagger.core.database import (
+    get_catalog_months as list_catalog_months,
 )
 from lightroom_tagger.core.identity_service import compute_single_image_aggregate_scores
 
@@ -174,15 +174,13 @@ def _parse_clip_similar_catalog_params():
     }
 
 
-def _rows_to_catalog_api_images(rows, score_perspective_arg: str | None) -> list[dict]:
+def _rows_to_catalog_api_images(rows) -> list[dict]:
     """Transform ``query_catalog_images`` rows to API image dicts (catalog list + NL search)."""
-    del score_perspective_arg  # best-score fields are always computed in the list query
     images: list[dict] = []
     for row in rows:
         out = dict(row)
         desc_summary = out.pop("description_summary", None)
         desc_best = out.pop("description_best_perspective", None)
-        desc_perspectives_json = out.pop("description_perspectives_json", None)
 
         cps = out.pop("catalog_perspective_score", None)
         out["catalog_perspective_score"] = int(cps) if cps is not None else None
@@ -196,17 +194,9 @@ def _rows_to_catalog_api_images(rows, score_perspective_arg: str | None) -> list
         if ai_analyzed:
             out["description_summary"] = desc_summary or ""
             out["description_best_perspective"] = desc_best or ""
-            if desc_perspectives_json:
-                try:
-                    out["description_perspectives"] = json.loads(desc_perspectives_json)
-                except (json.JSONDecodeError, TypeError):
-                    out["description_perspectives"] = {}
-            else:
-                out["description_perspectives"] = {}
         else:
             out["description_summary"] = None
             out["description_best_perspective"] = None
-            out["description_perspectives"] = None
 
         rid = out.get("id")
         if rid is not None and str(rid).strip().isdigit():
@@ -437,7 +427,7 @@ def list_catalog_images(db):
         except ValueError as err:
             return error_bad_request(str(err))
 
-        images = _rows_to_catalog_api_images(rows, score_perspective_arg)
+        images = _rows_to_catalog_api_images(rows)
 
         return jsonify(
             {
@@ -493,7 +483,7 @@ def get_catalog_image_similar(db, image_key: str):
         catalog_rows = query_catalog_images_by_keys(
             db, keys, score_perspective=score_perspective_arg
         )
-        images = _rows_to_catalog_api_images(catalog_rows, score_perspective_arg)
+        images = _rows_to_catalog_api_images(catalog_rows)
         dist_by_key = {k: float(d) for k, d in page_pairs}
         for img in images:
             d = dist_by_key.get(img["key"], 0.0)
@@ -531,13 +521,13 @@ def list_catalog_similarity_groups(db):
         for group in groups:
             seed_key = str(group["seed_key"])
             seed_rows = query_catalog_images_by_keys(db, [seed_key])
-            seed_images = _rows_to_catalog_api_images(seed_rows, None)
+            seed_images = _rows_to_catalog_api_images(seed_rows)
             if not seed_images:
                 continue
             candidate_rows = get_similarity_candidates_for_group(db, int(group["group_id"]))
             candidate_keys = [str(r["candidate_key"]) for r in candidate_rows]
             catalog_rows = query_catalog_images_by_keys(db, candidate_keys)
-            candidates = _rows_to_catalog_api_images(catalog_rows, None)
+            candidates = _rows_to_catalog_api_images(catalog_rows)
             by_key = {img["key"]: img for img in candidates}
             ordered_candidates = []
             for row in candidate_rows:

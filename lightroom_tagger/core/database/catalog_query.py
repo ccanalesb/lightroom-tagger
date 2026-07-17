@@ -5,13 +5,13 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Collection, Sequence
 
-from lightroom_tagger.core.database.catalog_query_filters import (
-    _append_query_catalog_image_filters,
-    _non_empty_str_list_for_json_array_filter,
-)
 from lightroom_tagger.core.database.catalog_query_best_score import (
     CATALOG_BEST_SCORE_JOIN_SQL,
     CATALOG_BEST_SCORE_SELECT_COLS,
+)
+from lightroom_tagger.core.database.catalog_query_filters import (
+    _append_query_catalog_image_filters,
+    _non_empty_str_list_for_json_array_filter,
 )
 from lightroom_tagger.core.database.db_init import _deserialize_row
 
@@ -236,7 +236,6 @@ def query_catalog_images(
     select_cols = (
         "i.*, d.summary AS description_summary, "
         "d.best_perspective AS description_best_perspective, "
-        "d.perspectives AS description_perspectives_json, "
         f"{CATALOG_BEST_SCORE_SELECT_COLS}, "
         "st.stack_id AS stack_id, st.stack_size AS stack_member_count, "
         "CASE WHEN st.stack_id IS NOT NULL AND i.key = st.representative_key "
@@ -288,7 +287,6 @@ def query_catalog_images_by_keys(
     select_cols = (
         "i.*, d.summary AS description_summary, "
         "d.best_perspective AS description_best_perspective, "
-        "d.perspectives AS description_perspectives_json, "
         f"{CATALOG_BEST_SCORE_SELECT_COLS}, "
         "st.stack_id AS stack_id, st.stack_size AS stack_member_count, "
         "CASE WHEN st.stack_id IS NOT NULL AND i.key = st.representative_key "

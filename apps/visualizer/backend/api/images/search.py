@@ -30,16 +30,8 @@ from .common import _clamp_pagination
 search_bp = Blueprint("images_search", __name__)
 
 
-def _score_perspective_from_filters(filters: dict | None) -> str | None:
-    if not filters:
-        return None
-    sp = str(filters.get("score_perspective") or "").strip()
-    return sp or None
-
-
 def _catalog_rows_with_signals(
     result_images: list[dict],
-    score_perspective_arg: str | None,
 ) -> list[dict]:
     """Map core rows to API images, merging semantic score / why_matched / thumbnail_url."""
     catalog_rows: list[dict] = []
@@ -54,7 +46,7 @@ def _catalog_rows_with_signals(
             }
         catalog_rows.append(r)
 
-    images = _rows_to_catalog_api_images(catalog_rows, score_perspective_arg)
+    images = _rows_to_catalog_api_images(catalog_rows)
     for img in images:
         sig = signals_by_key.get(img["key"])
         if sig is not None and sig.get("score") is not None:
@@ -109,8 +101,7 @@ def nl_search_images(db):
         except CatalogSearchInputError as exc:
             return error_bad_request(str(exc))
 
-        score_perspective_arg = _score_perspective_from_filters(result.filters)
-        images = _rows_to_catalog_api_images(result.images, score_perspective_arg)
+        images = _rows_to_catalog_api_images(result.images)
         return jsonify(
             {
                 "filters": result.filters,
@@ -154,7 +145,7 @@ def semantic_search_images(db):
         except CatalogSearchInputError as exc:
             return error_bad_request(str(exc))
 
-        images = _catalog_rows_with_signals(result.images, score_perspective_arg)
+        images = _catalog_rows_with_signals(result.images)
 
         return jsonify(
             {
@@ -230,13 +221,12 @@ def chat_search_images(db):
             return error_bad_request(str(exc))
 
         if result.mode in ("semantic", "tool_calling"):
-            images = _catalog_rows_with_signals(result.images, score_perspective_arg)
+            images = _catalog_rows_with_signals(result.images)
             if result.mode == "tool_calling":
                 for img in images:
                     img["thumbnail_url"] = f"/api/images/catalog/{img['key']}/thumbnail"
         else:
-            sp_from_filter = _score_perspective_from_filters(result.filters)
-            images = _rows_to_catalog_api_images(result.images, sp_from_filter)
+            images = _rows_to_catalog_api_images(result.images)
 
         payload: dict[str, Any] = {
             "search_mode": result.mode,

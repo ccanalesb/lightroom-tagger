@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 from spectree import Response
-
 from utils.db import with_db
 from utils.responses import error_bad_request, error_not_found, error_server_error
 
@@ -19,7 +18,6 @@ from api.schemas.stacks import (
     StackSplitMemberRequest,
     StackSplitMemberResponse,
 )
-
 from lightroom_tagger.core.database import (
     StackMutationError,
     library_write,
@@ -54,7 +52,7 @@ def get_stack_members(db, stack_id: int):
             return jsonify({"items": []})
 
         catalog_rows = _query_catalog_rows_for_stack_member_keys(db, keys, score_perspective=None)
-        items = _rows_to_catalog_api_images(catalog_rows, None)
+        items = _rows_to_catalog_api_images(catalog_rows)
         for it in items:
             it["thumbnail_url"] = f"/api/images/catalog/{it['key']}/thumbnail"
         return jsonify({"items": items})
