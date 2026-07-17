@@ -1,6 +1,6 @@
-"""Upsert the layering / framing / compositional-cleanliness perspectives into the DB.
+"""Upsert the framing / compositional-cleanliness perspectives into the DB.
 
-These three ship as tracked defaults under ``prompts/perspectives/`` and are seeded
+These ship as tracked defaults under ``prompts/perspectives/`` and are seeded
 automatically by ``seed_perspectives_from_prompts_dir`` on a *fresh* DB (only when the
 ``perspectives`` table is empty). This script exists for the other case: injecting or
 refreshing them in an **existing** DB. It is self-contained — ``prompt_markdown`` comes
@@ -32,12 +32,6 @@ PERSPECTIVES_DIR = REPO_ROOT / "prompts" / "perspectives"
 # slug -> (display_name, description). Sourced from the yt-to-photo-prompt-lab recipe;
 # inlined so this script has no dependency on any path outside this repo.
 META = {
-    "layering": (
-        "Layering",
-        "Evaluating the composition based on the layering of foreground, middleground, "
-        "and background, and how those planes individually function and collectively "
-        "interact to create depth and narrative context.",
-    ),
     "framing": (
         "Framing",
         "Evaluating the use of a natural framing device to encircle the primary subject: "
