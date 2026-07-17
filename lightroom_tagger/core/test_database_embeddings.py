@@ -32,7 +32,7 @@ class TestDatabaseEmbeddings(unittest.TestCase):
     def test_init_database_image_clip_embedding_roundtrip(self):
         """CLIP vec0 row round-trip via library_write and upsert (Phase 5 SIM-01)."""
         uv = self.db.execute("PRAGMA user_version").fetchone()
-        self.assertEqual(int(uv["user_version"]), 5)
+        self.assertEqual(int(uv["user_version"]), 6)
         key = store_image(
             self.db,
             {

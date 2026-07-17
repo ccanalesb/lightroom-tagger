@@ -1,8 +1,11 @@
 """Perspective and image score DB helpers."""
 
+import json
 import re
 import sqlite3
 from datetime import datetime, timezone
+
+LEGACY_DESCRIPTION_PROMPT_VERSION = "legacy:description"
 
 # The yt-to-photo-prompt-lab exporter marks an optional (excusable) dimension with
 # an HTML comment in the perspective markdown. This marker is the sole source of
@@ -282,3 +285,112 @@ def get_available_score_perspectives_for_image(
         (image_key, image_type),
     ).fetchall()
     return [str(r["perspective_slug"]) for r in rows]
+
+
+def has_current_image_score(
+    conn: sqlite3.Connection,
+    image_key: str,
+    image_type: str,
+    perspective_slug: str,
+) -> bool:
+    """Whether an image already has a current score for this perspective."""
+    row = conn.execute(
+        """
+        SELECT 1 FROM image_scores
+        WHERE image_key = ? AND image_type = ? AND perspective_slug = ?
+          AND is_current = 1
+        LIMIT 1
+        """,
+        (image_key, image_type, perspective_slug),
+    ).fetchone()
+    return row is not None
+
+
+def _coerce_perspective_blob_score(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        score = value
+    elif isinstance(value, float) and value.is_integer():
+        score = int(value)
+    elif isinstance(value, str) and value.strip().isdigit():
+        score = int(value.strip())
+    else:
+        return None
+    if 1 <= score <= 10:
+        return score
+    return None
+
+
+def backfill_legacy_description_scores_from_blobs(conn: sqlite3.Connection) -> int:
+    """Gap-fill ``image_scores`` from ``image_descriptions.perspectives`` blobs.
+
+    Inserts ``legacy:description`` rows only for (image, perspective) pairs that
+    lack a current ``image_scores`` row. Does not call
+    :func:`supersede_previous_current_scores` — real scoring-pass rows win.
+    Returns the number of rows inserted.
+    """
+    rows = conn.execute(
+        """
+        SELECT image_key, image_type, perspectives, model_used, described_at
+        FROM image_descriptions
+        WHERE perspectives IS NOT NULL
+          AND TRIM(perspectives) != ''
+          AND TRIM(perspectives) != '{}'
+        """
+    ).fetchall()
+
+    inserted = 0
+    for row in rows:
+        raw = row["perspectives"]
+        try:
+            perspectives = json.loads(raw) if isinstance(raw, str) else raw
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(perspectives, dict) or not perspectives:
+            continue
+
+        image_key = row["image_key"]
+        image_type = row.get("image_type") or "catalog"
+        model_used = row.get("model_used") or ""
+        scored_at = row.get("described_at") or ""
+        if not scored_at:
+            continue
+
+        for slug, pdata in perspectives.items():
+            if not slug or not isinstance(pdata, dict):
+                continue
+            score = _coerce_perspective_blob_score(pdata.get("score"))
+            if score is None:
+                continue
+            if has_current_image_score(conn, image_key, image_type, slug):
+                continue
+            insert_image_score(
+                conn,
+                {
+                    "image_key": image_key,
+                    "image_type": image_type,
+                    "perspective_slug": slug,
+                    "score": score,
+                    "rationale": str(pdata.get("analysis") or ""),
+                    "model_used": model_used,
+                    "prompt_version": LEGACY_DESCRIPTION_PROMPT_VERSION,
+                    "scored_at": scored_at,
+                    "is_current": 1,
+                },
+            )
+            inserted += 1
+    return inserted
+
+
+def migrate_legacy_description_scores_to_image_scores(conn: sqlite3.Connection) -> None:
+    """Backfill blob perspective scores into ``image_scores`` (user_version 5 → 6)."""
+    row = conn.execute("PRAGMA user_version").fetchone()
+    current_uv = int(row["user_version"] if row else 0)
+    if current_uv >= 6:
+        return
+    try:
+        backfill_legacy_description_scores_from_blobs(conn)
+    except sqlite3.OperationalError:
+        return
+    conn.execute("PRAGMA user_version = 6")
