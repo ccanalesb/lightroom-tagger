@@ -28,9 +28,11 @@ Architectural decision records live in `docs/adr/`:
 | [ADR-0011](../../docs/adr/0011-managed-db-and-catalog-lifecycle-seam.md) | `managed_library_db` / `managed_catalog` lifecycle context managers |
 | [ADR-0012](../../docs/adr/0012-excusable-perspectives.md) | Excusable (not-attempted) perspectives (renumbered from a duplicate 0005) |
 | [ADR-0013](../../docs/adr/0013-backend-authoritative-openapi-contract-seam.md) | Backend-authoritative OpenAPI contract seam; generated frontend types, drift gated in CI |
+| [ADR-0014](../../docs/adr/0014-one-vision-op-and-persist-engine.md) | One vision-op and persist engine |
+| [ADR-0015](../../docs/adr/0015-search-catalog-front-door.md) | `search_catalog` front door with guardrail |
 
 ## Usage by skills
 
 - `diagnose`, `tdd`, `improve-codebase-architecture` — read the context file closest to the files being worked on
 - If work spans both contexts, read both
-- `CONTEXT.md` files do not exist yet — create them when the domain language stabilizes or when a skill asks for them
+- Both `CONTEXT.md` files exist (`lightroom_tagger/CONTEXT.md`, `apps/visualizer/CONTEXT.md`); keep them current as the domain language evolves
