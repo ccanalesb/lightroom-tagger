@@ -25,6 +25,13 @@ persistence. Parent initiative: one vision-op-and-persist engine (issue #139).
 2. **Persist stage** — `run_vision_op_persist(spec, pre_check, accept_result, persist)`
    wraps the core with optional skip checks, result validation, and DB writes. Returns
    a uniform `VisionOpOutcome` (`written` | `skipped` | `failed`).
+   **Outcome contract:** when the model ran but `accept_result` rejects the parsed
+   output (empty, unparseable, or semantically invalid), the engine returns `failed`
+   with reason `invalid result`. Only pre-model, non-attemptable conditions returned
+   by `pre_check` (video, already described, missing file, image-not-found, etc.)
+   are `skipped`. Batch checkpoints record `skipped` and `written` units but exclude
+   `failed`, so failed units are re-selected on resume and count toward consecutive-
+   failure fail-fast.
 3. **Op definitions live in `analyzer`** — concrete specs are built by
    `build_description_op_spec`, `build_score_op_spec`, `build_compare_op_spec`, and
    `build_compare_batch_op_spec` (image prep + `fn_factory` + parser per operation).

@@ -451,3 +451,97 @@ def test_batch_analyze_logs_when_backfill_combined_with_force(
         and 'cannot be combined with force regenerate' in (call.args[3] or '')
         for call in mock_add_log.call_args_list
     )
+
+
+_FAILED_INVALID = VisionOpOutcome(status='failed', reason='invalid result')
+
+
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
+@patch('lightroom_tagger.core.description_service.describe_matched_image')
+@patch('lightroom_tagger.core.database.get_undescribed_catalog_images')
+@patch('jobs.handlers.analyze.fingerprint_batch_describe', return_value='fp-analyze-describe')
+@patch('jobs.handlers.analyze.get_job')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
+def test_batch_analyze_resume_reattempts_describe_failures(
+    _mock_exists,
+    _mock_getenv,
+    mock_config,
+    mock_init_db,
+    mock_get_job,
+    _mock_fp_describe,
+    mock_get_undescribed,
+    mock_describe,
+    mock_score,
+    _mock_add_log,
+):
+    from jobs.handlers import handle_batch_analyze
+
+    metadata = {
+        'image_type': 'catalog',
+        'max_workers': 1,
+        'perspective_slugs': ['p1'],
+    }
+
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_db = MagicMock()
+    mock_db.execute.return_value.fetchall.return_value = []
+    mock_init_db.return_value = mock_db
+    mock_get_undescribed.return_value = [{'key': 'img_ok'}, {'key': 'img_bad'}]
+
+    def describe_side_effect(_db, key, **_kwargs):
+        if key == 'img_ok':
+            return _WRITTEN
+        return _FAILED_INVALID
+
+    mock_describe.side_effect = describe_side_effect
+    mock_score.return_value = _WRITTEN
+
+    runner = _make_runner()
+    handle_batch_analyze(runner, 'job-analyze-first', metadata)
+
+    first_payload = runner.complete_job.call_args[0][1]
+    assert first_payload['describe_succeeded'] == 1
+    assert first_payload['describe_failed'] == 1
+
+    merge_calls = [
+        c for c in runner.persist_checkpoint.call_args_list
+        if len(c[0]) >= 2 and isinstance(c[0][1], dict) and c[0][1].get('stage') == 'describe'
+    ]
+    assert merge_calls, 'expected nested describe checkpoint persist'
+    describe_cp = merge_calls[-1][0][1]['describe']
+    assert describe_cp['processed_pairs'] == ['img_ok|catalog']
+    assert 'img_bad|catalog' not in describe_cp['processed_pairs']
+
+    mock_describe.reset_mock()
+    mock_describe.side_effect = None
+    mock_describe.return_value = _WRITTEN
+    mock_score.reset_mock()
+    mock_score.return_value = _WRITTEN
+
+    mock_get_job.return_value = {
+        'status': 'running',
+        'metadata': {
+            'checkpoint': {
+                'checkpoint_version': 1,
+                'job_type': 'batch_analyze',
+                'stage': 'describe',
+                'describe': {
+                    'fingerprint': 'fp-analyze-describe',
+                    'processed_pairs': ['img_ok|catalog'],
+                    'total_at_start': 2,
+                },
+                'score': {},
+            },
+        },
+    }
+
+    handle_batch_analyze(runner, 'job-analyze-resume', metadata)
+
+    mock_describe.assert_called_once()
+    assert mock_describe.call_args[0][1] == 'img_bad'
+    resume_payload = runner.complete_job.call_args[0][1]
+    assert resume_payload['describe_succeeded'] == 1

@@ -339,3 +339,95 @@ def test_batch_score_non_force_never_calls_get_undescribed_catalog_images(
 
     assert mock_undescribed.call_count == 0
     assert mock_score.call_count == 4
+
+
+_FAILED_INVALID = VisionOpOutcome(status='failed', reason='model returned empty or invalid score response')
+
+
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
+@patch('jobs.handlers.analyze.get_job')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
+def test_batch_score_invalid_model_result_excluded_from_checkpoint(
+    _mock_exists,
+    mock_getenv,
+    mock_config,
+    mock_init_db,
+    mock_get_job,
+    mock_score,
+    _mock_add_log,
+):
+    from jobs.checkpoint import fingerprint_batch_score
+    from jobs.handlers import handle_batch_score
+
+    metadata = {
+        'image_type': 'catalog',
+        'date_filter': 'all',
+        'force': False,
+        'max_workers': 1,
+        'perspective_slugs': ['p1'],
+    }
+    triples = [('img_ok', 'catalog', 'p1'), ('img_bad', 'catalog', 'p1')]
+    fp = fingerprint_batch_score(metadata, triples)
+
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_db = MagicMock()
+
+    def _exec(sql, params=()):
+        m = MagicMock()
+        q = ' '.join(sql.split())
+        if 'FROM images' in q and 'image_scores' not in q:
+            m.fetchall.return_value = [{'key': 'img_ok'}, {'key': 'img_bad'}]
+        elif 'image_scores' in q:
+            m.fetchall.return_value = []
+        else:
+            m.fetchall.return_value = []
+        return m
+
+    mock_db.execute.side_effect = _exec
+    mock_init_db.return_value = mock_db
+
+    def score_side_effect(*args, **_kwargs):
+        key = args[1]
+        if key == 'img_ok':
+            return _WRITTEN
+        return _FAILED_INVALID
+
+    mock_score.side_effect = score_side_effect
+
+    runner = _make_runner()
+    handle_batch_score(runner, 'job-score-invalid-first', metadata)
+
+    first_result = runner.complete_job.call_args[0][1]
+    assert first_result['scored'] == 1
+    assert first_result['failed'] == 1
+    last_cp = runner.persist_checkpoint.call_args_list[-1][0][1]
+    assert last_cp['processed_triplets'] == ['img_ok|catalog|p1']
+    assert 'img_bad|catalog|p1' not in last_cp['processed_triplets']
+
+    mock_score.reset_mock()
+    mock_score.side_effect = None
+    mock_score.return_value = _WRITTEN
+    mock_get_job.return_value = {
+        'status': 'running',
+        'metadata': {
+            'checkpoint': {
+                'checkpoint_version': 1,
+                'job_type': 'batch_score',
+                'fingerprint': fp,
+                'processed_triplets': ['img_ok|catalog|p1'],
+                'total_at_start': 2,
+            },
+        },
+    }
+
+    handle_batch_score(runner, 'job-score-invalid-resume', metadata)
+
+    mock_score.assert_called_once()
+    assert mock_score.call_args[0][1] == 'img_bad'
+    resume_result = runner.complete_job.call_args[0][1]
+    assert resume_result['scored'] == 1
+    assert resume_result['total'] == 2
