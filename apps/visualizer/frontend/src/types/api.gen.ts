@@ -3550,13 +3550,6 @@ export interface components {
              */
             description_best_perspective: string | null;
             /**
-             * Description Perspectives
-             * @default null
-             */
-            description_perspectives: {
-                [key: string]: unknown;
-            } | null;
-            /**
              * Catalog Perspective Score
              * @default null
              */
@@ -3791,13 +3784,6 @@ export interface components {
              * @default null
              */
             description_best_perspective: string | null;
-            /**
-             * Description Perspectives
-             * @default null
-             */
-            description_perspectives: {
-                [key: string]: unknown;
-            } | null;
             /**
              * Catalog Perspective Score
              * @default null
@@ -4047,13 +4033,6 @@ export interface components {
              * @default null
              */
             description_best_perspective: string | null;
-            /**
-             * Description Perspectives
-             * @default null
-             */
-            description_perspectives: {
-                [key: string]: unknown;
-            } | null;
             /**
              * Catalog Perspective Score
              * @default null
@@ -4593,13 +4572,6 @@ export interface components {
              */
             description_best_perspective: string | null;
             /**
-             * Description Perspectives
-             * @default null
-             */
-            description_perspectives: {
-                [key: string]: unknown;
-            } | null;
-            /**
              * Catalog Perspective Score
              * @default null
              */
@@ -4834,13 +4806,6 @@ export interface components {
              * @default null
              */
             description_best_perspective: string | null;
-            /**
-             * Description Perspectives
-             * @default null
-             */
-            description_perspectives: {
-                [key: string]: unknown;
-            } | null;
             /**
              * Catalog Perspective Score
              * @default null
@@ -5125,13 +5090,6 @@ export interface components {
              */
             description_best_perspective: string | null;
             /**
-             * Description Perspectives
-             * @default null
-             */
-            description_perspectives: {
-                [key: string]: unknown;
-            } | null;
-            /**
              * Catalog Perspective Score
              * @default null
              */
@@ -5366,13 +5324,6 @@ export interface components {
              * @default null
              */
             description_best_perspective: string | null;
-            /**
-             * Description Perspectives
-             * @default null
-             */
-            description_perspectives: {
-                [key: string]: unknown;
-            } | null;
             /**
              * Catalog Perspective Score
              * @default null

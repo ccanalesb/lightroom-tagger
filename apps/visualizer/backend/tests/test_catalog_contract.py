@@ -85,7 +85,7 @@ def test_rows_to_catalog_api_images_round_trip(catalog_contract_client):
     conn = init_database(db_path)
     try:
         rows, _total = query_catalog_images(conn)
-        images = _rows_to_catalog_api_images(rows, None)
+        images = _rows_to_catalog_api_images(rows)
         assert images
         validated = CatalogImage.model_validate(validate_catalog_image(images[0]))
         assert validated.filename

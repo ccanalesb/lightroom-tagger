@@ -46,7 +46,6 @@ class CatalogImage(BaseModel):
     ai_analyzed: bool | None = None
     description_summary: str | None = None
     description_best_perspective: str | None = None
-    description_perspectives: dict[str, Any] | None = None
     catalog_perspective_score: int | None = None
     catalog_score_perspective: str | None = None
     stack_id: int | None = None

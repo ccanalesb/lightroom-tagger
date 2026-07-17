@@ -167,6 +167,8 @@ def test_catalog_analyzed_filter_and_embedded_description(catalog_analyzed_clien
     probe = next(img for img in data["images"] if img["key"] == image_key)
     assert probe["ai_analyzed"] is True
     assert probe["description_summary"] == "probe-summary"
+    # LIST path is fully decoupled from the description blob's per-perspective scores.
+    assert "description_perspectives" not in probe
 
     resp = client.get("/api/images/catalog?analyzed=false")
     assert resp.status_code == 200
