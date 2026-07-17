@@ -6,6 +6,7 @@ import {
   type FilterDescriptor,
   type FilterSchema,
 } from '../components/filters/types'
+import { usePageUiStore } from '../stores/pageUiStore'
 
 export type UseFiltersReturn = {
   values: Record<string, unknown>
@@ -131,16 +132,40 @@ function descriptorIsActive(
   return cur !== def
 }
 
-export function useFilters(schema: FilterSchema): UseFiltersReturn {
+export type UseFiltersOptions = {
+  /** In-memory key for persisting filter state across route changes within a session. */
+  persistKey?: string
+}
+
+function mergeWithDefaults(
+  schema: FilterSchema,
+  persisted: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const defaults = buildDefaults(schema)
+  if (!persisted) return defaults
+  return { ...defaults, ...persisted }
+}
+
+export function useFilters(
+  schema: FilterSchema,
+  options?: UseFiltersOptions,
+): UseFiltersReturn {
+  const persistKey = options?.persistKey
+  const getFilterState = usePageUiStore((s) => s.getFilterState)
+  const setFilterState = usePageUiStore((s) => s.setFilterState)
+  const clearFilterState = usePageUiStore((s) => s.clearFilterState)
+
   const schemaRef = useRef(schema)
   schemaRef.current = schema
 
-  const [rawValues, setRawValues] = useState<Record<string, unknown>>(() =>
-    buildDefaults(schema),
-  )
-  const [committedValues, setCommittedValues] = useState<Record<string, unknown>>(() =>
-    buildDefaults(schema),
-  )
+  const [rawValues, setRawValues] = useState<Record<string, unknown>>(() => {
+    const persisted = persistKey ? getFilterState(persistKey)?.raw : undefined
+    return mergeWithDefaults(schema, persisted)
+  })
+  const [committedValues, setCommittedValues] = useState<Record<string, unknown>>(() => {
+    const persisted = persistKey ? getFilterState(persistKey)?.committed : undefined
+    return mergeWithDefaults(schema, persisted)
+  })
 
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout> | undefined>>({})
 
@@ -187,6 +212,11 @@ export function useFilters(schema: FilterSchema): UseFiltersReturn {
       debounceTimers.current = {}
     }
   }, [])
+
+  useEffect(() => {
+    if (!persistKey) return
+    setFilterState(persistKey, { raw: rawValues, committed: committedValues })
+  }, [persistKey, rawValues, committedValues, setFilterState])
 
   const commitSearchKey = useCallback((key: string, value: unknown) => {
     setCommittedValues((prev) => {
@@ -272,7 +302,8 @@ export function useFilters(schema: FilterSchema): UseFiltersReturn {
     const defaults = buildDefaults(schemaRef.current)
     setRawValues(defaults)
     setCommittedValues(defaults)
-  }, [])
+    if (persistKey) clearFilterState(persistKey)
+  }, [persistKey, clearFilterState])
 
   const toQueryParams = useCallback((): Record<string, unknown> => {
     const out: Record<string, unknown> = {}

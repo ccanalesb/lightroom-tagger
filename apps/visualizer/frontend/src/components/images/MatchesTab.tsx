@@ -19,6 +19,7 @@ import { MatchGroupTile } from './MatchGroupTile';
 import { FilterBar } from '../filters/FilterBar';
 import { useFilters } from '../../hooks/useFilters';
 import type { FilterSchema } from '../filters/types';
+import { FILTER_PERSIST_KEYS } from '../../stores/pageUiStore';
 import { invalidateAll, useQuery } from '../../data';
 
 export function MatchesTab() {
@@ -44,7 +45,7 @@ export function MatchesTab() {
     ],
     [],
   );
-  const filters = useFilters(matchesSchema);
+  const filters = useFilters(matchesSchema, { persistKey: FILTER_PERSIST_KEYS.imagesMatches });
   const { values: filterValues } = filters;
   const sortByDate = filterValues.sortByDate as string | undefined;
   const sortParam = (sortByDate ?? 'newest') as 'newest' | 'oldest';

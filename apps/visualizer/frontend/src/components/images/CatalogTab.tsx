@@ -50,6 +50,7 @@ import { formatMonth } from '../../utils/date';
 import { useFilters } from '../../hooks/useFilters';
 import { FilterBar } from '../filters/FilterBar';
 import type { FilterSchema } from '../filters/types';
+import { FILTER_PERSIST_KEYS } from '../../stores/pageUiStore';
 import { stableSerializeRecord } from '../../utils/stableQueryKey';
 
 const LIMIT = 50;
@@ -221,7 +222,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
     ];
   }, [availableMonths, scorePerspectives]);
 
-  const filters = useFilters(catalogSchema);
+  const filters = useFilters(catalogSchema, { persistKey: FILTER_PERSIST_KEYS.imagesCatalog });
   const { values: filterValues, rawValues: filterRawValues, toQueryParams, activeCount } = filters;
 
   const listParams = useMemo(

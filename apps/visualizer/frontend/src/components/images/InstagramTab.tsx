@@ -16,6 +16,7 @@ import { useModal } from '../../hooks/useModal';
 import { useFilters } from '../../hooks/useFilters';
 import { FilterBar } from '../filters/FilterBar';
 import type { FilterSchema } from '../filters/types';
+import { FILTER_PERSIST_KEYS } from '../../stores/pageUiStore';
 import type { InstagramImage } from '../../services/api';
 import { ImagesAPI } from '../../services/api';
 import { formatMonth } from '../../utils/date';
@@ -64,7 +65,7 @@ export function InstagramTab() {
     [availableMonths],
   );
 
-  const filters = useFilters(instagramSchema);
+  const filters = useFilters(instagramSchema, { persistKey: FILTER_PERSIST_KEYS.imagesInstagram });
   const { values: filterValues, toQueryParams } = filters;
   const dateFolder = filterValues.dateFolder as string | undefined;
   const sortByDate = filterValues.sortByDate as string | undefined;

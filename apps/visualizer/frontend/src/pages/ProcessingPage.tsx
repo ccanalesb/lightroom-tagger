@@ -1,5 +1,5 @@
-import { Suspense, useCallback, useMemo, useState, useTransition } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Suspense, useCallback, useState, useTransition } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Tabs, Tab } from '../components/ui/Tabs';
 import { MatchingTab } from '../components/processing/MatchingTab';
 import { AnalyzeTab } from '../components/processing/AnalyzeTab';
@@ -11,8 +11,10 @@ import { SettingsTab } from '../components/processing/SettingsTab';
 import { PerspectivesTab } from '../components/processing/PerspectivesTab';
 import { Button } from '../components/ui/Button';
 import { useJobSocket } from '../hooks/useJobSocket';
+import { usePageTab } from '../hooks/usePageTab';
 import { JobsAPI } from '../services/api';
 import { ErrorBoundary, ErrorState, invalidateAll, useQuery } from '../data';
+import { PROCESSING_TAB_IDS, usePageUiStore } from '../stores/pageUiStore';
 import {
   TAB_VISION_MATCHING,
   TAB_ANALYZE,
@@ -26,25 +28,6 @@ import {
 } from '../constants/strings';
 
 const PAGE_SIZE = 50;
-
-const PROCESSING_TAB_IDS = [
-  'matching',
-  'analyze',
-  'perspectives',
-  'cache',
-  'jobs',
-  'providers',
-  'settings',
-] as const;
-type ProcessingTabId = (typeof PROCESSING_TAB_IDS)[number];
-
-function tabIdFromSearch(search: string): ProcessingTabId {
-  const tab = new URLSearchParams(search).get('tab');
-  if (tab && PROCESSING_TAB_IDS.includes(tab as ProcessingTabId)) {
-    return tab as ProcessingTabId;
-  }
-  return 'matching';
-}
 
 const JOBS_RECOVERED_BANNER =
   'Some jobs were automatically resumed after the last server restart. Check the job queue for progress.';
@@ -90,9 +73,16 @@ function JobQueueTabWithData({
 }
 
 export function ProcessingPage() {
-  const location = useLocation();
   const navigate = useNavigate();
-  const activeTab = useMemo(() => tabIdFromSearch(location.search), [location.search]);
+  const processingTab = usePageUiStore((s) => s.processingTab);
+  const setProcessingTab = usePageUiStore((s) => s.setProcessingTab);
+  const { activeTab, handleTabChange } = usePageTab({
+    pagePath: '/processing',
+    tabIds: PROCESSING_TAB_IDS,
+    defaultTab: 'matching',
+    storedTab: processingTab,
+    setStoredTab: setProcessingTab,
+  });
 
   const [jobsRecoveredBanner, setJobsRecoveredBanner] = useState<string | null>(null);
 
@@ -102,15 +92,6 @@ export function ProcessingPage() {
   // jobListRevision drives ProcessingPage re-renders so JobQueueTabWithData
   // re-renders after invalidateAll(['jobs.list']) clears the cache.
   void jobListRevision;
-
-  const handleTabChange = (id: string) => {
-    if (!PROCESSING_TAB_IDS.includes(id as ProcessingTabId)) return;
-    const next = id as ProcessingTabId;
-    navigate(
-      { pathname: '/processing', search: next === 'matching' ? '' : `?tab=${next}` },
-      { replace: true },
-    );
-  };
 
   const openJobQueueTab = useCallback(() => {
     navigate(PROCESSING_JOB_QUEUE_ROUTE, { replace: true });
