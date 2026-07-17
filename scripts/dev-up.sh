@@ -46,7 +46,16 @@ if [[ -x "$ROOT_DIR/.venv/bin/python" ]]; then
   PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
 fi
 
-if ! "$PYTHON_BIN" - "$BACKEND_PORT" <<'PY'
+# Wait until a port is bindable, retrying briefly. A just-stopped server can
+# linger in TIME_WAIT (or a racing `make dev-down` may still be tearing down),
+# so poll for ~5s instead of failing on the first conflict. Only give up — and
+# print the manual-recovery hint — once the port stays busy the whole window.
+wait_for_port_free() {
+  local port="$1"
+  local attempt
+
+  for attempt in {1..20}; do
+    if "$PYTHON_BIN" - "$port" <<'PY'
 import socket, sys
 s = socket.socket()
 try:
@@ -56,29 +65,23 @@ except OSError:
 finally:
     s.close()
 PY
-then
-  echo "Port $BACKEND_PORT is already in use."
-  echo "Run 'make dev-down' first, or stop the process using that port."
-  echo "Tip: 'fuser -k ${BACKEND_PORT}/tcp' (Linux/WSL) can free it quickly."
-  exit 1
-fi
+    then
+      if [[ "$attempt" -gt 1 ]]; then
+        echo "Port $port is now free."
+      fi
+      return 0
+    fi
+    sleep 0.25
+  done
 
-if ! "$PYTHON_BIN" - <<'PY'
-import socket
-s = socket.socket()
-try:
-    s.bind(("127.0.0.1", 5173))
-except OSError:
-    raise SystemExit(1)
-finally:
-    s.close()
-PY
-then
-  echo "Port 5173 is already in use."
+  echo "Port $port is already in use."
   echo "Run 'make dev-down' first, or stop the process using that port."
-  echo "Tip: 'fuser -k 5173/tcp' (Linux/WSL) can free it quickly."
-  exit 1
-fi
+  echo "Tip: 'fuser -k ${port}/tcp' (Linux/WSL) can free it quickly."
+  return 1
+}
+
+wait_for_port_free "$BACKEND_PORT" || exit 1
+wait_for_port_free 5173 || exit 1
 
 echo "Starting backend on http://127.0.0.1:$BACKEND_PORT ..."
 (
