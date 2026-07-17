@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, request
 from spectree import Response
 from utils.db import with_db
 from utils.responses import error_bad_request, error_server_error
+from utils.score_perspective import validate_score_perspective_exists
 
 from api.openapi import spec
 from api.schemas.jobs import ErrorBody
@@ -20,8 +21,6 @@ from api.schemas.search import (
     SemanticSearchResponse,
 )
 from lightroom_tagger.core.catalog_search import CatalogSearchInputError, search_catalog
-
-from utils.score_perspective import validate_score_perspective_exists
 
 from .catalog import (
     _rows_to_catalog_api_images,
