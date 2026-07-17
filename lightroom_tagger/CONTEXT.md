@@ -15,8 +15,8 @@
 | **validated match** | A match with `validated_at` set — human-confirmed pairing. The population used by posting analytics and identity aggregation. |
 | **match score** | The single 0–1 confidence the matcher assigns to a catalog↔Instagram candidate pairing: a weighted blend of the phash-similarity, description-text-similarity, and vision-verdict signals (`total_score` in matcher results). Distinct from **score** below, which evaluates one image against a perspective. |
 | **vision comparison** | A side-by-side AI comparison of two images to determine if they are the same photo. |
-| **description** | An AI-generated textual description of a catalog image. |
-| **score** | A numeric AI evaluation of an image (catalog or Instagram dump) against a named perspective (e.g. "composition", "light"). Stored in `image_scores`. `image_type` distinguishes catalog vs dump images. `is_current = 1` marks the active score for a version. Not to be confused with the matcher's **match score**. |
+| **description** | An AI-generated textual description of a catalog image (prose and technical fields only — summary, composition, subjects, mood, colors). Perspective scores are **not** produced by the description pass; see **score** below. |
+| **score** | A numeric AI evaluation of an image (catalog or Instagram dump) against a named perspective (e.g. "composition", "light"). Stored in `image_scores` — the **single source of truth** for perspective scores. `image_type` distinguishes catalog vs dump images. `is_current = 1` marks the active score for a version. Not to be confused with the matcher's **match score**. Legacy `image_descriptions.perspectives` may still hold backfilled or pre-split data but new description writes leave it untouched. |
 | **perspective** | A named scoring lens (slug + prompt). Catalog images are scored per-perspective. |
 | **optional perspective** | A perspective whose technique a strong photograph could legitimately skip (`perspectives.optional = 1`). Only optional perspectives may be excused; seeded as optional when the source markdown carries `<!-- optional: true -->` (the export contract from yt-to-photo-prompt-lab). |
 | **excused score** | An `image_scores` row with `not_attempted = 1`: the model judged the perspective's technique genuinely absent (only allowed for optional perspectives). It still carries a numeric score/rationale but is excluded from identity aggregation. Mirrors yt-to-photo-prompt-lab's "not scorable" outcome. |
@@ -60,7 +60,7 @@
 | `cancel_scope` | Thread-local cooperative cancellation — workers register a `cancel_check` callback; retry/fallback paths honour it |
 | `scoring_service` | Per-perspective scoring of catalog and Instagram images via vision models |
 | `identity_service` | Best-photo ranking, style fingerprint, post-next hints from current catalog scores |
-| `description_service` | Describes catalog images; orchestrates `analyzer.description` + DB writes |
+| `description_service` | Describes catalog images (prose-only — no perspective scores); orchestrates `analyzer.description` + DB writes |
 | `embedding_service` | Text embedding generation and storage |
 | `clip_embedding_service` | CLIP image embedding generation and storage |
 | `clip_similarity` | Catalog similarity search via CLIP embeddings |
@@ -69,7 +69,7 @@
 | `nl_catalog_search` | Internal LLM runners for NL filter and tool-calling search — orchestrated only via `catalog_search` (ADR-0015) |
 | `catalog_sync` | Incremental additions-only catalog → library.db refresh (set-difference on ids) |
 | `catalog_nl_filter` | SQL filter builder for NL search queries |
-| `prompt_builder` | Builds scoring and description prompts |
+| `prompt_builder` | Builds prose-only description prompts and per-perspective scoring prompts |
 | `structured_output` | Parses and retries LLM JSON score responses |
 | `posting_analytics` | Instagram cadence/frequency stats from validated dump |
 | `posting_analytics_captions` | Caption statistics and unposted-catalog listing |

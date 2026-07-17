@@ -379,11 +379,10 @@ def test_build_description_prompt_returns_string():
     prompt = build_description_prompt()
     assert isinstance(prompt, str)
     assert len(prompt) > 100
-    assert 'street photographer' in prompt.lower()
-    assert 'documentary' in prompt.lower()
-    assert 'publisher' in prompt.lower()
     assert 'composition' in prompt.lower()
     assert 'JSON' in prompt
+    assert '"perspectives"' not in prompt
+    assert '"score"' not in prompt
 
 
 def test_parse_description_response_valid_json():
@@ -422,7 +421,7 @@ def test_parse_description_response_handles_garbage():
     from lightroom_tagger.core.analyzer import parse_description_response
     result = parse_description_response('This is not JSON at all')
     assert result['summary'] == ''
-    assert result['best_perspective'] == ''
+    assert 'best_perspective' not in result
 
 
 def test_get_description_model_prefers_env_override():

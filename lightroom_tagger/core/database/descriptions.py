@@ -105,15 +105,15 @@ def store_image_description(db: sqlite3.Connection, record: dict) -> str:
     with library_write(db):
         db.execute("""
             INSERT INTO image_descriptions
-                (image_key, image_type, summary, composition, perspectives,
-                 technical, subjects, best_perspective, model_used, described_at,
+                (image_key, image_type, summary, composition,
+                 technical, subjects, model_used, described_at,
                  dominant_colors, mood_tags, has_repetition, description_search_document)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(image_key) DO UPDATE SET
                 image_type=excluded.image_type, summary=excluded.summary,
-                composition=excluded.composition, perspectives=excluded.perspectives,
+                composition=excluded.composition,
                 technical=excluded.technical, subjects=excluded.subjects,
-                best_perspective=excluded.best_perspective, model_used=excluded.model_used,
+                model_used=excluded.model_used,
                 described_at=excluded.described_at,
                 dominant_colors=excluded.dominant_colors, mood_tags=excluded.mood_tags,
                 has_repetition=excluded.has_repetition,
@@ -122,10 +122,8 @@ def store_image_description(db: sqlite3.Connection, record: dict) -> str:
             image_key, image_type,
             record.get('summary', ''),
             _serialize_json(record.get('composition', {})),
-            _serialize_json(record.get('perspectives', {})),
             _serialize_json(record.get('technical', {})),
             _serialize_json(record.get('subjects', [])),
-            record.get('best_perspective', ''),
             record.get('model_used', ''),
             record['described_at'],
             dominant_colors, mood_tags, has_repetition, description_search_document,

@@ -11,7 +11,6 @@ from lightroom_tagger.core.database import (
     get_image,
     get_image_description,
     get_instagram_dump_media,
-    list_perspectives,
     resolve_filepath,
     store_image_description,
 )
@@ -63,17 +62,10 @@ def _description_structured_is_valid(structured: dict) -> bool:
 
 def _resolve_description_user_prompt(
     db: sqlite3.Connection, perspective_slugs: list[str] | None
-) -> str | None:
-    """Return assembled user prompt text, or ``None`` to use the legacy monolithic prompt."""
-    active_rows = list_perspectives(db, active_only=True)
-    if perspective_slugs:
-        by_slug = {r["slug"]: r for r in active_rows}
-        rows = [by_slug[s] for s in perspective_slugs if s in by_slug]
-    else:
-        rows = active_rows
-    if not rows:
-        return None
-    return build_description_user_prompt(rows)
+) -> str:
+    """Return assembled prose-only user prompt text."""
+    del db, perspective_slugs  # kept for call-site signature compatibility
+    return build_description_user_prompt()
 
 
 def _persist_description_structured(
@@ -255,10 +247,8 @@ def _store_structured(
         'image_type': image_type,
         'summary': structured.get('summary', ''),
         'composition': structured.get('composition', {}),
-        'perspectives': structured.get('perspectives', {}),
         'technical': structured.get('technical', {}),
         'subjects': structured.get('subjects', []),
-        'best_perspective': structured.get('best_perspective', ''),
         'model_used': model_used or get_description_model(),
         'dominant_colors': dc,
         'mood_tags': mt,

@@ -10,17 +10,10 @@ from lightroom_tagger.core.provider_registry import ProviderRegistry
 
 from .image_prep import compress_image, get_viewable_path, get_viewable_path_managed
 
-# Legacy monolithic prompt; prefer prompt_builder + DB perspectives when available.
+# Legacy monolithic prompt; prefer prompt_builder.build_description_user_prompt when available.
 DESCRIPTION_PROMPT = """You are an experienced photo editor reviewing images for a photography portfolio. Be direct and constructive. State clearly what works and what doesn't — no flattery, no sugarcoating, but also no performative negativity. Every image has strengths and weaknesses; identify both with specifics.
 
-Analyze this photograph from three expert perspectives and return a structured JSON response.
-
-## Perspectives (each gets its own score — an image can be a 7 for street but a 3 for publishing)
-1. **Street Photographer**: Is there a decisive moment or is the timing off? Evaluate geometry, light, and candid quality. What would make this frame stronger? Score how well it works AS street photography.
-2. **Documentary Photographer**: Does this tell a story? Is there emotional weight? What narrative is present or missing? How could the storytelling improve? Score how well it works AS documentary work.
-3. **Publisher**: What's the realistic use case? (magazine cover, editorial feature, blog post, social media, stock, none). What audience would this serve? What limits its usability? Score its commercial value.
-
-Also choose which single perspective fits this image best (best_perspective).
+Analyze this photograph and return a structured JSON response with descriptive and technical fields only — do not score the image.
 
 ## Composition Analysis
 Identify:
@@ -36,16 +29,6 @@ Identify:
 - **Lighting**: (natural_front, natural_side, natural_back, golden_hour, blue_hour, overcast, artificial, mixed, low_light, high_key, low_key)
 - **Time of day** if discernible: (dawn, morning, midday, afternoon, golden_hour, blue_hour, night, unknown)
 
-## Scoring Rubric (use the FULL range honestly — most photos land between 4-6)
-- **1-2**: Technically broken or no photographic intent. Accidental shot.
-- **3-4**: Snapshot with some intent but weak execution or no clear subject.
-- **5**: Competent but forgettable. Technically fine, nothing memorable.
-- **6**: Above average. One strong element (light, moment, composition) but doesn't fully come together.
-- **7**: Good. Clear intent, solid execution. Minor issues hold it back.
-- **8**: Strong. Portfolio-worthy. Would make someone pause and look twice.
-- **9**: Excellent. Gallery-level. Distinctive voice, memorable image.
-- **10**: Masterwork. Iconic potential. Rare.
-
 ## Required JSON format (respond with ONLY this JSON, no other text):
 {
   "summary": "1-2 sentence objective description of the image content",
@@ -59,28 +42,13 @@ Identify:
     "depth": "shallow|moderate|deep",
     "balance": "symmetric|asymmetric|radial"
   },
-  "perspectives": {
-    "street": {
-      "analysis": "2-3 sentences — what works, what doesn't, what would improve it",
-      "score": 1-10
-    },
-    "documentary": {
-      "analysis": "2-3 sentences — what works, what doesn't, what would improve it",
-      "score": 1-10
-    },
-    "publisher": {
-      "analysis": "2-3 sentences — realistic use case and what limits usability",
-      "score": 1-10
-    }
-  },
   "technical": {
     "dominant_colors": ["#hex1", "#hex2"],
     "mood": "one_word",
     "lighting": "lighting_type",
     "time_of_day": "time_period"
   },
-  "subjects": ["subject1", "subject2"],
-  "best_perspective": "street|documentary|publisher"
+  "subjects": ["subject1", "subject2"]
 }"""
 
 _DESCRIPTION_FALLBACK: dict[str, Any] = {
@@ -89,10 +57,8 @@ _DESCRIPTION_FALLBACK: dict[str, Any] = {
     'mood_tags': [],
     'has_repetition': False,
     'composition': {},
-    'perspectives': {},
     'technical': {},
     'subjects': [],
-    'best_perspective': '',
 }
 
 

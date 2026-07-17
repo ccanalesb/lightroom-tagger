@@ -38,14 +38,8 @@ class TestImageDescriptions(unittest.TestCase):
             'image_type': 'catalog',
             'summary': 'A street scene at golden hour',
             'composition': {'layers': ['foreground', 'background'], 'techniques': ['rule_of_thirds']},
-            'perspectives': {
-                'street': {'analysis': 'Strong geometry', 'score': 7},
-                'documentary': {'analysis': 'Fair story', 'score': 5},
-                'publisher': {'analysis': 'Editorial use', 'score': 6},
-            },
             'technical': {'dominant_colors': ['#2b3a4c'], 'mood': 'contemplative'},
             'subjects': ['person', 'architecture'],
-            'best_perspective': 'street',
             'model_used': 'gemma3:27b',
         }
         key = store_image_description(self.db, record)
@@ -54,8 +48,26 @@ class TestImageDescriptions(unittest.TestCase):
         stored = get_image_description(self.db, '2024-01-15_photo.jpg')
         self.assertIsNotNone(stored)
         self.assertEqual(stored['summary'], 'A street scene at golden hour')
-        self.assertEqual(stored['perspectives']['street']['score'], 7)
+        self.assertIn(stored.get('perspectives'), (None, {}))
         self.assertIn('described_at', stored)
+
+    def test_store_image_description_leaves_perspectives_untouched_on_update(self):
+        self.db.execute(
+            "INSERT INTO image_descriptions "
+            "(image_key, image_type, summary, perspectives, model_used, described_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                'legacy-key', 'catalog', 'old',
+                '{"street": {"score": 7}}', 'old-model', '2024-01-01T00:00:00',
+            ),
+        )
+        store_image_description(self.db, {
+            'image_key': 'legacy-key', 'image_type': 'catalog',
+            'summary': 'Updated', 'model_used': 'new-model',
+        })
+        stored = get_image_description(self.db, 'legacy-key')
+        self.assertEqual(stored['summary'], 'Updated')
+        self.assertEqual(stored['perspectives']['street']['score'], 7)
 
     def test_get_image_description_not_found(self):
         self.assertIsNone(get_image_description(self.db, 'nonexistent'))

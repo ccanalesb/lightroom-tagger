@@ -1,4 +1,4 @@
-"""Assemble multi-perspective image description prompts from DB perspective rows."""
+"""Assemble prose-only image description prompts and per-perspective scoring prompts."""
 
 from __future__ import annotations
 
@@ -20,38 +20,21 @@ _TECHNICAL_BLOCK = """## Technical Analysis
 
 
 def build_description_user_prompt(
-    perspective_rows: list[dict],
     *,
     composition_block: bool = True,
     technical_block: bool = True,
 ) -> str:
-    """Build the text user message for a structured multi-perspective description call.
-
-    *perspective_rows* dicts should include ``slug``, ``display_name``, and ``prompt_markdown``
-    (as returned from the ``perspectives`` table / :func:`list_perspectives`).
-    """
-    n = len(perspective_rows)
-    slug_list = [str(r["slug"]) for r in perspective_rows]
-    best_alternatives = "|".join(slug_list)
-
+    """Build the text user message for a prose-only structured description call."""
     intro = (
         "You are an experienced photo editor reviewing images for a photography portfolio. "
         "Be direct and constructive. State clearly what works and what doesn't — no flattery, "
         "no sugarcoating, but also no performative negativity. Every image has strengths and "
         "weaknesses; identify both with specifics.\n\n"
-        f"Analyze this photograph from {n} expert perspectives and return a structured JSON "
-        "response.\n\n"
-        "Each perspective below gets its own score — an image can be strong in one lens and weak "
-        "in another. Also choose which single perspective fits this image best (best_perspective)."
+        "Analyze this photograph and return a structured JSON response with descriptive and "
+        "technical fields only — do not score the image."
     )
 
     parts: list[str] = [intro]
-
-    for row in perspective_rows:
-        display_name = str(row["display_name"])
-        slug = str(row["slug"])
-        body = str(row.get("prompt_markdown", "")).strip()
-        parts.append(f"### Perspective: {display_name} ({slug})\n{body}")
 
     if composition_block:
         parts.append(_COMPOSITION_BLOCK)
@@ -59,42 +42,27 @@ def build_description_user_prompt(
     if technical_block:
         parts.append(_TECHNICAL_BLOCK)
 
-    persp_json_lines: list[str] = []
-    for row in perspective_rows:
-        slug = str(row["slug"])
-        persp_json_lines.append(
-            f'    "{slug}": {{\n'
-            '      "analysis": "2-3 sentences — what works, what doesn\'t, what would improve it",\n'
-            '      "score": 1-10\n'
-            "    }"
-        )
-    perspectives_inner = ",\n".join(persp_json_lines)
-
-    json_template = f"""## Required JSON format (respond with ONLY this JSON, no other text):
-{{
+    json_template = """## Required JSON format (respond with ONLY this JSON, no other text):
+{
   "summary": "1-2 sentence objective description of the image content",
   "dominant_colors": ["#RRGGBB", "#RRGGBB"],
   "mood_tags": ["tag", "tag2"],
   "has_repetition": false,
-  "composition": {{
+  "composition": {
     "layers": ["foreground: <description>", "midground: <description>", "background: <description>"],
     "techniques": ["technique1", "technique2"],
     "problems": ["specific issue 1", "specific issue 2"],
     "depth": "shallow|moderate|deep",
     "balance": "symmetric|asymmetric|radial"
-  }},
-  "perspectives": {{
-{perspectives_inner}
-  }},
-  "technical": {{
+  },
+  "technical": {
     "dominant_colors": ["#hex1", "#hex2"],
     "mood": "one_word",
     "lighting": "lighting_type",
     "time_of_day": "time_period"
-  }},
-  "subjects": ["subject1", "subject2"],
-  "best_perspective": "{best_alternatives}"
-}}
+  },
+  "subjects": ["subject1", "subject2"]
+}
 
 **Root visual fields (required keys, use empty arrays or false if unknown):**
 - `dominant_colors`: the 2–5 most salient colors as hex strings (`#RRGGBB`).
