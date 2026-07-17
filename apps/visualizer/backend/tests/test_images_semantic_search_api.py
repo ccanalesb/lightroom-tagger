@@ -144,3 +144,55 @@ def test_semantic_search_rejects_short_query(semantic_search_client, monkeypatch
     r = client.post("/api/images/search/semantic-search", json={"query": "a"})
     assert r.status_code == 400
     assert "error" in r.get_json()
+
+
+def test_semantic_search_hyphenated_score_perspective_200(semantic_search_client, monkeypatch):
+    client, k_alpha, _k_beta = semantic_search_client
+    hyphen_slug = "environmental-context-legibility"
+    fixed_blob = b"\xef" * (768 * 4)
+
+    def fake_hybrid(_db, **kwargs):
+        return (
+            [
+                SemanticSearchRow(
+                    image_key=k_alpha,
+                    rrf_score=0.5,
+                    why_matched="FTS match",
+                ),
+            ],
+            1,
+            SemanticSearchMeta(
+                missing_embeddings_count=0,
+                semantic_index_empty=False,
+                rrf_k=60,
+                fts_no_match=False,
+            ),
+        )
+
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.embed_query_to_vec_blob", lambda _q: fixed_blob
+    )
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.run_semantic_hybrid_search", fake_hybrid
+    )
+
+    r = client.post(
+        "/api/images/search/semantic-search",
+        json={"query": "alpha beta", "score_perspective": hyphen_slug},
+    )
+    assert r.status_code == 200
+
+
+def test_semantic_search_unknown_score_perspective_400(semantic_search_client, monkeypatch):
+    client, _k_alpha, _k_beta = semantic_search_client
+    monkeypatch.setattr(
+        "lightroom_tagger.core.catalog_search.embed_query_to_vec_blob",
+        lambda _q: (_ for _ in ()).throw(AssertionError("should not run")),
+    )
+
+    r = client.post(
+        "/api/images/search/semantic-search",
+        json={"query": "alpha beta", "score_perspective": "no-such-perspective-slug"},
+    )
+    assert r.status_code == 400
+    assert r.get_json()["error"] == "unknown perspective 'no-such-perspective-slug'"

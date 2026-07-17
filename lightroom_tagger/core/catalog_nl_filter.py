@@ -8,14 +8,11 @@ There is **no** raw SQL in this type — the HTTP layer maps validated values to
 from __future__ import annotations
 
 import json
-import re
 from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from lightroom_tagger.core.structured_output import StructuredOutputError, repair_json_text
-
-_CATALOG_SCORE_PERSPECTIVE_SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 # Keys accepted by :func:`query_catalog_images` that this NL model is allowed
 # to set (excludes e.g. ``limit`` / ``offset`` pagination, ``analyzed`` / ``color_label``).
@@ -63,12 +60,8 @@ class CatalogNlFilter(BaseModel):
             raise ValueError(
                 "score_perspective is required when min_score or sort_by_score is set"
             )
-        if self.score_perspective is not None:
-            sp = self.score_perspective.strip()
-            if not sp:
-                raise ValueError("score_perspective must be a non-empty catalog slug (score_perspective)")
-            if not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(sp):
-                raise ValueError("score_perspective does not match the allowed slug (score_perspective)")
+        if self.score_perspective is not None and not self.score_perspective.strip():
+            raise ValueError("score_perspective must be a non-empty catalog slug (score_perspective)")
         return self
 
 

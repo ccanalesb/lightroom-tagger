@@ -78,3 +78,23 @@ def test_nl_search_extra_key_from_llm_400(nl_search_client, monkeypatch):
     data = r.get_json()
     assert "error" in data
     assert "NL filter" in data["error"]
+
+
+def test_nl_search_hyphenated_score_perspective_200(nl_search_client, monkeypatch):
+    hyphen_slug = "environmental-context-legibility"
+    monkeypatch.setattr(
+        "lightroom_tagger.core.nl_catalog_search.run_nl_catalog_filter_llm",
+        lambda *a, **k: f'{{"score_perspective": "{hyphen_slug}", "sort_by_score": "desc"}}',
+    )
+    r = nl_search_client.post("/api/images/search/nl-search", json={"query": "best photos"})
+    assert r.status_code == 200
+
+
+def test_nl_search_unknown_score_perspective_400(nl_search_client, monkeypatch):
+    monkeypatch.setattr(
+        "lightroom_tagger.core.nl_catalog_search.run_nl_catalog_filter_llm",
+        lambda *a, **k: '{"score_perspective": "no-such-perspective-slug"}',
+    )
+    r = nl_search_client.post("/api/images/search/nl-search", json={"query": "best"})
+    assert r.status_code == 400
+    assert r.get_json()["error"] == "unknown perspective 'no-such-perspective-slug'"
