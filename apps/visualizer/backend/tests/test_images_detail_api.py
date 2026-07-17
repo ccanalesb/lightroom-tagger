@@ -47,14 +47,17 @@ def detail_client(tmp_path, monkeypatch):
             "image_key": catalog_key,
             "image_type": "catalog",
             "summary": "probe-summary",
-            "best_perspective": "street",
-            "perspectives": {"street": {"score_rationale": "nice"}},
             "composition": {},
             "technical": {},
             "subjects": [],
             "model_used": "test",
             "described_at": "2024-05-01T12:00:00",
         },
+    )
+    # Legacy description columns (pre-split backfill) — not written by store_image_description.
+    conn.execute(
+        "UPDATE image_descriptions SET best_perspective = ?, perspectives = ? WHERE image_key = ?",
+        ("street", '{"street": {"score_rationale": "nice"}}', catalog_key),
     )
 
     # Pick two active perspective slugs that ship with init_database.

@@ -74,10 +74,8 @@ class TestDescribeMatchedImage:
         raw_json = json.dumps({
             'summary': 'A street scene',
             'composition': {'depth': 'shallow'},
-            'perspectives': {'street': {'score': 7}},
             'technical': {'mood': 'gritty'},
             'subjects': ['person'],
-            'best_perspective': 'street',
         })
         mock_registry = _fake_registry(
             defaults={"description": {"provider": "ollama", "model": "test-model"}},
@@ -98,6 +96,12 @@ class TestDescribeMatchedImage:
         desc = get_image_description(db, catalog_key)
         assert desc is not None
         assert desc['summary'] == 'A street scene'
+        assert desc.get('perspectives') in (None, {})
+        score_count = db.execute(
+            "SELECT COUNT(*) AS n FROM image_scores WHERE image_key = ?",
+            (catalog_key,),
+        ).fetchone()['n']
+        assert score_count == 0
         assert mock_dispatcher.call_with_fallback.call_args.kwargs["model"] == "test-model"
 
     def test_describe_matched_image_honors_description_vision_model_env(self, tmp_path, monkeypatch):
@@ -116,10 +120,8 @@ class TestDescribeMatchedImage:
         raw_json = json.dumps({
             'summary': 'Env model scene',
             'composition': {},
-            'perspectives': {},
             'technical': {},
             'subjects': [],
-            'best_perspective': 'street',
         })
         registry = _fake_registry(
             defaults={"description": {"provider": "ollama", "model": "json-default"}},
@@ -169,8 +171,8 @@ class TestDescribeMatchedImage:
              patch('lightroom_tagger.core.description_service.get_description_model', return_value='test-model'):
             mock_run.return_value = ({
                 'summary': 'A street scene', 'composition': {'depth': 'shallow'},
-                'perspectives': {'street': {'score': 7}}, 'technical': {'mood': 'gritty'},
-                'subjects': ['person'], 'best_perspective': 'street',
+                'technical': {'mood': 'gritty'},
+                'subjects': ['person'],
             }, 'ollama', 'test-model')
             result = describe_matched_image(db, catalog_key)
 
@@ -188,8 +190,8 @@ class TestDescribeMatchedImage:
         catalog_key = store_image(db, {'filepath': filepath, 'filename': 'photo.jpg'})
         store_image_description(db, {
             'image_key': catalog_key, 'image_type': 'catalog', 'summary': 'existing',
-            'composition': {}, 'perspectives': {}, 'technical': {},
-            'subjects': [], 'best_perspective': 'street', 'model_used': 'old',
+            'composition': {}, 'technical': {},
+            'subjects': [], 'model_used': 'old',
         })
 
         with patch('lightroom_tagger.core.vision_op.run_vision_op') as mock_run:
@@ -207,15 +209,15 @@ class TestDescribeMatchedImage:
         catalog_key = store_image(db, {'filepath': filepath, 'filename': 'photo.jpg'})
         store_image_description(db, {
             'image_key': catalog_key, 'image_type': 'catalog', 'summary': 'old summary',
-            'composition': {}, 'perspectives': {}, 'technical': {},
-            'subjects': [], 'best_perspective': 'street', 'model_used': 'old',
+            'composition': {}, 'technical': {},
+            'subjects': [], 'model_used': 'old',
         })
 
         with patch('lightroom_tagger.core.vision_op.run_vision_op') as mock_run, \
              patch('lightroom_tagger.core.description_service.get_description_model', return_value='new-model'):
             mock_run.return_value = ({
-                'summary': 'Updated summary', 'composition': {}, 'perspectives': {},
-                'technical': {}, 'subjects': [], 'best_perspective': 'documentary',
+                'summary': 'Updated summary', 'composition': {},
+                'technical': {}, 'subjects': [],
             }, 'ollama', 'new-model')
             result = describe_matched_image(db, catalog_key, force=True)
 
@@ -336,8 +338,8 @@ class TestDescribeMatchedImage:
 
         with patch('lightroom_tagger.core.vision_op.run_vision_op') as mock_run:
             mock_run.return_value = ({
-                'summary': '', 'composition': {}, 'perspectives': {},
-                'technical': {}, 'subjects': [], 'best_perspective': '',
+                'summary': '', 'composition': {},
+                'technical': {}, 'subjects': [],
             }, 'ollama', 'test-model')
             result = describe_matched_image(db, catalog_key)
 
@@ -353,14 +355,14 @@ class TestDescribeMatchedImage:
         catalog_key = store_image(db, {'filepath': filepath, 'filename': 'photo.jpg'})
         store_image_description(db, {
             'image_key': catalog_key, 'image_type': 'catalog', 'summary': 'keep me',
-            'composition': {}, 'perspectives': {}, 'technical': {},
-            'subjects': [], 'best_perspective': 'street', 'model_used': 'old',
+            'composition': {}, 'technical': {},
+            'subjects': [], 'model_used': 'old',
         })
 
         with patch('lightroom_tagger.core.vision_op.run_vision_op') as mock_run:
             mock_run.return_value = ({
-                'summary': '   ', 'composition': {}, 'perspectives': {},
-                'technical': {}, 'subjects': [], 'best_perspective': '',
+                'summary': '   ', 'composition': {},
+                'technical': {}, 'subjects': [],
             }, 'ollama', 'test-model')
             result = describe_matched_image(db, catalog_key, force=True)
 
@@ -485,10 +487,8 @@ class TestStoreStructuredVisualMapping:
         structured = {
             'summary': 'A scene',
             'composition': {},
-            'perspectives': {},
             'technical': {'mood': 'gloomy'},
             'subjects': [],
-            'best_perspective': 'street',
         }
         _store_structured(db, catalog_key, 'catalog', structured, 'test-model')
 
@@ -506,10 +506,8 @@ class TestStoreStructuredVisualMapping:
         structured = {
             'summary': 'Colors',
             'composition': {},
-            'perspectives': {},
             'technical': {'dominant_colors': ['#aabbcc']},
             'subjects': [],
-            'best_perspective': 'street',
         }
         _store_structured(db, catalog_key, 'catalog', structured, 'test-model')
 
@@ -527,10 +525,8 @@ class TestStoreStructuredVisualMapping:
         structured = {
             'summary': 'Full visual row',
             'composition': {},
-            'perspectives': {},
             'technical': {},
             'subjects': ['x'],
-            'best_perspective': 'street',
             'dominant_colors': ['#112233', '#445566'],
             'mood_tags': ['calm', 'cool'],
             'has_repetition': True,
