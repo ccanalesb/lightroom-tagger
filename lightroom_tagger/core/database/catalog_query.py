@@ -9,6 +9,10 @@ from lightroom_tagger.core.database.catalog_query_filters import (
     _append_query_catalog_image_filters,
     _non_empty_str_list_for_json_array_filter,
 )
+from lightroom_tagger.core.database.catalog_query_best_score import (
+    CATALOG_BEST_SCORE_JOIN_SQL,
+    CATALOG_BEST_SCORE_SELECT_COLS,
+)
 from lightroom_tagger.core.database.db_init import _deserialize_row
 
 
@@ -79,6 +83,7 @@ def filter_order_keys_in_catalog(
             "AND s.image_type = 'catalog' AND s.perspective_slug = ? AND s.is_current = 1 "
         )
         join_bindings.append(sp)
+    join_sql += CATALOG_BEST_SCORE_JOIN_SQL
     join_sql += (
         "LEFT JOIN image_stack_members AS m_st ON m_st.image_key = i.key "
         "LEFT JOIN image_stacks AS st ON st.stack_id = m_st.stack_id "
@@ -200,6 +205,7 @@ def query_catalog_images(
             "AND s.image_type = 'catalog' AND s.perspective_slug = ? AND s.is_current = 1 "
         )
         join_bindings.append(sp)
+    join_sql += CATALOG_BEST_SCORE_JOIN_SQL
     join_sql += (
         "LEFT JOIN image_stack_members AS m_st ON m_st.image_key = i.key "
         "LEFT JOIN image_stacks AS st ON st.stack_id = m_st.stack_id "
@@ -230,12 +236,9 @@ def query_catalog_images(
     select_cols = (
         "i.*, d.summary AS description_summary, "
         "d.best_perspective AS description_best_perspective, "
-        "d.perspectives AS description_perspectives_json"
-    )
-    if use_score_join:
-        select_cols += ", s.score AS catalog_perspective_score"
-    select_cols += (
-        ", st.stack_id AS stack_id, st.stack_size AS stack_member_count, "
+        "d.perspectives AS description_perspectives_json, "
+        f"{CATALOG_BEST_SCORE_SELECT_COLS}, "
+        "st.stack_id AS stack_id, st.stack_size AS stack_member_count, "
         "CASE WHEN st.stack_id IS NOT NULL AND i.key = st.representative_key "
         "THEN 1 ELSE 0 END AS is_stack_representative"
     )
@@ -285,12 +288,9 @@ def query_catalog_images_by_keys(
     select_cols = (
         "i.*, d.summary AS description_summary, "
         "d.best_perspective AS description_best_perspective, "
-        "d.perspectives AS description_perspectives_json"
-    )
-    if use_score_join:
-        select_cols += ", s.score AS catalog_perspective_score"
-    select_cols += (
-        ", st.stack_id AS stack_id, st.stack_size AS stack_member_count, "
+        "d.perspectives AS description_perspectives_json, "
+        f"{CATALOG_BEST_SCORE_SELECT_COLS}, "
+        "st.stack_id AS stack_id, st.stack_size AS stack_member_count, "
         "CASE WHEN st.stack_id IS NOT NULL AND i.key = st.representative_key "
         "THEN 1 ELSE 0 END AS is_stack_representative"
     )
@@ -306,6 +306,7 @@ def query_catalog_images_by_keys(
             "AND s.image_type = 'catalog' AND s.perspective_slug = ? AND s.is_current = 1 "
         )
         join_bindings.append(sp)
+    join_sql += CATALOG_BEST_SCORE_JOIN_SQL
     join_sql += (
         "LEFT JOIN image_stack_members AS m_st ON m_st.image_key = i.key "
         "LEFT JOIN image_stacks AS st ON st.stack_id = m_st.stack_id "

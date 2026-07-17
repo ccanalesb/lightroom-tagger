@@ -129,9 +129,9 @@ def test_detail_catalog_returns_identity_and_available_perspectives(detail_clien
     # Perspective slug list sorted and deduped.
     assert data["available_score_perspectives"] == sorted([s0, s1])
 
-    # No score_perspective passed → catalog-score fields null.
-    assert data["catalog_perspective_score"] is None
-    assert data["catalog_score_perspective"] is None
+    # Best current catalog score is always exposed from image_scores.
+    assert data["catalog_perspective_score"] == 8
+    assert data["catalog_score_perspective"] == s0
 
     # Solo image: stack columns match catalog list row shape (Phase 07 detail parity).
     assert data["stack_id"] is None
@@ -182,13 +182,15 @@ def test_detail_catalog_stack_fields_for_multi_member_stack(tmp_path, monkeypatc
 
 
 def test_detail_catalog_with_score_perspective_query(detail_client):
-    client, catalog_key, s0, _ = detail_client
+    client, catalog_key, s0, _s1 = detail_client
 
+    base = client.get(f"/api/images/catalog/{catalog_key}").get_json()
     resp = client.get(f"/api/images/catalog/{catalog_key}?score_perspective={s0}")
     assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["catalog_score_perspective"] == s0
-    assert data["catalog_perspective_score"] == 8
+    filtered = resp.get_json()
+    # Best score is independent of the score_perspective query param.
+    assert filtered["catalog_perspective_score"] == base["catalog_perspective_score"] == 8
+    assert filtered["catalog_score_perspective"] == base["catalog_score_perspective"] == s0
 
 
 def test_detail_instagram_has_empty_identity(detail_client):

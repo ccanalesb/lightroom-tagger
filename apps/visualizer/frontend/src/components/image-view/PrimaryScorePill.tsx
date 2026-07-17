@@ -1,5 +1,4 @@
 import type { ImageView } from '../../services/api'
-import { DESCRIPTION_PERSPECTIVE_LABELS } from '../DescriptionPanel/perspectiveLabels'
 import { ScorePill } from '../ui/badges'
 import { IDENTITY_LABEL_AGGREGATE } from '../../constants/strings'
 
@@ -7,8 +6,8 @@ import { IDENTITY_LABEL_AGGREGATE } from '../../constants/strings'
  * Source of the primary score pill (CONTEXT Q3):
  *   - `'identity'`: Identity aggregate (Top Photos, Best, Post-next, Unposted,
  *     Analytics non-posted). Pill labeled "Aggregate".
- *   - `'catalog'`: Catalog perspective score when available; falls back to the
- *     description best-perspective score. Used by the catalog browsing views.
+ *   - `'catalog'`: Max current perspective score from ``image_scores`` (list/detail API).
+ *     Used by the catalog browsing views.
  *   - `'none'`: Hide the primary score pill (Instagram tiles).
  */
 export type PrimaryScoreSource = 'identity' | 'catalog' | 'none'
@@ -32,29 +31,9 @@ export function PrimaryScorePill({ image, source }: PrimaryScorePillProps) {
     }
     case 'catalog': {
       const catalog = image.catalog_perspective_score
-      if (typeof catalog === 'number') {
-        const slug = image.catalog_score_perspective ?? undefined
-        return <ScorePill score={catalog} label={shortSlug(slug)} />
-      }
-      const best = image.description_best_perspective
-      const perspectives = image.description_perspectives
-      if (
-        best &&
-        perspectives &&
-        typeof perspectives === 'object' &&
-        best in perspectives
-      ) {
-        const p = (perspectives as Record<string, { score?: number } | undefined>)[best]
-        if (p && typeof p.score === 'number') {
-          return (
-            <ScorePill
-              score={p.score}
-              label={DESCRIPTION_PERSPECTIVE_LABELS[best] || best}
-            />
-          )
-        }
-      }
-      return null
+      if (typeof catalog !== 'number') return null
+      const slug = image.catalog_score_perspective ?? undefined
+      return <ScorePill score={catalog} label={shortSlug(slug)} />
     }
     case 'none':
       return null

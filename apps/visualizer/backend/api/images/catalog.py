@@ -29,6 +29,7 @@ from lightroom_tagger.core.database import (
     get_catalog_months as list_catalog_months,
     get_catalog_similarity_groups_paginated,
     get_current_scores_for_image,
+    get_best_current_catalog_score,
     get_image,
     get_image_description,
     get_similarity_candidates_for_group,
@@ -175,7 +176,7 @@ def _parse_clip_similar_catalog_params():
 
 def _rows_to_catalog_api_images(rows, score_perspective_arg: str | None) -> list[dict]:
     """Transform ``query_catalog_images`` rows to API image dicts (catalog list + NL search)."""
-    score_join_active = bool(score_perspective_arg)
+    del score_perspective_arg  # best-score fields are always computed in the list query
     images: list[dict] = []
     for row in rows:
         out = dict(row)
@@ -183,10 +184,12 @@ def _rows_to_catalog_api_images(rows, score_perspective_arg: str | None) -> list
         desc_best = out.pop("description_best_perspective", None)
         desc_perspectives_json = out.pop("description_perspectives_json", None)
 
-        if score_join_active:
-            cps = out.pop("catalog_perspective_score", None)
-            out["catalog_perspective_score"] = int(cps) if cps is not None else None
-            out["catalog_score_perspective"] = score_perspective_arg
+        cps = out.pop("catalog_perspective_score", None)
+        out["catalog_perspective_score"] = int(cps) if cps is not None else None
+        csp = out.pop("catalog_score_perspective", None)
+        out["catalog_score_perspective"] = (
+            str(csp) if cps is not None and csp is not None else None
+        )
 
         ai_analyzed = desc_summary is not None
         out["ai_analyzed"] = ai_analyzed
@@ -257,17 +260,9 @@ def _build_catalog_detail(db, image_key, score_perspective):
         out["identity_per_perspective"] = []
 
     score_rows = get_current_scores_for_image(db, image_key, "catalog")
-    if score_perspective:
-        match = next(
-            (r for r in score_rows if str(r.get("perspective_slug")) == score_perspective),
-            None,
-        )
-        out["catalog_perspective_score"] = int(match["score"]) if match else None
-        out["catalog_score_perspective"] = score_perspective
-    else:
-        out["catalog_perspective_score"] = None
-        out["catalog_score_perspective"] = None
-
+    best_score, best_slug = get_best_current_catalog_score(db, image_key)
+    out["catalog_perspective_score"] = best_score
+    out["catalog_score_perspective"] = best_slug
     out["available_score_perspectives"] = [str(r["perspective_slug"]) for r in score_rows]
 
     rid = out.get("id")
