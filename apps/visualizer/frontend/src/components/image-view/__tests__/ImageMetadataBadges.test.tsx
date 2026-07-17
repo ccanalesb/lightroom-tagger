@@ -78,9 +78,6 @@ describe('ImageMetadataBadges', () => {
       <ImageMetadataBadges
         image={baseImage({
           description_best_perspective: 'street',
-          description_perspectives: {
-            street: { analysis: '', score: 6 },
-          },
         })}
         primaryScoreSource="catalog"
       />,

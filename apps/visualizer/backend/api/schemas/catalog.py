@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+
 class IdentityPerPerspectiveScore(BaseModel):
     model_config = ConfigDict(extra='forbid')
 

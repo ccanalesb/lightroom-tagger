@@ -47,7 +47,6 @@ export function fromCatalogListRow(row: CatalogImageInput): ImageView {
     ai_analyzed: row.ai_analyzed,
     description_summary: row.description_summary,
     description_best_perspective: row.description_best_perspective,
-    description_perspectives: row.description_perspectives ?? null,
     catalog_perspective_score: row.catalog_perspective_score,
     catalog_score_perspective: row.catalog_score_perspective ?? null,
     stack_id: row.stack_id,

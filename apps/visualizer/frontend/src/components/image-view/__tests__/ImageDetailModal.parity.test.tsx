@@ -135,8 +135,12 @@ describe('ImageDetailModal — cross-entry parity', () => {
       description: { provider: null, model: null },
     } as unknown as Awaited<ReturnType<typeof ProvidersAPI.getDefaults>>)
     vi.spyOn(PerspectivesAPI, 'list').mockResolvedValue([])
-    vi.spyOn(ScoresAPI, 'getCurrent').mockResolvedValue({ current: [] })
-    vi.spyOn(ScoresAPI, 'getHistory').mockResolvedValue({ history: [] })
+    vi.spyOn(ScoresAPI, 'getCurrent').mockResolvedValue({
+      current: [],
+    } as unknown as Awaited<ReturnType<typeof ScoresAPI.getCurrent>>)
+    vi.spyOn(ScoresAPI, 'getHistory').mockResolvedValue({
+      history: [],
+    } as unknown as Awaited<ReturnType<typeof ScoresAPI.getHistory>>)
     vi.spyOn(DescriptionsAPI, 'get').mockResolvedValue({
       description: null,
     } as unknown as Awaited<ReturnType<typeof DescriptionsAPI.get>>)
