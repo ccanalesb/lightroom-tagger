@@ -78,7 +78,7 @@ def build_scoring_user_prompt(perspective_row: dict) -> str:
 
     Expects a ``perspectives``-shaped dict: ``slug``, ``display_name``, ``prompt_markdown``.
     The model must return **only** JSON matching :class:`~lightroom_tagger.core.structured_output.ScoreResponse`
-    (not the multi-perspective describe schema from :func:`build_description_user_prompt`).
+    (not the prose-only describe schema from :func:`build_description_user_prompt`).
     """
     slug = str(perspective_row["slug"])
     display_name = str(perspective_row["display_name"])
