@@ -49,7 +49,9 @@ export const usePageUiStore = create<PageUiState>((set, get) => ({
     })),
   clearFilterState: (key) =>
     set((prev) => {
-      const { [key]: _removed, ...rest } = prev.filterStates
+      if (!(key in prev.filterStates)) return prev
+      const rest = { ...prev.filterStates }
+      delete rest[key]
       return { filterStates: rest }
     }),
 }))
