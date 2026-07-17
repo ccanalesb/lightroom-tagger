@@ -17,9 +17,6 @@ describe('PrimaryScorePill', () => {
       <PrimaryScorePill
         image={baseImage({
           description_best_perspective: 'street',
-          description_perspectives: {
-            street: { analysis: '', score: 6 },
-          },
         })}
         source="catalog"
       />,

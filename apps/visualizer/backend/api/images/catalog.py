@@ -239,13 +239,10 @@ def _build_catalog_detail(db, image_key, score_perspective):
         out["ai_analyzed"] = True
         out["description_summary"] = desc_row.get("summary") or ""
         out["description_best_perspective"] = desc_row.get("best_perspective") or ""
-        persp = desc_row.get("perspectives")
-        out["description_perspectives"] = persp if isinstance(persp, dict) else {}
     else:
         out["ai_analyzed"] = False
         out["description_summary"] = None
         out["description_best_perspective"] = None
-        out["description_perspectives"] = None
 
     identity = compute_single_image_aggregate_scores(db, image_key)
     if identity is not None:

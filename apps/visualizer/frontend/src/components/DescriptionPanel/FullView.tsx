@@ -2,11 +2,9 @@ import type { ImageDescription, ImageDescriptionComposition, ImageDescriptionTec
 import {
   DESC_PANEL_SUMMARY,
   DESC_PANEL_COMPOSITION,
-  DESC_PANEL_PERSPECTIVES,
   DESC_PANEL_TECHNICAL,
   DESC_PANEL_SUBJECTS,
   DESC_PANEL_MODEL,
-  DESC_BEST_FIT,
   DESC_COMPOSITION_DEPTH,
   DESC_COMPOSITION_BALANCE,
   DESC_TECHNICAL_MOOD,
@@ -16,8 +14,6 @@ import {
 } from '../../constants/strings'
 import { Section } from '../shared/Section'
 import { underscoreToSpaces } from '../../utils/underscoreToSpaces'
-import { descriptionScoreColor } from '../../utils/scoreColorClasses'
-import { DESCRIPTION_PERSPECTIVE_LABELS } from './perspectiveLabels'
 
 interface FullViewProps {
   description: ImageDescription
@@ -25,7 +21,6 @@ interface FullViewProps {
 
 export function FullView({ description }: FullViewProps) {
   const composition = description.composition as ImageDescriptionComposition | undefined
-  const perspectives = description.perspectives
   const technical = description.technical as ImageDescriptionTechnical | undefined
   const { subjects } = description
 
@@ -34,28 +29,6 @@ export function FullView({ description }: FullViewProps) {
       {description.summary && (
         <Section title={DESC_PANEL_SUMMARY}>
           <p className="text-gray-700">{description.summary}</p>
-        </Section>
-      )}
-
-      {perspectives && Object.keys(perspectives).length > 0 && (
-        <Section title={DESC_PANEL_PERSPECTIVES}>
-          <div className="space-y-2">
-            {(Object.entries(perspectives) as [string, { analysis: string; score: number }][]).map(
-              ([key, val]) => (
-                <div key={key} className="flex gap-2">
-                  <div className="flex-shrink-0 w-20">
-                    <span className={`inline-block text-xs px-1.5 py-0.5 rounded font-medium ${descriptionScoreColor(val.score)}`}>
-                      {DESCRIPTION_PERSPECTIVE_LABELS[key] || key} {val.score}
-                    </span>
-                    {description.best_perspective === key && (
-                      <span className="block text-[10px] text-gray-400 mt-0.5">{DESC_BEST_FIT}</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-600 flex-1">{val.analysis}</p>
-                </div>
-              ),
-            )}
-          </div>
         </Section>
       )}
 
