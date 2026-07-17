@@ -103,23 +103,22 @@ def _run_score_persist(
         silent_compression=silent_compression,
     )
 
-    reject_reason: dict[str, str] = {}
-
     def accept_result(parsed_bundle: tuple) -> bool:
         parsed, _repaired = parsed_bundle
         got_slug = _normalize_perspective_slug(parsed.perspective_slug)
-        if got_slug != perspective_slug.strip():
-            if log_callback:
-                log_callback(
-                    "warning",
-                    f"Slug mismatch: model returned {parsed.perspective_slug!r}, "
-                    f"normalized to {got_slug!r}, expected {perspective_slug!r} — skipping",
-                )
-            reject_reason["msg"] = (
-                f"Model returned perspective_slug {parsed.perspective_slug!r}; "
-                f"expected {perspective_slug!r}"
+        # This call scored exactly one perspective (perspective_slug), and the
+        # score is always persisted under it below. The model's echoed slug is
+        # only a sanity check; some models won't reproduce it verbatim when a
+        # perspective's display_name diverges from its slug. Persist the score
+        # under the requested perspective rather than discarding valid work —
+        # just log the discrepancy for observability.
+        if got_slug != perspective_slug.strip() and log_callback:
+            log_callback(
+                "warning",
+                f"Slug mismatch: model returned {parsed.perspective_slug!r}, "
+                f"normalized to {got_slug!r}, expected {perspective_slug!r} — "
+                f"persisting under {perspective_slug!r}",
             )
-            return False
         return True
 
     def persist(parsed_bundle: tuple, provider: str, model_used: str) -> None:
@@ -157,8 +156,6 @@ def _run_score_persist(
         persist=persist,
     )
     if outcome.status == "failed" and outcome.reason == "invalid result":
-        if "msg" in reject_reason:
-            return VisionOpOutcome(status="failed", reason=reject_reason["msg"])
         return VisionOpOutcome(
             status="failed",
             reason="model returned empty or invalid score response",

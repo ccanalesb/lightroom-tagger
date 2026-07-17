@@ -335,7 +335,15 @@ def test_score_image_skips_video_without_calling_provider(tmp_path) -> None:
     assert rows == []
 
 
-def test_score_image_fails_with_specific_reason_on_slug_mismatch(tmp_path) -> None:
+def test_score_image_persists_under_requested_slug_on_slug_mismatch(tmp_path) -> None:
+    """A model that echoes a non-matching perspective_slug must not lose the score.
+
+    The call scores exactly one perspective (``expected_slug``) and always persists
+    under it; the echoed slug is only a sanity check. Regression guard for the
+    scoring job silently discarding every score for a perspective whose
+    display_name diverges from its slug (e.g. intensity-suggestion /
+    "Interpretive & Human Charge").
+    """
     conn = init_database(str(tmp_path / "library.db"))
     insert_perspective(
         conn,
@@ -360,6 +368,8 @@ def test_score_image_fails_with_specific_reason_on_slug_mismatch(tmp_path) -> No
     mock_dispatcher = MagicMock()
     mock_dispatcher.call_with_fallback.return_value = (raw_json, "ollama", "vision-model")
 
+    logs: list[tuple[str, str]] = []
+
     with ExitStack() as stack:
         for p in _scoring_patches(mock_registry=mock_registry, mock_dispatcher=mock_dispatcher):
             stack.enter_context(p)
@@ -371,14 +381,22 @@ def test_score_image_fails_with_specific_reason_on_slug_mismatch(tmp_path) -> No
             force=True,
             provider_id="ollama",
             model="vision-model",
-            log_callback=None,
+            log_callback=lambda level, msg: logs.append((level, msg)),
         )
 
-    assert outcome.status == "failed"
-    assert outcome.wrote is False
-    assert "wrong_slug" in (outcome.reason or "")
-    assert "expected_slug" in (outcome.reason or "")
-    assert get_current_scores_for_image(conn, "2020-01-01_slug.jpg", "catalog") == []
+    # The score is kept, persisted under the requested perspective.
+    assert outcome.reason is None
+    assert outcome.wrote is True
+    rows = get_current_scores_for_image(conn, "2020-01-01_slug.jpg", "catalog")
+    assert len(rows) == 1
+    assert rows[0]["perspective_slug"] == "expected_slug"
+    assert rows[0]["score"] == 6
+    assert rows[0]["is_current"] == 1
+    # The discrepancy is still surfaced as a warning for observability.
+    assert any(
+        level == "warning" and "wrong_slug" in msg and "expected_slug" in msg
+        for level, msg in logs
+    )
 
 
 def test_score_image_fails_on_generic_invalid_model_response(tmp_path) -> None:
