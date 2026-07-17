@@ -429,3 +429,76 @@ def test_score_read_helpers(tmp_path) -> None:
     assert get_available_score_perspectives_for_image(conn, "missing") == []
     assert get_all_current_perspective_slugs(init_database(str(tmp_path / "e.db"))) == []
     conn.close()
+
+
+def test_query_catalog_images_best_score_from_image_scores(tmp_path) -> None:
+    from lightroom_tagger.core.database import get_best_current_catalog_score
+    from lightroom_tagger.core.database.scores import LEGACY_DESCRIPTION_PROMPT_VERSION
+
+    conn = init_database(str(tmp_path / "library.db"))
+    conn.execute(
+        """
+        INSERT INTO perspectives (slug, display_name, description, prompt_markdown)
+        VALUES ('alpha_best', 'Alpha', '', ''), ('zulu_best', 'Zulu', '', '')
+        """
+    )
+    conn.commit()
+
+    multi_key = store_image(
+        conn,
+        {"date_taken": "2024-01-01", "filename": "multi.jpg", "rating": 3, "id": "m1"},
+    )
+    legacy_key = store_image(
+        conn,
+        {"date_taken": "2024-02-01", "filename": "legacy.jpg", "rating": 3, "id": "m2"},
+    )
+    ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    for slug, score in (("alpha_best", 7), ("zulu_best", 9)):
+        insert_image_score(
+            conn,
+            {
+                "image_key": multi_key,
+                "image_type": "catalog",
+                "perspective_slug": slug,
+                "score": score,
+                "prompt_version": "v1",
+                "scored_at": ts,
+                "is_current": 1,
+            },
+        )
+    insert_image_score(
+        conn,
+        {
+            "image_key": legacy_key,
+            "image_type": "catalog",
+            "perspective_slug": "alpha_best",
+            "score": 6,
+            "prompt_version": LEGACY_DESCRIPTION_PROMPT_VERSION,
+            "scored_at": ts,
+            "is_current": 1,
+        },
+    )
+    conn.commit()
+
+    assert get_best_current_catalog_score(conn, multi_key) == (9, "zulu_best")
+    assert get_best_current_catalog_score(conn, legacy_key) == (6, "alpha_best")
+
+    rows_plain, _ = query_catalog_images(conn, limit=50, offset=0)
+    by_key = {r["key"]: r for r in rows_plain}
+    assert by_key[multi_key]["catalog_perspective_score"] == 9
+    assert by_key[multi_key]["catalog_score_perspective"] == "zulu_best"
+    assert by_key[legacy_key]["catalog_perspective_score"] == 6
+    assert by_key[legacy_key]["catalog_score_perspective"] == "alpha_best"
+
+    rows_filtered, _ = query_catalog_images(
+        conn,
+        score_perspective="alpha_best",
+        limit=50,
+        offset=0,
+    )
+    by_key_filtered = {r["key"]: r for r in rows_filtered}
+    assert by_key_filtered[multi_key]["catalog_perspective_score"] == 9
+    assert by_key_filtered[multi_key]["catalog_score_perspective"] == "zulu_best"
+    assert by_key_filtered[legacy_key]["catalog_perspective_score"] == 6
+    assert by_key_filtered[legacy_key]["catalog_score_perspective"] == "alpha_best"
+    conn.close()

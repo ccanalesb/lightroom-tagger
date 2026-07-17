@@ -10,6 +10,7 @@ import threading
 import time
 from datetime import datetime
 
+from lightroom_tagger.core.database.catalog_query_best_score import get_best_current_catalog_score
 from lightroom_tagger.core.database.catalog_query import (
     _append_query_catalog_image_filters,
     _non_empty_str_list_for_json_array_filter,

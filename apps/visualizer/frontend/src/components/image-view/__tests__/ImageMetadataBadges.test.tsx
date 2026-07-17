@@ -73,8 +73,8 @@ describe('ImageMetadataBadges', () => {
     expect(screen.getByLabelText('street score 8')).toBeInTheDocument()
   })
 
-  it('catalog source falls back to description best-perspective score', () => {
-    render(
+  it('catalog source does not fall back to description best-perspective score', () => {
+    const { container } = render(
       <ImageMetadataBadges
         image={baseImage({
           description_best_perspective: 'street',
@@ -85,7 +85,8 @@ describe('ImageMetadataBadges', () => {
         primaryScoreSource="catalog"
       />,
     )
-    expect(screen.getByLabelText(/score 6$/)).toBeInTheDocument()
+    expect(container.querySelector('[aria-label^="street score"]')).toBeNull()
+    expect(container.querySelector('[aria-label$="score 6"]')).toBeNull()
   })
 
   it('Instagram tile (source=none) shows no primary score pill', () => {
