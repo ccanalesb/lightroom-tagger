@@ -12,7 +12,7 @@ from pathlib import Path
 import sqlite_vec
 
 from . import library_bootstrap_schema
-from .scores import markdown_marks_optional
+from .scores import markdown_marks_optional, migrate_legacy_description_scores_to_image_scores
 from .db_init_migrations import (
     _backfill_matched_catalog_key_from_validated_matches,
     _library_db_file_path,
@@ -210,6 +210,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
     _migrate_image_descriptions_fts(conn)
     _migrate_image_text_embeddings_vec0(conn)
     _migrate_image_clip_embeddings_vec0(conn)
+    migrate_legacy_description_scores_to_image_scores(conn)
     # Stack members reference `images` by key at insert time; `images` is created above.
     _migrate_image_stacks(conn)
     _migrate_catalog_similarity(conn)

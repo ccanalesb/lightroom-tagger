@@ -56,7 +56,7 @@ class TestDatabaseDbInit(unittest.TestCase):
         self.assertIn("vec0", clip_sql)
         self.assertIn("float[512]", clip_sql)
         uv = self.db.execute("PRAGMA user_version").fetchone()
-        self.assertEqual(int(uv["user_version"]), 5)
+        self.assertEqual(int(uv["user_version"]), 6)
 
     def test_migrate_unified_image_keys_rewrites_legacy_key(self):
         """Legacy full-datetime composite keys remap to YYYY-MM-DD_filename."""
