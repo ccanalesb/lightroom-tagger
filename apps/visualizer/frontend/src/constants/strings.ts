@@ -52,6 +52,8 @@ export const DATE_ESTIMATED_SUFFIX = '(est.)'
 // Image details
 export const IMAGE_DETAILS_TITLE = 'Image Details'
 export const IMAGE_DETAILS_AI_DESCRIPTION = 'AI Description'
+export const IMAGE_DETAILS_DESCRIPTIVE_TECHNICAL = 'Descriptive & technical'
+export const IMAGE_DETAILS_PERSPECTIVE_ANALYSIS = 'Perspective analysis'
 
 // Catalog image modal — critique scores (phase 06-03)
 export const SECTION_IMAGE_SCORES = 'Critique scores'

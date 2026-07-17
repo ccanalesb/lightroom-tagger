@@ -6,9 +6,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from api.schemas.perspectives import PerspectiveScore
-
-
 class IdentityPerPerspectiveScore(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
@@ -162,7 +159,6 @@ class ImageView(BaseModel):
     ai_analyzed: bool | None = None
     description_summary: str | None = None
     description_best_perspective: str | None = None
-    description_perspectives: dict[str, PerspectiveScore | Any] | None = None
     catalog_perspective_score: int | None = None
     catalog_score_perspective: str | None = None
     available_score_perspectives: list[str] | None = None

@@ -119,6 +119,7 @@ def test_detail_catalog_returns_identity_and_available_perspectives(detail_clien
     assert data["ai_analyzed"] is True
     assert data["description_summary"] == "probe-summary"
     assert data["description_best_perspective"] == "street"
+    assert "description_perspectives" not in data
 
     # Identity aggregate: equal-weight mean of [8, 6] = 7.0.
     assert data["identity_aggregate_score"] == pytest.approx(7.0)

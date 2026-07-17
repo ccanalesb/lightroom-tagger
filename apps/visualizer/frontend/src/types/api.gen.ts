@@ -1946,13 +1946,6 @@ export interface components {
              */
             description_best_perspective: string | null;
             /**
-             * Description Perspectives
-             * @default null
-             */
-            description_perspectives: {
-                [key: string]: components["schemas"]["ImageView.573ec44.PerspectiveScore"] | unknown;
-            } | null;
-            /**
              * Catalog Perspective Score
              * @default null
              */
@@ -4225,16 +4218,6 @@ export interface components {
             scored_at: string;
             /** Rationale Preview */
             rationale_preview: string;
-        };
-        /**
-         * PerspectiveScore
-         * @description Nested perspective line item in image descriptions.
-         */
-        "ImageView.573ec44.PerspectiveScore": {
-            /** Analysis */
-            analysis: string;
-            /** Score */
-            score: number;
         };
         /** InstagramExifData */
         "InstagramListResponse.2d55088.InstagramExifData": {

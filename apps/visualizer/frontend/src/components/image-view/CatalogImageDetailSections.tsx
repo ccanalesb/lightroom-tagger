@@ -1,9 +1,11 @@
 import type { ImageView } from '../../services/api'
 import { AIDescriptionSection } from '../DescriptionPanel'
+import { AIPerspectiveSection } from '../catalog/AIPerspectiveSection'
 import { Badge } from '../ui/badges'
 import { MetadataRow } from '../ui/MetadataRow'
 import {
   DATE_NO_DATE,
+  IMAGE_DETAILS_DESCRIPTIVE_TECHNICAL,
   LABEL_CAPTION,
   LABEL_DATE,
   LABEL_DIMENSIONS,
@@ -22,10 +24,8 @@ interface CatalogImageDetailSectionsProps {
 
 /**
  * Catalog-specific body sections for the consolidated ImageDetailModal.
- * Per-perspective scoring lives inside the AI description (see
- * `AIDescriptionSection` → `DescriptionPanel` → perspectives). The
- * legacy standalone critique-scores panel was removed to avoid
- * duplicate per-perspective data in the modal.
+ * Descriptive/technical content comes from `image_descriptions`; per-perspective
+ * scores come from `image_scores` in a separate section with its own regenerate control.
  */
 export function CatalogImageDetailSections({
   image,
@@ -69,6 +69,12 @@ export function CatalogImageDetailSections({
       ) : null}
 
       <AIDescriptionSection
+        imageKey={image.key}
+        imageType="catalog"
+        titleOverride={IMAGE_DETAILS_DESCRIPTIVE_TECHNICAL}
+        onDataChanged={onDataChanged}
+      />
+      <AIPerspectiveSection
         imageKey={image.key}
         imageType="catalog"
         onDataChanged={onDataChanged}
