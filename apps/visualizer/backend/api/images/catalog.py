@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import re
 from collections.abc import Sequence
 from typing import Any
 
@@ -11,6 +10,7 @@ from flask import Blueprint, jsonify, request, send_file
 from spectree import Response
 from utils.db import with_db
 from utils.responses import error_bad_request, error_not_found, error_server_error
+from utils.score_perspective import validate_score_perspective_exists
 
 from api.openapi import spec
 from api.schemas.catalog import (
@@ -43,8 +43,6 @@ from .common import _catalog_thumbnail_roots, _clamp_pagination, _is_path_under_
 
 catalog_bp = Blueprint("images_catalog", __name__)
 
-_CATALOG_SCORE_PERSPECTIVE_SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
-
 _DETAIL_IMAGE_TYPES = ("catalog", "instagram")
 
 
@@ -65,7 +63,7 @@ def _query_catalog_rows_for_stack_member_keys(
     )
 
 
-def _parse_clip_similar_catalog_params():
+def _parse_clip_similar_catalog_params(db):
     """Parse query params for GET /catalog/.../similar."""
     posted_raw = request.args.get("posted")
     if posted_raw == "true":
@@ -97,9 +95,10 @@ def _parse_clip_similar_catalog_params():
         description_search_raw.strip() if description_search_raw is not None else None
     )
 
-    score_perspective = (request.args.get("score_perspective") or "").strip()
-    if score_perspective and not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(score_perspective):
-        return error_bad_request("invalid score_perspective slug"), None
+    score_perspective_raw = (request.args.get("score_perspective") or "").strip()
+    score_perspective, sp_err = validate_score_perspective_exists(db, score_perspective_raw or None)
+    if sp_err:
+        return error_bad_request(sp_err), None
 
     sort_raw = (request.args.get("sort_by_score") or "").strip().lower()
     if sort_raw:
@@ -149,7 +148,7 @@ def _parse_clip_similar_catalog_params():
         request.args.get("offset", 0, type=int),
     )
 
-    score_perspective_arg = score_perspective or None
+    score_perspective_arg = score_perspective
     clip_filter_kwargs: dict[str, Any] = {
         "posted": posted_filter,
         "month": month,
@@ -363,8 +362,11 @@ def list_catalog_images(db):
         )
 
         score_perspective = (request.args.get("score_perspective") or "").strip()
-        if score_perspective and not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(score_perspective):
-            return error_bad_request("invalid score_perspective slug")
+        score_perspective_arg, sp_err = validate_score_perspective_exists(
+            db, score_perspective or None
+        )
+        if sp_err:
+            return error_bad_request(sp_err)
 
         sort_raw = (request.args.get("sort_by_score") or "").strip().lower()
         sort_by_score = None
@@ -373,7 +375,7 @@ def list_catalog_images(db):
                 return error_bad_request("sort_by_score must be asc or desc")
             sort_by_score = sort_raw
 
-        if sort_by_score and not score_perspective:
+        if sort_by_score and not score_perspective_arg:
             return error_bad_request("sort_by_score requires score_perspective")
 
         sort_date_raw = (request.args.get("sort_by_date") or "").strip().lower()
@@ -396,7 +398,7 @@ def list_catalog_images(db):
                 if min_score < 1 or min_score > 10:
                     return error_bad_request("min_score must be between 1 and 10")
 
-        if min_score is not None and not score_perspective:
+        if min_score is not None and not score_perspective_arg:
             return error_bad_request("min_score requires score_perspective")
 
         limit, offset = _clamp_pagination(
@@ -404,7 +406,6 @@ def list_catalog_images(db):
             request.args.get("offset", 0, type=int),
         )
 
-        score_perspective_arg = score_perspective or None
         try:
             rows, total = query_catalog_images(
                 db,
@@ -451,7 +452,7 @@ def get_catalog_image_similar(db, image_key: str):
         if get_image(db, image_key) is None:
             return error_not_found("image")
 
-        err, parsed = _parse_clip_similar_catalog_params()
+        err, parsed = _parse_clip_similar_catalog_params(db)
         if err is not None:
             return err
         assert parsed is not None
@@ -566,12 +567,15 @@ def list_catalog_similarity_groups(db):
 )
 def get_catalog_image_detail(db, image_key):
     """Single catalog image detail for the consolidated image-view modal."""
-    score_perspective = (request.args.get("score_perspective") or "").strip()
-    if score_perspective and not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(score_perspective):
-        return error_bad_request("invalid score_perspective slug")
+    score_perspective_raw = (request.args.get("score_perspective") or "").strip()
+    score_perspective_arg, sp_err = validate_score_perspective_exists(
+        db, score_perspective_raw or None
+    )
+    if sp_err:
+        return error_bad_request(sp_err)
 
     try:
-        payload, not_found = _build_catalog_detail(db, image_key, score_perspective or None)
+        payload, not_found = _build_catalog_detail(db, image_key, score_perspective_arg)
         if not_found:
             return error_not_found("image")
         return jsonify(payload)
@@ -582,7 +586,6 @@ def get_catalog_image_detail(db, image_key):
 __all__ = (
     "catalog_bp",
     "_DETAIL_IMAGE_TYPES",
-    "_CATALOG_SCORE_PERSPECTIVE_SLUG_RE",
     "_clip_similarity_why_matched_line",
     "_parse_clip_similar_catalog_params",
     "_query_catalog_rows_for_stack_member_keys",

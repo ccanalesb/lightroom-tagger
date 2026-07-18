@@ -238,5 +238,13 @@ def test_detail_400_for_instagram_score_perspective(detail_client):
 
 def test_detail_400_for_invalid_score_perspective_slug(detail_client):
     client, catalog_key, *_ = detail_client
-    resp = client.get(f"/api/images/catalog/{catalog_key}?score_perspective=BAD SLUG")
+    resp = client.get(f"/api/images/catalog/{catalog_key}?score_perspective=no-such-perspective")
     assert resp.status_code == 400
+    assert resp.get_json()["error"] == "unknown perspective 'no-such-perspective'"
+
+
+def test_detail_hyphenated_score_perspective_200(detail_client):
+    client, catalog_key, _s0, _s1 = detail_client
+    hyphen_slug = "environmental-context-legibility"
+    resp = client.get(f"/api/images/catalog/{catalog_key}?score_perspective={hyphen_slug}")
+    assert resp.status_code == 200

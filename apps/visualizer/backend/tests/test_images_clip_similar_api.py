@@ -120,6 +120,24 @@ def test_clip_similar_success_includes_meta_and_similarity(clip_similar_client) 
     assert "Visual match (" in im["why_matched"]
 
 
+def test_clip_similar_hyphenated_score_perspective_200(clip_similar_client) -> None:
+    client, k_seed, _k_nb = clip_similar_client
+    hyphen_slug = "environmental-context-legibility"
+    r = client.get(
+        f"/api/images/catalog/{k_seed}/similar?score_perspective={hyphen_slug}&limit=10"
+    )
+    assert r.status_code == 200
+
+
+def test_clip_similar_unknown_score_perspective_400(clip_similar_client) -> None:
+    client, k_seed, _k_nb = clip_similar_client
+    r = client.get(
+        f"/api/images/catalog/{k_seed}/similar?score_perspective=no-such-perspective-slug"
+    )
+    assert r.status_code == 400
+    assert r.get_json()["error"] == "unknown perspective 'no-such-perspective-slug'"
+
+
 def test_catalog_similarity_groups_endpoint_returns_persisted_groups(tmp_path, monkeypatch) -> None:
     db_path = str(tmp_path / "library.db")
     conn = init_database(db_path)

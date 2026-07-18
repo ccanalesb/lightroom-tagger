@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, request
 from spectree import Response
 from utils.db import with_db
 from utils.responses import error_bad_request, error_server_error
+from utils.score_perspective import validate_score_perspective_exists
 
 from api.openapi import spec
 from api.schemas.jobs import ErrorBody
@@ -22,7 +23,6 @@ from api.schemas.search import (
 from lightroom_tagger.core.catalog_search import CatalogSearchInputError, search_catalog
 
 from .catalog import (
-    _CATALOG_SCORE_PERSPECTIVE_SLUG_RE,
     _rows_to_catalog_api_images,
 )
 from .common import _clamp_pagination
@@ -56,15 +56,16 @@ def _catalog_rows_with_signals(
     return images
 
 
-def _parse_score_perspective_body(body: dict[str, Any]) -> str | None | tuple:
-    """Return slug or ``error_bad_request`` response tuple when invalid."""
+def _parse_score_perspective_body(db, body: dict[str, Any]) -> str | None | tuple:
+    """Return slug or ``error_bad_request`` response tuple when unknown."""
     if "score_perspective" not in body or body.get("score_perspective") is None:
         return None
-    sp = str(body.get("score_perspective") or "").strip()
-    if not sp:
+    sp_raw = str(body.get("score_perspective") or "").strip()
+    if not sp_raw:
         return None
-    if not _CATALOG_SCORE_PERSPECTIVE_SLUG_RE.match(sp):
-        return error_bad_request("invalid score_perspective slug")
+    sp, err = validate_score_perspective_exists(db, sp_raw)
+    if err:
+        return error_bad_request(err)
     return sp
 
 
@@ -129,7 +130,7 @@ def semantic_search_images(db):
 
         limit, offset = _clamp_pagination(body.get("limit", 50), body.get("offset", 0))
 
-        score_perspective_arg = _parse_score_perspective_body(body)
+        score_perspective_arg = _parse_score_perspective_body(db, body)
         if isinstance(score_perspective_arg, tuple):
             return score_perspective_arg
 
@@ -200,7 +201,7 @@ def chat_search_images(db):
 
         limit, offset = _clamp_pagination(body.get("limit", 50), body.get("offset", 0))
 
-        score_perspective_arg = _parse_score_perspective_body(body)
+        score_perspective_arg = _parse_score_perspective_body(db, body)
         if isinstance(score_perspective_arg, tuple):
             return score_perspective_arg
 

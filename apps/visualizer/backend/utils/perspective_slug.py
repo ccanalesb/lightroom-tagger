@@ -2,4 +2,4 @@
 
 import re
 
-PERSPECTIVE_SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+PERSPECTIVE_SLUG_RE = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")

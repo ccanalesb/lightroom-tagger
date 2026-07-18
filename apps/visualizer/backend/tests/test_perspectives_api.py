@@ -89,6 +89,21 @@ def test_create_derives_optional_from_markdown_marker(client):
     assert resp.get_json()["optional"] is True
 
 
+def test_create_hyphenated_slug(client):
+    body = {
+        "slug": "fresh-kebab-case-slug",
+        "display_name": "Fresh Kebab",
+        "prompt_markdown": "# Env\nEvaluate.",
+    }
+    resp = client.post(
+        "/api/perspectives/",
+        data=json.dumps(body),
+        content_type="application/json",
+    )
+    assert resp.status_code == 201
+    assert resp.get_json()["slug"] == "fresh-kebab-case-slug"
+
+
 def test_edit_markdown_marker_flips_optional(client):
     # Adding the marker via an edit flips optional on...
     put = client.put(

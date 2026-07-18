@@ -103,3 +103,35 @@ def test_catalog_score_perspective_sort_desc_matches_db(catalog_score_ordered_cl
     assert data["images"][0]["catalog_perspective_score"] == 9
     assert data["images"][0]["catalog_score_perspective"] == slug
     assert data["images"][1]["catalog_perspective_score"] == 2
+
+
+def test_catalog_hyphenated_score_perspective_200(catalog_score_ordered_client):
+    client, _slug, key_hi, _key_lo = catalog_score_ordered_client
+    import utils.db as db_mod
+    from lightroom_tagger.core.database import init_database
+
+    conn = init_database(db_mod.LIBRARY_DB)
+    hyphen_slug = "environmental-context-legibility"
+    conn.execute(
+        """
+        INSERT INTO image_scores (
+            image_key, image_type, perspective_slug, score, prompt_version, scored_at, is_current
+        ) VALUES (?, 'catalog', ?, 8, 'v1', '2024-01-01T00:00:00+00:00', 1)
+        """,
+        (key_hi, hyphen_slug),
+    )
+    conn.commit()
+    conn.close()
+
+    resp = client.get(
+        f"/api/images/catalog?score_perspective={hyphen_slug}&sort_by_score=desc&limit=50"
+    )
+    assert resp.status_code == 200
+
+
+def test_catalog_unknown_score_perspective_400(empty_catalog_client):
+    resp = empty_catalog_client.get(
+        "/api/images/catalog?score_perspective=no-such-perspective-slug"
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "unknown perspective 'no-such-perspective-slug'"

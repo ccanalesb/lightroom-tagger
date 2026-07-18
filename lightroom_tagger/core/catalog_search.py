@@ -34,6 +34,7 @@ from lightroom_tagger.core.database import (
 from lightroom_tagger.core.embedding_service import embed_query_to_vec_blob
 from lightroom_tagger.core.exceptions import ModelUnavailableError
 from lightroom_tagger.core.provider_registry import ProviderRegistry
+from lightroom_tagger.core.score_perspective import validate_score_perspective_exists
 from lightroom_tagger.core.search_tools import extract_images_from_tool_messages
 from lightroom_tagger.core.semantic_search import run_semantic_hybrid_search
 from lightroom_tagger.core.structured_output import StructuredOutputError
@@ -224,6 +225,10 @@ def _run_nl_filter_query(
     restrict_to_keys: frozenset[str] | None = None,
 ) -> SearchResult:
     qkwargs = catalog_nl_filter_to_query_kwargs(filters)
+    if filters.score_perspective is not None:
+        _, sp_err = validate_score_perspective_exists(db, filters.score_perspective)
+        if sp_err:
+            raise CatalogSearchInputError(sp_err)
     qkwargs["limit"] = limit
     qkwargs["offset"] = offset
     if restrict_to_keys is not None:
@@ -309,6 +314,10 @@ def search_catalog(
     Single front door for catalog search (ADR-0015). Returns detached core rows
     and per-row signals via :class:`SearchResult` — never live ``sqlite3.Row``.
     """
+    score_perspective_arg, sp_err = validate_score_perspective_exists(db, score_perspective)
+    if sp_err:
+        raise CatalogSearchInputError(sp_err)
+
     restrict_to_keys, pin_meta = _resolve_pin_context(db, pin_key)
 
     if mode == "semantic":
@@ -316,7 +325,7 @@ def search_catalog(
             _run_semantic_search(
                 db,
                 message,
-                score_perspective=score_perspective,
+                score_perspective=score_perspective_arg,
                 limit=limit,
                 offset=offset,
                 restrict_to_keys=restrict_to_keys,
@@ -352,7 +361,7 @@ def search_catalog(
                     turns,
                     provider_id=provider_id,
                     model=model,
-                    score_perspective=score_perspective,
+                    score_perspective=score_perspective_arg,
                     restrict_to_keys=restrict_to_keys,
                 ),
                 pin_meta,
@@ -369,7 +378,7 @@ def search_catalog(
             result = _run_semantic_search(
                 db,
                 message,
-                score_perspective=score_perspective,
+                score_perspective=score_perspective_arg,
                 limit=limit,
                 offset=offset,
                 restrict_to_keys=restrict_to_keys,
