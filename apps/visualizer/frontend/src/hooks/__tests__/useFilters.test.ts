@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useFilters } from '../useFilters'
 import type { FilterSchema } from '../../components/filters/types'
+import { usePageUiStore } from '../../stores/pageUiStore'
 
 /** Exercises the framework-default toggle codec (no serialize/deserialize). */
 const minimalSchema: FilterSchema = [
@@ -69,6 +70,14 @@ const minimalSchema: FilterSchema = [
 ]
 
 describe('useFilters', () => {
+  beforeEach(() => {
+    usePageUiStore.setState({
+      imagesTab: 'instagram',
+      processingTab: 'matching',
+      filterStates: {},
+    })
+  })
+
   it('activeCount baseline is 0 with default schema values', () => {
     const { result } = renderHook(() => useFilters(minimalSchema))
     expect(result.current.activeCount).toBe(0)
@@ -146,6 +155,23 @@ describe('useFilters', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('persists filter state in memory when persistKey is set', () => {
+    const { result, unmount } = renderHook(() =>
+      useFilters(minimalSchema, { persistKey: 'test.filters' }),
+    )
+    act(() => {
+      result.current.setValue('posted', true)
+    })
+    expect(result.current.toQueryParams().posted).toBe(true)
+    unmount()
+
+    const { result: restored } = renderHook(() =>
+      useFilters(minimalSchema, { persistKey: 'test.filters' }),
+    )
+    expect(restored.current.toQueryParams().posted).toBe(true)
+    expect(restored.current.isActive('posted')).toBe(true)
   })
 })
 

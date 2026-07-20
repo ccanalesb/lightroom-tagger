@@ -1,11 +1,13 @@
-import { Suspense, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Suspense, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Tabs, Tab } from '../components/ui/Tabs';
 import { InstagramTab } from '../components/images/InstagramTab';
 import { CatalogTab } from '../components/images/CatalogTab';
 import { MatchesTab } from '../components/images/MatchesTab';
 import { SkeletonGrid } from '../components/ui/page-states';
 import { ErrorBoundary, ErrorState, invalidateAll } from '../data';
+import { usePageTab } from '../hooks/usePageTab';
+import { IMAGES_TAB_IDS, usePageUiStore } from '../stores/pageUiStore';
 import {
   IMAGES_OPEN_POSTING_ANALYTICS,
   TAB_INSTAGRAM,
@@ -13,23 +15,18 @@ import {
   TAB_MATCHES,
 } from '../constants/strings';
 
-const IMAGES_TAB_IDS = ['instagram', 'catalog', 'matches'] as const;
-type ImagesTabId = (typeof IMAGES_TAB_IDS)[number];
-
-function tabIdFromSearch(search: string): ImagesTabId {
-  const tab = new URLSearchParams(search).get('tab');
-  if (tab && IMAGES_TAB_IDS.includes(tab as ImagesTabId)) {
-    return tab as ImagesTabId;
-  }
-  return 'instagram';
-}
-
 const tabSuspenseFallback = <SkeletonGrid count={12} />;
 
 export function ImagesPage() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const activeTab = useMemo(() => tabIdFromSearch(location.search), [location.search]);
+  const imagesTab = usePageUiStore((s) => s.imagesTab);
+  const setImagesTab = usePageUiStore((s) => s.setImagesTab);
+  const { activeTab, handleTabChange } = usePageTab({
+    pagePath: '/images',
+    tabIds: IMAGES_TAB_IDS,
+    defaultTab: 'instagram',
+    storedTab: imagesTab,
+    setStoredTab: setImagesTab,
+  });
   const [catalogPostedFilter, setCatalogPostedFilter] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
@@ -37,15 +34,6 @@ export function ImagesPage() {
       setCatalogPostedFilter(undefined);
     }
   }, [activeTab]);
-
-  const handleTabChange = (id: string) => {
-    if (!IMAGES_TAB_IDS.includes(id as ImagesTabId)) return;
-    const next = id as ImagesTabId;
-    navigate(
-      { pathname: '/images', search: next === 'instagram' ? '' : `?tab=${next}` },
-      { replace: true },
-    );
-  };
 
   const tabs: Tab[] = [
     {
