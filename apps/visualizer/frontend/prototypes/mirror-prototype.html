@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PROTOTYPE — Mirror UI (#203)</title>
+<style>
+  :root {
+    --bg: #0f1115; --surface: #171a21; --surface-2: #1e222b;
+    --border: #2a2f3a; --text: #e8eaed; --text-2: #a5abb6; --text-3: #6f7684;
+    --accent: #7cc4ff; --accent-2: #2b6ea3; --warn: #f2c14e;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .proto-banner { background: repeating-linear-gradient(45deg,#3a2b00,#3a2b00 12px,#2e2200 12px,#2e2200 24px);
+    color: var(--warn); font-size: 12px; padding: 6px 16px; letter-spacing: .04em; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 32px 24px 120px; }
+  .page-head { margin-bottom: 8px; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
+  .page-title { margin: 0 0 4px; font-size: 26px; font-weight: 650; }
+  .page-sub { margin: 0 0 32px; color: var(--text-2); max-width: 62ch; }
+  .tech { margin: 0 0 40px; }
+  .tech-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .tech-name { font-size: 21px; font-weight: 640; }
+  .stat { position: relative; cursor: help; color: var(--accent); font-weight: 600;
+    border-bottom: 1px dotted var(--accent-2); }
+  .stat.flat { color: var(--text-2); border-bottom-color: var(--border); }
+  .stat .tip { position: absolute; left: 0; top: 150%; white-space: nowrap; background: #000;
+    border: 1px solid var(--border); border-radius: 8px; padding: 7px 11px; font-size: 12px;
+    font-weight: 400; color: var(--text-2); opacity: 0; pointer-events: none;
+    transition: opacity .12s; z-index: 5; }
+  .stat:hover .tip, .stat:focus .tip { opacity: 1; }
+  .badge { font-size: 11.5px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border);
+    color: var(--text-2); background: var(--surface-2); white-space: nowrap; }
+  .badge.warn { color: var(--warn); border-color: #5a4a10; background: #241d05; }
+  .badge.flat { color: var(--text-2); }
+  .tech-desc { color: var(--text-3); font-size: 13px; margin: 2px 0 14px; }
+  .rail { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x proximity; }
+  .rail::-webkit-scrollbar { height: 8px; }
+  .rail::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+  .thumb { flex: 0 0 auto; width: 150px; height: 150px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--border); background: var(--surface-2); cursor: pointer; position: relative;
+    scroll-snap-align: start; transition: transform .12s, border-color .12s; }
+  .thumb:hover, .thumb:focus-visible { transform: translateY(-2px); border-color: var(--accent-2); outline: none; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb .rank { position: absolute; top: 6px; left: 6px; font-size: 11px; font-weight: 600;
+    background: rgba(0,0,0,.6); color: #fff; border-radius: 6px; padding: 1px 6px; }
+  .empty-note { color: var(--text-3); font-size: 13px; font-style: italic; }
+  /* switcher */
+  .switch { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 50;
+    display: flex; align-items: center; gap: 4px; background: #000; border: 1px solid #3a3f4b;
+    border-radius: 999px; padding: 5px 6px; box-shadow: 0 8px 30px rgba(0,0,0,.6); }
+  .switch button { background: transparent; border: none; color: var(--text); font-size: 16px;
+    cursor: pointer; padding: 4px 10px; border-radius: 999px; }
+  .switch button:hover { background: #222; }
+  .switch .label { font-size: 13px; min-width: 220px; text-align: center; color: var(--text); }
+  .switch .label b { color: var(--accent); }
+  /* modal */
+  .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 60;
+    display: none; align-items: center; justify-content: center; padding: 24px; }
+  .modal-back.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    width: min(880px, 100%); max-height: 88vh; overflow: auto; display: grid; grid-template-columns: 1.2fr 1fr; }
+  .modal .pic { background: #000; display: flex; align-items: center; justify-content: center; }
+  .modal .pic img { width: 100%; height: 100%; max-height: 88vh; object-fit: contain; }
+  .modal .meta { padding: 22px; }
+  .modal .fn { font-size: 13px; color: var(--text-3); word-break: break-all; margin-bottom: 4px; }
+  .modal h3 { margin: 0 0 14px; font-size: 19px; }
+  .standout { background: var(--surface-2); border: 1px solid var(--accent-2); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 18px; }
+  .standout .lbl { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+  .standout .big { font-size: 17px; font-weight: 640; margin-top: 2px; }
+  .standout .why { color: var(--text-2); font-size: 13.5px; margin-top: 8px; }
+  .scores { list-style: none; padding: 0; margin: 0 0 16px; }
+  .scores li { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px;
+    padding: 7px 0; border-top: 1px solid var(--border); font-size: 14px; }
+  .scores li.top .name { color: var(--accent); font-weight: 600; }
+  .bar { grid-column: 1 / -1; height: 5px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--accent-2); }
+  .scores li.top .bar > i { background: var(--accent); }
+  .pctval { color: var(--text-2); font-variant-numeric: tabular-nums; }
+  .rat { color: var(--text-2); font-size: 13.5px; }
+  .modal .close { position: absolute; }
+  .x { float: right; background: transparent; border: none; color: var(--text-3); font-size: 22px; cursor: pointer; }
+  @media (max-width: 720px){ .modal { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="proto-banner">PROTOTYPE — throwaway artifact for issue #203. Not production. Needs backend on :5001 for photos.</div>
+<div class="wrap">
+  <div class="page-head">Mirror · who am I</div>
+  <h1 class="page-title">The techniques your work reliably spikes on</h1>
+  <p class="page-sub">Across your 3291 analyzed catalog photos. Each technique below is one your photos win on more often than chance &mdash; shown through the peak photos that prove it. Click any photo to see what makes it stand out.</p>
+  <div id="sections"></div>
+</div>
+
+<div class="switch">
+  <button id="prev" aria-label="Previous state">&larr;</button>
+  <div class="label" id="statelabel"></div>
+  <button id="next" aria-label="Next state">&rarr;</button>
+</div>
+
+<div class="modal-back" id="modalback">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+const DATA = {"signature": {"compositional-cleanliness": {"slug": "compositional-cleanliness", "display": "Compositional Cleanliness", "votes": 741, "photos_on": 3291, "win_rate": 0.2252, "expected_wins": 961.0, "z": -8.47, "crowned": false, "coverage": 1.0, "low_coverage": false}, "environmental-context-legibility": {"slug": "environmental-context-legibility", "display": "Depth & Environmental Context", "votes": 1212, "photos_on": 3289, "win_rate": 0.3685, "expected_wins": 960.3, "z": 9.69, "crowned": true, "coverage": 0.999, "low_coverage": false}, "framing": {"slug": "framing", "display": "Framing", "votes": 460, "photos_on": 1639, "win_rate": 0.2807, "expected_wins": 410.0, "z": 2.85, "crowned": true, "coverage": 0.498, "low_coverage": true}, "intensity-suggestion": {"slug": "intensity-suggestion", "display": "Interpretive & Human Charge", "votes": 878, "photos_on": 3287, "win_rate": 0.2671, "expected_wins": 959.7, "z": -3.15, "crowned": false, "coverage": 0.999, "low_coverage": false}}, "exemplars": {"compositional-cleanliness": [{"key": "2026-01-08_L1007198", "score": 8, "pct": 99.9, "purity": 11.7, "rationale": "Strong control of negative space with minimal, purposeful elements: the yellow navigational marker, two swans, and distant shoreline lights. The left-weighted marker balances the swans in the lower right; vast dark water isolates subjects w", "all_scores": {"compositional-cleanliness": 8, "environmental-context-legibility": 5, "framing": 3, "intensity-suggestion": 6}, "all_pcts": {"compositional-cleanliness": 100, "environmental-context-legibility": 25, "framing": 28, "intensity-suggestion": 88}}, {"key": "2026-07-08_R0002713", "score": 8, "pct": 99.9, "purity": 4.7, "rationale": "Strong compositional cleanliness: the primary subject (the floating store) reads immediately against the vast negative space of water and sky. No competing elements clutter the frame\u2014the kayak to the right adds balance without distraction. ", "all_scores": {"compositional-cleanliness": 8, "environmental-context-legibility": 8, "intensity-suggestion": 6}, "all_pcts": {"compositional-cleanliness": 100, "environmental-context-legibility": 95, "intensity-suggestion": 88}}, {"key": "2026-02-28_R0000175", "score": 8, "pct": 99.9, "purity": 2.1, "rationale": "The composition is strongly controlled with clear visual hierarchy. The frame is divided into two distinct zones: the bright billboard above and the dark silhouette below. The large-scale advertisement with 'STUDIO' text and the figure in r", "all_scores": {"compositional-cleanliness": 8, "environmental-context-legibility": 6, "framing": 5, "intensity-suggestion": 7}, "all_pcts": {"compositional-cleanliness": 100, "environmental-context-legibility": 44, "framing": 81, "intensity-suggestion": 98}}, {"key": "2026-07-08_R0002757", "score": 8, "pct": 99.9, "purity": 2.1, "rationale": "Strong compositional cleanliness. The floating convenience store is centered and isolated against vast negative space of water and sky, reading immediately as the primary subject. No competing foreground clutter; horizon line is low and con", "all_scores": {"compositional-cleanliness": 8, "environmental-context-legibility": 7, "intensity-suggestion": 7}, "all_pcts": {"compositional-cleanliness": 100, "environmental-context-legibility": 73, "intensity-suggestion": 98}}, {"key": "2026-07-08_R0002755", "score": 8, "pct": 99.9, "purity": 2.1, "rationale": "The composition is remarkably clean and intentional. The floating convenience store sits centered in the lower half of the frame, isolated against vast negative space of water and sky. No competing elements distract from the primary subject", "all_scores": {"compositional-cleanliness": 8, "environmental-context-legibility": 8, "intensity-suggestion": 7}, "all_pcts": {"compositional-cleanliness": 100, "environmental-context-legibility": 95, "intensity-suggestion": 98}}, {"key": "2026-07-08_R0002739", "score": 8, "pct": 99.9, "purity": 2.1, "rationale": "The composition is exceptionally clean and intentional. The floating convenience store is centered with strong symmetry, surrounded by expansive, uncluttered negative space of water and sky. The horizon line sits low, giving the sky dominan", "all_scores": {"compositional-cleanliness": 8, "environmental-context-legibility": 7, "intensity-suggestion": 7}, "all_pcts": {"compositional-cleanliness": 100, "environmental-context-legibility": 73, "intensity-suggestion": 98}}, {"key": "2026-07-08_R0002738", "score": 8, "pct": 99.9, "purity": 2.1, "rationale": "The composition is notably clean and intentional. The primary subject\u2014the floating convenience store\u2014reads immediately and clearly, centered in the frame with strong visual identity against the expansive water and sky. Negative space is del", "all_scores": {"compositional-cleanliness": 8, "environmental-context-legibility": 6, "intensity-suggestion": 7}, "all_pcts": {"compositional-cleanliness": 100, "environmental-context-legibility": 44, "intensity-suggestion": 98}}, {"key": "2026-07-08_R0002737", "score": 8, "pct": 99.9, "purity": 0.0, "rationale": "The composition is notably clean and intentional. The floating convenience store is isolated as a clear, singular subject against vast negative space of water and sky. No competing elements distract from the subject; the horizon line is con", "all_scores": {"compositional-cleanliness": 8, "environmental-context-legibility": 6, "intensity-suggestion": 8}, "all_pcts": {"compositional-cleanliness": 100, "environmental-context-legibility": 44, "intensity-suggestion": 100}}, {"key": "2026-07-08_R0002736", "score": 8, "pct": 99.9, "purity": 0.0, "rationale": "Strong compositional cleanliness: the floating convenience store sits centered with clear separation from the horizon, surrounded by expansive, undisturbed negative space in the water and sky. The reflection creates a clean vertical axis th", "all_scores": {"compositional-cleanliness": 8, "environmental-context-legibility": 7, "intensity-suggestion": 8}, "all_pcts": {"compositional-cleanliness": 100, "environmental-context-legibility": 73, "intensity-suggestion": 100}}, {"key": "2026-02-10_L1007315", "score": 7, "pct": 98.6, "purity": 90.7, "rationale": "Clean, minimalist composition with controlled negative space. The cracked ice pattern creates clear geometric lines that guide the eye without distraction. No competing elements intrude; the frame is unified by consistent blue tone and text", "all_scores": {"compositional-cleanliness": 7, "environmental-context-legibility": 3, "intensity-suggestion": 3}, "all_pcts": {"compositional-cleanliness": 99, "environmental-context-legibility": 6, "intensity-suggestion": 8}}, {"key": "2026-01-26_L1007218", "score": 7, "pct": 98.6, "purity": 84.9, "rationale": "The composition is intentionally minimal with snow as the clear primary subject, and the frame is largely free of competing elements. The railing and poles at the edges provide context without overwhelming the subject. However, the slight i", "all_scores": {"compositional-cleanliness": 7, "environmental-context-legibility": 4, "framing": 2, "intensity-suggestion": 3}, "all_pcts": {"compositional-cleanliness": 99, "environmental-context-legibility": 14, "framing": 8, "intensity-suggestion": 8}}, {"key": "2026-05-16_R0001425", "score": 7, "pct": 98.6, "purity": 84.9, "rationale": "The composition is clean and intentional with a clear diagonal division between the textured stone structure and the negative space of the sky. The primary subject (the stepped stone construction) reads immediately without competing element", "all_scores": {"compositional-cleanliness": 7, "environmental-context-legibility": 4, "intensity-suggestion": 2}, "all_pcts": {"compositional-cleanliness": 99, "environmental-context-legibility": 14, "intensity-suggestion": 2}}], "environmental-context-legibility": [{"key": "2026-05-16_R0001436", "score": 9, "pct": 99.9, "purity": 27.8, "rationale": "Exceptional depth with three fully legible planes: foreground shows stone ruins with tourists in sharp detail including individual figures and architectural texture; middleground reveals the broad Avenue of the Dead with scattered visitors ", "all_scores": {"compositional-cleanliness": 5, "environmental-context-legibility": 9, "intensity-suggestion": 4}, "all_pcts": {"compositional-cleanliness": 72, "environmental-context-legibility": 100, "intensity-suggestion": 29}}, {"key": "2026-05-16_R0001383", "score": 9, "pct": 99.9, "purity": 27.8, "rationale": "Exceptional depth and environmental context. Foreground shows grounded balloons, vehicles, and building rooftops with crisp detail. Middleground features multiple balloons at varying altitudes casting long shadows across terrain, with reada", "all_scores": {"compositional-cleanliness": 5, "environmental-context-legibility": 9, "intensity-suggestion": 4}, "all_pcts": {"compositional-cleanliness": 72, "environmental-context-legibility": 100, "intensity-suggestion": 29}}, {"key": "2026-05-16_R0001371", "score": 9, "pct": 99.9, "purity": 27.8, "rationale": "Foreground (checkered balloon), middleground (colorful balloon, scattered trees, buildings, roads), and background (distant balloons, town, mountains) are all sharply legible and interact to create clear spatial depth. The viewer can read t", "all_scores": {"compositional-cleanliness": 5, "environmental-context-legibility": 9, "intensity-suggestion": 4}, "all_pcts": {"compositional-cleanliness": 72, "environmental-context-legibility": 100, "intensity-suggestion": 29}}, {"key": "2026-05-16_R0001437", "score": 9, "pct": 99.9, "purity": 6.2, "rationale": "Foreground shows stone platform edges and clustered tourists with clear texture and scale; middleground reveals the Avenue of the Dead with scattered visitors, smaller ruins, and central platform; background presents the Pyramid of the Sun,", "all_scores": {"compositional-cleanliness": 6, "environmental-context-legibility": 9, "framing": 5, "intensity-suggestion": 3}, "all_pcts": {"compositional-cleanliness": 94, "environmental-context-legibility": 100, "framing": 81, "intensity-suggestion": 8}}, {"key": "2026-05-16_R0001423", "score": 9, "pct": 99.9, "purity": 6.2, "rationale": "Three distinct planes operate with exceptional clarity: the rough cobblestone foreground establishes vantage point and texture; the middleground reveals multiple stepped pyramids with readable architectural detail, staircases, and spatial r", "all_scores": {"compositional-cleanliness": 6, "environmental-context-legibility": 9, "framing": 4, "intensity-suggestion": 3}, "all_pcts": {"compositional-cleanliness": 94, "environmental-context-legibility": 100, "framing": 56, "intensity-suggestion": 8}}, {"key": "2026-05-16_R0001373", "score": 9, "pct": 99.9, "purity": 6.2, "rationale": "Three exceptionally legible planes interlock to create strong spatial depth and rich narrative context. Foreground: modern buildings, roads, vehicles, and curved perimeter path anchor the viewer at ground level. Middleground: the massive Py", "all_scores": {"compositional-cleanliness": 6, "environmental-context-legibility": 9, "intensity-suggestion": 5}, "all_pcts": {"compositional-cleanliness": 94, "environmental-context-legibility": 100, "intensity-suggestion": 63}}, {"key": "2026-04-26_L1007699", "score": 8, "pct": 95.2, "purity": 63.1, "rationale": "Three distinct planes function clearly: foreground trash bins (sharp, with graffiti detail), middleground skatepark activity (skaters, ramps, the blue-shirted figure), and background park/trees/buildings. Each plane is legible and interacts", "all_scores": {"compositional-cleanliness": 4, "environmental-context-legibility": 8, "framing": 3, "intensity-suggestion": 4}, "all_pcts": {"compositional-cleanliness": 32, "environmental-context-legibility": 95, "framing": 28, "intensity-suggestion": 29}}, {"key": "2026-03-20_R0000513", "score": 8, "pct": 95.2, "purity": 63.1, "rationale": "Foreground (street, car, pole, trash bin), middleground (pedestrian, bike-share station), and background (FreshCo storefront, buildings, bare trees) are all legible and interact. The signage, architecture, vehicles, and secondary elements (", "all_scores": {"compositional-cleanliness": 4, "environmental-context-legibility": 8, "intensity-suggestion": 3}, "all_pcts": {"compositional-cleanliness": 32, "environmental-context-legibility": 95, "intensity-suggestion": 8}}, {"key": "2026-03-15_L1007582", "score": 8, "pct": 95.2, "purity": 63.1, "rationale": "Foreground (barrier with Irish flag, figures in winter coats), middleground (street with manhole cover, orange cone, pedestrians crossing), and background (microbrewery signage, ALFORAT restaurant, EB GAMES, brick architecture) all read dis", "all_scores": {"compositional-cleanliness": 4, "environmental-context-legibility": 8, "intensity-suggestion": 4}, "all_pcts": {"compositional-cleanliness": 32, "environmental-context-legibility": 95, "intensity-suggestion": 29}}, {"key": "2026-03-15_R0000417", "score": 8, "pct": 95.2, "purity": 63.1, "rationale": "Foreground parade float with 'St. Patrick's Day Parade' signage is sharp and readable, middleground includes the RAM truck and West 49 storefront with clear advertising, and background shows tall buildings including the distinctive curved t", "all_scores": {"compositional-cleanliness": 4, "environmental-context-legibility": 8, "intensity-suggestion": 4}, "all_pcts": {"compositional-cleanliness": 32, "environmental-context-legibility": 95, "intensity-suggestion": 29}}, {"key": "2026-02-28_R0000118", "score": 8, "pct": 95.2, "purity": 63.1, "rationale": "Foreground (subject in beanie/jacket), middleground (street, cars, overpass, bare trees), and background (CN Tower, skyline buildings, sky) are all clearly legible and interact. The CN Tower anchors the location as Toronto, the overpass and", "all_scores": {"compositional-cleanliness": 4, "environmental-context-legibility": 8, "intensity-suggestion": 4}, "all_pcts": {"compositional-cleanliness": 32, "environmental-context-legibility": 95, "intensity-suggestion": 29}}, {"key": "2026-02-27_R0000114", "score": 8, "pct": 95.2, "purity": 63.1, "rationale": "Three distinct planes operate clearly: foreground (orange bollards, curb, slushy street with grate and debris), middleground (snow mound with interacting figures, kiosk pillar), and background (frosted glass facade with walking figure and v", "all_scores": {"compositional-cleanliness": 4, "environmental-context-legibility": 8, "intensity-suggestion": 4}, "all_pcts": {"compositional-cleanliness": 32, "environmental-context-legibility": 95, "intensity-suggestion": 29}}], "framing": [{"key": "2026-07-08_R0002766", "score": 8, "pct": 99.4, "purity": 27.3, "rationale": "The two curved high-rise towers on the left and right create a strong natural frame that encloses the CN Tower in the center. The converging vertical lines of the buildings form a compelling V-shape that funnels the eye directly toward the ", "all_scores": {"compositional-cleanliness": 5, "environmental-context-legibility": 5, "framing": 8, "intensity-suggestion": 4}, "all_pcts": {"compositional-cleanliness": 72, "environmental-context-legibility": 25, "framing": 99, "intensity-suggestion": 29}}, {"key": "2026-06-27_R0002231", "score": 8, "pct": 99.4, "purity": 26.2, "rationale": "The open doorway creates a clear, natural rectangular frame that encloses the restaurant interior and counter area. The door jambs and glass panels on both sides form a well-defined border that draws the eye directly toward the Portuguese f", "all_scores": {"compositional-cleanliness": 5, "environmental-context-legibility": 7, "framing": 8, "intensity-suggestion": 4}, "all_pcts": {"compositional-cleanliness": 72, "environmental-context-legibility": 73, "framing": 99, "intensity-suggestion": 29}}, {"key": "2026-06-05_L1008130", "score": 8, "pct": 99.4, "purity": 26.2, "rationale": "The large circular cutout (likely part of a public art installation or architectural structure) creates a bold, well-defined frame around the sports field and cityscape beyond. The circular shape is complete and geometrically strong, with t", "all_scores": {"compositional-cleanliness": 5, "environmental-context-legibility": 7, "framing": 8, "intensity-suggestion": 4}, "all_pcts": {"compositional-cleanliness": 72, "environmental-context-legibility": 73, "framing": 99, "intensity-suggestion": 29}}, {"key": "2026-02-10_L1007320", "score": 8, "pct": 99.4, "purity": 11.2, "rationale": "The life preserver ring creates a near-perfect circular frame that cleanly encloses the icy water scene beyond. The red ring contrasts sharply with the blue-white interior, naturally drawing the eye through the center while the vertical met", "all_scores": {"compositional-cleanliness": 5, "environmental-context-legibility": 6, "framing": 8, "intensity-suggestion": 6}, "all_pcts": {"compositional-cleanliness": 72, "environmental-context-legibility": 44, "framing": 99, "intensity-suggestion": 88}}, {"key": "2026-06-27_R0002214", "score": 8, "pct": 99.4, "purity": 11.2, "rationale": "The motorcycle side mirror serves as a clear, well-formed natural framing device that encircles the two men in conversation. The circular mirror creates an appealing, contained shape that isolates the primary subjects from the surrounding s", "all_scores": {"compositional-cleanliness": 5, "environmental-context-legibility": 6, "framing": 8, "intensity-suggestion": 6}, "all_pcts": {"compositional-cleanliness": 72, "environmental-context-legibility": 44, "framing": 99, "intensity-suggestion": 88}}, {"key": "2026-05-16_L1007972", "score": 8, "pct": 99.4, "purity": 11.2, "rationale": "The vehicle's window and door frame create a natural, well-formed rectangular enclosure around the brightly lit taco restaurant. The dark silhouette of the car interior wraps around three sides of the scene, creating a strong contrast that ", "all_scores": {"compositional-cleanliness": 5, "environmental-context-legibility": 6, "framing": 8, "intensity-suggestion": 6}, "all_pcts": {"compositional-cleanliness": 72, "environmental-context-legibility": 44, "framing": 99, "intensity-suggestion": 88}}, {"key": "2026-03-14_R0000333", "score": 8, "pct": 99.4, "purity": 5.6, "rationale": "The window frame and surrounding dark structural elements create a natural, well-integrated rectangular frame that encloses the view of the city below. The dark silhouette of the photographer's feet at the bottom adds a grounding foreground", "all_scores": {"compositional-cleanliness": 6, "environmental-context-legibility": 6, "framing": 8, "intensity-suggestion": 6}, "all_pcts": {"compositional-cleanliness": 94, "environmental-context-legibility": 44, "framing": 99, "intensity-suggestion": 88}}, {"key": "2026-05-24_R0001653", "score": 8, "pct": 99.4, "purity": 5.6, "rationale": "The carved stone archway and columns create a strong natural frame that fully encloses the subject. The architectural details form a cohesive, appealing shape with the pointed Gothic arch directing the eye downward toward the person. The fr", "all_scores": {"compositional-cleanliness": 6, "environmental-context-legibility": 6, "framing": 8, "intensity-suggestion": 5}, "all_pcts": {"compositional-cleanliness": 94, "environmental-context-legibility": 44, "framing": 99, "intensity-suggestion": 63}}, {"key": "2026-05-16_R0001485", "score": 8, "pct": 99.4, "purity": 5.6, "rationale": "The ornate stone doorway and teal window frame provide a strong, natural framing device that fully encloses the doll display. The architectural surround\u2014including decorative carved borders, columns, and the window sill\u2014creates a complete re", "all_scores": {"compositional-cleanliness": 6, "environmental-context-legibility": 6, "framing": 8, "intensity-suggestion": 3}, "all_pcts": {"compositional-cleanliness": 94, "environmental-context-legibility": 44, "framing": 99, "intensity-suggestion": 8}}, {"key": "2026-05-15_R0001279", "score": 8, "pct": 99.4, "purity": 5.6, "rationale": "The dark parking garage structure creates a natural rectangular frame around the sky and buildings beyond. The concrete opening forms a clean, well-defined border that encloses the subject (the exterior view and sky), directing the eye forw", "all_scores": {"compositional-cleanliness": 6, "environmental-context-legibility": 4, "framing": 8, "intensity-suggestion": 3}, "all_pcts": {"compositional-cleanliness": 94, "environmental-context-legibility": 14, "framing": 99, "intensity-suggestion": 8}}, {"key": "2026-05-15_R0001278", "score": 8, "pct": 99.4, "purity": 5.6, "rationale": "The dark underpass/overhead structure creates a strong natural rectangular frame that fully encloses the sky and ramp exit beyond. The framing element is complete on all four sides (dark ceiling, left and right walls, dark foreground), form", "all_scores": {"compositional-cleanliness": 6, "environmental-context-legibility": 4, "framing": 8, "intensity-suggestion": 4}, "all_pcts": {"compositional-cleanliness": 94, "environmental-context-legibility": 14, "framing": 99, "intensity-suggestion": 29}}, {"key": "2026-05-15_R0001277", "score": 8, "pct": 99.4, "purity": 5.6, "rationale": "The dark tunnel opening acts as a strong, well-formed natural frame that encircles the bright exterior scene. The surrounding concrete walls and ceiling create a clear rectangular portal shape that sharply contrasts with the blue sky beyond", "all_scores": {"compositional-cleanliness": 6, "environmental-context-legibility": 4, "framing": 8, "intensity-suggestion": 4}, "all_pcts": {"compositional-cleanliness": 94, "environmental-context-legibility": 14, "framing": 99, "intensity-suggestion": 29}}], "intensity-suggestion": [{"key": "2026-04-26_L1007718", "score": 8, "pct": 99.9, "purity": 26.6, "rationale": "The photograph generates strong interpretive charge through an absurd, quietly unsettling juxtaposition: a child curled in the storage basket beneath a stroller, looking directly at the camera with an expression of resigned boredom or mild ", "all_scores": {"compositional-cleanliness": 4, "environmental-context-legibility": 7, "framing": 4, "intensity-suggestion": 8}, "all_pcts": {"compositional-cleanliness": 32, "environmental-context-legibility": 73, "framing": 56, "intensity-suggestion": 100}}, {"key": "2026-06-07_R0001779", "score": 8, "pct": 99.9, "purity": 26.6, "rationale": "The image generates strong interpretive charge through sustained visual metaphor and unresolved human tension. A fortune-teller wearing a glittering green alien mask faces a client whose back is turned to us, creating asymmetry of knowledge", "all_scores": {"compositional-cleanliness": 5, "environmental-context-legibility": 7, "intensity-suggestion": 8}, "all_pcts": {"compositional-cleanliness": 72, "environmental-context-legibility": 73, "intensity-suggestion": 100}}, {"key": "2026-07-08_R0002720", "score": 8, "pct": 99.9, "purity": 6.1, "rationale": "The floating convenience store on open water is inherently absurd and triggers immediate interpretive work: Why is this here? Who needs snacks mid-lake? The small 'CONVENIENCE' sign with its ordinary commercial language clashing against the", "all_scores": {"compositional-cleanliness": 6, "environmental-context-legibility": 6, "intensity-suggestion": 8}, "all_pcts": {"compositional-cleanliness": 94, "environmental-context-legibility": 44, "intensity-suggestion": 100}}, {"key": "2026-05-17_R0001511", "score": 8, "pct": 99.9, "purity": 2.5, "rationale": "The ceiling's inverted perspective creates immediate disorientation\u2014the viewer must reorient to 'read' the floating figure, whose outstretched arms and downward gaze suggest plummeting or spiritual ascent. The spectral horses, chariot fragm", "all_scores": {"compositional-cleanliness": 5, "environmental-context-legibility": 7, "framing": 7, "intensity-suggestion": 8}, "all_pcts": {"compositional-cleanliness": 72, "environmental-context-legibility": 73, "framing": 97, "intensity-suggestion": 100}}, {"key": "2026-07-08_R0002751", "score": 8, "pct": 99.9, "purity": 1.2, "rationale": "The image derives its charge from a deeply absurd and unresolved juxtaposition: a fully functional 'Convenience' store\u2014complete with neon OPEN sign, stocked shelves visible through the doorway, and a yellow fire hydrant planted beside it\u2014fl", "all_scores": {"compositional-cleanliness": 7, "environmental-context-legibility": 5, "intensity-suggestion": 8}, "all_pcts": {"compositional-cleanliness": 99, "environmental-context-legibility": 25, "intensity-suggestion": 100}}, {"key": "2026-07-08_R0002749", "score": 8, "pct": 99.9, "purity": 1.2, "rationale": "The floating convenience store in open water creates a strong absurdist juxtaposition that immediately generates narrative questions: who placed this here, who operates it, who are the customers? The 'OPEN' sign glowing against empty water ", "all_scores": {"compositional-cleanliness": 7, "environmental-context-legibility": 6, "intensity-suggestion": 8}, "all_pcts": {"compositional-cleanliness": 99, "environmental-context-legibility": 44, "intensity-suggestion": 100}}, {"key": "2026-07-08_R0002735", "score": 8, "pct": 99.9, "purity": 1.2, "rationale": "The floating 'Convenience' store in open water creates a potent absurdist premise that immediately exceeds literal description. The central tension lies in the oxymoronic installation\u2014a commercial structure dependent on foot traffic and fix", "all_scores": {"compositional-cleanliness": 7, "environmental-context-legibility": 6, "intensity-suggestion": 8}, "all_pcts": {"compositional-cleanliness": 99, "environmental-context-legibility": 44, "intensity-suggestion": 100}}, {"key": "2026-07-08_R0002718", "score": 8, "pct": 99.9, "purity": 1.2, "rationale": "The floating convenience store on open water is an absurdist visual metaphor that immediately ruptures normal expectation\u2014commerce detached from land, infrastructure, logical context. The lone kayak pulled alongside suggests a human narrati", "all_scores": {"compositional-cleanliness": 7, "environmental-context-legibility": 7, "intensity-suggestion": 8}, "all_pcts": {"compositional-cleanliness": 99, "environmental-context-legibility": 73, "intensity-suggestion": 100}}, {"key": "2026-07-08_R0002737", "score": 8, "pct": 99.9, "purity": -0.0, "rationale": "The floating convenience store in open water is an absurdist, unexplained juxtaposition that generates immediate interpretive charge: What is this structure doing isolated in the middle of a lake? Who operates it, who patronizes it, and und", "all_scores": {"compositional-cleanliness": 8, "environmental-context-legibility": 6, "intensity-suggestion": 8}, "all_pcts": {"compositional-cleanliness": 100, "environmental-context-legibility": 44, "intensity-suggestion": 100}}, {"key": "2026-07-08_R0002736", "score": 8, "pct": 99.9, "purity": -0.0, "rationale": "The floating convenience store in open water is an absurdist, unresolved image that immediately generates narrative questions: who built this, who patronizes it, how does it survive storms? The neon 'OPEN' sign glowing in daylight adds dead", "all_scores": {"compositional-cleanliness": 8, "environmental-context-legibility": 7, "intensity-suggestion": 8}, "all_pcts": {"compositional-cleanliness": 100, "environmental-context-legibility": 73, "intensity-suggestion": 100}}, {"key": "2025-11-10_DSCF1921", "score": 7, "pct": 97.8, "purity": 92.0, "rationale": "The photograph generates sustained interpretive charge through several layered mechanisms. The film-negative inversion destabilizes immediate recognition, forcing the viewer to actively reconstruct the scene while maintaining an oneiric, me", "all_scores": {"compositional-cleanliness": 3, "environmental-context-legibility": 2, "framing": 1, "intensity-suggestion": 7}, "all_pcts": {"compositional-cleanliness": 6, "environmental-context-legibility": 2, "framing": 0, "intensity-suggestion": 98}}, {"key": "2026-03-15_L1007620", "score": 7, "pct": 97.8, "purity": 84.1, "rationale": "The motion blur transforms the dancers' ruffled skirts into abstract vortexes, creating visual metaphor where human movement becomes almost elemental force\u2014order and chaos intertwined. The tension between this kinetic energy and the rigid, ", "all_scores": {"compositional-cleanliness": 3, "environmental-context-legibility": 4, "intensity-suggestion": 7}, "all_pcts": {"compositional-cleanliness": 6, "environmental-context-legibility": 14, "intensity-suggestion": 98}}]}, "filenames": {"2026-03-15_L1007620": "L1007620", "2026-03-15_R0000417": "R0000417", "2026-05-16_R0001373": "R0001373", "2026-05-16_R0001436": "R0001436", "2026-05-16_R0001383": "R0001383", "2026-06-27_R0002214": "R0002214", "2026-02-28_R0000118": "R0000118", "2026-01-26_L1007218": "L1007218", "2025-11-10_DSCF1921": "DSCF1921", "2026-07-08_R0002751": "R0002751", "2026-07-08_R0002755": "R0002755", "2026-02-28_R0000175": "R0000175", "2026-05-15_R0001277": "R0001277", "2026-07-08_R0002737": "R0002737", "2026-05-16_R0001437": "R0001437", "2026-05-24_R0001653": "R0001653", "2026-07-08_R0002713": "R0002713", "2026-05-16_R0001423": "R0001423", "2026-05-17_R0001511": "R0001511", "2026-01-08_L1007198": "L1007198", "2026-06-05_L1008130": "L1008130", "2026-03-14_R0000333": "R0000333", "2026-03-20_R0000513": "R0000513", "2026-05-16_R0001425": "R0001425", "2026-07-08_R0002749": "R0002749", "2026-05-15_R0001278": "R0001278", "2026-04-26_L1007718": "L1007718", "2026-04-26_L1007699": "L1007699", "2026-05-16_L1007972": "L1007972", "2026-07-08_R0002757": "R0002757", "2026-07-08_R0002736": "R0002736", "2026-07-08_R0002739": "R0002739", "2026-07-08_R0002738": "R0002738", "2026-06-27_R0002231": "R0002231", "2026-07-08_R0002766": "R0002766", "2026-05-15_R0001279": "R0001279", "2026-02-27_R0000114": "R0000114", "2026-06-07_R0001779": "R0001779", "2026-05-16_R0001371": "R0001371", "2026-07-08_R0002718": "R0002718", "2026-02-10_L1007315": "L1007315", "2026-03-15_L1007582": "L1007582", "2026-05-16_R0001485": "R0001485", "2026-07-08_R0002720": "R0002720", "2026-02-10_L1007320": "L1007320", "2026-07-08_R0002735": "R0002735"}, "population": 3291, "display": {"compositional-cleanliness": "Compositional Cleanliness", "environmental-context-legibility": "Depth & Environmental Context", "framing": "Framing", "intensity-suggestion": "Interpretive & Human Charge"}};
+const THUMB = k => `http://localhost:5001/api/images/catalog/${encodeURIComponent(k)}/thumbnail`;
+const D = DATA.display;
+
+// Three review states. Each names which technique sections to render and how.
+const STATES = {
+  happy: {
+    label: 'Happy path — 1 clear signature',
+    sections: [ { slug: 'environmental-context-legibility' } ],
+  },
+  coverage: {
+    label: 'Real result — 2 signatures, 1 with coverage caveat',
+    sections: [ { slug: 'environmental-context-legibility' }, { slug: 'framing', caveat: true } ],
+  },
+  flat: {
+    label: 'Fallback — nothing distinctive',
+    sections: [ { slug: 'environmental-context-legibility', flat: true } ],
+  },
+};
+const ORDER = ['happy','coverage','flat'];
+
+function strengthLabel(z) {
+  if (z >= 6) return 'A defining strength';
+  if (z >= 3) return 'A clear strength';
+  return 'A strength';
+}
+function techSection(cfg) {
+  const s = DATA.signature[cfg.slug];
+  const wr = Math.round(s.win_rate * 100);
+  const chance = Math.round((s.expected_wins / s.photos_on) * 100);
+  const numbers = `wins ${wr}% of contests vs ~${chance}% by chance · z=${s.z}`;
+  const wrap = document.createElement('section');
+  wrap.className = 'tech';
+
+  const head = document.createElement('div');
+  head.className = 'tech-head';
+  head.innerHTML = `<span class="tech-name">${D[cfg.slug]}</span>`;
+  if (cfg.flat) {
+    head.innerHTML += `<span class="stat flat" tabindex="0">Leading, but not strongly distinctive<span class="tip">${numbers}</span></span>`;
+  } else {
+    head.innerHTML += `<span class="stat" tabindex="0">${strengthLabel(s.z)}<span class="tip">${numbers}</span></span>`;
+    if (cfg.caveat) head.innerHTML += `<span class="badge warn">scored on ~${Math.round(s.coverage*100)}% of your catalog</span>`;
+  }
+  wrap.appendChild(head);
+
+  if (cfg.flat) {
+    const desc = document.createElement('div');
+    desc.className = 'tech-desc';
+    desc.textContent = 'No technique clears the bar for a distinctive signature — your strengths are fairly even. This is simply your leading lens.';
+    wrap.appendChild(desc);
+  }
+
+  const rail = document.createElement('div');
+  rail.className = 'rail';
+  DATA.exemplars[cfg.slug].forEach((e, i) => {
+    const t = document.createElement('button');
+    t.className = 'thumb';
+    t.innerHTML = `<span class="rank">#${i+1}</span><img loading="lazy" src="${THUMB(e.key)}" alt="peak photo ${i+1}">`;
+    t.onclick = () => openModal(cfg.slug, e);
+    rail.appendChild(t);
+  });
+  wrap.appendChild(rail);
+  return wrap;
+}
+
+function openModal(slug, e) {
+  const scoreRows = Object.keys(e.all_pcts)
+    .sort((a,b) => e.all_pcts[b] - e.all_pcts[a])
+    .map(p => {
+      const top = p === slug;
+      return `<li class="${top?'top':''}">
+        <span class="name">${D[p]}</span>
+        <span class="pctval">${e.all_pcts[p]}th pct · ${e.all_scores[p]}/10</span>
+        <span class="bar"><i style="width:${e.all_pcts[p]}%"></i></span>
+      </li>`;
+    }).join('');
+  const m = document.getElementById('modal');
+  m.innerHTML = `
+    <div class="pic"><img src="${THUMB(e.key)}" alt=""></div>
+    <div class="meta">
+      <button class="x" id="xbtn" aria-label="Close">&times;</button>
+      <div class="fn">${DATA.filenames[e.key] || e.key}</div>
+      <h3>Why it's here</h3>
+      <div class="standout">
+        <div class="lbl">Standout dimension</div>
+        <div class="big">${D[slug]} — ${e.pct}th percentile</div>
+        <div class="why">Ranks in the top ${(100 - e.pct).toFixed(1)}% of your catalog on this lens${ e.purity > 0 ? `, and leads its own next-strongest lens by ${e.purity} points (distinctive, not just generally strong).` : '.' }</div>
+      </div>
+      <ul class="scores">${scoreRows}</ul>
+      <div class="rat">${e.rationale || ''}</div>
+    </div>`;
+  document.getElementById('xbtn').onclick = closeModal;
+  document.getElementById('modalback').classList.add('open');
+}
+function closeModal(){ document.getElementById('modalback').classList.remove('open'); }
+document.getElementById('modalback').onclick = ev => { if (ev.target.id === 'modalback') closeModal(); };
+
+let idx = 0;
+function render(){
+  const st = STATES[ORDER[idx]];
+  const host = document.getElementById('sections');
+  host.innerHTML = '';
+  st.sections.forEach(cfg => host.appendChild(techSection(cfg)));
+  document.getElementById('statelabel').innerHTML = `<b>${idx+1}/3</b> · ${st.label}`;
+  const u = new URL(location); u.searchParams.set('state', ORDER[idx]); history.replaceState(null,'',u);
+}
+document.getElementById('next').onclick = () => { idx = (idx+1)%ORDER.length; render(); };
+document.getElementById('prev').onclick = () => { idx = (idx-1+ORDER.length)%ORDER.length; render(); };
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape') closeModal();
+  if (ev.key === 'ArrowRight') document.getElementById('next').click();
+  if (ev.key === 'ArrowLeft') document.getElementById('prev').click();
+});
+const start = new URL(location).searchParams.get('state');
+if (start && ORDER.includes(start)) idx = ORDER.indexOf(start);
+render();
+// deep-link a modal open for review/screenshot: ?modal=<slug>
+const mparam = new URL(location).searchParams.get('modal');
+if (mparam && DATA.exemplars[mparam]) openModal(mparam, DATA.exemplars[mparam][0]);
+</script>
+</body>
+</html>
