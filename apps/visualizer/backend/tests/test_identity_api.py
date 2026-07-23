@@ -48,13 +48,13 @@ def test_best_photos_posted_invalid_400(identity_client) -> None:
     assert "posted must be true or false" in (body.get("error") or "")
 
 
-def test_style_fingerprint_200_shape(identity_client) -> None:
-    resp = identity_client.get("/api/identity/style-fingerprint")
+def test_mirror_200_shape(identity_client) -> None:
+    resp = identity_client.get("/api/identity/mirror")
     assert resp.status_code == 200
     data = resp.get_json()
     assert data is not None
-    assert "per_perspective" in data
-    assert "top_rationale_tokens" in data
+    assert "population" in data
+    assert "sections" in data
     assert "meta" in data
 
 

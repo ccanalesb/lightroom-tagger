@@ -153,7 +153,7 @@ export const INSIGHTS_EMPTY_FINGERPRINT =
 export const INSIGHTS_QUICK_ANALYTICS_TITLE = 'Analytics'
 export const INSIGHTS_QUICK_ANALYTICS_DESC = 'Posting frequency, heatmaps, and caption aggregates.'
 export const INSIGHTS_QUICK_IDENTITY_TITLE = 'Identity'
-export const INSIGHTS_QUICK_IDENTITY_DESC = 'Best photos, style fingerprint, and post-next suggestions.'
+export const INSIGHTS_QUICK_IDENTITY_DESC = 'Mirror signature, and post-next suggestions.'
 export const INSIGHTS_QUICK_PROCESSING_TITLE = 'Processing'
 export const INSIGHTS_QUICK_PROCESSING_DESC = 'Matching, descriptions, scoring jobs, and perspectives.'
 export const INSIGHTS_KPI_ACTIVE_JOBS = 'Active jobs'
@@ -481,12 +481,17 @@ export const ANALYTICS_STAT_AVG_TAGS = 'Avg. hashtags per post (unique)'
 // Identity (Phase 8 / 08-02)
 export const IDENTITY_PAGE_TITLE = 'Identity'
 export const IDENTITY_PAGE_SUBTITLE =
-  'Best scored catalog photos, your style fingerprint from critique scores, and what to post next.'
+  'Your photographic signature from critique scores, and what to post next.'
 export const IDENTITY_SECTION_BEST_PHOTOS = 'Best photos'
-export const IDENTITY_SECTION_STYLE_FINGERPRINT = 'Style fingerprint'
+export const IDENTITY_MIRROR_SECTION = 'Mirror'
+export const IDENTITY_MIRROR_INTRO =
+  'Across your {count} analyzed catalog photos with multi-lens coverage. Each technique below is one your photos win on more often than chance — shown through the peak photos that prove it. Click any photo to see what makes it stand out.'
+export const IDENTITY_MIRROR_EMPTY =
+  'Not enough multi-lens scored catalog data yet. Score images on at least two active perspectives.'
+export const IDENTITY_MIRROR_LOW_COVERAGE = 'scored on ~{pct}% of your catalog'
+export const IDENTITY_MIRROR_WHY_HERE = "Why it's here"
+export const IDENTITY_MIRROR_STANDOUT = 'Standout dimension'
 export const IDENTITY_SECTION_POST_NEXT = 'What to post next'
-export const IDENTITY_INTRO_STYLE_FINGERPRINT =
-  'Your aggregate scores and rationale patterns across active critique lenses. This is the "shape" of your work before you pick individual shots to share.'
 export const IDENTITY_INTRO_BEST_PHOTOS =
   'A ranked set of your strongest catalog images—highest equal-weight aggregate first. "Posted" on a tile means that catalog photo already appears on Instagram.'
 export const IDENTITY_INTRO_POST_NEXT =

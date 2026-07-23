@@ -1,9 +1,8 @@
 import type {
-  IdentityBestPhotoItem,
   IdentityBestPhotosMeta,
+  MirrorMeta,
+  MirrorResponse,
   PostNextSuggestionsMeta,
-  StyleFingerprintMeta,
-  StyleFingerprintResponse,
 } from '../services/api'
 
 /** OpenAPI nullable meta — all keys present (generated contract shape). */
@@ -19,21 +18,22 @@ export const EMPTY_BEST_PHOTOS_META: IdentityBestPhotosMeta = {
   coverage_note: null,
 }
 
-export const EMPTY_STYLE_FINGERPRINT_META: StyleFingerprintMeta = {
-  tokenization_note: null,
-  perspectives_included: null,
-  weighting: null,
+export const EMPTY_MIRROR_META: MirrorMeta = {
+  active_perspectives: null,
+  total_catalog_images: null,
+  voting_rule: null,
+  crowning_rule: null,
+  low_coverage_threshold: null,
+  exemplar_limit: null,
+  descriptor_min_count: null,
   scores_are_advisory: null,
+  fallback_active: null,
 }
 
-export const EMPTY_STYLE_FINGERPRINT_RESPONSE: StyleFingerprintResponse = {
-  per_perspective: [],
-  aggregate_distribution: { '1-3': 0, '4-6': 0, '7-10': 0 },
-  aggregate_distribution_note: null,
-  top_rationale_tokens: [],
-  evidence: {},
-  evidence_note: null,
-  meta: EMPTY_STYLE_FINGERPRINT_META,
+export const EMPTY_MIRROR_RESPONSE: MirrorResponse = {
+  population: 0,
+  sections: [],
+  meta: EMPTY_MIRROR_META,
 }
 
 export const EMPTY_POST_NEXT_META: PostNextSuggestionsMeta = {
@@ -53,4 +53,4 @@ export const NULLABLE_BEST_PHOTO_FIELDS = {
   stack_id: null,
   stack_member_count: null,
   is_stack_representative: null,
-} as const satisfies Partial<IdentityBestPhotoItem>
+} as const satisfies Partial<import('../services/api').IdentityBestPhotoItem>

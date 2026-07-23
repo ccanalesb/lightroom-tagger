@@ -1,4 +1,4 @@
-"""Identity API: best-photos ranking, style fingerprint, post-next suggestions (phase 08-01).
+"""Identity API: best-photos ranking, mirror signature, post-next suggestions (phase 08-01).
 
 Thumbnails are not inlined here; responses include ``image_key`` and ``filename`` so the
 frontend can use the existing catalog thumbnail/image routes.
@@ -18,14 +18,14 @@ from api.openapi import spec
 from api.schemas.identity import (
     IdentityBestPhotosQuery,
     IdentityBestPhotosResponse,
+    MirrorResponse,
     PostNextSuggestionsQuery,
     PostNextSuggestionsResponse,
-    StyleFingerprintResponse,
 )
 from api.schemas.jobs import ErrorBody
 from utils.pagination import _clamp_pagination
 from lightroom_tagger.core.identity_service import (
-    build_style_fingerprint,
+    build_mirror,
     rank_best_photos,
     suggest_what_to_post_next,
 )
@@ -106,16 +106,16 @@ def best_photos(db: sqlite3.Connection):
         return error_server_error()
 
 
-@bp.route("/style-fingerprint", methods=["GET"])
+@bp.route("/mirror", methods=["GET"])
 @with_db
 @spec.validate(
-    resp=Response(HTTP_200=StyleFingerprintResponse, HTTP_500=ErrorBody),
+    resp=Response(HTTP_200=MirrorResponse, HTTP_500=ErrorBody),
     tags=['identity'],
 )
-def style_fingerprint(db: sqlite3.Connection):
-    """Catalog-wide style fingerprint (per-perspective stats, tokens, evidence)."""
+def mirror(db: sqlite3.Connection):
+    """Catalog Mirror: crowned signature techniques and exemplar rails."""
     try:
-        return jsonify(build_style_fingerprint(db))
+        return jsonify(build_mirror(db))
     except Exception:
         return error_server_error()
 

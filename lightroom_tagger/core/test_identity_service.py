@@ -14,7 +14,7 @@ from lightroom_tagger.core.database import (
     validate_match,
 )
 from lightroom_tagger.core.identity_service import (
-    build_style_fingerprint,
+    build_mirror,
     compute_image_aggregate_scores,
     compute_image_peak_percentile_scores,
     compute_within_perspective_percentile_lookup,
@@ -207,30 +207,149 @@ def test_rank_best_photos_filters_by_posted(tmp_path) -> None:
     assert len(page_all) == 2
 
 
-def test_style_fingerprint_mean_and_rationale_tokens(tmp_path) -> None:
-    db_path = tmp_path / "library.db"
-    conn = init_database(str(db_path))
-    slugs = _active_slugs(conn, limit=1)
-    slug = slugs[0]
+def test_mirror_descriptor_log_odds_prefers_lens_specific_tokens(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    hot, cold = slugs[0], slugs[1]
 
-    k1 = store_image(
-        conn,
-        {"date_taken": "2024-03-01", "filename": "a.jpg", "instagram_posted": False},
-    )
-    k2 = store_image(
-        conn,
-        {"date_taken": "2024-03-02", "filename": "b.jpg", "instagram_posted": False},
-    )
-    _add_score(conn, k1, slug, 6, rationale="kumquat lighting balance")
-    _add_score(conn, k2, slug, 8, rationale="kumquat framing works well")
+    for i in range(6):
+        k = store_image(
+            conn,
+            {
+                "date_taken": f"2024-10-{10 + i:02d}",
+                "filename": f"m{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        _add_score(conn, k, hot, 8 + (i % 2), rationale="kumquat lighting balance frame")
+        _add_score(conn, k, cold, 2 + (i % 2), rationale="ordinary street scene")
     conn.commit()
 
-    fp = build_style_fingerprint(conn)
-    per = next(p for p in fp["per_perspective"] if p["perspective_slug"] == slug)
-    assert per["mean_score"] == 7.0
-    assert per["median_score"] == 7.0
-    tokens = {t["token"]: t["count"] for t in fp["top_rationale_tokens"]}
-    assert tokens.get("kumquat", 0) >= 2
+    mirror = build_mirror(conn)
+    section = next(s for s in mirror["sections"] if s["perspective_slug"] == hot)
+    tokens = {d["token"] for d in section["descriptors"]}
+    assert "kumquat" in tokens
+    assert all(d["count"] >= 5 for d in section["descriptors"])
+
+
+def test_mirror_exemplar_ordering_and_purity_tiebreak(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    hot, cold = slugs[0], slugs[1]
+
+    keys: list[str] = []
+    # Three images on hot lens; same top raw score but different purity vs cold lens.
+    for i, cold_score in enumerate([2, 4, 4]):
+        k = store_image(
+            conn,
+            {
+                "date_taken": f"2024-11-{10 + i:02d}",
+                "filename": f"ex{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        keys.append(k)
+        _add_score(conn, k, hot, 10)
+        _add_score(conn, k, cold, cold_score)
+    conn.commit()
+
+    mirror = build_mirror(conn)
+    section = next((s for s in mirror["sections"]), None)
+    assert section is not None
+    exemplars = section["exemplars"]
+    assert len(exemplars) >= 2
+    # Highest purity on the hot lens should sort ahead at equal hot percentile.
+    assert exemplars[0]["purity"] >= exemplars[1]["purity"]
+
+
+def test_mirror_strength_label_thresholds(tmp_path) -> None:
+    from lightroom_tagger.core.identity_service.mirror import _strength_label
+
+    assert _strength_label(z_score=6.0, crowned=True, leading_not_distinctive=False) == (
+        "A defining strength"
+    )
+    assert _strength_label(z_score=3.0, crowned=True, leading_not_distinctive=False) == (
+        "A clear strength"
+    )
+    assert _strength_label(z_score=2.0, crowned=True, leading_not_distinctive=False) == (
+        "A strength"
+    )
+    assert _strength_label(z_score=0.5, crowned=False, leading_not_distinctive=True) == (
+        "Leading, but not strongly distinctive"
+    )
+
+
+def test_mirror_crowning_uses_binomial_and_fallback(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    hot, cold = slugs[0], slugs[1]
+
+    for i in range(12):
+        k = store_image(
+            conn,
+            {
+                "date_taken": f"2024-12-{10 + i:02d}",
+                "filename": f"crown{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        hot_score = 10 if i < 10 else 5
+        cold_score = 2 if i < 10 else 9
+        _add_score(conn, k, hot, hot_score)
+        _add_score(conn, k, cold, cold_score)
+    conn.commit()
+
+    mirror = build_mirror(conn)
+    crowned = [s for s in mirror["sections"] if s["crowned"]]
+    assert crowned
+    assert crowned[0]["perspective_slug"] == hot
+    assert crowned[0]["z_score"] > 0
+
+    # Even split → fallback top-1, not crowned.
+    conn2 = init_database(str(tmp_path / "even.db"))
+    for i in range(8):
+        k = store_image(
+            conn2,
+            {
+                "date_taken": f"2025-01-{10 + i:02d}",
+                "filename": f"even{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        _add_score(conn2, k, hot, 5 + (i % 2))
+        _add_score(conn2, k, cold, 5 + ((i + 1) % 2))
+    conn2.commit()
+
+    even = build_mirror(conn2)
+    assert even["meta"]["fallback_active"] is True
+    assert len(even["sections"]) == 1
+    assert even["sections"][0]["leading_not_distinctive"] is True
+
+
+def test_mirror_reads_percentile_lookup_not_aggregate_scores(tmp_path, monkeypatch) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    hot, cold = slugs[0], slugs[1]
+    k = store_image(
+        conn,
+        {"date_taken": "2025-02-01", "filename": "one.jpg", "instagram_posted": False},
+    )
+    _add_score(conn, k, hot, 8)
+    _add_score(conn, k, cold, 4)
+    conn.commit()
+
+    lookup = compute_within_perspective_percentile_lookup(conn)
+
+    def _tracked_lookup(c):
+        assert c is conn
+        return lookup
+
+    monkeypatch.setattr(
+        "lightroom_tagger.core.identity_service.mirror.compute_within_perspective_percentile_lookup",
+        _tracked_lookup,
+    )
+
+    build_mirror(conn)
 
 
 def test_suggestions_only_unposted_with_reasons(tmp_path) -> None:

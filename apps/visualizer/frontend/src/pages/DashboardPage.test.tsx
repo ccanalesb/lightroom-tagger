@@ -12,14 +12,12 @@ import {
 } from '../services/api'
 import {
   EMPTY_BEST_PHOTOS_META,
-  EMPTY_STYLE_FINGERPRINT_RESPONSE,
 } from '../__test-utils__/identityFixtures'
 import {
   INSIGHTS_PAGE_TITLE,
   INSIGHTS_SECTION_EXPLORE,
   INSIGHTS_SECTION_HIGHLIGHTS,
   INSIGHTS_SECTION_POSTING,
-  INSIGHTS_SECTION_SCORES,
 } from '../constants/strings'
 
 describe('DashboardPage', () => {
@@ -31,18 +29,6 @@ describe('DashboardPage', () => {
       posted_to_instagram: 0,
       matches_found: 0,
       db_path: '/tmp/x.db',
-    })
-    vi.spyOn(IdentityAPI, 'getStyleFingerprint').mockResolvedValue({
-      ...EMPTY_STYLE_FINGERPRINT_RESPONSE,
-      per_perspective: [
-        {
-          perspective_slug: 'street',
-          mean_score: 7,
-          median_score: 7,
-          count_scores: 3,
-        },
-      ],
-      aggregate_distribution: { '7-10': 2, '4-6': 1, '1-3': 0 },
     })
     vi.spyOn(IdentityAPI, 'getBestPhotos').mockImplementation(() =>
       Promise.resolve({
@@ -87,7 +73,7 @@ describe('DashboardPage', () => {
     ).toBeInTheDocument()
     await waitFor(() => {
       expect(
-        screen.getByRole('heading', { level: 2, name: INSIGHTS_SECTION_SCORES }),
+        screen.getByRole('heading', { level: 2, name: INSIGHTS_SECTION_POSTING }),
       ).toBeInTheDocument()
     })
     await waitFor(() => {

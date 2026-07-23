@@ -1,4 +1,4 @@
-"""Identity API response models — best photos, style fingerprint, post-next suggestions."""
+"""Identity API response models — best photos, mirror signature, post-next suggestions."""
 
 from __future__ import annotations
 
@@ -59,41 +59,77 @@ class IdentityBestPhotosQuery(BaseModel):
     posted: str | None = None
 
 
-class StyleFingerprintPerPerspective(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-
-    perspective_slug: str
-    mean_score: float | None = None
-    median_score: float | None = None
-    count_scores: int
-
-
-class StyleFingerprintMeta(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-
-    tokenization_note: str | None = None
-    perspectives_included: list[str] | None = None
-    weighting: str | None = None
-    scores_are_advisory: str | None = None
-
-
-class TopRationaleToken(BaseModel):
+class MirrorDescriptor(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     token: str
+    log_odds: float
     count: int
 
 
-class StyleFingerprintResponse(BaseModel):
+class MirrorExemplarPerPerspective(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    per_perspective: list[StyleFingerprintPerPerspective]
-    aggregate_distribution: dict[str, int]
-    aggregate_distribution_note: str | None = None
-    top_rationale_tokens: list[TopRationaleToken]
-    evidence: dict[str, list[str]]
-    evidence_note: str | None = None
-    meta: StyleFingerprintMeta
+    perspective_slug: str
+    display_name: str
+    score: int
+    percentile: float
+
+
+class MirrorExemplar(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    image_key: str
+    filename: str
+    date_taken: str
+    rating: int
+    instagram_posted: bool
+    score: int
+    percentile: float
+    purity: float
+    rationale_preview: str
+    per_perspective: list[MirrorExemplarPerPerspective]
+
+
+class MirrorTechniqueSection(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    perspective_slug: str
+    display_name: str
+    strength_label: str
+    leading_not_distinctive: bool
+    crowned: bool
+    win_rate: float
+    chance_rate: float
+    z_score: float
+    votes: int
+    photos_on: int
+    coverage: float
+    low_coverage: bool
+    descriptors: list[MirrorDescriptor]
+    exemplars: list[MirrorExemplar]
+
+
+class MirrorMeta(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    active_perspectives: list[str] | None = None
+    total_catalog_images: int | None = None
+    voting_rule: str | None = None
+    crowning_rule: str | None = None
+    low_coverage_threshold: float | None = None
+    exemplar_limit: int | None = None
+    descriptor_min_count: int | None = None
+    scores_are_advisory: str | None = None
+    fallback_active: bool | None = None
+
+
+class MirrorResponse(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    population: int
+    sections: list[MirrorTechniqueSection]
+    meta: MirrorMeta
 
 
 class PostNextCandidate(BaseModel):

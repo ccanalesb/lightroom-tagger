@@ -10,17 +10,21 @@ export type IdentityBestPhotosMeta =
 export type IdentityBestPhotosResponse =
   components['schemas']['IdentityBestPhotosResponse.00d7522']
 
-export type StyleFingerprintPerPerspective =
-  components['schemas']['StyleFingerprintResponse.00d7522.StyleFingerprintPerPerspective']
+export type MirrorDescriptor =
+  components['schemas']['MirrorResponse.00d7522.MirrorDescriptor']
 
-export type StyleFingerprintMeta =
-  components['schemas']['StyleFingerprintResponse.00d7522.StyleFingerprintMeta']
+export type MirrorExemplar =
+  components['schemas']['MirrorResponse.00d7522.MirrorExemplar']
 
-export type TopRationaleToken =
-  components['schemas']['StyleFingerprintResponse.00d7522.TopRationaleToken']
+export type MirrorExemplarPerPerspective =
+  components['schemas']['MirrorResponse.00d7522.MirrorExemplarPerPerspective']
 
-export type StyleFingerprintResponse =
-  components['schemas']['StyleFingerprintResponse.00d7522']
+export type MirrorMeta = components['schemas']['MirrorResponse.00d7522.MirrorMeta']
+
+export type MirrorResponse = components['schemas']['MirrorResponse.00d7522']
+
+export type MirrorTechniqueSection =
+  components['schemas']['MirrorResponse.00d7522.MirrorTechniqueSection']
 
 export type PostNextCandidate =
   components['schemas']['PostNextSuggestionsResponse.00d7522.PostNextCandidate']

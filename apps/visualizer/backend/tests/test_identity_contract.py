@@ -7,8 +7,8 @@ from app import create_app
 
 from api.schemas.identity import (
     IdentityBestPhotosResponse,
+    MirrorResponse,
     PostNextSuggestionsResponse,
-    StyleFingerprintResponse,
 )
 from lightroom_tagger.core.database import init_database, insert_image_score, store_image
 
@@ -58,13 +58,13 @@ def test_best_photos_round_trip_from_handler(identity_contract_client):
     assert validated.meta.ranking_key == "peak_percentile"
 
 
-def test_style_fingerprint_round_trip_from_handler(identity_contract_client):
-    payload = identity_contract_client.get("/api/identity/style-fingerprint").get_json()
+def test_mirror_round_trip_from_handler(identity_contract_client):
+    payload = identity_contract_client.get("/api/identity/mirror").get_json()
     assert payload is not None
 
-    validated = StyleFingerprintResponse.model_validate(payload)
-    assert isinstance(validated.per_perspective, list)
-    assert validated.meta.weighting == "equal"
+    validated = MirrorResponse.model_validate(payload)
+    assert isinstance(validated.population, int)
+    assert isinstance(validated.sections, list)
 
 
 def test_suggestions_round_trip_from_handler(identity_contract_client):
