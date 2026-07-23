@@ -16,6 +16,8 @@ from lightroom_tagger.core.database import (
 from lightroom_tagger.core.identity_service import (
     build_style_fingerprint,
     compute_image_aggregate_scores,
+    compute_image_peak_percentile_scores,
+    compute_within_perspective_percentile_lookup,
     rank_best_photos,
     suggest_what_to_post_next,
 )
@@ -149,7 +151,7 @@ def test_rank_best_photos_orders_by_aggregate_and_excludes_low_coverage(tmp_path
     keys = [r["image_key"] for r in page]
     assert k_partial not in keys
     assert keys[0] == k_high
-    assert page[0]["aggregate_score"] > page[1]["aggregate_score"]
+    assert page[0]["peak_percentile"] > page[1]["peak_percentile"]
 
 
 def test_rank_best_photos_filters_by_posted(tmp_path) -> None:
@@ -354,3 +356,133 @@ def test_suggestions_offset_returns_second_page(tmp_path) -> None:
     assert out["total"] >= 3
     assert len(out["candidates"]) == 1
     assert out["candidates"][0]["image_key"] == expected_second
+
+
+def test_midrank_percentile_assigns_tied_scores_same_rank(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=1)
+    slug = slugs[0]
+
+    keys: list[str] = []
+    for i, score in enumerate([5, 5, 10]):
+        k = store_image(
+            conn,
+            {
+                "date_taken": f"2024-06-{10 + i:02d}",
+                "filename": f"tie{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        keys.append(k)
+        _add_score(conn, k, slug, score)
+    conn.commit()
+
+    lookup = compute_within_perspective_percentile_lookup(conn)
+    tied_a = lookup[(keys[0], slug)]
+    tied_b = lookup[(keys[1], slug)]
+    top = lookup[(keys[2], slug)]
+
+    assert tied_a == tied_b
+    assert 0.0 <= tied_a <= 1.0
+    assert top == 1.0
+    assert tied_a < top
+
+
+def test_percentile_normalizes_within_each_perspective_independently(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    hot, cold = slugs[0], slugs[1]
+
+    image_keys: list[str] = []
+    hot_scores = [8, 9, 10]
+    cold_scores = [2, 3, 4]
+    for i, (hs, cs) in enumerate(zip(hot_scores, cold_scores)):
+        k = store_image(
+            conn,
+            {
+                "date_taken": f"2024-07-{10 + i:02d}",
+                "filename": f"norm{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        image_keys.append(k)
+        _add_score(conn, k, hot, hs)
+        _add_score(conn, k, cold, cs)
+    conn.commit()
+
+    lookup = compute_within_perspective_percentile_lookup(conn)
+    # Middle raw score in each distribution should map to the same percentile.
+    mid_hot = lookup[(image_keys[1], hot)]
+    mid_cold = lookup[(image_keys[1], cold)]
+    assert mid_hot == mid_cold == 0.5
+
+
+def test_percentile_excludes_ineligible_population_from_baseline(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=1)
+    slug = slugs[0]
+
+    eligible_key = store_image(
+        conn,
+        {"date_taken": "2024-08-01", "filename": "eligible.jpg", "instagram_posted": False},
+    )
+    excused_key = store_image(
+        conn,
+        {"date_taken": "2024-08-02", "filename": "excused.jpg", "instagram_posted": False},
+    )
+    _add_score(conn, eligible_key, slug, 4)
+    _add_score(conn, excused_key, slug, 10, not_attempted=1)
+    conn.commit()
+
+    lookup = compute_within_perspective_percentile_lookup(conn)
+    assert (excused_key, slug) not in lookup
+    assert lookup[(eligible_key, slug)] == 1.0
+
+
+def test_rank_best_photos_prefers_peak_percentile_over_mean(tmp_path) -> None:
+    """High mean on a cold lens loses to a peak on a hot lens after normalization."""
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    hot, cold = slugs[0], slugs[1]
+
+    # Baseline population for hot lens: mostly 8–10; cold lens: mostly 2–4.
+    baseline_keys: list[str] = []
+    for i, (hs, cs) in enumerate([(8, 2), (9, 3), (10, 4), (9, 3)]):
+        k = store_image(
+            conn,
+            {
+                "date_taken": f"2024-09-{10 + i:02d}",
+                "filename": f"base{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        baseline_keys.append(k)
+        _add_score(conn, k, hot, hs)
+        _add_score(conn, k, cold, cs)
+
+    mean_winner = store_image(
+        conn,
+        {"date_taken": "2024-09-20", "filename": "mean.jpg", "instagram_posted": False},
+    )
+    peak_winner = store_image(
+        conn,
+        {"date_taken": "2024-09-21", "filename": "peak.jpg", "instagram_posted": False},
+    )
+    # Higher mean, but only mid-pack on each lens.
+    _add_score(conn, mean_winner, hot, 9)
+    _add_score(conn, mean_winner, cold, 4)
+    # Lower mean, but top of the hot-lens distribution.
+    _add_score(conn, peak_winner, hot, 10)
+    _add_score(conn, peak_winner, cold, 2)
+    conn.commit()
+
+    mean_items, _ = compute_image_aggregate_scores(conn, min_perspectives=2)
+    mean_row = next(i for i in mean_items if i["image_key"] == mean_winner)
+    peak_row = next(i for i in mean_items if i["image_key"] == peak_winner)
+    assert mean_row["aggregate_score"] > peak_row["aggregate_score"]
+
+    page, total, meta = rank_best_photos(conn, limit=10, offset=0, min_perspectives=2)
+    assert total >= 2
+    assert meta["weighting"] == "peak_within_perspective_percentile"
+    assert page[0]["image_key"] == peak_winner
+    assert page[0]["peak_percentile"] >= page[1]["peak_percentile"]

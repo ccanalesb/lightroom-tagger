@@ -50,4 +50,18 @@ describe('pickDominantPerspective', () => {
     ])
     expect(result?.perspective_slug).toBe('street')
   })
+
+  it('prefers percentile over raw score when percentile is present', () => {
+    const result = pickDominantPerspective([
+      {
+        ...score('street', 'Street', 10),
+        percentile: 0.4,
+      },
+      {
+        ...score('documentary', 'Documentary', 6),
+        percentile: 0.95,
+      },
+    ])
+    expect(result?.perspective_slug).toBe('documentary')
+  })
 })

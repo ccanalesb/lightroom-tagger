@@ -100,7 +100,7 @@ const BEST_PHOTO_ROW: IdentityBestPhotoItem = {
   date_taken: '2026-04-01',
   rating: 4,
   instagram_posted: false,
-  aggregate_score: 7.2,
+  peak_percentile: 0.72,
   perspectives_covered: 2,
   eligible: true,
   per_perspective: SHARED_DETAIL.identity_per_perspective ?? [],

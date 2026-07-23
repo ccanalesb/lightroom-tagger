@@ -16,7 +16,7 @@ class IdentityBestPhotoItem(BaseModel):
 
     image_key: str
     image_type: ImageTypeLiteral | None = None
-    aggregate_score: float
+    peak_percentile: float
     perspectives_covered: int
     eligible: bool | None = None
     per_perspective: list[IdentityPerPerspectiveScore]
@@ -34,6 +34,7 @@ class IdentityBestPhotosMeta(BaseModel):
 
     active_perspectives: list[str] | None = None
     weighting: str | None = None
+    ranking_key: str | None = None
     min_perspectives_used: int | None = None
     coverage_rule: str | None = None
     total_catalog_images: int | None = None

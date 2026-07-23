@@ -12,7 +12,7 @@ import { IDENTITY_SECTION_BEST_PHOTOS } from '../../constants/strings'
 const postedBestPhotoItem = {
   ...NULLABLE_BEST_PHOTO_FIELDS,
   image_key: 'k1',
-  aggregate_score: 8,
+  peak_percentile: 0.8,
   perspectives_covered: 3,
   eligible: true,
   per_perspective: [

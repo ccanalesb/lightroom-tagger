@@ -69,7 +69,7 @@ describe('image-view adapters', () => {
     const row: IdentityBestPhotoItem = {
       ...NULLABLE_BEST_PHOTO_FIELDS,
       image_key: 'bk',
-      aggregate_score: 8.25,
+      peak_percentile: 0.825,
       perspectives_covered: 3,
       eligible: true,
       per_perspective: [
@@ -91,7 +91,7 @@ describe('image-view adapters', () => {
     const out = fromBestPhotoRow(row)
     expect(out.image_type).toBe('catalog')
     expect(out.key).toBe('bk')
-    expect(out.identity_aggregate_score).toBe(8.25)
+    expect(out.identity_peak_percentile).toBe(0.825)
     expect(out.identity_perspectives_covered).toBe(3)
     expect(out.identity_eligible).toBe(true)
     expect(out.identity_per_perspective).toHaveLength(1)

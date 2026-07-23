@@ -965,7 +965,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Paginated eligible catalog images ranked by aggregate perspective score. */
+        /** Paginated eligible catalog images ranked by peak within-perspective percentile. */
         get: operations["get__api_identity_best-photos"];
         put?: never;
         post?: never;
@@ -1966,6 +1966,11 @@ export interface components {
              */
             identity_aggregate_score: number | null;
             /**
+             * Identity Peak Percentile
+             * @default null
+             */
+            identity_peak_percentile: number | null;
+            /**
              * Identity Perspectives Covered
              * @default null
              */
@@ -2767,8 +2772,8 @@ export interface components {
              * @default null
              */
             image_type: ("catalog" | "instagram") | null;
-            /** Aggregate Score */
-            aggregate_score: number;
+            /** Peak Percentile */
+            peak_percentile: number;
             /** Perspectives Covered */
             perspectives_covered: number;
             /**
@@ -2815,6 +2820,11 @@ export interface components {
              */
             weighting: string | null;
             /**
+             * Ranking Key
+             * @default null
+             */
+            ranking_key: string | null;
+            /**
              * Min Perspectives Used
              * @default null
              */
@@ -2853,6 +2863,11 @@ export interface components {
             display_name: string;
             /** Score */
             score: number;
+            /**
+             * Percentile
+             * @default null
+             */
+            percentile: number | null;
             /** Prompt Version */
             prompt_version: string;
             /** Model Used */
@@ -2917,6 +2932,11 @@ export interface components {
             display_name: string;
             /** Score */
             score: number;
+            /**
+             * Percentile
+             * @default null
+             */
+            percentile: number | null;
             /** Prompt Version */
             prompt_version: string;
             /** Model Used */
@@ -4189,6 +4209,11 @@ export interface components {
             display_name: string;
             /** Score */
             score: number;
+            /**
+             * Percentile
+             * @default null
+             */
+            percentile: number | null;
             /** Prompt Version */
             prompt_version: string;
             /** Model Used */
