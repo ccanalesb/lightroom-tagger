@@ -74,7 +74,9 @@ import type {
   IdentityBestPhotosMeta,
   IdentityBestPhotosResponse,
   MirrorExemplar,
+  MirrorLensExemplarsResponse,
   MirrorMeta,
+  MirrorOtherLens,
   MirrorResponse,
   MirrorTechniqueSection,
   PostNextCandidate,
@@ -108,7 +110,9 @@ export type {
   IdentityBestPhotosMeta,
   IdentityBestPhotosResponse,
   MirrorExemplar,
+  MirrorLensExemplarsResponse,
   MirrorMeta,
+  MirrorOtherLens,
   MirrorResponse,
   MirrorTechniqueSection,
   PostNextCandidate,
@@ -781,6 +785,19 @@ export const IdentityAPI = {
   },
 
   getMirror: () => request<MirrorResponse>('/identity/mirror'),
+
+  getMirrorLensExemplars: (
+    slug: string,
+    params?: { limit?: number; offset?: number },
+  ) => {
+    const sp = new URLSearchParams()
+    if (params?.limit !== undefined) sp.set('limit', String(params.limit))
+    if (params?.offset !== undefined) sp.set('offset', String(params.offset))
+    const qs = sp.toString()
+    return request<MirrorLensExemplarsResponse>(
+      `/identity/mirror/lens/${encodeURIComponent(slug)}/exemplars${qs ? `?${qs}` : ''}`,
+    )
+  },
 
   getSuggestions: (params?: {
     limit?: number

@@ -18,6 +18,8 @@ from api.openapi import spec
 from api.schemas.identity import (
     IdentityBestPhotosQuery,
     IdentityBestPhotosResponse,
+    MirrorLensExemplarsQuery,
+    MirrorLensExemplarsResponse,
     MirrorResponse,
     PostNextSuggestionsQuery,
     PostNextSuggestionsResponse,
@@ -25,6 +27,7 @@ from api.schemas.identity import (
 from api.schemas.jobs import ErrorBody
 from utils.pagination import _clamp_pagination
 from lightroom_tagger.core.identity_service import (
+    build_lens_exemplars,
     build_mirror,
     rank_best_photos,
     suggest_what_to_post_next,
@@ -116,6 +119,32 @@ def mirror(db: sqlite3.Connection):
     """Catalog Mirror: crowned signature techniques and exemplar rails."""
     try:
         return jsonify(build_mirror(db))
+    except Exception:
+        return error_server_error()
+
+
+@bp.route("/mirror/lens/<slug>/exemplars", methods=["GET"])
+@with_db
+@spec.validate(
+    query=MirrorLensExemplarsQuery,
+    resp=Response(
+        HTTP_200=MirrorLensExemplarsResponse,
+        HTTP_400=ErrorBody,
+        HTTP_500=ErrorBody,
+    ),
+    tags=['identity'],
+)
+def mirror_lens_exemplars(db: sqlite3.Connection, slug: str):
+    """Paginated exemplar rail for one mirror lens (post-stack-collapse ranking)."""
+    try:
+        limit, offset = _clamp_pagination(
+            request.args.get("limit", 24, type=int),
+            request.args.get("offset", 0, type=int),
+        )
+        payload = build_lens_exemplars(db, slug, offset=offset, limit=limit)
+        return jsonify(payload)
+    except ValueError as exc:
+        return error_bad_request(str(exc))
     except Exception:
         return error_server_error()
 

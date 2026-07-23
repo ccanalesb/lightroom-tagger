@@ -41,6 +41,8 @@ interface ImageDetailModalProps {
   /** When set, catalog detail calls request `?score_perspective=<slug>`
    *  so the header pill shows the same slug the tile used. */
   scorePerspectiveSlug?: string
+  /** Optional content rendered above the detail body (e.g. Mirror standout). */
+  contextSlot?: ReactNode
   onClose: () => void
 }
 
@@ -363,6 +365,7 @@ export function ImageDetailModal({
   initialImage,
   primaryScoreSource,
   scorePerspectiveSlug,
+  contextSlot,
   onClose,
 }: ImageDetailModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -405,6 +408,8 @@ export function ImageDetailModal({
             </h2>
             <ModalCloseButton onClick={onClose} />
           </div>
+
+          {contextSlot ? <div className="border-b border-border px-6 py-4">{contextSlot}</div> : null}
 
           <ErrorBoundary
             resetKeys={[imageType, imageKey, scorePerspectiveSlug ?? '']}

@@ -24,7 +24,8 @@ export const EMPTY_MIRROR_META: MirrorMeta = {
   voting_rule: null,
   crowning_rule: null,
   low_coverage_threshold: null,
-  exemplar_limit: null,
+  exemplar_initial_limit: null,
+  exemplar_page_size: null,
   descriptor_min_count: null,
   scores_are_advisory: null,
   fallback_active: null,
@@ -33,6 +34,7 @@ export const EMPTY_MIRROR_META: MirrorMeta = {
 export const EMPTY_MIRROR_RESPONSE: MirrorResponse = {
   population: 0,
   sections: [],
+  other_lenses: [],
   meta: EMPTY_MIRROR_META,
 }
 

@@ -55,7 +55,83 @@ def test_mirror_200_shape(identity_client) -> None:
     assert data is not None
     assert "population" in data
     assert "sections" in data
+    assert "other_lenses" in data
     assert "meta" in data
+
+
+def test_mirror_lens_exemplars_unknown_slug_400(identity_client) -> None:
+    resp = identity_client.get("/api/identity/mirror/lens/not-a-real-slug/exemplars")
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body is not None
+    assert "unknown or inactive" in (body.get("error") or "")
+
+
+def test_mirror_lens_exemplars_pagination(identity_client, tmp_path, monkeypatch) -> None:
+    db_path = str(tmp_path / "library.db")
+    init_database(db_path)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT slug FROM perspectives WHERE active = 1 ORDER BY slug LIMIT 2"
+    ).fetchall()
+    assert len(rows) >= 2
+    hot, cold = str(rows[0]["slug"]), str(rows[1]["slug"])
+    for i in range(4):
+        k = store_image(
+            conn,
+            {
+                "date_taken": f"2025-05-{10 + i:02d}",
+                "filename": f"api_ex{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        insert_image_score(
+            conn,
+            {
+                "image_key": k,
+                "image_type": "catalog",
+                "perspective_slug": hot,
+                "score": 10 - i,
+                "rationale": "",
+                "model_used": "test-model",
+                "prompt_version": "v-test",
+                "scored_at": "2024-09-01T12:00:00+00:00",
+                "is_current": 1,
+            },
+        )
+        insert_image_score(
+            conn,
+            {
+                "image_key": k,
+                "image_type": "catalog",
+                "perspective_slug": cold,
+                "score": 2 + i,
+                "rationale": "",
+                "model_used": "test-model",
+                "prompt_version": "v-test",
+                "scored_at": "2024-09-01T12:00:00+00:00",
+                "is_current": 1,
+            },
+        )
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setattr("utils.db.LIBRARY_DB", db_path)
+    app = create_app()
+    client = app.test_client()
+
+    r0 = client.get(f"/api/identity/mirror/lens/{hot}/exemplars?limit=2&offset=0")
+    r1 = client.get(f"/api/identity/mirror/lens/{hot}/exemplars?limit=2&offset=2")
+    assert r0.status_code == 200
+    assert r1.status_code == 200
+    data0 = r0.get_json()
+    data1 = r1.get_json()
+    assert data0 is not None and data1 is not None
+    assert data0["total"] == 4
+    assert len(data0["items"]) == 2
+    assert len(data1["items"]) == 2
+    assert data0["items"][0]["image_key"] != data1["items"][0]["image_key"]
 
 
 def test_suggestions_200_shape(identity_client) -> None:
