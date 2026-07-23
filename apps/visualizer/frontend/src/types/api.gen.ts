@@ -3173,11 +3173,6 @@ export interface components {
              */
             coverage_rule: string | null;
             /**
-             * Timezone Assumption
-             * @default null
-             */
-            timezone_assumption: string | null;
-            /**
              * High Score Rule
              * @default null
              */

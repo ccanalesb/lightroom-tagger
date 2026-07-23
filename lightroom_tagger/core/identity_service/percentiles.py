@@ -73,6 +73,7 @@ def compute_image_peak_percentile_scores(
     *,
     min_perspectives: int | None = None,
     include_ineligible: bool = True,
+    percentile_lookup: dict[tuple[str, str], float] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Per-image peak within-perspective percentile plus per-perspective detail.
 
@@ -93,7 +94,8 @@ def compute_image_peak_percentile_scores(
         conn.execute("SELECT COUNT(*) AS c FROM images").fetchone()["c"]
     )
 
-    percentile_lookup = compute_within_perspective_percentile_lookup(conn)
+    if percentile_lookup is None:
+        percentile_lookup = compute_within_perspective_percentile_lookup(conn)
     rows = conn.execute(_SCORES_BASE_SQL).fetchall()
 
     by_key: dict[str, list[dict[str, Any]]] = {}

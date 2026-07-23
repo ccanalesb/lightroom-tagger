@@ -5,17 +5,9 @@ from __future__ import annotations
 import sqlite3
 from typing import Any
 
-from .mirror import build_mirror
+from .mirror import build_mirror_scan, compute_signature_stats
 from .percentiles import compute_image_peak_percentile_scores
 from .ranking import _image_meta_map
-
-
-def _crowned_slugs(mirror: dict[str, Any]) -> set[str]:
-    return {
-        str(section["perspective_slug"])
-        for section in mirror.get("sections", [])
-        if section.get("crowned")
-    }
 
 
 def _peak_perspective(per_perspective: list[dict[str, Any]]) -> dict[str, Any]:
@@ -40,9 +32,13 @@ def suggest_what_to_post_next(
     if sort_by_date is not None and sort_by_date not in ("newest", "oldest"):
         raise ValueError("sort_by_date must be 'newest' or 'oldest'")
 
-    items, peak_meta = compute_image_peak_percentile_scores(conn, include_ineligible=False)
-    mirror = build_mirror(conn)
-    crowned = _crowned_slugs(mirror)
+    scan = build_mirror_scan(conn)
+    items, peak_meta = compute_image_peak_percentile_scores(
+        conn,
+        include_ineligible=False,
+        percentile_lookup=scan.percentile_lookup,
+    )
+    crowned = {s["perspective_slug"] for s in compute_signature_stats(scan) if s["crowned"]}
     keys = [str(i["image_key"]) for i in items if i.get("eligible")]
     img_meta = _image_meta_map(conn, keys)
 
@@ -87,7 +83,6 @@ def suggest_what_to_post_next(
         "ranking_key": peak_meta.get("ranking_key"),
         "min_perspectives_used": peak_meta.get("min_perspectives_used"),
         "coverage_rule": peak_meta.get("coverage_rule"),
-        "timezone_assumption": "UTC",
         "high_score_rule": (
             "reason code high_score_unposted when peak_percentile >= p90 of eligible "
             "unposted images' peak within-perspective percentiles."
