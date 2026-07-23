@@ -7,6 +7,7 @@ from app import create_app
 
 from api.schemas.identity import (
     IdentityBestPhotosResponse,
+    MirrorLensExemplarsResponse,
     MirrorResponse,
     PostNextSuggestionsResponse,
 )
@@ -65,6 +66,24 @@ def test_mirror_round_trip_from_handler(identity_contract_client):
     validated = MirrorResponse.model_validate(payload)
     assert isinstance(validated.population, int)
     assert isinstance(validated.sections, list)
+    assert isinstance(validated.other_lenses, list)
+
+
+def test_mirror_lens_exemplars_round_trip_from_handler(identity_contract_client):
+    slug_row = identity_contract_client.get("/api/identity/mirror").get_json()
+    assert slug_row is not None
+    section = (slug_row.get("sections") or [None])[0]
+    if section is None:
+        pytest.skip("no mirror sections in fixture catalog")
+    slug = section["perspective_slug"]
+    payload = identity_contract_client.get(
+        f"/api/identity/mirror/lens/{slug}/exemplars?limit=5&offset=0"
+    ).get_json()
+    assert payload is not None
+
+    validated = MirrorLensExemplarsResponse.model_validate(payload)
+    assert isinstance(validated.total, int)
+    assert isinstance(validated.items, list)
 
 
 def test_suggestions_round_trip_from_handler(identity_contract_client):

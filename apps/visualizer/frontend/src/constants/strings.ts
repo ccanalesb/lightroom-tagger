@@ -488,6 +488,9 @@ export const IDENTITY_MIRROR_EMPTY =
 export const IDENTITY_MIRROR_LOW_COVERAGE = 'scored on ~{pct}% of your catalog'
 export const IDENTITY_MIRROR_WHY_HERE = "Why it's here"
 export const IDENTITY_MIRROR_STANDOUT = 'Standout dimension'
+export const IDENTITY_MIRROR_OTHER_LENSES = 'Other lenses'
+export const IDENTITY_MIRROR_OTHER_LENSES_SUMMARY =
+  'Active perspectives that did not clear the distinctive-signature bar. Expand to browse exemplars.'
 export const IDENTITY_DIVIDER_BACKWARD = 'Who you are'
 export const IDENTITY_DIVIDER_FORWARD = 'What to post next'
 export const IDENTITY_SECTION_ADVISOR = 'Advisor'

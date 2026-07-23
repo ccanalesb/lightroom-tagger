@@ -992,6 +992,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/identity/mirror/lens/{slug}/exemplars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Paginated exemplar rail for one mirror lens (post-stack-collapse ranking). */
+        get: operations["get__api_identity_mirror_lens_{slug}_exemplars"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/identity/suggestions": {
         parameters: {
             query?: never;
@@ -1248,7 +1265,29 @@ export interface components {
             population: number;
             /** Sections */
             sections: components["schemas"]["MirrorResponse.00d7522.MirrorTechniqueSection"][];
+            /** Other Lenses */
+            other_lenses: components["schemas"]["MirrorResponse.00d7522.MirrorOtherLens"][];
             meta: components["schemas"]["MirrorResponse.00d7522.MirrorMeta"];
+        };
+        /** MirrorLensExemplarsQuery */
+        "MirrorLensExemplarsQuery.00d7522": {
+            /**
+             * Limit
+             * @default null
+             */
+            limit: number | null;
+            /**
+             * Offset
+             * @default null
+             */
+            offset: number | null;
+        };
+        /** MirrorLensExemplarsResponse */
+        "MirrorLensExemplarsResponse.00d7522": {
+            /** Items */
+            items: components["schemas"]["MirrorLensExemplarsResponse.00d7522.MirrorExemplar"][];
+            /** Total */
+            total: number;
         };
         /** PostNextSuggestionsQuery */
         "PostNextSuggestionsQuery.00d7522": {
@@ -2880,6 +2919,16 @@ export interface components {
             rationale_preview: string;
             /** Per Perspective */
             per_perspective: components["schemas"]["MirrorResponse.00d7522.MirrorExemplarPerPerspective"][];
+            /**
+             * Stack Id
+             * @default null
+             */
+            stack_id: number | null;
+            /**
+             * Stack Size
+             * @default null
+             */
+            stack_size: number | null;
         };
         /** MirrorExemplarPerPerspective */
         "MirrorResponse.00d7522.MirrorExemplarPerPerspective": {
@@ -2920,10 +2969,15 @@ export interface components {
              */
             low_coverage_threshold: number | null;
             /**
-             * Exemplar Limit
+             * Exemplar Initial Limit
              * @default null
              */
-            exemplar_limit: number | null;
+            exemplar_initial_limit: number | null;
+            /**
+             * Exemplar Page Size
+             * @default null
+             */
+            exemplar_page_size: number | null;
             /**
              * Descriptor Min Count
              * @default null
@@ -2939,6 +2993,31 @@ export interface components {
              * @default null
              */
             fallback_active: boolean | null;
+        };
+        /** MirrorOtherLens */
+        "MirrorResponse.00d7522.MirrorOtherLens": {
+            /** Perspective Slug */
+            perspective_slug: string;
+            /** Display Name */
+            display_name: string;
+            /** Strength Label */
+            strength_label: string;
+            /** Win Rate */
+            win_rate: number;
+            /** Chance Rate */
+            chance_rate: number;
+            /** Z Score */
+            z_score: number;
+            /** Coverage */
+            coverage: number;
+            /** Low Coverage */
+            low_coverage: boolean;
+            /** Votes */
+            votes: number;
+            /** Photos On */
+            photos_on: number;
+            /** Exemplar Total */
+            exemplar_total: number;
         };
         /** MirrorTechniqueSection */
         "MirrorResponse.00d7522.MirrorTechniqueSection": {
@@ -2970,6 +3049,52 @@ export interface components {
             descriptors: components["schemas"]["MirrorResponse.00d7522.MirrorDescriptor"][];
             /** Exemplars */
             exemplars: components["schemas"]["MirrorResponse.00d7522.MirrorExemplar"][];
+            /** Exemplar Total */
+            exemplar_total: number;
+        };
+        /** MirrorExemplar */
+        "MirrorLensExemplarsResponse.00d7522.MirrorExemplar": {
+            /** Image Key */
+            image_key: string;
+            /** Filename */
+            filename: string;
+            /** Date Taken */
+            date_taken: string;
+            /** Rating */
+            rating: number;
+            /** Instagram Posted */
+            instagram_posted: boolean;
+            /** Score */
+            score: number;
+            /** Percentile */
+            percentile: number;
+            /** Purity */
+            purity: number;
+            /** Rationale Preview */
+            rationale_preview: string;
+            /** Per Perspective */
+            per_perspective: components["schemas"]["MirrorLensExemplarsResponse.00d7522.MirrorExemplarPerPerspective"][];
+            /**
+             * Stack Id
+             * @default null
+             */
+            stack_id: number | null;
+            /**
+             * Stack Size
+             * @default null
+             */
+            stack_size: number | null;
+        };
+        /** MirrorExemplarPerPerspective */
+        "MirrorLensExemplarsResponse.00d7522.MirrorExemplarPerPerspective": {
+            /** Perspective Slug */
+            perspective_slug: string;
+            /** Display Name */
+            display_name: string;
+            /** Score */
+            score: number;
+            /** Percentile */
+            percentile: number;
         };
         /** IdentityPerPerspectiveScore */
         "PostNextSuggestionsResponse.00d7522.IdentityPerPerspectiveScore": {
@@ -8285,6 +8410,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MirrorResponse.00d7522"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+        };
+    };
+    "get__api_identity_mirror_lens_{slug}_exemplars": {
+        parameters: {
+            query?: {
+                limit?: number | null;
+                offset?: number | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MirrorLensExemplarsResponse.00d7522"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
                 };
             };
             /** @description Unprocessable Content */

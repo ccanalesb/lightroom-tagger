@@ -3,6 +3,7 @@ export {
   fromCatalogListRow,
   fromInstagramRow,
   fromMatchSide,
+  fromMirrorExemplar,
   fromPostNextRow,
   fromUnpostedRow,
 } from './adapters'

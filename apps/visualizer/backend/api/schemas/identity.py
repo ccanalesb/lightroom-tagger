@@ -89,6 +89,8 @@ class MirrorExemplar(BaseModel):
     purity: float
     rationale_preview: str
     per_perspective: list[MirrorExemplarPerPerspective]
+    stack_id: int | None = None
+    stack_size: int | None = None
 
 
 class MirrorTechniqueSection(BaseModel):
@@ -108,6 +110,23 @@ class MirrorTechniqueSection(BaseModel):
     low_coverage: bool
     descriptors: list[MirrorDescriptor]
     exemplars: list[MirrorExemplar]
+    exemplar_total: int
+
+
+class MirrorOtherLens(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    perspective_slug: str
+    display_name: str
+    strength_label: str
+    win_rate: float
+    chance_rate: float
+    z_score: float
+    coverage: float
+    low_coverage: bool
+    votes: int
+    photos_on: int
+    exemplar_total: int
 
 
 class MirrorMeta(BaseModel):
@@ -118,7 +137,8 @@ class MirrorMeta(BaseModel):
     voting_rule: str | None = None
     crowning_rule: str | None = None
     low_coverage_threshold: float | None = None
-    exemplar_limit: int | None = None
+    exemplar_initial_limit: int | None = None
+    exemplar_page_size: int | None = None
     descriptor_min_count: int | None = None
     scores_are_advisory: str | None = None
     fallback_active: bool | None = None
@@ -129,7 +149,20 @@ class MirrorResponse(BaseModel):
 
     population: int
     sections: list[MirrorTechniqueSection]
+    other_lenses: list[MirrorOtherLens]
     meta: MirrorMeta
+
+
+class MirrorLensExemplarsResponse(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    items: list[MirrorExemplar]
+    total: int
+
+
+class MirrorLensExemplarsQuery(BaseModel):
+    limit: int | None = None
+    offset: int | None = None
 
 
 class PostNextCandidate(BaseModel):

@@ -12,7 +12,7 @@ from .aggregates import (
     _truncate_rationale,
     compute_single_image_aggregate_scores,
 )
-from .mirror import build_mirror
+from .mirror import build_lens_exemplars, build_mirror
 from .percentiles import (
     compute_image_peak_percentile_scores,
     compute_within_perspective_percentile_lookup,
@@ -36,6 +36,7 @@ __all__ = [
     "_stack_non_representative_keys",
     "_tokenize_rationale",
     "_truncate_rationale",
+    "build_lens_exemplars",
     "build_mirror",
     "compute_image_peak_percentile_scores",
     "compute_single_image_aggregate_scores",

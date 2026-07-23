@@ -21,7 +21,13 @@ export type MirrorExemplarPerPerspective =
 
 export type MirrorMeta = components['schemas']['MirrorResponse.00d7522.MirrorMeta']
 
+export type MirrorOtherLens =
+  components['schemas']['MirrorResponse.00d7522.MirrorOtherLens']
+
 export type MirrorResponse = components['schemas']['MirrorResponse.00d7522']
+
+export type MirrorLensExemplarsResponse =
+  components['schemas']['MirrorLensExemplarsResponse.00d7522']
 
 export type MirrorTechniqueSection =
   components['schemas']['MirrorResponse.00d7522.MirrorTechniqueSection']

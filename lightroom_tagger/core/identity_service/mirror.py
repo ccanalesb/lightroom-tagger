@@ -14,10 +14,15 @@ from .aggregates import (
     _truncate_rationale,
 )
 from .percentiles import compute_within_perspective_percentile_lookup
-from .ranking import _image_meta_map
+from .ranking import (
+    _image_meta_map,
+    _stack_fields_for_image_keys,
+    _stack_non_representative_keys,
+)
 
 _LOW_COVERAGE_THRESHOLD = 0.5
-_EXEMPLAR_LIMIT = 12
+_EXEMPLAR_INITIAL_LIMIT = 24
+_EXEMPLAR_PAGE_SIZE = 12
 _DESCRIPTOR_MIN_COUNT = 5
 _DESCRIPTOR_LIMIT = 15
 _MIN_VOTING_LENSES = 2
@@ -129,8 +134,16 @@ def _purity(lens_percentile: float, other_percentiles: list[float]) -> float:
     return round((lens_percentile - max(other_percentiles)) * 100.0, 1)
 
 
-def build_mirror(conn: sqlite3.Connection) -> dict[str, Any]:
-    """Catalog Mirror: crowned signature lenses, descriptors, and exemplar rails."""
+def _build_by_image(
+    conn: sqlite3.Connection,
+) -> tuple[
+    list[str],
+    set[str],
+    dict[str, str],
+    dict[str, list[dict[str, Any]]],
+    dict[str, list[str]],
+    list[str],
+]:
     active_slugs = _active_perspective_slugs(conn)
     slug_set = set(active_slugs)
     display_by_slug: dict[str, str] = {}
@@ -141,7 +154,6 @@ def build_mirror(conn: sqlite3.Connection) -> dict[str, Any]:
             continue
         display_by_slug.setdefault(slug, str(r["perspective_display_name"] or slug))
 
-    total_catalog = int(conn.execute("SELECT COUNT(*) AS c FROM images").fetchone()["c"])
     percentile_lookup = compute_within_perspective_percentile_lookup(conn)
 
     by_image: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -167,6 +179,125 @@ def build_mirror(conn: sqlite3.Connection) -> dict[str, Any]:
                 "rationale": rationale,
             }
         )
+
+    return active_slugs, slug_set, display_by_slug, by_image, rationales_by_slug, corpus_rationales
+
+
+def _lens_exemplar_candidates(
+    slug: str,
+    by_image: dict[str, list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    for image_key, perspectives in by_image.items():
+        match = next((p for p in perspectives if p["perspective_slug"] == slug), None)
+        if match is None:
+            continue
+        others = [p["percentile"] for p in perspectives if p["perspective_slug"] != slug]
+        candidates.append(
+            {
+                "image_key": image_key,
+                "score": match["score"],
+                "percentile": match["percentile"],
+                "purity": _purity(match["percentile"], others),
+                "rationale": match.get("rationale") or "",
+                "per_perspective": perspectives,
+            }
+        )
+    return candidates
+
+
+def _format_exemplar_rows(
+    conn: sqlite3.Connection,
+    rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if not rows:
+        return []
+
+    keys = [str(row["image_key"]) for row in rows]
+    meta_map = _image_meta_map(conn, keys)
+    stack_by_key = _stack_fields_for_image_keys(conn, keys)
+
+    exemplars: list[dict[str, Any]] = []
+    for row in rows:
+        image_key = str(row["image_key"])
+        per_out = []
+        for p in sorted(row["per_perspective"], key=lambda x: x["perspective_slug"]):
+            per_out.append(
+                {
+                    "perspective_slug": p["perspective_slug"],
+                    "display_name": p["display_name"],
+                    "score": p["score"],
+                    "percentile": round(p["percentile"], 6),
+                }
+            )
+        im = meta_map.get(image_key, {})
+        stack = stack_by_key.get(image_key, {})
+        exemplars.append(
+            {
+                "image_key": image_key,
+                "score": row["score"],
+                "percentile": round(row["percentile"] * 100.0, 1),
+                "purity": row["purity"],
+                "rationale_preview": _truncate_rationale(row["rationale"]),
+                "per_perspective": per_out,
+                "filename": im.get("filename") or "",
+                "date_taken": im.get("date_taken") or "",
+                "rating": int(im.get("rating") or 0),
+                "instagram_posted": bool(im.get("instagram_posted")),
+                "stack_id": stack.get("stack_id"),
+                "stack_size": stack.get("stack_member_count"),
+            }
+        )
+    return exemplars
+
+
+def build_lens_exemplars(
+    conn: sqlite3.Connection,
+    slug: str,
+    *,
+    offset: int = 0,
+    limit: int = _EXEMPLAR_INITIAL_LIMIT,
+    by_image: dict[str, list[dict[str, Any]]] | None = None,
+) -> dict[str, Any]:
+    """Ranked exemplars for one lens; collapses burst stacks to representatives."""
+    active_slugs = _active_perspective_slugs(conn)
+    if slug not in active_slugs:
+        raise ValueError(f"unknown or inactive perspective slug: {slug}")
+
+    if by_image is None:
+        _, _, _, by_image, _, _ = _build_by_image(conn)
+
+    candidates = _lens_exemplar_candidates(slug, by_image)
+    candidate_keys = [str(c["image_key"]) for c in candidates]
+    drop_keys = _stack_non_representative_keys(conn, candidate_keys)
+    candidates = [c for c in candidates if str(c["image_key"]) not in drop_keys]
+
+    candidates.sort(
+        key=lambda row: (
+            -row["percentile"],
+            -row["purity"],
+            row["image_key"],
+        )
+    )
+
+    total = len(candidates)
+    page = candidates[offset : offset + limit] if limit > 0 else []
+    items = _format_exemplar_rows(conn, page)
+    return {"items": items, "total": total}
+
+
+def build_mirror(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Catalog Mirror: crowned signature lenses, descriptors, and exemplar rails."""
+    (
+        active_slugs,
+        _slug_set,
+        display_by_slug,
+        by_image,
+        rationales_by_slug,
+        corpus_rationales,
+    ) = _build_by_image(conn)
+
+    total_catalog = int(conn.execute("SELECT COUNT(*) AS c FROM images").fetchone()["c"])
 
     votes: Counter[str] = Counter()
     photos_on: Counter[str] = Counter()
@@ -232,59 +363,17 @@ def build_mirror(conn: sqlite3.Connection) -> dict[str, Any]:
         fallback = True
         section_stats = [max(signature_stats, key=lambda s: (s["votes"], s["z_score"]))]
 
-    exemplar_keys: list[str] = []
+    section_slugs = {s["perspective_slug"] for s in section_stats}
     sections: list[dict[str, Any]] = []
     for stat in section_stats:
         slug = stat["perspective_slug"]
-        candidates: list[dict[str, Any]] = []
-        for image_key, perspectives in by_image.items():
-            match = next((p for p in perspectives if p["perspective_slug"] == slug), None)
-            if match is None:
-                continue
-            others = [p["percentile"] for p in perspectives if p["perspective_slug"] != slug]
-            candidates.append(
-                {
-                    "image_key": image_key,
-                    "score": match["score"],
-                    "percentile": match["percentile"],
-                    "purity": _purity(match["percentile"], others),
-                    "rationale": match.get("rationale") or "",
-                    "per_perspective": perspectives,
-                }
-            )
-
-        candidates.sort(
-            key=lambda row: (
-                -row["percentile"],
-                -row["purity"],
-                row["image_key"],
-            )
+        exemplar_payload = build_lens_exemplars(
+            conn,
+            slug,
+            offset=0,
+            limit=_EXEMPLAR_INITIAL_LIMIT,
+            by_image=by_image,
         )
-        top = candidates[:_EXEMPLAR_LIMIT]
-        exemplar_keys.extend(str(row["image_key"]) for row in top)
-
-        exemplars: list[dict[str, Any]] = []
-        for row in top:
-            per_out = []
-            for p in sorted(row["per_perspective"], key=lambda x: x["perspective_slug"]):
-                per_out.append(
-                    {
-                        "perspective_slug": p["perspective_slug"],
-                        "display_name": p["display_name"],
-                        "score": p["score"],
-                        "percentile": round(p["percentile"], 6),
-                    }
-                )
-            exemplars.append(
-                {
-                    "image_key": row["image_key"],
-                    "score": row["score"],
-                    "percentile": round(row["percentile"] * 100.0, 1),
-                    "purity": row["purity"],
-                    "rationale_preview": _truncate_rationale(row["rationale"]),
-                    "per_perspective": per_out,
-                }
-            )
 
         leading_not_distinctive = fallback
         sections.append(
@@ -309,22 +398,47 @@ def build_mirror(conn: sqlite3.Connection) -> dict[str, Any]:
                     rationales_by_slug.get(slug, []),
                     corpus_rationales,
                 ),
-                "exemplars": exemplars,
+                "exemplars": exemplar_payload["items"],
+                "exemplar_total": exemplar_payload["total"],
             }
         )
 
-    meta_map = _image_meta_map(conn, list(dict.fromkeys(exemplar_keys)))
-    for section in sections:
-        for exemplar in section["exemplars"]:
-            im = meta_map.get(str(exemplar["image_key"]), {})
-            exemplar["filename"] = im.get("filename") or ""
-            exemplar["date_taken"] = im.get("date_taken") or ""
-            exemplar["rating"] = int(im.get("rating") or 0)
-            exemplar["instagram_posted"] = bool(im.get("instagram_posted"))
+    other_lenses: list[dict[str, Any]] = []
+    for stat in signature_stats:
+        slug = stat["perspective_slug"]
+        if slug in section_slugs:
+            continue
+        exemplar_total = build_lens_exemplars(
+            conn,
+            slug,
+            offset=0,
+            limit=0,
+            by_image=by_image,
+        )["total"]
+        other_lenses.append(
+            {
+                "perspective_slug": slug,
+                "display_name": stat["display_name"],
+                "strength_label": _strength_label(
+                    z_score=stat["z_score"],
+                    crowned=stat["crowned"],
+                    leading_not_distinctive=False,
+                ),
+                "win_rate": stat["win_rate"],
+                "chance_rate": stat["chance_rate"],
+                "z_score": stat["z_score"],
+                "coverage": stat["coverage"],
+                "low_coverage": stat["low_coverage"],
+                "votes": stat["votes"],
+                "photos_on": stat["photos_on"],
+                "exemplar_total": exemplar_total,
+            }
+        )
 
     return {
         "population": voting_population,
         "sections": sections,
+        "other_lenses": other_lenses,
         "meta": {
             "active_perspectives": active_slugs,
             "total_catalog_images": total_catalog,
@@ -336,7 +450,8 @@ def build_mirror(conn: sqlite3.Connection) -> dict[str, Any]:
                 f"one-sided binomial test p < {_CROWN_ALPHA} on coverage-corrected win rate"
             ),
             "low_coverage_threshold": _LOW_COVERAGE_THRESHOLD,
-            "exemplar_limit": _EXEMPLAR_LIMIT,
+            "exemplar_initial_limit": _EXEMPLAR_INITIAL_LIMIT,
+            "exemplar_page_size": _EXEMPLAR_PAGE_SIZE,
             "descriptor_min_count": _DESCRIPTOR_MIN_COUNT,
             "scores_are_advisory": (
                 "Rankings reflect model/rubric versions at time of scoring (is_current rows)."

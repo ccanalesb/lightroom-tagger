@@ -10,6 +10,7 @@ from lightroom_tagger.core.database import (
     store_image,
 )
 from lightroom_tagger.core.identity_service import (
+    build_lens_exemplars,
     build_mirror,
     compute_image_peak_percentile_scores,
     compute_single_image_aggregate_scores,
@@ -402,6 +403,145 @@ def test_mirror_reads_percentile_lookup_not_aggregate_scores(tmp_path, monkeypat
     )
 
     build_mirror(conn)
+
+
+def _insert_two_member_stack(conn, rep_key: str, mem_key: str) -> int:
+    conn.execute(
+        "INSERT INTO image_stacks (representative_key, stack_size) VALUES (?, ?)",
+        (rep_key, 2),
+    )
+    conn.commit()
+    row = conn.execute("SELECT last_insert_rowid() AS x").fetchone()
+    assert row is not None
+    sid = int(row["x"])
+    conn.execute(
+        "INSERT INTO image_stack_members (stack_id, image_key) VALUES (?, ?)",
+        (sid, rep_key),
+    )
+    conn.execute(
+        "INSERT INTO image_stack_members (stack_id, image_key) VALUES (?, ?)",
+        (sid, mem_key),
+    )
+    conn.commit()
+    return sid
+
+
+def test_build_lens_exemplars_pagination_ordering_and_total(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    hot, cold = slugs[0], slugs[1]
+
+    for i in range(5):
+        k = store_image(
+            conn,
+            {
+                "date_taken": f"2024-11-{10 + i:02d}",
+                "filename": f"page{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        hot_score = 10 - i
+        cold_score = 2 + i
+        _add_score(conn, k, hot, hot_score)
+        _add_score(conn, k, cold, cold_score)
+    conn.commit()
+
+    full = build_lens_exemplars(conn, hot, offset=0, limit=100)
+    assert full["total"] == 5
+    assert len(full["items"]) == 5
+    purities = [row["purity"] for row in full["items"]]
+    assert purities == sorted(purities, reverse=True)
+
+    page0 = build_lens_exemplars(conn, hot, offset=0, limit=2)
+    page1 = build_lens_exemplars(conn, hot, offset=2, limit=2)
+    assert page0["total"] == 5
+    assert len(page0["items"]) == 2
+    assert len(page1["items"]) == 2
+    assert page0["items"][0]["image_key"] != page1["items"][0]["image_key"]
+    assert page0["items"][0]["percentile"] >= page1["items"][0]["percentile"]
+
+
+def test_build_lens_exemplars_collapses_burst_to_representative(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    hot, cold = slugs[0], slugs[1]
+
+    rep = store_image(
+        conn,
+        {"date_taken": "2024-12-01", "filename": "rep.jpg", "instagram_posted": False},
+    )
+    mem = store_image(
+        conn,
+        {"date_taken": "2024-12-02", "filename": "mem.jpg", "instagram_posted": False},
+    )
+    solo = store_image(
+        conn,
+        {"date_taken": "2024-12-03", "filename": "solo.jpg", "instagram_posted": False},
+    )
+    for k, hot_score in [(rep, 10), (mem, 9), (solo, 8)]:
+        _add_score(conn, k, hot, hot_score)
+        _add_score(conn, k, cold, 2)
+    _insert_two_member_stack(conn, rep, mem)
+    conn.commit()
+
+    payload = build_lens_exemplars(conn, hot, offset=0, limit=10)
+    keys = {row["image_key"] for row in payload["items"]}
+    assert payload["total"] == 2
+    assert rep in keys
+    assert solo in keys
+    assert mem not in keys
+    rep_row = next(r for r in payload["items"] if r["image_key"] == rep)
+    assert rep_row["stack_id"] is not None
+    assert rep_row["stack_size"] == 2
+
+
+def test_mirror_other_lenses_excludes_crowned_and_includes_stats(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=4)
+    assert len(slugs) >= 4
+    a, b, c, d = slugs[0], slugs[1], slugs[2], slugs[3]
+    HIGH, LOW = 9, 2
+
+    def _img(name: str) -> str:
+        return store_image(
+            conn,
+            {"date_taken": "2025-03-01", "filename": name, "instagram_posted": False},
+        )
+
+    for i in range(16):
+        k = _img(f"grpA{i}.jpg")
+        _add_score(conn, k, a, HIGH)
+        _add_score(conn, k, c, LOW)
+    for i in range(12):
+        k = _img(f"grpB{i}.jpg")
+        _add_score(conn, k, b, HIGH)
+        _add_score(conn, k, d, LOW)
+    for i in range(2):
+        k = _img(f"grpC{i}.jpg")
+        _add_score(conn, k, c, HIGH)
+        _add_score(conn, k, a, LOW)
+    for i in range(2):
+        k = _img(f"grpD{i}.jpg")
+        _add_score(conn, k, d, HIGH)
+        _add_score(conn, k, b, LOW)
+    conn.commit()
+
+    mirror = build_mirror(conn)
+    crowned_slugs = {s["perspective_slug"] for s in mirror["sections"] if s["crowned"]}
+    assert {a, b} <= crowned_slugs
+
+    other_slugs = {row["perspective_slug"] for row in mirror["other_lenses"]}
+    assert a not in other_slugs
+    assert b not in other_slugs
+    assert c in other_slugs or d in other_slugs
+    for row in mirror["other_lenses"]:
+        assert "strength_label" in row
+        assert "exemplar_total" in row
+        assert row["exemplar_total"] >= 0
+
+    for section in mirror["sections"]:
+        assert "exemplar_total" in section
+        assert section["exemplar_total"] >= len(section["exemplars"])
 
 
 def test_suggestions_only_unposted_with_reasons(tmp_path) -> None:
