@@ -4,14 +4,21 @@ import { thumbnailUrl } from '../../utils/imageUrl'
 import { Badge } from '../ui/badges'
 import { formatStackCountBadge } from '../../constants/strings'
 
-const EXEMPLAR_PAGE_SIZE = 12
-const EXEMPLAR_INITIAL_LIMIT = 24
+// Fallbacks only; the live values come from the mirror payload's
+// `meta.exemplar_page_size` / `meta.exemplar_initial_limit` (see props below)
+// so a backend change to the page sizes can't silently diverge from the UI.
+const DEFAULT_EXEMPLAR_PAGE_SIZE = 12
+const DEFAULT_EXEMPLAR_INITIAL_LIMIT = 24
 
 interface ExemplarRailProps {
   perspectiveSlug: string
   initialItems?: MirrorExemplar[]
   initialTotal: number
   onOpenExemplar: (exemplar: MirrorExemplar, index: number) => void
+  /** From mirror `meta.exemplar_page_size`; falls back to the default. */
+  pageSize?: number
+  /** From mirror `meta.exemplar_initial_limit`; falls back to the default. */
+  initialLimit?: number
 }
 
 export function ExemplarRail({
@@ -19,6 +26,8 @@ export function ExemplarRail({
   initialItems,
   initialTotal,
   onOpenExemplar,
+  pageSize = DEFAULT_EXEMPLAR_PAGE_SIZE,
+  initialLimit = DEFAULT_EXEMPLAR_INITIAL_LIMIT,
 }: ExemplarRailProps) {
   const [items, setItems] = useState<MirrorExemplar[]>(initialItems ?? [])
   const [total, setTotal] = useState(initialTotal)
@@ -45,7 +54,7 @@ export function ExemplarRail({
     setError(null)
     void IdentityAPI.getMirrorLensExemplars(perspectiveSlug, {
       offset: 0,
-      limit: EXEMPLAR_INITIAL_LIMIT,
+      limit: initialLimit,
     })
       .then((payload) => {
         if (cancelled) return
@@ -62,7 +71,7 @@ export function ExemplarRail({
     return () => {
       cancelled = true
     }
-  }, [initialItems, perspectiveSlug])
+  }, [initialItems, perspectiveSlug, initialLimit])
 
   useEffect(() => {
     updateScrollButtons()
@@ -79,7 +88,7 @@ export function ExemplarRail({
     try {
       const payload = await IdentityAPI.getMirrorLensExemplars(perspectiveSlug, {
         offset: items.length,
-        limit: EXEMPLAR_PAGE_SIZE,
+        limit: pageSize,
       })
       setItems((prev) => [...prev, ...payload.items])
       setTotal(payload.total)

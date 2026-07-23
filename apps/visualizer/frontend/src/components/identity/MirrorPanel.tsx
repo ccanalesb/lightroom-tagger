@@ -54,9 +54,13 @@ function MirrorStandoutContext({
 function TechniqueBlock({
   section,
   onOpenExemplar,
+  pageSize,
+  initialLimit,
 }: {
   section: MirrorTechniqueSection
   onOpenExemplar: (exemplar: MirrorExemplar) => void
+  pageSize?: number
+  initialLimit?: number
 }) {
   return (
     <section className="space-y-3" aria-labelledby={`mirror-tech-${section.perspective_slug}`}>
@@ -107,6 +111,8 @@ function TechniqueBlock({
         initialItems={section.exemplars}
         initialTotal={section.exemplar_total}
         onOpenExemplar={onOpenExemplar}
+        pageSize={pageSize}
+        initialLimit={initialLimit}
       />
     </section>
   )
@@ -115,9 +121,13 @@ function TechniqueBlock({
 function OtherLensRow({
   lens,
   onOpenExemplar,
+  pageSize,
+  initialLimit,
 }: {
   lens: MirrorOtherLens
   onOpenExemplar: (exemplar: MirrorExemplar) => void
+  pageSize?: number
+  initialLimit?: number
 }) {
   return (
     <details className="rounded-base border border-border bg-bg">
@@ -144,6 +154,8 @@ function OtherLensRow({
           perspectiveSlug={lens.perspective_slug}
           initialTotal={lens.exemplar_total}
           onOpenExemplar={onOpenExemplar}
+          pageSize={pageSize}
+          initialLimit={initialLimit}
         />
       </div>
     </details>
@@ -190,6 +202,9 @@ function MirrorContent({ data }: { data: MirrorResponse }) {
     )
   }
 
+  const exemplarPageSize = data.meta?.exemplar_page_size ?? undefined
+  const exemplarInitialLimit = data.meta?.exemplar_initial_limit ?? undefined
+
   return (
     <>
       <p className="text-sm text-text-secondary">
@@ -201,6 +216,8 @@ function MirrorContent({ data }: { data: MirrorResponse }) {
             key={section.perspective_slug}
             section={section}
             onOpenExemplar={(exemplar) => openFromSection(section, exemplar)}
+            pageSize={exemplarPageSize}
+            initialLimit={exemplarInitialLimit}
           />
         ))}
       </div>
@@ -217,6 +234,8 @@ function MirrorContent({ data }: { data: MirrorResponse }) {
                 key={lens.perspective_slug}
                 lens={lens}
                 onOpenExemplar={(exemplar) => openFromSection(lens, exemplar)}
+                pageSize={exemplarPageSize}
+                initialLimit={exemplarInitialLimit}
               />
             ))}
           </div>
