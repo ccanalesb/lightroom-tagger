@@ -77,6 +77,7 @@ describe('image-view adapters', () => {
           perspective_slug: 'street',
           display_name: 'Street',
           score: 9,
+          percentile: 0.825,
           prompt_version: 'v1',
           model_used: 'm',
           scored_at: 't',
