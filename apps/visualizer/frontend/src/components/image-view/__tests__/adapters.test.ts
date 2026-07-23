@@ -105,14 +105,17 @@ describe('image-view adapters', () => {
       filename: 'pn.jpg',
       date_taken: '2024-04-04',
       rating: 4,
-      aggregate_score: 7.1,
+      peak_percentile: 0.71,
+      peak_perspective_slug: 'composition',
+      peak_perspective_display_name: 'Composition',
+      is_signature: true,
       perspectives_covered: 2,
       per_perspective: [],
       reasons: ['x'],
       reason_codes: ['high_score_unposted'],
     }
     const out = fromPostNextRow(row)
-    expect(out.identity_aggregate_score).toBe(7.1)
+    expect(out.identity_peak_percentile).toBe(0.71)
     expect(out.identity_perspectives_covered).toBe(2)
     expect(out.identity_per_perspective).toEqual([])
     expect(out.identity_eligible).toBeUndefined()

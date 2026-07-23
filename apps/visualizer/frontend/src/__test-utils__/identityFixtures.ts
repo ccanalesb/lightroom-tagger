@@ -38,13 +38,11 @@ export const EMPTY_MIRROR_RESPONSE: MirrorResponse = {
 
 export const EMPTY_POST_NEXT_META: PostNextSuggestionsMeta = {
   weighting: null,
+  ranking_key: null,
   min_perspectives_used: null,
   coverage_rule: null,
   timezone_assumption: null,
   high_score_rule: null,
-  posted_semantics: null,
-  cadence_gap: null,
-  cadence_note: null,
 }
 
 /** Minimal nullable identity row fields required by generated OpenAPI types. */

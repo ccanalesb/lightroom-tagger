@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import {
   IdentityAPI,
   type PostNextCandidate,
-  type PostNextSuggestionsMeta,
 } from '../../services/api'
 import { useQuery } from '../../data'
 import { ImageDetailModal, fromPostNextRow } from '../image-view'
@@ -11,11 +10,12 @@ import { Button } from '../ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import {
   IDENTITY_ACTION_OPEN_CATALOG,
-  IDENTITY_INTRO_POST_NEXT,
-  IDENTITY_POST_NEXT_EMPTY_FALLBACK,
-  IDENTITY_POST_NEXT_HELP,
+  IDENTITY_ADVISOR_EMPTY_FALLBACK,
+  IDENTITY_ADVISOR_HELP,
+  IDENTITY_INTRO_ADVISOR,
   IDENTITY_REASON_CODE_LABELS,
-  IDENTITY_SECTION_POST_NEXT,
+  IDENTITY_SECTION_ADVISOR,
+  IDENTITY_SIGNATURE_LABEL,
   FILTER_LABEL_SORT_DATE,
   FILTER_SORT_DATE_NEWEST,
   FILTER_SORT_DATE_OLDEST,
@@ -37,7 +37,17 @@ function labelForReasonCode(code: string): string {
   return IDENTITY_REASON_CODE_LABELS[code] ?? code.replace(/_/g, ' ')
 }
 
-export function PostNextSuggestionsPanel() {
+function formatPeakPercentile(peak: number): string {
+  return `${(peak * 100).toFixed(1)}%`
+}
+
+function peakLensLabel(row: PostNextCandidate): string {
+  const name = row.peak_perspective_display_name || row.peak_perspective_slug
+  if (!name) return '—'
+  return row.is_signature ? `${name} (${IDENTITY_SIGNATURE_LABEL})` : name
+}
+
+export function AdvisorPanel() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const [extra, setExtra] = useState<{ sortKey: string; rows: PostNextCandidate[] }>({
@@ -90,7 +100,6 @@ export function PostNextSuggestionsPanel() {
   const appended = extra.sortKey === sortKey ? extra.rows : []
   const rows = [...initial.candidates, ...appended]
   const total = initial.total
-  const meta: PostNextSuggestionsMeta | undefined = initial.meta
   const emptyState = initial.empty_state
 
   const handleLoadMore = () => {
@@ -119,20 +128,20 @@ export function PostNextSuggestionsPanel() {
       })
   }
 
-  const emptyMessage = rows.length === 0 ? emptyState ?? IDENTITY_POST_NEXT_EMPTY_FALLBACK : null
+  const emptyMessage = rows.length === 0 ? emptyState ?? IDENTITY_ADVISOR_EMPTY_FALLBACK : null
 
   return (
-    <section className="space-y-3" aria-labelledby="identity-post-next-heading">
-      <h2 id="identity-post-next-heading" className="text-card-title text-text">
-        {IDENTITY_SECTION_POST_NEXT}
+    <section className="space-y-3" aria-labelledby="identity-advisor-heading">
+      <h2 id="identity-advisor-heading" className="text-card-title text-text">
+        {IDENTITY_SECTION_ADVISOR}
       </h2>
-      <p className="text-sm text-text-secondary">{IDENTITY_INTRO_POST_NEXT}</p>
+      <p className="text-sm text-text-secondary">{IDENTITY_INTRO_ADVISOR}</p>
       <Card padding="md">
         <CardHeader>
-          <CardTitle className="text-base sr-only">{IDENTITY_SECTION_POST_NEXT}</CardTitle>
+          <CardTitle className="text-base sr-only">{IDENTITY_SECTION_ADVISOR}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 !text-text">
-          <p className="text-sm text-text-secondary">{IDENTITY_POST_NEXT_HELP}</p>
+          <p className="text-sm text-text-secondary">{IDENTITY_ADVISOR_HELP}</p>
           <FilterBar
             schema={postNextSchema}
             filters={filters}
@@ -145,15 +154,6 @@ export function PostNextSuggestionsPanel() {
             }
             disabled={false}
           />
-
-          {meta?.cadence_note ? (
-            <p
-              className="rounded-base border border-border bg-surface px-3 py-2 text-sm text-text-secondary"
-              role="status"
-            >
-              {meta.cadence_note}
-            </p>
-          ) : null}
 
           {loadMoreError ? (
             <p className="text-sm text-error" role="alert">
@@ -170,61 +170,64 @@ export function PostNextSuggestionsPanel() {
           {rows.length > 0 ? (
             <>
               <ol className="space-y-4">
-              {rows.map((row, i) => {
-                const dateDisplay = row.date_taken
-                  ? new Date(row.date_taken).toLocaleDateString()
-                  : '—'
-                return (
-                  <li
-                    key={row.image_key}
-                    className="flex flex-col gap-3 rounded-card border border-border bg-bg p-3 sm:flex-row sm:items-start"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setSelected(row)}
-                      className="mx-auto shrink-0 focus:outline-none focus:ring-2 focus:ring-accent sm:mx-0"
+                {rows.map((row, i) => {
+                  const dateDisplay = row.date_taken
+                    ? new Date(row.date_taken).toLocaleDateString()
+                    : '—'
+                  return (
+                    <li
+                      key={row.image_key}
+                      className="flex flex-col gap-3 rounded-card border border-border bg-bg p-3 sm:flex-row sm:items-start"
                     >
-                      <img
-                        src={`/api/images/${row.image_type ?? 'catalog'}/${encodeURIComponent(row.image_key)}/thumbnail`}
-                        alt={row.filename}
-                        className="h-28 w-28 rounded-base border border-border object-cover"
-                        loading="lazy"
-                      />
-                    </button>
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <div className="flex flex-wrap items-baseline gap-2">
-                        <span className="text-xs font-medium text-text-tertiary">#{i + 1}</span>
-                        <p className="truncate font-medium text-text">{row.filename}</p>
-                        <span className="text-sm font-semibold text-accent">
-                          {row.aggregate_score.toFixed(2)}
-                        </span>
-                        <span className="text-xs text-text-tertiary">{dateDisplay}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {row.reason_codes.map((code, ci) => (
-                          <span
-                            key={`${code}-${ci}`}
-                            className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs text-text-secondary"
-                          >
-                            {labelForReasonCode(code)}
-                          </span>
-                        ))}
-                      </div>
-                      <ul className="list-inside list-disc space-y-1 text-sm text-text-secondary">
-                        {row.reasons.map((r, j) => (
-                          <li key={j}>{r}</li>
-                        ))}
-                      </ul>
-                      <Link
-                        to={`/images?tab=catalog&image_key=${encodeURIComponent(row.image_key)}`}
-                        className="inline-block text-sm font-medium text-accent hover:underline focus:outline-none focus:ring-2 focus:ring-accent rounded-sm"
+                      <button
+                        type="button"
+                        onClick={() => setSelected(row)}
+                        className="mx-auto shrink-0 focus:outline-none focus:ring-2 focus:ring-accent sm:mx-0"
                       >
-                        {IDENTITY_ACTION_OPEN_CATALOG}
-                      </Link>
-                    </div>
-                  </li>
-                )
-              })}
+                        <img
+                          src={`/api/images/${row.image_type ?? 'catalog'}/${encodeURIComponent(row.image_key)}/thumbnail`}
+                          alt={row.filename}
+                          className="h-28 w-28 rounded-base border border-border object-cover"
+                          loading="lazy"
+                        />
+                      </button>
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="flex flex-wrap items-baseline gap-2">
+                          <span className="text-xs font-medium text-text-tertiary">#{i + 1}</span>
+                          <p className="truncate font-medium text-text">{row.filename}</p>
+                          <span className="text-sm font-semibold text-accent">
+                            {formatPeakPercentile(row.peak_percentile)}
+                          </span>
+                          <span className="text-xs text-text-tertiary">{dateDisplay}</span>
+                        </div>
+                        <p className="text-sm text-text-secondary">
+                          Peak lens: <span className="text-text">{peakLensLabel(row)}</span>
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {row.reason_codes.map((code, ci) => (
+                            <span
+                              key={`${code}-${ci}`}
+                              className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs text-text-secondary"
+                            >
+                              {labelForReasonCode(code)}
+                            </span>
+                          ))}
+                        </div>
+                        <ul className="list-inside list-disc space-y-1 text-sm text-text-secondary">
+                          {row.reasons.map((r, j) => (
+                            <li key={j}>{r}</li>
+                          ))}
+                        </ul>
+                        <Link
+                          to={`/images?tab=catalog&image_key=${encodeURIComponent(row.image_key)}`}
+                          className="inline-block text-sm font-medium text-accent hover:underline focus:outline-none focus:ring-2 focus:ring-accent rounded-sm"
+                        >
+                          {IDENTITY_ACTION_OPEN_CATALOG}
+                        </Link>
+                      </div>
+                    </li>
+                  )
+                })}
               </ol>
               {total !== null && rows.length < total ? (
                 <div className="flex justify-center pt-2">

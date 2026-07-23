@@ -134,12 +134,6 @@ def suggestions(db: sqlite3.Connection):
             request.args.get("limit", 20, type=int),
             request.args.get("offset", 0, type=int),
         )
-        look_recent = request.args.get("lookback_days_recent", type=int)
-        look_base = request.args.get("lookback_days_baseline", type=int)
-        if look_recent is not None and look_recent < 1:
-            return error_bad_request("lookback_days_recent must be at least 1")
-        if look_base is not None and look_base < 1:
-            return error_bad_request("lookback_days_baseline must be at least 1")
         sort_by_date, err = _parse_sort_by_date()
         if err is not None:
             return err
@@ -148,8 +142,6 @@ def suggestions(db: sqlite3.Connection):
             db,
             limit=limit,
             offset=offset,
-            lookback_days_recent=look_recent if look_recent is not None else 30,
-            lookback_days_baseline=look_base if look_base is not None else 90,
             sort_by_date=sort_by_date,
         )
         return jsonify(

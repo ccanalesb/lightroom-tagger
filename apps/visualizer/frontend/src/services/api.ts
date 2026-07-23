@@ -785,19 +785,11 @@ export const IdentityAPI = {
   getSuggestions: (params?: {
     limit?: number
     offset?: number
-    lookback_days_recent?: number
-    lookback_days_baseline?: number
     sort_by_date?: 'newest' | 'oldest'
   }) => {
     const sp = new URLSearchParams()
     if (params?.limit !== undefined) sp.set('limit', String(params.limit))
     if (params?.offset !== undefined) sp.set('offset', String(params.offset))
-    if (params?.lookback_days_recent !== undefined) {
-      sp.set('lookback_days_recent', String(params.lookback_days_recent))
-    }
-    if (params?.lookback_days_baseline !== undefined) {
-      sp.set('lookback_days_baseline', String(params.lookback_days_baseline))
-    }
     if (params?.sort_by_date) sp.set('sort_by_date', params.sort_by_date)
     const qs = sp.toString()
     return request<PostNextSuggestionsResponse>(`/identity/suggestions${qs ? `?${qs}` : ''}`)

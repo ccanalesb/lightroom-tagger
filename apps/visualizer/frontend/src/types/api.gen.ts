@@ -1263,16 +1263,6 @@ export interface components {
              */
             offset: number | null;
             /**
-             * Lookback Days Recent
-             * @default null
-             */
-            lookback_days_recent: number | null;
-            /**
-             * Lookback Days Baseline
-             * @default null
-             */
-            lookback_days_baseline: number | null;
-            /**
              * Sort By Date
              * @default null
              */
@@ -3018,8 +3008,14 @@ export interface components {
             date_taken: string;
             /** Rating */
             rating: number;
-            /** Aggregate Score */
-            aggregate_score: number;
+            /** Peak Percentile */
+            peak_percentile: number;
+            /** Peak Perspective Slug */
+            peak_perspective_slug: string;
+            /** Peak Perspective Display Name */
+            peak_perspective_display_name: string;
+            /** Is Signature */
+            is_signature: boolean;
             /** Perspectives Covered */
             perspectives_covered: number;
             /** Per Perspective */
@@ -3036,6 +3032,11 @@ export interface components {
              * @default null
              */
             weighting: string | null;
+            /**
+             * Ranking Key
+             * @default null
+             */
+            ranking_key: string | null;
             /**
              * Min Perspectives Used
              * @default null
@@ -3056,21 +3057,6 @@ export interface components {
              * @default null
              */
             high_score_rule: string | null;
-            /**
-             * Posted Semantics
-             * @default null
-             */
-            posted_semantics: string | null;
-            /**
-             * Cadence Gap
-             * @default null
-             */
-            cadence_gap: boolean | null;
-            /**
-             * Cadence Note
-             * @default null
-             */
-            cadence_note: string | null;
         };
         /**
          * Job
@@ -8326,8 +8312,6 @@ export interface operations {
             query?: {
                 limit?: number | null;
                 offset?: number | null;
-                lookback_days_recent?: number | null;
-                lookback_days_baseline?: number | null;
                 sort_by_date?: string | null;
             };
             header?: never;
