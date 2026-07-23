@@ -80,7 +80,7 @@ export function fromBestPhotoRow(row: IdentityBestPhotoItem): ImageView {
     stack_member_count: row.stack_member_count,
     is_stack_representative: row.is_stack_representative,
     // Identity fields are authoritative on this endpoint.
-    identity_aggregate_score: row.aggregate_score,
+    identity_peak_percentile: row.peak_percentile,
     identity_perspectives_covered: row.perspectives_covered,
     identity_eligible: row.eligible,
     identity_per_perspective: row.per_perspective,

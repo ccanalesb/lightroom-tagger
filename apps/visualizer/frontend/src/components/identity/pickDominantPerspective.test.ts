@@ -11,6 +11,7 @@ function score(
     perspective_slug,
     display_name,
     score: scoreVal,
+    percentile: null,
     prompt_version: 'v1',
     model_used: 'm',
     scored_at: 't',
@@ -25,6 +26,7 @@ describe('pickDominantPerspective', () => {
         perspective_slug: 'street',
         display_name: 'Street',
         score: 9,
+        percentile: null,
         prompt_version: 'v1',
         model_used: 'm',
         scored_at: 't',
@@ -49,5 +51,19 @@ describe('pickDominantPerspective', () => {
       score('documentary', 'Documentary', 8),
     ])
     expect(result?.perspective_slug).toBe('street')
+  })
+
+  it('prefers percentile over raw score when percentile is present', () => {
+    const result = pickDominantPerspective([
+      {
+        ...score('street', 'Street', 10),
+        percentile: 0.4,
+      },
+      {
+        ...score('documentary', 'Documentary', 6),
+        percentile: 0.95,
+      },
+    ])
+    expect(result?.perspective_slug).toBe('documentary')
   })
 })

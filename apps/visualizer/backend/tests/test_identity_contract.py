@@ -54,7 +54,8 @@ def test_best_photos_round_trip_from_handler(identity_contract_client):
 
     validated = IdentityBestPhotosResponse.model_validate(payload)
     assert isinstance(validated.total, int)
-    assert validated.meta.weighting == "equal"
+    assert validated.meta.weighting == "peak_within_perspective_percentile"
+    assert validated.meta.ranking_key == "peak_percentile"
 
 
 def test_style_fingerprint_round_trip_from_handler(identity_contract_client):

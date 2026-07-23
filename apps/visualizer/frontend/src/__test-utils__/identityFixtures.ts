@@ -10,6 +10,7 @@ import type {
 export const EMPTY_BEST_PHOTOS_META: IdentityBestPhotosMeta = {
   active_perspectives: null,
   weighting: null,
+  ranking_key: null,
   min_perspectives_used: null,
   coverage_rule: null,
   total_catalog_images: null,

@@ -13,6 +13,10 @@ from .aggregates import (
     compute_image_aggregate_scores,
     compute_single_image_aggregate_scores,
 )
+from .percentiles import (
+    compute_image_peak_percentile_scores,
+    compute_within_perspective_percentile_lookup,
+)
 from .ranking import (
     _image_meta_map,
     _stack_fields_for_image_keys,
@@ -37,7 +41,9 @@ __all__ = [
     "_truncate_rationale",
     "build_style_fingerprint",
     "compute_image_aggregate_scores",
+    "compute_image_peak_percentile_scores",
     "compute_single_image_aggregate_scores",
+    "compute_within_perspective_percentile_lookup",
     "rank_best_photos",
     "suggest_what_to_post_next",
 ]

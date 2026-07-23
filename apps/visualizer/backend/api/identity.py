@@ -77,7 +77,7 @@ def _parse_optional_posted() -> tuple[bool | None, ResponseReturnValue | None]:
     tags=['identity'],
 )
 def best_photos(db: sqlite3.Connection):
-    """Paginated eligible catalog images ranked by aggregate perspective score."""
+    """Paginated eligible catalog images ranked by peak within-perspective percentile."""
     try:
         limit, offset = _clamp_pagination(
             request.args.get("limit", 50, type=int),

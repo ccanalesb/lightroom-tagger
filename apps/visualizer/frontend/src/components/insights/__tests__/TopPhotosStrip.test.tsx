@@ -7,7 +7,7 @@ import type { IdentityBestPhotoItem } from '../../../services/api'
 const item: IdentityBestPhotoItem = {
   ...NULLABLE_BEST_PHOTO_FIELDS,
   image_key: 'k-dash',
-  aggregate_score: 8,
+  peak_percentile: 0.8,
   perspectives_covered: 1,
   eligible: null,
   per_perspective: [
@@ -15,6 +15,7 @@ const item: IdentityBestPhotoItem = {
       perspective_slug: 'street',
       display_name: 'Street',
       score: 9,
+      percentile: 0.8,
       prompt_version: 'v1',
       model_used: 'm',
       scored_at: 't',

@@ -1,6 +1,6 @@
 import type { ImageView } from '../../services/api'
 import { ScorePill } from '../ui/badges'
-import { IDENTITY_LABEL_AGGREGATE } from '../../constants/strings'
+import { IDENTITY_LABEL_AGGREGATE, IDENTITY_LABEL_PEAK } from '../../constants/strings'
 
 /**
  * Source of the primary score pill (CONTEXT Q3):
@@ -25,6 +25,10 @@ interface PrimaryScorePillProps {
 export function PrimaryScorePill({ image, source }: PrimaryScorePillProps) {
   switch (source) {
     case 'identity': {
+      const peak = image.identity_peak_percentile
+      if (typeof peak === 'number' && Number.isFinite(peak)) {
+        return <ScorePill score={peak * 10} label={IDENTITY_LABEL_PEAK} />
+      }
       const score = image.identity_aggregate_score
       if (typeof score !== 'number') return null
       return <ScorePill score={score} label={IDENTITY_LABEL_AGGREGATE} />

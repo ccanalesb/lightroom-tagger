@@ -13,6 +13,7 @@ class IdentityPerPerspectiveScore(BaseModel):
     perspective_slug: str
     display_name: str
     score: int
+    percentile: float | None = None
     prompt_version: str
     model_used: str
     scored_at: str
@@ -163,6 +164,7 @@ class ImageView(BaseModel):
     catalog_score_perspective: str | None = None
     available_score_perspectives: list[str] | None = None
     identity_aggregate_score: float | None = None
+    identity_peak_percentile: float | None = None
     identity_perspectives_covered: int | None = None
     identity_eligible: bool | None = None
     identity_per_perspective: list[IdentityPerPerspectiveScore] = Field(default_factory=list)

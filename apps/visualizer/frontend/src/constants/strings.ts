@@ -496,6 +496,7 @@ export const IDENTITY_BEST_PHOTOS_HELP =
 export const IDENTITY_BEST_PHOTOS_EMPTY_FALLBACK =
   'No eligible ranked photos yet. Run scoring on more perspectives per image to meet coverage.'
 export const IDENTITY_LABEL_AGGREGATE = 'Aggregate'
+export const IDENTITY_LABEL_PEAK = 'Peak'
 export const IDENTITY_LABEL_PERSPECTIVES_COVERED = 'Perspectives scored'
 export const IDENTITY_COL_PERSPECTIVE = 'Perspective'
 export const IDENTITY_COL_SCORE = 'Score'
