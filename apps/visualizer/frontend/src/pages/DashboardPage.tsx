@@ -3,15 +3,12 @@ import type { FilterSchema } from '../components/filters/types'
 import { InsightsKpiRow } from '../components/insights/InsightsKpiRow'
 import { InsightsQuickNav } from '../components/insights/InsightsQuickNav'
 import { MiniPostingFrequencyChart } from '../components/insights/MiniPostingFrequencyChart'
-import { PerspectiveRadarSummary } from '../components/insights/PerspectiveRadarSummary'
-import { ScoreDistributionChart } from '../components/insights/ScoreDistributionChart'
 import { TopPhotosStrip } from '../components/insights/TopPhotosStrip'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { TabNav } from '../components/ui/Tabs'
 import {
   ANALYTICS_EMPTY_NO_POSTS,
   IDENTITY_BEST_PHOTOS_EMPTY_FALLBACK,
-  INSIGHTS_EMPTY_FINGERPRINT,
   INSIGHTS_FOOTER_TIMEZONE,
   INSIGHTS_PAGE_SUBTITLE,
   INSIGHTS_PAGE_TITLE,
@@ -19,7 +16,6 @@ import {
   INSIGHTS_SECTION_EXPLORE,
   INSIGHTS_SECTION_HIGHLIGHTS,
   INSIGHTS_SECTION_POSTING,
-  INSIGHTS_SECTION_SCORES,
   INSIGHTS_TOP_PHOTOS_REGION_ARIA,
   INSIGHTS_TOP_PHOTOS_TAB_ALL,
   INSIGHTS_TOP_PHOTOS_TAB_POSTED,
@@ -36,7 +32,6 @@ import {
   type IdentityBestPhotosMeta,
   type PostingFrequencyResponse,
   type Stats,
-  type StyleFingerprintResponse,
 } from '../services/api'
 
 function formatIsoDate(d: Date): string {
@@ -58,10 +53,6 @@ function errMessage(e: unknown): string {
   return String(e)
 }
 
-function totalScoreCount(per: StyleFingerprintResponse['per_perspective']): number {
-  return per.reduce((acc, p) => acc + (p.count_scores || 0), 0)
-}
-
 function sumBucketCounts(buckets: PostingFrequencyResponse['buckets']): number {
   return buckets.reduce((acc, b) => acc + b.count, 0)
 }
@@ -79,8 +70,6 @@ type TopPhotosBucket = {
 type DashboardBundle = {
   stats: Stats | null
   errStats: string | null
-  fingerprint: StyleFingerprintResponse | null
-  errFingerprint: string | null
   topPhotosByTab: Record<TopPhotosTabKey, TopPhotosBucket>
   frequency: PostingFrequencyResponse | null
   errFrequency: string | null
@@ -92,7 +81,6 @@ async function fetchDashboardBundle(postingRange: { from: string; to: string }):
 
   const results = await Promise.allSettled([
     SystemAPI.stats(),
-    IdentityAPI.getStyleFingerprint(),
     IdentityAPI.getBestPhotos({ limit: 8, posted: false }),
     IdentityAPI.getBestPhotos({ limit: 8, posted: true }),
     IdentityAPI.getBestPhotos({ limit: 8 }),
@@ -104,7 +92,7 @@ async function fetchDashboardBundle(postingRange: { from: string; to: string }):
     JobsAPI.list(),
   ])
 
-  const [r0, r1, r2, r3, r4, r5, r6] = results
+  const [r0, r1, r2, r3, r4, r5] = results
 
   let stats: Stats | null = null
   let errStats: string | null = null
@@ -112,14 +100,6 @@ async function fetchDashboardBundle(postingRange: { from: string; to: string }):
     stats = r0.value
   } else {
     errStats = errMessage(r0.reason)
-  }
-
-  let fingerprint: StyleFingerprintResponse | null = null
-  let errFingerprint: string | null = null
-  if (r1.status === 'fulfilled') {
-    fingerprint = r1.value
-  } else {
-    errFingerprint = errMessage(r1.reason)
   }
 
   const mapBest = (
@@ -144,30 +124,28 @@ async function fetchDashboardBundle(postingRange: { from: string; to: string }):
   }
 
   const topPhotosByTab: Record<TopPhotosTabKey, TopPhotosBucket> = {
-    unposted: mapBest(r2),
-    posted: mapBest(r3),
-    all: mapBest(r4),
+    unposted: mapBest(r1),
+    posted: mapBest(r2),
+    all: mapBest(r3),
   }
 
   let frequency: PostingFrequencyResponse | null = null
   let errFrequency: string | null = null
-  if (r5.status === 'fulfilled') {
-    frequency = r5.value
+  if (r4.status === 'fulfilled') {
+    frequency = r4.value
   } else {
-    errFrequency = errMessage(r5.reason)
+    errFrequency = errMessage(r4.reason)
   }
 
   let activeJobs = 0
-  if (r6.status === 'fulfilled') {
-    const jobsList = Array.isArray(r6.value?.data) ? r6.value.data : []
+  if (r5.status === 'fulfilled') {
+    const jobsList = Array.isArray(r5.value?.data) ? r5.value.data : []
     activeJobs = jobsList.filter((job) => job.status === 'pending' || job.status === 'running').length
   }
 
   return {
     stats,
     errStats,
-    fingerprint,
-    errFingerprint,
     topPhotosByTab,
     frequency,
     errFrequency,
@@ -213,8 +191,6 @@ function DashboardPageInner() {
   const {
     stats,
     errStats,
-    fingerprint,
-    errFingerprint,
     topPhotosByTab,
     frequency,
     errFrequency,
@@ -222,11 +198,7 @@ function DashboardPageInner() {
   } = bundle
 
   const loadingStats = false
-  const loadingFingerprint = false
   const loadingFrequency = false
-
-  const fpNoScores =
-    fingerprint && !errFingerprint && totalScoreCount(fingerprint.per_perspective) === 0
 
   const rawTopPhotosPosted = filters.values.topPhotosPosted as string | undefined
   const activeTopPhotosTab: TopPhotosTabKey =
@@ -250,7 +222,6 @@ function DashboardPageInner() {
 
   const a11yErrors = [
     errStats && `Stats: ${errStats}`,
-    errFingerprint && `Style fingerprint: ${errFingerprint}`,
     topPhotosByTab.unposted.error && `Best photos (unposted): ${topPhotosByTab.unposted.error}`,
     topPhotosByTab.posted.error && `Best photos (posted): ${topPhotosByTab.posted.error}`,
     topPhotosByTab.all.error && `Best photos (all): ${topPhotosByTab.all.error}`,
@@ -279,72 +250,40 @@ function DashboardPageInner() {
         </p>
       ) : null}
 
-      <section className="space-y-3" aria-labelledby="insights-scores-heading">
-        <h2 id="insights-scores-heading" className="text-card-title text-text">
-          {INSIGHTS_SECTION_SCORES}
+      <section className="space-y-3" aria-labelledby="insights-posting-heading">
+        <h2 id="insights-posting-heading" className="text-card-title text-text">
+          {INSIGHTS_SECTION_POSTING}
         </h2>
-        {fpNoScores ? (
-          <div
-            className="rounded-card border border-dashed border-border bg-surface px-4 py-3 text-sm text-text-secondary"
-            role="status"
-          >
-            {INSIGHTS_EMPTY_FINGERPRINT}
-          </div>
-        ) : null}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Card padding="md">
-            <CardHeader>
-              <CardTitle className="text-base sr-only">{INSIGHTS_SECTION_SCORES}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6 !text-text">
-              <ScoreDistributionChart
-                aggregateDistribution={fingerprint?.aggregate_distribution ?? null}
-                note={fingerprint?.aggregate_distribution_note}
-                loading={loadingFingerprint}
-                error={errFingerprint}
+        <Card padding="md">
+          <CardHeader>
+            <CardTitle className="text-base sr-only">{INSIGHTS_SECTION_POSTING}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 !text-text">
+            <p className="text-xs text-text-tertiary">{INSIGHTS_POSTING_RANGE_NOTE}</p>
+            {showPostingEmpty ? (
+              <div
+                className="rounded-card border border-dashed border-border bg-surface px-4 py-3 text-sm text-text-secondary"
+                role="status"
+              >
+                {ANALYTICS_EMPTY_NO_POSTS}
+              </div>
+            ) : (
+              <MiniPostingFrequencyChart
+                buckets={postingBuckets}
+                meta={frequency?.meta ?? null}
+                loading={loadingFrequency}
+                error={errFrequency}
+                rangeEndIso={postingRange.to}
               />
-              <PerspectiveRadarSummary
-                perPerspective={fingerprint?.per_perspective ?? null}
-                loading={loadingFingerprint}
-                error={errFingerprint}
-              />
-              {fingerprint?.meta?.scores_are_advisory ? (
-                <p className="text-xs text-text-tertiary">{fingerprint.meta.scores_are_advisory}</p>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card padding="md">
-            <CardHeader>
-              <CardTitle className="text-base">{INSIGHTS_SECTION_POSTING}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 !text-text">
-              <p className="text-xs text-text-tertiary">{INSIGHTS_POSTING_RANGE_NOTE}</p>
-              {showPostingEmpty ? (
-                <div
-                  className="rounded-card border border-dashed border-border bg-surface px-4 py-3 text-sm text-text-secondary"
-                  role="status"
-                >
-                  {ANALYTICS_EMPTY_NO_POSTS}
-                </div>
-              ) : (
-                <MiniPostingFrequencyChart
-                  buckets={postingBuckets}
-                  meta={frequency?.meta ?? null}
-                  loading={loadingFrequency}
-                  error={errFrequency}
-                  rangeEndIso={postingRange.to}
-                />
-              )}
-              {frequency?.meta?.timezone_assumption ? (
-                <p className="text-xs text-text-secondary">
-                  <span className="font-medium text-text">Timezone assumption: </span>
-                  {frequency.meta.timezone_assumption}
-                </p>
-              ) : null}
-            </CardContent>
-          </Card>
-        </div>
+            )}
+            {frequency?.meta?.timezone_assumption ? (
+              <p className="text-xs text-text-secondary">
+                <span className="font-medium text-text">Timezone assumption: </span>
+                {frequency.meta.timezone_assumption}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
       </section>
 
       <section className="space-y-3" aria-labelledby="insights-highlights-heading">

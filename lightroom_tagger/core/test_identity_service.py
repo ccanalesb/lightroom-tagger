@@ -14,7 +14,7 @@ from lightroom_tagger.core.database import (
     validate_match,
 )
 from lightroom_tagger.core.identity_service import (
-    build_style_fingerprint,
+    build_mirror,
     compute_image_aggregate_scores,
     compute_image_peak_percentile_scores,
     compute_within_perspective_percentile_lookup,
@@ -207,30 +207,208 @@ def test_rank_best_photos_filters_by_posted(tmp_path) -> None:
     assert len(page_all) == 2
 
 
-def test_style_fingerprint_mean_and_rationale_tokens(tmp_path) -> None:
-    db_path = tmp_path / "library.db"
-    conn = init_database(str(db_path))
-    slugs = _active_slugs(conn, limit=1)
-    slug = slugs[0]
+def test_mirror_descriptor_log_odds_prefers_lens_specific_tokens(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    hot, cold = slugs[0], slugs[1]
 
-    k1 = store_image(
-        conn,
-        {"date_taken": "2024-03-01", "filename": "a.jpg", "instagram_posted": False},
-    )
-    k2 = store_image(
-        conn,
-        {"date_taken": "2024-03-02", "filename": "b.jpg", "instagram_posted": False},
-    )
-    _add_score(conn, k1, slug, 6, rationale="kumquat lighting balance")
-    _add_score(conn, k2, slug, 8, rationale="kumquat framing works well")
+    for i in range(6):
+        k = store_image(
+            conn,
+            {
+                "date_taken": f"2024-10-{10 + i:02d}",
+                "filename": f"m{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        _add_score(conn, k, hot, 8 + (i % 2), rationale="kumquat lighting balance frame")
+        _add_score(conn, k, cold, 2 + (i % 2), rationale="ordinary street scene")
     conn.commit()
 
-    fp = build_style_fingerprint(conn)
-    per = next(p for p in fp["per_perspective"] if p["perspective_slug"] == slug)
-    assert per["mean_score"] == 7.0
-    assert per["median_score"] == 7.0
-    tokens = {t["token"]: t["count"] for t in fp["top_rationale_tokens"]}
-    assert tokens.get("kumquat", 0) >= 2
+    mirror = build_mirror(conn)
+    section = next(s for s in mirror["sections"] if s["perspective_slug"] == hot)
+    tokens = {d["token"] for d in section["descriptors"]}
+    assert "kumquat" in tokens
+    assert all(d["count"] >= 5 for d in section["descriptors"])
+
+
+def test_mirror_exemplar_ordering_and_purity_tiebreak(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    hot, cold = slugs[0], slugs[1]
+
+    keys: list[str] = []
+    # Three images on hot lens; same top raw score but different purity vs cold lens.
+    for i, cold_score in enumerate([2, 4, 4]):
+        k = store_image(
+            conn,
+            {
+                "date_taken": f"2024-11-{10 + i:02d}",
+                "filename": f"ex{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        keys.append(k)
+        _add_score(conn, k, hot, 10)
+        _add_score(conn, k, cold, cold_score)
+    conn.commit()
+
+    mirror = build_mirror(conn)
+    section = next((s for s in mirror["sections"]), None)
+    assert section is not None
+    exemplars = section["exemplars"]
+    assert len(exemplars) >= 2
+    # Highest purity on the hot lens should sort ahead at equal hot percentile.
+    assert exemplars[0]["purity"] >= exemplars[1]["purity"]
+
+
+def test_mirror_strength_label_thresholds(tmp_path) -> None:
+    from lightroom_tagger.core.identity_service.mirror import _strength_label
+
+    assert _strength_label(z_score=6.0, crowned=True, leading_not_distinctive=False) == (
+        "A defining strength"
+    )
+    assert _strength_label(z_score=3.0, crowned=True, leading_not_distinctive=False) == (
+        "A clear strength"
+    )
+    assert _strength_label(z_score=2.0, crowned=True, leading_not_distinctive=False) == (
+        "A strength"
+    )
+    assert _strength_label(z_score=0.5, crowned=False, leading_not_distinctive=True) == (
+        "Leading, but not strongly distinctive"
+    )
+
+
+def test_mirror_crowning_uses_binomial_and_fallback(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    hot, cold = slugs[0], slugs[1]
+
+    for i in range(12):
+        k = store_image(
+            conn,
+            {
+                "date_taken": f"2024-12-{10 + i:02d}",
+                "filename": f"crown{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        hot_score = 10 if i < 10 else 5
+        cold_score = 2 if i < 10 else 9
+        _add_score(conn, k, hot, hot_score)
+        _add_score(conn, k, cold, cold_score)
+    conn.commit()
+
+    mirror = build_mirror(conn)
+    crowned = [s for s in mirror["sections"] if s["crowned"]]
+    assert crowned
+    assert crowned[0]["perspective_slug"] == hot
+    assert crowned[0]["z_score"] > 0
+
+    # Even split → fallback top-1, not crowned.
+    conn2 = init_database(str(tmp_path / "even.db"))
+    for i in range(8):
+        k = store_image(
+            conn2,
+            {
+                "date_taken": f"2025-01-{10 + i:02d}",
+                "filename": f"even{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        _add_score(conn2, k, hot, 5 + (i % 2))
+        _add_score(conn2, k, cold, 5 + ((i + 1) % 2))
+    conn2.commit()
+
+    even = build_mirror(conn2)
+    assert even["meta"]["fallback_active"] is True
+    assert len(even["sections"]) == 1
+    assert even["sections"][0]["leading_not_distinctive"] is True
+
+
+def test_mirror_reproduces_multi_crown_shape_with_low_coverage_caveat(tmp_path) -> None:
+    """#203 headline shape: two lenses crowned, z-sorted, the lower-coverage one flagged.
+
+    The real catalog crowns more than one technique and marks a low-coverage crown
+    with a caveat (spec #207 AC: "crowns Depth & Environmental-Context + Framing,
+    Framing with the low-coverage caveat"). This asserts that mechanism on a
+    synthetic catalog engineered to that shape. Scores use a two-band {9, 2} layout
+    per lens so each image's percentile argmax is unambiguous: the winner lens sits
+    in its 9-band (percentile ~0.56) while the other sits in its 2-band (~0.44). The
+    anchor groups (C, D) give c/d a high band so their diluter scores in groups A/B
+    stay bottom-percentile. See percentiles._midrank_percentile_ranks for the math.
+    """
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=4)
+    assert len(slugs) >= 4
+    a, b, c, d = slugs[0], slugs[1], slugs[2], slugs[3]
+    HIGH, LOW = 9, 2
+
+    def _img(name: str) -> str:
+        return store_image(
+            conn,
+            {"date_taken": "2025-03-01", "filename": name, "instagram_posted": False},
+        )
+
+    # Group A (16): {a, c} — a spikes, wins every image → high-coverage crown.
+    for i in range(16):
+        k = _img(f"grpA{i}.jpg")
+        _add_score(conn, k, a, HIGH)
+        _add_score(conn, k, c, LOW)
+    # Group B (12): {b, d} — b spikes, wins every image → crowned but lower coverage.
+    for i in range(12):
+        k = _img(f"grpB{i}.jpg")
+        _add_score(conn, k, b, HIGH)
+        _add_score(conn, k, d, LOW)
+    # Group C (2): {c, a} — anchors c's high band so group-A c stays bottom-percentile.
+    for i in range(2):
+        k = _img(f"grpC{i}.jpg")
+        _add_score(conn, k, c, HIGH)
+        _add_score(conn, k, a, LOW)
+    # Group D (2): {d, b} — anchors d's high band; neither c nor d clears the bar.
+    for i in range(2):
+        k = _img(f"grpD{i}.jpg")
+        _add_score(conn, k, d, HIGH)
+        _add_score(conn, k, b, LOW)
+    conn.commit()
+
+    mirror = build_mirror(conn)
+    assert mirror["meta"]["fallback_active"] is False
+
+    crowned = [s for s in mirror["sections"] if s["crowned"]]
+    # Two techniques crowned, ordered by descending z.
+    assert [s["perspective_slug"] for s in crowned] == [a, b]
+    assert crowned[0]["z_score"] >= crowned[1]["z_score"]
+
+    by_slug = {s["perspective_slug"]: s for s in crowned}
+    assert by_slug[a]["low_coverage"] is False  # scored on 18/32
+    assert by_slug[b]["low_coverage"] is True  # scored on 14/32 → carries the caveat
+
+
+def test_mirror_reads_percentile_lookup_not_aggregate_scores(tmp_path, monkeypatch) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    hot, cold = slugs[0], slugs[1]
+    k = store_image(
+        conn,
+        {"date_taken": "2025-02-01", "filename": "one.jpg", "instagram_posted": False},
+    )
+    _add_score(conn, k, hot, 8)
+    _add_score(conn, k, cold, 4)
+    conn.commit()
+
+    lookup = compute_within_perspective_percentile_lookup(conn)
+
+    def _tracked_lookup(c):
+        assert c is conn
+        return lookup
+
+    monkeypatch.setattr(
+        "lightroom_tagger.core.identity_service.mirror.compute_within_perspective_percentile_lookup",
+        _tracked_lookup,
+    )
+
+    build_mirror(conn)
 
 
 def test_suggestions_only_unposted_with_reasons(tmp_path) -> None:

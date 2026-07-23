@@ -1,4 +1,4 @@
-"""Catalog identity aggregation: best-photo ranking, style fingerprint, post-next hints."""
+"""Catalog identity aggregation: best-photo ranking, mirror signature, post-next hints."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from .aggregates import (
     compute_image_aggregate_scores,
     compute_single_image_aggregate_scores,
 )
+from .mirror import build_mirror
 from .percentiles import (
     compute_image_peak_percentile_scores,
     compute_within_perspective_percentile_lookup,
@@ -23,7 +24,6 @@ from .ranking import (
     _stack_non_representative_keys,
     rank_best_photos,
 )
-from .style_fingerprint import _aggregate_histogram, build_style_fingerprint
 from .suggest_post import _posted_catalog_keys_sql, suggest_what_to_post_next
 
 __all__ = [
@@ -31,7 +31,6 @@ __all__ = [
     "_WORD_RE",
     "_RATIONALE_PREVIEW_MAX",
     "_active_perspective_slugs",
-    "_aggregate_histogram",
     "_default_min_perspectives",
     "_image_meta_map",
     "_posted_catalog_keys_sql",
@@ -39,7 +38,7 @@ __all__ = [
     "_stack_non_representative_keys",
     "_tokenize_rationale",
     "_truncate_rationale",
-    "build_style_fingerprint",
+    "build_mirror",
     "compute_image_aggregate_scores",
     "compute_image_peak_percentile_scores",
     "compute_single_image_aggregate_scores",

@@ -975,15 +975,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/identity/style-fingerprint": {
+    "/api/identity/mirror": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Catalog-wide style fingerprint (per-perspective stats, tokens, evidence). */
-        get: operations["get__api_identity_style-fingerprint"];
+        /** Catalog Mirror: crowned signature techniques and exemplar rails. */
+        get: operations["get__api_identity_mirror"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1242,31 +1242,13 @@ export interface components {
             total: number;
             meta: components["schemas"]["IdentityBestPhotosResponse.00d7522.IdentityBestPhotosMeta"];
         };
-        /** StyleFingerprintResponse */
-        "StyleFingerprintResponse.00d7522": {
-            /** Per Perspective */
-            per_perspective: components["schemas"]["StyleFingerprintResponse.00d7522.StyleFingerprintPerPerspective"][];
-            /** Aggregate Distribution */
-            aggregate_distribution: {
-                [key: string]: number;
-            };
-            /**
-             * Aggregate Distribution Note
-             * @default null
-             */
-            aggregate_distribution_note: string | null;
-            /** Top Rationale Tokens */
-            top_rationale_tokens: components["schemas"]["StyleFingerprintResponse.00d7522.TopRationaleToken"][];
-            /** Evidence */
-            evidence: {
-                [key: string]: string[];
-            };
-            /**
-             * Evidence Note
-             * @default null
-             */
-            evidence_note: string | null;
-            meta: components["schemas"]["StyleFingerprintResponse.00d7522.StyleFingerprintMeta"];
+        /** MirrorResponse */
+        "MirrorResponse.00d7522": {
+            /** Population */
+            population: number;
+            /** Sections */
+            sections: components["schemas"]["MirrorResponse.00d7522.MirrorTechniqueSection"][];
+            meta: components["schemas"]["MirrorResponse.00d7522.MirrorMeta"];
         };
         /** PostNextSuggestionsQuery */
         "PostNextSuggestionsQuery.00d7522": {
@@ -2877,52 +2859,127 @@ export interface components {
             /** Rationale Preview */
             rationale_preview: string;
         };
-        /** StyleFingerprintMeta */
-        "StyleFingerprintResponse.00d7522.StyleFingerprintMeta": {
+        /** MirrorDescriptor */
+        "MirrorResponse.00d7522.MirrorDescriptor": {
+            /** Token */
+            token: string;
+            /** Log Odds */
+            log_odds: number;
+            /** Count */
+            count: number;
+        };
+        /** MirrorExemplar */
+        "MirrorResponse.00d7522.MirrorExemplar": {
+            /** Image Key */
+            image_key: string;
+            /** Filename */
+            filename: string;
+            /** Date Taken */
+            date_taken: string;
+            /** Rating */
+            rating: number;
+            /** Instagram Posted */
+            instagram_posted: boolean;
+            /** Score */
+            score: number;
+            /** Percentile */
+            percentile: number;
+            /** Purity */
+            purity: number;
+            /** Rationale Preview */
+            rationale_preview: string;
+            /** Per Perspective */
+            per_perspective: components["schemas"]["MirrorResponse.00d7522.MirrorExemplarPerPerspective"][];
+        };
+        /** MirrorExemplarPerPerspective */
+        "MirrorResponse.00d7522.MirrorExemplarPerPerspective": {
+            /** Perspective Slug */
+            perspective_slug: string;
+            /** Display Name */
+            display_name: string;
+            /** Score */
+            score: number;
+            /** Percentile */
+            percentile: number;
+        };
+        /** MirrorMeta */
+        "MirrorResponse.00d7522.MirrorMeta": {
             /**
-             * Tokenization Note
+             * Active Perspectives
              * @default null
              */
-            tokenization_note: string | null;
+            active_perspectives: string[] | null;
             /**
-             * Perspectives Included
+             * Total Catalog Images
              * @default null
              */
-            perspectives_included: string[] | null;
+            total_catalog_images: number | null;
             /**
-             * Weighting
+             * Voting Rule
              * @default null
              */
-            weighting: string | null;
+            voting_rule: string | null;
+            /**
+             * Crowning Rule
+             * @default null
+             */
+            crowning_rule: string | null;
+            /**
+             * Low Coverage Threshold
+             * @default null
+             */
+            low_coverage_threshold: number | null;
+            /**
+             * Exemplar Limit
+             * @default null
+             */
+            exemplar_limit: number | null;
+            /**
+             * Descriptor Min Count
+             * @default null
+             */
+            descriptor_min_count: number | null;
             /**
              * Scores Are Advisory
              * @default null
              */
             scores_are_advisory: string | null;
+            /**
+             * Fallback Active
+             * @default null
+             */
+            fallback_active: boolean | null;
         };
-        /** StyleFingerprintPerPerspective */
-        "StyleFingerprintResponse.00d7522.StyleFingerprintPerPerspective": {
+        /** MirrorTechniqueSection */
+        "MirrorResponse.00d7522.MirrorTechniqueSection": {
             /** Perspective Slug */
             perspective_slug: string;
-            /**
-             * Mean Score
-             * @default null
-             */
-            mean_score: number | null;
-            /**
-             * Median Score
-             * @default null
-             */
-            median_score: number | null;
-            /** Count Scores */
-            count_scores: number;
-        };
-        /** TopRationaleToken */
-        "StyleFingerprintResponse.00d7522.TopRationaleToken": {
-            /** Token */
-            token: string;
-            /** Count */
-            count: number;
+            /** Display Name */
+            display_name: string;
+            /** Strength Label */
+            strength_label: string;
+            /** Leading Not Distinctive */
+            leading_not_distinctive: boolean;
+            /** Crowned */
+            crowned: boolean;
+            /** Win Rate */
+            win_rate: number;
+            /** Chance Rate */
+            chance_rate: number;
+            /** Z Score */
+            z_score: number;
+            /** Votes */
+            votes: number;
+            /** Photos On */
+            photos_on: number;
+            /** Coverage */
+            coverage: number;
+            /** Low Coverage */
+            low_coverage: boolean;
+            /** Descriptors */
+            descriptors: components["schemas"]["MirrorResponse.00d7522.MirrorDescriptor"][];
+            /** Exemplars */
+            exemplars: components["schemas"]["MirrorResponse.00d7522.MirrorExemplar"][];
         };
         /** IdentityPerPerspectiveScore */
         "PostNextSuggestionsResponse.00d7522.IdentityPerPerspectiveScore": {
@@ -8226,7 +8283,7 @@ export interface operations {
             };
         };
     };
-    "get__api_identity_style-fingerprint": {
+    get__api_identity_mirror: {
         parameters: {
             query?: never;
             header?: never;
@@ -8241,7 +8298,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StyleFingerprintResponse.00d7522"];
+                    "application/json": components["schemas"]["MirrorResponse.00d7522"];
                 };
             };
             /** @description Unprocessable Content */

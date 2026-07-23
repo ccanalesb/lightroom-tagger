@@ -1,7 +1,6 @@
 import { Suspense } from 'react'
-import { BestPhotosGrid } from '../components/identity/BestPhotosGrid'
+import { MirrorPanel } from '../components/identity/MirrorPanel'
 import { PostNextSuggestionsPanel } from '../components/identity/PostNextSuggestionsPanel'
-import { StyleFingerprintPanel } from '../components/identity/StyleFingerprintPanel'
 import { SkeletonGrid } from '../components/ui/page-states'
 import { IDENTITY_PAGE_SUBTITLE, IDENTITY_PAGE_TITLE } from '../constants/strings'
 import { ErrorBoundary, ErrorState, invalidate, invalidateAll } from '../data'
@@ -19,30 +18,14 @@ export function IdentityPage() {
           <ErrorState
             error={error}
             reset={() => {
-              invalidate(['identity', 'style-fingerprint'])
+              invalidate(['identity', 'mirror'])
               reset()
             }}
           />
         )}
       >
         <Suspense fallback={<SkeletonGrid count={6} />}>
-          <StyleFingerprintPanel />
-        </Suspense>
-      </ErrorBoundary>
-
-      <ErrorBoundary
-        fallback={({ error, reset }) => (
-          <ErrorState
-            error={error}
-            reset={() => {
-              invalidateAll(['identity', 'best-photos'])
-              reset()
-            }}
-          />
-        )}
-      >
-        <Suspense fallback={<SkeletonGrid count={6} />}>
-          <BestPhotosGrid />
+          <MirrorPanel />
         </Suspense>
       </ErrorBoundary>
 

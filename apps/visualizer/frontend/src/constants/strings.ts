@@ -148,12 +148,10 @@ export const INSIGHTS_POSTING_RANGE_NOTE =
   'Last 12 months, monthly buckets (UTC). Adjust range on the Analytics page.'
 export const INSIGHTS_FOOTER_TIMEZONE =
   'Timestamps follow the same assumptions as Analytics (often UTC from export). Open Analytics for full filters and notes.'
-export const INSIGHTS_EMPTY_FINGERPRINT =
-  'Not enough scored catalog data yet. Run scoring from Processing to see distributions and perspective means.'
 export const INSIGHTS_QUICK_ANALYTICS_TITLE = 'Analytics'
 export const INSIGHTS_QUICK_ANALYTICS_DESC = 'Posting frequency, heatmaps, and caption aggregates.'
 export const INSIGHTS_QUICK_IDENTITY_TITLE = 'Identity'
-export const INSIGHTS_QUICK_IDENTITY_DESC = 'Best photos, style fingerprint, and post-next suggestions.'
+export const INSIGHTS_QUICK_IDENTITY_DESC = 'Mirror signature, and post-next suggestions.'
 export const INSIGHTS_QUICK_PROCESSING_TITLE = 'Processing'
 export const INSIGHTS_QUICK_PROCESSING_DESC = 'Matching, descriptions, scoring jobs, and perspectives.'
 export const INSIGHTS_KPI_ACTIVE_JOBS = 'Active jobs'
@@ -481,18 +479,18 @@ export const ANALYTICS_STAT_AVG_TAGS = 'Avg. hashtags per post (unique)'
 // Identity (Phase 8 / 08-02)
 export const IDENTITY_PAGE_TITLE = 'Identity'
 export const IDENTITY_PAGE_SUBTITLE =
-  'Best scored catalog photos, your style fingerprint from critique scores, and what to post next.'
-export const IDENTITY_SECTION_BEST_PHOTOS = 'Best photos'
-export const IDENTITY_SECTION_STYLE_FINGERPRINT = 'Style fingerprint'
+  'Your photographic signature from critique scores, and what to post next.'
+export const IDENTITY_MIRROR_SECTION = 'Mirror'
+export const IDENTITY_MIRROR_INTRO =
+  'Across your {count} analyzed catalog photos with multi-lens coverage. Each technique below is one your photos win on more often than chance — shown through the peak photos that prove it. Click any photo to see what makes it stand out.'
+export const IDENTITY_MIRROR_EMPTY =
+  'Not enough multi-lens scored catalog data yet. Score images on at least two active perspectives.'
+export const IDENTITY_MIRROR_LOW_COVERAGE = 'scored on ~{pct}% of your catalog'
+export const IDENTITY_MIRROR_WHY_HERE = "Why it's here"
+export const IDENTITY_MIRROR_STANDOUT = 'Standout dimension'
 export const IDENTITY_SECTION_POST_NEXT = 'What to post next'
-export const IDENTITY_INTRO_STYLE_FINGERPRINT =
-  'Your aggregate scores and rationale patterns across active critique lenses. This is the "shape" of your work before you pick individual shots to share.'
-export const IDENTITY_INTRO_BEST_PHOTOS =
-  'A ranked set of your strongest catalog images—highest equal-weight aggregate first. "Posted" on a tile means that catalog photo already appears on Instagram.'
 export const IDENTITY_INTRO_POST_NEXT =
   'Unposted candidates the server flags as worth sharing next, with a short reason on each row.'
-export const IDENTITY_BEST_PHOTOS_HELP =
-  'Ranked by equal-weight aggregate over active perspectives (server order). Expand a row for per-perspective scores and rubric versions.'
 export const IDENTITY_BEST_PHOTOS_EMPTY_FALLBACK =
   'No eligible ranked photos yet. Run scoring on more perspectives per image to meet coverage.'
 export const IDENTITY_LABEL_AGGREGATE = 'Aggregate'

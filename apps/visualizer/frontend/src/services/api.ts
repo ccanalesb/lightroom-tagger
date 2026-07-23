@@ -73,12 +73,13 @@ import type {
   IdentityBestPhotoItem,
   IdentityBestPhotosMeta,
   IdentityBestPhotosResponse,
+  MirrorExemplar,
+  MirrorMeta,
+  MirrorResponse,
+  MirrorTechniqueSection,
   PostNextCandidate,
   PostNextSuggestionsMeta,
   PostNextSuggestionsResponse,
-  StyleFingerprintMeta,
-  StyleFingerprintPerPerspective,
-  StyleFingerprintResponse,
 } from '../types/identity'
 import type {
   CachePipelineRun,
@@ -106,12 +107,13 @@ export type {
   IdentityBestPhotoItem,
   IdentityBestPhotosMeta,
   IdentityBestPhotosResponse,
+  MirrorExemplar,
+  MirrorMeta,
+  MirrorResponse,
+  MirrorTechniqueSection,
   PostNextCandidate,
   PostNextSuggestionsMeta,
   PostNextSuggestionsResponse,
-  StyleFingerprintMeta,
-  StyleFingerprintPerPerspective,
-  StyleFingerprintResponse,
 }
 export type {
   CachePipelineRun,
@@ -756,7 +758,7 @@ export const AnalyticsAPI = {
   },
 }
 
-// --- Identity (Phase 8) — GET /api/identity/best-photos, /api/identity/style-fingerprint, /api/identity/suggestions
+// --- Identity (Phase 8) — GET /api/identity/best-photos, /api/identity/mirror, /api/identity/suggestions
 
 export const IdentityAPI = {
   getBestPhotos: (params?: {
@@ -778,7 +780,7 @@ export const IdentityAPI = {
     return request<IdentityBestPhotosResponse>(`/identity/best-photos${qs ? `?${qs}` : ''}`)
   },
 
-  getStyleFingerprint: () => request<StyleFingerprintResponse>('/identity/style-fingerprint'),
+  getMirror: () => request<MirrorResponse>('/identity/mirror'),
 
   getSuggestions: (params?: {
     limit?: number
