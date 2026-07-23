@@ -326,6 +326,65 @@ def test_mirror_crowning_uses_binomial_and_fallback(tmp_path) -> None:
     assert even["sections"][0]["leading_not_distinctive"] is True
 
 
+def test_mirror_reproduces_multi_crown_shape_with_low_coverage_caveat(tmp_path) -> None:
+    """#203 headline shape: two lenses crowned, z-sorted, the lower-coverage one flagged.
+
+    The real catalog crowns more than one technique and marks a low-coverage crown
+    with a caveat (spec #207 AC: "crowns Depth & Environmental-Context + Framing,
+    Framing with the low-coverage caveat"). This asserts that mechanism on a
+    synthetic catalog engineered to that shape. Scores use a two-band {9, 2} layout
+    per lens so each image's percentile argmax is unambiguous: the winner lens sits
+    in its 9-band (percentile ~0.56) while the other sits in its 2-band (~0.44). The
+    anchor groups (C, D) give c/d a high band so their diluter scores in groups A/B
+    stay bottom-percentile. See percentiles._midrank_percentile_ranks for the math.
+    """
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=4)
+    assert len(slugs) >= 4
+    a, b, c, d = slugs[0], slugs[1], slugs[2], slugs[3]
+    HIGH, LOW = 9, 2
+
+    def _img(name: str) -> str:
+        return store_image(
+            conn,
+            {"date_taken": "2025-03-01", "filename": name, "instagram_posted": False},
+        )
+
+    # Group A (16): {a, c} — a spikes, wins every image → high-coverage crown.
+    for i in range(16):
+        k = _img(f"grpA{i}.jpg")
+        _add_score(conn, k, a, HIGH)
+        _add_score(conn, k, c, LOW)
+    # Group B (12): {b, d} — b spikes, wins every image → crowned but lower coverage.
+    for i in range(12):
+        k = _img(f"grpB{i}.jpg")
+        _add_score(conn, k, b, HIGH)
+        _add_score(conn, k, d, LOW)
+    # Group C (2): {c, a} — anchors c's high band so group-A c stays bottom-percentile.
+    for i in range(2):
+        k = _img(f"grpC{i}.jpg")
+        _add_score(conn, k, c, HIGH)
+        _add_score(conn, k, a, LOW)
+    # Group D (2): {d, b} — anchors d's high band; neither c nor d clears the bar.
+    for i in range(2):
+        k = _img(f"grpD{i}.jpg")
+        _add_score(conn, k, d, HIGH)
+        _add_score(conn, k, b, LOW)
+    conn.commit()
+
+    mirror = build_mirror(conn)
+    assert mirror["meta"]["fallback_active"] is False
+
+    crowned = [s for s in mirror["sections"] if s["crowned"]]
+    # Two techniques crowned, ordered by descending z.
+    assert [s["perspective_slug"] for s in crowned] == [a, b]
+    assert crowned[0]["z_score"] >= crowned[1]["z_score"]
+
+    by_slug = {s["perspective_slug"]: s for s in crowned}
+    assert by_slug[a]["low_coverage"] is False  # scored on 18/32
+    assert by_slug[b]["low_coverage"] is True  # scored on 14/32 → carries the caveat
+
+
 def test_mirror_reads_percentile_lookup_not_aggregate_scores(tmp_path, monkeypatch) -> None:
     conn = init_database(str(tmp_path / "library.db"))
     slugs = _active_slugs(conn, limit=2)

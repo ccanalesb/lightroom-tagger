@@ -25,7 +25,14 @@ _CROWN_ALPHA = 0.05
 
 
 def _binom_sf(k: int, n: int, p: float) -> float:
-    """P(X >= k) for X ~ Binomial(n, p)."""
+    """P(X >= k) for X ~ Binomial(n, p).
+
+    Exact for n < 30; for n >= 30 (the real-catalog regime) uses the
+    continuity-corrected normal approximation, which is accurate deep in the
+    upper tail where crowning decisions actually sit. A lens sitting right at
+    p ~ 0.05 could differ marginally from the exact test; distinctive lenses
+    (large z) are unaffected. No scipy/numpy dependency, so this is hand-rolled.
+    """
     if k <= 0:
         return 1.0
     if k > n:
@@ -51,6 +58,11 @@ def _binom_sf(k: int, n: int, p: float) -> float:
 
 
 def _signature_z(votes: int, expected_wins: float, photos_on: int, chance: float) -> float:
+    # Each photo's win probability is 1/k_i (k_i = lenses it was scored on), so the
+    # vote count is Poisson-binomial. We approximate it with a homogeneous
+    # Binomial(photos_on, chance) using the mean per-photo chance. Because the true
+    # variance sum_i p_i(1-p_i) <= n*chance*(1-chance) (Jensen), this denominator is
+    # an upper bound, so z is conservative (understated) — crowning never over-fires.
     denom = photos_on * chance * (1.0 - chance)
     if denom <= 0.0:
         return 0.0
@@ -106,8 +118,14 @@ def _distinctive_descriptors(
 
 
 def _purity(lens_percentile: float, other_percentiles: list[float]) -> float:
+    # Purity is a *separation*: how far this lens's percentile leads the image's
+    # next-strongest lens (spec #207: "X-percentile - next-highest-percentile").
+    # An image scored on only this lens has no other lens to separate from, so its
+    # purity is undefined — report 0.0 (no demonstrated concentration) rather than
+    # the raw percentile, which would let single-lens images out-rank genuinely
+    # distinctive multi-lens ones in the exemplar tiebreak.
     if not other_percentiles:
-        return round(lens_percentile * 100.0, 1)
+        return 0.0
     return round((lens_percentile - max(other_percentiles)) * 100.0, 1)
 
 
