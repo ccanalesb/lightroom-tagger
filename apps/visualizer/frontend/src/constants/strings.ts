@@ -497,9 +497,6 @@ export const IDENTITY_ADVISOR_HELP =
   'Coverage-eligible images you have not posted yet. Signature labels are informational only — ranking uses peak percentile alone.'
 export const IDENTITY_ADVISOR_EMPTY_FALLBACK = 'No suggestions right now.'
 export const IDENTITY_SIGNATURE_LABEL = 'signature'
-export const IDENTITY_SECTION_POST_NEXT = 'What to post next'
-export const IDENTITY_INTRO_POST_NEXT =
-  'Unposted candidates the server flags as worth sharing next, with a short reason on each row.'
 export const IDENTITY_BEST_PHOTOS_EMPTY_FALLBACK =
   'No eligible ranked photos yet. Run scoring on more perspectives per image to meet coverage.'
 export const IDENTITY_LABEL_AGGREGATE = 'Aggregate'
@@ -516,9 +513,6 @@ export const IDENTITY_FINGERPRINT_EVIDENCE = 'Example images'
 export const IDENTITY_FINGERPRINT_EMPTY =
   'Not enough scored catalog data to chart. Score images across active perspectives.'
 export const IDENTITY_FINGERPRINT_LOW_DATA = 'Some perspectives have no scores yet.'
-export const IDENTITY_POST_NEXT_HELP =
-  'Unposted catalog images that meet coverage rules, with reasons from the server.'
-export const IDENTITY_POST_NEXT_EMPTY_FALLBACK = 'No suggestions right now.'
 export const IDENTITY_ACTION_OPEN_CATALOG = 'Open in catalog'
 export const IDENTITY_REASON_CODE_LABELS: Record<string, string> = {
   high_score_unposted: 'High peak (unposted)',
