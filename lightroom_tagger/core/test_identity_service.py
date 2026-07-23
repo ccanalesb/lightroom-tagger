@@ -3,20 +3,16 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timedelta, timezone
 
 from lightroom_tagger.core.database import (
     init_database,
     insert_image_score,
     store_image,
-    store_instagram_dump_media,
-    store_match,
-    validate_match,
 )
 from lightroom_tagger.core.identity_service import (
     build_mirror,
-    compute_image_aggregate_scores,
     compute_image_peak_percentile_scores,
+    compute_single_image_aggregate_scores,
     compute_within_perspective_percentile_lookup,
     rank_best_photos,
     suggest_what_to_post_next,
@@ -71,8 +67,8 @@ def test_aggregate_excludes_excused_perspective(tmp_path) -> None:
     _add_score(conn, k, s1, 5, not_attempted=1)
     conn.commit()
 
-    items, _ = compute_image_aggregate_scores(conn, min_perspectives=1)
-    row = next(i for i in items if i["image_key"] == k)
+    row = compute_single_image_aggregate_scores(conn, k)
+    assert row is not None
     assert row["perspectives_covered"] == 1
     assert row["aggregate_score"] == 8.0
     assert [p["perspective_slug"] for p in row["per_perspective"]] == [s0]
@@ -91,11 +87,8 @@ def test_image_with_all_perspectives_excused_is_not_scorable(tmp_path) -> None:
     _add_score(conn, k, s1, 5, not_attempted=1)
     conn.commit()
 
-    items, _ = compute_image_aggregate_scores(conn, min_perspectives=1)
-    match = [i for i in items if i["image_key"] == k]
-    assert match == [] or (
-        match[0]["perspectives_covered"] == 0 and match[0]["eligible"] is False
-    )
+    row = compute_single_image_aggregate_scores(conn, k)
+    assert row is None
 
 
 def test_rank_best_photos_orders_by_aggregate_and_excludes_low_coverage(tmp_path) -> None:
@@ -140,7 +133,7 @@ def test_rank_best_photos_orders_by_aggregate_and_excludes_low_coverage(tmp_path
     _add_score(conn, k_partial, s0, 10)
     conn.commit()
 
-    items, meta = compute_image_aggregate_scores(conn, min_perspectives=2)
+    items, meta = compute_image_peak_percentile_scores(conn, min_perspectives=2)
     partial_row = next(i for i in items if i["image_key"] == k_partial)
     assert partial_row["eligible"] is False
     assert partial_row["perspectives_covered"] == 1
@@ -446,63 +439,53 @@ def test_suggestions_only_unposted_with_reasons(tmp_path) -> None:
     assert all(len(c["reasons"]) >= 1 for c in out["candidates"])
 
 
-def test_suggestions_cadence_gap_meta_optional(tmp_path) -> None:
-    """Heavy baseline window vs quiet recent window → cadence hint in meta."""
-    db_path = tmp_path / "library.db"
-    conn = init_database(str(db_path))
-    slugs = _active_slugs(conn)
-    s0, s1 = slugs[0], slugs[1]
+def test_suggestions_ranks_by_peak_percentile(tmp_path) -> None:
+    """Suggestions order by peak percentile, not raw mean."""
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    hot, cold = slugs[0], slugs[1]
 
-    k_cat = store_image(
+    for i, (hs, cs) in enumerate([(8, 2), (9, 3), (10, 4), (9, 3)]):
+        k = store_image(
+            conn,
+            {
+                "date_taken": f"2024-09-{10 + i:02d}",
+                "filename": f"base{i}.jpg",
+                "instagram_posted": False,
+            },
+        )
+        _add_score(conn, k, hot, hs)
+        _add_score(conn, k, cold, cs)
+
+    mean_winner = store_image(
         conn,
-        {
-            "date_taken": "2024-05-01",
-            "filename": "cadence_candidate.jpg",
-            "instagram_posted": False,
-        },
+        {"date_taken": "2024-09-20", "filename": "mean.jpg", "instagram_posted": False},
     )
-    _add_score(conn, k_cat, s0, 9)
-    _add_score(conn, k_cat, s1, 9)
+    peak_winner = store_image(
+        conn,
+        {"date_taken": "2024-09-21", "filename": "peak.jpg", "instagram_posted": False},
+    )
+    _add_score(conn, mean_winner, hot, 9)
+    _add_score(conn, mean_winner, cold, 4)
+    _add_score(conn, peak_winner, hot, 10)
+    _add_score(conn, peak_winner, cold, 2)
     conn.commit()
 
-    today = datetime.now(timezone.utc).date()
-    # Inside baseline window (older than last 30 days), not in recent window.
-    baseline_day = today - timedelta(days=55)
+    mean_agg = (
+        sum(p["score"] for p in compute_single_image_aggregate_scores(conn, mean_winner)["per_perspective"])
+        / 2
+    )
+    peak_agg = (
+        sum(p["score"] for p in compute_single_image_aggregate_scores(conn, peak_winner)["per_perspective"])
+        / 2
+    )
+    assert mean_agg > peak_agg
 
-    for i in range(20):
-        post_day = baseline_day - timedelta(days=i)
-        created = f"{post_day.isoformat()}T12:00:00Z"
-        yyyymm = post_day.strftime("%Y%m")
-        ck = store_image(
-            conn,
-            {
-                "date_taken": post_day.isoformat(),
-                "filename": f"hist_{i}.jpg",
-                "instagram_posted": True,
-            },
-        )
-        store_instagram_dump_media(
-            conn,
-            {
-                "media_key": f"m{i}",
-                "date_folder": yyyymm,
-                "caption": "",
-                "created_at": created,
-            },
-        )
-        store_match(
-            conn,
-            {"catalog_key": ck, "insta_key": f"m{i}", "total_score": 1.0},
-            commit=False,
-        )
-        validate_match(conn, ck, f"m{i}")
-    conn.commit()
-
-    out = suggest_what_to_post_next(conn, limit=5)
+    out = suggest_what_to_post_next(conn, limit=10)
     assert out["candidates"]
-    meta = out.get("meta") or {}
-    assert meta.get("cadence_gap") is True
-    assert meta.get("cadence_note")
+    assert out["candidates"][0]["image_key"] == peak_winner
+    assert out["candidates"][0]["peak_percentile"] >= out["candidates"][1]["peak_percentile"]
+    assert out["meta"]["ranking_key"] == "peak_percentile"
 
 
 def test_suggestions_offset_returns_second_page(tmp_path) -> None:
@@ -654,10 +637,15 @@ def test_rank_best_photos_prefers_peak_percentile_over_mean(tmp_path) -> None:
     _add_score(conn, peak_winner, cold, 2)
     conn.commit()
 
-    mean_items, _ = compute_image_aggregate_scores(conn, min_perspectives=2)
-    mean_row = next(i for i in mean_items if i["image_key"] == mean_winner)
-    peak_row = next(i for i in mean_items if i["image_key"] == peak_winner)
-    assert mean_row["aggregate_score"] > peak_row["aggregate_score"]
+    mean_agg = (
+        sum(p["score"] for p in compute_single_image_aggregate_scores(conn, mean_winner)["per_perspective"])
+        / 2
+    )
+    peak_agg = (
+        sum(p["score"] for p in compute_single_image_aggregate_scores(conn, peak_winner)["per_perspective"])
+        / 2
+    )
+    assert mean_agg > peak_agg
 
     page, total, meta = rank_best_photos(conn, limit=10, offset=0, min_perspectives=2)
     assert total >= 2

@@ -95,7 +95,7 @@ export function fromPostNextRow(row: PostNextCandidate): ImageView {
     date_taken: row.date_taken,
     rating: row.rating,
     // Identity fields are authoritative on this endpoint.
-    identity_aggregate_score: row.aggregate_score,
+    identity_peak_percentile: row.peak_percentile,
     identity_perspectives_covered: row.perspectives_covered,
     identity_per_perspective: row.per_perspective,
   }

@@ -488,6 +488,15 @@ export const IDENTITY_MIRROR_EMPTY =
 export const IDENTITY_MIRROR_LOW_COVERAGE = 'scored on ~{pct}% of your catalog'
 export const IDENTITY_MIRROR_WHY_HERE = "Why it's here"
 export const IDENTITY_MIRROR_STANDOUT = 'Standout dimension'
+export const IDENTITY_DIVIDER_BACKWARD = 'Who you are'
+export const IDENTITY_DIVIDER_FORWARD = 'What to post next'
+export const IDENTITY_SECTION_ADVISOR = 'Advisor'
+export const IDENTITY_INTRO_ADVISOR =
+  'Unposted catalog photos ranked by peak within-perspective percentile, with the lens that drives each ranking and whether it matches your Mirror signature.'
+export const IDENTITY_ADVISOR_HELP =
+  'Coverage-eligible images you have not posted yet. Signature labels are informational only — ranking uses peak percentile alone.'
+export const IDENTITY_ADVISOR_EMPTY_FALLBACK = 'No suggestions right now.'
+export const IDENTITY_SIGNATURE_LABEL = 'signature'
 export const IDENTITY_SECTION_POST_NEXT = 'What to post next'
 export const IDENTITY_INTRO_POST_NEXT =
   'Unposted candidates the server flags as worth sharing next, with a short reason on each row.'
@@ -512,9 +521,7 @@ export const IDENTITY_POST_NEXT_HELP =
 export const IDENTITY_POST_NEXT_EMPTY_FALLBACK = 'No suggestions right now.'
 export const IDENTITY_ACTION_OPEN_CATALOG = 'Open in catalog'
 export const IDENTITY_REASON_CODE_LABELS: Record<string, string> = {
-  high_score_unposted: 'High score (unposted)',
-  cadence_gap: 'Cadence',
-  underrepresented_theme: 'Theme variety',
+  high_score_unposted: 'High peak (unposted)',
   eligible_unposted: 'Eligible unposted',
 }
 

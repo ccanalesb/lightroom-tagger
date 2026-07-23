@@ -140,7 +140,10 @@ class PostNextCandidate(BaseModel):
     filename: str
     date_taken: str
     rating: int
-    aggregate_score: float
+    peak_percentile: float
+    peak_perspective_slug: str
+    peak_perspective_display_name: str
+    is_signature: bool
     perspectives_covered: int
     per_perspective: list[IdentityPerPerspectiveScore]
     reasons: list[str]
@@ -151,13 +154,11 @@ class PostNextSuggestionsMeta(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     weighting: str | None = None
+    ranking_key: str | None = None
     min_perspectives_used: int | None = None
     coverage_rule: str | None = None
     timezone_assumption: str | None = None
     high_score_rule: str | None = None
-    posted_semantics: str | None = None
-    cadence_gap: bool | None = None
-    cadence_note: str | None = None
 
 
 class PostNextSuggestionsResponse(BaseModel):
@@ -172,6 +173,4 @@ class PostNextSuggestionsResponse(BaseModel):
 class PostNextSuggestionsQuery(BaseModel):
     limit: int | None = None
     offset: int | None = None
-    lookback_days_recent: int | None = None
-    lookback_days_baseline: int | None = None
     sort_by_date: str | None = None

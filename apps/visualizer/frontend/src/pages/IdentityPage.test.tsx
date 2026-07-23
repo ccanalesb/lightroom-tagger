@@ -9,10 +9,12 @@ import {
   EMPTY_POST_NEXT_META,
 } from '../__test-utils__/identityFixtures'
 import {
+  IDENTITY_ADVISOR_EMPTY_FALLBACK,
+  IDENTITY_DIVIDER_BACKWARD,
+  IDENTITY_DIVIDER_FORWARD,
   IDENTITY_MIRROR_EMPTY,
   IDENTITY_PAGE_TITLE,
-  IDENTITY_POST_NEXT_EMPTY_FALLBACK,
-  IDENTITY_SECTION_POST_NEXT,
+  IDENTITY_SECTION_ADVISOR,
   IDENTITY_MIRROR_SECTION,
 } from '../constants/strings'
 
@@ -44,13 +46,15 @@ describe('IdentityPage', () => {
       await screen.findByRole('heading', { level: 2, name: IDENTITY_MIRROR_SECTION }),
     ).toBeInTheDocument()
     expect(
-      await screen.findByRole('heading', { level: 2, name: IDENTITY_SECTION_POST_NEXT }),
+      await screen.findByRole('heading', { level: 2, name: IDENTITY_SECTION_ADVISOR }),
     ).toBeInTheDocument()
 
     const body = document.body.innerHTML
-    expect(body.indexOf(IDENTITY_MIRROR_SECTION) < body.indexOf(IDENTITY_SECTION_POST_NEXT)).toBe(
+    expect(body.indexOf(IDENTITY_MIRROR_SECTION) < body.indexOf(IDENTITY_SECTION_ADVISOR)).toBe(
       true,
     )
+    expect(screen.getByText(IDENTITY_DIVIDER_BACKWARD)).toBeInTheDocument()
+    expect(screen.getByText(IDENTITY_DIVIDER_FORWARD)).toBeInTheDocument()
   })
 
   it('shows empty-state copy when APIs return no data', async () => {
@@ -64,7 +68,7 @@ describe('IdentityPage', () => {
       expect(screen.getByText(IDENTITY_MIRROR_EMPTY)).toBeInTheDocument()
     })
     await waitFor(() => {
-      expect(screen.getByText(IDENTITY_POST_NEXT_EMPTY_FALLBACK)).toBeInTheDocument()
+      expect(screen.getByText(IDENTITY_ADVISOR_EMPTY_FALLBACK)).toBeInTheDocument()
     })
   })
 })

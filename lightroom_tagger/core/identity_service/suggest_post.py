@@ -3,28 +3,26 @@
 from __future__ import annotations
 
 import sqlite3
-from collections import Counter
-from datetime import datetime, timedelta, timezone
-from statistics import median
-from typing import Any, cast
+from typing import Any
 
-from lightroom_tagger.core.posting_analytics import get_posting_frequency
-
-from .aggregates import _SCORES_BASE_SQL, _tokenize_rationale, compute_image_aggregate_scores
+from .mirror import build_mirror
+from .percentiles import compute_image_peak_percentile_scores
 from .ranking import _image_meta_map
 
 
-def _posted_catalog_keys_sql() -> str:
-    """Catalog keys treated as posted: flag or validated dump match (aligned with Phase 7)."""
-    return """
-        SELECT DISTINCT i.key AS image_key
-        FROM images i
-        WHERE i.instagram_posted = 1
-        UNION
-        SELECT DISTINCT m.catalog_key AS image_key
-        FROM matches m
-        WHERE m.validated_at IS NOT NULL
-    """
+def _crowned_slugs(mirror: dict[str, Any]) -> set[str]:
+    return {
+        str(section["perspective_slug"])
+        for section in mirror.get("sections", [])
+        if section.get("crowned")
+    }
+
+
+def _peak_perspective(per_perspective: list[dict[str, Any]]) -> dict[str, Any]:
+    return sorted(
+        per_perspective,
+        key=lambda p: (-float(p.get("percentile") or 0.0), str(p.get("perspective_slug") or "")),
+    )[0]
 
 
 def suggest_what_to_post_next(
@@ -32,19 +30,19 @@ def suggest_what_to_post_next(
     *,
     limit: int,
     offset: int = 0,
-    lookback_days_recent: int = 30,
-    lookback_days_baseline: int = 90,
     sort_by_date: str | None = None,
 ) -> dict[str, Any]:
     """Unposted, coverage-eligible catalog images with heuristic reasons (D-44–D-46).
 
     ``sort_by_date`` (``newest`` / ``oldest``) only controls the date tiebreaker;
-    aggregate score remains the primary sort key.
+    peak within-perspective percentile remains the primary sort key.
     """
     if sort_by_date is not None and sort_by_date not in ("newest", "oldest"):
         raise ValueError("sort_by_date must be 'newest' or 'oldest'")
 
-    items, agg_meta = compute_image_aggregate_scores(conn, include_ineligible=False)
+    items, peak_meta = compute_image_peak_percentile_scores(conn, include_ineligible=False)
+    mirror = build_mirror(conn)
+    crowned = _crowned_slugs(mirror)
     keys = [str(i["image_key"]) for i in items if i.get("eligible")]
     img_meta = _image_meta_map(conn, keys)
 
@@ -56,93 +54,45 @@ def suggest_what_to_post_next(
         im = img_meta.get(k, {})
         if im.get("instagram_posted"):
             continue
-        candidates_full.append({**i, **im})
+        per = list(i.get("per_perspective") or [])
+        peak_lens = _peak_perspective(per) if per else {}
+        slug = str(peak_lens.get("perspective_slug") or "")
+        candidates_full.append(
+            {
+                **i,
+                **im,
+                "peak_perspective_slug": slug,
+                "peak_perspective_display_name": str(
+                    peak_lens.get("display_name") or slug
+                ),
+                "is_signature": slug in crowned if slug else False,
+            }
+        )
 
     date_reverse = sort_by_date != "oldest"
     candidates_full.sort(key=lambda r: r["image_key"])
     candidates_full.sort(key=lambda r: r.get("date_taken") or "", reverse=date_reverse)
-    candidates_full.sort(key=lambda r: r["aggregate_score"], reverse=True)
+    candidates_full.sort(key=lambda r: r["peak_percentile"], reverse=True)
 
-    unposted_aggs = [float(c["aggregate_score"]) for c in candidates_full]
-    if unposted_aggs:
-        sorted_aggs = sorted(unposted_aggs)
-        idx = max(0, int(round(0.9 * (len(sorted_aggs) - 1))))
-        p90 = sorted_aggs[idx]
+    unposted_peaks = [float(c["peak_percentile"]) for c in candidates_full]
+    if unposted_peaks:
+        sorted_peaks = sorted(unposted_peaks)
+        idx = max(0, int(round(0.9 * (len(sorted_peaks) - 1))))
+        p90 = sorted_peaks[idx]
     else:
-        p90 = 10.0
+        p90 = 1.0
 
-    # Posted rationale tokens (D-46): current catalog scores for posted keys.
-    posted_keys_rows = conn.execute(_posted_catalog_keys_sql()).fetchall()
-    posted_key_set = {str(r["image_key"]) for r in posted_keys_rows}
-    posted_token_counter: Counter[str] = Counter()
-    for r in conn.execute(_SCORES_BASE_SQL).fetchall():
-        if str(r["image_key"]) not in posted_key_set:
-            continue
-        rat = r.get("rationale")
-        if isinstance(rat, str) and rat.strip():
-            posted_token_counter.update(_tokenize_rationale(rat))
-
-    posted_top = [t for t, c in posted_token_counter.most_common(25) if c >= 2]
-
-    # Cadence (D-45): compare recent vs older window using validated posts.
     suggestions_meta: dict[str, Any] = {
-        "weighting": agg_meta.get("weighting"),
-        "min_perspectives_used": agg_meta.get("min_perspectives_used"),
-        "coverage_rule": agg_meta.get("coverage_rule"),
+        "weighting": peak_meta.get("weighting"),
+        "ranking_key": peak_meta.get("ranking_key"),
+        "min_perspectives_used": peak_meta.get("min_perspectives_used"),
+        "coverage_rule": peak_meta.get("coverage_rule"),
         "timezone_assumption": "UTC",
         "high_score_rule": (
-            "reason code high_score_unposted when aggregate_score >= p90 of eligible "
-            "unposted images' aggregate scores."
-        ),
-        "posted_semantics": (
-            "Posted set for theme heuristic: instagram_posted=1 OR validated match "
-            "on catalog_key (same population family as posting_analytics)."
+            "reason code high_score_unposted when peak_percentile >= p90 of eligible "
+            "unposted images' peak within-perspective percentiles."
         ),
     }
-
-    today = datetime.now(timezone.utc).date()
-    recent_start = today - timedelta(days=max(1, lookback_days_recent) - 1)
-    recent_end = today
-    baseline_end = today - timedelta(days=lookback_days_recent)
-    baseline_start = today - timedelta(
-        days=lookback_days_recent + max(1, lookback_days_baseline) - 1
-    )
-
-    cadence_note: str | None = None
-    try:
-        buckets_r, _ = get_posting_frequency(
-            conn,
-            date_from=recent_start.isoformat(),
-            date_to=recent_end.isoformat(),
-            granularity="day",
-        )
-        buckets_b, _ = get_posting_frequency(
-            conn,
-            date_from=baseline_start.isoformat(),
-            date_to=baseline_end.isoformat(),
-            granularity="day",
-        )
-        recent_total = sum(cast(int, b["count"]) for b in buckets_r)
-        base_total = sum(cast(int, b["count"]) for b in buckets_b)
-        days_r = max(1, lookback_days_recent)
-        days_b = max(1, lookback_days_baseline)
-        rate_r = recent_total / days_r
-        rate_b = base_total / days_b if base_total else 0.0
-        # Below half the baseline daily rate → global cadence hint (only if baseline had posts).
-        if base_total > 0 and rate_r < 0.5 * rate_b:
-            cadence_note = (
-                "Recent posting rate is below half the prior-window daily average "
-                f"(validated dump posts: last {lookback_days_recent}d vs preceding "
-                f"{lookback_days_baseline}d)."
-            )
-            suggestions_meta["cadence_gap"] = True
-    except Exception:
-        cadence_note = None
-
-    if cadence_note:
-        suggestions_meta["cadence_note"] = cadence_note
-
-    mid = median(unposted_aggs) if unposted_aggs else 0.0
 
     total_candidates = len(candidates_full)
     lim = max(0, limit)
@@ -152,41 +102,28 @@ def suggest_what_to_post_next(
     for cand in page:
         reasons: list[str] = []
         codes: list[str] = []
-        agg = float(cand["aggregate_score"])
-        if agg >= p90:
+        peak = float(cand["peak_percentile"])
+        lens_name = str(cand.get("peak_perspective_display_name") or "")
+        is_sig = bool(cand.get("is_signature"))
+        if peak >= p90:
             reasons.append(
-                "Strong aggregate score among scored, unposted catalog images "
-                f"(aggregate={agg:.2f})."
+                "Strong peak percentile among scored, unposted catalog images "
+                f"(peak_percentile={peak:.4f})."
             )
             codes.append("high_score_unposted")
 
-        if cadence_note and agg >= mid:
-            reasons.append(
-                "Posting cadence has slowed versus your earlier window; "
-                "this image remains a strong candidate."
-            )
-            codes.append("cadence_gap")
-
-        cand_tokens: Counter[str] = Counter()
-        for p in cand.get("per_perspective") or []:
-            prev = p.get("rationale_preview") or ""
-            cand_tokens.update(_tokenize_rationale(prev))
-        for tok in posted_top:
-            posted_c = posted_token_counter.get(tok, 0)
-            if posted_c < 2:
-                continue
-            if cand_tokens.get(tok, 0) == 0:
+        if lens_name:
+            if is_sig:
                 reasons.append(
-                    f"Theme '{tok}' appears often in posted-image score rationales "
-                    "but not in this image's rationale snippets — possible variety gap."
+                    f"Peak lens is {lens_name}, one of your crowned signature techniques."
                 )
-                codes.append("underrepresented_theme")
-                break
+            else:
+                reasons.append(f"Peak lens is {lens_name}.")
 
-        if not reasons:
+        if not codes:
             reasons.append(
                 "Unposted catalog image with sufficient perspective coverage; "
-                "ranked by aggregate score among eligible candidates."
+                "ranked by peak within-perspective percentile among eligible candidates."
             )
             codes.append("eligible_unposted")
 
@@ -196,7 +133,10 @@ def suggest_what_to_post_next(
                 "filename": cand.get("filename", ""),
                 "date_taken": cand.get("date_taken", ""),
                 "rating": cand.get("rating", 0),
-                "aggregate_score": cand["aggregate_score"],
+                "peak_percentile": cand["peak_percentile"],
+                "peak_perspective_slug": cand.get("peak_perspective_slug", ""),
+                "peak_perspective_display_name": cand.get("peak_perspective_display_name", ""),
+                "is_signature": is_sig,
                 "perspectives_covered": cand["perspectives_covered"],
                 "per_perspective": cand.get("per_perspective", []),
                 "reasons": reasons,

@@ -67,6 +67,7 @@ def test_suggestions_200_shape(identity_client) -> None:
     assert "total" in data
     assert isinstance(data["total"], int)
     assert "meta" in data
+    assert data["meta"].get("ranking_key") == "peak_percentile"
     assert "empty_state" in data
 
 

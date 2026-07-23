@@ -10,7 +10,6 @@ from .aggregates import (
     _default_min_perspectives,
     _tokenize_rationale,
     _truncate_rationale,
-    compute_image_aggregate_scores,
     compute_single_image_aggregate_scores,
 )
 from .mirror import build_mirror
@@ -24,7 +23,7 @@ from .ranking import (
     _stack_non_representative_keys,
     rank_best_photos,
 )
-from .suggest_post import _posted_catalog_keys_sql, suggest_what_to_post_next
+from .suggest_post import suggest_what_to_post_next
 
 __all__ = [
     "_SCORES_BASE_SQL",
@@ -33,13 +32,11 @@ __all__ = [
     "_active_perspective_slugs",
     "_default_min_perspectives",
     "_image_meta_map",
-    "_posted_catalog_keys_sql",
     "_stack_fields_for_image_keys",
     "_stack_non_representative_keys",
     "_tokenize_rationale",
     "_truncate_rationale",
     "build_mirror",
-    "compute_image_aggregate_scores",
     "compute_image_peak_percentile_scores",
     "compute_single_image_aggregate_scores",
     "compute_within_perspective_percentile_lookup",

@@ -1,8 +1,13 @@
 import { Suspense } from 'react'
+import { AdvisorPanel } from '../components/identity/AdvisorPanel'
 import { MirrorPanel } from '../components/identity/MirrorPanel'
-import { PostNextSuggestionsPanel } from '../components/identity/PostNextSuggestionsPanel'
 import { SkeletonGrid } from '../components/ui/page-states'
-import { IDENTITY_PAGE_SUBTITLE, IDENTITY_PAGE_TITLE } from '../constants/strings'
+import {
+  IDENTITY_DIVIDER_BACKWARD,
+  IDENTITY_DIVIDER_FORWARD,
+  IDENTITY_PAGE_SUBTITLE,
+  IDENTITY_PAGE_TITLE,
+} from '../constants/strings'
 import { ErrorBoundary, ErrorState, invalidate, invalidateAll } from '../data'
 
 export function IdentityPage() {
@@ -29,6 +34,16 @@ export function IdentityPage() {
         </Suspense>
       </ErrorBoundary>
 
+      <div
+        className="flex items-center gap-4 pt-2 text-sm text-text-secondary"
+        role="separator"
+        aria-label={`${IDENTITY_DIVIDER_BACKWARD} — ${IDENTITY_DIVIDER_FORWARD}`}
+      >
+        <span className="shrink-0 font-medium text-text">{IDENTITY_DIVIDER_BACKWARD}</span>
+        <span className="h-px flex-1 bg-border" aria-hidden />
+        <span className="shrink-0 font-medium text-text">{IDENTITY_DIVIDER_FORWARD}</span>
+      </div>
+
       <ErrorBoundary
         fallback={({ error, reset }) => (
           <ErrorState
@@ -41,7 +56,7 @@ export function IdentityPage() {
         )}
       >
         <Suspense fallback={<SkeletonGrid count={6} />}>
-          <PostNextSuggestionsPanel />
+          <AdvisorPanel />
         </Suspense>
       </ErrorBoundary>
     </div>
