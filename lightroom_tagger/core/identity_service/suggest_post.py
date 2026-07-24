@@ -38,7 +38,9 @@ def suggest_what_to_post_next(
         include_ineligible=False,
         percentile_lookup=scan.percentile_lookup,
     )
-    crowned = {s["perspective_slug"] for s in compute_signature_stats(scan) if s["crowned"]}
+    crowned = {
+        s["perspective_slug"] for s in compute_signature_stats(scan).stats if s["crowned"]
+    }
     keys = [str(i["image_key"]) for i in items if i.get("eligible")]
     img_meta = _image_meta_map(conn, keys)
 

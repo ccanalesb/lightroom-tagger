@@ -95,7 +95,7 @@ def _purity(lens_percentile: float, other_percentiles: list[float]) -> float:
 
 def build_mirror_scan(conn: sqlite3.Connection) -> MirrorScan:
     active_slugs = _active_perspective_slugs(conn)
-    slug_set = set(active_slugs)
+    slug_set = frozenset(active_slugs)
     display_by_slug: dict[str, str] = {}
     rows = conn.execute(_SCORES_BASE_SQL).fetchall()
     for r in rows:
@@ -105,6 +105,7 @@ def build_mirror_scan(conn: sqlite3.Connection) -> MirrorScan:
         display_by_slug.setdefault(slug, str(r["perspective_display_name"] or slug))
 
     percentile_lookup = compute_within_perspective_percentile_lookup(conn)
+    total_catalog = int(conn.execute("SELECT COUNT(*) AS c FROM images").fetchone()["c"])
 
     by_image: dict[str, list[dict[str, Any]]] = defaultdict(list)
     rationales_by_slug: dict[str, list[str]] = {s: [] for s in active_slugs}
@@ -138,6 +139,7 @@ def build_mirror_scan(conn: sqlite3.Connection) -> MirrorScan:
         rationales_by_slug=rationales_by_slug,
         corpus_rationales=corpus_rationales,
         percentile_lookup=percentile_lookup,
+        total_catalog=total_catalog,
     )
 
 
@@ -252,12 +254,11 @@ def build_mirror(conn: sqlite3.Connection) -> dict[str, Any]:
     rationales_by_slug = scan.rationales_by_slug
     corpus_rationales = scan.corpus_rationales
 
-    total_catalog = int(conn.execute("SELECT COUNT(*) AS c FROM images").fetchone()["c"])
+    total_catalog = scan.total_catalog
 
-    signature_stats = compute_signature_stats(scan, total_catalog=total_catalog)
-    voting_population = sum(
-        1 for perspectives in scan.by_image.values() if len(perspectives) >= _MIN_VOTING_LENSES
-    )
+    sig = compute_signature_stats(scan)
+    signature_stats = sig.stats
+    voting_population = sig.voting_population
 
     drop_keys = _stack_non_representative_keys(conn, list(scan.by_image.keys()))
 

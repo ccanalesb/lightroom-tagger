@@ -798,7 +798,7 @@ def test_rank_best_photos_prefers_peak_percentile_over_mean(tmp_path) -> None:
     assert page[0]["peak_percentile"] >= page[1]["peak_percentile"]
 
 
-def test_compute_signature_stats_matches_build_mirror_stats(tmp_path) -> None:
+def test_compute_signature_stats_crowns_expected_lenses_and_matches_mirror(tmp_path) -> None:
     conn = init_database(str(tmp_path / "library.db"))
     slugs = _active_slugs(conn, limit=4)
     assert len(slugs) >= 4
@@ -830,12 +830,39 @@ def test_compute_signature_stats_matches_build_mirror_stats(tmp_path) -> None:
     conn.commit()
 
     scan = build_mirror_scan(conn)
-    total_catalog = int(conn.execute("SELECT COUNT(*) AS c FROM images").fetchone()["c"])
-    direct = compute_signature_stats(scan, total_catalog=total_catalog)
+    assert scan.total_catalog == 32  # 16 + 12 + 2 + 2
 
-    scan_again = build_mirror_scan(conn)
-    again = compute_signature_stats(scan_again, total_catalog=total_catalog)
-    assert direct == again
+    sig = compute_signature_stats(scan)
+    by_slug = {s["perspective_slug"]: s for s in sig.stats}
+
+    # Every image was scored on exactly 2 lenses, so all 32 are voting-eligible.
+    assert sig.voting_population == 32
+
+    # Pin the actual crowning outcome, not just determinism: a and b dominate
+    # their pairings (16/18 and 12/14 wins vs a 0.5 chance rate) and crown; c and
+    # d lose theirs (2 wins, far below chance) and do not.
+    crowned = {s["perspective_slug"] for s in sig.stats if s["crowned"]}
+    assert crowned == {a, b}
+    assert (by_slug[a]["votes"], by_slug[a]["photos_on"]) == (16, 18)
+    assert (by_slug[b]["votes"], by_slug[b]["photos_on"]) == (12, 14)
+    assert by_slug[c]["crowned"] is False
+    assert by_slug[d]["crowned"] is False
+
+    # Coverage uses the real catalog total (regression guard: the primitive reads
+    # scan.total_catalog, so coverage is a genuine fraction, not a defaulted zero).
+    assert by_slug[a]["coverage"] == round(18 / 32, 4)
+
+    # The assembled Mirror payload must reflect the same crowned set and vote
+    # counts, confirming build_mirror and the Advisor share one crowning source.
+    mirror = build_mirror(conn)
+    section_by_slug = {s["perspective_slug"]: s for s in mirror["sections"]}
+    assert set(section_by_slug) == {a, b}
+    assert mirror["population"] == sig.voting_population
+    assert section_by_slug[a]["votes"] == by_slug[a]["votes"]
+    assert section_by_slug[b]["votes"] == by_slug[b]["votes"]
+
+    # Determinism: recomputing from a fresh scan yields identical stats.
+    assert compute_signature_stats(build_mirror_scan(conn)) == sig
 
 
 def test_build_lens_exemplars_shared_scan_and_drop_keys_match_standalone(tmp_path) -> None:

@@ -22,12 +22,25 @@ _CROWN_ALPHA = 0.05
 @dataclass(frozen=True)
 class MirrorScan:
     active_slugs: list[str]
-    slug_set: set[str]
+    slug_set: frozenset[str]
     display_by_slug: dict[str, str]
     by_image: dict[str, list[dict[str, Any]]]
     rationales_by_slug: dict[str, list[str]]
     corpus_rationales: list[str]
     percentile_lookup: dict[tuple[str, str], float]
+    total_catalog: int
+
+
+@dataclass(frozen=True)
+class SignatureStats:
+    """Per-lens crowning stats plus the voting population they were computed over.
+
+    ``voting_population`` is returned here so callers don't re-derive the same
+    ``_MIN_VOTING_LENSES`` threshold that this primitive already applies.
+    """
+
+    stats: list[dict[str, Any]]
+    voting_population: int
 
 
 def _binom_sf(k: int, n: int, p: float) -> float:
@@ -75,24 +88,27 @@ def _signature_z(votes: int, expected_wins: float, photos_on: int, chance: float
     return (votes - expected_wins) / math.sqrt(denom)
 
 
-def compute_signature_stats(
-    scan: MirrorScan,
-    *,
-    total_catalog: int | None = None,
-) -> list[dict[str, Any]]:
-    """Per-lens vote counts, z-scores, p-values, and crowning flags."""
+def compute_signature_stats(scan: MirrorScan) -> SignatureStats:
+    """Per-lens vote counts, z-scores, p-values, and crowning flags.
+
+    Coverage is computed against ``scan.total_catalog`` (always populated by
+    ``build_mirror_scan``), and the voting population is returned alongside the
+    stats so callers don't re-apply the ``_MIN_VOTING_LENSES`` threshold.
+    """
     active_slugs = scan.active_slugs
     display_by_slug = scan.display_by_slug
     by_image = scan.by_image
-    catalog = total_catalog if total_catalog is not None else 0
+    catalog = scan.total_catalog
 
     votes: Counter[str] = Counter()
     photos_on: Counter[str] = Counter()
     expected_wins: dict[str, float] = {s: 0.0 for s in active_slugs}
+    voting_population = 0
 
     for perspectives in by_image.values():
         if len(perspectives) < _MIN_VOTING_LENSES:
             continue
+        voting_population += 1
         inv_k = 1.0 / len(perspectives)
         top_pct = max(p["percentile"] for p in perspectives)
         tied = [p for p in perspectives if p["percentile"] == top_pct]
@@ -138,4 +154,4 @@ def compute_signature_stats(
                 "low_coverage": coverage < _LOW_COVERAGE_THRESHOLD,
             }
         )
-    return signature_stats
+    return SignatureStats(stats=signature_stats, voting_population=voting_population)
