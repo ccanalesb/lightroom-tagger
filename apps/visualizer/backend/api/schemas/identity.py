@@ -190,7 +190,6 @@ class PostNextSuggestionsMeta(BaseModel):
     ranking_key: str | None = None
     min_perspectives_used: int | None = None
     coverage_rule: str | None = None
-    timezone_assumption: str | None = None
     high_score_rule: str | None = None
 
 

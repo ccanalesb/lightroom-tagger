@@ -18,6 +18,10 @@ from lightroom_tagger.core.identity_service import (
     rank_best_photos,
     suggest_what_to_post_next,
 )
+from lightroom_tagger.core.identity_service.mirror import (
+    build_mirror_scan,
+    compute_signature_stats,
+)
 
 
 def _active_slugs(conn: sqlite3.Connection, *, limit: int = 4) -> list[str]:
@@ -792,3 +796,202 @@ def test_rank_best_photos_prefers_peak_percentile_over_mean(tmp_path) -> None:
     assert meta["weighting"] == "peak_within_perspective_percentile"
     assert page[0]["image_key"] == peak_winner
     assert page[0]["peak_percentile"] >= page[1]["peak_percentile"]
+
+
+def test_compute_signature_stats_crowns_expected_lenses_and_matches_mirror(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=4)
+    assert len(slugs) >= 4
+    a, b, c, d = slugs[0], slugs[1], slugs[2], slugs[3]
+    HIGH, LOW = 9, 2
+
+    def _img(name: str) -> str:
+        return store_image(
+            conn,
+            {"date_taken": "2025-03-01", "filename": name, "instagram_posted": False},
+        )
+
+    for i in range(16):
+        k = _img(f"grpA{i}.jpg")
+        _add_score(conn, k, a, HIGH)
+        _add_score(conn, k, c, LOW)
+    for i in range(12):
+        k = _img(f"grpB{i}.jpg")
+        _add_score(conn, k, b, HIGH)
+        _add_score(conn, k, d, LOW)
+    for i in range(2):
+        k = _img(f"grpC{i}.jpg")
+        _add_score(conn, k, c, HIGH)
+        _add_score(conn, k, a, LOW)
+    for i in range(2):
+        k = _img(f"grpD{i}.jpg")
+        _add_score(conn, k, d, HIGH)
+        _add_score(conn, k, b, LOW)
+    conn.commit()
+
+    scan = build_mirror_scan(conn)
+    assert scan.total_catalog == 32  # 16 + 12 + 2 + 2
+
+    sig = compute_signature_stats(scan)
+    by_slug = {s["perspective_slug"]: s for s in sig.stats}
+
+    # Every image was scored on exactly 2 lenses, so all 32 are voting-eligible.
+    assert sig.voting_population == 32
+
+    # Pin the actual crowning outcome, not just determinism: a and b dominate
+    # their pairings (16/18 and 12/14 wins vs a 0.5 chance rate) and crown; c and
+    # d lose theirs (2 wins, far below chance) and do not.
+    crowned = {s["perspective_slug"] for s in sig.stats if s["crowned"]}
+    assert crowned == {a, b}
+    assert (by_slug[a]["votes"], by_slug[a]["photos_on"]) == (16, 18)
+    assert (by_slug[b]["votes"], by_slug[b]["photos_on"]) == (12, 14)
+    assert by_slug[c]["crowned"] is False
+    assert by_slug[d]["crowned"] is False
+
+    # Coverage uses the real catalog total (regression guard: the primitive reads
+    # scan.total_catalog, so coverage is a genuine fraction, not a defaulted zero).
+    assert by_slug[a]["coverage"] == round(18 / 32, 4)
+
+    # The assembled Mirror payload must reflect the same crowned set and vote
+    # counts, confirming build_mirror and the Advisor share one crowning source.
+    mirror = build_mirror(conn)
+    section_by_slug = {s["perspective_slug"]: s for s in mirror["sections"]}
+    assert set(section_by_slug) == {a, b}
+    assert mirror["population"] == sig.voting_population
+    assert section_by_slug[a]["votes"] == by_slug[a]["votes"]
+    assert section_by_slug[b]["votes"] == by_slug[b]["votes"]
+
+    # Determinism: recomputing from a fresh scan yields identical stats.
+    assert compute_signature_stats(build_mirror_scan(conn)) == sig
+
+
+def test_build_lens_exemplars_shared_scan_and_drop_keys_match_standalone(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    hot, cold = slugs[0], slugs[1]
+
+    rep = store_image(
+        conn,
+        {"date_taken": "2024-12-01", "filename": "rep.jpg", "instagram_posted": False},
+    )
+    mem = store_image(
+        conn,
+        {"date_taken": "2024-12-02", "filename": "mem.jpg", "instagram_posted": False},
+    )
+    solo = store_image(
+        conn,
+        {"date_taken": "2024-12-03", "filename": "solo.jpg", "instagram_posted": False},
+    )
+    for k, hot_score in [(rep, 10), (mem, 9), (solo, 8)]:
+        _add_score(conn, k, hot, hot_score)
+        _add_score(conn, k, cold, 2)
+    _insert_two_member_stack(conn, rep, mem)
+    conn.commit()
+
+    standalone = build_lens_exemplars(conn, hot, offset=0, limit=10)
+
+    scan = build_mirror_scan(conn)
+    from lightroom_tagger.core.identity_service.ranking import _stack_non_representative_keys
+
+    drop_keys = _stack_non_representative_keys(conn, list(scan.by_image.keys()))
+    shared = build_lens_exemplars(
+        conn,
+        hot,
+        offset=0,
+        limit=10,
+        scan=scan,
+        drop_keys=drop_keys,
+    )
+    assert shared == standalone
+
+
+def test_suggestions_percentile_lookup_computed_once(tmp_path, monkeypatch) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn)
+    s0, s1 = slugs[0], slugs[1]
+    k = store_image(
+        conn,
+        {"date_taken": "2024-04-02", "filename": "unposted.jpg", "instagram_posted": False},
+    )
+    _add_score(conn, k, s0, 8)
+    _add_score(conn, k, s1, 8)
+    conn.commit()
+
+    lookup_calls = {"n": 0}
+    real_lookup = compute_within_perspective_percentile_lookup
+
+    def _tracked_lookup(c: sqlite3.Connection):
+        lookup_calls["n"] += 1
+        return real_lookup(c)
+
+    monkeypatch.setattr(
+        "lightroom_tagger.core.identity_service.mirror.compute_within_perspective_percentile_lookup",
+        _tracked_lookup,
+    )
+    monkeypatch.setattr(
+        "lightroom_tagger.core.identity_service.percentiles.compute_within_perspective_percentile_lookup",
+        _tracked_lookup,
+    )
+
+    suggest_what_to_post_next(conn, limit=10)
+    assert lookup_calls["n"] == 1
+
+
+def test_mirror_active_slugs_and_percentile_lookup_bounded(tmp_path, monkeypatch) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=4)
+    assert len(slugs) >= 4
+    a, b, c, d = slugs[0], slugs[1], slugs[2], slugs[3]
+    HIGH, LOW = 9, 2
+
+    def _img(name: str) -> str:
+        return store_image(
+            conn,
+            {"date_taken": "2025-03-01", "filename": name, "instagram_posted": False},
+        )
+
+    for i in range(16):
+        k = _img(f"grpA{i}.jpg")
+        _add_score(conn, k, a, HIGH)
+        _add_score(conn, k, c, LOW)
+    for i in range(12):
+        k = _img(f"grpB{i}.jpg")
+        _add_score(conn, k, b, HIGH)
+        _add_score(conn, k, d, LOW)
+    for i in range(2):
+        k = _img(f"grpC{i}.jpg")
+        _add_score(conn, k, c, HIGH)
+        _add_score(conn, k, a, LOW)
+    for i in range(2):
+        k = _img(f"grpD{i}.jpg")
+        _add_score(conn, k, d, HIGH)
+        _add_score(conn, k, b, LOW)
+    conn.commit()
+
+    slug_calls = {"n": 0}
+    lookup_calls = {"n": 0}
+    from lightroom_tagger.core.identity_service import aggregates
+
+    real_slugs = aggregates._active_perspective_slugs
+    real_lookup = compute_within_perspective_percentile_lookup
+
+    def _tracked_slugs(c: sqlite3.Connection):
+        slug_calls["n"] += 1
+        return real_slugs(c)
+
+    def _tracked_lookup(c: sqlite3.Connection):
+        lookup_calls["n"] += 1
+        return real_lookup(c)
+
+    monkeypatch.setattr(
+        "lightroom_tagger.core.identity_service.mirror._active_perspective_slugs",
+        _tracked_slugs,
+    )
+    monkeypatch.setattr(
+        "lightroom_tagger.core.identity_service.mirror.compute_within_perspective_percentile_lookup",
+        _tracked_lookup,
+    )
+
+    build_mirror(conn)
+    assert slug_calls["n"] == 1
+    assert lookup_calls["n"] == 1

@@ -43,7 +43,6 @@ export const EMPTY_POST_NEXT_META: PostNextSuggestionsMeta = {
   ranking_key: null,
   min_perspectives_used: null,
   coverage_rule: null,
-  timezone_assumption: null,
   high_score_rule: null,
 }
 

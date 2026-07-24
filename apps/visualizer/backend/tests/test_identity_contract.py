@@ -92,7 +92,6 @@ def test_suggestions_round_trip_from_handler(identity_contract_client):
 
     validated = PostNextSuggestionsResponse.model_validate(payload)
     assert isinstance(validated.total, int)
-    assert validated.meta.timezone_assumption == "UTC"
     assert validated.meta.ranking_key == "peak_percentile"
 
 

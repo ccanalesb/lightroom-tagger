@@ -19,59 +19,18 @@ from .ranking import (
     _stack_fields_for_image_keys,
     _stack_non_representative_keys,
 )
+from .signature import (
+    _CROWN_ALPHA,
+    _LOW_COVERAGE_THRESHOLD,
+    _MIN_VOTING_LENSES,
+    MirrorScan,
+    compute_signature_stats,
+)
 
-_LOW_COVERAGE_THRESHOLD = 0.5
 _EXEMPLAR_INITIAL_LIMIT = 24
 _EXEMPLAR_PAGE_SIZE = 12
 _DESCRIPTOR_MIN_COUNT = 5
 _DESCRIPTOR_LIMIT = 15
-_MIN_VOTING_LENSES = 2
-_CROWN_ALPHA = 0.05
-
-
-def _binom_sf(k: int, n: int, p: float) -> float:
-    """P(X >= k) for X ~ Binomial(n, p).
-
-    Exact for n < 30; for n >= 30 (the real-catalog regime) uses the
-    continuity-corrected normal approximation, which is accurate deep in the
-    upper tail where crowning decisions actually sit. A lens sitting right at
-    p ~ 0.05 could differ marginally from the exact test; distinctive lenses
-    (large z) are unaffected. No scipy/numpy dependency, so this is hand-rolled.
-    """
-    if k <= 0:
-        return 1.0
-    if k > n:
-        return 0.0
-    if p <= 0.0:
-        return 0.0 if k > 0 else 1.0
-    if p >= 1.0:
-        return 1.0 if k <= n else 0.0
-
-    mu = n * p
-    if n >= 30:
-        sigma_sq = n * p * (1.0 - p)
-        if sigma_sq <= 0.0:
-            return 0.0 if k > mu else 1.0
-        z = (k - 0.5 - mu) / math.sqrt(sigma_sq)
-        return 0.5 * math.erfc(z / math.sqrt(2.0))
-
-    total = 0.0
-    q = 1.0 - p
-    for i in range(k, n + 1):
-        total += math.comb(n, i) * (p**i) * (q ** (n - i))
-    return min(1.0, total)
-
-
-def _signature_z(votes: int, expected_wins: float, photos_on: int, chance: float) -> float:
-    # Each photo's win probability is 1/k_i (k_i = lenses it was scored on), so the
-    # vote count is Poisson-binomial. We approximate it with a homogeneous
-    # Binomial(photos_on, chance) using the mean per-photo chance. Because the true
-    # variance sum_i p_i(1-p_i) <= n*chance*(1-chance) (Jensen), this denominator is
-    # an upper bound, so z is conservative (understated) — crowning never over-fires.
-    denom = photos_on * chance * (1.0 - chance)
-    if denom <= 0.0:
-        return 0.0
-    return (votes - expected_wins) / math.sqrt(denom)
 
 
 def _strength_label(*, z_score: float, crowned: bool, leading_not_distinctive: bool) -> str:
@@ -134,18 +93,9 @@ def _purity(lens_percentile: float, other_percentiles: list[float]) -> float:
     return round((lens_percentile - max(other_percentiles)) * 100.0, 1)
 
 
-def _build_by_image(
-    conn: sqlite3.Connection,
-) -> tuple[
-    list[str],
-    set[str],
-    dict[str, str],
-    dict[str, list[dict[str, Any]]],
-    dict[str, list[str]],
-    list[str],
-]:
+def build_mirror_scan(conn: sqlite3.Connection) -> MirrorScan:
     active_slugs = _active_perspective_slugs(conn)
-    slug_set = set(active_slugs)
+    slug_set = frozenset(active_slugs)
     display_by_slug: dict[str, str] = {}
     rows = conn.execute(_SCORES_BASE_SQL).fetchall()
     for r in rows:
@@ -155,6 +105,7 @@ def _build_by_image(
         display_by_slug.setdefault(slug, str(r["perspective_display_name"] or slug))
 
     percentile_lookup = compute_within_perspective_percentile_lookup(conn)
+    total_catalog = int(conn.execute("SELECT COUNT(*) AS c FROM images").fetchone()["c"])
 
     by_image: dict[str, list[dict[str, Any]]] = defaultdict(list)
     rationales_by_slug: dict[str, list[str]] = {s: [] for s in active_slugs}
@@ -180,7 +131,16 @@ def _build_by_image(
             }
         )
 
-    return active_slugs, slug_set, display_by_slug, by_image, rationales_by_slug, corpus_rationales
+    return MirrorScan(
+        active_slugs=active_slugs,
+        slug_set=slug_set,
+        display_by_slug=display_by_slug,
+        by_image=dict(by_image),
+        rationales_by_slug=rationales_by_slug,
+        corpus_rationales=corpus_rationales,
+        percentile_lookup=percentile_lookup,
+        total_catalog=total_catalog,
+    )
 
 
 def _lens_exemplar_candidates(
@@ -257,19 +217,20 @@ def build_lens_exemplars(
     *,
     offset: int = 0,
     limit: int = _EXEMPLAR_INITIAL_LIMIT,
-    by_image: dict[str, list[dict[str, Any]]] | None = None,
+    scan: MirrorScan | None = None,
+    drop_keys: set[str] | None = None,
 ) -> dict[str, Any]:
     """Ranked exemplars for one lens; collapses burst stacks to representatives."""
-    active_slugs = _active_perspective_slugs(conn)
-    if slug not in active_slugs:
+    if scan is None:
+        scan = build_mirror_scan(conn)
+
+    if slug not in scan.active_slugs:
         raise ValueError(f"unknown or inactive perspective slug: {slug}")
 
-    if by_image is None:
-        _, _, _, by_image, _, _ = _build_by_image(conn)
-
-    candidates = _lens_exemplar_candidates(slug, by_image)
-    candidate_keys = [str(c["image_key"]) for c in candidates]
-    drop_keys = _stack_non_representative_keys(conn, candidate_keys)
+    candidates = _lens_exemplar_candidates(slug, scan.by_image)
+    if drop_keys is None:
+        candidate_keys = [str(c["image_key"]) for c in candidates]
+        drop_keys = _stack_non_representative_keys(conn, candidate_keys)
     candidates = [c for c in candidates if str(c["image_key"]) not in drop_keys]
 
     candidates.sort(
@@ -288,71 +249,18 @@ def build_lens_exemplars(
 
 def build_mirror(conn: sqlite3.Connection) -> dict[str, Any]:
     """Catalog Mirror: crowned signature lenses, descriptors, and exemplar rails."""
-    (
-        active_slugs,
-        _slug_set,
-        display_by_slug,
-        by_image,
-        rationales_by_slug,
-        corpus_rationales,
-    ) = _build_by_image(conn)
+    scan = build_mirror_scan(conn)
+    active_slugs = scan.active_slugs
+    rationales_by_slug = scan.rationales_by_slug
+    corpus_rationales = scan.corpus_rationales
 
-    total_catalog = int(conn.execute("SELECT COUNT(*) AS c FROM images").fetchone()["c"])
+    total_catalog = scan.total_catalog
 
-    votes: Counter[str] = Counter()
-    photos_on: Counter[str] = Counter()
-    expected_wins: dict[str, float] = {s: 0.0 for s in active_slugs}
-    voting_population = 0
+    sig = compute_signature_stats(scan)
+    signature_stats = sig.stats
+    voting_population = sig.voting_population
 
-    for perspectives in by_image.values():
-        if len(perspectives) < _MIN_VOTING_LENSES:
-            continue
-        voting_population += 1
-        inv_k = 1.0 / len(perspectives)
-        top_pct = max(p["percentile"] for p in perspectives)
-        tied = [p for p in perspectives if p["percentile"] == top_pct]
-        if len(tied) != 1:
-            for p in perspectives:
-                photos_on[p["perspective_slug"]] += 1
-                expected_wins[p["perspective_slug"]] += inv_k
-            continue
-
-        winner_slug = tied[0]["perspective_slug"]
-        votes[winner_slug] += 1
-        for p in perspectives:
-            slug = p["perspective_slug"]
-            photos_on[slug] += 1
-            expected_wins[slug] += inv_k
-
-    signature_stats: list[dict[str, Any]] = []
-    for slug in active_slugs:
-        n = photos_on.get(slug, 0)
-        if n == 0:
-            continue
-        v = votes.get(slug, 0)
-        expected = expected_wins.get(slug, 0.0)
-        chance = expected / n if n else 0.0
-        win_rate = v / n if n else 0.0
-        z = _signature_z(v, expected, n, chance)
-        p_value = _binom_sf(v, n, chance) if 0.0 < chance < 1.0 else 1.0
-        crowned = p_value < _CROWN_ALPHA and z > 0
-        coverage = n / total_catalog if total_catalog else 0.0
-        signature_stats.append(
-            {
-                "perspective_slug": slug,
-                "display_name": display_by_slug.get(slug, slug),
-                "votes": v,
-                "photos_on": n,
-                "win_rate": round(win_rate, 6),
-                "expected_wins": round(expected, 4),
-                "chance_rate": round(chance, 6),
-                "z_score": round(z, 2),
-                "p_value": round(p_value, 6),
-                "crowned": crowned,
-                "coverage": round(coverage, 4),
-                "low_coverage": coverage < _LOW_COVERAGE_THRESHOLD,
-            }
-        )
+    drop_keys = _stack_non_representative_keys(conn, list(scan.by_image.keys()))
 
     crowned_stats = [s for s in signature_stats if s["crowned"]]
     crowned_stats.sort(key=lambda s: (-s["z_score"], s["perspective_slug"]))
@@ -372,7 +280,8 @@ def build_mirror(conn: sqlite3.Connection) -> dict[str, Any]:
             slug,
             offset=0,
             limit=_EXEMPLAR_INITIAL_LIMIT,
-            by_image=by_image,
+            scan=scan,
+            drop_keys=drop_keys,
         )
 
         leading_not_distinctive = fallback
@@ -413,7 +322,8 @@ def build_mirror(conn: sqlite3.Connection) -> dict[str, Any]:
             slug,
             offset=0,
             limit=0,
-            by_image=by_image,
+            scan=scan,
+            drop_keys=drop_keys,
         )["total"]
         other_lenses.append(
             {
