@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery } from '../../data';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
-import { WorkerSlider } from '../matching/WorkerSlider';
+import { WorkerSlider } from '../ui/WorkerSlider';
 import { ProviderModelSelect } from '../ui/ProviderModelSelect';
 import { useMatchOptions } from '../../stores/matchOptionsContext';
 import { JobsAPI, PerspectivesAPI, ProvidersAPI } from '../../services/api';

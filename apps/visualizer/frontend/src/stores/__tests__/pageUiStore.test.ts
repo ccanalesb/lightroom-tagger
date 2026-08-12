@@ -4,14 +4,13 @@ import { usePageUiStore } from '../pageUiStore'
 describe('pageUiStore', () => {
   beforeEach(() => {
     usePageUiStore.setState({
-      imagesTab: 'instagram',
-      processingTab: 'matching',
+      imagesTab: 'catalog',
+      processingTab: 'analyze',
       filterStates: {},
     })
   })
 
   it('stores and restores tab selections', () => {
-    usePageUiStore.getState().setImagesTab('catalog')
     usePageUiStore.getState().setProcessingTab('jobs')
     expect(usePageUiStore.getState().imagesTab).toBe('catalog')
     expect(usePageUiStore.getState().processingTab).toBe('jobs')

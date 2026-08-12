@@ -27,9 +27,11 @@ import type {
   ImageDescriptionPerspectives,
   ImageDescriptionTechnical,
 } from '../types/descriptions'
+// The Instagram / Matches UI is gone (#233), but these API clients and their
+// types survive together until slice 2 (#234) deletes the endpoints they call.
 import type { InstagramImage, InstagramImageInput, InstagramListResponse } from '../types/instagram'
-import type { Job, JobsGetOptions, JobsHealth, JobsListResponse } from '../types/job'
 import type { Match, MatchGroup, MatchesListResponse } from '../types/matches'
+import type { Job, JobsGetOptions, JobsHealth, JobsListResponse } from '../types/job'
 import type {
   PerspectiveDetail,
   PerspectiveScore,

@@ -1,7 +1,6 @@
 import { Suspense, useCallback, useState, useTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, Tab } from '../components/ui/Tabs';
-import { MatchingTab } from '../components/processing/MatchingTab';
 import { AnalyzeTab } from '../components/processing/AnalyzeTab';
 import { CatalogCacheTab } from '../components/processing/CatalogCacheTab';
 import { JobQueueTab } from '../components/processing/JobQueueTab';
@@ -16,7 +15,6 @@ import { JobsAPI } from '../services/api';
 import { ErrorBoundary, ErrorState, invalidateAll, useQuery } from '../data';
 import { PROCESSING_TAB_IDS, usePageUiStore } from '../stores/pageUiStore';
 import {
-  TAB_VISION_MATCHING,
   TAB_ANALYZE,
   TAB_PERSPECTIVES,
   TAB_CATALOG_CACHE,
@@ -79,7 +77,7 @@ export function ProcessingPage() {
   const { activeTab, handleTabChange } = usePageTab({
     pagePath: '/processing',
     tabIds: PROCESSING_TAB_IDS,
-    defaultTab: 'matching',
+    defaultTab: 'analyze',
     storedTab: processingTab,
     setStoredTab: setProcessingTab,
   });
@@ -98,21 +96,6 @@ export function ProcessingPage() {
   }, [navigate]);
 
   const tabs: Tab[] = [
-    {
-      id: 'matching',
-      label: TAB_VISION_MATCHING,
-      content: (
-        <ErrorBoundary
-          fallback={({ error, reset }) => (
-            <ErrorState error={error} reset={reset} title="Could not load matching tab" />
-          )}
-        >
-          <Suspense fallback={tabSuspenseFallback}>
-            <MatchingTab />
-          </Suspense>
-        </ErrorBoundary>
-      ),
-    },
     {
       id: 'analyze',
       label: TAB_ANALYZE,
@@ -223,7 +206,7 @@ export function ProcessingPage() {
       <div className="mb-6">
         <h1 className="text-section text-text mb-2">{NAV_PROCESSING}</h1>
         <p className="text-text-secondary">
-          Vision matching, descriptions, catalog cache management, and job monitoring
+          Descriptions, scoring, catalog cache management, and job monitoring
         </p>
       </div>
 

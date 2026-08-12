@@ -24,12 +24,6 @@ vi.mock('../CatalogImageDetailSections', () => ({
   ),
 }))
 
-vi.mock('../InstagramImageDetailSections', () => ({
-  InstagramImageDetailSections: ({ image }: { image: { key: string } }) => (
-    <div data-testid="instagram-sections" data-key={image.key} />
-  ),
-}))
-
 import { ImageDetailModal } from '../ImageDetailModal'
 import { ImagesAPI } from '../../../services/api'
 
@@ -201,9 +195,9 @@ describe('ImageDetailModal', () => {
     })
   })
 
-  it('routes instagram image_type to InstagramImageDetailSections', async () => {
+  it('renders instagram images without catalog detail sections', async () => {
     vi.spyOn(ImagesAPI, 'getImageDetail').mockResolvedValue(
-      buildDetail({ image_type: 'instagram', key: 'ig1' }),
+      buildDetail({ image_type: 'instagram', key: 'ig1', filename: 'ig1.jpg' }),
     )
 
     render(
@@ -216,9 +210,10 @@ describe('ImageDetailModal', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByTestId('instagram-sections')).toBeInTheDocument()
+      expect(screen.getByAltText('ig1')).toBeInTheDocument()
     })
     expect(screen.queryByTestId('catalog-sections')).toBeNull()
+    expect(screen.queryByTestId('instagram-sections')).toBeNull()
   })
 
   it('shows loading state while detail is in flight', () => {

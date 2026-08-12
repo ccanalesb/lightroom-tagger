@@ -9,8 +9,7 @@ export interface CollapsibleSectionProps {
 
 /**
  * Disclosure shell shared by Advanced sections that don't depend on matching state.
- * The visual chrome mirrors `matching/AdvancedOptions.tsx` so toggles look the same
- * across tabs, but no provider/threshold/weights props leak in.
+ * No provider/threshold/weights props leak in.
  */
 export function CollapsibleSection({ title, isOpen, onToggle, children }: CollapsibleSectionProps) {
   return (

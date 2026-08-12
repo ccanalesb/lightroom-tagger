@@ -6,7 +6,6 @@ import { deleteMatching } from '../../../data/cache';
 import { CatalogCacheTab } from '../CatalogCacheTab';
 import {
   ADVANCED_OPTIONS_TITLE,
-  ADVANCED_WEIGHTS_TITLE,
   CATALOG_CACHE_BUILD_CTA,
   CATALOG_CACHE_BUILD_SUCCESS,
   CATALOG_CACHE_EMBED_CATALOG_HELPER,
@@ -166,7 +165,6 @@ describe('CatalogCacheTab', () => {
     );
     await screen.findByRole('button', { name: CATALOG_CACHE_EMBED_CATALOG_LABEL });
     expect(screen.queryByText(ADVANCED_OPTIONS_TITLE)).toBeNull();
-    expect(screen.queryByText(ADVANCED_WEIGHTS_TITLE)).toBeNull();
     expect(screen.queryByLabelText(/provider/i)).toBeNull();
     expect(screen.queryByLabelText(/threshold/i)).toBeNull();
   });

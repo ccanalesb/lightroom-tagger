@@ -26,22 +26,21 @@ export function usePageTab<T extends string>(config: {
     [location.search, tabIds],
   )
 
-  const activeTab = urlTab ?? storedTab ?? defaultTab
+  const storedValidTab = tabIds.includes(storedTab) ? storedTab : defaultTab
+  const activeTab = urlTab ?? storedValidTab
 
   useEffect(() => {
-    if (urlTab !== null) return
-    if (storedTab === defaultTab) return
-    navigate(
-      { pathname: pagePath, search: `?tab=${storedTab}` },
-      { replace: true },
-    )
-  }, [urlTab, storedTab, defaultTab, pagePath, navigate])
-
-  useEffect(() => {
-    if (activeTab !== storedTab) {
+    if (storedTab !== activeTab) {
       setStoredTab(activeTab)
     }
   }, [activeTab, storedTab, setStoredTab])
+
+  useEffect(() => {
+    const desiredSearch = activeTab === defaultTab ? '' : `?tab=${activeTab}`
+    if (location.search !== desiredSearch) {
+      navigate({ pathname: pagePath, search: desiredSearch }, { replace: true })
+    }
+  }, [activeTab, defaultTab, pagePath, location.search, navigate])
 
   const handleTabChange = (id: string) => {
     if (!tabIds.includes(id as T)) return

@@ -72,8 +72,8 @@ const minimalSchema: FilterSchema = [
 describe('useFilters', () => {
   beforeEach(() => {
     usePageUiStore.setState({
-      imagesTab: 'instagram',
-      processingTab: 'matching',
+      imagesTab: 'catalog',
+      processingTab: 'analyze',
       filterStates: {},
     })
   })
