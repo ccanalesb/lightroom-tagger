@@ -6,7 +6,6 @@ import type {
   InstagramImageInput,
   Match,
   PostNextCandidate,
-  UnpostedCatalogItem,
 } from '../../../services/api'
 import {
   fromBestPhotoRow,
@@ -14,7 +13,6 @@ import {
   fromInstagramRow,
   fromMatchSide,
   fromPostNextRow,
-  fromUnpostedRow,
 } from '../adapters'
 
 describe('image-view adapters', () => {
@@ -45,24 +43,6 @@ describe('image-view adapters', () => {
     expect(out.identity_aggregate_score).toBeUndefined()
     expect(out.identity_per_perspective).toBeUndefined()
     expect(out.identity_perspectives_covered).toBeUndefined()
-  })
-
-  it('fromUnpostedRow maps sparse row and leaves scores undefined', () => {
-    const row: UnpostedCatalogItem = {
-      key: 'u1',
-      filename: 'u1.jpg',
-      date_taken: '2024-03-01',
-      rating: 4,
-    }
-    const out = fromUnpostedRow(row)
-    expect(out).toMatchObject({
-      image_type: 'catalog',
-      key: 'u1',
-      filename: 'u1.jpg',
-      instagram_posted: false,
-    })
-    expect(out.identity_aggregate_score).toBeUndefined()
-    expect(out.catalog_perspective_score).toBeUndefined()
   })
 
   it('fromBestPhotoRow carries identity fields authoritatively', () => {

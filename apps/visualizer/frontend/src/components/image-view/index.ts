@@ -5,7 +5,6 @@ export {
   fromMatchSide,
   fromMirrorExemplar,
   fromPostNextRow,
-  fromUnpostedRow,
 } from './adapters'
 export { ImageMetadataBadges } from './ImageMetadataBadges'
 export { PrimaryScorePill } from './PrimaryScorePill'

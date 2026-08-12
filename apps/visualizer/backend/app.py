@@ -145,7 +145,6 @@ def create_app():
     app.db = db
 
     from api import (
-        analytics,
         descriptions,
         identity,
         jobs,
@@ -181,7 +180,6 @@ def create_app():
         view_func=_invalid_polymorphic_image_detail,
         methods=['GET'],
     )
-    app.register_blueprint(analytics.bp, url_prefix='/api/analytics')
     app.register_blueprint(descriptions.bp, url_prefix='/api/descriptions')
     app.register_blueprint(providers.bp, url_prefix='/api/providers')
     app.register_blueprint(system.bp, url_prefix='/api')

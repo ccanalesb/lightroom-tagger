@@ -12,7 +12,7 @@ retired and what the attempt taught. That is the only job of these docs.
 | --- | --- | --- | --- |
 | Chat / NL / semantic search | to be removed by [#223](https://github.com/ccanalesb/lightroom-tagger/issues/223) | `parked/chat-search` | — |
 | Instagram import + vision matching | to be removed by [#225](https://github.com/ccanalesb/lightroom-tagger/issues/225) | `parked/instagram-matching` | — |
-| Posting analytics | to be removed by [#222](https://github.com/ccanalesb/lightroom-tagger/issues/222) | `parked/posting-analytics` | — |
+| Posting analytics | retired 2026-08-12 ([#222](https://github.com/ccanalesb/lightroom-tagger/issues/222)) | `parked/posting-analytics` | [posting-analytics.md](posting-analytics.md) |
 
 Each removal PR fills in its own row — adding the retirement date and linking the doc it
 writes — so this table is never a promise of a file that does not exist.

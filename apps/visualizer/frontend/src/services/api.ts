@@ -58,18 +58,6 @@ import type {
   StackSplitMemberResponse,
 } from '../types/stacks'
 import type {
-  AnalyticsGranularity,
-  CaptionStatsResponse,
-  HeatmapCell,
-  PostingFrequencyBucket,
-  PostingFrequencyMeta,
-  PostingFrequencyResponse,
-  PostingHeatmapMeta,
-  PostingHeatmapResponse,
-  UnpostedCatalogItem,
-  UnpostedCatalogResponse,
-} from '../types/analytics'
-import type {
   IdentityBestPhotoItem,
   IdentityBestPhotosMeta,
   IdentityBestPhotosResponse,
@@ -93,18 +81,6 @@ import type {
 } from '../types/system'
 import { API_DEFAULT_URL } from '../constants/strings'
 
-export type {
-  AnalyticsGranularity,
-  CaptionStatsResponse,
-  HeatmapCell,
-  PostingFrequencyBucket,
-  PostingFrequencyMeta,
-  PostingFrequencyResponse,
-  PostingHeatmapMeta,
-  PostingHeatmapResponse,
-  UnpostedCatalogItem,
-  UnpostedCatalogResponse,
-}
 export type {
   IdentityBestPhotoItem,
   IdentityBestPhotosMeta,
@@ -339,7 +315,6 @@ export const ConfigAPI = {
     invalidateAll(['catalog.cache.stats'])
     invalidateAll(['jobs.health'])
     invalidateAll(['dashboard'])
-    invalidateAll(['analytics'])
     return result
   },
 
@@ -709,56 +684,6 @@ export const ScoresAPI = {
     return request<ScoresHistoryResponse>(
       `/scores/${encodeURIComponent(imageKey)}/history?${sp.toString()}`,
     )
-  },
-}
-
-// --- Analytics (Phase 7 /api/analytics) ---
-
-export const AnalyticsAPI = {
-  getPostingFrequency: (params: {
-    date_from: string
-    date_to: string
-    granularity?: AnalyticsGranularity
-  }) => {
-    const sp = new URLSearchParams()
-    sp.set('date_from', params.date_from)
-    sp.set('date_to', params.date_to)
-    sp.set('granularity', params.granularity ?? 'day')
-    return request<PostingFrequencyResponse>(`/analytics/posting-frequency?${sp.toString()}`)
-  },
-
-  getPostingHeatmap: (params: { date_from: string; date_to: string }) => {
-    const sp = new URLSearchParams()
-    sp.set('date_from', params.date_from)
-    sp.set('date_to', params.date_to)
-    return request<PostingHeatmapResponse>(`/analytics/posting-heatmap?${sp.toString()}`)
-  },
-
-  getCaptionStats: (params: { date_from: string; date_to: string }) => {
-    const sp = new URLSearchParams()
-    sp.set('date_from', params.date_from)
-    sp.set('date_to', params.date_to)
-    return request<CaptionStatsResponse>(`/analytics/caption-stats?${sp.toString()}`)
-  },
-
-  /** Catalog images with `instagram_posted = 0` (server-filtered). */
-  getUnpostedCatalog: (params?: {
-    date_from?: string
-    date_to?: string
-    min_rating?: number
-    month?: string
-    limit?: number
-    offset?: number
-  }) => {
-    const sp = new URLSearchParams()
-    if (params?.date_from) sp.set('date_from', params.date_from)
-    if (params?.date_to) sp.set('date_to', params.date_to)
-    if (params?.min_rating !== undefined) sp.set('min_rating', String(params.min_rating))
-    if (params?.month) sp.set('month', params.month)
-    if (params?.limit !== undefined) sp.set('limit', String(params.limit))
-    if (params?.offset !== undefined) sp.set('offset', String(params.offset))
-    const qs = sp.toString()
-    return request<UnpostedCatalogResponse>(`/analytics/unposted-catalog${qs ? `?${qs}` : ''}`)
   },
 }
 

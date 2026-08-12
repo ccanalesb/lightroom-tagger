@@ -1,8 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import {
-  INSIGHTS_QUICK_ANALYTICS_DESC,
-  INSIGHTS_QUICK_ANALYTICS_TITLE,
   INSIGHTS_QUICK_IDENTITY_DESC,
   INSIGHTS_QUICK_IDENTITY_TITLE,
   INSIGHTS_QUICK_PROCESSING_DESC,
@@ -11,11 +9,6 @@ import {
 
 export function InsightsQuickNav() {
   const links = [
-    {
-      to: '/analytics',
-      title: INSIGHTS_QUICK_ANALYTICS_TITLE,
-      desc: INSIGHTS_QUICK_ANALYTICS_DESC,
-    },
     {
       to: '/identity',
       title: INSIGHTS_QUICK_IDENTITY_TITLE,
@@ -29,7 +22,7 @@ export function InsightsQuickNav() {
   ] as const
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
       {links.map((item) => (
         <Link key={item.to} to={item.to}>
           <Card hoverable padding="md">

@@ -11,8 +11,8 @@
 | **catalog** | A Lightroom `.lrcat` SQLite file. Read-only except for keyword writes via `lightroom/writer.py`. |
 | **image** / **catalog image** | A photo record in the library DB indexed from the Lightroom catalog. |
 | **instagram dump** | An exported ZIP/directory of Instagram media and metadata provided by the user (no API access). |
-| **match** | The result of pairing a catalog image with an Instagram post, stored in `matches`. Has two states: *proposed* (created by the vision pipeline, `validated_at` is NULL) and *validated* (human-confirmed, `validated_at` is set). Only validated matches drive posting analytics and identity. |
-| **validated match** | A match with `validated_at` set — human-confirmed pairing. The population used by posting analytics and identity aggregation. |
+| **match** | The result of pairing a catalog image with an Instagram post, stored in `matches`. Has two states: *proposed* (created by the vision pipeline, `validated_at` is NULL) and *validated* (human-confirmed, `validated_at` is set). Only validated matches drive identity aggregation. |
+| **validated match** | A match with `validated_at` set — human-confirmed pairing. The population used by identity aggregation. |
 | **match score** | The single 0–1 confidence the matcher assigns to a catalog↔Instagram candidate pairing: a weighted blend of the phash-similarity, description-text-similarity, and vision-verdict signals (`total_score` in matcher results). Distinct from **score** below, which evaluates one image against a perspective. |
 | **vision comparison** | A side-by-side AI comparison of two images to determine if they are the same photo. |
 | **description** | An AI-generated textual description of a catalog image (prose and technical fields only — summary, composition, subjects, mood, colors). Perspective scores are **not** produced by the description pass; see **score** below. |
@@ -71,8 +71,6 @@
 | `catalog_nl_filter` | SQL filter builder for NL search queries |
 | `prompt_builder` | Builds prose-only description prompts and per-perspective scoring prompts |
 | `structured_output` | Parses and retries LLM JSON score responses |
-| `posting_analytics` | Instagram cadence/frequency stats from validated dump |
-| `posting_analytics_captions` | Caption statistics and unposted-catalog listing |
 | `vision_cache` | Cached compressed images and phash lookups for vision pipeline |
 | `config` | `load_config` — merges `config.yaml` + env overrides; `get_vision_model`, `get_description_model` |
 | `path_utils` | Path resolution helpers |
