@@ -7,13 +7,6 @@ stale metadata from different inputs is ignored (handlers log ``checkpoint misma
 ``total_at_start``. Fingerprint includes sorted ``perspective_slugs`` when metadata carries a
 non-empty list (empty/missing → ``null`` in the canonical payload).
 
-**vision_match** — ``job_type``, ``fingerprint``, ``processed_media_keys`` (Instagram dump
-``media_key`` values).
-
-**enrich_catalog** — ``job_type``, ``fingerprint``, ``processed_image_keys`` (catalog image keys).
-
-**prepare_catalog** — ``job_type``, ``fingerprint``, ``processed_image_keys`` (catalog image keys).
-
 **batch_score** — ``job_type``, ``fingerprint``, ``processed_triplets`` (``\"key|itype|slug\"`` strings),
 ``total_at_start`` (int). Fingerprint canonical JSON matches ``batch_describe`` knobs plus an ordered
 triple list (sorted by ``f\"{key}|{itype}|{slug}\"``).
@@ -215,52 +208,6 @@ def fingerprint_batch_score(
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def fingerprint_vision_match(
-    *,
-    threshold: float,
-    weights: dict[str, Any],
-    month: Any,
-    year: Any,
-    last_months: Any,
-    media_key: Any,
-    force_reprocess: bool,
-    force_descriptions: bool,
-    skip_undescribed: bool,
-    provider_id: Any,
-    provider_model: Any,
-    max_workers: int,
-    clip_top_k: int = 50,
-) -> str:
-    """SHA-256 hex of canonical JSON for vision_match checkpoint scope."""
-    stable_weights = {k: weights[k] for k in sorted(weights)}
-    payload = {
-        "force_descriptions": bool(force_descriptions),
-        "force_reprocess": bool(force_reprocess),
-        "last_months": last_months,
-        "max_workers": int(max_workers),
-        "media_key": media_key,
-        "month": month,
-        "provider_id": provider_id,
-        "provider_model": provider_model,
-        "skip_undescribed": bool(skip_undescribed),
-        "threshold": float(threshold),
-        "weights": stable_weights,
-        "year": year,
-    }
-    # Omit default so fingerprints match checkpoints from builds before clip_top_k existed.
-    if int(clip_top_k) != 50:
-        payload["clip_top_k"] = int(clip_top_k)
-    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def fingerprint_catalog_keys(*, total: int, keys: list[str]) -> str:
-    """SHA-256 hex for enrich_catalog / prepare_catalog input identity."""
-    payload = {"keys": sorted(keys), "total": int(total)}
-    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
 def merge_checkpoint_into_metadata(
     existing_metadata: dict[str, Any], checkpoint_body: dict[str, Any]
 ) -> dict[str, Any]:
@@ -271,10 +218,6 @@ def merge_checkpoint_into_metadata(
 
 
 # --- Per-type resume shape extractors (delegates for :func:`load_resume_state`) ---
-
-
-def resume_processed_media_keys(chk: dict[str, Any]) -> set[str]:
-    return set(chk.get("processed_media_keys") or [])
 
 
 def resume_processed_image_keys(chk: dict[str, Any]) -> set[str]:
@@ -290,36 +233,6 @@ def resume_processed_triplets(chk: dict[str, Any]) -> set[str]:
 
 
 # --- Per-type checkpoint body builders (paired with resume loaders on ``JOB_TYPES``) ---
-
-
-def build_vision_match_checkpoint_body(
-    *, fingerprint: str, processed: set[str], **_: Any
-) -> dict[str, Any]:
-    return {
-        "job_type": "vision_match",
-        "fingerprint": fingerprint,
-        "processed_media_keys": sorted(processed),
-    }
-
-
-def build_enrich_catalog_checkpoint_body(
-    *, fingerprint: str, processed: set[str], **_: Any
-) -> dict[str, Any]:
-    return {
-        "job_type": "enrich_catalog",
-        "fingerprint": fingerprint,
-        "processed_image_keys": sorted(processed),
-    }
-
-
-def build_prepare_catalog_checkpoint_body(
-    *, fingerprint: str, processed: set[str], **_: Any
-) -> dict[str, Any]:
-    return {
-        "job_type": "prepare_catalog",
-        "fingerprint": fingerprint,
-        "processed_image_keys": sorted(processed),
-    }
 
 
 def build_batch_describe_checkpoint_body(

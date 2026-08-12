@@ -27,11 +27,11 @@ def test_create_job():
         db_path = os.path.join(tmpdir, 'test.db')
         db = init_db(db_path)
 
-        job_id = create_job(db, 'analyze_instagram', {'post_url': 'https://instagram.com/p/ABC'})
+        job_id = create_job(db, 'batch_describe', {})
 
         assert job_id is not None
         job = get_job(db, job_id)
-        assert job['type'] == 'analyze_instagram'
+        assert job['type'] == 'batch_describe'
         assert job['status'] == 'pending'
         assert job['progress'] == 0
 
@@ -40,7 +40,7 @@ def test_update_job_status():
         db_path = os.path.join(tmpdir, 'test.db')
         db = init_db(db_path)
 
-        job_id = create_job(db, 'vision_match', {})
+        job_id = create_job(db, 'batch_describe', {})
         update_job_status(db, job_id, 'running', progress=25, current_step='Processing image 1/100')
 
         job = get_job(db, job_id)
@@ -53,7 +53,7 @@ def test_add_job_log():
         db_path = os.path.join(tmpdir, 'test.db')
         db = init_db(db_path)
 
-        job_id = create_job(db, 'vision_match', {})
+        job_id = create_job(db, 'batch_describe', {})
         add_job_log(db, job_id, 'info', 'Starting vision matching')
 
         job = get_job(db, job_id)
@@ -67,7 +67,7 @@ def test_update_job_field_persists_json():
         db_path = os.path.join(tmpdir, 'test.db')
         db = init_db(db_path)
 
-        job_id = create_job(db, 'vision_match', {'phase': 'init'})
+        job_id = create_job(db, 'batch_describe', {'phase': 'init'})
         update_job_field(db, job_id, 'metadata', {'phase': 'running', 'count': 3})
         update_job_field(db, job_id, 'result', {'matches': [{'a': 1}]})
 
@@ -80,7 +80,7 @@ def test_update_job_field_rejects_unknown_column():
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, 'test.db')
         db = init_db(db_path)
-        job_id = create_job(db, 'vision_match', {})
+        job_id = create_job(db, 'batch_describe', {})
 
         with pytest.raises(ValueError, match='Unsupported job field'):
             update_job_field(db, job_id, 'id', 'evil')
@@ -93,7 +93,7 @@ def test_update_job_field_rejects_logs_column():
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, 'test.db')
         db = init_db(db_path)
-        job_id = create_job(db, 'vision_match', {})
+        job_id = create_job(db, 'batch_describe', {})
 
         with pytest.raises(ValueError, match='Unsupported job field'):
             update_job_field(db, job_id, 'logs', [{'timestamp': 'x'}])

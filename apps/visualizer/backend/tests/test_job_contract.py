@@ -24,7 +24,7 @@ def db():
 
 
 def test_job_model_round_trip_includes_log_summary_fields(db):
-    job_id = create_job(db, 'vision_match', {})
+    job_id = create_job(db, 'batch_describe', {})
     add_job_log(db, job_id, 'warning', 'careful')
     add_job_log(db, job_id, 'error', 'boom')
 
@@ -38,7 +38,7 @@ def test_job_model_round_trip_includes_log_summary_fields(db):
 
 
 def test_build_job_emit_payload_enriches_get_job_row(db):
-    job_id = create_job(db, 'vision_match', {})
+    job_id = create_job(db, 'batch_describe', {})
     add_job_log(db, job_id, 'info', 'hello')
 
     raw = get_job(db, job_id)

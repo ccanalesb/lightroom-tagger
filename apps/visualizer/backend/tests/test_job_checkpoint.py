@@ -11,9 +11,6 @@ from jobs.checkpoint import (
     build_batch_embed_image_checkpoint_body,
     build_batch_score_checkpoint_body,
     build_batch_stack_detect_checkpoint_body,
-    build_enrich_catalog_checkpoint_body,
-    build_prepare_catalog_checkpoint_body,
-    build_vision_match_checkpoint_body,
     fingerprint_batch_describe,
     fingerprint_batch_score,
     fingerprint_batch_stack_detect,
@@ -189,21 +186,6 @@ def test_load_resume_state_job_type_mismatch_returns_empty() -> None:
 def test_load_resume_state_fingerprint_drift_logs_per_handler_message() -> None:
     cases = [
         (
-            "vision_match",
-            {"processed_media_keys": ["mk1"]},
-            "checkpoint mismatch: vision_match fingerprint changed, starting fresh",
-        ),
-        (
-            "enrich_catalog",
-            {"processed_image_keys": ["ik1"]},
-            "checkpoint mismatch: enrich_catalog fingerprint changed, starting fresh",
-        ),
-        (
-            "prepare_catalog",
-            {"processed_image_keys": ["ik1"]},
-            "checkpoint mismatch: prepare_catalog fingerprint changed, starting fresh",
-        ),
-        (
             "batch_describe",
             {"processed_pairs": ["k1|catalog"], "total_at_start": 1},
             "checkpoint mismatch: batch_describe fingerprint changed, starting fresh",
@@ -300,33 +282,6 @@ def test_build_checkpoint_body_matches_hand_rolled_payloads() -> None:
     processed = {"b", "a"}
     total = 7
     cases = [
-        (
-            build_vision_match_checkpoint_body,
-            {
-                "job_type": "vision_match",
-                "fingerprint": fp,
-                "processed_media_keys": ["a", "b"],
-            },
-            {"fingerprint": fp, "processed": processed},
-        ),
-        (
-            build_enrich_catalog_checkpoint_body,
-            {
-                "job_type": "enrich_catalog",
-                "fingerprint": fp,
-                "processed_image_keys": ["a", "b"],
-            },
-            {"fingerprint": fp, "processed": processed},
-        ),
-        (
-            build_prepare_catalog_checkpoint_body,
-            {
-                "job_type": "prepare_catalog",
-                "fingerprint": fp,
-                "processed_image_keys": ["a", "b"],
-            },
-            {"fingerprint": fp, "processed": processed},
-        ),
         (
             build_batch_describe_checkpoint_body,
             {

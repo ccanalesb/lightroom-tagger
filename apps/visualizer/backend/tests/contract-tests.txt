@@ -21,12 +21,7 @@ tests/test_providers_api.py
 tests/test_catalog_contract.py
 tests/test_catalog_instagram_posted_api.py
 tests/test_stacks_contract.py
-tests/test_instagram_contract.py
 tests/test_config_contract.py
-tests/test_matches_contract.py
-tests/test_matches_api_pin.py
-tests/test_match_groups.py
-tests/test_match_validation.py
 tests/test_descriptions_contract.py
 tests/test_scores_contract.py
 tests/test_identity_contract.py

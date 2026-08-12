@@ -59,12 +59,6 @@ from api.schemas.identity import (
     PostNextSuggestionsQuery,
     PostNextSuggestionsResponse,
 )
-from api.schemas.instagram import (
-    InstagramImage,
-    InstagramListResponse,
-    InstagramMonthsResponse,
-    validate_instagram_image,
-)
 from api.schemas.system import (
     CachePipelineRun,
     CachePipelineStatus,
@@ -91,17 +85,6 @@ from api.schemas.jobs import (
     enrich_job_log_stats,
     validate_job_payload,
     validate_jobs_recovered_payload,
-)
-from api.schemas.matches import (
-    Match,
-    MatchesListResponse,
-    MatchGroup,
-    MatchRejectConflictResponse,
-    MatchRejectSuccessResponse,
-    MatchValidateResponse,
-    validate_match,
-    validate_match_group,
-    validate_matches_list_response,
 )
 from api.schemas.perspectives import (
     PerspectiveDetail,
@@ -138,12 +121,6 @@ from api.schemas.providers import (
 )
 
 __all__ = [
-    'Match',
-    'MatchGroup',
-    'MatchRejectConflictResponse',
-    'MatchRejectSuccessResponse',
-    'MatchesListResponse',
-    'MatchValidateResponse',
     'CachePipelineRun',
     'CachePipelineStatus',
     'CacheStatus',
@@ -189,9 +166,6 @@ __all__ = [
     'ImageDetailResponse',
     'ImageScoreRow',
     'ImageView',
-    'InstagramImage',
-    'InstagramListResponse',
-    'InstagramMonthsResponse',
     'Job',
     'JobCreateRequest',
     'JobLog',
@@ -240,12 +214,8 @@ __all__ = [
     'validate_image_description',
     'validate_image_score_row',
     'validate_image_view',
-    'validate_instagram_image',
     'validate_job_payload',
     'validate_jobs_recovered_payload',
-    'validate_match',
-    'validate_match_group',
-    'validate_matches_list_response',
     'validate_perspective_detail',
     'validate_perspective_summary',
     'validate_stack_metadata',

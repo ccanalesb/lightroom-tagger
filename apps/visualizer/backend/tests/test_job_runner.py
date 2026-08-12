@@ -16,9 +16,9 @@ def test_job_runner_starts_job():
         db = init_db(db_path)
 
         runner = JobRunner(db)
-        job_id = create_job(db, 'analyze_instagram', {'test': True})
+        job_id = create_job(db, 'batch_describe', {'test': True})
 
-        runner.start_job(job_id, 'analyze_instagram', {})
+        runner.start_job(job_id, 'batch_describe', {})
 
         job = get_job(db, job_id)
         assert job['status'] == 'running'

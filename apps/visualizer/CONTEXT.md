@@ -8,10 +8,10 @@ The visualizer is the web product that surfaces library data to the user. It con
 
 | Term | Meaning |
 |---|---|
-| **job** | A background task (e.g. run matching, score images, generate descriptions). Stored in `visualizer.db`. Has a lifecycle: `pending → running → completed / failed / cancelled`. |
+| **job** | A background task (e.g. score images, generate descriptions, build catalog cache). Stored in `visualizer.db`. Has a lifecycle: `pending → running → completed / failed / cancelled`. |
 | **job runner** | `JobRunner` in `jobs/runner.py` — coordinates job lifecycle, progress hooks, cancellation events, and thread-local DB connections for worker threads. |
 | **job processor** | Daemon thread started at app startup that drains the job queue and dispatches to handlers. |
-| **handler** | A function in `jobs/handlers/` (one module per job family) that implements a specific job type (e.g. `handle_vision_match`, `handle_batch_describe`). |
+| **handler** | A function in `jobs/handlers/` (one module per job family) that implements a specific job type (e.g. `handle_batch_describe`, `handle_batch_stack_detect`). |
 | **job-type registry** | `jobs/registry.py` — explicit `JOB_TYPES` list (`JobType` dataclass) co-locating handler, catalog requirement, and checkpoint helpers per type. Single registration surface; mirrors ADR-0006. See ADR-0010. |
 | **job transitions seam** | `jobs/transitions.py` — pure cancel/retry status legality and `update_job_status` targets. Routes delegate via `transition_cancel` / `transition_retry`; no status-rule literals in `api/jobs.py`. See ADR-0010. |
 | **checkpoint** | Persisted job progress snapshot merged into job metadata so interrupted jobs can resume. |
@@ -19,16 +19,16 @@ The visualizer is the web product that surfaces library data to the user. It con
 | **visualizer DB** | `visualizer.db` — SQLite database holding jobs, logs, and visualizer-specific state. Separate from `library.db`. |
 | **library DB** | `library.db` — the shared library database (images, scores, descriptions, matches). The visualizer reads/writes this via the `lightroom_tagger` library. |
 | **library-DB lifecycle seam** | Job handlers open `library.db` via `make_managed_library_db` in `jobs/handlers/db_lifecycle.py` (backed by `init_database`); never hand-roll `init_database(...)` + manual `close()` in handler bodies. See ADR-0011. |
-| **blueprint** | A Flask blueprint under `apps/visualizer/backend/api/`. One per domain area (jobs, images, descriptions, providers, scores, analytics, identity, system). |
+| **blueprint** | A Flask blueprint under `apps/visualizer/backend/api/`. One per domain area (jobs, images, descriptions, providers, scores, identity, system). |
 | **response helpers** | `utils/responses.py` — `error_not_found`, `error_bad_request`, `success_paginated`, etc. Always use these for consistent JSON shapes. |
 | **WebSocket / SocketIO** | Real-time job progress pushed from backend to frontend via Flask-SocketIO + socket.io-client. |
 | **perspective** | Named scoring lens shown in the UI (matches the library concept). |
 | **model-scoped re-do** (`redo_unless_model`) | A batch describe/score mode that regenerates every eligible image *except* those whose current row was produced by the named target model, which it preserves. Lets a model-swap backlog run over many throttled cycles without redoing the target model's own finished work. Overrides blanket `force`. |
 | **identity** | Photographer style fingerprint and suggestions page (`IdentityPage.tsx`). |
 | **description search** | Keyword filter on the Images page (`CatalogTab` / `description_search` → FTS5 over `image_descriptions`); not the retired chat Search page. |
-| **instagram_posted** | Catalog flag: user marks a photo as posted to Instagram in `ImageDetailModal`. Match validation still auto-sets it until that write path is removed (#218). Advisor and catalog `posted` filters read the column only. |
+| **instagram_posted** | Catalog flag: user marks a photo as posted to Instagram in `ImageDetailModal`. Advisor and catalog `posted` filters read the column only. |
 
-The Images page is catalog-only in the UI (#225 slice 1); Instagram gallery and match review tabs were removed while backend list endpoints remain until slice 2. Processing no longer exposes a Vision Matching tab in the UI — matching jobs are still enqueued via API/CLI until slice 2.
+The Images page is catalog-only in the UI (#225). Instagram gallery, match review, and their HTTP/job surfaces were removed in slice 2 (#234); library matcher code remains until slice 3.
 
 ## Key files
 
@@ -42,14 +42,13 @@ The Images page is catalog-only in the UI (#225 slice 1); Instagram gallery and 
 | `library_db.py` | Thin wrapper for opening `library.db` connections from the backend |
 | `jobs/runner.py` | `JobRunner` — lifecycle, cancellation, thread-local DB, progress hooks |
 | `jobs/registry.py` | Explicit `JOB_TYPES` registry — dispatch, catalog requirement, checkpoint co-location |
-| `jobs/handlers/` | Per-job-family handler modules (`analyze`, `matching`, `embed`, …) |
+| `jobs/handlers/` | Per-job-family handler modules (`analyze`, `embed`, `stacks`, …) |
 | `jobs/transitions.py` | Pure cancel/retry state machine (`transition_cancel`, `transition_retry`) |
 | `jobs/checkpoint.py` | Checkpoint merge logic |
 | `api/jobs.py` | REST endpoints for job CRUD and cancellation (spectree + pydantic — ADR-0013) |
-| `api/images.py` | Image listing, detail, thumbnail endpoints |
+| `api/images/` | Catalog and stack image blueprints (`catalog`, `stacks`) |
 | `api/descriptions.py` | Description fetch/trigger endpoints |
 | `api/scores.py` | Score endpoints per image/perspective |
-| `api/analytics.py` | Posting analytics endpoints |
 | `api/identity.py` | Identity/suggestions endpoints |
 | `api/providers.py` | Provider availability endpoints |
 | `api/system.py` | Health, config, system info |

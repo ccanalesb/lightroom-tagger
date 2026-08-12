@@ -57,7 +57,6 @@ const PATH_DIAGNOSTICS_JOB_TYPES = new Set([
   'batch_analyze',
   'single_describe',
   'single_score',
-  'vision_match',
 ]);
 
 function statusToBadgeVariant(status: Job['status']): BadgeVariant {

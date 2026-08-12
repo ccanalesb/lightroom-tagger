@@ -24,10 +24,10 @@ def socketio_client():
         app.db = init_db(db_path)
 
         from api import jobs, system
-        from api.images import instagram_bp
+        from api.images import catalog_bp
 
         app.register_blueprint(jobs.bp, url_prefix='/api/jobs')
-        app.register_blueprint(instagram_bp, url_prefix='/api/instagram-images')
+        app.register_blueprint(catalog_bp, url_prefix='/api/images/catalog')
         app.register_blueprint(system.bp, url_prefix='/api')
 
         socketio = SocketIO(app, cors_allowed_origins="*")

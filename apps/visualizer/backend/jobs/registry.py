@@ -16,17 +16,11 @@ from .checkpoint import (
     build_batch_embed_image_checkpoint_body,
     build_batch_score_checkpoint_body,
     build_batch_stack_detect_checkpoint_body,
-    build_enrich_catalog_checkpoint_body,
-    build_prepare_catalog_checkpoint_body,
-    build_vision_match_checkpoint_body,
     fingerprint_batch_describe,
     fingerprint_batch_embed_image,
     fingerprint_batch_score,
     fingerprint_batch_stack_detect,
-    fingerprint_catalog_keys,
-    fingerprint_vision_match,
     resume_processed_image_keys,
-    resume_processed_media_keys,
     resume_processed_pairs,
     resume_processed_triplets,
 )
@@ -39,12 +33,6 @@ from .handlers.analyze import (
 )
 from .handlers.catalog import handle_catalog_sync
 from .handlers.embed import handle_batch_embed_image
-from .handlers.instagram import handle_analyze_instagram, handle_instagram_import
-from .handlers.matching import (
-    handle_enrich_catalog,
-    handle_prepare_catalog,
-    handle_vision_match,
-)
 from .handlers.stacks import (
     handle_batch_catalog_similarity,
     handle_batch_stack_detect,
@@ -67,51 +55,6 @@ class JobType:
 
 
 JOB_TYPES: list[JobType] = [
-    JobType(
-        'analyze_instagram',
-        handle_analyze_instagram,
-        None,
-        None,
-        None,
-        None,
-        requires_catalog=False,
-    ),
-    JobType(
-        'instagram_import',
-        handle_instagram_import,
-        None,
-        None,
-        None,
-        None,
-        requires_catalog=True,
-    ),
-    JobType(
-        'vision_match',
-        handle_vision_match,
-        fingerprint_vision_match,
-        resume_processed_media_keys,
-        build_vision_match_checkpoint_body,
-        'checkpoint mismatch: vision_match fingerprint changed, starting fresh',
-        requires_catalog=True,
-    ),
-    JobType(
-        'enrich_catalog',
-        handle_enrich_catalog,
-        fingerprint_catalog_keys,
-        resume_processed_image_keys,
-        build_enrich_catalog_checkpoint_body,
-        'checkpoint mismatch: enrich_catalog fingerprint changed, starting fresh',
-        requires_catalog=True,
-    ),
-    JobType(
-        'prepare_catalog',
-        handle_prepare_catalog,
-        fingerprint_catalog_keys,
-        resume_processed_image_keys,
-        build_prepare_catalog_checkpoint_body,
-        'checkpoint mismatch: prepare_catalog fingerprint changed, starting fresh',
-        requires_catalog=True,
-    ),
     JobType(
         'batch_describe',
         handle_batch_describe,

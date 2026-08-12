@@ -42,7 +42,7 @@ describe('JobsHealthBanner', () => {
         exists: false,
         reason: 'LIBRARY_DB points to a missing file.',
       },
-      jobs_requiring_catalog: ['batch_describe', 'vision_match'],
+      jobs_requiring_catalog: ['batch_describe', 'batch_embed_image'],
       catalog_available: false,
     });
 
@@ -52,7 +52,7 @@ describe('JobsHealthBanner', () => {
     expect(banner.textContent).toContain('Catalog unavailable');
     expect(banner.textContent).toContain('LIBRARY_DB points to a missing file.');
     expect(banner.textContent).toContain('batch_describe');
-    expect(banner.textContent).toContain('vision_match');
+    expect(banner.textContent).toContain('batch_embed_image');
     expect(banner.textContent).toContain('/missing/library.db');
   });
 

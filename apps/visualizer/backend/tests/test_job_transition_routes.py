@@ -40,7 +40,7 @@ def mock_runner(monkeypatch):
 
 
 def _create(client, status='pending'):
-    resp = client.post('/api/jobs/', json={'type': 'analyze_instagram', 'metadata': {}})
+    resp = client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
     assert resp.status_code == 201, resp.json
     job_id = resp.json['id']
     if status != 'pending':

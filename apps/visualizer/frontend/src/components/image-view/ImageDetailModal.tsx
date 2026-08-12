@@ -293,13 +293,19 @@ function ImageDetailModalBody({
     [imageType, imageKey, scorePerspectiveSlug],
   )
 
-  const image = useQuery(detailKey, () =>
-    ImagesAPI.getImageDetail(
+  const image = useQuery(detailKey, () => {
+    if (imageType !== 'catalog') {
+      if (!initialImage) {
+        throw new Error('Instagram image detail is no longer available')
+      }
+      return Promise.resolve(initialImage)
+    }
+    return ImagesAPI.getImageDetail(
       imageType,
       imageKey,
       scorePerspectiveSlug ? { score_perspective: scorePerspectiveSlug } : undefined,
-    ),
-  )
+    )
+  })
 
   const [postedOverride, setPostedOverride] = useState<boolean | null>(null)
   useEffect(() => {

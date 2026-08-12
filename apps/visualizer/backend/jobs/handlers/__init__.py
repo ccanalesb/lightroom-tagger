@@ -14,8 +14,6 @@ from .analyze import (
 )
 from .catalog import handle_catalog_sync
 from .embed import handle_batch_embed_image
-from .instagram import handle_analyze_instagram, handle_instagram_import
-from .matching import handle_enrich_catalog, handle_prepare_catalog, handle_vision_match
 from .stacks import (
     handle_batch_catalog_similarity,
     handle_batch_stack_detect,
@@ -39,11 +37,6 @@ def __getattr__(name: str):
 
 __all__ = (
     'JOB_HANDLERS',
-    'handle_analyze_instagram',
-    'handle_instagram_import',
-    'handle_vision_match',
-    'handle_enrich_catalog',
-    'handle_prepare_catalog',
     'handle_batch_describe',
     'handle_single_describe',
     'handle_single_score',

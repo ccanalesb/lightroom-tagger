@@ -271,10 +271,10 @@ describe('JobDetailModal', () => {
     expect(screen.getByText(JOB_SKIP_MISSING_FILE).parentElement).toHaveTextContent('1');
   });
 
-  it('renders grouped path diagnostics for vision_match jobs', async () => {
+  it('renders grouped path diagnostics for batch_embed_image jobs', async () => {
     mockGet.mockResolvedValue(
       makeJob({
-        type: 'vision_match',
+        type: 'batch_embed_image',
         result: {
           processed: 0,
           matched: 0,
@@ -288,7 +288,7 @@ describe('JobDetailModal', () => {
         },
       }),
     );
-    render(<JobDetailModal job={makeJob({ type: 'vision_match' })} onClose={() => {}} />);
+    render(<JobDetailModal job={makeJob({ type: 'batch_embed_image' })} onClose={() => {}} />);
 
     expect(await screen.findByText(JOB_DETAILS_EMBED_DIAGNOSTICS_TITLE)).toBeTruthy();
     expect(screen.getByText(JOB_SKIP_MISSING_FILE).parentElement).toHaveTextContent('3');
