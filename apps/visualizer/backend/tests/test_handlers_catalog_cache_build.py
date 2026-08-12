@@ -19,7 +19,6 @@ def test_catalog_cache_build_registered_in_job_handlers() -> None:
 
 
 @patch('jobs.handlers.stacks._resolve_library_db_or_fail', return_value='/tmp/library.db')
-@patch('jobs.handlers.stacks.list_instagram_dump_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks.list_catalog_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks._handle_catalog_similarity_inner')
 @patch('jobs.handlers.stacks._handle_batch_stack_detect_inner')
@@ -31,7 +30,6 @@ def test_chain_runs_stages_in_order(
     mock_stack: MagicMock,
     mock_sim: MagicMock,
     _mock_cat_need: MagicMock,
-    _mock_ig_need: MagicMock,
     _mock_db: MagicMock,
 ) -> None:
     from jobs.handlers import handle_catalog_cache_build
@@ -89,7 +87,6 @@ def test_chain_runs_stages_in_order(
 
 
 @patch('jobs.handlers.stacks._resolve_library_db_or_fail', return_value='/tmp/library.db')
-@patch('jobs.handlers.stacks.list_instagram_dump_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks.list_catalog_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks._handle_catalog_similarity_inner')
 @patch('jobs.handlers.stacks._handle_batch_stack_detect_inner')
@@ -101,7 +98,6 @@ def test_chain_honors_cancel_between_stages(
     mock_stack: MagicMock,
     mock_sim: MagicMock,
     _mock_cat_need: MagicMock,
-    _mock_ig_need: MagicMock,
     _mock_db: MagicMock,
 ) -> None:
     from jobs.handlers import handle_catalog_cache_build
@@ -134,7 +130,6 @@ def test_chain_honors_cancel_between_stages(
 
 @patch('jobs.handlers.stacks._resolve_library_db_or_fail', return_value='/tmp/library.db')
 @patch('jobs.handlers.stacks.add_job_log')
-@patch('jobs.handlers.stacks.list_instagram_dump_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks.list_catalog_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks._handle_catalog_similarity_inner')
 @patch('jobs.handlers.stacks._handle_batch_stack_detect_inner')
@@ -146,7 +141,6 @@ def test_stage_banner_logs_include_similarity_stage(
     mock_stack: MagicMock,
     mock_sim: MagicMock,
     _mock_cat_need: MagicMock,
-    _mock_ig_need: MagicMock,
     mock_log: MagicMock,
     _mock_db: MagicMock,
 ) -> None:

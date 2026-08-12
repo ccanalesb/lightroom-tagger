@@ -4,7 +4,7 @@ This repo uses two independent context files. Read the one closest to the area y
 
 | Area | Context file | Covers |
 |---|---|---|
-| Library & CLI | [`lightroom_tagger/CONTEXT.md`](lightroom_tagger/CONTEXT.md) | Matching, vision, providers, scoring, identity, CLI, `library.db` write serialization |
+| Library & CLI | [`lightroom_tagger/CONTEXT.md`](lightroom_tagger/CONTEXT.md) | Vision, providers, scoring, identity, catalog similarity, CLI, `library.db` write serialization |
 | Visualizer product | [`apps/visualizer/CONTEXT.md`](apps/visualizer/CONTEXT.md) | Flask API, job queue, WebSocket, React SPA, blueprints, design system |
 
 ## Cross-cutting decisions

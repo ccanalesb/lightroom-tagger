@@ -328,3 +328,59 @@ def get_all_catalog_images(db: sqlite3.Connection) -> list:
         if img.get('filepath'):
             img['filepath'] = resolve_filepath(img['filepath'])
     return images
+
+
+def set_instagram_posted(db: sqlite3.Connection, key: str, posted: bool) -> bool:
+    """Set whether a catalog image has been posted to Instagram.
+
+    Does not commit — pair with :func:`library_write` or call ``db.commit()``.
+    """
+    cursor = db.execute(
+        "UPDATE images SET instagram_posted = ? WHERE key = ?",
+        (int(posted), key),
+    )
+    return cursor.rowcount > 0
+
+
+def update_instagram_status(db: sqlite3.Connection, key: str, posted: bool = True) -> bool:
+    """Update ``instagram_posted`` for a catalog image and commit."""
+    result = set_instagram_posted(db, key, posted)
+    if result:
+        db.commit()
+    return result
+
+
+def search_by_instagram_posted(db: sqlite3.Connection, posted: bool = True) -> list[dict]:
+    """Search images by Instagram posted status."""
+    rows = db.execute(
+        "SELECT * FROM images WHERE instagram_posted = ?", (int(posted),)
+    ).fetchall()
+    return [_deserialize_row(r) for r in rows]
+
+
+def get_images_without_hash(db: sqlite3.Connection) -> list[dict]:
+    """Get all images that don't have a computed hash yet."""
+    rows = db.execute(
+        "SELECT * FROM images WHERE image_hash IS NULL"
+    ).fetchall()
+    return [_deserialize_row(r) for r in rows]
+
+
+def update_image_hash(db: sqlite3.Connection, key: str, image_hash: str) -> bool:
+    """Update the image hash for an image."""
+    cursor = db.execute(
+        "UPDATE images SET image_hash = ? WHERE key = ?", (image_hash, key)
+    )
+    db.commit()
+    return cursor.rowcount > 0
+
+
+def batch_update_hashes(db: sqlite3.Connection, updates: list[dict]) -> int:
+    """Batch update image hashes."""
+    count = 0
+    for update in updates:
+        key = update.get('key')
+        image_hash = update.get('image_hash')
+        if key and image_hash and update_image_hash(db, key, image_hash):
+            count += 1
+    return count

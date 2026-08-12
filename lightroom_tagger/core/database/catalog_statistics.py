@@ -36,6 +36,11 @@ def get_posted_images_count(db: sqlite3.Connection) -> int:
     )
 
 
+def count_matches(db: sqlite3.Connection) -> int:
+    """Count rows in ``matches`` (legacy table; export tracked in #228)."""
+    return _scalar_count(db, "SELECT COUNT(*) AS cnt FROM matches")
+
+
 def count_catalog_images_with_descriptions(db: sqlite3.Connection) -> int:
     """Count catalog images with an AI description row."""
     return _scalar_count(

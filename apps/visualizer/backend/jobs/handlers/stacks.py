@@ -18,7 +18,6 @@ from lightroom_tagger.core.database import (
     library_write,
     list_catalog_keys_needing_clip_embedding,
     list_clip_embedded_catalog_keys_newest_first,
-    list_instagram_dump_keys_needing_clip_embedding,
 )
 
 from ..checkpoint import fingerprint_batch_stack_detect, fingerprint_catalog_cache_build, job_type_entry, load_resume_state
@@ -645,7 +644,7 @@ def _handle_catalog_cache_build_inner(runner, job_id: str, metadata: dict) -> No
         return
 
     embed_meta = dict(metadata)
-    embed_meta['image_type'] = 'catalog_and_instagram'
+    embed_meta['image_type'] = 'catalog'
     embed_meta['force'] = bool(metadata.get('force_embed', False))
     embed_meta['_catalog_cache_chain'] = True
 
@@ -677,11 +676,7 @@ def _handle_catalog_cache_build_inner(runner, job_id: str, metadata: dict) -> No
         cat_need = list_catalog_keys_needing_clip_embedding(
             lib_db, months=months, year=year, min_rating=min_rating
         )
-        ig_need = list_instagram_dump_keys_needing_clip_embedding(
-            lib_db, months=months, year=year, min_rating=min_rating
-        )
-        overlap = set(cat_need) & set(ig_need)
-        incomplete_k = len(cat_need) + len(ig_need) - len(overlap)
+        incomplete_k = len(cat_need)
 
     if incomplete_k > 0:
         add_job_log(

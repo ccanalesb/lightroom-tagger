@@ -1,4 +1,4 @@
-"""CLIP embedding job handlers (catalog + Instagram dump)."""
+"""CLIP embedding job handlers (catalog images)."""
 
 from __future__ import annotations
 
@@ -16,8 +16,6 @@ from lightroom_tagger.core.database import (
     library_write,
     list_catalog_keys_for_clip_embed_force,
     list_catalog_keys_needing_clip_embedding,
-    list_instagram_dump_keys_for_clip_embed_force,
-    list_instagram_dump_keys_needing_clip_embedding,
     upsert_image_clip_embedding,
 )
 from ..checkpoint import (
@@ -52,7 +50,7 @@ managed_library_db = make_managed_library_db(lambda p: init_database(p))
 
 
 def handle_batch_embed_image(runner, job_id: str, metadata: dict) -> None:
-    """Embed catalog and/or Instagram dump images into ``image_clip_embeddings`` (sqlite-vec)."""
+    """Embed catalog images into ``image_clip_embeddings`` (sqlite-vec)."""
     with cancel_scope.install(lambda: runner.is_cancelled(job_id)):
         _handle_batch_embed_image_inner(runner, job_id, metadata)
 
@@ -66,11 +64,20 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 job_id,
                 (
                     "batch_embed_image: image_type must be 'catalog' "
-                    "or 'catalog_and_instagram'"
+                    "(legacy 'catalog_and_instagram' is treated as catalog)"
                 ),
                 severity='warning',
             )
             return
+        if image_type == 'catalog_and_instagram':
+            if not bool(metadata.get('_catalog_cache_chain')):
+                database.add_job_log(
+                    runner.db,
+                    job_id,
+                    'info',
+                    "batch_embed_image: ignoring legacy image_type 'catalog_and_instagram'; "
+                    'embedding catalog images only',
+                )
 
         db_path = _resolve_library_db_or_fail(runner, job_id)
         if db_path is None:
@@ -92,7 +99,7 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                     'info',
                     (
                         'batch_embed_image stage=precompute_embeddings '
-                        '(builds similarity index only; does not produce matches). '
+                        '(builds similarity index only). '
                         'After completion, run stack detection or catalog similarity.'
                     ),
                 )
@@ -117,51 +124,14 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                         f'force={force}, months={months}, year={year}, min_rating={min_rating}'
                     ),
                 )
-            if image_type == 'catalog':
-                if force:
-                    full_list = list_catalog_keys_for_clip_embed_force(
-                        lib_db, months=months, year=year, min_rating=min_rating
-                    )
-                else:
-                    full_list = list_catalog_keys_needing_clip_embedding(
-                        lib_db, months=months, year=year, min_rating=min_rating
-                    )
+            if force:
+                full_list = list_catalog_keys_for_clip_embed_force(
+                    lib_db, months=months, year=year, min_rating=min_rating
+                )
             else:
-                if force:
-                    cat_keys = list_catalog_keys_for_clip_embed_force(
-                        lib_db, months=months, year=year, min_rating=min_rating
-                    )
-                    ig_keys = list_instagram_dump_keys_for_clip_embed_force(
-                        lib_db, months=months, year=year, min_rating=min_rating
-                    )
-                else:
-                    cat_keys = list_catalog_keys_needing_clip_embedding(
-                        lib_db, months=months, year=year, min_rating=min_rating
-                    )
-                    ig_keys = list_instagram_dump_keys_needing_clip_embedding(
-                        lib_db, months=months, year=year, min_rating=min_rating
-                    )
-                overlap = set(cat_keys) & set(ig_keys)
-                if overlap:
-                    database.add_job_log(
-                        runner.db,
-                        job_id,
-                        'warning',
-                        (
-                            'batch_embed_image: catalog and Instagram dump share '
-                            f'{len(overlap)} key(s); embedding each once'
-                        ),
-                    )
-                seen_keys: set[str] = set()
-                full_list = []
-                for k in cat_keys:
-                    if k not in seen_keys:
-                        seen_keys.add(k)
-                        full_list.append(k)
-                for k in ig_keys:
-                    if k not in seen_keys:
-                        seen_keys.add(k)
-                        full_list.append(k)
+                full_list = list_catalog_keys_needing_clip_embedding(
+                    lib_db, months=months, year=year, min_rating=min_rating
+                )
 
             total_at_start = len(full_list)
             fp = fingerprint_batch_embed_image(

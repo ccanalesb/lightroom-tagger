@@ -6,8 +6,8 @@ import config
 from flask import Blueprint, current_app, has_app_context, jsonify
 from spectree import Response
 from lightroom_tagger.core.database import (
+    count_matches,
     get_all_images,
-    get_all_matches,
     get_instagram_dump_media_filtered,
     get_posted_images_count,
     init_database,
@@ -133,7 +133,7 @@ def get_stats():
             'catalog_images': len(get_all_images(db)),
             'instagram_images': len(get_instagram_dump_media_filtered(db)),
             'posted_to_instagram': get_posted_images_count(db),
-            'matches_found': len(get_all_matches(db)),
+            'matches_found': count_matches(db),
             'db_path': db_path,
         }
 

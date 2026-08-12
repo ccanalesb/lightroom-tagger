@@ -20,14 +20,7 @@ _ALLOWLISTED_FILES: frozenset[str] = frozenset(
 )
 
 # Per-worker-thread callbacks that open/close their own sqlite connection.
-_ALLOWLISTED_FUNCTIONS: frozenset[tuple[str, str]] = frozenset(
-    {
-        (
-            "apps/visualizer/backend/jobs/handlers/matching.py",
-            "process_single_image",
-        ),
-    }
-)
+_ALLOWLISTED_FUNCTIONS: frozenset[tuple[str, str]] = frozenset()
 
 _OPEN_FUNCS: frozenset[str] = frozenset({"init_database", "connect_catalog"})
 
@@ -199,9 +192,7 @@ def test_guardrail_allowlists_cm_internals() -> None:
 
 
 def test_guardrail_allowlists_worker_thread_callback() -> None:
-    rel = "apps/visualizer/backend/jobs/handlers/matching.py"
-    assert (rel, "process_single_image") in _ALLOWLISTED_FUNCTIONS
-    assert not _scan_file(rel)
+    assert _ALLOWLISTED_FUNCTIONS == frozenset()
 
 
 def test_guardrail_scans_cli_and_handlers() -> None:

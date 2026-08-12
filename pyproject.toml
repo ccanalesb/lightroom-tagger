@@ -52,11 +52,6 @@ dev = [
 
 [project.scripts]
 lightroom-tagger = "lightroom_tagger.core.cli:main"
-lightroom-analyze-instagram = "lightroom_tagger.scripts.analyze_instagram_images:main"
-lightroom-run-matching = "lightroom_tagger.scripts.run_vision_matching:main"
-lightroom-generate-report = "lightroom_tagger.scripts.generate_validation_report:generate_html_report"
-lightroom-import-dump = "lightroom_tagger.scripts.import_instagram_dump:main"
-lightroom-match-dump = "lightroom_tagger.scripts.match_instagram_dump:main"
 
 [project.urls]
 Homepage = "https://github.com/canalescm/lightroom-tagger"
@@ -82,9 +77,6 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B", "C4", "SIM"]
 ignore = ["E501"]
-
-[tool.ruff.lint.per-file-ignores]
-"lightroom_tagger/scripts/match_instagram_dump.py" = ["E402", "I001"]
 
 [tool.mypy]
 python_version = "3.10"

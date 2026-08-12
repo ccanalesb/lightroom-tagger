@@ -1,9 +1,6 @@
 """CLIP embedding DB helpers."""
 
 import sqlite3
-from datetime import datetime, timedelta
-
-from .instagram import _INSTAGRAM_DUMP_CLIP_VIDEO_GUARD
 
 
 def _sort_catalog_key_rows_newest_first(rows: list[sqlite3.Row]) -> list[str]:
@@ -94,96 +91,3 @@ def list_catalog_keys_for_clip_embed_force(
     )
     rows = conn.execute(sql, params).fetchall()
     return _sort_catalog_key_rows_newest_first(rows)
-
-
-def _instagram_dump_clip_embed_filters(
-    *,
-    months: int | None,
-    year: str | None,
-) -> tuple[list[str], list]:
-    """Base ``WHERE`` fragments (alias ``m``) for Instagram dump CLIP-eligible rows.
-
-    Mirrors the date window semantics of :func:`_list_catalog_keys_clip_embed_sql_params`
-    (``months`` rolling window + optional calendar ``year``). Dump rows have no
-    rating column — ``min_rating`` does not apply here.
-
-    ``date_folder`` values follow the compact ``YYYYMM`` ordering used by
-    :func:`get_instagram_by_date_filter` (lexicographic ``>=`` cutoff).
-    """
-    parts: list[str] = [
-        "m.file_path IS NOT NULL AND TRIM(COALESCE(m.file_path, '')) != ''",
-        _INSTAGRAM_DUMP_CLIP_VIDEO_GUARD,
-    ]
-    params: list = []
-    if months is not None:
-        from_date = (datetime.now() - timedelta(days=months * 30)).strftime("%Y%m")
-        parts.append("m.date_folder >= ?")
-        params.append(from_date)
-    if year is not None:
-        parts.append("m.date_folder LIKE ?")
-        params.append(f"{year}%")
-    return parts, params
-
-
-def _list_instagram_dump_clip_embed_sql_params(
-    *,
-    months: int | None,
-    year: str | None,
-) -> tuple[str, tuple]:
-    """WHERE clause fragments for Instagram dump rows eligible for CLIP embedding."""
-    parts, params_list = _instagram_dump_clip_embed_filters(months=months, year=year)
-    where_sql = " AND ".join(parts)
-    sql = f"""
-        SELECT m.media_key AS media_key, m.date_folder AS date_folder
-        FROM instagram_dump_media m
-        WHERE {where_sql}
-        ORDER BY m.date_folder DESC, m.media_key DESC
-    """
-    return sql, tuple(params_list)
-
-
-def list_instagram_dump_keys_needing_clip_embedding(
-    conn: sqlite3.Connection,
-    *,
-    months: int | None,
-    year: str | None,
-    min_rating: int | None,
-) -> list[str]:
-    """Instagram dump ``media_key`` values with usable paths, missing CLIP vec0 rows.
-
-    Uses the active embedding dimension implicitly via presence in
-    ``image_clip_embeddings`` (same invalidation story as catalog listings).
-
-    ``min_rating`` is accepted for parity with catalog helpers but ignored —
-    dump media has no catalog rating column.
-    """
-    _ = min_rating
-    parts, params_list = _instagram_dump_clip_embed_filters(months=months, year=year)
-    parts_with_null = [*parts, "ce.image_key IS NULL"]
-    where_sql = " AND ".join(parts_with_null)
-    sql = f"""
-        SELECT m.media_key AS media_key
-        FROM instagram_dump_media m
-        LEFT JOIN image_clip_embeddings ce ON ce.image_key = m.media_key
-        WHERE {where_sql}
-        ORDER BY m.date_folder DESC, m.media_key DESC
-    """
-    rows = conn.execute(sql, tuple(params_list)).fetchall()
-    return [str(row["media_key"]) for row in rows]
-
-
-def list_instagram_dump_keys_for_clip_embed_force(
-    conn: sqlite3.Connection,
-    *,
-    months: int | None,
-    year: str | None,
-    min_rating: int | None,
-) -> list[str]:
-    """All Instagram dump keys in the date window with usable paths (including embedded).
-
-    ``min_rating`` is ignored — see :func:`list_instagram_dump_keys_needing_clip_embedding`.
-    """
-    _ = min_rating
-    sql, params = _list_instagram_dump_clip_embed_sql_params(months=months, year=year)
-    rows = conn.execute(sql, params).fetchall()
-    return [str(row["media_key"]) for row in rows]

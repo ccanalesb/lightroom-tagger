@@ -18,7 +18,6 @@ class Config:
     ai_model: str = "claude-3-5-sonnet-20241022"
     skip_ai: bool = False
     verbose: bool = False
-    instagram_url: str = "https://www.instagram.com/im.canales"
     instagram_keyword: str = "Posted"
     hash_threshold: int = 5
     small_catalog_path: str = ""
@@ -60,7 +59,6 @@ def load_config(config_path: str = "config.yaml") -> Config:
         "ai_model": "claude-3-5-sonnet-20241022",
         "skip_ai": False,
         "verbose": False,
-        "instagram_url": "https://www.instagram.com/im.canales",
         "instagram_keyword": "Posted",
         "hash_threshold": 5,
         "cloudflare_account_id": "",
@@ -84,7 +82,6 @@ def _load_from_env(data: dict) -> dict:
         "LIGHTRoom_AI_MODEL": "ai_model",
         "LIGHTRoom_SKIP_AI": "skip_ai",
         "LIGHTRoom_VERBOSE": "verbose",
-        "LIGHTRoom_INSTAGRAM_URL": "instagram_url",
         "LIGHTRoom_INSTAGRAM_KEYWORD": "instagram_keyword",
         "LIGHTRoom_HASH_THRESHOLD": "hash_threshold",
         "CLOUDFLARE_ACCOUNT_ID": "cloudflare_account_id",

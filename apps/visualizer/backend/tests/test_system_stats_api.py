@@ -7,7 +7,6 @@ from lightroom_tagger.core.database import (
     init_database,
     store_image,
     store_instagram_dump_media,
-    store_match,
     update_instagram_status,
 )
 
@@ -37,10 +36,14 @@ def _client_for_library(tmp_path, monkeypatch):
             "date_folder": "202401",
         },
     )
-    store_match(
-        lib,
-        {"catalog_key": k1, "insta_key": "202401/111", "total_score": 0.8},
+    lib.execute(
+        """
+        INSERT INTO matches (catalog_key, insta_key, total_score, matched_at)
+        VALUES (?, ?, ?, datetime('now'))
+        """,
+        (k1, "202401/111", 0.8),
     )
+    lib.commit()
     lib.close()
 
     monkeypatch.setattr(config, "LIBRARY_DB", str(db_path))

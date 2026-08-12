@@ -28,7 +28,7 @@ The visualizer is the web product that surfaces library data to the user. It con
 | **description search** | Keyword filter on the Images page (`CatalogTab` / `description_search` → FTS5 over `image_descriptions`); not the retired chat Search page. |
 | **instagram_posted** | Catalog flag: user marks a photo as posted to Instagram in `ImageDetailModal`. Advisor and catalog `posted` filters read the column only. |
 
-The Images page is catalog-only in the UI (#225). Instagram gallery, match review, and their HTTP/job surfaces were removed in slice 2 (#234); library matcher code remains until slice 3.
+The Images page is catalog-only in the UI ([#225](https://github.com/ccanalesb/lightroom-tagger/issues/225)). Instagram gallery, match review, dump import, and vision matching were removed in three slices; see `docs/parked/instagram-matching.md`.
 
 ## Key files
 
