@@ -27,9 +27,8 @@ import type {
   ImageDescriptionPerspectives,
   ImageDescriptionTechnical,
 } from '../types/descriptions'
-import type { InstagramImage, InstagramImageInput, InstagramListResponse } from '../types/instagram'
+import type { components } from '../types/api.gen'
 import type { Job, JobsGetOptions, JobsHealth, JobsListResponse } from '../types/job'
-import type { Match, MatchGroup, MatchesListResponse } from '../types/matches'
 import type {
   PerspectiveDetail,
   PerspectiveScore,
@@ -75,6 +74,50 @@ import type {
   VisionModelsResponse,
 } from '../types/system'
 import { API_DEFAULT_URL } from '../constants/strings'
+
+/** Slice 2 removes these API clients; types stay until then (see #225). */
+type InstagramImageSchema =
+  components['schemas']['InstagramListResponse.2d55088.InstagramImage']
+type InstagramImage = InstagramImageSchema
+type InstagramImageInput = Pick<InstagramImageSchema, 'key'> &
+  Partial<Omit<InstagramImageSchema, 'key'>>
+type InstagramListResponse = components['schemas']['InstagramListResponse.2d55088']
+
+type GenMatch = components['schemas']['MatchesListResponse.595c1c1.Match']
+type GenMatchGroup = components['schemas']['MatchesListResponse.595c1c1.MatchGroup']
+
+type OptionalizeNulls<T> = {
+  [K in keyof T as null extends T[K] ? K : never]?: T[K] | undefined
+} & {
+  [K in keyof T as null extends T[K] ? never : K]: T[K]
+}
+
+type GenMatchCore = Omit<
+  GenMatch,
+  'instagram_image' | 'catalog_image' | 'catalog_description' | 'insta_description'
+>
+
+type Match = OptionalizeNulls<GenMatchCore> & {
+  instagram_image?: InstagramImageInput | null
+  catalog_image?: CatalogImageInput | null
+  catalog_description?: ImageDescription | null
+  insta_description?: ImageDescription | null
+}
+
+type GenMatchGroupCore = Omit<GenMatchGroup, 'instagram_image' | 'candidates' | 'all_rejected'>
+
+type MatchGroup = OptionalizeNulls<GenMatchGroupCore> & {
+  candidates: Match[]
+  instagram_image?: InstagramImageInput | null
+  all_rejected?: boolean
+}
+
+type GenMatchesListResponse = components['schemas']['MatchesListResponse.595c1c1']
+
+type MatchesListResponse = Omit<GenMatchesListResponse, 'match_groups' | 'matches'> & {
+  match_groups: MatchGroup[]
+  matches: Match[]
+}
 
 export type {
   IdentityBestPhotoItem,

@@ -20,7 +20,7 @@ vi.mock('../../../stores/matchOptionsContext', () => ({
 vi.mock('../../ui/ProviderModelSelect', () => ({
   ProviderModelSelect: () => null,
 }));
-vi.mock('../../matching/WorkerSlider', () => ({
+vi.mock('../../ui/WorkerSlider', () => ({
   WorkerSlider: () => null,
 }));
 

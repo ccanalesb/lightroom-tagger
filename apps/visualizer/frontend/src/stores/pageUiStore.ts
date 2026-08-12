@@ -1,10 +1,9 @@
 import { create } from 'zustand'
 
-export const IMAGES_TAB_IDS = ['instagram', 'catalog', 'matches'] as const
+export const IMAGES_TAB_IDS = ['catalog'] as const
 export type ImagesTabId = (typeof IMAGES_TAB_IDS)[number]
 
 export const PROCESSING_TAB_IDS = [
-  'matching',
   'analyze',
   'perspectives',
   'cache',
@@ -15,9 +14,7 @@ export const PROCESSING_TAB_IDS = [
 export type ProcessingTabId = (typeof PROCESSING_TAB_IDS)[number]
 
 export const FILTER_PERSIST_KEYS = {
-  imagesInstagram: 'images.instagram',
   imagesCatalog: 'images.catalog',
-  imagesMatches: 'images.matches',
 } as const
 
 export type PersistedFilterState = {
@@ -37,8 +34,8 @@ type PageUiState = {
 }
 
 export const usePageUiStore = create<PageUiState>((set, get) => ({
-  imagesTab: 'instagram',
-  processingTab: 'matching',
+  imagesTab: 'catalog',
+  processingTab: 'analyze',
   filterStates: {},
   setImagesTab: (tab) => set({ imagesTab: tab }),
   setProcessingTab: (tab) => set({ processingTab: tab }),

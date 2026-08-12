@@ -1,19 +1,17 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { renderHook, waitFor, cleanup } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { usePageTab } from '../usePageTab'
 import { usePageUiStore } from '../../stores/pageUiStore'
+import { deleteMatching } from '../../data/cache'
 
 function LocationProbe() {
   const location = useLocation()
   return <div data-testid="location">{`${location.pathname}${location.search}`}</div>
 }
 
-function renderPageTab(
-  initialPath: string,
-  storedTab: 'instagram' | 'catalog' | 'matches',
-) {
+function renderPageTab(initialPath: string, storedTab: 'catalog') {
   usePageUiStore.setState({ imagesTab: storedTab })
 
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -36,8 +34,8 @@ function renderPageTab(
     () =>
       usePageTab({
         pagePath: '/images',
-        tabIds: ['instagram', 'catalog', 'matches'] as const,
-        defaultTab: 'instagram',
+        tabIds: ['catalog'] as const,
+        defaultTab: 'catalog',
         storedTab: usePageUiStore((s) => s.imagesTab),
         setStoredTab: usePageUiStore((s) => s.setImagesTab),
       }),
@@ -48,22 +46,34 @@ function renderPageTab(
 describe('usePageTab', () => {
   beforeEach(() => {
     usePageUiStore.setState({
-      imagesTab: 'instagram',
-      processingTab: 'matching',
+      imagesTab: 'catalog',
+      processingTab: 'analyze',
       filterStates: {},
     })
   })
 
-  it('restores stored tab when landing without ?tab=', async () => {
+  afterEach(() => {
+    cleanup()
+    deleteMatching(() => true)
+    usePageUiStore.setState({
+      imagesTab: 'catalog',
+      processingTab: 'analyze',
+      filterStates: {},
+    })
+  })
+
+  it('uses catalog as the default images tab', async () => {
     const { result } = renderPageTab('/images', 'catalog')
     await waitFor(() => {
       expect(result.current.activeTab).toBe('catalog')
     })
   })
 
-  it('prefers explicit URL tab over stored tab', () => {
-    const { result } = renderPageTab('/images?tab=matches', 'catalog')
-    expect(result.current.activeTab).toBe('matches')
-    expect(usePageUiStore.getState().imagesTab).toBe('matches')
+  it('redirects away from deleted tab query params', async () => {
+    const { result } = renderPageTab('/images?tab=instagram', 'catalog')
+    await waitFor(() => {
+      expect(result.current.activeTab).toBe('catalog')
+    })
+    expect(usePageUiStore.getState().imagesTab).toBe('catalog')
   })
 })

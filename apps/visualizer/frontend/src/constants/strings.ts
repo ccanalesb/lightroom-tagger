@@ -3,25 +3,12 @@ export const APP_TITLE = 'Lightroom Tagger'
 
 // Navigation
 export const NAV_INSIGHTS = 'Insights'
-export const NAV_INSTAGRAM = 'Instagram'
-export const NAV_MATCHING = 'Matching'
-export const NAV_DESCRIPTIONS = 'Descriptions'
-export const NAV_JOBS = 'Jobs'
 export const NAV_IMAGES = 'Images'
-export const NAV_CATALOG = 'Catalog'
-export const NAV_MATCHES = 'Matches'
 export const NAV_PROCESSING = 'Processing'
 export const NAV_IDENTITY = 'Identity'
-export const NAV_JOB_QUEUE = 'Job Queue'
 
 // Tab labels
-export const TAB_INSTAGRAM = 'Instagram'
 export const TAB_CATALOG = 'Catalog'
-export const TAB_MATCHES = 'Matches'
-export const MATCHES_TAB_EMPTY =
-  'No proposed matches yet. Run vision matching from Processing.'
-export const TAB_VISION_MATCHING = 'Vision Matching'
-export const TAB_DESCRIPTIONS = 'Descriptions'
 export const TAB_ANALYZE = 'Analyze'
 export const TAB_PERSPECTIVES = 'Perspectives'
 export const TAB_CATALOG_CACHE = 'Catalog Cache'
@@ -36,7 +23,6 @@ export const NAV_PERSPECTIVES_HELP =
 // Placeholders
 export const PLACEHOLDER_COMING_SOON = 'Coming soon...'
 export const PLACEHOLDER_CATALOG_VIEW = 'Catalog image view coming soon'
-export const PLACEHOLDER_MATCHES_VIEW = 'Matches view coming soon'
 
 // Badge labels (for variant prop values, not display strings)
 export const BADGE_MATCHED = 'Matched'
@@ -74,13 +60,11 @@ export const LABEL_FOLDER = 'Folder'
 export const LABEL_SOURCE = 'Source'
 export const LABEL_DATE = 'Date'
 export const LABEL_IMAGE_HASH_DISPLAY = 'Image Hash'
-export const LABEL_CATALOG_MATCH = 'Catalog Match'
 export const LABEL_TITLE = 'Title'
 export const LABEL_PATH = 'Path'
 export const LABEL_DIMENSIONS = 'Dimensions'
 export const LABEL_CAPTION = 'Caption'
 export const LABEL_KEYWORDS = 'Keywords'
-export const LABEL_INSTAGRAM_CAPTION = 'Instagram Caption'
 
 // Status Display
 export const STATUS_LABELS: Record<string, string> = {
@@ -101,7 +85,6 @@ export const ERROR_SEVERITY_LABELS: Record<string, string> = {
 export const MSG_LOADING = 'Loading...'
 export const MSG_UNKNOWN_ERROR = 'Unknown error'
 export const MSG_NO_JOBS = 'No jobs found. Start a job to see it here.'
-export const MSG_NO_MATCHES = 'No matches found. Run vision matching first.'
 export const MSG_CONNECTED = 'Connected'
 export const MSG_DISCONNECTED = 'Disconnected'
 export const MSG_ERROR_PREFIX = 'Error:'
@@ -149,18 +132,7 @@ export const INSIGHTS_QUICK_PROCESSING_DESC = 'Matching, descriptions, scoring j
 export const INSIGHTS_KPI_ACTIVE_JOBS = 'Active jobs'
 export const INSIGHTS_KPI_ACTIVE_JOBS_DESC = 'Queued or running'
 
-// Instagram Page
-export const INSTAGRAM_DOWNLOADED = 'Downloaded Instagram Images'
-export const INSTAGRAM_ERROR_PLACEHOLDER = 'Error'
-export const INSTAGRAM_MATCHED_PREFIX = 'Matched:'
-export const INSTAGRAM_VIA = 'via'
-
-// Matching Page
-export const MATCHING_RESULTS = 'Matching Results'
-export const MATCHING_RUN_PROMPT = 'Click "Run Matching" above to start the matching process.'
-
 // Actions
-export const ACTION_RUN_MATCHING = 'Run Matching'
 export const ACTION_CANCEL = 'Cancel'
 export const ACTION_CANCELLING = 'Cancelling...'
 
@@ -300,11 +272,6 @@ export function formatStackCountBadge(n: number): string {
 // Config
 export const ITEMS_PER_PAGE = 48
 
-// Settings — Instagram dump (server path; IG-01)
-export const SETTINGS_INSTAGRAM_DUMP_TITLE = 'Instagram export dump'
-export const SETTINGS_INSTAGRAM_DUMP_HELP =
-  'Path must be reachable by the visualizer server (large folder — not uploaded from the browser).'
-
 // Job Details Modal
 export const JOB_DETAILS_TITLE = 'Job Details'
 export const JOB_DETAILS_PROGRESS = 'Progress'
@@ -358,7 +325,6 @@ export const JOB_WEIGHT_VISION = 'Vision:'
 
 // Matching Page Advanced Options
 export const ADVANCED_OPTIONS_TITLE = 'Advanced Options'
-export const ADVANCED_DATE_FILTER = 'Date filter'
 export const ADVANCED_DATE_ALL = 'All time'
 export const ADVANCED_DATE_1MONTH = 'Last month'
 export const ADVANCED_DATE_2MONTHS = 'Last 2 months'
@@ -373,68 +339,12 @@ export const ADVANCED_DATE_YEAR_2025 = '2025 only'
 export const ADVANCED_DATE_YEAR_2024 = '2024 only'
 export const ADVANCED_DATE_YEAR_2023 = '2023 only'
 
-export const ADVANCED_MODEL_LABEL = 'Vision Model'
-export const ADVANCED_MODEL_DESCRIPTION = 'Model used for vision comparison'
-export const ADVANCED_PROVIDER_OVERRIDES_LEGACY_MODEL =
-  'Provider-specific model selection overrides the legacy Ollama model below when set.'
-
-export const ADVANCED_THRESHOLD_LABEL = 'Match Threshold'
-export const ADVANCED_THRESHOLD_MIN = '0.50 (lenient)'
-export const ADVANCED_THRESHOLD_MAX = '0.95 (strict)'
-export const ADVANCED_THRESHOLD_DESCRIPTION = 'Minimum score required for a match (default: 0.70)'
-
-export const ADVANCED_WEIGHTS_TITLE = 'Matching Weights'
 export const ADVANCED_WEIGHTS_MUST_SUM = 'Weights must sum to 100%'
-export const ADVANCED_WEIGHTS_TOTAL = 'Total'
-
-export const ADVANCED_WEIGHT_PHASH = 'Perceptual Hash (pHash)'
-export const ADVANCED_WEIGHT_DESC = 'Description Similarity'
-export const ADVANCED_WEIGHT_VISION = 'Vision Model'
 
 export const ADVANCED_WORKERS_LABEL = 'Parallel Workers'
 export const ADVANCED_WORKERS_DESCRIPTION = 'Process multiple images in parallel (higher = faster, more load)'
 export const ADVANCED_WORKERS_MIN = '1 (sequential)'
 export const ADVANCED_WORKERS_MAX = '4 (parallel)'
-
-export const ADVANCED_RESET_DEFAULTS = 'Reset to defaults'
-export const ADVANCED_FORCE_DESCRIPTIONS = 'Force regenerate AI descriptions'
-export const ADVANCED_FORCE_REPROCESS = 'Include already matched images'
-export const ADVANCED_FIX_WEIGHTS = 'Please fix weight configuration before starting'
-export const MODAL_ALREADY_MATCHED = 'Previously matched to:'
-export const ADVANCED_START = 'Start'
-export const ADVANCED_STARTING = 'Starting...'
-
-// Matching Status
-export const MATCHING_IN_PROGRESS = 'Matching in progress...'
-export const MATCHING_WAITING = 'Waiting to start'
-export const MATCHING_PERCENT_COMPLETE = '% complete'
-export const MATCHING_PROCESSING = 'Processing...'
-export const MATCHING_VIEW_DETAILS = 'View Details'
-export const MATCHING_COMPLETED = 'Matching completed!'
-export const MATCHING_COMPLETED_MATCHES = 'matches found'
-export const MATCHING_FAILED = 'Matching failed'
-export const MATCHING_FAILED_UNKNOWN = 'Unknown error'
-export const MATCHING_DISMISS = 'Dismiss'
-
-export const MATCHING_CLIP_TOP_K_LABEL = 'CLIP shortlist size (top-k)'
-export const MATCHING_CLIP_TOP_K_HELPER =
-  'Default 50 — cosine shortlist before scoring; tune for recall vs cost.'
-export const MATCHING_CLIP_TOP_K_ERROR = 'Enter a value between 1 and 500.'
-export const MATCHING_CATALOG_CACHE_POINTER =
-  'Stack and similarity jobs run from the Catalog cache tab.'
-
-// Match Card
-export const MATCH_CARD_IG_LABEL = 'IG'
-export const MATCH_CARD_CATALOG_LABEL = 'Cat'
-export const MATCH_CARD_NO_IMAGE = 'No image'
-export const MATCH_CARD_SCORE_PHASH = 'PHash'
-export const MATCH_CARD_SCORE_DESC = 'Desc'
-export const MATCH_CARD_SCORE_VISION = 'Vision'
-export const MATCH_CARD_SCORE_TOTAL = 'Total:'
-export const MATCH_CANDIDATES_OF = 'of'
-export const MATCH_CAROUSEL_PREVIOUS = 'Previous candidate'
-export const MATCH_CAROUSEL_NEXT = 'Next candidate'
-export const MATCH_CANDIDATE_LABEL = 'Candidate'
 
 // Identity (Phase 8 / 08-02)
 export const IDENTITY_PAGE_TITLE = 'Identity'
@@ -625,54 +535,6 @@ export const DESC_TECHNICAL_MOOD = 'Mood:'
 export const DESC_TECHNICAL_LIGHTING = 'Lighting:'
 export const DESC_TECHNICAL_TIME = 'Time:'
 export const DESC_TECHNICAL_COLORS = 'Colors:'
-
-// Match detail modal
-export const MATCH_DETAIL_INSTAGRAM = 'Instagram'
-export const MATCH_DETAIL_CATALOG = 'Catalog'
-export const MATCH_DETAIL_VISION_LABEL = 'Vision:'
-export const MATCH_DETAIL_VISION_SCORE_LABEL = 'Vision score:'
-export const MATCH_DETAIL_DESC_LABEL = 'Description:'
-export const MATCH_DETAIL_VISION_REASONING = 'Vision model note'
-export const MATCH_DETAIL_SCORE_LABEL = 'Score:'
-export const MATCH_DETAIL_PHASH_LABEL = 'PHash:'
-export const MATCH_DETAIL_MATCH_DETAILS = 'Match Details'
-export const MATCH_DETAIL_INSTAGRAM_KEY = 'Instagram Key:'
-export const MATCH_DETAIL_CATALOG_KEY = 'Catalog Key:'
-export const MATCH_DETAIL_MODEL = 'Model:'
-export const MATCH_DETAIL_UNVALIDATE_FIRST = 'Un-validate first to reject'
-
-export const MATCH_VALIDATE = 'Validate'
-export const MATCH_VALIDATED = 'Validated'
-
-export function msgMatchGroupCandidates(count: number): string {
-  return `${count} candidate${count === 1 ? '' : 's'}`
-}
-
-export const MATCH_REJECT = 'Reject'
-export const MATCH_REJECT_TITLE = 'Reject this match?'
-export const MATCH_REJECT_BODY = 'This will remove the match and blocklist this pairing. The Instagram image will be free to match other catalog candidates.'
-export const MATCH_REJECT_CANCEL = 'Cancel'
-export const MATCH_REJECT_CONFIRM = 'Reject Match'
-
-/** Inline header label after a successful reject (modal stays open). */
-export const MATCH_DETAIL_REJECTED_LABEL = 'Rejected'
-/** Delay before auto-closing the modal after reject when no further candidates (ms). */
-export const MATCH_DETAIL_REJECTED_AUTOCLOSE_MS = 1500
-/** Badge on fully-rejected tombstone groups (no catalog matches left). */
-export const MATCH_TOMBSTONE_NO_MATCH_BADGE = 'No match'
-/** Row between unvalidated match groups and validated / tombstone groups on Matches tab. */
-export const MATCHES_VALIDATED_DIVIDER_LABEL = '— Validated —'
-/** Non-clickable tombstone card: screen readers only. */
-export const MATCH_TOMBSTONE_CARD_ARIA_LABEL =
-  'Reviewed Instagram post with no remaining catalog matches'
-
-export const MODAL_MATCH_THIS_PHOTO = 'Match This Photo'
-export const MODAL_MATCH_RUNNING = 'Matching...'
-export const MODAL_MATCH_RESULT_FOUND = 'Match found!'
-export const MODAL_MATCH_RESULT_NONE = 'No match found'
-export const MODAL_MATCH_VIEW_RESULTS = 'View on Matching page'
-export const MODAL_MATCH_RETRY = 'Run Again'
-export const MODAL_MATCH_JOB_FAILED_PREFIX = 'Match failed:'
 
 // Providers Page
 export const NAV_PROVIDERS = 'Providers'

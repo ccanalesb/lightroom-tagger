@@ -25,8 +25,10 @@ The visualizer is the web product that surfaces library data to the user. It con
 | **perspective** | Named scoring lens shown in the UI (matches the library concept). |
 | **model-scoped re-do** (`redo_unless_model`) | A batch describe/score mode that regenerates every eligible image *except* those whose current row was produced by the named target model, which it preserves. Lets a model-swap backlog run over many throttled cycles without redoing the target model's own finished work. Overrides blanket `force`. |
 | **identity** | Photographer style fingerprint and suggestions page (`IdentityPage.tsx`). |
-| **description search** | Keyword filter on the Images tab (`CatalogTab` / `description_search` → FTS5 over `image_descriptions`); not the retired chat Search page. |
+| **description search** | Keyword filter on the Images page (`CatalogTab` / `description_search` → FTS5 over `image_descriptions`); not the retired chat Search page. |
 | **instagram_posted** | Catalog flag: user marks a photo as posted to Instagram in `ImageDetailModal`. Match validation still auto-sets it until that write path is removed (#218). Advisor and catalog `posted` filters read the column only. |
+
+The Images page is catalog-only in the UI (#225 slice 1); Instagram gallery and match review tabs were removed while backend list endpoints remain until slice 2. Processing no longer exposes a Vision Matching tab in the UI — matching jobs are still enqueued via API/CLI until slice 2.
 
 ## Key files
 

@@ -23,7 +23,6 @@ import {
 import { Button } from '../ui/Button/Button'
 import { ConfirmModalFrame, UndoToastBar, useUndoToast } from '../ui/ConfirmUndoAction'
 import { CatalogImageDetailSections } from './CatalogImageDetailSections'
-import { InstagramImageDetailSections } from './InstagramImageDetailSections'
 import { ImageMetadataBadges, type PrimaryScoreSource } from './ImageMetadataBadges'
 import { ImageTile } from './ImageTile'
 import { fromCatalogListRow } from './adapters'
@@ -341,9 +340,6 @@ function ImageDetailModalBody({
               onDataChanged={handleDataChanged}
               onPostedChange={setPostedOverride}
             />
-          ) : null}
-          {image.image_type === 'instagram' ? (
-            <InstagramImageDetailSections image={image} onDataChanged={handleDataChanged} />
           ) : null}
           {image.image_type === 'catalog' && stackId != null && !Number.isNaN(stackId) ? (
             <CatalogDetailStackEditing
