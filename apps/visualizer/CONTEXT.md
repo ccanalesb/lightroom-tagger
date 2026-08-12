@@ -24,9 +24,9 @@ The visualizer is the web product that surfaces library data to the user. It con
 | **WebSocket / SocketIO** | Real-time job progress pushed from backend to frontend via Flask-SocketIO + socket.io-client. |
 | **perspective** | Named scoring lens shown in the UI (matches the library concept). |
 | **model-scoped re-do** (`redo_unless_model`) | A batch describe/score mode that regenerates every eligible image *except* those whose current row was produced by the named target model, which it preserves. Lets a model-swap backlog run over many throttled cycles without redoing the target model's own finished work. Overrides blanket `force`. |
-| **identity** | Photographer style fingerprint and suggestions page (`IdentityPage.tsx`). |
+| **identity** | Photographer style fingerprint and suggestions page (`IdentityPage.tsx`). Catalog-only candidate pool ([#218](https://github.com/ccanalesb/lightroom-tagger/issues/218)); Advisor `high_score_unposted` / `eligible_unposted` key off manually set `instagram_posted` (see [#205](https://github.com/ccanalesb/lightroom-tagger/issues/205)). |
 | **description search** | Keyword filter on the Images page (`CatalogTab` / `description_search` → FTS5 over `image_descriptions`); not the retired chat Search page. |
-| **instagram_posted** | Catalog flag: user marks a photo as posted to Instagram in `ImageDetailModal`. Advisor and catalog `posted` filters read the column only. |
+| **instagram_posted** | Catalog flag: user marks a photo as posted to Instagram in `ImageDetailModal`. Advisor and catalog `posted` filters read the column only — not derived from Instagram dump rows ([#218](https://github.com/ccanalesb/lightroom-tagger/issues/218)). |
 
 The Images page is catalog-only in the UI ([#225](https://github.com/ccanalesb/lightroom-tagger/issues/225)). Instagram gallery, match review, dump import, and vision matching were removed in three slices; see `docs/parked/instagram-matching.md`.
 

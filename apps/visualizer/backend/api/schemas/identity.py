@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict
 
 from api.schemas.catalog import IdentityPerPerspectiveScore
 
-ImageTypeLiteral = Literal['catalog', 'instagram']
+ImageTypeLiteral = Literal['catalog']
 
 
 class IdentityBestPhotoItem(BaseModel):

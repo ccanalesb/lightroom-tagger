@@ -56,7 +56,7 @@ export function fromCatalogListRow(row: CatalogImageInput): ImageView {
 
 export function fromBestPhotoRow(row: IdentityBestPhotoItem): ImageView {
   return {
-    image_type: row.image_type ?? 'catalog',
+    image_type: 'catalog',
     key: row.image_key,
     filename: row.filename,
     date_taken: row.date_taken,
@@ -75,7 +75,7 @@ export function fromBestPhotoRow(row: IdentityBestPhotoItem): ImageView {
 
 export function fromPostNextRow(row: PostNextCandidate): ImageView {
   return {
-    image_type: row.image_type ?? 'catalog',
+    image_type: 'catalog',
     key: row.image_key,
     filename: row.filename,
     date_taken: row.date_taken,

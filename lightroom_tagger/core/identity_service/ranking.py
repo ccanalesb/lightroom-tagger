@@ -27,23 +27,6 @@ def _image_meta_map(conn: sqlite3.Connection, keys: list[str]) -> dict[str, dict
             "instagram_posted": bool(r.get("instagram_posted")),
             "image_type": "catalog",
         }
-    # Instagram images (keys not already resolved above)
-    missing = [k for k in keys if k not in out]
-    if missing:
-        ig_placeholders = ",".join("?" * len(missing))
-        ig_rows = conn.execute(
-            f"SELECT media_key, filename, created_at FROM instagram_dump_media "
-            f"WHERE media_key IN ({ig_placeholders})",
-            missing,
-        ).fetchall()
-        for r in ig_rows:
-            out[str(r["media_key"])] = {
-                "filename": r.get("filename") or r.get("media_key") or "",
-                "date_taken": r.get("created_at") or "",
-                "rating": 0,
-                "instagram_posted": True,
-                "image_type": "instagram",
-            }
     return out
 
 
