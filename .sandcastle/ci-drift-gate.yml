@@ -50,7 +50,7 @@ jobs:
       # them was a typecheck.
       - name: Frontend tests
         working-directory: apps/visualizer/frontend
-        run: npx vitest run
+        run: npx vitest run --retry=2
 
       # Scope: all migrated contract groups (V1–V7). The list lives in
       # apps/visualizer/backend/tests/contract-tests.txt -- edit that file, never

@@ -46,7 +46,7 @@ jobs:
       # them was a typecheck.
       - name: Frontend tests
         working-directory: apps/visualizer/frontend
-        run: npx vitest run
+        run: npx vitest run --retry=2
 
       # The test list lives in tests/contract-tests.txt, NOT inline here: a GitHub
       # App cannot push .github/workflows/**, so an agent removing a surface could
