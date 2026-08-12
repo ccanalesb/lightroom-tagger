@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Insights after the consolidation — #220 mock</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Tokens copied verbatim from apps/visualizer/frontend/src/index.css — do not invent values here. */
+  :root {
+    --color-background:#ffffff; --color-surface:#f6f5f4; --color-surface-hover:#f1f0ed;
+    --color-text-primary:rgba(0,0,0,0.95); --color-text-secondary:#4a4642; --color-text-tertiary:#847f7a;
+    --color-border:rgba(0,0,0,0.12); --color-border-strong:rgba(0,0,0,0.2);
+    --color-accent:#0075de; --color-accent-hover:#005bab; --color-accent-light:#f2f9ff;
+    --color-success:#1aae39; --color-warning:#dd5b00; --color-error:#e03e3e;
+  }
+  .dark {
+    --color-background:#191919; --color-surface:#31302e; --color-surface-hover:#3d3b38;
+    --color-text-primary:#f7f6f5; --color-text-secondary:#b8b7b4; --color-text-tertiary:#8a8985;
+    --color-border:rgba(255,255,255,0.12); --color-border-strong:rgba(255,255,255,0.25);
+    --color-accent:#4A9EFF; --color-accent-hover:#7AB8FF; --color-accent-light:rgba(74,158,255,0.15);
+    --color-success:#3db39a; --color-warning:#ff8c42; --color-error:#ff6b6b;
+  }
+  /* tailwind.config.js: rounded-card 12px, rounded-base 8px, shadow-card, Inter */
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Inter',-apple-system,system-ui,'Segoe UI',sans-serif;
+       background:var(--color-background);color:var(--color-text-primary);
+       -webkit-font-smoothing:antialiased;transition:background-color .2s ease,color .2s ease}
+  .wrap{max-width:1200px;margin:0 auto;padding:24px 20px 72px}
+
+  /* .Card = bg-bg border border-border rounded-card shadow-card p-4 */
+  .card{background:var(--color-background);border:1px solid var(--color-border);border-radius:12px;
+        box-shadow:rgba(0,0,0,.04) 0 4px 18px,rgba(0,0,0,.027) 0 2.025px 7.84688px,rgba(0,0,0,.02) 0 .8px 2.925px,rgba(0,0,0,.01) 0 .175px 1.04062px;
+        padding:16px;transition:all .15s;display:block;text-decoration:none;color:inherit}
+  a.card:hover{border-color:var(--color-border-strong);
+        box-shadow:rgba(0,0,0,.01) 0 1px 3px,rgba(0,0,0,.02) 0 3px 7px,rgba(0,0,0,.02) 0 7px 15px,rgba(0,0,0,.04) 0 14px 28px,rgba(0,0,0,.05) 0 23px 52px}
+  .card-title{font-size:14px;font-weight:600;line-height:1.375;margin:0}
+  .card-desc{font-size:12px;color:var(--color-text-secondary);margin:8px 0 0}
+  .row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+
+  /* .Badge = inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold border */
+  .badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:9999px;
+         font-size:12px;font-weight:600;border:1px solid var(--color-border);
+         background:var(--color-surface);color:var(--color-text-secondary);white-space:nowrap}
+  .badge.success{background:rgba(26,174,57,.08);color:var(--color-success);border-color:rgba(26,174,57,.25)}
+  .badge.accent{background:var(--color-accent-light);color:var(--color-accent);border-color:rgba(0,117,222,.25)}
+  .badge.warning{background:rgba(221,91,0,.08);color:var(--color-warning);border-color:rgba(221,91,0,.25)}
+
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+  .cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:960px){.kpis{grid-template-columns:repeat(2,1fr)}.cards3{grid-template-columns:1fr}}
+
+  h1{font-size:26px;line-height:1.23;letter-spacing:-.625px;font-weight:700;margin:0 0 4px}
+  .lede{color:var(--color-text-secondary);font-size:13px;margin:0 0 24px}
+  .sect{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--color-text-tertiary);
+        margin:28px 0 10px;font-weight:600}
+  code{background:var(--color-surface);padding:1px 5px;border-radius:4px;font-size:.92em}
+
+  nav{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
+  nav span{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:500;color:var(--color-text-secondary);border:1px solid transparent}
+  nav span.on{background:var(--color-accent-light);color:var(--color-accent);border-color:rgba(0,117,222,.25)}
+  nav span.dead{color:var(--color-error);text-decoration:line-through;opacity:.6}
+
+  .rail{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+  .thumb{aspect-ratio:3/2;border-radius:8px;border:1px solid var(--color-border);background:var(--color-surface);
+         position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;
+         color:var(--color-text-tertiary);font-size:11px}
+  .thumb .b{position:absolute;right:6px;bottom:6px}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  td{padding:5px 0;color:var(--color-text-secondary);vertical-align:middle}
+  td.v{text-align:right;color:var(--color-text-primary);font-variant-numeric:tabular-nums;width:70px;font-weight:600}
+  td.b{width:46%;padding-left:14px}
+  .bar{height:6px;border-radius:9999px;background:var(--color-surface);overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--color-accent)}
+  .bar i.warn{background:var(--color-warning)}
+  .bar i.err{background:var(--color-error)}
+
+  .toggle{position:fixed;top:16px;right:16px;padding:7px 14px;border-radius:8px;cursor:pointer;
+          border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text-primary);
+          font:600 12px Inter,sans-serif}
+  .note{border-left:3px solid var(--color-border-strong);padding:2px 0 2px 14px;margin:28px 0 0;
+        color:var(--color-text-secondary);font-size:13px}
+  .note b{color:var(--color-text-primary)}
+</style>
+</head>
+<body>
+<button class="toggle" onclick="document.documentElement.classList.toggle('dark')">Toggle theme</button>
+<div class="wrap">
+
+  <h1>Insights</h1>
+  <p class="lede">Mock for <b>#220</b>. Tokens, radii, shadows and component markup copied from
+    <code>index.css</code>, <code>tailwind.config.js</code>, <code>Card.tsx</code> and <code>Badge.tsx</code>.
+    Every number is real, read from <code>library.db</code>.</p>
+
+  <nav>
+    <span class="on">Insights</span><span>Images</span>
+    <span class="dead">Search</span><span class="dead">Analytics</span>
+    <span>Identity</span><span>Processing</span>
+  </nav>
+  <p class="lede" style="margin-bottom:28px">Four items survive. <code>/search</code> and <code>/analytics</code>
+    redirect to <code>/images</code>, matching the existing <code>/instagram</code> → <code>/images</code> pattern.</p>
+
+  <!-- Same shape as today: grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 -->
+  <div class="kpis">
+    <a class="card" href="#">
+      <div class="row"><h3 class="card-title">Catalog images</h3><span class="badge success">42,136</span></div>
+      <p class="card-desc">Lightroom catalog entries</p>
+    </a>
+    <a class="card" href="#">
+      <div class="row"><h3 class="card-title">Scoring 9+</h3><span class="badge success">95</span></div>
+      <p class="card-desc">Your best, mostly unposted</p>
+    </a>
+    <a class="card" href="#">
+      <div class="row"><h3 class="card-title">Stacks to cull</h3><span class="badge accent">7,683</span></div>
+      <p class="card-desc">22,190 frames inside</p>
+    </a>
+    <a class="card" href="#">
+      <div class="row"><h3 class="card-title">Coverage gaps</h3><span class="badge warning">3</span></div>
+      <p class="card-desc">Perspectives barely scored</p>
+    </a>
+    <a class="card" href="#">
+      <div class="row"><h3 class="card-title">Active jobs</h3><span class="badge">0</span></div>
+      <p class="card-desc">Running or queued right now</p>
+    </a>
+  </div>
+
+  <div class="sect">Best unposted — opens the shared image modal, where the manual posted toggle lives</div>
+  <div class="rail">
+    <div class="thumb">AsyncThumbnail<span class="badge success b">9.0</span></div>
+    <div class="thumb">AsyncThumbnail<span class="badge success b">9.0</span></div>
+    <div class="thumb">AsyncThumbnail<span class="badge success b">8.9</span></div>
+    <div class="thumb">AsyncThumbnail<span class="badge success b">8.8</span></div>
+    <div class="thumb">AsyncThumbnail<span class="badge success b">8.8</span></div>
+    <div class="thumb">AsyncThumbnail<span class="badge success b">8.7</span></div>
+  </div>
+
+  <div class="sect">Next actions</div>
+  <div class="cards3">
+    <a class="card" href="#">
+      <div class="row"><h3 class="card-title">Cull a burst</h3><span class="badge accent">7,683</span></div>
+      <p class="card-desc">Stacks grouped by <code>date_taken</code>, holding 22,190 frames. Pick the keeper, reject the rest.</p>
+    </a>
+    <a class="card" href="#">
+      <div class="row"><h3 class="card-title">Near-duplicates</h3><span class="badge accent">12,295</span></div>
+      <p class="card-desc">Catalog similarity groups. Framing per #226 — this card is its home in the IA.</p>
+    </a>
+    <a class="card" href="#">
+      <div class="row"><h3 class="card-title">Finish the pass</h3><span class="badge">570</span></div>
+      <p class="card-desc">Undescribed images, plus four perspectives short of full coverage.</p>
+    </a>
+  </div>
+
+  <div class="sect">Perspective coverage</div>
+  <div class="card">
+    <table>
+      <tr><td>color-theory</td><td class="v">38,514</td><td class="b"><div class="bar"><i style="width:100%"></i></div></td></tr>
+      <tr><td>documentary</td><td class="v">38,514</td><td class="b"><div class="bar"><i style="width:100%"></i></div></td></tr>
+      <tr><td>street</td><td class="v">38,514</td><td class="b"><div class="bar"><i style="width:100%"></i></div></td></tr>
+      <tr><td>compositional-cleanliness</td><td class="v">30,222</td><td class="b"><div class="bar"><i class="warn" style="width:78%"></i></div></td></tr>
+      <tr><td>environmental-context-legibility</td><td class="v">30,222</td><td class="b"><div class="bar"><i class="warn" style="width:78%"></i></div></td></tr>
+      <tr><td>framing</td><td class="v">30,221</td><td class="b"><div class="bar"><i class="warn" style="width:78%"></i></div></td></tr>
+      <tr><td>intensity-suggestion</td><td class="v">30,220</td><td class="b"><div class="bar"><i class="warn" style="width:78%"></i></div></td></tr>
+      <tr><td>layering</td><td class="v">649</td><td class="b"><div class="bar"><i class="err" style="width:2%"></i></div></td></tr>
+      <tr><td>tension-human-element</td><td class="v">95</td><td class="b"><div class="bar"><i class="err" style="width:1%"></i></div></td></tr>
+      <tr><td>publisher</td><td class="v">2</td><td class="b"><div class="bar"><i class="err" style="width:1%"></i></div></td></tr>
+    </table>
+  </div>
+
+  <p class="note">
+    <b>Why not pipeline counters.</b> Describe and score are 98.6% done, so those tiles would be frozen forever.
+    Every tile above is a door into a surviving surface — the rule is <b>no tile that is only a number</b>.<br><br>
+    <b>What died from the current row.</b> Of today's five KPIs, three go: <code>instagram_images</code> and
+    <code>matches_found</code> (tabs deleted) and the <code>/analytics</code> link behind <code>posted_to_instagram</code>.
+    <b>Catalog images</b> and <b>Active jobs</b> survive unchanged.
+    <code>MiniPostingFrequencyChart</code> is deleted, not replaced — the only remaining time signal is
+    <code>date_taken</code>, which is a shooting-frequency chart nobody acts on.<br><br>
+    <b>Build with the real components:</b> <code>Card</code> / <code>CardHeader</code> / <code>CardTitle</code> /
+    <code>CardContent</code>, <code>Badge</code> (default · success · accent · warning),
+    <code>AsyncThumbnail</code> and <code>TileGrid</code> for the rail, and <code>Link</code> wrappers as
+    <code>InsightsKpiRow.tsx</code> already does. Strings belong in <code>constants/strings.ts</code>.
+  </p>
+
+</div>
+</body>
+</html>
