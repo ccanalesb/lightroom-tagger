@@ -154,11 +154,6 @@ def test_guardrail_allowlists_vision_client_wrappers() -> None:
         assert rel in _ALLOWLISTED_FILES
 
 
-def test_guardrail_scans_nl_catalog_search() -> None:
-    assert "lightroom_tagger/core/nl_catalog_search.py" in _iter_scanned_source_files()
-    assert not _scan_file("lightroom_tagger/core/nl_catalog_search.py")
-
-
 def _scan_source(source: str, rel_path: str = "fake/module.py") -> list[_RawProviderCallHit]:
     visitor = _ProviderCallVisitor(rel_path)
     visitor.visit(ast.parse(source))

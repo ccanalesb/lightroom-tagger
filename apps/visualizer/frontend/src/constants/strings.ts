@@ -8,7 +8,6 @@ export const NAV_MATCHING = 'Matching'
 export const NAV_DESCRIPTIONS = 'Descriptions'
 export const NAV_JOBS = 'Jobs'
 export const NAV_IMAGES = 'Images'
-export const NAV_SEARCH = 'Search'
 export const NAV_CATALOG = 'Catalog'
 export const NAV_MATCHES = 'Matches'
 export const NAV_PROCESSING = 'Processing'
@@ -507,14 +506,6 @@ export const PROCESSING_EMBED_CATALOG_FAILED_PREFIX = 'Couldn’t start Embed im
 export const PROCESSING_OPEN_JOB_QUEUE = 'Open Job Queue'
 export const PROCESSING_JOB_QUEUE_ROUTE = '/processing?tab=jobs'
 export const PROCESSING_CATALOG_CACHE_ROUTE = '/processing?tab=cache'
-
-export const SEARCH_PIN_INACTIVE_PREFIX = 'Similarity pin inactive:'
-export const SEARCH_PIN_INACTIVE_SUFFIX = 'Results use your full catalog.'
-export const SEARCH_PIN_WARN_NO_CLIP = 'CLIP embedding not yet built for pinned image'
-/** Backend chat-search `fallback_reason` when similarity pin cannot use CLIP (OPS-01). */
-export const SEARCH_PIN_FALLBACK_REASON_NO_CLIP_EMBEDDING = 'no_clip_embedding'
-export const SEARCH_PIN_HELP_EMBED = 'Run "Embed catalog images only" (or Build catalog cache) under Processing → Catalog cache, then try again.'
-export const SEARCH_PIN_LINK_CACHE = 'Open Catalog cache'
 
 /** Catalog Cache tab — composite pipeline + Advanced stage triggers (Phase 08 / CACHE-01). */
 export const CATALOG_CACHE_BUILD_CTA = 'Build catalog cache'

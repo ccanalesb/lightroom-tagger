@@ -26,9 +26,6 @@ triple list (sorted by ``f\"{key}|{itype}|{slug}\"``).
 their own slice of ``metadata`` (the analyze handler normalizes ``force_describe`` /
 ``force_score`` into each sub-payload before fingerprinting).
 
-**batch_text_embed** — ``job_type``, ``fingerprint``, ``processed_pairs`` (``"key|catalog"`` strings),
-``total_at_start`` (same semantics as ``batch_describe``).
-
 **batch_embed_image** — ``job_type: 'batch_embed_image'``, ``fingerprint``, ``processed_pairs`` (sorted list of
 catalog ``image_key`` strings — the same strings that appear in the fingerprint's ``pairs`` array),
 ``total_at_start``, ``checkpoint_version: 1``.
@@ -47,7 +44,6 @@ from collections.abc import Callable
 from typing import Any
 
 from lightroom_tagger.core.clip_embedding_service import CLIP_EMBED_DIM, CLIP_EMBED_MODEL_ID
-from lightroom_tagger.core.embedding_service import TEXT_EMBED_DIM, TEXT_EMBED_MODEL_ID
 
 CHECKPOINT_VERSION: int = 1
 
@@ -79,30 +75,6 @@ def fingerprint_batch_describe(
         "perspective_slugs": perspective_slugs_fp,
         "provider_id": metadata.get("provider_id"),
         "provider_model": metadata.get("provider_model"),
-    }
-    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def fingerprint_batch_text_embed(
-    metadata: dict[str, Any], ordered_pairs: list[tuple[str, str]]
-) -> str:
-    """SHA-256 hex of canonical JSON for batch_text_embed inputs and ordered pair list."""
-    min_rating_raw = metadata.get("min_rating")
-    min_rating: int | None
-    try:
-        min_rating = int(min_rating_raw) if min_rating_raw is not None else None
-    except (TypeError, ValueError):
-        min_rating = None
-    pairs = sorted(f"{key}|{itype}" for key, itype in ordered_pairs)
-    payload = {
-        "date_filter": metadata.get("date_filter", "all"),
-        "embedding_dim": TEXT_EMBED_DIM,
-        "embedding_model_id": TEXT_EMBED_MODEL_ID,
-        "force": bool(metadata.get("force", False)),
-        "image_type": str(metadata.get("image_type", "catalog")),
-        "min_rating": min_rating,
-        "pairs": pairs,
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -368,17 +340,6 @@ def build_batch_score_checkpoint_body(
         "job_type": "batch_score",
         "fingerprint": fingerprint,
         "processed_triplets": sorted(processed),
-        "total_at_start": total_at_start,
-    }
-
-
-def build_batch_text_embed_checkpoint_body(
-    *, fingerprint: str, processed: set[str], total_at_start: int, **_: Any
-) -> dict[str, Any]:
-    return {
-        "job_type": "batch_text_embed",
-        "fingerprint": fingerprint,
-        "processed_pairs": sorted(processed),
         "total_at_start": total_at_start,
     }
 

@@ -16,8 +16,6 @@ _ALLOWLISTED_FILES: frozenset[str] = frozenset(
     {
         "lightroom_tagger/core/vision_op.py",
         "lightroom_tagger/core/fallback.py",
-        # different scope — text NL filter + multi-turn tool loop; see #139 Non-goals.
-        "lightroom_tagger/core/nl_catalog_search.py",
     }
 )
 
@@ -166,22 +164,6 @@ def test_guardrail_allowlists_vision_op_engine() -> None:
 def test_guardrail_allowlists_fallback_dispatcher() -> None:
     assert "lightroom_tagger/core/fallback.py" in _ALLOWLISTED_FILES
     assert not _scan_file("lightroom_tagger/core/fallback.py")
-
-
-def test_guardrail_allowlists_nl_catalog_search() -> None:
-    assert "lightroom_tagger/core/nl_catalog_search.py" in _ALLOWLISTED_FILES
-    assert not _scan_file("lightroom_tagger/core/nl_catalog_search.py")
-
-
-def test_guardrail_scans_nl_catalog_search_when_unlisted() -> None:
-    """Prove nl_catalog_search would fail without the explicit allow-list."""
-    rel = "lightroom_tagger/core/nl_catalog_search.py"
-    path = _REPO_ROOT / rel
-    source = path.read_text(encoding="utf-8")
-    tree = ast.parse(source, filename=str(path))
-    visitor = _VisionOpOrchestrationVisitor(rel)
-    visitor.visit(tree)
-    assert visitor.hits, "nl_catalog_search should contain inline orchestration"
 
 
 def _scan_source(source: str, rel_path: str = "fake/module.py") -> list[_InlineVisionOpHit]:

@@ -16,7 +16,6 @@ from .checkpoint import (
     build_batch_embed_image_checkpoint_body,
     build_batch_score_checkpoint_body,
     build_batch_stack_detect_checkpoint_body,
-    build_batch_text_embed_checkpoint_body,
     build_enrich_catalog_checkpoint_body,
     build_prepare_catalog_checkpoint_body,
     build_vision_match_checkpoint_body,
@@ -24,7 +23,6 @@ from .checkpoint import (
     fingerprint_batch_embed_image,
     fingerprint_batch_score,
     fingerprint_batch_stack_detect,
-    fingerprint_batch_text_embed,
     fingerprint_catalog_keys,
     fingerprint_vision_match,
     resume_processed_image_keys,
@@ -40,7 +38,7 @@ from .handlers.analyze import (
     handle_single_score,
 )
 from .handlers.catalog import handle_catalog_sync
-from .handlers.embed import handle_batch_embed_image, handle_batch_text_embed
+from .handlers.embed import handle_batch_embed_image
 from .handlers.instagram import handle_analyze_instagram, handle_instagram_import
 from .handlers.matching import (
     handle_enrich_catalog,
@@ -175,15 +173,6 @@ JOB_TYPES: list[JobType] = [
         None,
         None,
         None,
-        requires_catalog=True,
-    ),
-    JobType(
-        'batch_text_embed',
-        handle_batch_text_embed,
-        fingerprint_batch_text_embed,
-        resume_processed_pairs,
-        build_batch_text_embed_checkpoint_body,
-        'checkpoint mismatch: batch_text_embed fingerprint changed, starting fresh',
         requires_catalog=True,
     ),
     JobType(

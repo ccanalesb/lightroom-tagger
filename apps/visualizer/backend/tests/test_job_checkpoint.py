@@ -11,14 +11,12 @@ from jobs.checkpoint import (
     build_batch_embed_image_checkpoint_body,
     build_batch_score_checkpoint_body,
     build_batch_stack_detect_checkpoint_body,
-    build_batch_text_embed_checkpoint_body,
     build_enrich_catalog_checkpoint_body,
     build_prepare_catalog_checkpoint_body,
     build_vision_match_checkpoint_body,
     fingerprint_batch_describe,
     fingerprint_batch_score,
     fingerprint_batch_stack_detect,
-    fingerprint_batch_text_embed,
     load_resume_state,
     job_type_entry,
 )
@@ -82,23 +80,6 @@ def test_fingerprint_batch_stack_detect_permutation_invariant_and_delta_force_se
         meta, keys, resolved_delta_ms=2000, force_mode="preserve_edited"
     )
     assert fp_full != fp_preserve
-
-
-def test_fingerprint_batch_text_embed_stable_and_force_sensitive() -> None:
-    meta = {
-        "image_type": "catalog",
-        "date_filter": "all",
-        "force": False,
-        "min_rating": None,
-    }
-    pairs = [("k2", "catalog"), ("k1", "catalog")]
-    a = fingerprint_batch_text_embed(meta, pairs)
-    b = fingerprint_batch_text_embed(dict(meta), list(pairs))
-    assert a == b
-    perm = [("k1", "catalog"), ("k2", "catalog")]
-    assert fingerprint_batch_text_embed(meta, perm) == a
-    meta_force = {**meta, "force": True}
-    assert fingerprint_batch_text_embed(meta_force, pairs) != a
 
 
 def test_fingerprint_batch_score_force_and_triples_and_slug_order() -> None:
@@ -233,11 +214,6 @@ def test_load_resume_state_fingerprint_drift_logs_per_handler_message() -> None:
             "checkpoint mismatch: batch_score fingerprint changed, starting fresh",
         ),
         (
-            "batch_text_embed",
-            {"processed_pairs": ["k1|catalog"], "total_at_start": 1},
-            "checkpoint mismatch: batch_text_embed fingerprint changed, starting fresh",
-        ),
-        (
             "batch_embed_image",
             {"processed_pairs": ["k1"], "total_at_start": 1},
             "checkpoint mismatch: batch_embed_image fingerprint changed, starting fresh",
@@ -367,16 +343,6 @@ def test_build_checkpoint_body_matches_hand_rolled_payloads() -> None:
                 "job_type": "batch_score",
                 "fingerprint": fp,
                 "processed_triplets": ["a", "b"],
-                "total_at_start": total,
-            },
-            {"fingerprint": fp, "processed": processed, "total_at_start": total},
-        ),
-        (
-            build_batch_text_embed_checkpoint_body,
-            {
-                "job_type": "batch_text_embed",
-                "fingerprint": fp,
-                "processed_pairs": ["a", "b"],
                 "total_at_start": total,
             },
             {"fingerprint": fp, "processed": processed, "total_at_start": total},

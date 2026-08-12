@@ -22,7 +22,6 @@ from .db_init_migrations import (
     _migrate_image_clip_embeddings_vec0,
     _migrate_image_descriptions_fts,
     _migrate_image_stacks,
-    _migrate_image_text_embeddings_vec0,
     _migrate_images_schema,
     _migrate_unified_image_keys,
     migrate_unified_image_keys,
@@ -208,7 +207,6 @@ def init_database(db_path: str) -> sqlite3.Connection:
     _migrate_unified_image_keys(conn)
     _backfill_matched_catalog_key_from_validated_matches(conn)
     _migrate_image_descriptions_fts(conn)
-    _migrate_image_text_embeddings_vec0(conn)
     _migrate_image_clip_embeddings_vec0(conn)
     migrate_legacy_description_scores_to_image_scores(conn)
     # Stack members reference `images` by key at insert time; `images` is created above.

@@ -10,7 +10,7 @@ retired and what the attempt taught. That is the only job of these docs.
 
 | Capability | Status | Tag | Doc |
 | --- | --- | --- | --- |
-| Chat / NL / semantic search | to be removed by [#223](https://github.com/ccanalesb/lightroom-tagger/issues/223) | `parked/chat-search` | — |
+| Chat / NL / semantic search | retired 2026-08-12 ([#223](https://github.com/ccanalesb/lightroom-tagger/issues/223)) | `parked/chat-search` | [chat-search.md](chat-search.md) |
 | Instagram import + vision matching | to be removed by [#225](https://github.com/ccanalesb/lightroom-tagger/issues/225) | `parked/instagram-matching` | — |
 | Posting analytics | retired 2026-08-12 ([#222](https://github.com/ccanalesb/lightroom-tagger/issues/222)) | `parked/posting-analytics` | [posting-analytics.md](posting-analytics.md) |
 

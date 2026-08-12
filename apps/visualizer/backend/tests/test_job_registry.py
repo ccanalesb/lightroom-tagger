@@ -11,7 +11,7 @@ from jobs.handlers.analyze import (
     handle_single_score,
 )
 from jobs.handlers.catalog import handle_catalog_sync
-from jobs.handlers.embed import handle_batch_embed_image, handle_batch_text_embed
+from jobs.handlers.embed import handle_batch_embed_image
 from jobs.handlers.instagram import handle_analyze_instagram, handle_instagram_import
 from jobs.handlers.matching import (
     handle_enrich_catalog,
@@ -40,7 +40,6 @@ _EXPECTED_JOB_HANDLERS = {
     'batch_analyze': handle_batch_analyze,
     'batch_stack_detect': handle_batch_stack_detect,
     'batch_catalog_similarity': handle_batch_catalog_similarity,
-    'batch_text_embed': handle_batch_text_embed,
     'batch_embed_image': handle_batch_embed_image,
     'catalog_sync': handle_catalog_sync,
     'catalog_cache_build': handle_catalog_cache_build,
@@ -56,7 +55,6 @@ _EXPECTED_CATALOG_JOB_TYPES = frozenset(
         'batch_analyze',
         'batch_stack_detect',
         'batch_catalog_similarity',
-        'batch_text_embed',
         'batch_embed_image',
         'single_describe',
         'single_score',

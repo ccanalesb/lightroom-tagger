@@ -13,7 +13,7 @@ from .analyze import (
     handle_single_score,
 )
 from .catalog import handle_catalog_sync
-from .embed import handle_batch_embed_image, handle_batch_text_embed
+from .embed import handle_batch_embed_image
 from .instagram import handle_analyze_instagram, handle_instagram_import
 from .matching import handle_enrich_catalog, handle_prepare_catalog, handle_vision_match
 from .stacks import (
@@ -51,7 +51,6 @@ __all__ = (
     'handle_batch_analyze',
     'handle_batch_stack_detect',
     'handle_batch_catalog_similarity',
-    'handle_batch_text_embed',
     'handle_batch_embed_image',
     'handle_catalog_sync',
     'handle_catalog_cache_build',

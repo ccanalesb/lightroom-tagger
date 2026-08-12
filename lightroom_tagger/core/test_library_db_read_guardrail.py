@@ -12,12 +12,10 @@ import pytest
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 _TARGET_REL_PATHS = (
-    "lightroom_tagger/core/search_tools.py",
     "apps/visualizer/backend/api/system.py",
     "apps/visualizer/backend/api/images/matches.py",
     "apps/visualizer/backend/api/images/instagram.py",
     "apps/visualizer/backend/api/images/catalog.py",
-    "apps/visualizer/backend/api/images/search.py",
     "apps/visualizer/backend/api/images/stacks.py",
 )
 
@@ -147,5 +145,5 @@ def test_guardrail_allowlists_jobs_reads_in_system_py() -> None:
     assert not _library_table_hits(_scan_file("apps/visualizer/backend/api/system.py"))
 
 
-def test_guardrail_scans_all_seven_target_files() -> None:
-    assert len(_TARGET_REL_PATHS) == 7
+def test_guardrail_scans_all_target_files() -> None:
+    assert len(_TARGET_REL_PATHS) == 5

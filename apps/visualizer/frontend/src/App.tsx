@@ -4,7 +4,6 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary'
 import { IdentityPage } from './pages/IdentityPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { ImagesPage } from './pages/ImagesPage'
-import { SearchPage } from './pages/SearchPage'
 import { ProcessingPage } from './pages/ProcessingPage'
 import { MatchOptionsProvider } from './stores/matchOptionsContext'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -18,7 +17,7 @@ function App() {
             <Route path="/" element={<Layout />}>
               <Route index element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
               <Route path="images" element={<ErrorBoundary><ImagesPage /></ErrorBoundary>} />
-              <Route path="search" element={<ErrorBoundary><SearchPage /></ErrorBoundary>} />
+              <Route path="search" element={<Navigate to="/images" replace />} />
               <Route path="analytics" element={<Navigate to="/images" replace />} />
               <Route path="identity" element={<ErrorBoundary><IdentityPage /></ErrorBoundary>} />
               <Route path="processing" element={<ErrorBoundary><ProcessingPage /></ErrorBoundary>} />
