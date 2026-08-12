@@ -53,6 +53,8 @@ def build_score_op_spec(
     log_callback=None,
     silent_compression: bool = False,
     registry: ProviderRegistry | None = None,
+    think: bool = False,
+    max_tokens: int = 2048,
 ):
     """Build a :class:`VisionOpSpec` for the scoring vision operation."""
     from lightroom_tagger.core.vision_op import VisionOpSpec
@@ -78,6 +80,8 @@ def build_score_op_spec(
                 compressed,
                 log_callback=log_callback,
                 user_prompt=user_prompt,
+                think=think,
+                max_tokens=max_tokens,
             )
 
         return fn_factory

@@ -440,8 +440,13 @@ def _run_describe_pass(
     image_type = metadata.get('image_type', 'both')
     date_filter = metadata.get('date_filter', 'all')
     force = metadata.get('force', False)
+    # Model-scoped re-do (see apps/visualizer/CONTEXT.md): regenerate every eligible
+    # image EXCEPT those whose current row was produced by this target model. It
+    # implies a per-item force (so an old model's row is overwritten) and, per the
+    # tiebreak, overrides any blanket ``force`` flag.
+    redo_unless_model = (metadata.get('redo_unless_model') or '').strip() or None
     backfill_visual_tags = bool(metadata.get('backfill_visual_tags', False))
-    describe_force = bool(force) or backfill_visual_tags
+    describe_force = bool(force) or backfill_visual_tags or bool(redo_unless_model)
     desc_provider_id = metadata.get('provider_id')
     desc_provider_model = metadata.get('provider_model')
     max_workers = int(metadata.get('max_workers', 4))
@@ -494,7 +499,7 @@ def _run_describe_pass(
         (k, t) for k, t in images_to_describe if pair_label(k, t) not in processed_pairs
     ]
 
-    if not backfill_visual_tags and not force and images_to_describe:
+    if not backfill_visual_tags and not force and not redo_unless_model and images_to_describe:
         already_described: set[str] = set()
         rows_desc = lib_db.execute(
             "SELECT image_key FROM image_descriptions"
@@ -514,6 +519,26 @@ def _run_describe_pass(
                 if log_prefix else
                 f'Skipped {skipped_by_db} already-described images (DB pre-filter)',
             )
+
+    # Model-scoped re-do: keep only images NOT already described by the target model;
+    # everything surviving is regenerated with force (describe_force is True above).
+    if redo_unless_model and images_to_describe:
+        rows_target = lib_db.execute(
+            "SELECT image_key, image_type FROM image_descriptions WHERE model_used = ?",
+            (redo_unless_model,),
+        ).fetchall()
+        done_by_target = {(r['image_key'], r['image_type']) for r in rows_target}
+        before_target = len(images_to_describe)
+        images_to_describe = [
+            (k, t) for k, t in images_to_describe if (k, t) not in done_by_target
+        ]
+        skipped_target = before_target - len(images_to_describe)
+        msg = (
+            f'model-scoped re-do (redo_unless_model={redo_unless_model}): '
+            f'skipped {skipped_target} images already described by this model; '
+            f'force-regenerating the rest'
+        )
+        add_job_log(runner.db, job_id, 'info', f'{log_prefix}{msg}' if log_prefix else msg)
 
     total = len(images_to_describe)
     already_done = total_at_start - total
@@ -794,6 +819,11 @@ def _handle_batch_describe_inner(runner, job_id: str, metadata: dict):
 
             image_type = metadata.get('image_type', 'both')  # catalog, instagram, both
             force = metadata.get('force', False)
+            # Model-scoped re-do must widen selection to ALL images (not just
+            # undescribed ones), same as force — otherwise old-model rows never enter
+            # the candidate set for the per-model filter in _run_describe_pass.
+            redo_unless_model = (metadata.get('redo_unless_model') or '').strip() or None
+            select_all = bool(force) or bool(redo_unless_model)
 
             # ``last_months`` (int) and ``year`` ('YYYY') now win over the legacy
             # ``date_filter`` string; see ``_resolve_date_window`` for details.
@@ -825,17 +855,17 @@ def _handle_batch_describe_inner(runner, job_id: str, metadata: dict):
                         year=year,
                         min_rating=min_rating,
                     )
-                elif force or year is not None:
+                elif select_all or year is not None:
                     # ``year`` is a new window that the undescribed-only helper
-                    # doesn't know about yet, so we run the raw SQL path for both
-                    # ``force`` and ``year`` (joining in the description filter
-                    # manually when ``force`` is off).
+                    # doesn't know about yet, so we run the raw SQL path for
+                    # ``force``, ``redo_unless_model``, and ``year`` (joining in the
+                    # description filter manually when none widen selection).
                     images_to_describe += _select_catalog_keys(
                         lib_db,
                         months=months,
                         year=year,
                         min_rating=min_rating,
-                        undescribed_only=not force,
+                        undescribed_only=not select_all,
                     )
                 else:
                     images_to_describe += [
@@ -852,7 +882,7 @@ def _handle_batch_describe_inner(runner, job_id: str, metadata: dict):
                     lib_db,
                     months=months,
                     year=year,
-                    undescribed_only=not force,
+                    undescribed_only=not select_all,
                 )
 
             if backfill_visual_tags and not images_to_describe:
@@ -915,6 +945,13 @@ def _run_score_pass(
     image_type = metadata.get('image_type', 'both')
     date_filter = metadata.get('date_filter', 'all')
     force = metadata.get('force', False)
+    # Model-scoped re-do (see apps/visualizer/CONTEXT.md): re-score every triple
+    # EXCEPT those whose current score was produced by this target model. It implies
+    # a per-item force (so an old model's row at the same prompt_version is deleted +
+    # replaced) and, per the tiebreak, overrides any blanket ``force`` flag.
+    redo_unless_model = (metadata.get('redo_unless_model') or '').strip() or None
+    if redo_unless_model:
+        force = True
     score_provider_id = metadata.get('provider_id')
     score_provider_model = metadata.get('provider_model')
     max_workers = int(metadata.get('max_workers', 4))
@@ -1009,6 +1046,41 @@ def _run_score_pass(
                     if log_prefix else
                     f'Skipped {skipped_by_db} already-scored triplets (DB pre-filter)',
                 )
+
+    # Model-scoped re-do: keep only triples whose CURRENT score was NOT produced by
+    # the target model (matched per current prompt_version so a rubric change still
+    # re-scores). Survivors run with force=True (set above), replacing the old row.
+    if redo_unless_model and work_triples:
+        from lightroom_tagger.core.scoring_service import compute_prompt_version
+        from lightroom_tagger.core.database import get_perspective_by_slug
+        slug_versions = {}
+        for s in slugs:
+            prow = get_perspective_by_slug(lib_db, s)
+            if prow:
+                slug_versions[s] = compute_prompt_version(prow)
+        if slug_versions:
+            done_by_target: set[str] = set()
+            for slug, pv in slug_versions.items():
+                rows = lib_db.execute(
+                    "SELECT image_key, image_type FROM image_scores "
+                    "WHERE perspective_slug = ? AND prompt_version = ? "
+                    "AND is_current = 1 AND model_used = ?",
+                    (slug, pv, redo_unless_model),
+                ).fetchall()
+                for r in rows:
+                    done_by_target.add(triplet_label(r['image_key'], r['image_type'], slug))
+            before_target = len(work_triples)
+            work_triples = [
+                (k, t, s) for k, t, s in work_triples
+                if triplet_label(k, t, s) not in done_by_target
+            ]
+            skipped_target = before_target - len(work_triples)
+            msg = (
+                f'model-scoped re-do (redo_unless_model={redo_unless_model}): '
+                f'skipped {skipped_target} triples already scored by this model; '
+                f'force-rescoring the rest'
+            )
+            add_job_log(runner.db, job_id, 'info', f'{log_prefix}{msg}' if log_prefix else msg)
 
     total = len(work_triples)
     already_done = total_at_start - total
@@ -1362,6 +1434,10 @@ def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
 
             image_type = metadata.get('image_type', 'both')
             force = bool(metadata.get('force_describe', False))
+            # Model-scoped re-do widens shared selection to ALL images like force so
+            # old-model rows reach the per-model filters in the describe/score passes.
+            redo_unless_model = (metadata.get('redo_unless_model') or '').strip() or None
+            select_all = bool(force) or bool(redo_unless_model)
 
             months, year = _resolve_date_window(metadata)
             min_rating_raw = metadata.get('min_rating')
@@ -1390,13 +1466,13 @@ def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
                         year=year,
                         min_rating=min_rating,
                     )
-                elif force or year is not None:
+                elif select_all or year is not None:
                     shared_selection += _select_catalog_keys(
                         lib_db,
                         months=months,
                         year=year,
                         min_rating=min_rating,
-                        undescribed_only=not force,
+                        undescribed_only=not select_all,
                     )
                 else:
                     shared_selection += [
@@ -1407,12 +1483,12 @@ def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
                     ]
 
             if image_type in ('instagram', 'both'):
-                if force or year is not None:
+                if select_all or year is not None:
                     shared_selection += _select_instagram_keys(
                         lib_db,
                         months=months,
                         year=year,
-                        undescribed_only=not force,
+                        undescribed_only=not select_all,
                     )
                 else:
                     shared_selection += [

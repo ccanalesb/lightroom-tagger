@@ -134,6 +134,38 @@ def get_or_create_cached_image(db, catalog_key: str, original_path: str) -> str 
                     os.unlink(tf)
 
 
+def resolve_vision_image(db, catalog_key: str, original_path: str) -> tuple[str | None, bool]:
+    """Resolve the image to feed a vision op, preferring the local cache.
+
+    Returns ``(image_path, silent_compression)`` — ``silent_compression`` is True
+    when ``image_path`` is an already-compressed cache file that must not be
+    recompressed. Returns ``(None, False)`` when no usable image exists.
+
+    When the original is reachable, this refreshes/validates the cache exactly as
+    before (mtime-invalidated). When the original is **unreachable** (e.g. an
+    unmounted NAS), it falls back to an already-cached compressed image so
+    describe/score run entirely off the local vision cache — the intended contract.
+    """
+    if os.path.exists(original_path):
+        cached = get_or_create_cached_image(db, catalog_key, original_path)
+        if cached and os.path.exists(cached):
+            # ``cached`` is either the compressed cache file or (rare no-op) the
+            # original itself; both are safe to pass with silent_compression=True.
+            return cached, True
+        return original_path, False
+
+    # Original unreachable — use the pre-existing compressed cache if present.
+    rec = get_vision_cached_image(db, catalog_key)
+    cache_path = rec.get('compressed_path') if rec else None
+    if (
+        cache_path
+        and cache_path != VISION_CACHE_OVERSIZED_SENTINEL
+        and os.path.exists(cache_path)
+    ):
+        return cache_path, True
+    return None, False
+
+
 def get_cached_phash(db, catalog_key: str) -> str | None:
     """Get pre-computed pHash from cache.
 

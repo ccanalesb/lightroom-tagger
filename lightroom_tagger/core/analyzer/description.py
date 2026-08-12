@@ -103,6 +103,8 @@ def build_description_op_spec(
     user_prompt: str | None = None,
     silent_compression: bool = False,
     registry: ProviderRegistry | None = None,
+    think: bool = False,
+    max_tokens: int = 2048,
 ):
     """Build a :class:`VisionOpSpec` for the description vision operation."""
     from lightroom_tagger.core.vision_client import generate_description as _gen
@@ -131,6 +133,8 @@ def build_description_op_spec(
                 compressed,
                 log_callback=log_callback,
                 user_prompt=user_prompt,
+                think=think,
+                max_tokens=max_tokens,
             )
 
         return fn_factory
@@ -163,6 +167,8 @@ def run_description_vision_op(
     user_prompt: str | None = None,
     silent_compression: bool = False,
     registry: ProviderRegistry | None = None,
+    think: bool = False,
+    max_tokens: int = 2048,
 ) -> dict:
     """Run the description vision op and return the parsed dict with provider metadata."""
     from lightroom_tagger.core.vision_op import run_vision_op
@@ -175,6 +181,8 @@ def run_description_vision_op(
         user_prompt=user_prompt,
         silent_compression=silent_compression,
         registry=registry,
+        think=think,
+        max_tokens=max_tokens,
     )
     parsed, provider, model_used = run_vision_op(spec)
     result = dict(parsed)

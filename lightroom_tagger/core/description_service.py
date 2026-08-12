@@ -15,7 +15,7 @@ from lightroom_tagger.core.database import (
     store_image_description,
 )
 from lightroom_tagger.core.prompt_builder import build_description_user_prompt
-from lightroom_tagger.core.vision_cache import get_or_create_cached_image
+from lightroom_tagger.core.vision_cache import resolve_vision_image
 from lightroom_tagger.core.vision_op import VisionOpOutcome, run_vision_op_persist
 
 LogCallback = Callable[[str, str], None] | None
@@ -138,17 +138,13 @@ def describe_matched_image(db: sqlite3.Connection, catalog_key: str, force: bool
     filepath = resolve_filepath(image['filepath'])
     if _is_non_describable_path(filepath):
         return VisionOpOutcome(status='skipped', reason='non-describable file type')
-    if not os.path.exists(filepath):
-        return VisionOpOutcome(status='skipped', reason='file missing')
 
-    cached_path = get_or_create_cached_image(db, catalog_key, filepath)
-    image_for_describe = cached_path if cached_path and os.path.exists(cached_path) else filepath
+    # Prefer the local vision cache; the original may be unreachable (e.g. an
+    # unmounted NAS), in which case describe runs off the cached compressed image.
+    image_for_describe, use_silent_compression = resolve_vision_image(db, catalog_key, filepath)
+    if image_for_describe is None:
+        return VisionOpOutcome(status='skipped', reason='file missing')
     user_prompt = _resolve_description_user_prompt(db, perspective_slugs)
-    use_silent_compression = (
-        bool(cached_path)
-        and cached_path == image_for_describe
-        and os.path.exists(cached_path)
-    )
 
     outcome = _run_description_persist(
         db,

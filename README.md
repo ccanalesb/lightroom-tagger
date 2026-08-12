@@ -84,6 +84,63 @@ curl -fsSL https://ollama.com/install.sh | sh
 ollama pull gemma3:27b
 ```
 
+### Ollama Autopilot (external observer)
+
+`scripts/ollama_autopilot.py` is a thin external observer (not part of the
+pipeline) that keeps your Ollama Cloud plan busy while leaving headroom. It does
+**not** reimplement any pipeline logic — it never reads `library.db`, selects
+images, or checks paths. It only watches your plan usage and, when there's
+headroom and no describe/score pass is already running, **triggers the existing
+pipeline jobs** over HTTP (`POST /api/jobs/`): `batch_describe` and `batch_score`
+(round-robin, both idempotent). The pipeline owns all selection, preflight, and
+reachability; the observer just reads each job's pass/fail result to pace retries
+(a job type that fails or is aborted is backed off, then retried). Never runs
+`catalog_sync`.
+
+Ollama exposes no official usage API ([ollama/ollama#12532](https://github.com/ollama/ollama/issues/12532)),
+so the observer meters usage two ways, in preference order:
+
+1. **Real usage (optional).** If you supply your `ollama.com` `__Secure-session`
+   cookie (`--usage-cookie` / `--usage-cookie-file` / `$OLLAMA_SESSION_COOKIE`),
+   it scrapes the actual **Session** and **Weekly** usage percentages from
+   `ollama.com/settings` and holds at `--max-session-pct` / `--max-weekly-pct`
+   (default 85 → 15% headroom). This is unofficial and brittle (the cookie is
+   `HttpOnly`, copy it from DevTools → Application → Cookies; it expires and the
+   page markup may change), so it **degrades gracefully** to meter #2 on any
+   failure.
+2. **Wall-clock self-meter (fallback).** Job wall-clock time as a proxy for
+   GPU-time over rolling 5h/7d windows, against a budget you calibrate (watch
+   `ollama.com/settings` + Ollama's 90%-of-limit email).
+
+The cookie and backend port can also be set once in `.env` (auto-loaded via
+`python-dotenv`; already gitignored) instead of on the command line:
+
+```dotenv
+OLLAMA_SESSION_COOKIE=aid=...; __Secure-session=...
+FLASK_PORT=5001
+```
+
+It's report-only unless `--live` is passed.
+
+```bash
+# Report usage + what it would trigger; never triggers anything
+.venv/bin/python scripts/ollama_autopilot.py --dry-run
+
+# Real usage: hold at 85% of session + weekly limits (15% headroom)
+OLLAMA_SESSION_COOKIE=... .venv/bin/python scripts/ollama_autopilot.py --live \
+    --max-session-pct 85 --max-weekly-pct 85
+
+# No cookie: wall-clock fallback, holding back 15% of a calibrated budget
+.venv/bin/python scripts/ollama_autopilot.py --live \
+    --budget-5h-min 180 --budget-7d-min 1800 --headroom 0.15
+
+# One cycle then exit (e.g. from cron/launchd)
+.venv/bin/python scripts/ollama_autopilot.py --live --once ...
+```
+
+Requires the visualizer backend to be running (it processes the queued jobs).
+See the module docstring for the full metering/calibration rationale.
+
 ## Basic Usage
 
 ```bash

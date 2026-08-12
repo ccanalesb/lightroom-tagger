@@ -181,8 +181,16 @@ def generate_description(
     log_callback: LogCallback = None,
     *,
     user_prompt: str | None = None,
+    think: bool = False,
+    max_tokens: int = 2048,
 ) -> str:
-    """Generate a structured description for a single image. Returns raw text."""
+    """Generate a structured description for a single image. Returns raw text.
+
+    ``think`` opts a thinking-capable Ollama model into its reasoning channel; it
+    defaults False because that is the reliable structured-JSON path (see
+    vision_client_ollama). ``max_tokens`` bounds the generation budget — thinking
+    needs a larger budget or the answer truncates.
+    """
     img_b64 = _encode_image(image_path)
     text_prompt = build_description_prompt()
     if user_prompt is not None and user_prompt.strip():
@@ -201,16 +209,17 @@ def generate_description(
     if is_ollama_client(client):
         # Ollama thinking models (e.g. kimi-k2.6) exhaust the token budget on the
         # reasoning channel and return empty content through the OpenAI-compat
-        # endpoint, which ignores ``think``. Route to the native API with thinking
-        # disabled so we get the actual JSON back. Harmless no-op for non-thinking
-        # models. See vision_client_ollama for detail.
-        raw = native_chat(client, model, messages, max_tokens=2048, think=False)
+        # endpoint, which ignores ``think``. Route to the native API so ``think`` is
+        # honoured. Defaults to ``think=False`` (the reliable JSON path); callers can
+        # opt into reasoning explicitly. Harmless no-op for non-thinking models.
+        # See vision_client_ollama for detail.
+        raw = native_chat(client, model, messages, max_tokens=max_tokens, think=think)
     else:
         try:
             response = client.chat.completions.create(
                 model=model,
                 messages=cast(Any, messages),
-                max_tokens=2048,
+                max_tokens=max_tokens,
             )
         except Exception as exc:
             raise _map_openai_error(

@@ -25,7 +25,7 @@ from lightroom_tagger.core.database import (
 )
 from lightroom_tagger.core.prompt_builder import build_scoring_user_prompt
 from lightroom_tagger.core.structured_output import StructuredOutputError
-from lightroom_tagger.core.vision_cache import get_or_create_cached_image
+from lightroom_tagger.core.vision_cache import resolve_vision_image
 from lightroom_tagger.core.vision_op import VisionOpOutcome, run_vision_op_persist
 
 LogCallback = Callable[[str, str], None] | None
@@ -184,8 +184,8 @@ def score_image_for_perspective(
         if not image or not image.get("filepath"):
             return VisionOpOutcome(status="skipped", reason="Catalog image missing or has no filepath")
         filepath = resolve_filepath(str(image["filepath"]))
-        if not os.path.exists(filepath):
-            return VisionOpOutcome(status="skipped", reason=f"Image file not found: {filepath}")
+        # Existence is resolved later via resolve_vision_image so scoring can fall
+        # back to the local vision cache when the original (e.g. NAS) is unreachable.
     elif image_type == "instagram":
         dump = get_instagram_dump_media(db, image_key)
         if not dump or not dump.get("file_path"):
@@ -218,12 +218,9 @@ def score_image_for_perspective(
 
     silent_compression = False
     if image_type == "catalog":
-        cached = get_or_create_cached_image(db, image_key, filepath)
-        if cached and os.path.exists(cached):
-            image_for_score = cached
-            silent_compression = True
-        else:
-            image_for_score = filepath
+        image_for_score, silent_compression = resolve_vision_image(db, image_key, filepath)
+        if image_for_score is None:
+            return VisionOpOutcome(status="skipped", reason=f"Image file not found: {filepath}")
     else:
         image_for_score = filepath
 

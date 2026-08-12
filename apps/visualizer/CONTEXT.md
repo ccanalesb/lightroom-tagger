@@ -23,6 +23,7 @@ The visualizer is the web product that surfaces library data to the user. It con
 | **response helpers** | `utils/responses.py` — `error_not_found`, `error_bad_request`, `success_paginated`, etc. Always use these for consistent JSON shapes. |
 | **WebSocket / SocketIO** | Real-time job progress pushed from backend to frontend via Flask-SocketIO + socket.io-client. |
 | **perspective** | Named scoring lens shown in the UI (matches the library concept). |
+| **model-scoped re-do** (`redo_unless_model`) | A batch describe/score mode that regenerates every eligible image *except* those whose current row was produced by the named target model, which it preserves. Lets a model-swap backlog run over many throttled cycles without redoing the target model's own finished work. Overrides blanket `force`. |
 | **identity** | Photographer style fingerprint and suggestions page (`IdentityPage.tsx`). |
 | **search** | NL catalog search surface (`SearchPage.tsx`) — image search endpoints call `lightroom_tagger.core.catalog_search.search_catalog` only (ADR-0015) |
 

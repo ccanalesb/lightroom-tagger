@@ -431,3 +431,123 @@ def test_batch_score_invalid_model_result_excluded_from_checkpoint(
     resume_result = runner.complete_job.call_args[0][1]
     assert resume_result['scored'] == 1
     assert resume_result['total'] == 2
+
+
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
+@patch('lightroom_tagger.core.database.get_perspective_by_slug')
+def test_batch_score_redo_unless_model_skips_target_and_forces_rest(
+    mock_get_perspective,
+    _mock_exists,
+    mock_getenv,
+    mock_config,
+    mock_init_db,
+    mock_score,
+    _mock_add_log,
+):
+    """redo_unless_model: skip triples the target model already scored; force-rescore the rest."""
+    from jobs.handlers import handle_batch_score
+
+    mock_get_perspective.side_effect = lambda _db, slug: {'slug': slug, 'prompt_markdown': ''}
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_db = MagicMock()
+
+    def _exec(sql, params=()):
+        m = MagicMock()
+        q = ' '.join(sql.split())
+        if 'FROM images' in q and 'image_scores' not in q:
+            m.fetchall.return_value = [{'key': 'img1'}, {'key': 'img2'}]
+        elif 'image_scores' in q and 'model_used' in q:
+            # img1 already scored by the target model -> should be skipped
+            m.fetchall.return_value = [{'image_key': 'img1', 'image_type': 'catalog'}]
+        else:
+            m.fetchall.return_value = []
+        return m
+
+    mock_db.execute.side_effect = _exec
+    mock_init_db.return_value = mock_db
+    mock_score.return_value = _WRITTEN
+
+    runner = _make_runner()
+    handle_batch_score(
+        runner,
+        'job-redo',
+        {
+            'image_type': 'catalog',
+            'max_workers': 1,
+            'perspective_slugs': ['p1'],
+            # note: no blanket force; redo_unless_model must imply force per-item
+            'redo_unless_model': 'ollama:kimi-k2.6:cloud',
+        },
+    )
+
+    # only img2 (not done by target) is rescored, and it's forced
+    mock_score.assert_called_once()
+    call = mock_score.call_args[0]
+    assert call[1] == 'img2'
+    assert call[4] is True  # force positional arg
+    res = runner.complete_job.call_args[0][1]
+    assert res['scored'] == 1
+    assert res['total'] == 2
+
+
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
+@patch('lightroom_tagger.core.database.get_perspective_by_slug')
+def test_batch_score_redo_unless_model_all_done_scores_nothing(
+    mock_get_perspective,
+    _mock_exists,
+    mock_getenv,
+    mock_config,
+    mock_init_db,
+    mock_score,
+    _mock_add_log,
+):
+    """When the target model already scored everything, nothing is rescored."""
+    from jobs.handlers import handle_batch_score
+
+    mock_get_perspective.side_effect = lambda _db, slug: {'slug': slug, 'prompt_markdown': ''}
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_db = MagicMock()
+
+    def _exec(sql, params=()):
+        m = MagicMock()
+        q = ' '.join(sql.split())
+        if 'FROM images' in q and 'image_scores' not in q:
+            m.fetchall.return_value = [{'key': 'img1'}, {'key': 'img2'}]
+        elif 'image_scores' in q and 'model_used' in q:
+            m.fetchall.return_value = [
+                {'image_key': 'img1', 'image_type': 'catalog'},
+                {'image_key': 'img2', 'image_type': 'catalog'},
+            ]
+        else:
+            m.fetchall.return_value = []
+        return m
+
+    mock_db.execute.side_effect = _exec
+    mock_init_db.return_value = mock_db
+
+    runner = _make_runner()
+    handle_batch_score(
+        runner,
+        'job-redo-all-done',
+        {
+            'image_type': 'catalog',
+            'max_workers': 1,
+            'perspective_slugs': ['p1'],
+            'redo_unless_model': 'ollama:kimi-k2.6:cloud',
+        },
+    )
+
+    mock_score.assert_not_called()
+    res = runner.complete_job.call_args[0][1]
+    assert res['scored'] == 0
+    assert res['total'] == 2

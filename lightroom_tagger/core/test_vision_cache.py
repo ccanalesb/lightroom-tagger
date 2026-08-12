@@ -159,3 +159,34 @@ def test_warm_vision_cache_honors_limit(temp_db, tmp_path):
 
     assert result == {"processed": 2, "skipped": 0, "errors": 0}
     assert mock_cache.call_count == 2
+
+
+def test_resolve_vision_image_falls_back_to_cache_when_original_missing(temp_db, tmp_path):
+    """Original unreachable (e.g. unmounted NAS) → use the pre-existing cached JPEG."""
+    cached = tmp_path / "cache" / "k1.jpg"
+    cached.parent.mkdir(parents=True, exist_ok=True)
+    cached.write_bytes(b"jpegbytes")
+    store_vision_cached_image(temp_db, "k1", str(cached), "phash", 123.0)
+
+    missing_original = str(tmp_path / "nas" / "does_not_exist.ARW")
+    path, silent = vc.resolve_vision_image(temp_db, "k1", missing_original)
+
+    assert path == str(cached)
+    assert silent is True
+
+
+def test_resolve_vision_image_skips_when_original_missing_and_no_cache(temp_db, tmp_path):
+    """No original and no cache → (None, False) so the caller skips cleanly."""
+    path, silent = vc.resolve_vision_image(
+        temp_db, "nokey", str(tmp_path / "gone.ARW")
+    )
+    assert path is None
+    assert silent is False
+
+
+def test_resolve_vision_image_no_cache_fallback_for_oversized_sentinel(temp_db, tmp_path):
+    """An oversized-sentinel cache row is not a usable image when original is gone."""
+    store_vision_cached_image(temp_db, "big", VISION_CACHE_OVERSIZED_SENTINEL, None, 1.0)
+    path, silent = vc.resolve_vision_image(temp_db, "big", str(tmp_path / "gone.ARW"))
+    assert path is None
+    assert silent is False

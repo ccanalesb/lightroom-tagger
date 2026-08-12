@@ -96,3 +96,4 @@ apps/visualizer/backend/*.key
 .augment/*
 artifacts/*
 scripts/ui-audit.mjs
+scripts/.autopilot-ledger.json

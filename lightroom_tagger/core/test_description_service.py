@@ -252,7 +252,7 @@ class TestDescribeMatchedImage:
         catalog_key = store_image(db, {'filepath': filepath, 'filename': 'clip.mov'})
 
         with patch('lightroom_tagger.core.vision_op.run_vision_op') as mock_run, \
-             patch('lightroom_tagger.core.description_service.get_or_create_cached_image') as mock_cache:
+             patch('lightroom_tagger.core.description_service.resolve_vision_image') as mock_cache:
             result = describe_matched_image(db, catalog_key)
 
         assert not result.wrote
@@ -275,8 +275,8 @@ class TestDescribeMatchedImage:
         with patch('lightroom_tagger.core.description_service.build_description_op_spec') as mock_spec, \
              patch('lightroom_tagger.core.description_service.run_vision_op_persist', return_value=_written()), \
              patch(
-                 'lightroom_tagger.core.description_service.get_or_create_cached_image',
-                 return_value=cached,
+                 'lightroom_tagger.core.description_service.resolve_vision_image',
+                 return_value=(cached, True),
              ), \
              patch('lightroom_tagger.core.description_service.get_description_model', return_value='test-model'):
             mock_spec.return_value = MagicMock()
@@ -301,8 +301,8 @@ class TestDescribeMatchedImage:
         with patch('lightroom_tagger.core.description_service.build_description_op_spec') as mock_spec, \
              patch('lightroom_tagger.core.description_service.run_vision_op_persist', return_value=_written()), \
              patch(
-                 'lightroom_tagger.core.description_service.get_or_create_cached_image',
-                 return_value=cached,
+                 'lightroom_tagger.core.description_service.resolve_vision_image',
+                 return_value=(cached, True),
              ), \
              patch('lightroom_tagger.core.description_service.get_description_model', return_value='test-model'):
             mock_spec.return_value = MagicMock()

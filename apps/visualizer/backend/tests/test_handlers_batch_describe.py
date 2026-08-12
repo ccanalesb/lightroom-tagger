@@ -641,3 +641,67 @@ def test_batch_describe_legitimate_skip_still_checkpointed(
     assert result['failed'] == 0
     last_cp = runner.persist_checkpoint.call_args_list[-1][0][1]
     assert last_cp['processed_pairs'] == ['img_skip|catalog']
+
+
+@patch('jobs.handlers.analyze.add_job_log')
+@patch('lightroom_tagger.core.description_service.describe_matched_image')
+@patch('jobs.handlers.analyze._select_catalog_keys')
+@patch('jobs.handlers.analyze.init_database')
+@patch('jobs.handlers.analyze.load_config')
+@patch('jobs.handlers.analyze.os.getenv', return_value='/tmp/library.db')
+@patch('jobs.handlers.common.require_library_db', return_value='/tmp/library.db')
+def test_batch_describe_redo_unless_model_skips_target_and_forces_rest(
+    _mock_exists,
+    mock_getenv,
+    mock_config,
+    mock_init_db,
+    mock_select_catalog,
+    mock_describe,
+    _mock_add_log,
+):
+    """redo_unless_model: re-describe old-model images with force; skip target-model ones.
+
+    Also proves selection widens to ALL catalog images (via _select_catalog_keys with
+    undescribed_only=False) even though no blanket force was set.
+    """
+    from jobs.handlers import handle_batch_describe
+
+    mock_config.return_value = MagicMock(db_path='/tmp/library.db')
+    mock_db = MagicMock()
+
+    def _exec(sql, params=()):
+        m = MagicMock()
+        q = ' '.join(sql.split())
+        if 'image_descriptions' in q and 'model_used' in q:
+            # img1 already described by the target model -> skipped
+            m.fetchall.return_value = [{'image_key': 'img1', 'image_type': 'catalog'}]
+        else:
+            m.fetchall.return_value = []
+        return m
+
+    mock_db.execute.side_effect = _exec
+    mock_init_db.return_value = mock_db
+    mock_select_catalog.return_value = [('img1', 'catalog'), ('img2', 'catalog')]
+    mock_describe.return_value = _WRITTEN
+
+    runner = _make_runner()
+    handle_batch_describe(
+        runner,
+        'job-redo-describe',
+        {
+            'image_type': 'catalog',
+            'max_workers': 1,
+            'redo_unless_model': 'ollama:kimi-k2.6:cloud',
+        },
+    )
+
+    # selection widened to all catalog images (undescribed_only=False)
+    mock_select_catalog.assert_called_once()
+    assert mock_select_catalog.call_args.kwargs['undescribed_only'] is False
+    # only img2 re-described, and forced
+    mock_describe.assert_called_once()
+    assert mock_describe.call_args[0][1] == 'img2'
+    assert mock_describe.call_args.kwargs['force'] is True
+    result = runner.complete_job.call_args[0][1]
+    assert result['described'] == 1
+    assert result['total'] == 2
