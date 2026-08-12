@@ -10,9 +10,8 @@ import { DATE_ESTIMATED_SUFFIX, DATE_NO_DATE } from '../../constants/strings'
  *      `"202403"`) → `YYYY/MM (estimated)`.
  *   3. `DATE_NO_DATE` sentinel.
  *
- * Extracted from `InstagramImageDetailSections` so other surfaces (match
- * modal, post-next, analytics) can share one definition of "what date do
- * we show" instead of re-implementing the fallback inline.
+ * Shared date-formatting helper so surfaces can use one definition of "what
+ * date do we show" instead of re-implementing the fallback inline.
  */
 export function formatImageDate(image: ImageView): string {
   if (image.created_at) return new Date(image.created_at).toLocaleString()
