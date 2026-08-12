@@ -11,8 +11,8 @@
 | **catalog** | A Lightroom `.lrcat` SQLite file. Read-only except for keyword writes via `lightroom/writer.py`. |
 | **image** / **catalog image** | A photo record in the library DB indexed from the Lightroom catalog. |
 | **instagram dump** | An exported ZIP/directory of Instagram media and metadata provided by the user (no API access). |
-| **match** | The result of pairing a catalog image with an Instagram post, stored in `matches`. Has two states: *proposed* (created by the vision pipeline, `validated_at` is NULL) and *validated* (human-confirmed, `validated_at` is set). Only validated matches drive identity aggregation. |
-| **validated match** | A match with `validated_at` set — human-confirmed pairing. The population used by identity aggregation. |
+| **match** | The result of pairing a catalog image with an Instagram post, stored in `matches`. Has two states: *proposed* (created by the vision pipeline, `validated_at` is NULL) and *validated* (human-confirmed, `validated_at` is set). Library-only concept — the HTTP/job surfaces that produced and validated matches were removed in #225 slice 2; the matcher library survives until slice 3. |
+| **validated match** | A match with `validated_at` set — human-confirmed pairing. No live consumer remains (identity aggregation is computed from current catalog scores, not matches); retained pending slice 3 matcher removal. |
 | **match score** | The single 0–1 confidence the matcher assigns to a catalog↔Instagram candidate pairing: a weighted blend of the phash-similarity, description-text-similarity, and vision-verdict signals (`total_score` in matcher results). Distinct from **score** below, which evaluates one image against a perspective. |
 | **vision comparison** | A side-by-side AI comparison of two images to determine if they are the same photo. |
 | **description** | An AI-generated textual description of a catalog image (prose and technical fields only — summary, composition, subjects, mood, colors). Perspective scores are **not** produced by the description pass; see **score** below. |
