@@ -11,14 +11,15 @@ vi.mock('../CatalogImageDetailSections', () => ({
   CatalogImageDetailSections: ({
     image,
     onDataChanged,
+    onPostedChange,
   }: {
     image: { key: string }
     onDataChanged?: () => void
+    onPostedChange?: (posted: boolean) => void
   }) => (
     <div data-testid="catalog-sections" data-key={image.key}>
-      <button type="button" onClick={() => onDataChanged?.()}>
-        refetch
-      </button>
+      <button type="button" onClick={() => onDataChanged?.()}>refetch</button>
+      <button type="button" onClick={() => onPostedChange?.(true)}>mark-posted</button>
     </div>
   ),
 }))
@@ -106,6 +107,26 @@ describe('ImageDetailModal', () => {
       expect(screen.getByTestId('catalog-sections')).toBeInTheDocument()
     })
     expect(screen.queryByRole('button', { name: /more like this/i })).toBeNull()
+  })
+
+  it('updates the Posted header badge when sections toggle posted optimistically', async () => {
+    vi.spyOn(ImagesAPI, 'getImageDetail').mockResolvedValue(
+      buildDetail({ instagram_posted: false }),
+    )
+    render(
+      <ImageDetailModal
+        imageType="catalog"
+        imageKey="k1"
+        primaryScoreSource="identity"
+        onClose={() => {}}
+      />,
+    )
+    await waitFor(() => {
+      expect(screen.getByTestId('catalog-sections')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Posted')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'mark-posted' }))
+    expect(screen.getByText('Posted')).toBeInTheDocument()
   })
 
   it('lets the representative choose another stack member in the modal', async () => {

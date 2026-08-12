@@ -19,6 +19,7 @@ tests/test_perspectives_api.py
 tests/test_providers_contract.py
 tests/test_providers_api.py
 tests/test_catalog_contract.py
+tests/test_catalog_instagram_posted_api.py
 tests/test_stacks_contract.py
 tests/test_instagram_contract.py
 tests/test_config_contract.py

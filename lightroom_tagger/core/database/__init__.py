@@ -94,6 +94,7 @@ from .instagram import (
     search_by_instagram_posted,
     store_instagram_dump_media,
     store_instagram_image,
+    set_instagram_posted,
     update_image_hash,
     update_instagram_status,
 )
@@ -351,6 +352,7 @@ __all__ = (
     'store_image',
     'store_image_description',
     'store_images_batch',
+    'set_instagram_posted',
     'store_instagram_dump_media',
     'store_instagram_image',
     'store_match',

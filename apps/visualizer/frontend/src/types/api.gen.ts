@@ -184,6 +184,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/images/catalog/{image_key}/instagram-posted": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Manually set or clear ``images.instagram_posted`` for a catalog key. */
+        patch: operations["patch__api_images_catalog_{image_key}_instagram-posted"];
+        trace?: never;
+    };
     "/api/images/catalog/{image_key}": {
         parameters: {
             query?: never;
@@ -1554,6 +1571,18 @@ export interface components {
             items: components["schemas"]["CatalogSimilarityGroupsResponse.573ec44.CatalogSimilarityGroup"][];
             /** Total */
             total: number;
+        };
+        /** InstagramPostedRequest */
+        "InstagramPostedRequest.573ec44": {
+            /** Posted */
+            posted: boolean;
+        };
+        /** InstagramPostedResponse */
+        "InstagramPostedResponse.573ec44": {
+            /** Key */
+            key: string;
+            /** Instagram Posted */
+            instagram_posted: boolean;
         };
         /**
          * ImageView
@@ -4861,6 +4890,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CatalogSimilarResponse.573ec44"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "patch__api_images_catalog_{image_key}_instagram-posted": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstagramPostedRequest.573ec44"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstagramPostedResponse.573ec44"];
                 };
             };
             /** @description Bad Request */

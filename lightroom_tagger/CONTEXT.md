@@ -27,6 +27,7 @@
 | **fallback** | The multi-provider retry chain: `FallbackDispatcher` tries providers in `fallback_order` when one fails. |
 | **phash** | Perceptual hash used for fast image similarity pre-screening before vision comparison. |
 | **stack** | A Lightroom virtual copy group; stack collapse logic deduplicates matched images. |
+| **instagram_posted** | Boolean on catalog images: whether the photo has been posted to Instagram. Set manually in the visualizer modal; match validation still auto-writes until removed (#218). |
 | **identity** | Aggregated style fingerprint and best-photo ranking for a photographer, computed from current catalog scores. |
 | **catalog indexing** | The process of reading catalog images that haven't been analyzed yet and computing phash, EXIF, and description for each, storing results in `library.db`. Precedes matching. |
 | **scan** | Full re-read of the catalog → idempotent upsert (by `key`) of *every* image into `library.db` (CLI `lightroom-tagger scan`). Heals everything but re-reads all rows. *Catalog sync* is the incremental counterpart. |

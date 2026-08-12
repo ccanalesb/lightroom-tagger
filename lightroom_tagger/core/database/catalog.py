@@ -120,8 +120,6 @@ def store_image(db: sqlite3.Connection, record: dict) -> str:
         'height': record.get('height'),
         'file_size': record.get('file_size'),
         'instagram_posted': int(bool(record.get('instagram_posted', False))),
-        'instagram_post_date': record.get('instagram_post_date'),
-        'instagram_url': record.get('instagram_url'),
         'instagram_index': record.get('instagram_index', 0),
         'image_hash': record.get('image_hash'),
         'analyzed_at': record.get('analyzed_at'),
@@ -135,13 +133,13 @@ def store_image(db: sqlite3.Connection, record: dict) -> str:
             color_label, keywords, title, caption, description, copyright,
             camera_make, camera_model, lens, focal_length, aperture,
             shutter_speed, iso, gps_latitude, gps_longitude, width, height,
-            file_size, instagram_posted, instagram_post_date, instagram_url,
+            file_size, instagram_posted,
             instagram_index, image_hash, analyzed_at, phash, exif, catalog_path)
         VALUES (:key, :id, :filename, :filepath, :date_taken, :rating, :pick,
             :color_label, :keywords, :title, :caption, :description, :copyright,
             :camera_make, :camera_model, :lens, :focal_length, :aperture,
             :shutter_speed, :iso, :gps_latitude, :gps_longitude, :width, :height,
-            :file_size, :instagram_posted, :instagram_post_date, :instagram_url,
+            :file_size, :instagram_posted,
             :instagram_index, :image_hash, :analyzed_at, :phash, :exif, :catalog_path)
         ON CONFLICT(key) DO UPDATE SET
             id=excluded.id,

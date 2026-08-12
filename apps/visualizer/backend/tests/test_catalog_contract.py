@@ -12,6 +12,7 @@ from api.schemas.catalog import (
     CatalogMonthsResponse,
     CatalogSimilarityGroupsResponse,
     ImageView,
+    InstagramPostedResponse,
     validate_catalog_image,
     validate_image_view,
 )
@@ -135,3 +136,16 @@ def test_catalog_list_accepts_null_metadata_fields(tmp_path, monkeypatch):
     assert null_row.caption is None
     assert null_row.filename is None
     assert null_row.aperture is None
+
+
+def test_instagram_posted_response_round_trip(catalog_contract_client):
+    client, _db_path = catalog_contract_client
+    list_payload = client.get("/api/images/catalog").get_json()
+    image_key = list_payload["images"][0]["key"]
+    payload = client.patch(
+        f"/api/images/catalog/{image_key}/instagram-posted",
+        json={"posted": True},
+    ).get_json()
+    validated = InstagramPostedResponse.model_validate(payload)
+    assert validated.key == image_key
+    assert validated.instagram_posted is True
