@@ -223,6 +223,19 @@ describe('CatalogImageDetailSections — scoring regenerate control', () => {
     })
     const perspectiveSection = perspectiveHeading.parentElement as HTMLElement
     const regenerate = within(perspectiveSection).getByRole('button', { name: 'Regenerate' })
+
+    // The provider defaults arrive on their own suspending query and are copied
+    // into state by an effect (AIPerspectiveSection). Finding the rationale only
+    // proves the *scores* resolved; the effect that sets provider_id /
+    // provider_model can still be a render behind, and clicking then captures the
+    // handler without them. waitFor cannot rescue that -- the call has already
+    // happened with the wrong arguments. Drain microtasks *and* a macrotask so
+    // every queued effect and its re-render have committed before the click.
+    await waitFor(() => expect(mockGetDefaults).toHaveBeenCalled())
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
     fireEvent.click(regenerate)
 
     await waitFor(() => {
