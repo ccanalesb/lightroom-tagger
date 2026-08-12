@@ -4,8 +4,6 @@ import { Badge } from '../ui/badges'
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import {
   DASHBOARD_CATALOG_IMAGES,
-  DASHBOARD_INSTAGRAM_IMAGES,
-  DASHBOARD_MATCHES,
   INSIGHTS_KPI_ACTIVE_JOBS,
   INSIGHTS_KPI_ACTIVE_JOBS_DESC,
   MSG_LOADING,
@@ -38,8 +36,6 @@ export function InsightsKpiRow({ stats, activeJobs, loading, error }: InsightsKp
   }
 
   const catalog = stats?.catalog_images ?? 0
-  const instagram = stats?.instagram_images ?? 0
-  const matches = stats?.matches_found ?? 0
 
   const cards: Array<{
     title: string
@@ -56,20 +52,6 @@ export function InsightsKpiRow({ stats, activeJobs, loading, error }: InsightsKp
       badge: catalog > 0 ? 'success' : 'default',
     },
     {
-      title: DASHBOARD_INSTAGRAM_IMAGES,
-      value: instagram.toLocaleString(),
-      description: 'From Instagram dump',
-      link: '/images?tab=instagram',
-      badge: instagram > 0 ? 'success' : 'default',
-    },
-    {
-      title: DASHBOARD_MATCHES,
-      value: matches.toLocaleString(),
-      description: 'Catalog ↔ Instagram pairs',
-      link: '/images?tab=matches',
-      badge: matches > 0 ? 'success' : 'default',
-    },
-    {
       title: INSIGHTS_KPI_ACTIVE_JOBS,
       value: activeJobs.toLocaleString(),
       description: INSIGHTS_KPI_ACTIVE_JOBS_DESC,
@@ -79,7 +61,7 @@ export function InsightsKpiRow({ stats, activeJobs, loading, error }: InsightsKp
   ]
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       {cards.map((stat) => (
         <Link key={stat.title} to={stat.link}>
           <Card hoverable padding="md">
