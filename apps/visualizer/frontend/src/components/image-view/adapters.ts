@@ -22,7 +22,6 @@ import type {
   Match,
   MirrorExemplar,
   PostNextCandidate,
-  UnpostedCatalogItem,
 } from '../../services/api'
 
 export function fromCatalogListRow(row: CatalogImageInput): ImageView {
@@ -54,18 +53,6 @@ export function fromCatalogListRow(row: CatalogImageInput): ImageView {
     stack_member_count: row.stack_member_count,
     is_stack_representative: row.is_stack_representative,
     // Identity fields intentionally omitted — list does not carry them.
-  }
-}
-
-export function fromUnpostedRow(row: UnpostedCatalogItem): ImageView {
-  return {
-    image_type: 'catalog',
-    key: row.key,
-    filename: row.filename,
-    date_taken: row.date_taken,
-    rating: row.rating,
-    instagram_posted: false,
-    // No scores / description on the unposted list row; detail fetch fills them.
   }
 }
 

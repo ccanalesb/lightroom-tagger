@@ -10,20 +10,18 @@ import {
   type CatalogImageInput,
   type IdentityBestPhotoItem,
   type ImageDetailResponse,
-  type UnpostedCatalogItem,
 } from '../../../services/api'
 import { ImageDetailModal } from '../ImageDetailModal'
 import {
   fromBestPhotoRow,
   fromCatalogListRow,
-  fromUnpostedRow,
 } from '../adapters'
 
 /**
  * Cross-cutting modal parity (plan Task 12).
  *
  * Opening the same image from any catalog-backed surface — the catalog
- * grid, the identity Best/Top photos, or Analytics "Not posted" — must
+ * grid or the identity Best/Top photos — must produce the same modal
  * produce the same modal content because every entry point ultimately
  * fetches the authoritative detail payload from
  * `ImagesAPI.getImageDetail`. This test locks in that guarantee by
@@ -83,13 +81,6 @@ const CATALOG_ROW: CatalogImageInput = {
   width: 100,
   height: 100,
   instagram_posted: false,
-}
-
-const UNPOSTED_ROW: UnpostedCatalogItem = {
-  key: SHARED_KEY,
-  filename: 'one.jpg',
-  date_taken: '2026-04-01',
-  rating: 4,
 }
 
 const BEST_PHOTO_ROW: IdentityBestPhotoItem = {
@@ -157,12 +148,6 @@ describe('ImageDetailModal — cross-entry parity', () => {
     const catalogHeader = within(dialog).getAllByLabelText(/Aggregate score/i)
     expect(catalogHeader.length).toBeGreaterThan(0)
     const catalogText = catalogHeader[0].textContent ?? ''
-    cleanup()
-
-    // Analytics → Not posted entry point.
-    dialog = await openFrom(fromUnpostedRow(UNPOSTED_ROW))
-    const unpostedHeader = within(dialog).getAllByLabelText(/Aggregate score/i)
-    expect(unpostedHeader[0].textContent).toBe(catalogText)
     cleanup()
 
     // Identity → Best / Top photos entry point.

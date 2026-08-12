@@ -12,7 +12,6 @@ export const NAV_SEARCH = 'Search'
 export const NAV_CATALOG = 'Catalog'
 export const NAV_MATCHES = 'Matches'
 export const NAV_PROCESSING = 'Processing'
-export const NAV_ANALYTICS = 'Analytics'
 export const NAV_IDENTITY = 'Identity'
 export const NAV_JOB_QUEUE = 'Job Queue'
 
@@ -125,7 +124,6 @@ export const LABEL_SCORE = 'score:'
 // Dashboard / Insights home (KPI labels shared with legacy dashboard copy)
 export const DASHBOARD_CATALOG_IMAGES = 'Catalog Images'
 export const DASHBOARD_INSTAGRAM_IMAGES = 'Instagram Images'
-export const DASHBOARD_POSTED = 'Posted to Instagram'
 export const DASHBOARD_MATCHES = 'Matches Found'
 export const DASHBOARD_RECENT_JOBS = 'Recent Jobs'
 export const DASHBOARD_NO_JOBS = 'No recent jobs'
@@ -135,29 +133,22 @@ export const DASHBOARD_MISSING = 'Missing'
 // Insights home (Phase 9)
 export const INSIGHTS_PAGE_TITLE = 'Insights'
 export const INSIGHTS_PAGE_SUBTITLE =
-  'Critique score summaries, posting cadence, and top catalog highlights — with shortcuts to Analytics, Identity, and Processing.'
+  'Critique score summaries and top catalog highlights — with shortcuts to Identity and Processing.'
 export const INSIGHTS_SECTION_SCORES = 'Scores & style'
-export const INSIGHTS_SECTION_POSTING = 'Posting cadence'
 export const INSIGHTS_SECTION_HIGHLIGHTS = 'Top scored photos'
 export const INSIGHTS_SECTION_EXPLORE = 'Explore'
 export const INSIGHTS_TOP_PHOTOS_TAB_UNPOSTED = 'Unposted'
 export const INSIGHTS_TOP_PHOTOS_TAB_POSTED = 'Posted'
 export const INSIGHTS_TOP_PHOTOS_TAB_ALL = 'All'
 export const INSIGHTS_TOP_PHOTOS_REGION_ARIA = 'Top scored photos'
-export const INSIGHTS_POSTING_RANGE_NOTE =
-  'Last 12 months, monthly buckets (UTC). Adjust range on the Analytics page.'
 export const INSIGHTS_FOOTER_TIMEZONE =
-  'Timestamps follow the same assumptions as Analytics (often UTC from export). Open Analytics for full filters and notes.'
-export const INSIGHTS_QUICK_ANALYTICS_TITLE = 'Analytics'
-export const INSIGHTS_QUICK_ANALYTICS_DESC = 'Posting frequency, heatmaps, and caption aggregates.'
+  'Timestamps on catalog images follow Lightroom capture metadata where available.'
 export const INSIGHTS_QUICK_IDENTITY_TITLE = 'Identity'
 export const INSIGHTS_QUICK_IDENTITY_DESC = 'Mirror signature, and post-next suggestions.'
 export const INSIGHTS_QUICK_PROCESSING_TITLE = 'Processing'
 export const INSIGHTS_QUICK_PROCESSING_DESC = 'Matching, descriptions, scoring jobs, and perspectives.'
 export const INSIGHTS_KPI_ACTIVE_JOBS = 'Active jobs'
 export const INSIGHTS_KPI_ACTIVE_JOBS_DESC = 'Queued or running'
-export const INSIGHTS_CADENCE_RECENT = 'Posts in last 4 weeks'
-export const INSIGHTS_CADENCE_PRIOR = 'vs prior 4 weeks'
 
 // Instagram Page
 export const INSTAGRAM_DOWNLOADED = 'Downloaded Instagram Images'
@@ -443,39 +434,6 @@ export const MATCH_CAROUSEL_PREVIOUS = 'Previous candidate'
 export const MATCH_CAROUSEL_NEXT = 'Next candidate'
 export const MATCH_CANDIDATE_LABEL = 'Candidate'
 
-// Analytics (Phase 7)
-export const ANALYTICS_PAGE_TITLE = 'Analytics'
-export const ANALYTICS_PAGE_SUBTITLE =
-  'Posting cadence, timing patterns, and caption aggregates from validated Instagram dump matches.'
-export const ANALYTICS_SECTION_FREQUENCY = 'Posting frequency'
-export const ANALYTICS_SECTION_HEATMAP = 'Posting time (day × hour)'
-export const ANALYTICS_SECTION_CAPTIONS = 'Captions & hashtags'
-export const ANALYTICS_LABEL_DATE_FROM = 'From'
-export const ANALYTICS_LABEL_DATE_TO = 'To'
-export const ANALYTICS_LABEL_GRANULARITY = 'Granularity'
-export const ANALYTICS_GRANULARITY_DAY = 'Daily'
-export const ANALYTICS_GRANULARITY_WEEK = 'Weekly'
-export const ANALYTICS_GRANULARITY_MONTH = 'Monthly'
-export const ANALYTICS_APPLY = 'Apply'
-export const ANALYTICS_LOADING = 'Loading analytics…'
-export const ANALYTICS_EMPTY_NO_POSTS =
-  'No validated posts in this date range. Validate matches on the Images page to populate analytics.'
-export const ANALYTICS_EMPTY_NO_DUMP =
-  'No posting data yet. Ingest an Instagram export dump and validate matches to see analytics.'
-export const ANALYTICS_HEATMAP_LEGEND = 'Darker cells = more posts (UTC hour)'
-export const ANALYTICS_TIMEZONE_DISCLAIMER =
-  'Times use the server’s assumptions (typically UTC from export timestamps). See the note below for details.'
-export const ANALYTICS_CAPTION_TOP_HASHTAGS = 'Top hashtags'
-export const ANALYTICS_CAPTION_STATS = 'Caption stats'
-export const ANALYTICS_COL_HASHTAG = 'Hashtag'
-export const ANALYTICS_COL_COUNT = 'Count'
-export const ANALYTICS_STAT_POSTS = 'Posts in range'
-export const ANALYTICS_STAT_WITH_CAPTION = 'With non-empty caption'
-export const ANALYTICS_STAT_AVG_LEN = 'Avg. caption length (chars)'
-export const ANALYTICS_STAT_MEDIAN_LEN = 'Median caption length'
-export const ANALYTICS_STAT_POSTS_WITH_TAGS = 'Posts with hashtags'
-export const ANALYTICS_STAT_AVG_TAGS = 'Avg. hashtags per post (unique)'
-
 // Identity (Phase 8 / 08-02)
 export const IDENTITY_PAGE_TITLE = 'Identity'
 export const IDENTITY_PAGE_SUBTITLE =
@@ -521,19 +479,6 @@ export const IDENTITY_REASON_CODE_LABELS: Record<string, string> = {
   high_score_unposted: 'High peak (unposted)',
   eligible_unposted: 'Eligible unposted',
 }
-
-// Analytics — not posted catalog (POST-04 / 07-03)
-export const ANALYTICS_NOT_POSTED_TITLE = 'Not posted to Instagram'
-export const ANALYTICS_NOT_POSTED_HELP =
-  'Catalog images with instagram_posted = 0. Filters apply on the server when you click Apply.'
-export const ANALYTICS_NOT_POSTED_MIN_RATING = 'Min rating'
-export const ANALYTICS_NOT_POSTED_FROM_DATE = 'From date'
-export const ANALYTICS_NOT_POSTED_TO_DATE = 'To date'
-export const ANALYTICS_NOT_POSTED_MONTH = 'Month'
-export const ANALYTICS_NOT_POSTED_EMPTY_ALL_POSTED =
-  'All catalog images are marked posted on Instagram.'
-export const ANALYTICS_NOT_POSTED_EMPTY_NO_MATCH = 'No images match filters'
-export const IMAGES_OPEN_POSTING_ANALYTICS = 'Open posting analytics'
 
 // Cache Status
 export const CACHE_TITLE = 'Vision Cache'

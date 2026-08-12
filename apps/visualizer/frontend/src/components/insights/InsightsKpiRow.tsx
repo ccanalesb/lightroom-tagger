@@ -6,7 +6,6 @@ import {
   DASHBOARD_CATALOG_IMAGES,
   DASHBOARD_INSTAGRAM_IMAGES,
   DASHBOARD_MATCHES,
-  DASHBOARD_POSTED,
   INSIGHTS_KPI_ACTIVE_JOBS,
   INSIGHTS_KPI_ACTIVE_JOBS_DESC,
   MSG_LOADING,
@@ -40,7 +39,6 @@ export function InsightsKpiRow({ stats, activeJobs, loading, error }: InsightsKp
 
   const catalog = stats?.catalog_images ?? 0
   const instagram = stats?.instagram_images ?? 0
-  const posted = stats?.posted_to_instagram ?? 0
   const matches = stats?.matches_found ?? 0
 
   const cards: Array<{
@@ -65,13 +63,6 @@ export function InsightsKpiRow({ stats, activeJobs, loading, error }: InsightsKp
       badge: instagram > 0 ? 'success' : 'default',
     },
     {
-      title: DASHBOARD_POSTED,
-      value: posted.toLocaleString(),
-      description: 'Marked posted to Instagram',
-      link: '/analytics',
-      badge: posted > 0 ? 'success' : 'default',
-    },
-    {
       title: DASHBOARD_MATCHES,
       value: matches.toLocaleString(),
       description: 'Catalog ↔ Instagram pairs',
@@ -88,7 +79,7 @@ export function InsightsKpiRow({ stats, activeJobs, loading, error }: InsightsKp
   ]
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((stat) => (
         <Link key={stat.title} to={stat.link}>
           <Card hoverable padding="md">

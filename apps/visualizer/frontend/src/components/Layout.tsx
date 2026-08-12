@@ -2,7 +2,6 @@ import { Outlet, NavLink } from 'react-router-dom';
 import { ThemeToggle } from './ui/ThemeToggle';
 import {
   APP_TITLE,
-  NAV_ANALYTICS,
   NAV_INSIGHTS,
   NAV_IDENTITY,
   NAV_IMAGES,
@@ -15,7 +14,6 @@ export function Layout() {
     { to: '/', label: NAV_INSIGHTS, exact: true },
     { to: '/images', label: NAV_IMAGES },
     { to: '/search', label: NAV_SEARCH },
-    { to: '/analytics', label: NAV_ANALYTICS },
     { to: '/identity', label: NAV_IDENTITY },
     { to: '/processing', label: NAV_PROCESSING },
   ];

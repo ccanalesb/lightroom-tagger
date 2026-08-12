@@ -29,7 +29,6 @@ tests/test_match_groups.py
 tests/test_match_validation.py
 tests/test_descriptions_contract.py
 tests/test_scores_contract.py
-tests/test_analytics_contract.py
 tests/test_identity_contract.py
 tests/test_system_contract.py
 tests/test_api_ts_contract_guardrail.py

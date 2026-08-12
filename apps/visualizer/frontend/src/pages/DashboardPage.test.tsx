@@ -5,7 +5,6 @@ import { MemoryRouter } from 'react-router-dom'
 import { DashboardPage } from './DashboardPage'
 import { invalidateAll } from '../data'
 import {
-  AnalyticsAPI,
   IdentityAPI,
   JobsAPI,
   SystemAPI,
@@ -17,7 +16,6 @@ import {
   INSIGHTS_PAGE_TITLE,
   INSIGHTS_SECTION_EXPLORE,
   INSIGHTS_SECTION_HIGHLIGHTS,
-  INSIGHTS_SECTION_POSTING,
 } from '../constants/strings'
 
 describe('DashboardPage', () => {
@@ -37,17 +35,6 @@ describe('DashboardPage', () => {
         meta: EMPTY_BEST_PHOTOS_META,
       }),
     )
-    vi.spyOn(AnalyticsAPI, 'getPostingFrequency').mockResolvedValue({
-      buckets: [{ bucket_start: '2025-01-01', count: 1 }],
-      meta: {
-        timestamp_source: null,
-        granularity: 'day',
-        timezone_assumption: 'UTC',
-        date_from: null,
-        date_to: null,
-        bucket_expression: null,
-      },
-    })
     vi.spyOn(JobsAPI, 'list').mockResolvedValue({
       total: 0,
       data: [],
@@ -72,11 +59,6 @@ describe('DashboardPage', () => {
       await screen.findByRole('heading', { level: 1, name: INSIGHTS_PAGE_TITLE }),
     ).toBeInTheDocument()
     await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { level: 2, name: INSIGHTS_SECTION_POSTING }),
-      ).toBeInTheDocument()
-    })
-    await waitFor(() => {
       expect(screen.getByRole('tab', { name: 'Unposted' })).toBeInTheDocument()
     })
     expect(screen.getByRole('tab', { name: 'Posted' })).toBeInTheDocument()
@@ -94,6 +76,5 @@ describe('DashboardPage', () => {
     expect(
       screen.getByRole('heading', { level: 2, name: INSIGHTS_SECTION_EXPLORE }),
     ).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 3, name: INSIGHTS_SECTION_POSTING })).toBeInTheDocument()
   })
 })
