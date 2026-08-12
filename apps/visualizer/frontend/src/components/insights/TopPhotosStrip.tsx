@@ -70,7 +70,7 @@ export function TopPhotosStrip({ items, loading, error, emptyMessage }: TopPhoto
       </div>
       {selected ? (
         <ImageDetailModal
-          imageType={(selected.image_type as 'catalog' | 'instagram') ?? 'catalog'}
+          imageType="catalog"
           imageKey={selected.image_key}
           initialImage={fromBestPhotoRow(selected)}
           primaryScoreSource="identity"

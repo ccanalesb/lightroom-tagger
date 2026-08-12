@@ -185,7 +185,7 @@ export function AdvisorPanel() {
                         className="mx-auto shrink-0 focus:outline-none focus:ring-2 focus:ring-accent sm:mx-0"
                       >
                         <img
-                          src={`/api/images/${row.image_type ?? 'catalog'}/${encodeURIComponent(row.image_key)}/thumbnail`}
+                          src={`/api/images/catalog/${encodeURIComponent(row.image_key)}/thumbnail`}
                           alt={row.filename}
                           className="h-28 w-28 rounded-base border border-border object-cover"
                           loading="lazy"
@@ -248,7 +248,7 @@ export function AdvisorPanel() {
 
       {selected ? (
         <ImageDetailModal
-          imageType={(selected.image_type as 'catalog' | 'instagram') ?? 'catalog'}
+          imageType="catalog"
           imageKey={selected.image_key}
           initialImage={fromPostNextRow(selected)}
           primaryScoreSource="identity"

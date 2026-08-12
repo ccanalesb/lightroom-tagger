@@ -2131,7 +2131,7 @@ export interface components {
              * Image Type
              * @default null
              */
-            image_type: ("catalog" | "instagram") | null;
+            image_type: "catalog" | null;
             /** Peak Percentile */
             peak_percentile: number;
             /** Perspectives Covered */
@@ -2475,7 +2475,7 @@ export interface components {
              * Image Type
              * @default null
              */
-            image_type: ("catalog" | "instagram") | null;
+            image_type: "catalog" | null;
             /** Filename */
             filename: string;
             /** Date Taken */
