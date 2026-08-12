@@ -25,7 +25,7 @@ The visualizer is the web product that surfaces library data to the user. It con
 | **perspective** | Named scoring lens shown in the UI (matches the library concept). |
 | **model-scoped re-do** (`redo_unless_model`) | A batch describe/score mode that regenerates every eligible image *except* those whose current row was produced by the named target model, which it preserves. Lets a model-swap backlog run over many throttled cycles without redoing the target model's own finished work. Overrides blanket `force`. |
 | **identity** | Photographer style fingerprint and suggestions page (`IdentityPage.tsx`). |
-| **search** | NL catalog search surface (`SearchPage.tsx`) — image search endpoints call `lightroom_tagger.core.catalog_search.search_catalog` only (ADR-0015) |
+| **description search** | Keyword filter on the Images tab (`CatalogTab` / `description_search` → FTS5 over `image_descriptions`); not the retired chat Search page. |
 
 ## Key files
 
@@ -58,7 +58,7 @@ The visualizer is the web product that surfaces library data to the user. It con
 | File / Dir | Role |
 |---|---|
 | `src/App.tsx` | Route definitions (React Router 6) |
-| `src/pages/` | Page components: Dashboard, Images, Processing, Analytics, Identity, Search |
+| `src/pages/` | Page components: Dashboard, Images, Processing, Identity |
 | `src/components/` | Shared UI components |
 | `src/services/` | API client (`api.ts`) and WebSocket service |
 | `src/hooks/` | Custom hooks (e.g. `useJobSocket` — invalidates `jobs.list` on server-emitted `job_created`) |
@@ -80,5 +80,4 @@ The server emits `job_created` on job creation (`POST /jobs`); `useJobSocket` ow
 - **Job-type knowledge through `JOB_TYPES` only** (ADR-0010): dispatch (`get_job_handler`), catalog gating (`catalog_requiring_job_types` / `JOB_TYPES_REQUIRING_CATALOG`), and checkpoint helpers are registry projections — no second handler map or catalog frozenset (enforced by `test_job_registry_guardrail.py`).
 - **Job status transitions through `jobs/transitions.py` only** (ADR-0010): `api/jobs.py` delegates cancel/retry to `transition_cancel` / `transition_retry`; no cancellable/retryable status sets or `update_job_status` targets in routes (enforced by `test_job_transitions_guardrail.py`).
 - **Library-DB lifecycle through `make_managed_library_db` only** (ADR-0011): handler modules bind one module-level CM via `jobs/handlers/db_lifecycle.py`; no hand-rolled `init_database(...)` + manual `close()` in handler orchestration (enforced by `test_db_lifecycle_guardrail.py`).
-- **Catalog search through `search_catalog` only** (ADR-0015): image search blueprints call `lightroom_tagger.core.catalog_search.search_catalog`; never the NL/tool/semantic runners directly (enforced by `test_search_catalog_guardrail.py`).
 - **API contract seam — backend-authoritative OpenAPI** (ADR-0013): All API response shapes are pydantic models exposed via spectree; frontend types are generated from OpenAPI (`npm run generate:api` → `src/types/api.gen.ts`); drift is gated in CI (see `.sandcastle/ci-drift-gate.yml`). `frontend/src/services/api.ts` must not declare hand-written response interfaces (enforced by `test_api_ts_contract_guardrail.py`). All API groups are migrated.

@@ -154,7 +154,7 @@ def create_app():
         scores,
         system,
     )
-    from api.images import catalog_bp, instagram_bp, matches_bp, search_bp, stacks_bp
+    from api.images import catalog_bp, instagram_bp, matches_bp, stacks_bp
     from api.images.catalog import list_catalog_similarity_groups
     from api.images.instagram import list_dump_media
 
@@ -163,7 +163,6 @@ def create_app():
     app.register_blueprint(stacks_bp, url_prefix='/api/images/stacks')
     app.register_blueprint(instagram_bp, url_prefix='/api/images/instagram')
     app.register_blueprint(matches_bp, url_prefix='/api/images/matches')
-    app.register_blueprint(search_bp, url_prefix='/api/images/search')
 
     app.add_url_rule(
         '/api/images/catalog-similarity-groups',

@@ -42,12 +42,6 @@ import type {
   ProviderModel,
 } from '../types/providers'
 import type {
-  ChatSearchMessage,
-  ChatSearchRequest,
-  ChatSearchResponse,
-  ChatSearchResultImage,
-} from '../types/search'
-import type {
   ImageScoreRow,
   ScoresCurrentResponse,
   ScoresHistoryResponse,
@@ -525,12 +519,6 @@ export const ImagesAPI = {
     invalidateAll(['identity'])
     return result
   },
-
-  chatSearch: (payload: ChatSearchRequest) =>
-    request<ChatSearchResponse>('/images/search/chat-search', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
 }
 
 export const MatchingAPI = {

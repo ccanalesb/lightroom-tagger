@@ -29,7 +29,7 @@ Architectural decision records live in `docs/adr/`:
 | [ADR-0012](../../docs/adr/0012-excusable-perspectives.md) | Excusable (not-attempted) perspectives (renumbered from a duplicate 0005) |
 | [ADR-0013](../../docs/adr/0013-backend-authoritative-openapi-contract-seam.md) | Backend-authoritative OpenAPI contract seam; generated frontend types, drift gated in CI |
 | [ADR-0014](../../docs/adr/0014-one-vision-op-and-persist-engine.md) | One vision-op and persist engine |
-| [ADR-0015](../../docs/adr/0015-search-catalog-front-door.md) | `search_catalog` front door with guardrail |
+| [ADR-0015](../../docs/adr/0015-search-catalog-front-door.md) | ~~`search_catalog` front door~~ — superseded; chat/NL/semantic search removed ([#223](https://github.com/ccanalesb/lightroom-tagger/issues/223)) |
 
 ## Usage by skills
 

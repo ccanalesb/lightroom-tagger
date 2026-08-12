@@ -1,11 +1,6 @@
 """CLIP-only visual similarity (KNN on ``image_clip_embeddings``), SIM-02 / D-05.
 
-Uses sqlite-vec cosine KNN like :func:`lightroom_tagger.core.semantic_search.knn_embedded_catalog_keys`
-but **only** against the 512-d CLIP vec0 table (same name as the Phase 5 catalog).
-Does not use the 768-d Phase 3 text embedding table.
-
-Over-fetch: KNN retrieves up to ``KNN_K_MAX`` neighbors so post-filters (catalog
-constraints + primary-grid / stack representative rule) can still fill a page.
+Uses sqlite-vec cosine KNN against the 512-d CLIP vec0 table.
 Response metadata uses model id **clip-ViT-B-32** and dimension **512** (``CLIP_EMBED_*``).
 """
 
@@ -20,7 +15,7 @@ from lightroom_tagger.core.database import (
     filter_order_keys_in_catalog,
 )
 
-# Match order-of-magnitude to semantic_search.KNN_K (200) with headroom for filtering.
+# Headroom for post-filters (catalog constraints + primary-grid / stack representative rule).
 KNN_K_MAX = 500
 
 
@@ -69,11 +64,9 @@ def list_pin_similarity_candidate_keys(
     *,
     max_candidates: int = 600,
 ) -> list[str]:
-    """Ordered catalog keys for pin-to-similar chat search: *seed_key* first, then CLIP
+    """Ordered catalog keys for pin-to-similar search: *seed_key* first, then CLIP
     neighbors (primary-grid rows only). Raises :class:`NoClipEmbeddingError` if the
     seed has no CLIP row.
-
-    Internal to ``catalog_search`` (ADR-0015) — do not call from the web layer.
     """
     blob = get_clip_embedding_blob_for_key(db, seed_key)
     if blob is None:

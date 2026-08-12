@@ -34,20 +34,13 @@ class TestDatabaseDbInit(unittest.TestCase):
         self.assertIsNotNone(row)
         self.assertEqual(get_image_count(self.db), 0)
 
-    def test_init_database_sqlite_vec_image_text_embeddings(self):
-        """sqlite-vec loads and vec0 table exists after init_database (Phase 3 NLS-03)."""
+    def test_init_database_sqlite_vec_image_clip_embeddings(self):
+        """sqlite-vec loads and CLIP vec0 table exists after init_database."""
         row = self.db.execute("SELECT vec_version() AS v").fetchone()
         self.assertIsNotNone(row)
         v = row["v"]
         self.assertIsNotNone(v)
         self.assertIsInstance(v, str)
-        sql_row = self.db.execute(
-            "SELECT sql FROM sqlite_master WHERE name = 'image_text_embeddings'"
-        ).fetchone()
-        self.assertIsNotNone(sql_row)
-        sql = sql_row["sql"] or ""
-        self.assertIn("vec0", sql)
-        self.assertIn("float[768]", sql)
         clip_row = self.db.execute(
             "SELECT type, name, sql FROM sqlite_master WHERE name = 'image_clip_embeddings'"
         ).fetchone()

@@ -1,7 +1,7 @@
 # ADR-0015: Catalog search front door (`search_catalog`)
 
 ## Status
-Accepted (2026-07)
+Superseded (2026-08-12) — chat / NL / semantic search and `search_catalog` removed in [#223](https://github.com/ccanalesb/lightroom-tagger/issues/223). Catalog keyword search over `image_descriptions_fts` via the Images `description_search` filter remains; CLIP similarity (`clip_similarity`, `image_clip_embeddings`) remains for catalog similarity ([#226](https://github.com/ccanalesb/lightroom-tagger/issues/226)).
 
 ## Context
 Catalog search routing, query execution, and pin-to-similarity shaping were
@@ -13,39 +13,33 @@ for natural-language catalog search (issue #140).
 
 Slices 1–3 moved every visualizer search endpoint through
 `lightroom_tagger.core.catalog_search.search_catalog` and removed the
-`_RuntimeDeps` / `use_runtime_deps` ContextVar seam. This ADR seals the boundary
-so regressions are un-mergeable.
+`_RuntimeDeps` / `use_runtime_deps` ContextVar seam. This ADR sealed the boundary
+so regressions were un-mergeable.
 
 ## Decision
 1. **Single front door** — `search_catalog(db, message, …) → SearchResult` in
-   `lightroom_tagger.core.catalog_search` owns strategy routing (`nl_filter` /
+   `lightroom_tagger.core.catalog_search` owned strategy routing (`nl_filter` /
    multi-turn / tool-calling / semantic), library-DB query execution, and
-   pin-to-similarity candidate restriction. It returns detached core image rows
+   pin-to-similarity candidate restriction. It returned detached core image rows
    plus per-row signals and optional metadata — not API-shaped envelopes.
-2. **Thin HTTP wrappers** — visualizer image search blueprints validate input,
-   open `library.db`, call `search_catalog`, and map `SearchResult` to the
-   existing JSON contract. They must not import or call the underlying runners.
-3. **Runners are internal** — `run_nl_catalog_filter_llm`,
-   `run_nl_catalog_filter_llm_multi_turn`, `run_tool_calling_search` (in
-   `nl_catalog_search`), `run_semantic_hybrid_search` (in `semantic_search`), and
-   `list_pin_similarity_candidate_keys` (in `clip_similarity`) are documented as
-   internal to the front door. Only `catalog_search.py` may orchestrate them.
-   Names are not underscore-prefixed so existing test patch targets stay stable.
+2. **Thin HTTP wrappers** — visualizer image search blueprints validated input,
+   opened `library.db`, called `search_catalog`, and mapped `SearchResult` to the
+   existing JSON contract. They did not import or call the underlying runners.
+3. **Runners were internal** — NL/tool/semantic runners and
+   `list_pin_similarity_candidate_keys` (in `clip_similarity`) were documented as
+   internal to the front door. Only `catalog_search.py` orchestrated them.
 4. **Read seam preserved** — per ADR-0008, `search_catalog` and its helpers
-   return detached `dict` rows from `core.database` read helpers, never live
+   returned detached `dict` rows from `core.database` read helpers, never live
    `sqlite3.Row` objects.
-5. **Enforcement** — `apps/visualizer/backend/tests/test_search_catalog_guardrail.py`
-   statically rejects any import or call of the forbidden runners under
-   `apps/visualizer/backend/` (excluding tests).
+5. **Enforcement** — `test_search_catalog_guardrail.py` statically rejected any
+   import or call of the forbidden runners under `apps/visualizer/backend/`
+   (excluding tests).
 
 ## Consequences
-- One place to audit catalog search orchestration; new search modes extend
-  `catalog_search` instead of growing blueprint logic.
-- Blueprints stay thin and contract-focused; strategy changes do not require
-  touching HTTP handlers.
-- Test patches may continue to target runners on `catalog_search` or
-  `nl_catalog_search` module paths where slice tests already mock internals.
-- Slight indirection via `SearchResult`; acceptable for a single seam.
+- One place to audit catalog search orchestration while the chat surface existed.
+- Blueprints stayed thin and contract-focused.
+- The guardrail and front door became dead weight once the Search page and
+  `search_catalog` were removed; keyword FTS search does not use this seam.
 
 ## Alternatives considered
 
@@ -53,5 +47,5 @@ so regressions are un-mergeable.
 |---|---|
 | **Rename runners with leading underscores** | Breaks established `unittest.mock.patch` targets in search API tests; churn without stronger enforcement than a guardrail. |
 | **ContextVar runtime-deps seam** | Reintroduces hidden wiring; slices 1–3 already removed it. |
-| **Guardrail only in core** | Web layer is the regression surface; `catalog_search.py` legitimately calls runners. |
+| **Guardrail only in core** | Web layer is the regression surface; `catalog_search.py` legitimately called runners. |
 | **Return API envelopes from core** | Couples library to Flask response shapes; violates ADR-0008 detached-row seam. |
