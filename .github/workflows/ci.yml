@@ -40,6 +40,14 @@ jobs:
         working-directory: apps/visualizer/frontend
         run: npx tsc --noEmit
 
+      # tsc proves the types line up; it does not prove the UI still behaves.
+      # Added while removing surfaces from the frontend (map #218) -- those
+      # slices are almost entirely frontend, and without this the only gate on
+      # them was a typecheck.
+      - name: Frontend tests
+        working-directory: apps/visualizer/frontend
+        run: npx vitest run
+
       # The test list lives in tests/contract-tests.txt, NOT inline here: a GitHub
       # App cannot push .github/workflows/**, so an agent removing a surface could
       # never remove its contract test from an inline list -- its whole branch is
