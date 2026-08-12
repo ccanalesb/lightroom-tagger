@@ -25,15 +25,33 @@ finishes is worth less than a short one that lands, and the reasoning is the pay
 the description.
 
 Cut the tag on the last commit that still contains the capability, **before** the removal
-PR merges:
+PR merges. Run these four steps in order and do not skip the last two — the first two
+removals each got this wrong, in different ways:
 
 ```sh
-git tag -a parked/<slug> -m "last commit containing <capability> (map #218)"
+# 1. Cut and push, anchored to master as it stands before the removal merges.
+git tag -a parked/<slug> -m "last commit containing <capability> (map #218)" origin/master
 git push origin parked/<slug>
+
+# 2. Read the SHA back OUT of the tag. Never type it from memory or from a
+#    commit you happened to be looking at -- that is how they drift apart.
+git rev-list -n1 parked/<slug> | cut -c1-7
+
+# 3. Prove the tag actually contains the capability.
+git cat-file -e parked/<slug>:<a path this PR deletes> && echo present
+
+# 4. Prove the tag reached the remote. A local-only tag helps nobody.
+git ls-remote --tags origin | grep parked/<slug>
 ```
 
-Record both the tag name and its short SHA in the doc. The tag is what you check out; the
-SHA is what survives if the tag is ever deleted or a mirror drops it.
+Record the tag name and the short SHA from step 2 in the doc header. The tag is what you
+check out; the SHA is what survives if the tag is ever deleted or a mirror drops it — so a
+SHA that disagrees with its tag is worse than no SHA at all.
+
+**Both failure modes have already happened.** Posting analytics cut the tag but recorded a
+different SHA in the doc. Chat search recorded the correct SHA but never cut the tag, so
+the doc pointed at a `git checkout` that would fail. Steps 2–4 exist to catch exactly
+these, and each is one command.
 
 ## Not parked
 
