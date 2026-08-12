@@ -16,9 +16,7 @@ from jobs.runner import JobRunner
 from lightroom_tagger.core.database import (
     init_database,
     library_write,
-    list_instagram_dump_keys_needing_clip_embedding,
     store_image,
-    store_instagram_dump_media,
     store_vision_cached_image,
     upsert_image_clip_embedding,
 )
@@ -47,49 +45,6 @@ def test_fingerprint_batch_embed_image_differs_catalog_vs_catalog_and_instagram(
         meta_union, keys, resolved_months=None, resolved_year=None
     )
     assert fp_cat != fp_union
-
-
-def test_instagram_dump_keys_needing_clip_embedding_excludes_existing_vec(
-    tmp_path,
-) -> None:
-    """Dump keys missing vec rows are listed; keys already embedded are omitted."""
-    db_path = tmp_path / "library.db"
-    conn = init_database(str(db_path))
-    store_instagram_dump_media(
-        conn,
-        {
-            "media_key": "ig_embedded",
-            "file_path": "/fake/a.jpg",
-            "filename": "a.jpg",
-            "date_folder": "202601",
-        },
-    )
-    store_instagram_dump_media(
-        conn,
-        {
-            "media_key": "ig_need_vec",
-            "file_path": "/fake/b.jpg",
-            "filename": "b.jpg",
-            "date_folder": "202602",
-        },
-    )
-    blob = sqlite_vec.serialize_float32([0.0] * 512)
-    with library_write(conn):
-        upsert_image_clip_embedding(conn, "ig_embedded", blob)
-    conn.close()
-
-    conn = init_database(str(db_path))
-    try:
-        keys = list_instagram_dump_keys_needing_clip_embedding(
-            conn,
-            months=None,
-            year=None,
-            min_rating=None,
-        )
-    finally:
-        conn.close()
-
-    assert keys == ["ig_need_vec"]
 
 
 @patch("database.add_job_log")
@@ -158,62 +113,6 @@ def test_batch_embed_image_writes_clip_row(
             .fetchone()["c"]
         )
         assert n == 1
-    finally:
-        verify.close()
-
-
-@patch("database.add_job_log")
-def test_batch_embed_image_catalog_and_instagram_embeds_instagram_dump_row(
-    _mock_add_log, tmp_path, monkeypatch
-) -> None:
-    from jobs.handlers.embed import handle_batch_embed_image
-
-    ig_jpg = tmp_path / "ig.jpg"
-    _write_min_jpg(ig_jpg)
-
-    db_path = tmp_path / "library.db"
-    conn = init_database(str(db_path))
-    store_instagram_dump_media(
-        conn,
-        {
-            "media_key": "ig_dump_mk",
-            "file_path": str(ig_jpg),
-            "filename": "ig.jpg",
-            "date_folder": "202604",
-        },
-    )
-    conn.close()
-
-    mock_enc = MagicMock(
-        return_value=np.ones((1, 512), dtype=np.float32)
-    )
-    monkeypatch.setattr(embed_mod, "encode_images", mock_enc)
-    monkeypatch.setattr(
-        path_diag_mod,
-        "get_or_create_cached_image",
-        lambda _db, _k, path: path,
-    )
-
-    monkeypatch.setenv("LIBRARY_DB", str(db_path))
-    runner = _make_runner()
-    handle_batch_embed_image(
-        runner,
-        "job-cat-ig",
-        {"image_type": "catalog_and_instagram"},
-    )
-
-    runner.complete_job.assert_called_once()
-    result = runner.complete_job.call_args[0][1]
-    assert result["embedded"] == 1
-    assert result["total"] == 1
-
-    verify = init_database(str(db_path))
-    try:
-        row = verify.execute(
-            "SELECT 1 FROM image_clip_embeddings WHERE image_key = ?",
-            ("ig_dump_mk",),
-        ).fetchone()
-        assert row is not None
     finally:
         verify.close()
 

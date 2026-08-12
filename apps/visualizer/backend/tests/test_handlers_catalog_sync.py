@@ -75,7 +75,6 @@ def test_standalone_sync_fails_loudly_on_catalog_lock(
 
 
 @patch('jobs.handlers.stacks._resolve_library_db_or_fail', return_value='/tmp/library.db')
-@patch('jobs.handlers.stacks.list_instagram_dump_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks.list_catalog_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks._handle_catalog_similarity_inner')
 @patch('jobs.handlers.stacks._handle_batch_stack_detect_inner')
@@ -87,7 +86,6 @@ def test_chain_continues_when_sync_fails(
     mock_stack: MagicMock,
     mock_sim: MagicMock,
     _mock_cat_need: MagicMock,
-    _mock_ig_need: MagicMock,
     _mock_db: MagicMock,
 ) -> None:
     from jobs.handlers import handle_catalog_cache_build
@@ -113,7 +111,6 @@ def test_chain_continues_when_sync_fails(
 
 
 @patch('jobs.handlers.stacks._resolve_library_db_or_fail', return_value='/tmp/library.db')
-@patch('jobs.handlers.stacks.list_instagram_dump_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks.list_catalog_keys_needing_clip_embedding', return_value=[])
 @patch('jobs.handlers.stacks._handle_catalog_similarity_inner')
 @patch('jobs.handlers.stacks._handle_batch_stack_detect_inner')
@@ -125,7 +122,6 @@ def test_chain_runs_sync_before_embed(
     mock_stack: MagicMock,
     mock_sim: MagicMock,
     _mock_cat_need: MagicMock,
-    _mock_ig_need: MagicMock,
     _mock_db: MagicMock,
 ) -> None:
     from jobs.handlers import handle_catalog_cache_build

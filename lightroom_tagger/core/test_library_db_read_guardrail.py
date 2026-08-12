@@ -13,8 +13,6 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 _TARGET_REL_PATHS = (
     "apps/visualizer/backend/api/system.py",
-    "apps/visualizer/backend/api/images/matches.py",
-    "apps/visualizer/backend/api/images/instagram.py",
     "apps/visualizer/backend/api/images/catalog.py",
     "apps/visualizer/backend/api/images/stacks.py",
 )
@@ -33,8 +31,7 @@ _LIBRARY_TABLE_RE = re.compile(
     r"rejected_matches|instagram_images|instagram_dump_media|image_stacks|"
     r"image_stack_members|vision_cache|vision_comparisons|"
     r"catalog_similarity_groups|catalog_similarity_candidates|"
-    r"image_clip_embeddings|image_text_embeddings|"
-    r"match_pool_snapshots|match_pool_snapshot_members"
+    r"image_clip_embeddings|image_text_embeddings"
     r")\b",
     re.IGNORECASE,
 )
@@ -146,4 +143,4 @@ def test_guardrail_allowlists_jobs_reads_in_system_py() -> None:
 
 
 def test_guardrail_scans_all_target_files() -> None:
-    assert len(_TARGET_REL_PATHS) == 5
+    assert len(_TARGET_REL_PATHS) == 3

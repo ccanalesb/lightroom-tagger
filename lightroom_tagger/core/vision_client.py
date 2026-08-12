@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import json as _json
 import os
 from collections.abc import Callable
 from typing import Any, cast
@@ -17,7 +18,6 @@ from typing import Any, cast
 import openai as openai_sdk
 
 from lightroom_tagger.core.analyzer.description import build_description_prompt
-from lightroom_tagger.core.analyzer.vision_compare import parse_vision_response
 from lightroom_tagger.core.exceptions import (
     AuthenticationError,
     ConnectionError,
@@ -111,6 +111,38 @@ def _map_openai_error(
         return ProviderError(str(exc), provider=provider, model=model)
 
     return ProviderError(str(exc), provider=provider, model=model)
+
+
+def parse_vision_response(raw: str) -> dict:
+    """Parse vision model response into structured result.
+
+    Expects JSON: {"confidence": 0-100, "reasoning": "..."}
+    Falls back to legacy SAME/DIFFERENT/UNCERTAIN parsing.
+    """
+    raw = raw.strip()
+
+    try:
+        if raw.startswith('```'):
+            raw = raw.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
+        data = _json.loads(raw)
+        confidence = int(data.get('confidence', 50))
+        confidence = max(0, min(100, confidence))
+        if confidence >= 70:
+            verdict = 'SAME'
+        elif confidence <= 30:
+            verdict = 'DIFFERENT'
+        else:
+            verdict = 'UNCERTAIN'
+        return {'confidence': confidence, 'verdict': verdict, 'reasoning': data.get('reasoning', '')}
+    except (TypeError, ValueError, KeyError, _json.JSONDecodeError):
+        pass
+
+    upper = raw.upper()
+    if upper.startswith('SAME') and 'DIFFERENT' not in upper[:20]:
+        return {'confidence': 100, 'verdict': 'SAME', 'reasoning': ''}
+    elif 'DIFFERENT' in upper[:50]:
+        return {'confidence': 0, 'verdict': 'DIFFERENT', 'reasoning': ''}
+    return {'confidence': 50, 'verdict': 'UNCERTAIN', 'reasoning': ''}
 
 
 def compare_images(

@@ -34,7 +34,6 @@ class Config:
     ai_model: str = "claude-3-5-sonnet-20241022"
     skip_ai: bool = False
     verbose: bool = False
-    instagram_url: str = ""
     instagram_keyword: str = "Posted"
     instagram_dump_path: str = ""
     hash_threshold: int = 5
@@ -44,18 +43,9 @@ class Config:
     cloudflare_api_token: str = ""
     instagram_session_id: str = ""
     vision_model: str = "gemma3:27b"
-    phash_weight: float = 0.4
-    desc_weight: float = 0.3
-    vision_weight: float = 0.3
-    match_threshold: float = 0.7
     vision_cache_dir: str = field(default_factory=lambda: os.path.expanduser("~/.cache/lightroom_tagger/vision"))
     vision_cache_enabled: bool = True
     ollama_host: str = "http://localhost:11434"
-    
-    # Parallel processing configuration
-    matching_workers: int = 4
-    vision_batch_size: int = 10
-    vision_batch_threshold: int = 5
 
     def __post_init__(self):
         self.catalog_path = self._resolve_path(self.catalog_path)
@@ -103,7 +93,6 @@ def load_config(config_path: str | None = None) -> Config:
         "ai_model": "claude-3-5-sonnet-20241022",
         "skip_ai": False,
         "verbose": False,
-        "instagram_url": "",
         "instagram_keyword": "Posted",
         "instagram_dump_path": "",
         "hash_threshold": 5,
@@ -112,16 +101,9 @@ def load_config(config_path: str | None = None) -> Config:
         "cloudflare_api_token": "",
         "instagram_session_id": "",
         "vision_model": "gemma3:27b",
-        "phash_weight": 0.4,
-        "desc_weight": 0.3,
-        "vision_weight": 0.3,
-        "match_threshold": 0.7,
         "vision_cache_dir": os.path.expanduser("~/.cache/lightroom_tagger/vision"),
         "vision_cache_enabled": True,
         "ollama_host": "http://localhost:11434",
-        "matching_workers": 4,
-        "vision_batch_size": 10,
-        "vision_batch_threshold": 5,
     }
 
     for key, value in defaults.items():
@@ -230,7 +212,6 @@ def _load_from_env(data: dict) -> dict:
         "LIGHTRoom_AI_MODEL": "ai_model",
         "LIGHTRoom_SKIP_AI": "skip_ai",
         "LIGHTRoom_VERBOSE": "verbose",
-        "LIGHTRoom_INSTAGRAM_URL": "instagram_url",
         "LIGHTRoom_INSTAGRAM_KEYWORD": "instagram_keyword",
         "INSTAGRAM_DUMP_PATH": "instagram_dump_path",
         "LIGHTRoom_HASH_THRESHOLD": "hash_threshold",
@@ -238,29 +219,18 @@ def _load_from_env(data: dict) -> dict:
         "CLOUDFLARE_API_TOKEN": "cloudflare_api_token",
         "INSTAGRAM_SESSION_ID": "instagram_session_id",
         "VISION_MODEL": "vision_model",
-        "PHASH_WEIGHT": "phash_weight",
-        "DESC_WEIGHT": "desc_weight",
-        "VISION_WEIGHT": "vision_weight",
-        "MATCH_THRESHOLD": "match_threshold",
         "VISION_CACHE_DIR": "vision_cache_dir",
         "VISION_CACHE_ENABLED": "vision_cache_enabled",
         "OLLAMA_HOST": "ollama_host",
-        "MATCHING_WORKERS": "matching_workers",
-        "VISION_BATCH_SIZE": "vision_batch_size",
-        "VISION_BATCH_THRESHOLD": "vision_batch_threshold",
     }
 
     for env_var, config_key in env_mappings.items():
         if env_var in os.environ:
             value = os.environ[env_var]
-            if config_key in ("workers", "hash_threshold", "matching_workers", "vision_batch_size", "vision_batch_threshold"):
+            if config_key in ("workers", "hash_threshold"):
                 value = int(value)
             elif config_key in ("skip_ai", "verbose", "vision_cache_enabled"):
                 value = value.lower() in ("true", "1", "yes")
-            elif config_key == "match_threshold":
-                value = int(value)
-            elif config_key in ("phash_weight", "desc_weight", "vision_weight"):
-                value = float(value)
             data[config_key] = value
 
     return data

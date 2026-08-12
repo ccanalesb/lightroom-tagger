@@ -273,7 +273,7 @@ def test_batch_analyze_resume_skips_describe_when_stage_score(
 @patch('jobs.handlers.analyze.add_job_log')
 @patch('jobs.handlers.analyze._score_single_image')
 @patch('lightroom_tagger.core.vision_op.run_vision_op')
-@patch('lightroom_tagger.core.description_service.get_or_create_cached_image')
+@patch('lightroom_tagger.core.vision_cache.get_or_create_cached_image')
 @patch('jobs.handlers.analyze.init_database')
 @patch('jobs.handlers.analyze.load_config')
 @patch('jobs.handlers.analyze.os.getenv')

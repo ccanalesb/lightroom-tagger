@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`lightroom_tagger` is an installable Python package that forms the core intelligence layer of the project. It reads Lightroom catalogs (SQLite, read-only except for keyword writes), ingests Instagram export dumps, runs vision-model matching and AI scoring, and exposes everything via a CLI. The visualizer app is a consumer of this library.
+`lightroom_tagger` is an installable Python package that forms the core intelligence layer of the project. It reads Lightroom catalogs (SQLite, read-only except for keyword writes), runs AI description and scoring, catalog similarity (CLIP), and identity aggregation, and exposes everything via the `lightroom-tagger` CLI. The visualizer app is a consumer of this library.
 
 ## Domain language
 
@@ -10,31 +10,27 @@
 |---|---|
 | **catalog** | A Lightroom `.lrcat` SQLite file. Read-only except for keyword writes via `lightroom/writer.py`. |
 | **image** / **catalog image** | A photo record in the library DB indexed from the Lightroom catalog. |
-| **instagram dump** | An exported ZIP/directory of Instagram media and metadata provided by the user (no API access). |
-| **match** | The result of pairing a catalog image with an Instagram post, stored in `matches`. Has two states: *proposed* (created by the vision pipeline, `validated_at` is NULL) and *validated* (human-confirmed, `validated_at` is set). Library-only concept — the HTTP/job surfaces that produced and validated matches were removed in #225 slice 2; the matcher library survives until slice 3. |
-| **validated match** | A match with `validated_at` set — human-confirmed pairing. No live consumer remains (identity aggregation is computed from current catalog scores, not matches); retained pending slice 3 matcher removal. |
-| **match score** | The single 0–1 confidence the matcher assigns to a catalog↔Instagram candidate pairing: a weighted blend of the phash-similarity, description-text-similarity, and vision-verdict signals (`total_score` in matcher results). Distinct from **score** below, which evaluates one image against a perspective. |
-| **vision comparison** | A side-by-side AI comparison of two images to determine if they are the same photo. |
-| **description** | An AI-generated textual description of a catalog image (prose and technical fields only — summary, composition, subjects, mood, colors). Perspective scores are **not** produced by the description pass; see **score** below. |
-| **score** | A numeric AI evaluation of an image (catalog or Instagram dump) against a named perspective (e.g. "composition", "light"). Stored in `image_scores` — the **single source of truth** for perspective scores. `image_type` distinguishes catalog vs dump images. `is_current = 1` marks the active score for a version. Not to be confused with the matcher's **match score**. Legacy `image_descriptions.perspectives` may still hold backfilled or pre-split data but new description writes leave it untouched. |
+| **instagram dump** | Legacy rows in `instagram_dump_media` from a removed import pipeline ([#225](https://github.com/ccanalesb/lightroom-tagger/issues/225)). The table may still hold data; describe/score jobs can target `image_type = 'instagram'` for existing rows. No import or matching code remains. |
+| **description** | An AI-generated textual description of a catalog or dump image (prose and technical fields only — summary, composition, subjects, mood, colors). Perspective scores are **not** produced by the description pass; see **score** below. |
+| **score** | A numeric AI evaluation of an image (catalog or legacy dump row) against a named perspective (e.g. "composition", "light"). Stored in `image_scores` — the **single source of truth** for perspective scores. `image_type` distinguishes catalog vs dump images. `is_current = 1` marks the active score for a version. Not to be confused with the retired matcher's **match score** (removed with [#225](https://github.com/ccanalesb/lightroom-tagger/issues/225)). |
 | **perspective** | A named scoring lens (slug + prompt). Catalog images are scored per-perspective. |
 | **optional perspective** | A perspective whose technique a strong photograph could legitimately skip (`perspectives.optional = 1`). Only optional perspectives may be excused; seeded as optional when the source markdown carries `<!-- optional: true -->` (the export contract from yt-to-photo-prompt-lab). |
 | **excused score** | An `image_scores` row with `not_attempted = 1`: the model judged the perspective's technique genuinely absent (only allowed for optional perspectives). It still carries a numeric score/rationale but is excluded from identity aggregation. Mirrors yt-to-photo-prompt-lab's "not scorable" outcome. |
 | **provider** | An AI model endpoint (Ollama, NVIDIA NIM, OpenRouter, etc.) defined in `providers.json`. |
 | **resolved model** | A `(provider_id, model)` pair chosen by `provider_resolution.resolve_model()` via the single precedence ladder (explicit arg → env → `providers.json` defaults → `config.yaml` → `fallback_order`). See ADR-0007. |
 | **provider call seam** | All provider/LLM HTTP calls go through `FallbackDispatcher.call_with_fallback` with a `fn_factory` that invokes `vision_client` / `vision_client_batch` helpers — never raw `client.chat.completions.create` at orchestration sites. Escalation (token bump, batch split, abort) is a pluggable `ErrorPolicy`. See ADR-0009. |
-| **vision op** | One provider vision call routed through the vision-op engine (`resolve_model` → `FallbackDispatcher` → parse), optionally persisted via `run_vision_op_persist`. Description, scoring, and compare build `VisionOpSpec` via `analyzer` op-spec helpers. See ADR-0014. |
+| **vision op** | One provider vision call routed through the vision-op engine (`resolve_model` → `FallbackDispatcher` → parse), optionally persisted via `run_vision_op_persist`. Description and scoring build `VisionOpSpec` via `analyzer` op-spec helpers. See ADR-0014. |
 | **fallback** | The multi-provider retry chain: `FallbackDispatcher` tries providers in `fallback_order` when one fails. |
-| **phash** | Perceptual hash used for fast image similarity pre-screening before vision comparison. |
-| **stack** | A Lightroom virtual copy group; stack collapse logic deduplicates matched images. |
+| **phash** | Perceptual hash used for cache-invalidation keys and fast similarity helpers — **not** the retired Instagram matcher pre-screen. |
+| **stack** | A Lightroom virtual copy group; stack detection groups by `date_taken` gaps (`batch_stack_detect`). |
 | **instagram_posted** | Boolean on catalog images: whether the photo has been posted to Instagram. Set manually in the visualizer catalog modal (`PATCH /api/images/catalog/<key>/instagram-posted`). |
 | **identity** | Aggregated style fingerprint and best-photo ranking for a photographer, computed from current catalog scores. |
-| **catalog indexing** | The process of reading catalog images that haven't been analyzed yet and computing phash, EXIF, and description for each, storing results in `library.db`. Precedes matching. |
+| **catalog indexing** | The process of reading catalog images that haven't been analyzed yet and computing phash, EXIF, and description for each, storing results in `library.db`. |
 | **scan** | Full re-read of the catalog → idempotent upsert (by `key`) of *every* image into `library.db` (CLI `lightroom-tagger scan`). Heals everything but re-reads all rows. *Catalog sync* is the incremental counterpart. |
 | **catalog sync** | Incremental refresh of `library.db` from the catalog: set-difference of catalog `id_local` against ids already in `library.db`, fetching+upserting only the missing rows. **Additions-only** — metadata edits to already-synced images are not detected (use a full *scan*), and images removed from the catalog are *logged as stale, never deleted*. Assumes a single configured catalog (`config.yaml` `catalog_path`); cross-catalog `id_local` collisions are unhandled. Runs as a standalone `catalog_sync` job and as the non-fatal stage 0 of `catalog_cache_build`. |
 | **description search** | Keyword filter over AI description text on the Images tab (`description_search` query param → FTS5 `image_descriptions_fts`, sanitized by `build_description_fts_query`). No LLM and no embeddings. |
-| **embedding** | CLIP vector representation of a catalog or Instagram dump image, stored in `image_clip_embeddings` for visual similarity and matching prefilter. |
-| **library DB** | `library.db` — the project's own SQLite database (not the Lightroom catalog). Holds indexed images, matches, scores, descriptions, and job state for the CLI path. |
+| **embedding** | CLIP vector representation of a **catalog** image, stored in `image_clip_embeddings` for catalog similarity (`clip_similarity`, sqlite-vec). Instagram-dump CLIP paths were removed with [#225](https://github.com/ccanalesb/lightroom-tagger/issues/225) slice 3. |
+| **library DB** | `library.db` — the project's own SQLite database (not the Lightroom catalog). Holds indexed images, scores, descriptions, legacy match/dump tables, and job state for the CLI path. |
 | **library_write** | Process-wide writer lock + `BEGIN IMMEDIATE` used for all writes to `library.db` to prevent `SQLITE_BUSY` under parallel workers. |
 | **library-DB read seam** | Typed read helpers in `lightroom_tagger.core.database` — the only supported way for blueprints, tools, and handlers to query `library.db` tables. Returns detached `dict`/scalar/list/set values, never live `sqlite3.Row`. See ADR-0008. |
 | **library-DB lifecycle seam** | Open/close `library.db` through `managed_library_db(path)` (or CLI `with_library_db` / handler `make_managed_library_db`) — never hand-roll `init_database(...)` + manual `close()` at orchestration sites. See ADR-0011. |
@@ -45,9 +41,8 @@
 
 | Module | Role |
 |---|---|
-| `database` | Library DB schema, migrations, image/score/description/match/stack storage, write serialization, and **read seam** (typed query helpers — all library-DB reads go through this module per ADR-0008) |
-| `matcher` | EXIF-based candidate selection + vision comparison pipeline |
-| `analyzer` | Image preparation (`image_prep`), inspection (`image_inspect`), vision comparison (`vision_compare`), description generation (`description`) |
+| `database` | Library DB schema, migrations, image/score/description/stack storage, dump-media read helpers, write serialization, and **read seam** (typed query helpers — all library-DB reads go through this module per ADR-0008) |
+| `analyzer` | Image preparation (`image_prep`), inspection (`image_inspect`), description generation (`description`), scoring op-specs (`scoring`) |
 | `vision_client` | OpenAI-compatible HTTP wrappers (`compare_images`, `generate_description`, `complete_chat_text`, `complete_chat_with_tools`) — the only place raw SDK completions live |
 | `vision_client_batch` | Batch compare helpers (loaded after `vision_client` to avoid import cycles) |
 | `provider_registry` | Loads `providers.json`, auto-discovers Ollama models, returns configured `openai.OpenAI` clients |
@@ -57,10 +52,10 @@
 | `vision_op` | Vision-op engine — `run_vision_op`, `run_vision_op_persist`, `VisionOpSpec`, `VisionOpOutcome` (`written` \| `skipped` \| `failed`; model-produced unusable results are `failed`, pre-check skips only are `skipped`; ADR-0014) |
 | `retry` | `retry_with_backoff` with `RETRYABLE_ERRORS` / `NOT_RETRYABLE_ERRORS` frozensets |
 | `cancel_scope` | Thread-local cooperative cancellation — workers register a `cancel_check` callback; retry/fallback paths honour it |
-| `scoring_service` | Per-perspective scoring of catalog and Instagram images via vision models |
+| `scoring_service` | Per-perspective scoring of catalog and legacy dump images via vision models |
 | `identity_service` | Best-photo ranking, style fingerprint, post-next hints from current catalog scores |
-| `description_service` | Describes catalog images (prose-only — no perspective scores); orchestrates `analyzer.description` + DB writes |
-| `clip_embedding_service` | CLIP image embedding generation |
+| `description_service` | Describes catalog and legacy dump images (prose-only — no perspective scores); orchestrates `analyzer.description` + DB writes |
+| `clip_embedding_service` | CLIP image embedding generation (catalog) |
 | `clip_similarity` | Catalog similarity search via CLIP embeddings (`image_clip_embeddings`) |
 | `catalog_sync` | Incremental additions-only catalog → library.db refresh (set-difference on ids) |
 | `prompt_builder` | Builds prose-only description prompts and per-perspective scoring prompts |
@@ -69,7 +64,7 @@
 | `config` | `load_config` — merges `config.yaml` + env overrides; `get_vision_model`, `get_description_model` |
 | `path_utils` | Path resolution helpers |
 | `text_constants` | Shared text/string constants |
-| `cli` | `argparse` CLI entry point (`lightroom-tagger` and friends); `run()` builds parser, applies global overrides, dispatches |
+| `cli` | `argparse` CLI entry point (`lightroom-tagger`); `run()` builds parser, applies global overrides, dispatches |
 | `cli_commands` | Explicit command registry (`Command` dataclass + `COMMANDS` list) — each command's name, flags, and handler live in one place |
 | `cli_cmds_extra` | Heavyweight CLI subcommands (`export`, `init`, `stats`, `enrich-catalog`) split out to keep `cli` under size budget |
 | `cli_library_db` | CLI adapter — `resolve_library_db_path`, `with_library_db`, and `CliError` mapping to exit code 1 |
@@ -88,11 +83,11 @@ Four distinct error surfaces — do not conflate them:
 
 - **Lightroom catalog is read-only** except for keyword writes via `lightroom/writer.py`.
 - **One writer at a time** on `library.db`: always use `library_write` context manager for DML; never bare `conn.commit()` in parallel worker paths.
-- **Library-DB reads through core.database only**: blueprints, job handlers, and CLI tools must not issue raw SQL against library tables — use typed helpers from `lightroom_tagger.core.database` (ADR-0008). Helpers return detached rows (`dict`), never live `sqlite3.Row`.
+- **Library-DB reads through core.database only**: blueprints, job handlers, and CLI tools must not issue raw SQL against library tables — use typed helpers from `lightroom_tagger.core.database` (ADR-0008). Helpers return detached rows (`dict`), never live `sqlite3.Row`. (Exception: legacy table counts where helpers were removed with [#225](https://github.com/ccanalesb/lightroom-tagger/issues/225) slice 3 are not reintroduced at call sites.)
 - **Library-DB and catalog lifecycle through managed context managers only** (ADR-0011): use `managed_library_db` / `managed_catalog` (or CLI `with_library_db` / handler `make_managed_library_db`); no hand-rolled `init_database(...)` or `connect_catalog(...)` + manual `close()` at orchestration sites (enforced by `test_db_lifecycle_guardrail.py`).
 - **Provider/model resolution through `resolve_model` only** (ADR-0007): no ad-hoc precedence ladders at call sites.
 - **Provider/LLM calls through the dispatcher seam only** (ADR-0009): orchestration code uses `FallbackDispatcher.call_with_fallback` with `vision_client` / `vision_client_batch` helpers inside `fn_factory`; no raw `client.chat.completions.create` outside the seam (enforced by `test_provider_call_guardrail.py`).
 - **Vision-op orchestration through the engine only** (ADR-0014): no inline `resolve_model → FallbackDispatcher → parse` outside `vision_op.py`; callers build `VisionOpSpec` via `analyzer` op-spec helpers and invoke `run_vision_op` / `run_vision_op_persist` (enforced by `test_vision_op_guardrail.py`).
 - **Providers are OpenAI-compatible**: all vision/LLM calls go through `openai.OpenAI` client regardless of backend (Ollama, NIM, OpenRouter).
-- **No Instagram API**: all Instagram data comes from user-provided export dumps via `instagram/dump_reader.py` and `instagram/deduplicator.py`. Live-crawl scraper code has been removed.
+- **No Instagram API or dump import**: removed with [#225](https://github.com/ccanalesb/lightroom-tagger/issues/225); see `docs/parked/instagram-matching.md`.
 - **Tests live next to modules**: `test_*.py` files are co-located under `lightroom_tagger/core/`.
