@@ -1,6 +1,6 @@
 # Parked: Posting analytics
 
-Retired 2026-08-12 · tag `parked/posting-analytics` · sha `b2aae02` · [map #218](https://github.com/ccanalesb/lightroom-tagger/issues/218)
+Retired 2026-08-12 · tag `parked/posting-analytics` · sha `dab3ac9` · [map #218](https://github.com/ccanalesb/lightroom-tagger/issues/218)
 
 ## What it did
 
