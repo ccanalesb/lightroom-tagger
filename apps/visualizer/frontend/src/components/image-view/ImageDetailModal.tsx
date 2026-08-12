@@ -302,6 +302,16 @@ function ImageDetailModalBody({
     ),
   )
 
+  const [postedOverride, setPostedOverride] = useState<boolean | null>(null)
+  useEffect(() => {
+    setPostedOverride(null)
+  }, [imageKey])
+
+  const displayImage =
+    postedOverride !== null && image
+      ? { ...image, instagram_posted: postedOverride }
+      : image
+
   const [, bump] = useState(0)
   const handleDataChanged = useCallback(() => {
     invalidate(detailKey)
@@ -323,10 +333,14 @@ function ImageDetailModalBody({
         </div>
 
         <div className="space-y-6">
-          <ImageMetadataBadges image={image} primaryScoreSource={primaryScoreSource} />
+          <ImageMetadataBadges image={displayImage} primaryScoreSource={primaryScoreSource} />
 
           {image.image_type === 'catalog' ? (
-            <CatalogImageDetailSections image={image} onDataChanged={handleDataChanged} />
+            <CatalogImageDetailSections
+              image={displayImage}
+              onDataChanged={handleDataChanged}
+              onPostedChange={setPostedOverride}
+            />
           ) : null}
           {image.image_type === 'instagram' ? (
             <InstagramImageDetailSections image={image} onDataChanged={handleDataChanged} />

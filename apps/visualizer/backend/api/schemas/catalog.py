@@ -74,6 +74,19 @@ class CatalogImage(BaseModel):
     score: float | None = None
 
 
+class InstagramPostedRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    posted: bool
+
+
+class InstagramPostedResponse(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    key: str
+    instagram_posted: bool
+
+
 class CatalogListResponse(BaseModel):
     model_config = ConfigDict(extra='forbid')
 

@@ -19,6 +19,8 @@ from api.schemas.catalog import (
     CatalogSimilarityGroupsResponse,
     CatalogSimilarResponse,
     ImageView,
+    InstagramPostedRequest,
+    InstagramPostedResponse,
 )
 from api.schemas.jobs import ErrorBody
 from lightroom_tagger.core.clip_similarity import NoClipEmbeddingError, run_clip_similar_for_seed
@@ -31,8 +33,10 @@ from lightroom_tagger.core.database import (
     get_image_description,
     get_similarity_candidates_for_group,
     get_vision_cached_image,
+    library_write,
     query_catalog_images,
     query_catalog_images_by_keys,
+    set_instagram_posted,
 )
 from lightroom_tagger.core.database import (
     get_catalog_months as list_catalog_months,
@@ -555,6 +559,38 @@ def list_catalog_similarity_groups(db):
             )
 
         return jsonify({"items": items, "total": total})
+    except Exception as e:
+        return error_server_error(str(e))
+
+
+@catalog_bp.route("/<path:image_key>/instagram-posted", methods=["PATCH"])
+@with_db
+@spec.validate(
+    json=InstagramPostedRequest,
+    resp=Response(
+        HTTP_200=InstagramPostedResponse,
+        HTTP_400=ErrorBody,
+        HTTP_404=ErrorBody,
+    ),
+    tags=['images-catalog'],
+)
+def patch_catalog_instagram_posted(db, image_key):
+    """Manually set or clear ``images.instagram_posted`` for a catalog key."""
+    try:
+        body = request.get_json(silent=True)
+        if not body or not isinstance(body, dict):
+            return error_bad_request("JSON body required")
+        posted_raw = body.get("posted")
+        if posted_raw is None or not isinstance(posted_raw, bool):
+            return error_bad_request("posted must be a boolean")
+
+        if not get_image(db, image_key):
+            return error_not_found("image")
+
+        with library_write(db):
+            set_instagram_posted(db, image_key, posted_raw)
+
+        return jsonify({"key": image_key, "instagram_posted": posted_raw})
     except Exception as e:
         return error_server_error(str(e))
 

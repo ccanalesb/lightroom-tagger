@@ -7,6 +7,7 @@ import type {
   IdentityPerPerspectiveScore,
   ImageDetailResponse,
   ImageView,
+  InstagramPostedResponse,
 } from '../types/catalog'
 import type {
   ConfigCatalogGetResponse,
@@ -507,6 +508,44 @@ export const ImagesAPI = {
       {
         method: 'POST',
         body: JSON.stringify({ image_key: imageKey }),
+      },
+    )
+    invalidateAll(['images.catalog'])
+    invalidateAll(['images.detail'])
+    invalidateAll(['dashboard'])
+    invalidateAll(['identity'])
+    return result
+  },
+
+  setInstagramPosted: async (imageKey: string, posted: boolean) => {
+    const result = await request<InstagramPostedResponse>(
+      `/images/catalog/${encodeURIComponent(imageKey)}/instagram-posted`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ posted }),
+      },
+    )
+    const detailPrefix = JSON.stringify(['images.detail']).slice(0, -1)
+    patchMatching(
+      (k) => k.startsWith(detailPrefix) && k.includes(imageKey),
+      (raw) => ({ ...(raw as ImageView), instagram_posted: posted }),
+    )
+    const catalogPrefix = JSON.stringify(['images.catalog']).slice(0, -1)
+    patchMatching(
+      (k) => k.startsWith(catalogPrefix),
+      (raw) => {
+        const resp = raw as { images?: CatalogImage[]; items?: CatalogImage[] }
+        const patchList = (rows: CatalogImage[] | undefined) =>
+          rows?.map((row) =>
+            row.key === imageKey ? { ...row, instagram_posted: posted } : row,
+          )
+        if (resp.images) {
+          return { ...resp, images: patchList(resp.images) }
+        }
+        if (resp.items) {
+          return { ...resp, items: patchList(resp.items) }
+        }
+        return raw
       },
     )
     invalidateAll(['images.catalog'])

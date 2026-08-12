@@ -9,16 +9,24 @@ from datetime import datetime, timedelta
 from .db_init import _deserialize_row, _serialize_json
 
 
-def update_instagram_status(db: sqlite3.Connection, key: str, posted: bool = True,
-                            post_date: str = None, url: str = None, index: int = 0) -> bool:
-    """Update Instagram status for an image."""
-    cursor = db.execute("""
-        UPDATE images SET instagram_posted = ?, instagram_post_date = ?,
-            instagram_url = ?, instagram_index = ?
-        WHERE key = ?
-    """, (int(posted), post_date, url, index, key))
-    db.commit()
+def set_instagram_posted(db: sqlite3.Connection, key: str, posted: bool) -> bool:
+    """Set whether a catalog image has been posted to Instagram.
+
+    Does not commit — pair with :func:`library_write` or call ``db.commit()``.
+    """
+    cursor = db.execute(
+        "UPDATE images SET instagram_posted = ? WHERE key = ?",
+        (int(posted), key),
+    )
     return cursor.rowcount > 0
+
+
+def update_instagram_status(db: sqlite3.Connection, key: str, posted: bool = True) -> bool:
+    """Update ``instagram_posted`` for a catalog image and commit."""
+    result = set_instagram_posted(db, key, posted)
+    if result:
+        db.commit()
+    return result
 
 
 def search_by_instagram_posted(db: sqlite3.Connection, posted: bool = True) -> list[dict]:

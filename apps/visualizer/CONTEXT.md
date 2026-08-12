@@ -26,6 +26,7 @@ The visualizer is the web product that surfaces library data to the user. It con
 | **model-scoped re-do** (`redo_unless_model`) | A batch describe/score mode that regenerates every eligible image *except* those whose current row was produced by the named target model, which it preserves. Lets a model-swap backlog run over many throttled cycles without redoing the target model's own finished work. Overrides blanket `force`. |
 | **identity** | Photographer style fingerprint and suggestions page (`IdentityPage.tsx`). |
 | **description search** | Keyword filter on the Images tab (`CatalogTab` / `description_search` → FTS5 over `image_descriptions`); not the retired chat Search page. |
+| **instagram_posted** | Catalog flag: user marks a photo as posted to Instagram in `ImageDetailModal`. Match validation still auto-sets it until that write path is removed (#218). Advisor and catalog `posted` filters read the column only. |
 
 ## Key files
 

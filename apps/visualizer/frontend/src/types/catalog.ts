@@ -20,5 +20,7 @@ export type ImageView = Pick<ImageViewSchema, 'image_type' | 'key'> &
   Partial<Omit<ImageViewSchema, 'image_type' | 'key'>>
 
 export type ImageDetailResponse = ImageViewSchema
+export type InstagramPostedResponse =
+  components['schemas']['InstagramPostedResponse.573ec44']
 export type IdentityPerPerspectiveScore =
   components['schemas']['ImageView.573ec44.IdentityPerPerspectiveScore']

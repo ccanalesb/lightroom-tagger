@@ -6,6 +6,7 @@ import { deleteMatching } from '../../../data/cache'
 import {
   IMAGE_DETAILS_DESCRIPTIVE_TECHNICAL,
   IMAGE_DETAILS_PERSPECTIVE_ANALYSIS,
+  IMAGE_DETAIL_POSTED_ARIA,
 } from '../../../constants/strings'
 import { CatalogImageDetailSections } from '../CatalogImageDetailSections'
 import type { ImageView } from '../../../services/api'
@@ -16,7 +17,12 @@ const mockGetDefaults = vi.fn()
 const mockListPerspectives = vi.fn()
 const mockGetCurrentScores = vi.fn()
 
+const mockSetInstagramPosted = vi.fn()
+
 vi.mock('../../../services/api', () => ({
+  ImagesAPI: {
+    setInstagramPosted: (...args: unknown[]) => mockSetInstagramPosted(...args),
+  },
   JobsAPI: {
     create: (...args: unknown[]) => mockCreate(...args),
   },
@@ -241,5 +247,51 @@ describe('CatalogImageDetailSections — scoring regenerate control', () => {
       expect(mockGetCurrentScores.mock.calls.length).toBeGreaterThanOrEqual(2)
     })
     expect(await within(perspectiveSection).findByText('Refreshed rationale')).toBeInTheDocument()
+  })
+})
+
+describe('CatalogImageDetailSections — instagram posted toggle', () => {
+  beforeEach(() => {
+    deleteMatching(() => true)
+    mockSetInstagramPosted.mockReset()
+    mockSetInstagramPosted.mockResolvedValue({
+      key: BASE_IMAGE.key,
+      instagram_posted: true,
+    })
+    mockGetDefaults.mockResolvedValue({
+      description: { provider: 'ollama', model: 'llava' },
+    })
+    mockListPerspectives.mockResolvedValue([])
+    mockGetDescription.mockResolvedValue({ description: null })
+    mockGetCurrentScores.mockResolvedValue({ current: [] })
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.clearAllMocks()
+  })
+
+  it('toggles posted via API and notifies parent optimistically', async () => {
+    const onPostedChange = vi.fn()
+    render(
+      <Suspense fallback={null}>
+        <CatalogImageDetailSections
+          image={{ ...BASE_IMAGE, instagram_posted: false }}
+          onPostedChange={onPostedChange}
+        />
+      </Suspense>,
+    )
+
+    const checkbox = await screen.findByRole('checkbox', { name: IMAGE_DETAIL_POSTED_ARIA })
+    expect(checkbox).not.toBeChecked()
+
+    fireEvent.click(checkbox)
+
+    expect(onPostedChange).toHaveBeenCalledWith(true)
+    expect(checkbox).toBeChecked()
+
+    await waitFor(() => {
+      expect(mockSetInstagramPosted).toHaveBeenCalledWith(BASE_IMAGE.key, true)
+    })
   })
 })

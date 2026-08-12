@@ -49,21 +49,16 @@ class TestInstagramStatus(unittest.TestCase):
         os.unlink(self.temp_db_path)
 
     def test_update_instagram_status(self):
-        """Test updating Instagram status."""
+        """Test updating Instagram posted flag."""
         result = update_instagram_status(
             self.db,
             '2024-01-15_photo.jpg',
             posted=True,
-            post_date='2024-02-01',
-            url='https://instagram.com/p/abc123',
-            index=0
         )
         self.assertTrue(result)
 
         img = get_image(self.db, '2024-01-15_photo.jpg')
         self.assertTrue(img['instagram_posted'])
-        self.assertEqual(img['instagram_post_date'], '2024-02-01')
-        self.assertEqual(img['instagram_url'], 'https://instagram.com/p/abc123')
 
     def test_get_images_without_hash(self):
         """Test finding images without hash."""

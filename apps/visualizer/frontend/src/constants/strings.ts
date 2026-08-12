@@ -247,6 +247,9 @@ export const CATALOG_FILTER_POSTED_ALL = 'All Images'
 export const CATALOG_FILTER_POSTED = 'Posted'
 export const CATALOG_FILTER_NOT_POSTED = 'Not Posted'
 
+export const IMAGE_DETAIL_POSTED_LABEL = 'Posted to Instagram'
+export const IMAGE_DETAIL_POSTED_ARIA = 'Mark whether this photo has been posted to Instagram'
+
 export const CATALOG_FILTER_ANALYZED_ALL = 'All'
 export const CATALOG_FILTER_ANALYZED_ONLY = 'Analyzed only'
 export const CATALOG_FILTER_NOT_ANALYZED = 'Not analyzed'
