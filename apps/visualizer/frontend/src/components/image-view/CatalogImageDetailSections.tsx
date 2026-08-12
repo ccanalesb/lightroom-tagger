@@ -1,5 +1,6 @@
 import type { ImageView } from '../../services/api'
 import { ImagesAPI } from '../../services/api'
+import { invalidateAll } from '../../data'
 import { AIDescriptionSection } from '../DescriptionPanel'
 import { AIPerspectiveSection } from '../catalog/AIPerspectiveSection'
 import { Badge } from '../ui/badges'
@@ -62,6 +63,10 @@ export function CatalogImageDetailSections({
     setTogglingPosted(true)
     try {
       await ImagesAPI.setInstagramPosted(image.key, next)
+      // Drop every cached catalog page: the Images grid can be filtered by
+      // `posted`, so a toggle changes which rows belong in the result set,
+      // not just how one row renders.
+      invalidateAll(['images.catalog', 'list'])
     } catch (e) {
       setPosted(prev)
       onPostedChange?.(prev)
