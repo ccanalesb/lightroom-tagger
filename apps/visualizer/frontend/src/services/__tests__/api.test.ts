@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { deleteMatching } from '../../data/cache'
 import { query } from '../../data/query'
-import { JobsAPI, ImagesAPI, MatchingAPI, DescriptionsAPI } from '../api'
+import { JobsAPI, ImagesAPI, DescriptionsAPI } from '../api'
 
 const fetchMock = vi.fn()
 globalThis.fetch = fetchMock
@@ -162,118 +162,12 @@ describe('ImagesAPI.getImageDetail', () => {
     expect(url).toContain('/images/catalog/a%2Fb%20c')
     expect(url).toContain('score_perspective=street')
   })
-
-  it('uses /images/instagram/<key> for instagram image_type', async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ image_type: 'instagram', key: 'ig1' }),
-    })
-    await ImagesAPI.getImageDetail('instagram', 'ig1')
-    const url = fetchMock.mock.calls[0][0] as string
-    expect(url).toMatch(/\/images\/instagram\/ig1$/)
-  })
 })
 
 describe('mutation cache updates', () => {
   beforeEach(() => {
     deleteMatching(() => true)
     vi.clearAllMocks()
-  })
-
-  it('MatchingAPI.validate patches matching.groups cache without forcing a refetch', async () => {
-    const listPayload = {
-      total: 1,
-      total_groups: 1,
-      match_groups: [
-        {
-          instagram_key: 'ik',
-          candidate_count: 1,
-          best_score: 0.9,
-          has_validated: false,
-          candidates: [
-            {
-              catalog_key: 'ck',
-              instagram_key: 'ik',
-              score: 0.9,
-            },
-          ],
-        },
-      ],
-      matches: [] as unknown[],
-    }
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => listPayload,
-    })
-    const listFetcher = () => MatchingAPI.list(100, 0, { sort_by_date: 'newest' })
-    const p1 = catchThrown(() => query(['matching.groups', 'newest'], listFetcher)) as Promise<unknown>
-    await p1
-    expect(query(['matching.groups', 'newest'], listFetcher)).toEqual(listPayload)
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ validated: true }),
-    })
-    await MatchingAPI.validate('ck', 'ik')
-
-    const p2 = catchThrown(() => query(['matching.groups', 'newest'], listFetcher)) as Promise<unknown>
-    await p2
-    const cached = query(['matching.groups', 'newest'], listFetcher)
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(cached.match_groups[0]?.has_validated).toBe(true)
-    expect(cached.match_groups[0]?.candidates[0]?.validated_at).toEqual(expect.any(String))
-  })
-
-  it('MatchingAPI.reject patches matching.groups cache without forcing a refetch', async () => {
-    const listPayload = {
-      total: 1,
-      total_groups: 1,
-      match_groups: [
-        {
-          instagram_key: 'i1',
-          candidate_count: 2,
-          best_score: 0.9,
-          has_validated: false,
-          candidates: [
-            {
-              catalog_key: 'c1',
-              instagram_key: 'i1',
-              score: 0.9,
-            },
-            {
-              catalog_key: 'c2',
-              instagram_key: 'i1',
-              score: 0.4,
-            },
-          ],
-        },
-      ],
-      matches: [] as unknown[],
-    }
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => listPayload,
-    })
-    const listFetcher = () => MatchingAPI.list(50, 0, { sort_by_date: 'oldest' })
-    const p1 = catchThrown(() => query(['matching.groups', 'oldest'], listFetcher)) as Promise<unknown>
-    await p1
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ rejected: true }),
-    })
-    await MatchingAPI.reject('c1', 'i1')
-
-    const p2 = catchThrown(() => query(['matching.groups', 'oldest'], listFetcher)) as Promise<unknown>
-    await p2
-    const cached = query(['matching.groups', 'oldest'], listFetcher)
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(cached.match_groups[0]?.candidate_count).toBe(1)
-    expect(cached.match_groups[0]?.candidates).toHaveLength(1)
-    expect(cached.match_groups[0]?.candidates[0]?.catalog_key).toBe('c2')
-    expect(cached.match_groups[0]?.best_score).toBeGreaterThan(0)
   })
 
   it('DescriptionsAPI.generate clears descriptions query for that image key', async () => {

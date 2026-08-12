@@ -33,8 +33,6 @@ import {
   CATALOG_CACHE_NAS_TROUBLESHOOTING_DOC_URL,
   CATALOG_CACHE_NAS_TROUBLESHOOTING_LINK_LABEL,
   CATALOG_CACHE_PIPELINE_TITLE,
-  CATALOG_CACHE_PREPARE_CATALOG_HELPER,
-  CATALOG_CACHE_PREPARE_CATALOG_TITLE,
   CATALOG_CACHE_PROGRESS_LABEL,
   CATALOG_CACHE_SIMILARITY_HELPER,
   CATALOG_CACHE_SIMILARITY_LABEL,
@@ -87,8 +85,7 @@ type AdvancedBusyKey =
   | 'embed_catalog'
   | 'embed_catalog_ig'
   | 'stack'
-  | 'similarity'
-  | 'prepare';
+  | 'similarity';
 
 export interface CatalogCacheTabProps {
   onOpenJobQueue?: () => void;
@@ -148,11 +145,12 @@ export function CatalogCacheTab({ onOpenJobQueue }: CatalogCacheTabProps) {
     if (key === 'embed_catalog' || key === 'embed_catalog_ig') {
       return PROCESSING_EMBED_CATALOG_QUEUED;
     }
-    const labels: Record<Exclude<AdvancedBusyKey, 'embed_catalog' | 'embed_catalog_ig'>, string> = {
+    const labels: Record<AdvancedBusyKey, string> = {
       sync: CATALOG_CACHE_SYNC_LABEL,
       stack: CATALOG_CACHE_STACK_DETECT_LABEL,
       similarity: CATALOG_CACHE_SIMILARITY_LABEL,
-      prepare: CATALOG_CACHE_PREPARE_CATALOG_TITLE,
+      embed_catalog: CATALOG_CACHE_EMBED_CATALOG_LABEL,
+      embed_catalog_ig: CATALOG_CACHE_EMBED_CATALOG_IG_LABEL,
     };
     return CATALOG_CACHE_PIPELINE_JOB_QUEUED(labels[key]);
   }, []);
@@ -328,14 +326,6 @@ export function CatalogCacheTab({ onOpenJobQueue }: CatalogCacheTabProps) {
                 disabled={anyBusy}
                 isBusy={advancedBusy === 'similarity'}
                 onRun={() => runAdvancedJob('similarity', 'batch_catalog_similarity', {})}
-              />
-              <PipelineRow
-                label={CATALOG_CACHE_PREPARE_CATALOG_TITLE}
-                helper={CATALOG_CACHE_PREPARE_CATALOG_HELPER}
-                lastRun={pipelineStatus.prepare_catalog ?? null}
-                disabled={anyBusy}
-                isBusy={advancedBusy === 'prepare'}
-                onRun={() => runAdvancedJob('prepare', 'prepare_catalog', {})}
               />
               {pipelineQueuedMessage ? (
                 <div className="rounded-base border border-border bg-surface p-4 space-y-3">

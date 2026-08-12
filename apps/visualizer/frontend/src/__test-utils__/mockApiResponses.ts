@@ -59,7 +59,7 @@ export function mockApiResponses(
         ok: true,
         json: async () => ({
           id: "test-job-id",
-          type: "vision_match",
+          type: "batch_describe",
           status: "pending",
           metadata: JSON.parse(init.body as string).metadata,
         }),

@@ -29,7 +29,7 @@ def db():
 
 
 def _create(db, status='pending'):
-    job_id = create_job(db, 'vision_match', {})
+    job_id = create_job(db, 'batch_describe', {})
     if status != 'pending':
         update_job_status(db, job_id, status)
     return job_id

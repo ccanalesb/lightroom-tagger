@@ -12,12 +12,6 @@ from jobs.handlers.analyze import (
 )
 from jobs.handlers.catalog import handle_catalog_sync
 from jobs.handlers.embed import handle_batch_embed_image
-from jobs.handlers.instagram import handle_analyze_instagram, handle_instagram_import
-from jobs.handlers.matching import (
-    handle_enrich_catalog,
-    handle_prepare_catalog,
-    handle_vision_match,
-)
 from jobs.handlers.stacks import (
     handle_batch_catalog_similarity,
     handle_batch_stack_detect,
@@ -28,11 +22,6 @@ from library_db import JOB_TYPES_REQUIRING_CATALOG
 
 # Snapshot of the pre-registry handler map — guards against accidental drift.
 _EXPECTED_JOB_HANDLERS = {
-    'analyze_instagram': handle_analyze_instagram,
-    'instagram_import': handle_instagram_import,
-    'vision_match': handle_vision_match,
-    'enrich_catalog': handle_enrich_catalog,
-    'prepare_catalog': handle_prepare_catalog,
     'batch_describe': handle_batch_describe,
     'single_describe': handle_single_describe,
     'single_score': handle_single_score,
@@ -47,9 +36,6 @@ _EXPECTED_JOB_HANDLERS = {
 
 _EXPECTED_CATALOG_JOB_TYPES = frozenset(
     {
-        'vision_match',
-        'enrich_catalog',
-        'prepare_catalog',
         'batch_describe',
         'batch_score',
         'batch_analyze',
@@ -58,7 +44,6 @@ _EXPECTED_CATALOG_JOB_TYPES = frozenset(
         'batch_embed_image',
         'single_describe',
         'single_score',
-        'instagram_import',
         'catalog_cache_build',
         'catalog_sync',
     }
@@ -110,7 +95,5 @@ def test_composite_job_types_have_no_checkpoint_fields():
         assert jt.checkpoint_mismatch_message is None
 
 
-def test_analyze_instagram_does_not_require_catalog():
-    jt = JOB_TYPES_BY_NAME['analyze_instagram']
-    assert jt.requires_catalog is False
-    assert 'analyze_instagram' not in JOB_TYPES_REQUIRING_CATALOG
+def test_all_job_types_require_catalog():
+    assert all(jt.requires_catalog for jt in JOB_TYPES)

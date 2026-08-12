@@ -18,8 +18,6 @@ import type {
   CatalogImageInput,
   ImageView,
   IdentityBestPhotoItem,
-  InstagramImageInput,
-  Match,
   MirrorExemplar,
   PostNextCandidate,
 } from '../../services/api'
@@ -101,51 +99,4 @@ export function fromMirrorExemplar(row: MirrorExemplar): ImageView {
     stack_member_count: row.stack_size,
     is_stack_representative: row.stack_id != null && (row.stack_size ?? 0) > 1 ? true : null,
   }
-}
-
-export function fromInstagramRow(row: InstagramImageInput): ImageView {
-  return {
-    image_type: 'instagram',
-    key: row.key,
-    filename: row.filename,
-    local_path: row.local_path,
-    created_at: row.created_at ?? null,
-    post_url: row.post_url ?? null,
-    caption: row.caption,
-    description_summary: row.description ?? null,
-    ai_analyzed:
-      typeof row.description === 'string' && row.description.trim().length > 0,
-    image_hash: row.image_hash,
-    // No identity / catalog score fields for Instagram rows.
-  }
-}
-
-/**
- * Matches carry partial `InstagramImage` / `CatalogImage` rows inside each
- * `Match`. Neither side carries identity or catalog-perspective scores, so
- * we only map the shape we have and let `ImageDetailModal` re-fetch the
- * authoritative payload on click (same contract as every other surface).
- */
-export function fromMatchSide(match: Match, side: 'instagram' | 'catalog'): ImageView {
-  if (side === 'instagram') {
-    const embedded = match.instagram_image
-    if (embedded) return fromInstagramRow(embedded)
-    return {
-      image_type: 'instagram',
-      key: match.instagram_key,
-      filename: filenameFromKey(match.instagram_key),
-    }
-  }
-  const embedded = match.catalog_image
-  if (embedded) return fromCatalogListRow(embedded)
-  return {
-    image_type: 'catalog',
-    key: match.catalog_key,
-    filename: filenameFromKey(match.catalog_key),
-  }
-}
-
-function filenameFromKey(key: string): string {
-  const tail = key.split('/').pop() ?? key
-  return tail.split('_').pop() ?? tail
 }

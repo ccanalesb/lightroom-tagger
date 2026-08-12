@@ -231,7 +231,7 @@ def _scan_source(source: str, rel_path: str = "fake/module.py") -> list[_Registr
 def test_detector_flags_parallel_handler_map() -> None:
     hits = _scan_source(
         "HANDLERS = {\n"
-        "    'vision_match': handle_vision_match,\n"
+        "    'batch_score': handle_batch_score,\n"
         "    'batch_describe': handle_batch_describe,\n"
         "}\n"
     )
@@ -240,6 +240,6 @@ def test_detector_flags_parallel_handler_map() -> None:
 
 def test_detector_flags_parallel_catalog_set() -> None:
     hits = _scan_source(
-        "NEEDS_CATALOG = frozenset({'vision_match', 'batch_describe'})\n"
+        "NEEDS_CATALOG = frozenset({'batch_score', 'batch_describe'})\n"
     )
     assert any(h.kind == "catalog_requirement_set" for h in hits)

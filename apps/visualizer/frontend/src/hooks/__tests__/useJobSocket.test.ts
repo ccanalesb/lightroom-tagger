@@ -92,7 +92,7 @@ describe('useJobSocket', () => {
     )?.[1] as (job: Job) => void;
     expect(createdHandler).toBeDefined();
 
-    const job = { id: 'job-new', status: 'pending', type: 'vision_match' } as Job;
+    const job = { id: 'job-new', status: 'pending', type: 'batch_describe' } as Job;
     act(() => {
       createdHandler(job);
     });

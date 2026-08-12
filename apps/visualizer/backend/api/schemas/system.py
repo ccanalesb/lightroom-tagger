@@ -73,4 +73,3 @@ class CachePipelineStatus(BaseModel):
     stack_detect: CachePipelineRun | None = None
     catalog_similarity: CachePipelineRun | None = None
     catalog_cache_build: CachePipelineRun | None = None
-    prepare_catalog: CachePipelineRun | None = None

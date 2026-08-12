@@ -63,7 +63,6 @@ const EMPTY_PIPELINE_STATUS = {
   stack_detect: null,
   catalog_similarity: null,
   catalog_cache_build: null,
-  prepare_catalog: null,
 };
 
 describe('CatalogCacheTab', () => {
@@ -279,10 +278,10 @@ describe('CatalogCacheTab', () => {
       await screen.findByRole('button', { name: new RegExp(CATALOG_CACHE_PIPELINE_TITLE, 'i') }),
     );
     expect(await screen.findByText(CATALOG_CACHE_EMBED_CATALOG_HELPER)).toBeTruthy();
-    // 6 pipeline rows (sync, catalog, catalog+ig, stack, similarity, prepare) all
+    // 5 pipeline rows (sync, catalog, catalog+ig, stack, similarity) all
     // start with "Never run" until at least one job has been created.
     const neverBadges = await screen.findAllByText(CATALOG_CACHE_LAST_RUN_NEVER);
-    expect(neverBadges.length).toBe(6);
+    expect(neverBadges.length).toBe(5);
   });
 
   it('renders status badge and relative timestamp for last run', async () => {

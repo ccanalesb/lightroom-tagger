@@ -154,22 +154,18 @@ def create_app():
         scores,
         system,
     )
-    from api.images import catalog_bp, instagram_bp, matches_bp, stacks_bp
+    from api.images import catalog_bp, stacks_bp
     from api.images.catalog import list_catalog_similarity_groups
-    from api.images.instagram import list_dump_media
 
     app.register_blueprint(jobs.bp, url_prefix='/api/jobs')
     app.register_blueprint(catalog_bp, url_prefix='/api/images/catalog')
     app.register_blueprint(stacks_bp, url_prefix='/api/images/stacks')
-    app.register_blueprint(instagram_bp, url_prefix='/api/images/instagram')
-    app.register_blueprint(matches_bp, url_prefix='/api/images/matches')
 
     app.add_url_rule(
         '/api/images/catalog-similarity-groups',
         view_func=list_catalog_similarity_groups,
         methods=['GET'],
     )
-    app.add_url_rule('/api/images/dump-media', view_func=list_dump_media, methods=['GET'])
 
     # Legacy invalid detail shape: ``/api/images/<bad_type>/<image_key>`` for ``bad_type`` not a
     # mounted family. Registered after family blueprints so real paths like ``/api/images/catalog/<key>``

@@ -194,27 +194,6 @@ def test_detail_catalog_with_score_perspective_query(detail_client):
     assert filtered["catalog_score_perspective"] == base["catalog_score_perspective"] == s0
 
 
-def test_detail_instagram_has_empty_identity(detail_client):
-    client, _catalog_key, _s0, _s1 = detail_client
-
-    resp = client.get("/api/images/instagram/ig-probe")
-    assert resp.status_code == 200
-    data = resp.get_json()
-    assert data["image_type"] == "instagram"
-    assert data["key"] == "ig-probe"
-    assert data["identity_aggregate_score"] is None
-    assert data["identity_per_perspective"] == []
-    assert data["available_score_perspectives"] == []
-    assert data["catalog_perspective_score"] is None
-    # Parity with ``_enrich_instagram_media`` so the detail modal renders
-    # the same folder/source fields list tiles would have.
-    assert data["instagram_folder"] == "2024-05"
-    assert data["local_path"] == "/tmp/ig-probe.jpg"
-    assert "source_folder" in data  # may be None for this fake file_path
-    assert data["processed"] is False
-    assert data["matched_catalog_key"] is None
-
-
 def test_detail_404_for_unknown_key(detail_client):
     client, *_ = detail_client
     resp = client.get("/api/images/catalog/does-not-exist")
@@ -223,9 +202,9 @@ def test_detail_404_for_unknown_key(detail_client):
 
 def test_detail_400_for_invalid_image_type(detail_client):
     client, catalog_key, *_ = detail_client
-    # Image type not in {catalog, instagram}. Because other static routes
-    # (``/catalog``, ``/instagram``, ``/matches``, ``/dump-media``) would win
-    # as prefixes, we use a two-segment URL with an unknown type.
+    # Image type not served by a mounted family blueprint (only ``/catalog``
+    # and ``/stacks`` remain). Use a two-segment URL with an unknown type so
+    # the legacy invalid-detail fallback returns 400.
     resp = client.get(f"/api/images/foo/{catalog_key}")
     assert resp.status_code == 400
 

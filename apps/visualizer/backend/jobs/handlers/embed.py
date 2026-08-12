@@ -93,7 +93,7 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                     (
                         'batch_embed_image stage=precompute_embeddings '
                         '(builds similarity index only; does not produce matches). '
-                        'After completion, run vision_match or stack detection.'
+                        'After completion, run stack detection or catalog similarity.'
                     ),
                 )
 

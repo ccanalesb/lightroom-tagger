@@ -42,7 +42,7 @@ def test_list_jobs(client):
 
 def test_create_job(client):
     response = client.post('/api/jobs/',
-        json={'type': 'analyze_instagram', 'metadata': {'post_url': 'https://instagram.com/p/ABC'}}
+        json={'type': 'batch_describe', 'metadata': {}}
     )
     assert response.status_code == 201
     assert 'id' in response.json
@@ -52,7 +52,7 @@ def test_create_job(client):
 def test_create_job_emits_socketio(client, mock_socketio):
     response = client.post(
         '/api/jobs/',
-        json={'type': 'analyze_instagram', 'metadata': {}},
+        json={'type': 'batch_describe', 'metadata': {}},
     )
     assert response.status_code == 201
     job_id = response.json['id']
@@ -63,23 +63,15 @@ def test_create_job_emits_socketio(client, mock_socketio):
     assert payload['status'] == 'pending'
     assert payload == response.json
 
-def test_create_instagram_import_job(client):
-    response = client.post(
-        '/api/jobs/',
-        json={'type': 'instagram_import', 'metadata': {}},
-    )
-    assert response.status_code == 201
-    assert response.json['type'] == 'instagram_import'
-
 def test_get_job(client):
     create_resp = client.post('/api/jobs/',
-        json={'type': 'vision_match', 'metadata': {}}
+        json={'type': 'batch_describe', 'metadata': {}}
     )
     job_id = create_resp.json['id']
 
     response = client.get(f'/api/jobs/{job_id}')
     assert response.status_code == 200
-    assert response.json['type'] == 'vision_match'
+    assert response.json['type'] == 'batch_describe'
 
 def test_get_active_jobs(client):
     response = client.get('/api/jobs/active')
@@ -87,7 +79,7 @@ def test_get_active_jobs(client):
     assert len(response.json) == 0
 
     client.post('/api/jobs/',
-        json={'type': 'vision_match', 'metadata': {}}
+        json={'type': 'batch_describe', 'metadata': {}}
     )
 
     response = client.get('/api/jobs/active')
@@ -95,7 +87,7 @@ def test_get_active_jobs(client):
     assert len(response.json) == 1
 
 
-def _seed_jobs(client, count, job_type='vision_match'):
+def _seed_jobs(client, count, job_type='batch_describe'):
     ids = []
     for _ in range(count):
         resp = client.post('/api/jobs/', json={'type': job_type, 'metadata': {}})
@@ -140,7 +132,7 @@ def test_list_jobs_default_limit_50(client):
 
 def test_get_job_truncates_logs_when_logs_limit_set(client):
     from database import add_job_log
-    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    create_resp = client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
     job_id = create_resp.json['id']
     for i in range(30):
         add_job_log(client.application.db, job_id, 'info', f'log entry {i}')
@@ -153,7 +145,7 @@ def test_get_job_truncates_logs_when_logs_limit_set(client):
 
 def test_get_job_logs_limit_zero_returns_all(client):
     from database import add_job_log
-    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    create_resp = client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
     job_id = create_resp.json['id']
     for i in range(5):
         add_job_log(client.application.db, job_id, 'info', f'log {i}')
@@ -164,7 +156,7 @@ def test_get_job_logs_limit_zero_returns_all(client):
 
 def test_get_job_logs_total_present_when_no_param(client):
     from database import add_job_log
-    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    create_resp = client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
     job_id = create_resp.json['id']
     for i in range(3):
         add_job_log(client.application.db, job_id, 'info', f'log {i}')
@@ -231,7 +223,7 @@ def test_get_job_details_compacts_checkpoint_lists(client):
 def test_active_jobs_includes_log_summary_fields(client):
     from database import add_job_log
 
-    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    create_resp = client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
     job_id = create_resp.json['id']
     add_job_log(client.application.db, job_id, 'warning', 'be careful')
 
@@ -264,7 +256,7 @@ def test_cancel_returns_503_json_when_database_locked(client, monkeypatch):
     import sqlite3
     from api import jobs as jobs_api
 
-    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    create_resp = client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
     job_id = create_resp.json['id']
 
     def _raise_locked(*_args, **_kwargs):
@@ -284,7 +276,7 @@ def test_retry_returns_503_json_when_database_locked(client, monkeypatch):
     from database import update_job_status
     from api import jobs as jobs_api
 
-    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    create_resp = client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
     job_id = create_resp.json['id']
     update_job_status(client.application.db, job_id, 'failed')
 
@@ -335,19 +327,11 @@ def test_create_catalog_job_rejected_when_library_db_missing(client, tmp_path, m
     assert body['library_db']['exists'] is False
 
 
-def test_create_non_catalog_job_allowed_when_library_db_missing(client, tmp_path, monkeypatch):
-    """Jobs that don't touch the catalog (e.g. ``analyze_instagram``) stay allowed."""
-    monkeypatch.setenv('LIBRARY_DB', str(tmp_path / 'nope.db'))
-    response = client.post('/api/jobs/', json={'type': 'analyze_instagram', 'metadata': {}})
-    assert response.status_code == 201
-    assert response.json['status'] == 'pending'
-
-
 def test_create_catalog_job_allowed_when_library_db_exists(client, tmp_path, monkeypatch):
     db = tmp_path / 'library.db'
     db.touch()
     monkeypatch.setenv('LIBRARY_DB', str(db))
-    response = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    response = client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
     assert response.status_code == 201
 
 
@@ -361,7 +345,7 @@ def test_cancel_is_idempotent_on_already_cancelled_job(client):
     """
     from database import update_job_status
 
-    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    create_resp = client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
     job_id = create_resp.json['id']
     update_job_status(client.application.db, job_id, 'cancelled')
 
@@ -378,7 +362,7 @@ def test_cancel_is_idempotent_on_completed_job(client):
     """Cancel against a completed job is treated as a no-op, not an error."""
     from database import update_job_status
 
-    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    create_resp = client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
     job_id = create_resp.json['id']
     update_job_status(client.application.db, job_id, 'completed')
 
@@ -392,7 +376,7 @@ def test_cancel_is_idempotent_on_failed_job(client):
     """Cancel against a failed job is treated as a no-op, not an error."""
     from database import update_job_status
 
-    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    create_resp = client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
     job_id = create_resp.json['id']
     update_job_status(client.application.db, job_id, 'failed')
 
@@ -456,8 +440,8 @@ def test_processor_health_reports_pending_count_from_db(client):
     can spot "pending not being picked up" from one endpoint.
     """
     # Enqueue two jobs.
-    client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
-    client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
+    client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
 
     response = client.get('/api/jobs/_processor_health')
     assert response.status_code == 200
@@ -469,7 +453,7 @@ def test_cancel_does_not_swallow_non_lock_operational_errors(client, monkeypatch
     import sqlite3
     from api import jobs as jobs_api
 
-    create_resp = client.post('/api/jobs/', json={'type': 'vision_match', 'metadata': {}})
+    create_resp = client.post('/api/jobs/', json={'type': 'batch_describe', 'metadata': {}})
     job_id = create_resp.json['id']
 
     def _raise_other(*_args, **_kwargs):

@@ -3,15 +3,11 @@ import { NULLABLE_BEST_PHOTO_FIELDS } from '../../../__test-utils__/identityFixt
 import type {
   CatalogImageInput,
   IdentityBestPhotoItem,
-  InstagramImageInput,
-  Match,
   PostNextCandidate,
 } from '../../../services/api'
 import {
   fromBestPhotoRow,
   fromCatalogListRow,
-  fromInstagramRow,
-  fromMatchSide,
   fromPostNextRow,
 } from '../adapters'
 
@@ -99,89 +95,5 @@ describe('image-view adapters', () => {
     expect(out.identity_perspectives_covered).toBe(2)
     expect(out.identity_per_perspective).toEqual([])
     expect(out.identity_eligible).toBeUndefined()
-  })
-
-  it('fromInstagramRow keeps image_type=instagram and omits identity fields', () => {
-    const row: InstagramImageInput = {
-      key: 'ig-1',
-      local_path: '/tmp/ig.jpg',
-      filename: 'ig.jpg',
-      instagram_folder: '2024-05',
-      source_folder: 'posts',
-      date_folder: '202405',
-      crawled_at: '',
-      image_index: 1,
-      total_in_post: 1,
-      caption: 'hi',
-      description: 'ai-desc',
-    }
-    const out = fromInstagramRow(row)
-    expect(out.image_type).toBe('instagram')
-    expect(out.description_summary).toBe('ai-desc')
-    expect(out.ai_analyzed).toBe(true)
-    expect(out.identity_aggregate_score).toBeUndefined()
-    expect(out.catalog_perspective_score).toBeUndefined()
-  })
-
-  it('fromInstagramRow sets ai_analyzed true when description is non-empty after trim', () => {
-    const base: Omit<InstagramImageInput, 'description'> = {
-      key: 'ig-2',
-      local_path: '/tmp/x.jpg',
-      filename: 'x.jpg',
-      instagram_folder: '2024-05',
-      source_folder: 'posts',
-      date_folder: '202405',
-      crawled_at: '',
-      image_index: 1,
-      total_in_post: 1,
-      caption: '',
-    }
-    const out = fromInstagramRow({ ...base, description: '  hello  ' })
-    expect(out.ai_analyzed).toBe(true)
-    expect(out.description_summary).toBe('  hello  ')
-  })
-
-  it('fromInstagramRow sets ai_analyzed false when description is missing or blank', () => {
-    const base: Omit<InstagramImageInput, 'description'> = {
-      key: 'ig-3',
-      local_path: '/tmp/y.jpg',
-      filename: 'y.jpg',
-      instagram_folder: '2024-05',
-      source_folder: 'posts',
-      date_folder: '202405',
-      crawled_at: '',
-      image_index: 1,
-      total_in_post: 1,
-      caption: '',
-    }
-    expect(fromInstagramRow({ ...base }).ai_analyzed).toBe(false)
-    expect(fromInstagramRow({ ...base, description: '' }).ai_analyzed).toBe(false)
-    expect(fromInstagramRow({ ...base, description: '   ' }).ai_analyzed).toBe(false)
-  })
-
-  it('fromMatchSide instagram uses fromInstagramRow so ai_analyzed follows description', () => {
-    const embedded: InstagramImageInput = {
-      key: 'ig-m',
-      local_path: '/tmp/m.jpg',
-      filename: 'm.jpg',
-      instagram_folder: '2024-05',
-      source_folder: 'posts',
-      date_folder: '202405',
-      crawled_at: '',
-      image_index: 1,
-      total_in_post: 1,
-      caption: '',
-      description: 'match list description',
-    }
-    const match: Match = {
-      instagram_key: 'ig-m',
-      catalog_key: 'cat-1',
-      score: 0.9,
-      instagram_image: embedded,
-    }
-    const out = fromMatchSide(match, 'instagram')
-    expect(out.image_type).toBe('instagram')
-    expect(out.ai_analyzed).toBe(true)
-    expect(out.description_summary).toBe('match list description')
   })
 })

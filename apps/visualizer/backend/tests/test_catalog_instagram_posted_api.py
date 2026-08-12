@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import os
-import tempfile
-
 import pytest
 from app import create_app
 from lightroom_tagger.core.database import get_image, init_database, store_image
@@ -87,36 +84,3 @@ def test_patch_instagram_posted_requires_boolean(catalog_posted_client):
         json={"posted": "yes"},
     )
     assert resp.status_code == 400
-
-
-def test_validate_match_still_sets_instagram_posted():
-    """Auto-write from match validation remains until the next #218 slice."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = os.path.join(tmpdir, "test.db")
-        db = init_database(db_path)
-        db.execute(
-            "INSERT INTO images (key, filename, filepath, date_taken) VALUES (?, ?, ?, ?)",
-            ("cat_001", "photo.jpg", "/fake/photo.jpg", "2024-01-15"),
-        )
-        db.execute(
-            "INSERT INTO instagram_dump_media (media_key, filename, file_path, created_at) "
-            "VALUES (?, ?, ?, ?)",
-            ("ig_001", "insta.jpg", "/fake/insta.jpg", "2024-01-15"),
-        )
-        db.execute(
-            "INSERT INTO matches (catalog_key, insta_key, total_score, vision_result) "
-            "VALUES (?, ?, ?, ?)",
-            ("cat_001", "ig_001", 0.85, "SAME"),
-        )
-        db.commit()
-        db.close()
-
-        client, _ = _make_client(db_path)
-        resp = client.patch("/api/images/matches/cat_001/ig_001/validate")
-        assert resp.status_code == 200
-
-        db = init_database(db_path)
-        img = get_image(db, "cat_001")
-        db.close()
-        assert img is not None
-        assert img["instagram_posted"] is True

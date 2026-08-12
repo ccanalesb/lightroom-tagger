@@ -1,7 +1,7 @@
 """Tests for ``GET /api/cache/pipeline-status``.
 
 The endpoint surfaces the most recent run for each Catalog Cache pipeline
-trigger so the UI can display "Last run X ago" next to each button. The seven
+trigger so the UI can display "Last run X ago" next to each button. The six
 buckets share a small set of edge cases:
 
 * No matching job → ``null``
@@ -58,7 +58,6 @@ def test_pipeline_status_returns_null_for_every_bucket_when_empty(client):
         'stack_detect',
         'catalog_similarity',
         'catalog_cache_build',
-        'prepare_catalog',
     }
     assert set(body.keys()) == expected_keys
     for v in body.values():
@@ -69,14 +68,12 @@ def test_pipeline_status_buckets_each_simple_job_type(client):
     sync = _create(client, 'catalog_sync')
     sd = _create(client, 'batch_stack_detect')
     sim = _create(client, 'batch_catalog_similarity')
-    pc = _create(client, 'prepare_catalog')
     chain = _create(client, 'catalog_cache_build')
 
     body = client.get('/api/cache/pipeline-status').json
     assert body['catalog_sync']['job_id'] == sync
     assert body['stack_detect']['job_id'] == sd
     assert body['catalog_similarity']['job_id'] == sim
-    assert body['prepare_catalog']['job_id'] == pc
     assert body['catalog_cache_build']['job_id'] == chain
     assert body['embed_catalog'] is None
     assert body['embed_catalog_and_instagram'] is None

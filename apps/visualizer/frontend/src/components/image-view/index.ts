@@ -1,8 +1,6 @@
 export {
   fromBestPhotoRow,
   fromCatalogListRow,
-  fromInstagramRow,
-  fromMatchSide,
   fromMirrorExemplar,
   fromPostNextRow,
 } from './adapters'

@@ -177,7 +177,6 @@ _CACHE_PIPELINE_BUCKETS: tuple[tuple[str, str, dict], ...] = (
     ('stack_detect', 'batch_stack_detect', {}),
     ('catalog_similarity', 'batch_catalog_similarity', {}),
     ('catalog_cache_build', 'catalog_cache_build', {}),
-    ('prepare_catalog', 'prepare_catalog', {}),
 )
 
 
@@ -245,7 +244,6 @@ def get_cache_pipeline_status():
     * ``stack_detect`` — most recent ``batch_stack_detect``.
     * ``catalog_similarity`` — most recent ``batch_catalog_similarity``.
     * ``catalog_cache_build`` — most recent composite chain (D-08).
-    * ``prepare_catalog`` — most recent pre-compress run.
 
     Each value is ``null`` when no matching job exists, otherwise:
 

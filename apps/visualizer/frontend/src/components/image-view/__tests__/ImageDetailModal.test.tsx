@@ -195,23 +195,23 @@ describe('ImageDetailModal', () => {
     })
   })
 
-  it('renders instagram images without catalog detail sections', async () => {
-    vi.spyOn(ImagesAPI, 'getImageDetail').mockResolvedValue(
-      buildDetail({ image_type: 'instagram', key: 'ig1', filename: 'ig1.jpg' }),
-    )
+  it('renders instagram images from initialImage without calling detail API', async () => {
+    const spy = vi.spyOn(ImagesAPI, 'getImageDetail')
 
     render(
       <ImageDetailModal
         imageType="instagram"
         imageKey="ig1"
+        initialImage={buildDetail({ image_type: 'instagram', key: 'ig1', filename: 'ig1.jpg' })}
         primaryScoreSource="none"
         onClose={() => {}}
       />,
     )
 
     await waitFor(() => {
-      expect(screen.getByAltText('ig1')).toBeInTheDocument()
+      expect(screen.getByAltText('ig1.jpg')).toBeInTheDocument()
     })
+    expect(spy).not.toHaveBeenCalled()
     expect(screen.queryByTestId('catalog-sections')).toBeNull()
     expect(screen.queryByTestId('instagram-sections')).toBeNull()
   })

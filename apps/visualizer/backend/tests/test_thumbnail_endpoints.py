@@ -9,7 +9,7 @@ import pytest
 from app import create_app
 
 from lightroom_tagger.core.config import Config
-from lightroom_tagger.core.database import init_database, store_image, store_instagram_dump_media
+from lightroom_tagger.core.database import init_database, store_image
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[1]
 _API_ROOT = _BACKEND_ROOT / "api"
@@ -49,39 +49,6 @@ def catalog_thumbnail_client(tmp_path, monkeypatch):
     return create_app().test_client(), "2024-01-10_thumb.jpg"
 
 
-@pytest.fixture
-def instagram_thumbnail_client(tmp_path, monkeypatch):
-    dump_root = tmp_path / "instagram_dump"
-    media_dir = dump_root / "media" / "posts" / "202405"
-    media_dir.mkdir(parents=True)
-    image_path = media_dir / "aaa.jpg"
-    image_path.write_bytes(_minimal_jpeg_bytes())
-
-    db_path = str(tmp_path / "library.db")
-    conn = init_database(db_path)
-    store_instagram_dump_media(
-        conn,
-        {
-            "media_key": "202405/aaa",
-            "file_path": str(image_path),
-            "filename": "aaa.jpg",
-            "date_folder": "202405",
-            "caption": "cap-a",
-            "created_at": "2024-05-01T10:00:00",
-            "added_at": "2024-05-02T11:00:00",
-            "post_url": "https://example/p/a",
-            "image_hash": "hash-a",
-            "processed": False,
-        },
-    )
-    conn.close()
-
-    monkeypatch.setattr("utils.db.LIBRARY_DB", db_path)
-    cfg = Config(instagram_dump_path=str(dump_root))
-    monkeypatch.setattr("lightroom_tagger.core.config.load_config", lambda _path="config.yaml": cfg)
-    return create_app().test_client(), "202405/aaa"
-
-
 def test_catalog_thumbnail_returns_jpeg(catalog_thumbnail_client):
     client, image_key = catalog_thumbnail_client
     response = client.get(f"/api/images/catalog/{image_key}/thumbnail")
@@ -93,23 +60,6 @@ def test_catalog_thumbnail_returns_jpeg(catalog_thumbnail_client):
 def test_catalog_thumbnail_missing_key_returns_404(catalog_thumbnail_client):
     client, _image_key = catalog_thumbnail_client
     response = client.get("/api/images/catalog/no-such-key/thumbnail")
-    assert response.status_code == 404
-    payload = response.get_json()
-    assert payload is not None
-    assert "error" in payload
-
-
-def test_instagram_thumbnail_returns_jpeg(instagram_thumbnail_client):
-    client, image_key = instagram_thumbnail_client
-    response = client.get(f"/api/images/instagram/{image_key}/thumbnail")
-    assert response.status_code == 200
-    assert response.content_type.startswith("image/jpeg")
-    assert response.data == _minimal_jpeg_bytes()
-
-
-def test_instagram_thumbnail_missing_key_returns_404(instagram_thumbnail_client):
-    client, _image_key = instagram_thumbnail_client
-    response = client.get("/api/images/instagram/missing/key/thumbnail")
     assert response.status_code == 404
     payload = response.get_json()
     assert payload is not None

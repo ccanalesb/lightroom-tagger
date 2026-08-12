@@ -68,9 +68,7 @@ def _resolve_date_window(metadata: dict) -> tuple[int | None, str | None]:
     The batch describe/score/analyze handlers used to only recognize the string
     tokens ``'3months' | '6months' | '12months'`` via a hardcoded map. New
     clients send the window directly as either ``last_months: int`` or
-    ``year: 'YYYY'`` — matching the richer contract already used by
-    ``handle_vision_match``. This helper accepts both and returns whichever is
-    set, preferring numeric inputs over the legacy ``date_filter`` string.
+    ``year: 'YYYY'``.
 
     Behaviour:
       * ``last_months`` wins when it is a positive integer.

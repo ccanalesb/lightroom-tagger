@@ -27,10 +27,6 @@ import type {
   ImageDescriptionPerspectives,
   ImageDescriptionTechnical,
 } from '../types/descriptions'
-// The Instagram / Matches UI is gone (#233), but these API clients and their
-// types survive together until slice 2 (#234) deletes the endpoints they call.
-import type { InstagramImage, InstagramImageInput, InstagramListResponse } from '../types/instagram'
-import type { Match, MatchGroup, MatchesListResponse } from '../types/matches'
 import type { Job, JobsGetOptions, JobsHealth, JobsListResponse } from '../types/job'
 import type {
   PerspectiveDetail,
@@ -121,8 +117,6 @@ export type {
   IdentityPerPerspectiveScore,
   ImageDetailResponse,
   ImageView,
-  InstagramImage,
-  InstagramImageInput,
   Job,
   JobsGetOptions,
   JobsHealth,
@@ -131,7 +125,6 @@ export type {
   StackRepresentativeResponse,
   StackSplitMemberResponse,
 }
-export type { Match, MatchGroup, MatchesListResponse }
 export type {
   DescriptionModel,
   DescriptionModelsResponse,
@@ -412,27 +405,6 @@ export const SystemAPI = {
 }
 
 export const ImagesAPI = {
-  listInstagram: (params?: {
-    limit?: number
-    offset?: number
-    date_folder?: string
-    date_from?: string
-    date_to?: string
-    sort_by_date?: 'newest' | 'oldest'
-  }) => {
-    const searchParams = new URLSearchParams()
-    if (params?.limit) searchParams.set('limit', String(params.limit))
-    if (params?.offset !== undefined) searchParams.set('offset', String(params.offset))
-    if (params?.date_folder) searchParams.set('date_folder', params.date_folder)
-    if (params?.date_from) searchParams.set('date_from', params.date_from)
-    if (params?.date_to) searchParams.set('date_to', params.date_to)
-    if (params?.sort_by_date) searchParams.set('sort_by_date', params.sort_by_date)
-    return request<InstagramListResponse>(`/images/instagram?${searchParams.toString()}`)
-  },
-
-  getInstagramMonths: () =>
-    request<{ months: string[] }>('/images/instagram/months'),
-
   getCatalogMonths: () =>
     request<{ months: string[] }>('/images/catalog/months'),
 
@@ -452,7 +424,7 @@ export const ImagesAPI = {
    * about partial list-row data (see consolidate-image-metadata plan).
    */
   getImageDetail: (
-    image_type: 'catalog' | 'instagram',
+    image_type: 'catalog',
     image_key: string,
     params?: { score_perspective?: string },
   ) => {
@@ -554,93 +526,6 @@ export const ImagesAPI = {
     invalidateAll(['images.detail'])
     invalidateAll(['dashboard'])
     invalidateAll(['identity'])
-    return result
-  },
-}
-
-export const MatchingAPI = {
-  list: (
-    limit?: number,
-    offset?: number,
-    params?: { sort_by_date?: 'newest' | 'oldest' },
-  ) => {
-    const sp = new URLSearchParams()
-    sp.set('limit', String(limit ?? 50))
-    sp.set('offset', String(offset ?? 0))
-    if (params?.sort_by_date) sp.set('sort_by_date', params.sort_by_date)
-    return request<MatchesListResponse>(`/images/matches?${sp.toString()}`)
-  },
-  validate: async (catalogKey: string, instaKey: string) => {
-    const result = await request<{ validated: boolean }>(
-      `/images/matches/${encodeURIComponent(catalogKey)}/${encodeURIComponent(instaKey)}/validate`,
-      { method: 'PATCH' },
-    )
-    // Patch cache in-place so Suspense is not triggered in the currently-mounted
-    // MatchesTab. The component also applies an optimistic update via setMatchGroups.
-    // The cache is invalidated on unmount so the next visit fetches fresh data.
-    const matchesPrefix = JSON.stringify(['matching.groups']).slice(0, -1)
-    patchMatching(
-      (k) => k.startsWith(matchesPrefix),
-      (raw) => {
-        const resp = raw as { match_groups?: MatchGroup[] }
-        if (!resp?.match_groups) return raw
-        return {
-          ...resp,
-          match_groups: resp.match_groups.map((group) => {
-            if (group.instagram_key !== instaKey) return group
-            const candidates = group.candidates.map((c) =>
-              c.catalog_key === catalogKey && c.instagram_key === instaKey
-                ? { ...c, validated_at: new Date().toISOString() }
-                : c,
-            )
-            return { ...group, candidates, has_validated: candidates.some((c) => !!c.validated_at) }
-          }),
-        }
-      },
-    )
-    invalidateAll(['images.instagram'])
-    invalidateAll(['images.catalog'])
-    invalidateAll(['images.detail'])
-    invalidateAll(['dashboard'])
-    return result
-  },
-  reject: async (catalogKey: string, instaKey: string) => {
-    const result = await request<{ rejected: boolean }>(
-      `/images/matches/${encodeURIComponent(catalogKey)}/${encodeURIComponent(instaKey)}/reject`,
-      { method: 'PATCH' },
-    )
-    // Patch cache in-place — same rationale as validate above.
-    const matchesPrefix = JSON.stringify(['matching.groups']).slice(0, -1)
-    patchMatching(
-      (k) => k.startsWith(matchesPrefix),
-      (raw) => {
-        const resp = raw as { match_groups?: MatchGroup[] }
-        if (!resp?.match_groups) return raw
-        return {
-          ...resp,
-          match_groups: resp.match_groups.flatMap((group) => {
-            if (group.instagram_key !== instaKey) return [group]
-            const remaining = group.candidates.filter(
-              (c) => !(c.catalog_key === catalogKey && c.instagram_key === instaKey),
-            )
-            if (remaining.length === 0) {
-              return [{ ...group, candidates: [], candidate_count: 0, best_score: 0, has_validated: false, all_rejected: true }]
-            }
-            return [{
-              ...group,
-              candidates: remaining,
-              candidate_count: remaining.length,
-              best_score: Math.max(...remaining.map((c) => c.score)),
-              has_validated: remaining.some((c) => !!c.validated_at),
-            }]
-          }),
-        }
-      },
-    )
-    invalidateAll(['images.instagram'])
-    invalidateAll(['images.catalog'])
-    invalidateAll(['images.detail'])
-    invalidateAll(['dashboard'])
     return result
   },
 }
