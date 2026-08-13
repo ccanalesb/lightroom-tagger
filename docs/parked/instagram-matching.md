@@ -56,4 +56,6 @@ ig_scores = export["image_scores_instagram"]["rows"]
 
 ---
 
+**OpenCLI scraping bridge:** The `.opencli/clis/instagram/` and `.opencli/explore/instagram/` adapter trees were removed with the rest of the Instagram surface (2026-08-13, map #218). They exposed `opencli instagram profile|posts|images` via a Chrome extension bridge — the same scraping path this pipeline no longer depends on.
+
 **Where it lives:** `git checkout parked/instagram-matching` · key paths: `lightroom_tagger/instagram/` (`dump_reader.py`, `deduplicator.py`), `lightroom_tagger/core/matcher/`, `lightroom_tagger/core/analyzer/compare.py`, `lightroom_tagger/core/analyzer/vision_compare.py`, `lightroom_tagger/core/database/instagram.py`, `matches.py`, `match_pool_snapshots.py`, matching console scripts under `lightroom_tagger/scripts/`, visualizer Instagram/match pages and APIs (slices 1–2) · data: `instagram-matching-export.json` next to `library.db` · prior design docs: `docs/comparison-pool-report.md` (removed with slice 3), `docs/plans/2026-03-17-multi-signal-matching*.md`, `docs/plans/2026-03-17-vision-model-matching.md`, `docs/plans/2026-04-06-parallel-batch-vision-matching.md`
