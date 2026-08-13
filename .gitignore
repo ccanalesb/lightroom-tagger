@@ -79,6 +79,12 @@ validation_report.html
 .run
 vision_matching_results.json
 library.db.worktree-backup
+# Written next to library.db by the user_version 6→7 migration (#228) — contains
+# exported Instagram matching rows, never belongs in the repo.
+instagram-matching-export.json
+library.db*.bak
+library.db*.bak-shm
+library.db*.bak-wal
 node_modules/
 .env.local
 thumbnails/
