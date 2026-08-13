@@ -65,6 +65,44 @@ class TestLoadConfig(unittest.TestCase):
         self.assertEqual(config.catalog_path, "/test/catalog")
         self.assertEqual(config.db_path, "/test/db")
 
+    @patch(
+        "lightroom_tagger.core.config.open",
+        new_callable=mock_open,
+        read_data="catalog_path: /test/catalog\nvision_batch_size: 10\nvision_batch_threshold: 5\n",
+    )
+    @patch("lightroom_tagger.core.config.Path.exists", return_value=True)
+    @patch("lightroom_tagger.core.config.load_dotenv")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_load_config_ignores_unknown_keys(self, mock_dotenv, mock_exists, mock_file):
+        """Keys left behind by a retired capability must not crash startup.
+
+        ``vision_batch_size`` / ``vision_batch_threshold`` are real debris from the
+        parked batch-vision work: they sat in a live config.yaml and took the whole
+        app down with ``TypeError: Config.__init__() got an unexpected keyword
+        argument``.
+        """
+        with self.assertLogs("lightroom_tagger.core.config", level="WARNING") as logs:
+            config = load_config("config.yaml")
+        self.assertEqual(config.catalog_path, "/test/catalog")
+        joined = "\n".join(logs.output)
+        self.assertIn("vision_batch_size", joined)
+        self.assertIn("vision_batch_threshold", joined)
+
+    @patch(
+        "lightroom_tagger.core.config.open",
+        new_callable=mock_open,
+        read_data="catalog_path: /test/catalog\nvison_model: typo-model\n",
+    )
+    @patch("lightroom_tagger.core.config.Path.exists", return_value=True)
+    @patch("lightroom_tagger.core.config.load_dotenv")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_load_config_warns_on_misspelled_key(self, mock_dotenv, mock_exists, mock_file):
+        """A typo must be visible, not silently swallowed into the default."""
+        with self.assertLogs("lightroom_tagger.core.config", level="WARNING") as logs:
+            config = load_config("config.yaml")
+        self.assertIn("vison_model", "\n".join(logs.output))
+        self.assertEqual(config.vision_model, "gemma3:27b")
+
     @patch("lightroom_tagger.core.config.open", new_callable=mock_open, read_data="catalog_path: /file/catalog\ndb_path: /file/db\n")
     @patch("lightroom_tagger.core.config.Path.exists", return_value=True)
     @patch("lightroom_tagger.core.config.load_dotenv")
