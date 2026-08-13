@@ -370,25 +370,6 @@ class TestDescribeMatchedImage:
         assert get_image_description(db, catalog_key)['summary'] == 'keep me'
 
 
-class TestDescribeInstagramImage:
-    def test_skips_video_without_calling_provider(self, tmp_path):
-        from lightroom_tagger.core.database import store_instagram_dump_media
-        from lightroom_tagger.core.description_service import describe_instagram_image
-
-        db = _make_db(tmp_path)
-        filepath = str(tmp_path / 'story.mov')
-        open(filepath, 'w').close()
-        store_instagram_dump_media(db, {
-            'media_key': 'IGVID', 'file_path': filepath, 'caption': '',
-            'timestamp': None, 'taken_at': None,
-        })
-
-        with patch('lightroom_tagger.core.vision_op.run_vision_op') as mock_run:
-            result = describe_instagram_image(db, 'IGVID')
-
-        assert not result.wrote
-        mock_run.assert_not_called()
-
 
 class TestStoreStructuredVisualMapping:
     """_store_structured fallbacks and persistence for VIS-01 columns."""

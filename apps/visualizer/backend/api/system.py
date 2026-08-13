@@ -173,7 +173,6 @@ _CACHE_PIPELINE_BUCKETS: tuple[tuple[str, str, dict], ...] = (
     # ``None`` means "absent or NULL" (legacy jobs without that key).
     ('catalog_sync', 'catalog_sync', {}),
     ('embed_catalog', 'batch_embed_image', {'image_type': ('catalog', None)}),
-    ('embed_catalog_and_instagram', 'batch_embed_image', {'image_type': ('catalog_and_instagram',)}),
     ('stack_detect', 'batch_stack_detect', {}),
     ('catalog_similarity', 'batch_catalog_similarity', {}),
     ('catalog_cache_build', 'catalog_cache_build', {}),
@@ -239,8 +238,6 @@ def get_cache_pipeline_status():
     * ``catalog_sync`` — most recent incremental catalog → library.db sync.
     * ``embed_catalog`` — most recent ``batch_embed_image`` with
       ``metadata.image_type`` of ``catalog`` or absent (legacy default).
-    * ``embed_catalog_and_instagram`` — same but ``image_type`` is
-      ``catalog_and_instagram``.
     * ``stack_detect`` — most recent ``batch_stack_detect``.
     * ``catalog_similarity`` — most recent ``batch_catalog_similarity``.
     * ``catalog_cache_build`` — most recent composite chain (D-08).

@@ -1,4 +1,4 @@
-"""Score catalog and Instagram-dump images per perspective into ``image_scores``.
+"""Score catalog images per perspective into ``image_scores``.
 
 Vision + compression route through :func:`lightroom_tagger.core.vision_op.run_vision_op_persist`
 via :func:`lightroom_tagger.core.analyzer.build_score_op_spec`.
@@ -16,7 +16,6 @@ from datetime import datetime, timezone
 from lightroom_tagger.core.analyzer import VIDEO_EXTENSIONS, build_score_op_spec
 from lightroom_tagger.core.database import (
     get_image,
-    get_instagram_dump_media,
     get_perspective_by_slug,
     insert_image_score,
     library_write,
@@ -179,22 +178,15 @@ def score_image_for_perspective(
     Returns a :class:`VisionOpOutcome`. ``wrote`` is True when a new score row
     was written.
     """
-    if image_type == "catalog":
-        image = get_image(db, image_key)
-        if not image or not image.get("filepath"):
-            return VisionOpOutcome(status="skipped", reason="Catalog image missing or has no filepath")
-        filepath = resolve_filepath(str(image["filepath"]))
-        # Existence is resolved later via resolve_vision_image so scoring can fall
-        # back to the local vision cache when the original (e.g. NAS) is unreachable.
-    elif image_type == "instagram":
-        dump = get_instagram_dump_media(db, image_key)
-        if not dump or not dump.get("file_path"):
-            return VisionOpOutcome(status="skipped", reason="Instagram media missing or has no file_path")
-        filepath = str(dump["file_path"])
-        if not os.path.exists(filepath):
-            return VisionOpOutcome(status="skipped", reason=f"Image file not found: {filepath}")
-    else:
+    if image_type != "catalog":
         return VisionOpOutcome(status="failed", reason=f"Invalid image_type: {image_type!r}")
+
+    image = get_image(db, image_key)
+    if not image or not image.get("filepath"):
+        return VisionOpOutcome(status="skipped", reason="Catalog image missing or has no filepath")
+    filepath = resolve_filepath(str(image["filepath"]))
+    # Existence is resolved later via resolve_vision_image so scoring can fall
+    # back to the local vision cache when the original (e.g. NAS) is unreachable.
 
     if os.path.splitext(filepath)[1].lower() in VIDEO_EXTENSIONS:
         return VisionOpOutcome(

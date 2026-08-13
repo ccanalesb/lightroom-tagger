@@ -20,18 +20,6 @@ _CATALOG_NOT_VIDEO_SQL = (
     "LOWER(i.filepath) NOT LIKE '%.mts' AND "
     "LOWER(i.filepath) NOT LIKE '%.m2ts'"
 )
-_INSTAGRAM_NOT_VIDEO_SQL = (
-    "LOWER(m.file_path) NOT LIKE '%.mov' AND "
-    "LOWER(m.file_path) NOT LIKE '%.mp4' AND "
-    "LOWER(m.file_path) NOT LIKE '%.avi' AND "
-    "LOWER(m.file_path) NOT LIKE '%.mkv' AND "
-    "LOWER(m.file_path) NOT LIKE '%.wmv' AND "
-    "LOWER(m.file_path) NOT LIKE '%.m4v' AND "
-    "LOWER(m.file_path) NOT LIKE '%.3gp' AND "
-    "LOWER(m.file_path) NOT LIKE '%.webm' AND "
-    "LOWER(m.file_path) NOT LIKE '%.mts' AND "
-    "LOWER(m.file_path) NOT LIKE '%.m2ts'"
-)
 
 # Legacy date_filter labels (kept for backward compatibility with older clients
 # and checkpoints). Prefer sending ``last_months`` as an int or ``year`` as a
@@ -176,62 +164,3 @@ def _select_catalog_keys(
 
     rows = lib_db.execute(sql, tuple(params)).fetchall()
     return [(r['key'], 'catalog') for r in rows]
-
-
-def _select_instagram_keys(
-    lib_db,
-    *,
-    months: int | None,
-    year: str | None,
-    undescribed_only: bool,
-) -> list[tuple[str, str]]:
-    """Select ``(media_key, 'instagram')`` tuples matching the given window.
-
-    Sibling of :func:`_select_catalog_keys`. Instagram dump media has no
-    ``min_rating`` and uses ``created_at`` as its date column.
-    """
-    params: list = []
-    if undescribed_only:
-        sql = (
-            "SELECT m.media_key AS media_key FROM instagram_dump_media m "
-            "LEFT JOIN image_descriptions d "
-            "  ON m.media_key = d.image_key AND d.image_type = 'instagram' "
-            "WHERE d.image_key IS NULL"
-        )
-        table_alias = "m."
-        conditions: list[str] = [_INSTAGRAM_NOT_VIDEO_SQL]
-    else:
-        sql = "SELECT m.media_key AS media_key FROM instagram_dump_media m WHERE " + _INSTAGRAM_NOT_VIDEO_SQL
-        table_alias = "m."
-        conditions = []
-
-    # Fall back to date_folder ("YYYYMM") when created_at is missing — the Instagram
-    # dump importer historically left created_at NULL for media without JSON metadata,
-    # so date windows would silently exclude those rows. This builds a synthetic
-    # "YYYY-MM-01" ISO date from date_folder as the fallback so both filters
-    # (months-window and year) still match.
-    created_col = f"{table_alias}created_at"
-    folder_col = f"{table_alias}date_folder"
-    date_expr = (
-        f"COALESCE(NULLIF({created_col}, ''),"
-        f" CASE WHEN {folder_col} GLOB '[0-9][0-9][0-9][0-9][0-9][0-9]'"
-        f"      THEN substr({folder_col},1,4) || '-' || substr({folder_col},5,2) || '-01'"
-        f"      ELSE NULL END)"
-    )
-
-    if months:
-        conditions.append(f"{date_expr} >= date('now', ?)")
-        params.append(f'-{months} months')
-    if year is not None:
-        conditions.append(f"strftime('%Y', {date_expr}) = ?")
-        params.append(year)
-
-    if conditions:
-        sql += " AND " + " AND ".join(conditions)
-
-    sql += (
-        f" ORDER BY ({date_expr} IS NULL) DESC, {date_expr} DESC, m.media_key DESC"
-    )
-
-    rows = lib_db.execute(sql, tuple(params)).fetchall()
-    return [(r['media_key'], 'instagram') for r in rows]

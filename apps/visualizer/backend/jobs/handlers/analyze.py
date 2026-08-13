@@ -20,7 +20,6 @@ from .common import (
     _resolve_date_window,
     _resolve_library_db_or_fail,
     _select_catalog_keys,
-    _select_instagram_keys,
 )
 from .path_diagnostics import PathSkipDiagnostics, empty_skip_reason_counts
 
@@ -140,43 +139,30 @@ def _score_single_image(
 
 
 def _diagnose_describe_skip(lib_db, key: str, itype: str, force: bool) -> str:
-    """Return a specific reason why describe_*_image returned False."""
+    """Return a specific reason why describe_matched_image returned False."""
     try:
         from lightroom_tagger.core.analyzer import VIDEO_EXTENSIONS
         from lightroom_tagger.core.database import (
             get_image,
             get_image_description,
-            get_instagram_dump_media,
         )
 
-        if itype == 'catalog':
-            if not force and get_image_description(lib_db, key):
-                return 'Already described (use force to regenerate)'
-            image = get_image(lib_db, key)
-            if not image:
-                return 'Image key not found in catalog'
-            filepath = image.get('filepath', '')
-            if not filepath:
-                return 'No filepath in catalog record'
-            from lightroom_tagger.core.description_service import resolve_filepath
-            resolved = resolve_filepath(filepath)
-            ext = os.path.splitext(resolved)[1].lower()
-            if ext in VIDEO_EXTENSIONS:
-                return f'Video file not describable: {os.path.basename(resolved)}'
-            if not os.path.exists(resolved):
-                return f'File not found: {resolved}'
-            return 'Model returned empty or invalid response'
-        else:
-            if not force and get_image_description(lib_db, key):
-                return 'Already described (use force to regenerate)'
-            ig = get_instagram_dump_media(lib_db, key)
-            if not ig:
-                return 'Instagram media key not found'
-            filepath = ig.get('file_path') or ''
-            ext = os.path.splitext(filepath)[1].lower()
-            if ext in VIDEO_EXTENSIONS:
-                return f'Video file not describable: {os.path.basename(filepath)}'
-            return 'Model returned empty or invalid response'
+        if not force and get_image_description(lib_db, key):
+            return 'Already described (use force to regenerate)'
+        image = get_image(lib_db, key)
+        if not image:
+            return 'Image key not found in catalog'
+        filepath = image.get('filepath', '')
+        if not filepath:
+            return 'No filepath in catalog record'
+        from lightroom_tagger.core.description_service import resolve_filepath
+        resolved = resolve_filepath(filepath)
+        ext = os.path.splitext(resolved)[1].lower()
+        if ext in VIDEO_EXTENSIONS:
+            return f'Video file not describable: {os.path.basename(resolved)}'
+        if not os.path.exists(resolved):
+            return f'File not found: {resolved}'
+        return 'Model returned empty or invalid response'
     except Exception as exc:
         return f'No description generated ({exc})'
 
@@ -197,25 +183,15 @@ def _describe_single_image(
     Returns:
         (status, success, error_message) where status is 'described'|'skipped'|'failed'
     """
-    from lightroom_tagger.core.description_service import (
-        describe_instagram_image,
-        describe_matched_image,
-    )
+    from lightroom_tagger.core.description_service import describe_matched_image
 
     try:
-        if itype == 'catalog':
-            result = describe_matched_image(
-                lib_db, key, force=force,
-                provider_id=desc_provider_id, model=desc_provider_model,
-                perspective_slugs=perspective_slugs,
-                telemetry=telemetry,
-            )
-        else:
-            result = describe_instagram_image(
-                lib_db, key, force=force,
-                provider_id=desc_provider_id, model=desc_provider_model,
-                perspective_slugs=perspective_slugs,
-            )
+        result = describe_matched_image(
+            lib_db, key, force=force,
+            provider_id=desc_provider_id, model=desc_provider_model,
+            perspective_slugs=perspective_slugs,
+            telemetry=telemetry,
+        )
 
         if result.status == 'written':
             return ('described', True, None)
@@ -299,8 +275,8 @@ def handle_single_score(runner, job_id: str, metadata: dict):
         if not image_key:
             runner.fail_job(job_id, 'image_key is required in metadata')
             return
-        if image_type not in ('catalog', 'instagram'):
-            runner.fail_job(job_id, 'image_type must be catalog or instagram')
+        if image_type != 'catalog':
+            runner.fail_job(job_id, 'image_type must be catalog')
             return
 
         config = load_config()
@@ -437,7 +413,7 @@ def _run_describe_pass(
     ``finalize_cancelled`` / early zero-work ``complete_job`` paths always run regardless of
     ``finalize``; callers check the ``None`` return to detect those short-circuit paths.
     """
-    image_type = metadata.get('image_type', 'both')
+    image_type = metadata.get('image_type', 'catalog')
     date_filter = metadata.get('date_filter', 'all')
     force = metadata.get('force', False)
     # Model-scoped re-do (see apps/visualizer/CONTEXT.md): regenerate every eligible
@@ -797,7 +773,7 @@ def _run_describe_pass(
 
 
 def handle_batch_describe(runner, job_id: str, metadata: dict):
-    """Generate AI descriptions for catalog and/or Instagram images in bulk."""
+    """Generate AI descriptions for catalog images in bulk."""
     # Install the cancel scope for the main handler thread so retry/fallback
     # sleeps inside the sequential describe path observe cancel requests
     # without any explicit plumbing. The parallel path installs its own
@@ -817,7 +793,10 @@ def _handle_batch_describe_inner(runner, job_id: str, metadata: dict):
             return
         with managed_library_db(db_path) as lib_db:
 
-            image_type = metadata.get('image_type', 'both')  # catalog, instagram, both
+            image_type = metadata.get('image_type', 'catalog')
+            if image_type != 'catalog':
+                runner.fail_job(job_id, 'image_type must be catalog')
+                return
             force = metadata.get('force', False)
             # Model-scoped re-do must widen selection to ALL images (not just
             # undescribed ones), same as force — otherwise old-model rows never enter
@@ -836,54 +815,35 @@ def _handle_batch_describe_inner(runner, job_id: str, metadata: dict):
                 except (TypeError, ValueError):
                     min_rating = None
 
-            from lightroom_tagger.core.database import (
-                get_undescribed_catalog_images,
-                get_undescribed_instagram_images,
-            )
+            from lightroom_tagger.core.database import get_undescribed_catalog_images
 
             backfill_visual_tags = bool(metadata.get('backfill_visual_tags', False))
             _log_backfill_force_conflict_if_any(runner, job_id, metadata)
 
             images_to_describe: list[tuple[str, str]] = []  # (key, type)
 
-            if image_type in ('catalog', 'both'):
-                if backfill_visual_tags:
-                    # Catalog only for this mode (D-18); re-describe rows missing visual tags.
-                    images_to_describe += _select_catalog_keys_missing_visual_tags(
-                        lib_db,
-                        months=months,
-                        year=year,
-                        min_rating=min_rating,
-                    )
-                elif select_all or year is not None:
-                    # ``year`` is a new window that the undescribed-only helper
-                    # doesn't know about yet, so we run the raw SQL path for
-                    # ``force``, ``redo_unless_model``, and ``year`` (joining in the
-                    # description filter manually when none widen selection).
-                    images_to_describe += _select_catalog_keys(
-                        lib_db,
-                        months=months,
-                        year=year,
-                        min_rating=min_rating,
-                        undescribed_only=not select_all,
-                    )
-                else:
-                    images_to_describe += [
-                        (img['key'], 'catalog')
-                        for img in get_undescribed_catalog_images(
-                            lib_db, months=months, min_rating=min_rating
-                        )
-                    ]
-
-            if image_type in ('instagram', 'both'):
-                # Always route through _select_instagram_keys so the COALESCE/date_folder
-                # fallback applies consistently regardless of force/year flags.
-                images_to_describe += _select_instagram_keys(
+            if backfill_visual_tags:
+                images_to_describe += _select_catalog_keys_missing_visual_tags(
                     lib_db,
                     months=months,
                     year=year,
+                    min_rating=min_rating,
+                )
+            elif select_all or year is not None:
+                images_to_describe += _select_catalog_keys(
+                    lib_db,
+                    months=months,
+                    year=year,
+                    min_rating=min_rating,
                     undescribed_only=not select_all,
                 )
+            else:
+                images_to_describe += [
+                    (img['key'], 'catalog')
+                    for img in get_undescribed_catalog_images(
+                        lib_db, months=months, min_rating=min_rating
+                    )
+                ]
 
             if backfill_visual_tags and not images_to_describe:
                 add_job_log(
@@ -942,7 +902,7 @@ def _run_score_pass(
     ``runner.complete_job`` on the success path exactly as before. When ``False`` it returns
     the result-summary dict instead (caller owns terminal completion).
     """
-    image_type = metadata.get('image_type', 'both')
+    image_type = metadata.get('image_type', 'catalog')
     date_filter = metadata.get('date_filter', 'all')
     force = metadata.get('force', False)
     # Model-scoped re-do (see apps/visualizer/CONTEXT.md): re-score every triple
@@ -1340,7 +1300,7 @@ def _run_score_pass(
 
 
 def handle_batch_score(runner, job_id: str, metadata: dict):
-    """Score catalog and/or Instagram images in bulk (one vision call per image × perspective).
+    """Score catalog images in bulk (one vision call per image × perspective).
 
     Checkpoint resume uses ``processed_triplets`` (``key|itype|slug``). Any hard failure increments
     ``failed``; skipped rows (already current, missing file) still advance the checkpoint like
@@ -1359,7 +1319,10 @@ def _handle_batch_score_inner(runner, job_id: str, metadata: dict):
             return
         with managed_library_db(db_path) as lib_db:
 
-            image_type = metadata.get('image_type', 'both')
+            image_type = metadata.get('image_type', 'catalog')
+            if image_type != 'catalog':
+                runner.fail_job(job_id, 'image_type must be catalog')
+                return
 
             months, year = _resolve_date_window(metadata)
             min_rating_raw = metadata.get('min_rating')
@@ -1374,24 +1337,13 @@ def _handle_batch_score_inner(runner, job_id: str, metadata: dict):
             # is), so ``undescribed_only=False`` matches the previous SQL exactly —
             # both the ``force`` and non-``force`` arms had identical selection.
 
-            images_for_scores: list[tuple[str, str]] = []
-
-            if image_type in ('catalog', 'both'):
-                images_for_scores += _select_catalog_keys(
-                    lib_db,
-                    months=months,
-                    year=year,
-                    min_rating=min_rating,
-                    undescribed_only=False,
-                )
-
-            if image_type in ('instagram', 'both'):
-                images_for_scores += _select_instagram_keys(
-                    lib_db,
-                    months=months,
-                    year=year,
-                    undescribed_only=False,
-                )
+            images_for_scores: list[tuple[str, str]] = _select_catalog_keys(
+                lib_db,
+                months=months,
+                year=year,
+                min_rating=min_rating,
+                undescribed_only=False,
+            )
 
             _run_score_pass(
                 runner,
@@ -1432,7 +1384,10 @@ def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
             return
         with managed_library_db(db_path) as lib_db:
 
-            image_type = metadata.get('image_type', 'both')
+            image_type = metadata.get('image_type', 'catalog')
+            if image_type != 'catalog':
+                runner.fail_job(job_id, 'image_type must be catalog')
+                return
             force = bool(metadata.get('force_describe', False))
             # Model-scoped re-do widens shared selection to ALL images like force so
             # old-model rows reach the per-model filters in the describe/score passes.
@@ -1448,53 +1403,35 @@ def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
                 except (TypeError, ValueError):
                     min_rating = None
 
-            from lightroom_tagger.core.database import (
-                get_undescribed_catalog_images,
-                get_undescribed_instagram_images,
-            )
+            from lightroom_tagger.core.database import get_undescribed_catalog_images
 
             backfill_visual_tags = bool(metadata.get('backfill_visual_tags', False))
             _log_backfill_force_conflict_if_any(runner, job_id, metadata)
 
             shared_selection: list[tuple[str, str]] = []
 
-            if image_type in ('catalog', 'both'):
-                if backfill_visual_tags:
-                    shared_selection += _select_catalog_keys_missing_visual_tags(
-                        lib_db,
-                        months=months,
-                        year=year,
-                        min_rating=min_rating,
+            if backfill_visual_tags:
+                shared_selection += _select_catalog_keys_missing_visual_tags(
+                    lib_db,
+                    months=months,
+                    year=year,
+                    min_rating=min_rating,
+                )
+            elif select_all or year is not None:
+                shared_selection += _select_catalog_keys(
+                    lib_db,
+                    months=months,
+                    year=year,
+                    min_rating=min_rating,
+                    undescribed_only=not select_all,
+                )
+            else:
+                shared_selection += [
+                    (img['key'], 'catalog')
+                    for img in get_undescribed_catalog_images(
+                        lib_db, months=months, min_rating=min_rating
                     )
-                elif select_all or year is not None:
-                    shared_selection += _select_catalog_keys(
-                        lib_db,
-                        months=months,
-                        year=year,
-                        min_rating=min_rating,
-                        undescribed_only=not select_all,
-                    )
-                else:
-                    shared_selection += [
-                        (img['key'], 'catalog')
-                        for img in get_undescribed_catalog_images(
-                            lib_db, months=months, min_rating=min_rating
-                        )
-                    ]
-
-            if image_type in ('instagram', 'both'):
-                if select_all or year is not None:
-                    shared_selection += _select_instagram_keys(
-                        lib_db,
-                        months=months,
-                        year=year,
-                        undescribed_only=not select_all,
-                    )
-                else:
-                    shared_selection += [
-                        (img['media_key'], 'instagram')
-                        for img in get_undescribed_instagram_images(lib_db, months=months)
-                    ]
+                ]
 
             if backfill_visual_tags and not shared_selection:
                 add_job_log(

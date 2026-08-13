@@ -29,8 +29,8 @@ def _normalize_score_row(row: dict) -> dict:
 
 def _image_type_from_request() -> tuple[str | None, Any]:
     raw = (request.args.get("image_type") or "catalog").strip().lower()
-    if raw not in ("catalog", "instagram"):
-        return None, error_bad_request("image_type must be catalog or instagram")
+    if raw != "catalog":
+        return None, error_bad_request("image_type must be catalog")
     return raw, None
 
 

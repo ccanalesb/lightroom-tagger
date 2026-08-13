@@ -28,7 +28,7 @@ class ScoresCurrentResponse(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     image_key: str
-    image_type: Literal['catalog', 'instagram']
+    image_type: Literal['catalog']
     current: list[ImageScoreRow]
 
 
@@ -36,7 +36,7 @@ class ScoresHistoryResponse(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     image_key: str
-    image_type: Literal['catalog', 'instagram']
+    image_type: Literal['catalog']
     perspective_slug: str
     history: list[ImageScoreRow]
 

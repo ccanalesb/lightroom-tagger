@@ -41,7 +41,6 @@ def test_list_descriptions_should_return_paginated_results():
         db_path = os.path.join(tmpdir, 'test.db')
         db = init_database(db_path)
         _seed_described_image(db, 'cat_001', 'catalog')
-        _seed_described_image(db, 'ig_001', 'instagram')
         db.close()
 
         client = _make_client(db_path)
@@ -49,7 +48,7 @@ def test_list_descriptions_should_return_paginated_results():
         assert resp.status_code == 200
 
         data = resp.get_json()
-        assert data['total'] >= 2
+        assert data['total'] >= 1
         assert 'items' in data
         assert 'pagination' in data
         assert data['pagination']['current_page'] == 1
@@ -60,7 +59,6 @@ def test_list_descriptions_should_filter_by_image_type():
         db_path = os.path.join(tmpdir, 'test.db')
         db = init_database(db_path)
         _seed_described_image(db, 'cat_001', 'catalog')
-        _seed_described_image(db, 'ig_001', 'instagram')
         db.close()
 
         client = _make_client(db_path)
@@ -69,6 +67,17 @@ def test_list_descriptions_should_filter_by_image_type():
         items = resp.get_json()['items']
         for item in items:
             assert item['image_type'] == 'catalog'
+
+
+def test_list_descriptions_rejects_instagram_image_type():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, 'test.db')
+        db = init_database(db_path)
+        db.close()
+
+        client = _make_client(db_path)
+        resp = client.get('/api/descriptions/?image_type=instagram')
+        assert resp.status_code == 400
 
 
 def test_list_descriptions_should_support_described_only_filter():

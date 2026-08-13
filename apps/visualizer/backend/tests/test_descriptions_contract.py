@@ -53,7 +53,6 @@ def test_descriptions_list_round_trip_from_handler():
         db_path = os.path.join(tmpdir, 'test.db')
         db = init_database(db_path)
         _seed_described_image(db, 'cat_001', 'catalog')
-        _seed_described_image(db, 'ig_001', 'instagram')
         db.close()
 
         client = _make_client(db_path)
@@ -61,8 +60,8 @@ def test_descriptions_list_round_trip_from_handler():
         assert payload is not None
 
         validated = DescriptionsListResponse.model_validate(payload)
-        assert validated.total >= 2
-        assert len(validated.items) >= 2
+        assert validated.total >= 1
+        assert len(validated.items) >= 1
         assert validated.pagination.current_page == 1
 
         row = validate_description_item(payload['items'][0])

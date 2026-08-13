@@ -202,35 +202,6 @@ def get_undescribed_catalog_images(
     return [_deserialize_row(r) for r in rows]
 
 
-def get_undescribed_instagram_images(db: sqlite3.Connection, months: int = None) -> list[dict]:
-    """Get Instagram dump media that don't have descriptions yet."""
-    sql = """
-        SELECT m.* FROM instagram_dump_media m
-        LEFT JOIN image_descriptions d
-            ON m.media_key = d.image_key AND d.image_type = 'instagram'
-        WHERE d.image_key IS NULL
-        AND LOWER(m.file_path) NOT LIKE '%.mov'
-        AND LOWER(m.file_path) NOT LIKE '%.mp4'
-        AND LOWER(m.file_path) NOT LIKE '%.avi'
-        AND LOWER(m.file_path) NOT LIKE '%.mkv'
-        AND LOWER(m.file_path) NOT LIKE '%.wmv'
-        AND LOWER(m.file_path) NOT LIKE '%.m4v'
-        AND LOWER(m.file_path) NOT LIKE '%.3gp'
-        AND LOWER(m.file_path) NOT LIKE '%.webm'
-        AND LOWER(m.file_path) NOT LIKE '%.mts'
-        AND LOWER(m.file_path) NOT LIKE '%.m2ts'
-    """
-    params: list = []
-    if months:
-        sql += " AND m.created_at >= date('now', ?)"
-        params.append(f'-{months} months')
-    sql += (
-        " ORDER BY (m.created_at IS NULL) DESC, m.created_at DESC, m.media_key DESC"
-    )
-    rows = db.execute(sql, params).fetchall()
-    return [_deserialize_row(r) for r in rows]
-
-
 def get_all_images_with_descriptions(db: sqlite3.Connection,
                                      image_type: str = None,
                                      described_only: bool = False,
@@ -243,8 +214,7 @@ def get_all_images_with_descriptions(db: sqlite3.Connection,
     parts = []
     params: list = []
 
-    if image_type != 'instagram':
-        parts.append("""
+    parts.append("""
             SELECT i.key AS image_key, 'catalog' AS image_type,
                    i.filename, i.date_taken AS date_ref,
                    d.summary, d.best_perspective, d.model_used AS desc_model,
@@ -255,19 +225,7 @@ def get_all_images_with_descriptions(db: sqlite3.Connection,
                 ON i.key = d.image_key AND d.image_type = 'catalog'
         """)
 
-    if image_type != 'catalog':
-        parts.append("""
-            SELECT m.media_key AS image_key, 'instagram' AS image_type,
-                   m.filename, m.created_at AS date_ref,
-                   d.summary, d.best_perspective, d.model_used AS desc_model,
-                   d.described_at,
-                   CASE WHEN d.image_key IS NOT NULL THEN 1 ELSE 0 END AS has_description
-            FROM instagram_dump_media m
-            LEFT JOIN image_descriptions d
-                ON m.media_key = d.image_key AND d.image_type = 'instagram'
-        """)
-
-    union_sql = " UNION ALL ".join(parts)
+    union_sql = parts[0]
 
     if described_only:
         wrapper = f"SELECT * FROM ({union_sql}) t WHERE t.has_description = 1"
@@ -275,13 +233,13 @@ def get_all_images_with_descriptions(db: sqlite3.Connection,
         wrapper = f"SELECT * FROM ({union_sql}) t"
 
     count_sql = f"SELECT COUNT(*) AS cnt FROM ({wrapper})"
-    total = db.execute(count_sql, params * len(parts)).fetchone()['cnt']
+    total = db.execute(count_sql, params).fetchone()['cnt']
 
     page_sql = (
         f"{wrapper} ORDER BY CASE WHEN t.described_at IS NULL THEN 1 ELSE 0 END, "
         f"t.described_at DESC, t.date_ref DESC LIMIT ? OFFSET ?"
     )
-    all_params = params * len(parts) + [limit, offset]
+    all_params = params + [limit, offset]
     rows = db.execute(page_sql, all_params).fetchall()
 
     return [_deserialize_row(r) for r in rows], total

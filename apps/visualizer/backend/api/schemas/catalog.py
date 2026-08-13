@@ -43,7 +43,7 @@ class CatalogImage(BaseModel):
     instagram_posted: bool | None = None
     instagram_url: str | None = None
     image_hash: str | None = None
-    image_type: Literal['catalog', 'instagram'] | None = None
+    image_type: Literal['catalog'] | None = None
     ai_analyzed: bool | None = None
     description_summary: str | None = None
     description_best_perspective: str | None = None
@@ -141,7 +141,7 @@ class ImageView(BaseModel):
 
     model_config = ConfigDict(extra='forbid')
 
-    image_type: Literal['catalog', 'instagram']
+    image_type: Literal['catalog']
     key: str
     id: int | None = None
     filename: str | None = None

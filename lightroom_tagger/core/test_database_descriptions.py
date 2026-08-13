@@ -8,7 +8,6 @@ from lightroom_tagger.core.database import (
     build_description_fts_query,
     get_image_description,
     get_undescribed_catalog_images,
-    get_undescribed_instagram_images,
     init_database,
     init_image_descriptions_table,
     store_image,
@@ -122,81 +121,6 @@ class TestImageDescriptions(unittest.TestCase):
             for img in get_undescribed_catalog_images(self.db, months=120, min_rating=3)
         ]
         self.assertEqual(keys, ['2024-06-20_in.jpg', '2024-06-01_in2.jpg'])
-
-    def test_get_undescribed_instagram_images_newest_first(self):
-        store_instagram_dump_media(self.db, {
-            'media_key': 'ig/old',
-            'file_path': '/ig/old.jpg',
-            'filename': 'old.jpg',
-            'date_folder': '202401',
-            'created_at': '2024-01-10T00:00:00',
-        })
-        store_instagram_dump_media(self.db, {
-            'media_key': 'ig/new',
-            'file_path': '/ig/new.jpg',
-            'filename': 'new.jpg',
-            'date_folder': '202406',
-            'created_at': '2024-06-20T00:00:00',
-        })
-        self.db.execute(
-            "INSERT INTO instagram_dump_media "
-            "(media_key, file_path, filename, date_folder, created_at, processed) "
-            "VALUES ('ig/undated', '/ig/u.jpg', 'u.jpg', '202405', NULL, 0)"
-        )
-        keys = [img['media_key'] for img in get_undescribed_instagram_images(self.db)]
-        self.assertEqual(keys[0], 'ig/undated')
-        self.assertEqual(keys[1:], ['ig/new', 'ig/old'])
-
-    def test_get_undescribed_instagram_images_equal_date_tiebreaker(self):
-        store_instagram_dump_media(self.db, {
-            'media_key': 'ig/aaa',
-            'file_path': '/ig/aaa.jpg',
-            'filename': 'aaa.jpg',
-            'date_folder': '202405',
-            'created_at': '2024-05-01T00:00:00',
-        })
-        store_instagram_dump_media(self.db, {
-            'media_key': 'ig/zzz',
-            'file_path': '/ig/zzz.jpg',
-            'filename': 'zzz.jpg',
-            'date_folder': '202405',
-            'created_at': '2024-05-01T00:00:00',
-        })
-        keys = [img['media_key'] for img in get_undescribed_instagram_images(self.db)]
-        self.assertEqual(keys, ['ig/zzz', 'ig/aaa'])
-
-    def test_get_undescribed_instagram_images_ordering_under_months_filter(self):
-        from datetime import datetime, timedelta
-
-        recent = datetime.now().strftime('%Y-%m-%dT00:00:00')
-        mid = (datetime.now() - timedelta(days=60)).strftime('%Y-%m-%dT00:00:00')
-        old = (datetime.now() - timedelta(days=400)).strftime('%Y-%m-%dT00:00:00')
-        store_instagram_dump_media(self.db, {
-            'media_key': 'ig/recent',
-            'file_path': '/ig/recent.jpg',
-            'filename': 'recent.jpg',
-            'date_folder': datetime.now().strftime('%Y%m'),
-            'created_at': recent,
-        })
-        store_instagram_dump_media(self.db, {
-            'media_key': 'ig/mid',
-            'file_path': '/ig/mid.jpg',
-            'filename': 'mid.jpg',
-            'date_folder': datetime.now().strftime('%Y%m'),
-            'created_at': mid,
-        })
-        store_instagram_dump_media(self.db, {
-            'media_key': 'ig/stale',
-            'file_path': '/ig/stale.jpg',
-            'filename': 'stale.jpg',
-            'date_folder': '202001',
-            'created_at': old,
-        })
-        keys = [
-            img['media_key']
-            for img in get_undescribed_instagram_images(self.db, months=12)
-        ]
-        self.assertEqual(keys, ['ig/recent', 'ig/mid'])
 
     def test_store_image_description_persists_has_repetition_stringly(self):
         store_image_description(self.db, {

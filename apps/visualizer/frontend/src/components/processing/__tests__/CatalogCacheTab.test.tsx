@@ -59,7 +59,6 @@ function renderCatalogCacheTab(props: { onOpenJobQueue?: () => void } = {}) {
 const EMPTY_PIPELINE_STATUS = {
   catalog_sync: null,
   embed_catalog: null,
-  embed_catalog_and_instagram: null,
   stack_detect: null,
   catalog_similarity: null,
   catalog_cache_build: null,
@@ -278,10 +277,10 @@ describe('CatalogCacheTab', () => {
       await screen.findByRole('button', { name: new RegExp(CATALOG_CACHE_PIPELINE_TITLE, 'i') }),
     );
     expect(await screen.findByText(CATALOG_CACHE_EMBED_CATALOG_HELPER)).toBeTruthy();
-    // 5 pipeline rows (sync, catalog, catalog+ig, stack, similarity) all
+    // 4 pipeline rows (sync, catalog, stack, similarity) all
     // start with "Never run" until at least one job has been created.
     const neverBadges = await screen.findAllByText(CATALOG_CACHE_LAST_RUN_NEVER);
-    expect(neverBadges.length).toBe(5);
+    expect(neverBadges.length).toBe(4);
   });
 
   it('renders status badge and relative timestamp for last run', async () => {

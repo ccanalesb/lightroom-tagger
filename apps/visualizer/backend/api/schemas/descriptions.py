@@ -14,7 +14,7 @@ class DescriptionItem(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     image_key: str
-    image_type: Literal['catalog', 'instagram']
+    image_type: Literal['catalog']
     filename: str | None = None
     date_ref: str | None = None
     summary: str | None = None

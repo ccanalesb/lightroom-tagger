@@ -202,7 +202,7 @@ describe('ImageDetailModal', () => {
       <ImageDetailModal
         imageType="instagram"
         imageKey="ig1"
-        initialImage={buildDetail({ image_type: 'instagram', key: 'ig1', filename: 'ig1.jpg' })}
+        initialImage={buildDetail({ key: 'ig1', filename: 'ig1.jpg' })}
         primaryScoreSource="none"
         onClose={() => {}}
       />,

@@ -61,7 +61,7 @@ def fingerprint_batch_describe(
         "backfill_visual_tags": bool(metadata.get("backfill_visual_tags", False)),
         "date_filter": metadata.get("date_filter", "all"),
         "force": bool(metadata.get("force", False)),
-        "image_type": metadata.get("image_type", "both"),
+        "image_type": metadata.get("image_type", "catalog"),
         "max_workers": int(metadata.get("max_workers", 4)),
         "min_rating": min_rating,
         "pairs": pairs,
@@ -71,15 +71,6 @@ def fingerprint_batch_describe(
     }
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def _normalized_batch_embed_image_type(metadata: dict[str, Any]) -> str:
-    """Canonical embed scope for resume identity: ``catalog`` vs ``catalog_and_instagram``."""
-    raw = metadata.get("image_type", "catalog")
-    s = str(raw).strip() if raw is not None else "catalog"
-    if s == "catalog_and_instagram":
-        return "catalog_and_instagram"
-    return "catalog"
 
 
 def fingerprint_catalog_cache_build(
@@ -105,7 +96,7 @@ def fingerprint_catalog_cache_build(
         "force_embed": bool(metadata.get("force_embed", False)),
         "force_similarity": bool(metadata.get("force_similarity", False)),
         "force_stack": bool(metadata.get("force_stack", False)),
-        "image_type": "catalog_and_instagram",
+        "image_type": "catalog",
         "last_months": metadata.get("last_months"),
         "min_rating": min_rating,
         "month": metadata.get("month"),
@@ -142,7 +133,7 @@ def fingerprint_batch_embed_image(
         "embedding_dim": CLIP_EMBED_DIM,
         "embedding_model_id": CLIP_EMBED_MODEL_ID,
         "force": bool(metadata.get("force", False)),
-        "image_type": _normalized_batch_embed_image_type(metadata),
+        "image_type": "catalog",
         "min_rating": min_rating,
         "pairs": pairs,
         "resolved_months": resolved_months,
@@ -196,7 +187,7 @@ def fingerprint_batch_score(
     payload = {
         "date_filter": metadata.get("date_filter", "all"),
         "force": bool(metadata.get("force", False)),
-        "image_type": metadata.get("image_type", "both"),
+        "image_type": metadata.get("image_type", "catalog"),
         "max_workers": int(metadata.get("max_workers", 4)),
         "min_rating": min_rating,
         "perspective_slugs": perspective_slugs_fp,

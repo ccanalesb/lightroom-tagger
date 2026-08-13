@@ -69,7 +69,6 @@ class CachePipelineStatus(BaseModel):
 
     catalog_sync: CachePipelineRun | None = None
     embed_catalog: CachePipelineRun | None = None
-    embed_catalog_and_instagram: CachePipelineRun | None = None
     stack_detect: CachePipelineRun | None = None
     catalog_similarity: CachePipelineRun | None = None
     catalog_cache_build: CachePipelineRun | None = None
