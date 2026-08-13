@@ -195,27 +195,6 @@ describe('ImageDetailModal', () => {
     })
   })
 
-  it('renders instagram images from initialImage without calling detail API', async () => {
-    const spy = vi.spyOn(ImagesAPI, 'getImageDetail')
-
-    render(
-      <ImageDetailModal
-        imageType="instagram"
-        imageKey="ig1"
-        initialImage={buildDetail({ key: 'ig1', filename: 'ig1.jpg' })}
-        primaryScoreSource="none"
-        onClose={() => {}}
-      />,
-    )
-
-    await waitFor(() => {
-      expect(screen.getByAltText('ig1.jpg')).toBeInTheDocument()
-    })
-    expect(spy).not.toHaveBeenCalled()
-    expect(screen.queryByTestId('catalog-sections')).toBeNull()
-    expect(screen.queryByTestId('instagram-sections')).toBeNull()
-  })
-
   it('shows loading state while detail is in flight', () => {
     vi.spyOn(ImagesAPI, 'getImageDetail').mockReturnValue(new Promise(() => {}))
     render(

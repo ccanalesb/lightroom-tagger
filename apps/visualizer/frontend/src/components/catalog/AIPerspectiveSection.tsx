@@ -14,7 +14,7 @@ import ImageScoresPanel from './ImageScoresPanel'
 
 interface AIPerspectiveSectionProps {
   imageKey: string
-  imageType: 'catalog' | 'instagram'
+  imageType: 'catalog'
   /** Called after a scoring job completes so the parent modal can refetch header metadata. */
   onDataChanged?: () => void
 }

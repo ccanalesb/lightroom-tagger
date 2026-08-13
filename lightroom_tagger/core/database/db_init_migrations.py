@@ -6,6 +6,20 @@ import os
 import shutil
 import sqlite3
 
+
+def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type IN ('table', 'view') AND name = ?",
+        (table,),
+    ).fetchone()
+    return row is not None
+
+
+def _column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
+    cols = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    return column in cols
+
+
 def _migrate_add_column(conn: sqlite3.Connection, table: str, column: str, col_type: str):
     """Add a column if it doesn't already exist. Safe to call repeatedly."""
     cols = {row['name'] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
@@ -41,8 +55,6 @@ def _migrate_images_schema(conn: sqlite3.Connection) -> None:
         ("height", "INTEGER"),
         ("file_size", "INTEGER"),
         ("instagram_posted", "INTEGER DEFAULT 0"),
-        ("instagram_post_date", "TEXT"),
-        ("instagram_url", "TEXT"),
         ("instagram_index", "INTEGER DEFAULT 0"),
         ("image_hash", "TEXT"),
         ("analyzed_at", "TEXT"),
@@ -63,43 +75,6 @@ def _library_db_file_path(conn: sqlite3.Connection) -> str:
     raise RuntimeError(
         "migrate_unified_image_keys: could not resolve main database file path"
     )
-
-
-def _backfill_matched_catalog_key_from_validated_matches(conn: sqlite3.Connection) -> None:
-    """One-time sync: for every validated row in ``matches``, mirror the
-    pairing onto ``instagram_dump_media.matched_catalog_key`` so the
-    Instagram tab "matched" badge reflects on-demand validations too.
-
-    Gated on ``PRAGMA user_version`` (bump: 1 → 2) so the UPDATE runs exactly
-    once per DB file. Still idempotent if it does run: only overwrites rows
-    whose ``matched_catalog_key`` is NULL (we never stomp a value written by
-    the bulk matcher).
-    """
-    row = conn.execute("PRAGMA user_version").fetchone()
-    current_uv = int(row["user_version"] if row else 0)
-    if current_uv >= 2:
-        return
-    try:
-        conn.execute(
-            "UPDATE instagram_dump_media "
-            "SET matched_catalog_key = ("
-            "    SELECT m.catalog_key FROM matches m "
-            "    WHERE m.insta_key = instagram_dump_media.media_key "
-            "      AND m.validated_at IS NOT NULL "
-            "    ORDER BY m.validated_at DESC LIMIT 1"
-            ") "
-            "WHERE matched_catalog_key IS NULL "
-            "  AND EXISTS ("
-            "    SELECT 1 FROM matches m "
-            "    WHERE m.insta_key = instagram_dump_media.media_key "
-            "      AND m.validated_at IS NOT NULL"
-            ")"
-        )
-    except sqlite3.OperationalError:
-        # `matches` may not exist yet on very fresh DBs — safe to skip and
-        # leave user_version unchanged so the next init retries.
-        return
-    conn.execute("PRAGMA user_version = 2")
 
 
 def _migrate_image_descriptions_fts(conn: sqlite3.Connection) -> None:
@@ -236,86 +211,6 @@ def _migrate_catalog_similarity(conn: sqlite3.Connection) -> None:
     )
 
 
-def _migrate_comparison_pool_snapshots(conn: sqlite3.Connection) -> None:
-    """Idempotent snapshot tables for evaluated Instagram comparison pools."""
-    conn.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS comparison_pool_snapshots (
-            snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            insta_key TEXT NOT NULL,
-            captured_at TEXT NOT NULL DEFAULT (datetime('now')),
-            source_job_id TEXT,
-            threshold REAL NOT NULL,
-            clip_top_k INTEGER NOT NULL,
-            weights_json TEXT NOT NULL,
-            candidate_count INTEGER NOT NULL DEFAULT 0,
-            diagnostics_json TEXT NOT NULL DEFAULT '{}',
-            insta_asset_path TEXT
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_comparison_pool_snapshots_insta_captured
-            ON comparison_pool_snapshots(insta_key, captured_at DESC, snapshot_id DESC);
-
-        CREATE INDEX IF NOT EXISTS idx_comparison_pool_snapshots_source_job
-            ON comparison_pool_snapshots(source_job_id);
-
-        CREATE TABLE IF NOT EXISTS comparison_pool_snapshot_candidates (
-            snapshot_id INTEGER NOT NULL
-                REFERENCES comparison_pool_snapshots(snapshot_id) ON DELETE CASCADE,
-            rank INTEGER NOT NULL,
-            catalog_key TEXT NOT NULL,
-            total_score REAL,
-            phash_distance REAL,
-            phash_score REAL,
-            desc_similarity REAL,
-            vision_result TEXT,
-            vision_score REAL,
-            vision_reasoning TEXT,
-            model_used TEXT,
-            rate_limited INTEGER NOT NULL DEFAULT 0,
-            source_path TEXT,
-            source_available INTEGER NOT NULL DEFAULT 0,
-            asset_path TEXT,
-            debug_resolved_path TEXT,
-            PRIMARY KEY (snapshot_id, catalog_key)
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_comparison_pool_snapshot_candidates_snapshot_rank
-            ON comparison_pool_snapshot_candidates(snapshot_id, rank);
-        """
-    )
-    _migrate_add_column(
-        conn,
-        "comparison_pool_snapshots",
-        "diagnostics_json",
-        "TEXT NOT NULL DEFAULT '{}'",
-    )
-    _migrate_add_column(
-        conn,
-        "comparison_pool_snapshots",
-        "insta_asset_path",
-        "TEXT",
-    )
-    _migrate_add_column(
-        conn,
-        "comparison_pool_snapshot_candidates",
-        "source_path",
-        "TEXT",
-    )
-    _migrate_add_column(
-        conn,
-        "comparison_pool_snapshot_candidates",
-        "source_available",
-        "INTEGER NOT NULL DEFAULT 0",
-    )
-    _migrate_add_column(
-        conn,
-        "comparison_pool_snapshot_candidates",
-        "asset_path",
-        "TEXT",
-    )
-
-
 def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
     """Remap legacy composite keys to date-truncated form; idempotent via user_version."""
     from .catalog import generate_key
@@ -360,14 +255,19 @@ def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
             loser_key = loser["key"]
             survivor_key = survivor["key"]
 
-            # Tables with non-unique FK columns: safe to remap
-            for stmt in (
-                "UPDATE matches SET catalog_key = ? WHERE catalog_key = ?",
-                "UPDATE rejected_matches SET catalog_key = ? WHERE catalog_key = ?",
-                "UPDATE vision_comparisons SET catalog_key = ? WHERE catalog_key = ?",
-                "UPDATE instagram_dump_media SET matched_catalog_key = ? WHERE matched_catalog_key = ?",
+            # Tables with non-unique FK columns: safe to remap (guarded — tables
+            # may already be absent if the 0→1 remap and 6→7 drop run together).
+            for table, column in (
+                ("matches", "catalog_key"),
+                ("rejected_matches", "catalog_key"),
+                ("vision_comparisons", "catalog_key"),
+                ("instagram_dump_media", "matched_catalog_key"),
             ):
-                conn.execute(stmt, (survivor_key, loser_key))
+                if _table_exists(conn, table) and _column_exists(conn, table, column):
+                    conn.execute(
+                        f"UPDATE [{table}] SET {column} = ? WHERE {column} = ?",
+                        (survivor_key, loser_key),
+                    )
 
             # Tables with unique key constraints: delete loser row if survivor
             # already owns one, otherwise remap.
@@ -403,30 +303,24 @@ def _migrate_unified_image_keys(conn: sqlite3.Connection) -> None:
             remaps.append((old_key, new_key))
 
     for old_key, new_key in remaps:
-        conn.execute(
-            "UPDATE matches SET catalog_key = ? WHERE catalog_key = ?",
-            (new_key, old_key),
-        )
-        conn.execute(
-            "UPDATE rejected_matches SET catalog_key = ? WHERE catalog_key = ?",
-            (new_key, old_key),
-        )
+        for table, column in (
+            ("matches", "catalog_key"),
+            ("rejected_matches", "catalog_key"),
+            ("vision_comparisons", "catalog_key"),
+            ("instagram_dump_media", "matched_catalog_key"),
+        ):
+            if _table_exists(conn, table) and _column_exists(conn, table, column):
+                conn.execute(
+                    f"UPDATE [{table}] SET {column} = ? WHERE {column} = ?",
+                    (new_key, old_key),
+                )
         conn.execute(
             "UPDATE vision_cache SET key = ? WHERE key = ?",
             (new_key, old_key),
         )
         conn.execute(
-            "UPDATE vision_comparisons SET catalog_key = ? WHERE catalog_key = ?",
-            (new_key, old_key),
-        )
-        conn.execute(
             "UPDATE image_descriptions SET image_key = ? "
             "WHERE image_key = ? AND image_type = 'catalog'",
-            (new_key, old_key),
-        )
-        conn.execute(
-            "UPDATE instagram_dump_media SET matched_catalog_key = ? "
-            "WHERE matched_catalog_key = ?",
             (new_key, old_key),
         )
         conn.execute(

@@ -84,22 +84,6 @@ def classify_path(
             return cached, None, None
         return None, 'encode_failed', resolved
 
-    row_dm = lib_db.execute(
-        "SELECT file_path FROM instagram_dump_media WHERE media_key = ?",
-        (image_key,),
-    ).fetchone()
-    if row_dm:
-        filepath = str(row_dm['file_path'] or '').strip()
-        if not filepath:
-            return None, 'empty_path', None
-        resolved = resolve_filepath(filepath)
-        if not resolved or not os.path.isfile(resolved):
-            return None, 'unresolved_or_missing', (resolved or filepath)
-        cached = get_or_create_cached_image(lib_db, image_key, resolved)
-        if cached and os.path.isfile(cached):
-            return cached, None, None
-        return None, 'encode_failed', resolved
-
     return None, 'no_row', None
 
 

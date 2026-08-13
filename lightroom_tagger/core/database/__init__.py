@@ -6,11 +6,9 @@ from lightroom_tagger.core.managed_connections import (
 )
 
 from .db_init import (
-    _backfill_matched_catalog_key_from_validated_matches,
     _deserialize_row,
     _dict_factory,
     _ensure_sqlite_vec_loaded,
-    _library_db_file_path,
     _migrate_add_column,
     _migrate_catalog_similarity,
     _migrate_image_clip_embeddings_vec0,
@@ -24,6 +22,7 @@ from .db_init import (
     migrate_unified_image_keys,
     seed_perspectives_from_prompts_dir,
 )
+from .db_init_migrations import _library_db_file_path
 
 from .catalog_statistics import (
     CatalogSchemaFacets,
@@ -32,7 +31,6 @@ from .catalog_statistics import (
     count_catalog_images_with_repetition,
     count_images_with_dominant_colors,
     count_images_with_mood_tags,
-    count_matches,
     count_rated_catalog_images,
     get_catalog_date_range,
     get_catalog_months,
@@ -76,12 +74,6 @@ from .catalog import (
     store_images_batch,
     update_image_hash,
     update_instagram_status,
-)
-
-from .dump_media import (
-    get_instagram_dump_media,
-    get_instagram_dump_media_filtered,
-    store_instagram_dump_media,
 )
 
 from lightroom_tagger.core.exceptions import StackMutationError
@@ -149,12 +141,9 @@ from .vision_cache import (
     VISION_CACHE_OVERSIZED_SENTINEL,
     get_cache_stats,
     get_vision_cached_image,
-    get_vision_comparison,
     init_vision_cache_table,
-    init_vision_comparisons_table,
     is_vision_cache_valid,
     store_vision_cached_image,
-    store_vision_comparison,
 )
 
 __all__ = (
@@ -163,7 +152,6 @@ __all__ = (
     'VISION_CACHE_OVERSIZED_SENTINEL',
     '_LIBRARY_WRITE_LOCK',
     '_append_query_catalog_image_filters',
-    '_backfill_matched_catalog_key_from_validated_matches',
     '_coerce_has_repetition',
     '_deserialize_row',
     '_dict_factory',
@@ -194,7 +182,6 @@ __all__ = (
     'count_catalog_images_with_repetition',
     'count_images_with_dominant_colors',
     'count_images_with_mood_tags',
-    'count_matches',
     'count_rated_catalog_images',
     'delete_image',
     'delete_perspective',
@@ -221,8 +208,6 @@ __all__ = (
     'get_image_description',
     'get_image_descriptions_by_type',
     'get_images_without_hash',
-    'get_instagram_dump_media',
-    'get_instagram_dump_media_filtered',
     'get_mood_tags_sample',
     'get_perspective_by_slug',
     'get_posted_images_count',
@@ -230,12 +215,10 @@ __all__ = (
     'get_similarity_groups_count',
     'get_undescribed_catalog_images',
     'get_vision_cached_image',
-    'get_vision_comparison',
     'init_catalog_table',
     'init_database',
     'init_image_descriptions_table',
     'init_vision_cache_table',
-    'init_vision_comparisons_table',
     'insert_catalog_similarity_group',
     'insert_image_score',
     'insert_perspective',
@@ -273,9 +256,7 @@ __all__ = (
     'store_image',
     'store_image_description',
     'store_images_batch',
-    'store_instagram_dump_media',
     'store_vision_cached_image',
-    'store_vision_comparison',
     'supersede_previous_current_scores',
     'update_image_hash',
     'update_instagram_status',

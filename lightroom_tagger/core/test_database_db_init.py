@@ -49,11 +49,19 @@ class TestDatabaseDbInit(unittest.TestCase):
         self.assertIn("vec0", clip_sql)
         self.assertIn("float[512]", clip_sql)
         uv = self.db.execute("PRAGMA user_version").fetchone()
-        self.assertEqual(int(uv["user_version"]), 6)
+        self.assertEqual(int(uv["user_version"]), 7)
 
     def test_migrate_unified_image_keys_rewrites_legacy_key(self):
         """Legacy full-datetime composite keys remap to YYYY-MM-DD_filename."""
         self.db.execute("PRAGMA user_version = 0")
+        self.db.executescript("""
+            CREATE TABLE IF NOT EXISTS matches (
+                catalog_key TEXT,
+                insta_key TEXT,
+                total_score REAL,
+                PRIMARY KEY (catalog_key, insta_key)
+            );
+        """)
         self.db.execute(
             """
             INSERT INTO images (key, id, filename, filepath, date_taken)
@@ -76,6 +84,14 @@ class TestDatabaseDbInit(unittest.TestCase):
     def test_migrate_unified_image_keys_merges_collisions(self):
         """Duplicate rows with different timestamp precision merge instead of crashing."""
         self.db.execute("PRAGMA user_version = 0")
+        self.db.executescript("""
+            CREATE TABLE IF NOT EXISTS matches (
+                catalog_key TEXT,
+                insta_key TEXT,
+                total_score REAL,
+                PRIMARY KEY (catalog_key, insta_key)
+            );
+        """)
         self.db.execute(
             "INSERT INTO images (key, id, filename, filepath, date_taken, rating) "
             "VALUES (?, ?, ?, ?, ?, ?)",

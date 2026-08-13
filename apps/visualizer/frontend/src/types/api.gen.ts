@@ -1396,12 +1396,8 @@ export interface components {
         "Stats.36cf89b": {
             /** Catalog Images */
             catalog_images: number;
-            /** Instagram Images */
-            instagram_images: number;
             /** Posted To Instagram */
             posted_to_instagram: number;
-            /** Matches Found */
-            matches_found: number;
             /** Db Path */
             db_path: string;
         };

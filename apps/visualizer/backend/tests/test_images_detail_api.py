@@ -15,7 +15,6 @@ from lightroom_tagger.core.database import (
     insert_image_score,
     store_image,
     store_image_description,
-    store_instagram_dump_media,
 )
 
 
@@ -82,20 +81,6 @@ def detail_client(tmp_path, monkeypatch):
                 "is_current": 1,
             },
         )
-
-    store_instagram_dump_media(
-        conn,
-        {
-            "media_key": "ig-probe",
-            "file_path": "/tmp/ig-probe.jpg",
-            "filename": "ig-probe.jpg",
-            "date_folder": "2024-05",
-            "caption": "insta caption",
-            "exif_data": None,
-            "post_url": "https://example/p/abc",
-            "image_hash": "hash",
-        },
-    )
 
     conn.commit()
     conn.close()

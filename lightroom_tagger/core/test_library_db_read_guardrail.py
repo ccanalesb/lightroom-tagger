@@ -27,11 +27,11 @@ _ALLOWLISTED_FUNCTIONS: frozenset[tuple[str, str]] = frozenset(
 _LIBRARY_TABLE_RE = re.compile(
     r"\b(?:FROM|JOIN|INTO|UPDATE|DELETE\s+FROM)\s+"
     r"(?:"
-    r"images|image_descriptions(?:_fts)?|image_scores|perspectives|matches|"
-    r"rejected_matches|instagram_images|instagram_dump_media|image_stacks|"
-    r"image_stack_members|vision_cache|vision_comparisons|"
+    r"images|image_descriptions(?:_fts)?|image_scores|perspectives|"
+    r"image_stacks|"
+    r"image_stack_members|vision_cache|"
     r"catalog_similarity_groups|catalog_similarity_candidates|"
-    r"image_clip_embeddings|image_text_embeddings"
+    r"image_clip_embeddings"
     r")\b",
     re.IGNORECASE,
 )

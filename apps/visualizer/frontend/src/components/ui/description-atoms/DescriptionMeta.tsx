@@ -1,6 +1,5 @@
 import {
   DESC_PAGE_SOURCE_CATALOG,
-  DESC_PAGE_SOURCE_INSTAGRAM,
   LABEL_MODEL,
 } from '../../../constants/strings'
 import { formatDate } from '../../../utils/date'
@@ -8,7 +7,7 @@ import { formatDate } from '../../../utils/date'
 interface DescriptionMetaProps {
   model?: string | null
   describedAt?: string | null
-  imageType?: 'catalog' | 'instagram'
+  imageType?: 'catalog'
   hasDescription?: boolean
   bestPerspective?: string | null
   dateRef?: string | null
@@ -28,7 +27,7 @@ export function DescriptionMeta({ model, describedAt, imageType, hasDescription,
   if (hasDescription && imageType) {
     parts.push(
       <span key="src" className="text-gray-500">
-        {imageType === 'catalog' ? DESC_PAGE_SOURCE_CATALOG : DESC_PAGE_SOURCE_INSTAGRAM}
+        {DESC_PAGE_SOURCE_CATALOG}
       </span>
     )
   }

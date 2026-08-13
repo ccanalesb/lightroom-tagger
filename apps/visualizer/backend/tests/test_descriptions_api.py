@@ -19,16 +19,10 @@ def _make_client(db_path):
 
 
 def _seed_described_image(db, key='cat_001', image_type='catalog'):
-    if image_type == 'catalog':
-        db.execute(
-            "INSERT OR IGNORE INTO images (key, filename, filepath, date_taken) VALUES (?, ?, ?, ?)",
-            (key, 'photo.jpg', '/fake/photo.jpg', '2024-01-15'),
-        )
-    else:
-        db.execute(
-            "INSERT OR IGNORE INTO instagram_dump_media (media_key, filename, file_path, created_at) VALUES (?, ?, ?, ?)",
-            (key, 'insta.jpg', '/fake/insta.jpg', '2024-01-15'),
-        )
+    db.execute(
+        "INSERT OR IGNORE INTO images (key, filename, filepath, date_taken) VALUES (?, ?, ?, ?)",
+        (key, 'photo.jpg', '/fake/photo.jpg', '2024-01-15'),
+    )
     db.execute(
         "INSERT INTO image_descriptions (image_key, image_type, summary, best_perspective, model_used, described_at) VALUES (?, ?, ?, ?, ?, ?)",
         (key, image_type, 'A test summary', 'street', 'gemma3:27b', '2024-06-01T00:00:00'),
