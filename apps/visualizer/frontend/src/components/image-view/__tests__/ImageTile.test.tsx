@@ -30,7 +30,10 @@ describe('ImageTile', () => {
   it('thumbnail src uses image_type and encoded key', () => {
     render(
       <ImageTile
-        image={baseImage({ image_type: 'instagram', key: 'a b/c' })}
+        image={{
+          ...baseImage({ key: 'a b/c' }),
+          image_type: 'instagram',
+        } as unknown as ImageView}
         variant="grid"
         primaryScoreSource="none"
         onClick={() => {}}
@@ -83,7 +86,7 @@ describe('ImageTile', () => {
   it('overlayBadges slot renders on top-right of thumbnail', () => {
     render(
       <ImageTile
-        image={baseImage({ image_type: 'instagram' })}
+        image={{ ...baseImage(), image_type: 'instagram' } as unknown as ImageView}
         variant="grid"
         primaryScoreSource="none"
         overlayBadges={<Badge variant="success">Matched</Badge>}

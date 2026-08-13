@@ -89,11 +89,13 @@ describe('ImageMetadataBadges', () => {
   it('Instagram tile (source=none) shows no primary score pill', () => {
     render(
       <ImageMetadataBadges
-        image={baseImage({
+        image={{
+          ...baseImage({
+            identity_aggregate_score: 7,
+            catalog_perspective_score: 7,
+          }),
           image_type: 'instagram',
-          identity_aggregate_score: 7,
-          catalog_perspective_score: 7,
-        })}
+        } as unknown as ImageView}
         primaryScoreSource="none"
       />,
     )
