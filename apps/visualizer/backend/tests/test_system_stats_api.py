@@ -6,7 +6,6 @@ from app import create_app
 from lightroom_tagger.core.database import (
     init_database,
     store_image,
-    store_instagram_dump_media,
     update_instagram_status,
 )
 
@@ -20,29 +19,6 @@ def _client_for_library(tmp_path, monkeypatch):
     k1 = store_image(lib, {"date_taken": "2024-01-01", "filename": "a.jpg"})
     store_image(lib, {"date_taken": "2024-02-01", "filename": "b.jpg"})
     update_instagram_status(lib, k1, posted=True)
-    store_instagram_dump_media(
-        lib,
-        {
-            "media_key": "202401/111",
-            "file_path": "/tmp/111.jpg",
-            "date_folder": "202401",
-        },
-    )
-    store_instagram_dump_media(
-        lib,
-        {
-            "media_key": "202401/222",
-            "file_path": "/tmp/222.jpg",
-            "date_folder": "202401",
-        },
-    )
-    lib.execute(
-        """
-        INSERT INTO matches (catalog_key, insta_key, total_score, matched_at)
-        VALUES (?, ?, ?, datetime('now'))
-        """,
-        (k1, "202401/111", 0.8),
-    )
     lib.commit()
     lib.close()
 
@@ -60,9 +36,7 @@ def test_stats_returns_seeded_counts(tmp_path, monkeypatch) -> None:
     assert resp.status_code == 200
     assert resp.json == {
         "catalog_images": 2,
-        "instagram_images": 2,
         "posted_to_instagram": 1,
-        "matches_found": 1,
         "db_path": db_path,
     }
 

@@ -1,95 +1,52 @@
-"""Tests for vision comparison cache accessors."""
+"""Tests for vision cache accessors."""
 
 import os
 import tempfile
 import unittest
 
 from lightroom_tagger.core.database import (
-    get_vision_comparison,
+    get_cache_stats,
+    get_vision_cached_image,
     init_database,
-    init_vision_comparisons_table,
-    store_vision_comparison,
+    init_vision_cache_table,
+    is_vision_cache_valid,
+    store_vision_cached_image,
 )
-class TestVisionComparisonCache(unittest.TestCase):
-    """Tests for vision comparison cache functions."""
+
+
+class TestVisionCache(unittest.TestCase):
+    """Tests for vision cache functions."""
 
     def setUp(self):
-        """Create temporary database."""
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.json') as tf:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as tf:
             self.temp_db_path = tf.name
         self.db = init_database(self.temp_db_path)
-        init_vision_comparisons_table(self.db)
+        init_vision_cache_table(self.db)
 
     def tearDown(self):
-        """Clean up."""
         self.db.close()
         os.unlink(self.temp_db_path)
 
-    def test_store_vision_comparison(self):
-        """Test storing a vision comparison result."""
-        result = store_vision_comparison(
+    def test_store_and_get_vision_cached_image(self):
+        result = store_vision_cached_image(
             self.db,
             catalog_key='cat_001',
-            insta_key='insta_001',
-            result='SAME',
-            vision_score=1.0,
-            model_used='gemma3:27b'
+            compressed_path='/cache/cat_001.jpg',
+            phash='abc',
+            original_mtime=1.0,
         )
         self.assertTrue(result)
-
-        # Retrieve cached result
-        cached = get_vision_comparison(self.db, 'cat_001', 'insta_001')
+        cached = get_vision_cached_image(self.db, 'cat_001')
         self.assertIsNotNone(cached)
-        self.assertEqual(cached['result'], 'SAME')
-        self.assertEqual(cached['vision_score'], 1.0)
-        self.assertEqual(cached['model_used'], 'gemma3:27b')
-        self.assertIn('compared_at', cached)
+        self.assertEqual(cached['compressed_path'], '/cache/cat_001.jpg')
+        self.assertEqual(cached['phash'], 'abc')
 
-    def test_get_vision_comparison_not_found(self):
-        """Test retrieving non-existent comparison."""
-        cached = get_vision_comparison(self.db, 'cat_999', 'insta_999')
-        self.assertIsNone(cached)
+    def test_get_cache_stats_empty(self):
+        stats = get_cache_stats(self.db)
+        self.assertEqual(stats['total'], 0)
+        self.assertEqual(stats['cached'], 0)
 
-    def test_vision_comparison_is_idempotent(self):
-        """Test that storing the same comparison twice updates it."""
-        # Store first time
-        store_vision_comparison(
-            self.db,
-            catalog_key='cat_001',
-            insta_key='insta_001',
-            result='UNCERTAIN',
-            vision_score=0.5,
-            model_used='gemma3:27b'
+    def test_is_vision_cache_valid_missing_entry(self):
+        self.assertFalse(
+            is_vision_cache_valid(self.db, 'missing', '/path/photo.jpg')
         )
-
-        # Store again with different result
-        store_vision_comparison(
-            self.db,
-            catalog_key='cat_001',
-            insta_key='insta_001',
-            result='SAME',
-            vision_score=1.0,
-            model_used='gemma3:27b-cloud'
-        )
-
-        # Should have updated result
-        cached = get_vision_comparison(self.db, 'cat_001', 'insta_001')
-        self.assertEqual(cached['result'], 'SAME')
-        self.assertEqual(cached['vision_score'], 1.0)
-        self.assertEqual(cached['model_used'], 'gemma3:27b-cloud')
-
-    def test_multiple_comparisons(self):
-        """Test storing multiple comparisons."""
-        store_vision_comparison(self.db, 'cat_001', 'insta_001', 'SAME', 1.0, 'gemma3:27b')
-        store_vision_comparison(self.db, 'cat_001', 'insta_002', 'DIFFERENT', 0.0, 'gemma3:27b')
-        store_vision_comparison(self.db, 'cat_002', 'insta_001', 'UNCERTAIN', 0.5, 'gemma3:27b')
-
-        # Each should be retrievable
-        c1 = get_vision_comparison(self.db, 'cat_001', 'insta_001')
-        self.assertEqual(c1['result'], 'SAME')
-
-        c2 = get_vision_comparison(self.db, 'cat_001', 'insta_002')
-        self.assertEqual(c2['result'], 'DIFFERENT')
-
-        c3 = get_vision_comparison(self.db, 'cat_002', 'insta_001')
-        self.assertEqual(c3['result'], 'UNCERTAIN')

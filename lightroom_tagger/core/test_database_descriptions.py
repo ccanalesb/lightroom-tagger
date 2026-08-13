@@ -12,7 +12,6 @@ from lightroom_tagger.core.database import (
     init_image_descriptions_table,
     store_image,
     store_image_description,
-    store_instagram_dump_media,
 )
 class TestImageDescriptions(unittest.TestCase):
     """Tests for image_descriptions table functions."""
@@ -242,15 +241,9 @@ def test_description_read_helpers(tmp_path) -> None:
         "subjects": ["tree"],
         "model_used": "m",
     })
-    store_image_description(db, {
-        "image_key": "ig-1",
-        "image_type": "instagram",
-        "summary": "IG shot",
-        "model_used": "m",
-    })
 
     all_rows = get_all_image_descriptions(db)
-    assert len(all_rows) == 2
+    assert len(all_rows) == 1
     assert all(not isinstance(r, sqlite3.Row) for r in all_rows)
     assert all_rows[0]["subjects"] == ["tree"]
 
@@ -258,6 +251,6 @@ def test_description_read_helpers(tmp_path) -> None:
     assert len(catalog_only) == 1
     assert catalog_only[0]["image_key"] == "cat-1"
 
-    assert get_image_descriptions_by_type(db, "instagram")[0]["image_key"] == "ig-1"
+    assert get_image_descriptions_by_type(db, "instagram") == []
     assert get_all_image_descriptions(init_database(str(tmp_path / "empty.db"))) == []
     db.close()

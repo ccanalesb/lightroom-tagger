@@ -29,8 +29,6 @@ BASE_LIBRARY_SCHEMA_SQL = '''
             height INTEGER,
             file_size INTEGER,
             instagram_posted INTEGER DEFAULT 0,
-            instagram_post_date TEXT,
-            instagram_url TEXT,
             instagram_index INTEGER DEFAULT 0,
             image_hash TEXT,
             analyzed_at TEXT,
@@ -39,85 +37,12 @@ BASE_LIBRARY_SCHEMA_SQL = '''
             catalog_path TEXT DEFAULT ''
         );
 
-        CREATE TABLE IF NOT EXISTS instagram_dump_media (
-            media_key TEXT PRIMARY KEY,
-            file_path TEXT,
-            filename TEXT,
-            date_folder TEXT,
-            caption TEXT,
-            created_at TEXT,
-            exif_data TEXT,
-            post_url TEXT,
-            image_hash TEXT,
-            processed INTEGER DEFAULT 0,
-            matched_catalog_key TEXT,
-            vision_result TEXT,
-            vision_score REAL,
-            processed_at TEXT,
-            last_attempted_at TEXT,
-            added_at TEXT
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_dump_media_hash ON instagram_dump_media(image_hash);
-        CREATE INDEX IF NOT EXISTS idx_dump_media_date ON instagram_dump_media(date_folder);
-        CREATE INDEX IF NOT EXISTS idx_dump_media_processed ON instagram_dump_media(processed);
-        CREATE INDEX IF NOT EXISTS idx_dump_media_processed_attempted ON instagram_dump_media(processed, last_attempted_at);
-
-        CREATE TABLE IF NOT EXISTS instagram_images (
-            key TEXT PRIMARY KEY,
-            local_path TEXT,
-            post_url TEXT,
-            filename TEXT,
-            description TEXT,
-            image_hash TEXT,
-            instagram_folder TEXT,
-            crawled_at TEXT,
-            phash TEXT,
-            exif TEXT,
-            created_at TEXT
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_insta_images_local_path ON instagram_images(local_path);
-
-        CREATE TABLE IF NOT EXISTS matches (
-            catalog_key TEXT,
-            insta_key TEXT,
-            phash_distance INTEGER,
-            phash_score REAL,
-            desc_similarity REAL,
-            vision_result TEXT,
-            vision_score REAL,
-            total_score REAL,
-            matched_at TEXT,
-            model_used TEXT,
-            validated_at TEXT,
-            rank INTEGER DEFAULT 1,
-            PRIMARY KEY (catalog_key, insta_key)
-        );
-
-        CREATE TABLE IF NOT EXISTS rejected_matches (
-            catalog_key TEXT,
-            insta_key TEXT,
-            rejected_at TEXT,
-            PRIMARY KEY (catalog_key, insta_key)
-        );
-
         CREATE TABLE IF NOT EXISTS vision_cache (
             key TEXT PRIMARY KEY,
             compressed_path TEXT,
             phash TEXT,
             compressed_at TEXT,
             original_mtime REAL
-        );
-
-        CREATE TABLE IF NOT EXISTS vision_comparisons (
-            catalog_key TEXT,
-            insta_key TEXT,
-            result TEXT,
-            vision_score REAL,
-            compared_at TEXT,
-            model_used TEXT,
-            PRIMARY KEY (catalog_key, insta_key)
         );
 
         CREATE TABLE IF NOT EXISTS image_descriptions (
@@ -175,47 +100,4 @@ BASE_LIBRARY_SCHEMA_SQL = '''
             ON image_scores(image_key, image_type);
         CREATE INDEX IF NOT EXISTS idx_image_scores_current
             ON image_scores(image_key, image_type, perspective_slug, is_current);
-
-        CREATE TABLE IF NOT EXISTS comparison_pool_snapshots (
-            snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            insta_key TEXT NOT NULL,
-            captured_at TEXT NOT NULL DEFAULT (datetime('now')),
-            source_job_id TEXT,
-            threshold REAL NOT NULL,
-            clip_top_k INTEGER NOT NULL,
-            weights_json TEXT NOT NULL,
-            candidate_count INTEGER NOT NULL DEFAULT 0,
-            diagnostics_json TEXT NOT NULL DEFAULT '{}',
-            insta_asset_path TEXT
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_comparison_pool_snapshots_insta_captured
-            ON comparison_pool_snapshots(insta_key, captured_at DESC, snapshot_id DESC);
-
-        CREATE INDEX IF NOT EXISTS idx_comparison_pool_snapshots_source_job
-            ON comparison_pool_snapshots(source_job_id);
-
-        CREATE TABLE IF NOT EXISTS comparison_pool_snapshot_candidates (
-            snapshot_id INTEGER NOT NULL
-                REFERENCES comparison_pool_snapshots(snapshot_id) ON DELETE CASCADE,
-            rank INTEGER NOT NULL,
-            catalog_key TEXT NOT NULL,
-            total_score REAL,
-            phash_distance REAL,
-            phash_score REAL,
-            desc_similarity REAL,
-            vision_result TEXT,
-            vision_score REAL,
-            vision_reasoning TEXT,
-            model_used TEXT,
-            rate_limited INTEGER NOT NULL DEFAULT 0,
-            source_path TEXT,
-            source_available INTEGER NOT NULL DEFAULT 0,
-            asset_path TEXT,
-            debug_resolved_path TEXT,
-            PRIMARY KEY (snapshot_id, catalog_key)
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_comparison_pool_snapshot_candidates_snapshot_rank
-            ON comparison_pool_snapshot_candidates(snapshot_id, rank);
 '''

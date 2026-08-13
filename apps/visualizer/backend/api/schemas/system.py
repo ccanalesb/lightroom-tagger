@@ -15,9 +15,7 @@ class Stats(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
     catalog_images: int
-    instagram_images: int
     posted_to_instagram: int
-    matches_found: int
     db_path: str
 
 

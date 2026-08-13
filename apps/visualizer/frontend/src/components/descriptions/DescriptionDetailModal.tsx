@@ -10,7 +10,6 @@ import {
   DESC_PAGE_GENERATE,
   DESC_PAGE_GENERATING,
   DESC_PAGE_SOURCE_CATALOG,
-  DESC_PAGE_SOURCE_INSTAGRAM,
   MSG_LOADING,
   MODAL_CLOSE,
 } from '../../constants/strings';
@@ -71,7 +70,7 @@ export function DescriptionDetailModal({
 
         <div className="px-6 py-3 border-t flex justify-between items-center text-xs text-gray-400">
           <span>
-            {item.image_type === 'catalog' ? DESC_PAGE_SOURCE_CATALOG : DESC_PAGE_SOURCE_INSTAGRAM}
+            {DESC_PAGE_SOURCE_CATALOG}
             {item.desc_model && ` · model: ${item.desc_model}`}
             {item.described_at && ` · ${formatDate(item.described_at)}`}
           </span>

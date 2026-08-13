@@ -13,12 +13,10 @@ import sqlite_vec
 
 from . import library_bootstrap_schema
 from .scores import markdown_marks_optional, migrate_legacy_description_scores_to_image_scores
+from .db_init_instagram_drop import _migrate_drop_instagram_dead_tables
 from .db_init_migrations import (
-    _backfill_matched_catalog_key_from_validated_matches,
-    _library_db_file_path,
     _migrate_add_column,
     _migrate_catalog_similarity,
-    _migrate_comparison_pool_snapshots,
     _migrate_image_clip_embeddings_vec0,
     _migrate_image_descriptions_fts,
     _migrate_image_stacks,
@@ -174,22 +172,12 @@ def init_database(db_path: str) -> sqlite3.Connection:
     )
 
     # Migrations for existing databases
-    _migrate_add_column(conn, 'instagram_dump_media', 'last_attempted_at', 'TEXT')
-    _migrate_add_column(conn, 'instagram_images', 'created_at', 'TEXT')
-    _migrate_add_column(conn, 'matches', 'model_used', 'TEXT')
-    _migrate_add_column(conn, 'matches', 'validated_at', 'TEXT')
-    _migrate_add_column(conn, 'matches', 'rank', 'INTEGER DEFAULT 1')
-    _migrate_add_column(conn, 'matches', 'vision_reasoning', 'TEXT')
     _migrate_add_column(conn, 'image_descriptions', 'dominant_colors', 'TEXT')
     _migrate_add_column(conn, 'image_descriptions', 'mood_tags', 'TEXT')
     _migrate_add_column(conn, 'image_descriptions', 'has_repetition', 'INTEGER')
     _migrate_add_column(conn, 'image_descriptions', 'description_search_document', 'TEXT')
     _migrate_add_column(conn, 'perspectives', 'optional', 'INTEGER NOT NULL DEFAULT 0')
     _migrate_add_column(conn, 'image_scores', 'not_attempted', 'INTEGER NOT NULL DEFAULT 0')
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_dump_media_processed_attempted "
-        "ON instagram_dump_media(processed, last_attempted_at)"
-    )
 
     # Legacy library DBs: existing `images` tables are not upgraded by
     # CREATE TABLE IF NOT EXISTS — add any columns missing vs current schema.
@@ -205,14 +193,13 @@ def init_database(db_path: str) -> sqlite3.Connection:
     """)
 
     _migrate_unified_image_keys(conn)
-    _backfill_matched_catalog_key_from_validated_matches(conn)
     _migrate_image_descriptions_fts(conn)
     _migrate_image_clip_embeddings_vec0(conn)
     migrate_legacy_description_scores_to_image_scores(conn)
     # Stack members reference `images` by key at insert time; `images` is created above.
     _migrate_image_stacks(conn)
     _migrate_catalog_similarity(conn)
-    _migrate_comparison_pool_snapshots(conn)
+    _migrate_drop_instagram_dead_tables(conn)
     seed_perspectives_from_prompts_dir(conn)
     conn.commit()
     return conn

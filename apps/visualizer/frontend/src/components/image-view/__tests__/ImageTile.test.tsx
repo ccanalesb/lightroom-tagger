@@ -27,22 +27,6 @@ describe('ImageTile', () => {
     expect(screen.getByText('abc')).toBeInTheDocument()
   })
 
-  it('thumbnail src uses image_type and encoded key', () => {
-    render(
-      <ImageTile
-        image={{
-          ...baseImage({ key: 'a b/c' }),
-          image_type: 'instagram',
-        } as unknown as ImageView}
-        variant="grid"
-        primaryScoreSource="none"
-        onClick={() => {}}
-      />,
-    )
-    const img = screen.getByRole('img') as HTMLImageElement
-    expect(img.src).toContain('/api/images/instagram/a%20b%2Fc/thumbnail')
-  })
-
   it('invokes onClick when the thumbnail button is clicked', () => {
     const onClick = vi.fn()
     render(

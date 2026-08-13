@@ -14,7 +14,7 @@ import { Badge } from '../ui/badges';
 
 export interface ImageScoresPanelProps {
   imageKey: string;
-  imageType?: 'catalog' | 'instagram';
+  imageType?: 'catalog';
   /** Increment to refetch current scores (e.g. after a scoring job completes). */
   reloadToken?: number;
   /** Optional map slug → display name from `PerspectivesAPI.list`. */

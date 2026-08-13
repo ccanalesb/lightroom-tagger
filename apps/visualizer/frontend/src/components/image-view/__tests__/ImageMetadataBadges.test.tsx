@@ -86,22 +86,6 @@ describe('ImageMetadataBadges', () => {
     expect(container.querySelector('[aria-label$="score 6"]')).toBeNull()
   })
 
-  it('Instagram tile (source=none) shows no primary score pill', () => {
-    render(
-      <ImageMetadataBadges
-        image={{
-          ...baseImage({
-            identity_aggregate_score: 7,
-            catalog_perspective_score: 7,
-          }),
-          image_type: 'instagram',
-        } as unknown as ImageView}
-        primaryScoreSource="none"
-      />,
-    )
-    expect(screen.queryByLabelText(/score/)).toBeNull()
-  })
-
   it('hidePrimaryScore suppresses the pill even when source would render one', () => {
     render(
       <ImageMetadataBadges

@@ -23,9 +23,7 @@ describe('DashboardPage', () => {
     invalidateAll(['dashboard'])
     vi.spyOn(SystemAPI, 'stats').mockResolvedValue({
       catalog_images: 1,
-      instagram_images: 2,
       posted_to_instagram: 0,
-      matches_found: 0,
       db_path: '/tmp/x.db',
     })
     vi.spyOn(IdentityAPI, 'getBestPhotos').mockImplementation(() =>

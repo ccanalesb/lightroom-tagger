@@ -30,7 +30,7 @@ import { ModalCloseButton } from './ModalCloseButton'
 import { ErrorBoundary, ErrorState, invalidate, invalidateAll, useQuery } from '../../data'
 
 interface ImageDetailModalProps {
-  imageType: 'catalog' | 'instagram'
+  imageType: 'catalog'
   imageKey: string
   /** Optional list-row data shown instantly while the detail call is in
    *  flight; once the detail payload arrives it overrides this. */
@@ -53,7 +53,7 @@ function ImageDetailModalFallback({
 }: {
   initialImage?: ImageView
   imageKey: string
-  imageType: 'catalog' | 'instagram'
+  imageType: 'catalog'
   primaryScoreSource: PrimaryScoreSource
 }) {
   return (

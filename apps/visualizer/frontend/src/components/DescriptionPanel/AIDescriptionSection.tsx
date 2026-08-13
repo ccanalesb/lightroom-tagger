@@ -12,7 +12,7 @@ import { invalidate, useQuery } from '../../data'
 
 interface AIDescriptionSectionProps {
   imageKey: string
-  imageType: 'catalog' | 'instagram'
+  imageType: 'catalog'
   /** Optional label prefix used inside the match modal to disambiguate
    *  the IG vs catalog panels, e.g. "Instagram — AI description". */
   titleOverride?: string

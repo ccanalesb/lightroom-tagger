@@ -17,7 +17,7 @@ The visualizer is the web product that surfaces library data to the user. It con
 | **checkpoint** | Persisted job progress snapshot merged into job metadata so interrupted jobs can resume. |
 | **emit_progress** | SocketIO callback passed into job runner and handlers to push real-time progress to the frontend. |
 | **visualizer DB** | `visualizer.db` — SQLite database holding jobs, logs, and visualizer-specific state. Separate from `library.db`. |
-| **library DB** | `library.db` — the shared library database (images, scores, descriptions, matches). The visualizer reads/writes this via the `lightroom_tagger` library. |
+| **library DB** | `library.db` — the shared library database (images, scores, descriptions). The visualizer reads/writes this via the `lightroom_tagger` library. Legacy Instagram-matching data lives in `instagram-matching-export.json` beside the DB ([#228](https://github.com/ccanalesb/lightroom-tagger/issues/228)). |
 | **library-DB lifecycle seam** | Job handlers open `library.db` via `make_managed_library_db` in `jobs/handlers/db_lifecycle.py` (backed by `init_database`); never hand-roll `init_database(...)` + manual `close()` in handler bodies. See ADR-0011. |
 | **blueprint** | A Flask blueprint under `apps/visualizer/backend/api/`. One per domain area (jobs, images, descriptions, providers, scores, identity, system). |
 | **response helpers** | `utils/responses.py` — `error_not_found`, `error_bad_request`, `success_paginated`, etc. Always use these for consistent JSON shapes. |

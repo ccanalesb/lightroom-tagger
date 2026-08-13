@@ -1,4 +1,4 @@
-"""Vision cache and vision comparison DB helpers."""
+"""Vision cache DB helpers."""
 
 import os
 import sqlite3
@@ -8,19 +8,10 @@ from ..analyzer import RAW_EXTENSIONS, VIDEO_EXTENSIONS
 
 from .catalog import library_write
 
-# ---------------------------------------------------------------------------
-# Vision cache
-# ---------------------------------------------------------------------------
-
 VISION_CACHE_OVERSIZED_SENTINEL = "__oversized__"
 
 
 def init_vision_cache_table(db: sqlite3.Connection):
-    """No-op: table is created in init_database."""
-    pass
-
-
-def init_vision_comparisons_table(db: sqlite3.Connection):
     """No-op: table is created in init_database."""
     pass
 
@@ -104,33 +95,3 @@ def get_cache_stats(db: sqlite3.Connection) -> dict:
         'missing': total - cached,
         'cache_size_mb': cache_size_bytes / (1024 * 1024),
     }
-
-
-# ---------------------------------------------------------------------------
-# Vision comparisons
-# ---------------------------------------------------------------------------
-
-def get_vision_comparison(db: sqlite3.Connection, catalog_key: str,
-                           insta_key: str) -> dict | None:
-    """Get cached vision comparison result."""
-    row = db.execute(
-        "SELECT * FROM vision_comparisons WHERE catalog_key = ? AND insta_key = ?",
-        (catalog_key, insta_key)
-    ).fetchone()
-    return dict(row) if row else None
-
-
-def store_vision_comparison(db: sqlite3.Connection, catalog_key: str, insta_key: str,
-                            result: str, vision_score: float, model_used: str) -> bool:
-    """Store vision comparison result in cache. Never expires."""
-    db.execute("""
-        INSERT INTO vision_comparisons (catalog_key, insta_key, result, vision_score,
-            compared_at, model_used)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(catalog_key, insta_key) DO UPDATE SET
-            result=excluded.result, vision_score=excluded.vision_score,
-            compared_at=excluded.compared_at, model_used=excluded.model_used
-    """, (catalog_key, insta_key, result, vision_score,
-          datetime.now().isoformat(), model_used))
-    db.commit()
-    return True
