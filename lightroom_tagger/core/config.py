@@ -1,11 +1,14 @@
+import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 import yaml
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 _CONFIG_MODULE_DIR = Path(__file__).resolve().parent
 
@@ -109,6 +112,22 @@ def load_config(config_path: str | None = None) -> Config:
     for key, value in defaults.items():
         if key not in data:
             data[key] = value
+
+    # A config file outlives the code that read it: retiring a capability leaves
+    # its keys behind in every existing config.yaml. Passing those straight into
+    # Config(**data) raises TypeError from deep inside the dataclass constructor,
+    # which surfaces as an opaque 500 in the visualizer rather than anything the
+    # owner can act on. Drop unknown keys — but log them, so a typo like
+    # ``vison_model`` is visible instead of silently falling back to the default.
+    known_fields = {f.name for f in fields(Config)}
+    unknown = sorted(set(data) - known_fields)
+    if unknown:
+        logger.warning(
+            "Ignoring unknown config key(s) in %s: %s",
+            config_file,
+            ", ".join(unknown),
+        )
+        data = {k: v for k, v in data.items() if k in known_fields}
 
     return Config(**data)
 
