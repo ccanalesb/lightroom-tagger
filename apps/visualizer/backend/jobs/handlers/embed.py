@@ -59,25 +59,13 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
     try:
         raw_scope = metadata.get('image_type', 'catalog')
         image_type = str(raw_scope).strip() if raw_scope is not None else 'catalog'
-        if image_type not in ('catalog', 'catalog_and_instagram'):
+        if image_type != 'catalog':
             runner.fail_job(
                 job_id,
-                (
-                    "batch_embed_image: image_type must be 'catalog' "
-                    "(legacy 'catalog_and_instagram' is treated as catalog)"
-                ),
+                "batch_embed_image: image_type must be 'catalog'",
                 severity='warning',
             )
             return
-        if image_type == 'catalog_and_instagram':
-            if not bool(metadata.get('_catalog_cache_chain')):
-                database.add_job_log(
-                    runner.db,
-                    job_id,
-                    'info',
-                    "batch_embed_image: ignoring legacy image_type 'catalog_and_instagram'; "
-                    'embedding catalog images only',
-                )
 
         db_path = _resolve_library_db_or_fail(runner, job_id)
         if db_path is None:

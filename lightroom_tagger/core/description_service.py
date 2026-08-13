@@ -1,4 +1,4 @@
-"""Describe matched catalog and Instagram images on demand."""
+"""Describe matched catalog images on demand."""
 import os
 import sqlite3
 import threading
@@ -10,7 +10,6 @@ from lightroom_tagger.core.config import get_description_model
 from lightroom_tagger.core.database import (
     get_image,
     get_image_description,
-    get_instagram_dump_media,
     resolve_filepath,
     store_image_description,
 )
@@ -161,43 +160,6 @@ def describe_matched_image(db: sqlite3.Connection, catalog_key: str, force: bool
         with telemetry['_lock']:
             telemetry['silent_compression_skips'] += 1
     return outcome
-
-
-def describe_instagram_image(db: sqlite3.Connection, media_key: str, force: bool = False,
-                             provider_id: str | None = None,
-                             model: str | None = None,
-                             log_callback: LogCallback = None,
-                             perspective_slugs: list[str] | None = None) -> VisionOpOutcome:
-    """Generate and store a description for an Instagram image if needed.
-
-    Uses the local file from instagram_dump_media. ``wrote`` is True when a
-    non-empty description was stored.
-    """
-    if not force and get_image_description(db, media_key):
-        return VisionOpOutcome(status='skipped', reason='description exists')
-
-    dump_media = get_instagram_dump_media(db, media_key)
-    if not dump_media or not dump_media.get('file_path'):
-        return VisionOpOutcome(status='skipped', reason='image not found')
-
-    filepath = dump_media['file_path']
-    if _is_non_describable_path(filepath):
-        return VisionOpOutcome(status='skipped', reason='non-describable file type')
-    if not os.path.exists(filepath):
-        return VisionOpOutcome(status='skipped', reason='file missing')
-
-    user_prompt = _resolve_description_user_prompt(db, perspective_slugs)
-    return _run_description_persist(
-        db,
-        media_key,
-        'instagram',
-        filepath,
-        provider_id=provider_id,
-        model=model,
-        log_callback=log_callback,
-        user_prompt=user_prompt,
-        silent_compression=False,
-    )
 
 
 def _store_structured(

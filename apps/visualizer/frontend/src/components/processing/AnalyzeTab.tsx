@@ -38,8 +38,6 @@ import {
   ANALYZE_SCORE_JOB_STARTED,
 } from '../../constants/strings';
 
-type ImageType = 'both' | 'instagram' | 'catalog';
-
 // Date-filter options mirror the richer contract MatchingTab uses. The value
 // is either ``'all'`` (no window), ``'<N>months'`` (last-N-months rolling
 // window), or a four-digit year (specific calendar year). The backend
@@ -59,12 +57,6 @@ type DateFilter =
   | '2025'
   | '2024'
   | '2023';
-
-const IMAGE_TYPE_OPTIONS: { value: ImageType; label: string }[] = [
-  { value: 'both', label: 'Instagram + Catalog' },
-  { value: 'instagram', label: 'Instagram Only' },
-  { value: 'catalog', label: 'Catalog Only' },
-];
 
 const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
   { value: 'all', label: ADVANCED_DATE_ALL },
@@ -98,7 +90,6 @@ export function buildDateMetadata(
 
 export function AnalyzeTab() {
   const { options, updateOption } = useMatchOptions();
-  const [imageType, setImageType] = useState<ImageType>('both');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [batchMinRating, setBatchMinRating] = useState<number | null>(null);
   const [forceDescribe, setForceDescribe] = useState(false);
@@ -173,7 +164,7 @@ export function AnalyzeTab() {
 
   const buildSharedBaseMetadata = useCallback((): Record<string, unknown> => {
     const metadata: Record<string, unknown> = {
-      image_type: imageType,
+      image_type: 'catalog',
       ...buildDateMetadata(dateFilter),
       max_workers: options.maxWorkers,
     };
@@ -183,7 +174,6 @@ export function AnalyzeTab() {
     metadata.perspective_slugs = [...selectedPerspectiveSlugs];
     return metadata;
   }, [
-    imageType,
     dateFilter,
     batchMinRating,
     options.maxWorkers,
@@ -298,23 +288,6 @@ export function AnalyzeTab() {
 
             <div>
               <label className="block text-sm font-medium text-text mb-2">
-                Image Source
-              </label>
-              <select
-                value={imageType}
-                onChange={(e) => setImageType(e.target.value as ImageType)}
-                className="w-full px-3 py-2 rounded-base border border-border bg-bg text-text focus:outline-none focus:ring-2 focus:ring-accent hover:border-border-strong transition-all"
-              >
-                {IMAGE_TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text mb-2">
                 Date Range
               </label>
               <select
@@ -385,7 +358,7 @@ export function AnalyzeTab() {
                 ))}
               </select>
               <p className="mt-1.5 text-xs text-text-secondary">
-                Applies to catalog (and both); Instagram-only batches ignore this filter.
+                Applies to catalog images in the selected date range.
               </p>
             </div>
 

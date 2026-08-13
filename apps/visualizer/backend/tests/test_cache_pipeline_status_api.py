@@ -54,7 +54,6 @@ def test_pipeline_status_returns_null_for_every_bucket_when_empty(client):
     expected_keys = {
         'catalog_sync',
         'embed_catalog',
-        'embed_catalog_and_instagram',
         'stack_detect',
         'catalog_similarity',
         'catalog_cache_build',
@@ -76,18 +75,13 @@ def test_pipeline_status_buckets_each_simple_job_type(client):
     assert body['catalog_similarity']['job_id'] == sim
     assert body['catalog_cache_build']['job_id'] == chain
     assert body['embed_catalog'] is None
-    assert body['embed_catalog_and_instagram'] is None
 
 
 def test_pipeline_status_splits_batch_embed_image_by_image_type(client):
     cat_only = _create(client, 'batch_embed_image', {'image_type': 'catalog'})
-    cat_ig = _create(
-        client, 'batch_embed_image', {'image_type': 'catalog_and_instagram'},
-    )
 
     body = client.get('/api/cache/pipeline-status').json
     assert body['embed_catalog']['job_id'] == cat_only
-    assert body['embed_catalog_and_instagram']['job_id'] == cat_ig
 
 
 def test_pipeline_status_legacy_embed_without_image_type_maps_to_catalog(client):
@@ -95,7 +89,6 @@ def test_pipeline_status_legacy_embed_without_image_type_maps_to_catalog(client)
 
     body = client.get('/api/cache/pipeline-status').json
     assert body['embed_catalog']['job_id'] == legacy
-    assert body['embed_catalog_and_instagram'] is None
 
 
 def test_pipeline_status_returns_most_recent_per_bucket(client):

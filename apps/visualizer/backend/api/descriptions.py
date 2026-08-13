@@ -7,10 +7,7 @@ from lightroom_tagger.core.database import (
     get_all_images_with_descriptions,
     get_image_description,
 )
-from lightroom_tagger.core.description_service import (
-    describe_instagram_image,
-    describe_matched_image,
-)
+from lightroom_tagger.core.description_service import describe_matched_image
 from api.openapi import spec
 from api.schemas.descriptions import (
     DescriptionGenerateRequest,
@@ -37,7 +34,9 @@ _JSON_COLS = ('composition', 'perspectives', 'technical', 'subjects')
 def list_descriptions(db):
     """List images with their AI descriptions."""
     try:
-        image_type = request.args.get('image_type')  # catalog, instagram, or None for both
+        image_type = request.args.get('image_type')  # catalog only
+        if image_type not in (None, '', 'catalog'):
+            return jsonify({'error': f'Invalid image_type: {image_type}'}), 400
         described_only = request.args.get('described_only', 'false') == 'true'
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
@@ -114,19 +113,14 @@ def generate_description(db, image_key):
         if model and not provider_id:
             os.environ['DESCRIPTION_VISION_MODEL'] = model
 
+        if image_type not in (None, '', 'catalog'):
+            return jsonify({'error': f'Invalid image_type: {image_type}'}), 400
+
         try:
-            if image_type == 'catalog':
-                generated = describe_matched_image(
-                    db, image_key, force=force,
-                    provider_id=provider_id, model=provider_model,
-                )
-            elif image_type == 'instagram':
-                generated = describe_instagram_image(
-                    db, image_key, force=force,
-                    provider_id=provider_id, model=provider_model,
-                )
-            else:
-                return jsonify({'error': f'Invalid image_type: {image_type}'}), 400
+            generated = describe_matched_image(
+                db, image_key, force=force,
+                provider_id=provider_id, model=provider_model,
+            )
         except KeyError:
             if not provider_id:
                 raise

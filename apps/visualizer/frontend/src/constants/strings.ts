@@ -453,8 +453,6 @@ export const CATALOG_CACHE_SYNC_LABEL = 'Sync catalog'
 export const CATALOG_CACHE_SYNC_HELPER =
   'Pull newly imported catalog images into library.db (additions only — does not update ratings or remove stale rows).'
 export const CATALOG_CACHE_EMBED_CATALOG_LABEL = 'Embed catalog images only'
-/** Advanced — embed catalog + Instagram (`image_type: catalog_and_instagram`). */
-export const CATALOG_CACHE_EMBED_CATALOG_IG_LABEL = 'Embed catalog + Instagram images'
 export const CATALOG_CACHE_STACK_DETECT_LABEL = 'Run stack detection'
 export const CATALOG_CACHE_SIMILARITY_LABEL = 'Run catalog similarity'
 export const CATALOG_CACHE_PREPARE_CATALOG_TITLE = 'Pre-compress catalog images'
@@ -463,8 +461,6 @@ export const CATALOG_CACHE_PREPARE_CATALOG_TITLE = 'Pre-compress catalog images'
  * understand what the job does before clicking. Kept short (≤ ~20 words). */
 export const CATALOG_CACHE_EMBED_CATALOG_HELPER =
   'Compute CLIP visual embeddings for every catalog image so vision matching can shortlist candidates fast. Catalog file paths must be readable from the server — mount NAS shares before running.'
-export const CATALOG_CACHE_EMBED_CATALOG_IG_HELPER =
-  'Same as catalog embed, plus Instagram dump images so prefilter works in both directions. Mount network shares so both catalog and dump paths are reachable.'
 export const CATALOG_CACHE_PIPELINE_JOB_QUEUED = (label: string) =>
   `${label} job queued. Open Job Queue to monitor progress.`
 export const CATALOG_CACHE_STACK_DETECT_HELPER =

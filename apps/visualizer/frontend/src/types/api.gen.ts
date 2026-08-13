@@ -577,7 +577,7 @@ export interface paths {
          * Latest run per Catalog Cache pipeline trigger.
          * @description One entry per UI button on ``CatalogCacheTab``:
          *
-         *     * ``catalog_sync`` — most recent incremental catalog → library.db sync. * ``embed_catalog`` — most recent ``batch_embed_image`` with   ``metadata.image_type`` of ``catalog`` or absent (legacy default). * ``embed_catalog_and_instagram`` — same but ``image_type`` is   ``catalog_and_instagram``. * ``stack_detect`` — most recent ``batch_stack_detect``. * ``catalog_similarity`` — most recent ``batch_catalog_similarity``. * ``catalog_cache_build`` — most recent composite chain (D-08).
+         *     * ``catalog_sync`` — most recent incremental catalog → library.db sync. * ``embed_catalog`` — most recent ``batch_embed_image`` with   ``metadata.image_type`` of ``catalog`` or absent (legacy default). * ``stack_detect`` — most recent ``batch_stack_detect``. * ``catalog_similarity`` — most recent ``batch_catalog_similarity``. * ``catalog_cache_build`` — most recent composite chain (D-08).
          *
          *     Each value is ``null`` when no matching job exists, otherwise:
          *
@@ -1360,9 +1360,9 @@ export interface components {
             image_key: string;
             /**
              * Image Type
-             * @enum {string}
+             * @constant
              */
-            image_type: "catalog" | "instagram";
+            image_type: "catalog";
             /** Perspective Slug */
             perspective_slug: string;
             /** History */
@@ -1374,9 +1374,9 @@ export interface components {
             image_key: string;
             /**
              * Image Type
-             * @enum {string}
+             * @constant
              */
-            image_type: "catalog" | "instagram";
+            image_type: "catalog";
             /** Current */
             current: components["schemas"]["ScoresCurrentResponse.c9bd13d.ImageScoreRow"][];
         };
@@ -1416,8 +1416,6 @@ export interface components {
             catalog_sync: components["schemas"]["CachePipelineStatus.36cf89b.CachePipelineRun"] | null;
             /** @default null */
             embed_catalog: components["schemas"]["CachePipelineStatus.36cf89b.CachePipelineRun"] | null;
-            /** @default null */
-            embed_catalog_and_instagram: components["schemas"]["CachePipelineStatus.36cf89b.CachePipelineRun"] | null;
             /** @default null */
             stack_detect: components["schemas"]["CachePipelineStatus.36cf89b.CachePipelineRun"] | null;
             /** @default null */
@@ -1484,9 +1482,9 @@ export interface components {
         "ImageView.573ec44": {
             /**
              * Image Type
-             * @enum {string}
+             * @constant
              */
-            image_type: "catalog" | "instagram";
+            image_type: "catalog";
             /** Key */
             key: string;
             /**
@@ -1847,9 +1845,9 @@ export interface components {
             image_key: string;
             /**
              * Image Type
-             * @enum {string}
+             * @constant
              */
-            image_type: "catalog" | "instagram";
+            image_type: "catalog";
             /**
              * Filename
              * @default null
@@ -3065,7 +3063,7 @@ export interface components {
              * Image Type
              * @default null
              */
-            image_type: ("catalog" | "instagram") | null;
+            image_type: "catalog" | null;
             /**
              * Ai Analyzed
              * @default null
@@ -3300,7 +3298,7 @@ export interface components {
              * Image Type
              * @default null
              */
-            image_type: ("catalog" | "instagram") | null;
+            image_type: "catalog" | null;
             /**
              * Ai Analyzed
              * @default null
@@ -3549,7 +3547,7 @@ export interface components {
              * Image Type
              * @default null
              */
-            image_type: ("catalog" | "instagram") | null;
+            image_type: "catalog" | null;
             /**
              * Ai Analyzed
              * @default null
@@ -3828,7 +3826,7 @@ export interface components {
              * Image Type
              * @default null
              */
-            image_type: ("catalog" | "instagram") | null;
+            image_type: "catalog" | null;
             /**
              * Ai Analyzed
              * @default null

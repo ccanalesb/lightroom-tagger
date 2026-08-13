@@ -21,9 +21,7 @@ import {
   CATALOG_CACHE_BUILD_SUCCESS,
   CATALOG_CACHE_CARD_TITLE,
   CATALOG_CACHE_EMBED_CATALOG_HELPER,
-  CATALOG_CACHE_EMBED_CATALOG_IG_HELPER,
   CATALOG_CACHE_EMBED_CATALOG_LABEL,
-  CATALOG_CACHE_EMBED_CATALOG_IG_LABEL,
   CATALOG_CACHE_INTRO_BODY,
   CATALOG_CACHE_LAST_RUN_LABEL,
   CATALOG_CACHE_LAST_RUN_NEVER,
@@ -83,7 +81,6 @@ async function fetchCacheStats(): Promise<CacheStats> {
 type AdvancedBusyKey =
   | 'sync'
   | 'embed_catalog'
-  | 'embed_catalog_ig'
   | 'stack'
   | 'similarity';
 
@@ -142,7 +139,7 @@ export function CatalogCacheTab({ onOpenJobQueue }: CatalogCacheTabProps) {
   }, []);
 
   const pipelineQueuedMessageForKey = useCallback((key: AdvancedBusyKey): string => {
-    if (key === 'embed_catalog' || key === 'embed_catalog_ig') {
+    if (key === 'embed_catalog') {
       return PROCESSING_EMBED_CATALOG_QUEUED;
     }
     const labels: Record<AdvancedBusyKey, string> = {
@@ -150,7 +147,6 @@ export function CatalogCacheTab({ onOpenJobQueue }: CatalogCacheTabProps) {
       stack: CATALOG_CACHE_STACK_DETECT_LABEL,
       similarity: CATALOG_CACHE_SIMILARITY_LABEL,
       embed_catalog: CATALOG_CACHE_EMBED_CATALOG_LABEL,
-      embed_catalog_ig: CATALOG_CACHE_EMBED_CATALOG_IG_LABEL,
     };
     return CATALOG_CACHE_PIPELINE_JOB_QUEUED(labels[key]);
   }, []);
@@ -297,18 +293,6 @@ export function CatalogCacheTab({ onOpenJobQueue }: CatalogCacheTabProps) {
                 isBusy={advancedBusy === 'embed_catalog'}
                 onRun={() =>
                   runAdvancedJob('embed_catalog', 'batch_embed_image', { image_type: 'catalog' })
-                }
-              />
-              <PipelineRow
-                label={CATALOG_CACHE_EMBED_CATALOG_IG_LABEL}
-                helper={CATALOG_CACHE_EMBED_CATALOG_IG_HELPER}
-                lastRun={pipelineStatus.embed_catalog_and_instagram ?? null}
-                disabled={anyBusy}
-                isBusy={advancedBusy === 'embed_catalog_ig'}
-                onRun={() =>
-                  runAdvancedJob('embed_catalog_ig', 'batch_embed_image', {
-                    image_type: 'catalog_and_instagram',
-                  })
                 }
               />
               <PipelineRow

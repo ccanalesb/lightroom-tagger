@@ -22,14 +22,14 @@ from jobs.runner import JobRunner
 
 def test_fingerprint_batch_describe_stable_and_force_sensitive() -> None:
     meta = {
-        "image_type": "both",
+        "image_type": "catalog",
         "date_filter": "all",
         "force": False,
         "max_workers": 4,
         "provider_id": None,
         "provider_model": None,
     }
-    pairs = [("k1", "catalog"), ("k2", "instagram")]
+    pairs = [("k1", "catalog"), ("k2", "catalog")]
     a = fingerprint_batch_describe(meta, pairs)
     b = fingerprint_batch_describe(dict(meta), list(pairs))
     assert a == b
@@ -81,7 +81,7 @@ def test_fingerprint_batch_stack_detect_permutation_invariant_and_delta_force_se
 
 def test_fingerprint_batch_score_force_and_triples_and_slug_order() -> None:
     meta = {
-        "image_type": "both",
+        "image_type": "catalog",
         "date_filter": "all",
         "force": False,
         "max_workers": 4,
@@ -89,7 +89,7 @@ def test_fingerprint_batch_score_force_and_triples_and_slug_order() -> None:
         "provider_model": None,
         "perspective_slugs": ["b", "a"],
     }
-    triples = [("k1", "catalog", "a"), ("k2", "instagram", "b")]
+    triples = [("k1", "catalog", "a"), ("k2", "catalog", "b")]
     base = fingerprint_batch_score(meta, triples)
     assert fingerprint_batch_score(dict(meta), list(triples)) == base
     assert fingerprint_batch_score({**meta, "force": True}, triples) != base
@@ -144,7 +144,7 @@ def test_load_resume_state_returns_processed_set_on_match() -> None:
     meta = _checkpoint_metadata(
         "batch_describe",
         "fp-ok",
-        processed_pairs=["k1|catalog", "k2|instagram"],
+        processed_pairs=["k1|catalog", "k2|catalog"],
         total_at_start=2,
     )
     result = load_resume_state(
@@ -153,7 +153,7 @@ def test_load_resume_state_returns_processed_set_on_match() -> None:
         "fp-ok",
         logs.append,
     )
-    assert result == {"k1|catalog", "k2|instagram"}
+    assert result == {"k1|catalog", "k2|catalog"}
     assert logs == []
 
 
