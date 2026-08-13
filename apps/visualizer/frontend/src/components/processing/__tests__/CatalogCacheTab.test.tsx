@@ -277,7 +277,7 @@ describe('CatalogCacheTab', () => {
       await screen.findByRole('button', { name: new RegExp(CATALOG_CACHE_PIPELINE_TITLE, 'i') }),
     );
     expect(await screen.findByText(CATALOG_CACHE_EMBED_CATALOG_HELPER)).toBeTruthy();
-    // 5 pipeline rows (sync, catalog, catalog+ig, stack, similarity) all
+    // 4 pipeline rows (sync, catalog, stack, similarity) all
     // start with "Never run" until at least one job has been created.
     const neverBadges = await screen.findAllByText(CATALOG_CACHE_LAST_RUN_NEVER);
     expect(neverBadges.length).toBe(4);
