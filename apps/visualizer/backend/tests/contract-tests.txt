@@ -27,3 +27,4 @@ tests/test_scores_contract.py
 tests/test_identity_contract.py
 tests/test_system_contract.py
 tests/test_api_ts_contract_guardrail.py
+tests/test_readme_guardrail.py

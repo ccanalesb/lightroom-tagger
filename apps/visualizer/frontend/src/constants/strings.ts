@@ -452,7 +452,7 @@ export const CATALOG_CACHE_PIPELINE_TITLE = 'Pipeline stages'
 export const CATALOG_CACHE_SYNC_LABEL = 'Sync catalog'
 export const CATALOG_CACHE_SYNC_HELPER =
   'Pull newly imported catalog images into library.db (additions only — does not update ratings or remove stale rows).'
-export const CATALOG_CACHE_EMBED_CATALOG_LABEL = 'Embed catalog images only'
+export const CATALOG_CACHE_EMBED_CATALOG_LABEL = 'Embed catalog images'
 export const CATALOG_CACHE_STACK_DETECT_LABEL = 'Run stack detection'
 export const CATALOG_CACHE_SIMILARITY_LABEL = 'Run catalog similarity'
 export const CATALOG_CACHE_PREPARE_CATALOG_TITLE = 'Pre-compress catalog images'
@@ -460,11 +460,11 @@ export const CATALOG_CACHE_PREPARE_CATALOG_TITLE = 'Pre-compress catalog images'
 /** One-sentence explanations shown next to each pipeline trigger so users
  * understand what the job does before clicking. Kept short (≤ ~20 words). */
 export const CATALOG_CACHE_EMBED_CATALOG_HELPER =
-  'Compute CLIP visual embeddings for every catalog image so vision matching can shortlist candidates fast. Catalog file paths must be readable from the server — mount NAS shares before running.'
+  'Compute CLIP visual embeddings for every catalog image so catalog similarity can find related shots. Catalog file paths must be readable from the server — mount NAS shares before running.'
 export const CATALOG_CACHE_PIPELINE_JOB_QUEUED = (label: string) =>
   `${label} job queued. Open Job Queue to monitor progress.`
 export const CATALOG_CACHE_STACK_DETECT_HELPER =
-  'Group burst-shot catalog images into stacks by date so only the representative frame goes through matching.'
+  'Group burst-shot catalog images into stacks by date so only the representative frame is described and scored.'
 export const CATALOG_CACHE_SIMILARITY_HELPER =
   'Materialize catalog-to-catalog similarity groups for review (preview shown above).'
 
