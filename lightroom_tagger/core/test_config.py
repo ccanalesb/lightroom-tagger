@@ -1,5 +1,6 @@
 import os
 import unittest
+from dataclasses import fields
 from pathlib import Path
 from unittest.mock import mock_open, patch
 
@@ -26,6 +27,11 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(config.workers, 4)
         self.assertEqual(config.instagram_keyword, "Posted")
         self.assertEqual(config.hash_threshold, 5)
+
+    def test_no_credential_shaped_instagram_field(self):
+        """The credential-shaped instagram_session_id must not reappear (#248)."""
+        field_names = {f.name for f in fields(Config)}
+        self.assertNotIn("instagram_session_id", field_names)
 
     def test_custom_values(self):
         """Test custom values override defaults."""
