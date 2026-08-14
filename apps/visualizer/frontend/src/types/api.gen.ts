@@ -695,24 +695,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/config/instagram-dump": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** get_instagram_dump <GET> */
-        get: operations["get__api_config_instagram-dump"];
-        /** put_instagram_dump <PUT> */
-        put: operations["put__api_config_instagram-dump"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/config/stack-detection": {
         parameters: {
             query?: never;
@@ -1272,27 +1254,6 @@ export interface components {
         "ConfigCatalogPutResponse.ab1fa53": {
             /** Catalog Path */
             catalog_path: string;
-            /** Ok */
-            ok: boolean;
-        };
-        /** ConfigInstagramDumpGetResponse */
-        "ConfigInstagramDumpGetResponse.ab1fa53": {
-            /** Instagram Dump Path */
-            instagram_dump_path: string;
-            /** Resolved Path */
-            resolved_path: string;
-            /** Exists */
-            exists: boolean;
-        };
-        /** ConfigInstagramDumpPutRequest */
-        "ConfigInstagramDumpPutRequest.ab1fa53": {
-            /** Instagram Dump Path */
-            instagram_dump_path: string;
-        };
-        /** ConfigInstagramDumpPutResponse */
-        "ConfigInstagramDumpPutResponse.ab1fa53": {
-            /** Instagram Dump Path */
-            instagram_dump_path: string;
             /** Ok */
             ok: boolean;
         };
@@ -6249,77 +6210,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConfigCatalogPutResponse.ab1fa53"];
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
-                };
-            };
-            /** @description Unprocessable Content */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ValidationError.6a07bef"];
-                };
-            };
-        };
-    };
-    "get__api_config_instagram-dump": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConfigInstagramDumpGetResponse.ab1fa53"];
-                };
-            };
-            /** @description Unprocessable Content */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ValidationError.6a07bef"];
-                };
-            };
-        };
-    };
-    "put__api_config_instagram-dump": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ConfigInstagramDumpPutRequest.ab1fa53"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConfigInstagramDumpPutResponse.ab1fa53"];
                 };
             };
             /** @description Bad Request */

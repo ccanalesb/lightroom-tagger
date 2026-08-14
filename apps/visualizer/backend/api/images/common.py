@@ -44,19 +44,6 @@ def _is_path_under_allowed_roots(file_path: str, roots: list[str]) -> bool:
     return False
 
 
-def _instagram_thumbnail_roots() -> list[str]:
-    from lightroom_tagger.core.config import load_config
-
-    cfg = load_config()
-    dump = (cfg.instagram_dump_path or "").strip()
-    if not dump:
-        return []
-    root = _canonical_path(dump)
-    if root and os.path.isdir(root):
-        return [root]
-    return []
-
-
 def _catalog_thumbnail_roots() -> list[str]:
     from lightroom_tagger.core.config import load_config
 
@@ -119,7 +106,6 @@ __all__ = (
     "_canonical_path",
     "_extract_source_folder",
     "_filter_by_date",
-    "_instagram_thumbnail_roots",
     "_is_path_under_allowed_roots",
     "_parent_dir_if_exists",
 )

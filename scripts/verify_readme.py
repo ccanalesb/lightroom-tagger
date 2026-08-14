@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify README.md has no dead ends: commands, paths, config keys, and routes."""
+"""Verify README.md has no dead ends: commands, paths, config keys, env vars, and routes."""
 
 from __future__ import annotations
 
@@ -31,6 +31,7 @@ _OPTIONAL_PATHS = frozenset({"library.db", "config.yaml", "export.json"})
 # `lightroom-import-dump` for months after it was deleted).
 
 _CONFIG_FIELD_NAMES: frozenset[str] | None = None
+_CONFIG_ENV_VAR_NAMES: frozenset[str] | None = None
 _CLI_SUBCOMMANDS: frozenset[str] | None = None
 _VISUALIZER_PAGES: frozenset[str] | None = None
 _CONSOLE_SCRIPTS: frozenset[str] | None = None
@@ -43,6 +44,15 @@ def _config_field_names() -> frozenset[str]:
 
         _CONFIG_FIELD_NAMES = frozenset(f.name for f in fields(Config))
     return _CONFIG_FIELD_NAMES
+
+
+def _config_env_var_names() -> frozenset[str]:
+    global _CONFIG_ENV_VAR_NAMES
+    if _CONFIG_ENV_VAR_NAMES is None:
+        from lightroom_tagger.core.config import CONFIG_ENV_MAPPINGS
+
+        _CONFIG_ENV_VAR_NAMES = frozenset(CONFIG_ENV_MAPPINGS)
+    return _CONFIG_ENV_VAR_NAMES
 
 
 def _cli_subcommands() -> frozenset[str]:
@@ -192,6 +202,17 @@ def _extract_config_yaml_keys(text: str) -> set[str]:
     return keys
 
 
+def _extract_documented_env_vars(text: str) -> set[str]:
+    """Env vars from the README's environment-overrides callout."""
+    env_vars: set[str] = set()
+    for line in text.splitlines():
+        if not line.startswith("Environment overrides"):
+            continue
+        for match in re.finditer(r"`([A-Z][A-Z0-9_]+)`", line):
+            env_vars.add(match.group(1))
+    return env_vars
+
+
 def _extract_named_pages(text: str) -> set[str]:
     """Extract URL paths from the Pages table in README."""
     pages: set[str] = set()
@@ -244,6 +265,13 @@ def verify_readme(readme_path: Path = README) -> list[Finding]:
     for key in sorted(_extract_config_yaml_keys(text)):
         if key not in known:
             findings.append(Finding("config", f"Unknown config key in README example: {key!r}"))
+
+    known_env = _config_env_var_names()
+    for env_var in sorted(_extract_documented_env_vars(text)):
+        if env_var not in known_env:
+            findings.append(
+                Finding("env", f"Unknown config env var in README: {env_var!r}")
+            )
 
     real_pages = _visualizer_pages()
     for page in sorted(_extract_named_pages(text)):

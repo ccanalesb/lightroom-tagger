@@ -1,4 +1,4 @@
-"""Guardrail: README commands, paths, config keys, and page routes stay truthful."""
+"""Guardrail: README commands, paths, config keys, env vars, and page routes stay truthful."""
 
 from __future__ import annotations
 
@@ -45,6 +45,10 @@ def test_readme_has_no_dead_ends():
         (
             "config",
             "# X\n\n```yaml\ncatalog_path: /a.lrcat\nmatch_threshold: 0.7\n```\n",
+        ),
+        (
+            "env",
+            "# X\n\nEnvironment overrides (common): `INSTAGRAM_DUMP_PATH`.\n",
         ),
         # A redirect listed as if it were a page.
         (

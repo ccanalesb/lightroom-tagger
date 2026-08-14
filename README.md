@@ -91,7 +91,7 @@ vision_cache_enabled: true
 
 All keys above are fields on `Config` in `lightroom_tagger/core/config.py`. Unknown keys in an existing `config.yaml` are ignored with a warning.
 
-Environment overrides (common): `VISION_MODEL`, `LIGHTRoom_CATALOG`, `LIGHTRoom_DB`, `OLLAMA_HOST`, `INSTAGRAM_DUMP_PATH`.
+Environment overrides (common): `VISION_MODEL`, `LIGHTRoom_CATALOG`, `LIGHTRoom_DB`, `OLLAMA_HOST`.
 
 **NAS catalogs:** close Lightroom Classic if you see `database is locked`. See [docs/CATALOG_READ_WRITE.md](docs/CATALOG_READ_WRITE.md) and [docs/STORAGE_MOUNT_REQUIREMENTS.md](docs/STORAGE_MOUNT_REQUIREMENTS.md).
 
