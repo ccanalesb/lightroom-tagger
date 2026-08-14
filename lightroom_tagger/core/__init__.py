@@ -16,11 +16,6 @@ from lightroom_tagger.core.hasher import (
     compute_multiple_hashes,
     compute_phash,
 )
-from lightroom_tagger.core.phash import (
-    compare_hashes,
-    find_matches,
-    hamming_distance,
-)
 
 __all__ = [
     "Config",
@@ -38,7 +33,4 @@ __all__ = [
     "compute_phash",
     "compute_multiple_hashes",
     "batch_compute_hashes",
-    "find_matches",
-    "hamming_distance",
-    "compare_hashes",
 ]

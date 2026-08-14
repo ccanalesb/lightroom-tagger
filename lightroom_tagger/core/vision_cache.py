@@ -183,43 +183,6 @@ def get_cached_phash(db, catalog_key: str) -> str | None:
     return ph if ph else None
 
 
-class InstagramCache:
-    """In-memory cache for compressed Instagram images during a single matching run.
-
-    Compresses the Instagram image once and holds it in memory for reuse across
-    all candidate comparisons.
-    """
-
-    _compressed_path: str | None = None
-    _original_path: str | None = None
-
-    def __init__(self, db=None):
-        self.db = db
-
-    def compress_instagram_image(self, insta_path: str) -> str | None:
-        """Compress Instagram image once and cache for this run.
-
-        Args:
-            insta_path: Path to Instagram image
-
-        Returns:
-            Path to compressed image
-        """
-        if self._compressed_path is None or self._original_path != insta_path:
-            self._original_path = insta_path
-            self._compressed_path = compress_image(insta_path)
-        return self._compressed_path
-
-    def cleanup(self):
-        """Clean up temp file after matching run.
-
-        Note: We don't delete here because the temp file may still be needed
-        by the caller. The temp file will be cleaned up by the OS eventually.
-        """
-        self._compressed_path = None
-        self._original_path = None
-
-
 def get_cache_stats(db) -> dict:
     """Get vision cache statistics.
 

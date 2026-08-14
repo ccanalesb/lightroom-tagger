@@ -105,7 +105,6 @@ export const LABEL_SCORE = 'score:'
 
 // Dashboard / Insights home (KPI labels shared with legacy dashboard copy)
 export const DASHBOARD_CATALOG_IMAGES = 'Catalog Images'
-export const DASHBOARD_INSTAGRAM_IMAGES = 'Instagram Images'
 export const DASHBOARD_MATCHES = 'Matches Found'
 export const DASHBOARD_RECENT_JOBS = 'Recent Jobs'
 export const DASHBOARD_NO_JOBS = 'No recent jobs'
@@ -188,7 +187,6 @@ export function msgShowingOf(shown: number, total: number, noun = 'items'): stri
 // Modal
 export const MODAL_TITLE_IMAGE_DETAILS = 'Image Details'
 export const MODAL_CLOSE = 'Close'
-export const MODAL_VIEW_ON_INSTAGRAM = 'View on Instagram'
 
 // Metadata Sections
 export const META_SECTION_BASIC_INFO = 'Basic Information'
@@ -524,14 +522,11 @@ export const CATALOG_CACHE_SIMILARITY_CANDIDATE_LABEL = (n: number) =>
 export const DESC_PAGE_TITLE = 'AI Descriptions'
 export const DESC_PAGE_TAB_ALL = 'All'
 export const DESC_PAGE_TAB_CATALOG = 'Catalog'
-export const DESC_PAGE_TAB_INSTAGRAM = 'Instagram'
 export const DESC_PAGE_BATCH_CATALOG = 'Generate Catalog Descriptions'
-export const DESC_PAGE_BATCH_INSTAGRAM = 'Generate Instagram Descriptions'
 export const DESC_PAGE_BATCH_ALL = 'Generate All Descriptions'
 export const DESC_PAGE_BATCH_RUNNING = 'Generating...'
 export const DESC_PAGE_MODEL_LABEL = 'Vision Model'
 export const DESC_PAGE_SOURCE_CATALOG = 'Source: catalog file'
-export const DESC_PAGE_SOURCE_INSTAGRAM = 'Source: Instagram post'
 export const DESC_PAGE_FILTER_ALL = 'All time'
 export const DESC_PAGE_FILTER_3M = 'Last 3 months'
 export const DESC_PAGE_FILTER_6M = 'Last 6 months'
