@@ -6,11 +6,11 @@ import { deleteMatching } from '../../../data/cache';
 import { AnalyzeTab } from '../AnalyzeTab';
 import { ANALYZE_BACKFILL_FORCE_EXCLUSIVE_HINT, ANALYZE_BACKFILL_VISUAL_TAGS_LABEL, ANALYZE_FORCE_DESCRIBE_LABEL, ANALYZE_FORCE_SCORE_LABEL } from '../../../constants/strings';
 
-// Minimal MatchOptions provider the component expects. We stub it directly
+// Minimal AnalyzeOptions provider the component expects. We stub it directly
 // rather than mounting the real provider so the test stays focused on the
 // submit-feedback contract introduced in fix #1.
-vi.mock('../../../stores/matchOptionsContext', () => ({
-  useMatchOptions: () => ({
+vi.mock('../../../stores/analyzeOptionsContext', () => ({
+  useAnalyzeOptions: () => ({
     options: { maxWorkers: 4 },
     updateOption: vi.fn(),
   }),

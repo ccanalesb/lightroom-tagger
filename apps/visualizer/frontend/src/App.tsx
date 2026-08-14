@@ -6,13 +6,13 @@ import { DashboardPage } from './pages/DashboardPage'
 import { ImagesPage } from './pages/ImagesPage'
 import { ProcessingPage } from './pages/ProcessingPage'
 import { StackSuggestionsPage } from './pages/StackSuggestionsPage'
-import { MatchOptionsProvider } from './stores/matchOptionsContext'
+import { AnalyzeOptionsProvider } from './stores/analyzeOptionsContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 
 function App() {
   return (
     <ThemeProvider>
-      <MatchOptionsProvider>
+      <AnalyzeOptionsProvider>
         <Router>
           <Routes>
             <Route path="/" element={<Layout />}>
@@ -37,7 +37,7 @@ function App() {
             </Route>
           </Routes>
         </Router>
-      </MatchOptionsProvider>
+      </AnalyzeOptionsProvider>
     </ThemeProvider>
   )
 }

@@ -371,8 +371,6 @@ export const ADVANCED_DATE_YEAR_2025 = '2025 only'
 export const ADVANCED_DATE_YEAR_2024 = '2024 only'
 export const ADVANCED_DATE_YEAR_2023 = '2023 only'
 
-export const ADVANCED_WEIGHTS_MUST_SUM = 'Weights must sum to 100%'
-
 export const ADVANCED_WORKERS_LABEL = 'Parallel Workers'
 export const ADVANCED_WORKERS_DESCRIPTION = 'Process multiple images in parallel (higher = faster, more load)'
 export const ADVANCED_WORKERS_MIN = '1 (sequential)'

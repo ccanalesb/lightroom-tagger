@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { WorkerSlider } from '../ui/WorkerSlider';
 import { ProviderModelSelect } from '../ui/ProviderModelSelect';
-import { useMatchOptions } from '../../stores/matchOptionsContext';
+import { useAnalyzeOptions } from '../../stores/analyzeOptionsContext';
 import { JobsAPI, PerspectivesAPI, ProvidersAPI } from '../../services/api';
 import {
   ADVANCED_DATE_12MONTHS,
@@ -89,7 +89,7 @@ export function buildDateMetadata(
 }
 
 export function AnalyzeTab() {
-  const { options, updateOption } = useMatchOptions();
+  const { options, updateOption } = useAnalyzeOptions();
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   const [batchMinRating, setBatchMinRating] = useState<number | null>(null);
   const [forceDescribe, setForceDescribe] = useState(false);
