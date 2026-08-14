@@ -40,7 +40,7 @@ def _append_query_catalog_image_filters(
     :func:`~lightroom_tagger.core.database.catalog_query.filter_order_keys_in_catalog`. The
     caller must initialize *clauses* (e.g. ``[\"1=1\"]`` or ``i.key IN (...)``) and *bindings*.
     """
-    from .descriptions import build_description_fts_query
+    from .descriptions import DESCRIPTION_FTS_KEY_SUBQUERY, build_description_fts_query
 
     if posted is True:
         clauses.append("i.instagram_posted = 1")
@@ -120,13 +120,7 @@ def _append_query_catalog_image_filters(
         if fts_err:
             raise ValueError(fts_err)
         if match_str is not None:
-            clauses.append(
-                "i.key IN ("
-                "SELECT d2.image_key FROM image_descriptions d2 "
-                "INNER JOIN image_descriptions_fts ON image_descriptions_fts.rowid = d2.rowid "
-                "WHERE d2.image_type = 'catalog' AND image_descriptions_fts MATCH ?"
-                ")"
-            )
+            clauses.append(f"i.key IN ({DESCRIPTION_FTS_KEY_SUBQUERY})")
             bindings.append(match_str)
 
     dc_tokens = _non_empty_str_list_for_json_array_filter(dominant_colors)
