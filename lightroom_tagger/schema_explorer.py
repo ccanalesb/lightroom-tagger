@@ -2,7 +2,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from lightroom_tagger.config import load_config
+from lightroom_tagger.core.config import load_config
 from lightroom_tagger.lightroom.reader import connect_catalog
 
 KEY_TABLES = [
