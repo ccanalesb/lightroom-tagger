@@ -13,7 +13,9 @@ from lightroom_tagger.core.database import (
     get_image_count,
     init_database,
     query_catalog_images,
+    search_by_keyword,
     store_image,
+    store_image_description,
     store_images_batch,
 )
 class TestDatabaseCatalogCrud(unittest.TestCase):
@@ -206,3 +208,69 @@ class TestQueryCatalogImages(unittest.TestCase):
         rows, total = query_catalog_images(self.db, month='202404')
         self.assertEqual(total, 1)
         self.assertEqual(rows[0]['filename'], 'beta_unique.jpg')
+
+
+class TestSearchByKeyword(unittest.TestCase):
+    """Tests for search_by_keyword (Lightroom metadata + description FTS)."""
+
+    def setUp(self):
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as tf:
+            self.temp_db_path = tf.name
+        self.db = init_database(self.temp_db_path)
+
+    def tearDown(self):
+        self.db.close()
+        bak = self.temp_db_path + ".pre-key-migration.bak"
+        if os.path.exists(bak):
+            os.unlink(bak)
+        os.unlink(self.temp_db_path)
+
+    def test_lightroom_keyword_only_match(self):
+        store_image(self.db, {
+            'date_taken': '2024-01-15',
+            'filename': 'plain.jpg',
+            'keywords': ['sunset'],
+        })
+        store_image(self.db, {
+            'date_taken': '2024-01-16',
+            'filename': 'other.jpg',
+            'keywords': ['portrait'],
+        })
+        results = search_by_keyword(self.db, 'sunset')
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['filename'], 'plain.jpg')
+
+    def test_description_only_match(self):
+        store_image(self.db, {'date_taken': '2024-01-15', 'filename': 'described.jpg'})
+        store_image(self.db, {'date_taken': '2024-01-16', 'filename': 'bare.jpg'})
+        store_image_description(self.db, {
+            'image_key': '2024-01-15_described.jpg',
+            'image_type': 'catalog',
+            'summary': 'A wide mountain landscape at dawn',
+            'subjects': ['peaks', 'mist'],
+            'model_used': 'test',
+        })
+        results = search_by_keyword(self.db, 'landscape')
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['filename'], 'described.jpg')
+
+    def test_both_sources_deduplicated(self):
+        store_image(self.db, {
+            'date_taken': '2024-01-15',
+            'filename': 'both.jpg',
+            'keywords': ['landscape'],
+        })
+        store_image_description(self.db, {
+            'image_key': '2024-01-15_both.jpg',
+            'image_type': 'catalog',
+            'summary': 'Rolling landscape hills',
+            'model_used': 'test',
+        })
+        results = search_by_keyword(self.db, 'landscape')
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['filename'], 'both.jpg')
+
+    def test_malformed_query_raises(self):
+        with self.assertRaises(ValueError) as ctx:
+            search_by_keyword(self.db, 'a')
+        self.assertIn('at least 2 characters', str(ctx.exception))

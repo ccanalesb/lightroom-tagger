@@ -175,15 +175,38 @@ def get_image(db: sqlite3.Connection, key: str) -> dict | None:
     return _deserialize_row(row) if row else None
 
 def search_by_keyword(db: sqlite3.Connection, keyword: str) -> list[dict]:
-    """Search images by keyword in keywords, filename, title, description."""
+    """Search images by keyword in Lightroom metadata and AI descriptions (FTS5)."""
+    from .descriptions import build_description_fts_query
+
     pattern = f'%{keyword}%'
-    rows = db.execute("""
-        SELECT * FROM images
-        WHERE keywords LIKE ? COLLATE NOCASE
-           OR filename LIKE ? COLLATE NOCASE
-           OR title LIKE ? COLLATE NOCASE
-           OR description LIKE ? COLLATE NOCASE
-    """, (pattern, pattern, pattern, pattern)).fetchall()
+    lr_clause = (
+        "keywords LIKE ? COLLATE NOCASE OR "
+        "filename LIKE ? COLLATE NOCASE OR "
+        "title LIKE ? COLLATE NOCASE OR "
+        "description LIKE ? COLLATE NOCASE"
+    )
+    bindings: list = [pattern, pattern, pattern, pattern]
+
+    match_str, fts_err = build_description_fts_query(keyword)
+    if fts_err:
+        raise ValueError(fts_err)
+
+    if match_str is not None:
+        where = (
+            f"({lr_clause}) OR key IN ("
+            "SELECT d2.image_key FROM image_descriptions d2 "
+            "INNER JOIN image_descriptions_fts ON image_descriptions_fts.rowid = d2.rowid "
+            "WHERE d2.image_type = 'catalog' AND image_descriptions_fts MATCH ?"
+            ")"
+        )
+        bindings.append(match_str)
+    else:
+        where = lr_clause
+
+    rows = db.execute(
+        f"SELECT DISTINCT * FROM images WHERE {where}",
+        bindings,
+    ).fetchall()
     return [_deserialize_row(r) for r in rows]
 
 def search_by_rating(db: sqlite3.Connection, min_rating: int = 0) -> list[dict]:

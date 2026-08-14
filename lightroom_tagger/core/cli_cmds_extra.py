@@ -20,7 +20,11 @@ def cmd_export(args, config, db):
     results = get_all_images(db)
 
     if args.keyword:
-        results = search_by_keyword(db, args.keyword)
+        try:
+            results = search_by_keyword(db, args.keyword)
+        except ValueError as e:
+            print(f"Error: {e}")
+            return 1
     elif args.rating is not None:
         results = search_by_rating(db, args.rating)
 

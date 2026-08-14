@@ -26,15 +26,13 @@ lightroom-tagger init --db library.db
 # Index catalog metadata into library.db
 lightroom-tagger scan --catalog "/path/to/Catalog.lrcat" --db library.db
 
-# Search by Lightroom metadata (keywords, filename, title, caption)
+# Search by Lightroom metadata or AI descriptions (FTS5)
 lightroom-tagger search --keyword "landscape" --db library.db
 
 # Export or inspect
 lightroom-tagger export --db library.db --output export.json
 lightroom-tagger stats --db library.db
 ```
-
-**CLI search limitation:** `search` queries Lightroom-side columns only. AI-generated descriptions are searchable on the **Images** page in the visualizer (FTS5). Wiring the CLI to `image_descriptions_fts` is tracked in [#247](https://github.com/ccanalesb/lightroom-tagger/issues/247).
 
 Incremental catalog updates (additions only):
 
