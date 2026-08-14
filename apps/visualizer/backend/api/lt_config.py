@@ -6,7 +6,6 @@ from spectree import Response
 from lightroom_tagger.core.config import (
     load_config,
     update_config_yaml_catalog_path,
-    update_config_yaml_instagram_dump_path,
     update_config_yaml_stack_burst_delta_ms,
 )
 from utils.responses import error_bad_request
@@ -16,9 +15,6 @@ from api.schemas.config import (
     ConfigCatalogGetResponse,
     ConfigCatalogPutRequest,
     ConfigCatalogPutResponse,
-    ConfigInstagramDumpGetResponse,
-    ConfigInstagramDumpPutRequest,
-    ConfigInstagramDumpPutResponse,
     ConfigStackDetectionGetResponse,
     ConfigStackDetectionPutRequest,
     ConfigStackDetectionPutResponse,
@@ -73,45 +69,6 @@ def put_catalog():
         return error_bad_request("catalog_path must be an existing file")
     update_config_yaml_catalog_path(LT_CONFIG_YAML, value)
     return jsonify({"catalog_path": value.strip(), "ok": True})
-
-
-@bp.route('/instagram-dump', methods=['GET'])
-@spec.validate(
-    resp=Response(HTTP_200=ConfigInstagramDumpGetResponse),
-    tags=['config'],
-)
-def get_instagram_dump():
-    cfg = load_config(LT_CONFIG_YAML)
-    raw = cfg.instagram_dump_path or ""
-    resolved = str(Path(raw).expanduser()) if raw else ""
-    exists = bool(resolved and os.path.isdir(resolved))
-    return jsonify(
-        {
-            "instagram_dump_path": raw,
-            "resolved_path": resolved,
-            "exists": exists,
-        }
-    )
-
-
-@bp.route('/instagram-dump', methods=['PUT'])
-@spec.validate(
-    json=ConfigInstagramDumpPutRequest,
-    resp=Response(HTTP_200=ConfigInstagramDumpPutResponse, HTTP_400=ErrorBody),
-    tags=['config'],
-)
-def put_instagram_dump():
-    data = request.get_json(silent=True)
-    if data is None or "instagram_dump_path" not in data:
-        return error_bad_request("instagram_dump_path is required")
-    value = data["instagram_dump_path"]
-    if not isinstance(value, str):
-        return error_bad_request("instagram_dump_path must be a string")
-    expanded = str(Path(value).expanduser())
-    if not os.path.isdir(expanded):
-        return error_bad_request("instagram_dump_path must be an existing directory")
-    update_config_yaml_instagram_dump_path(LT_CONFIG_YAML, value)
-    return jsonify({"instagram_dump_path": value.strip(), "ok": True})
 
 
 @bp.route('/stack-detection', methods=['GET'])

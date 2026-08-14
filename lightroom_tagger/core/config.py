@@ -38,7 +38,6 @@ class Config:
     skip_ai: bool = False
     verbose: bool = False
     instagram_keyword: str = "Posted"
-    instagram_dump_path: str = ""
     hash_threshold: int = 5
     stack_burst_delta_ms: int = 2000
     small_catalog_path: str = ""
@@ -96,7 +95,6 @@ def load_config(config_path: str | None = None) -> Config:
         "skip_ai": False,
         "verbose": False,
         "instagram_keyword": "Posted",
-        "instagram_dump_path": "",
         "hash_threshold": 5,
         "stack_burst_delta_ms": 2000,
         "cloudflare_account_id": "",
@@ -168,32 +166,6 @@ def update_config_yaml_catalog_path(config_file: str, catalog_path: str) -> None
         )
 
 
-def update_config_yaml_instagram_dump_path(config_file: str, instagram_dump_path: str) -> None:
-    """Write ``instagram_dump_path`` into ``config_file`` YAML, preserving other keys."""
-    path = Path(config_file)
-    stripped = instagram_dump_path.strip()
-    if not stripped:
-        raise ValueError("instagram_dump_path must be non-empty")
-
-    if path.exists():
-        with open(path) as f:
-            data = yaml.safe_load(f) or {}
-    else:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        data = {}
-
-    data["instagram_dump_path"] = stripped
-
-    with open(path, "w") as stream:
-        yaml.safe_dump(
-            data,
-            stream,
-            default_flow_style=False,
-            sort_keys=False,
-            allow_unicode=True,
-        )
-
-
 def update_config_yaml_stack_burst_delta_ms(config_file: str, stack_burst_delta_ms: int) -> None:
     """Write ``stack_burst_delta_ms`` into ``config_file`` YAML, preserving other keys."""
     int_value = int(stack_burst_delta_ms)
@@ -220,27 +192,27 @@ def update_config_yaml_stack_burst_delta_ms(config_file: str, stack_burst_delta_
         )
 
 
-def _load_from_env(data: dict) -> dict:
-    env_mappings = {
-        "LIGHTRoom_CATALOG": "catalog_path",
-        "LIGHTRoom_DB": "db_path",
-        "LIGHTRoom_MOUNT": "mount_point",
-        "LIGHTRoom_WORKERS": "workers",
-        "LIGHTRoom_AI_MODEL": "ai_model",
-        "LIGHTRoom_SKIP_AI": "skip_ai",
-        "LIGHTRoom_VERBOSE": "verbose",
-        "LIGHTRoom_INSTAGRAM_KEYWORD": "instagram_keyword",
-        "INSTAGRAM_DUMP_PATH": "instagram_dump_path",
-        "LIGHTRoom_HASH_THRESHOLD": "hash_threshold",
-        "CLOUDFLARE_ACCOUNT_ID": "cloudflare_account_id",
-        "CLOUDFLARE_API_TOKEN": "cloudflare_api_token",
-        "VISION_MODEL": "vision_model",
-        "VISION_CACHE_DIR": "vision_cache_dir",
-        "VISION_CACHE_ENABLED": "vision_cache_enabled",
-        "OLLAMA_HOST": "ollama_host",
-    }
+CONFIG_ENV_MAPPINGS: dict[str, str] = {
+    "LIGHTRoom_CATALOG": "catalog_path",
+    "LIGHTRoom_DB": "db_path",
+    "LIGHTRoom_MOUNT": "mount_point",
+    "LIGHTRoom_WORKERS": "workers",
+    "LIGHTRoom_AI_MODEL": "ai_model",
+    "LIGHTRoom_SKIP_AI": "skip_ai",
+    "LIGHTRoom_VERBOSE": "verbose",
+    "LIGHTRoom_INSTAGRAM_KEYWORD": "instagram_keyword",
+    "LIGHTRoom_HASH_THRESHOLD": "hash_threshold",
+    "CLOUDFLARE_ACCOUNT_ID": "cloudflare_account_id",
+    "CLOUDFLARE_API_TOKEN": "cloudflare_api_token",
+    "VISION_MODEL": "vision_model",
+    "VISION_CACHE_DIR": "vision_cache_dir",
+    "VISION_CACHE_ENABLED": "vision_cache_enabled",
+    "OLLAMA_HOST": "ollama_host",
+}
 
-    for env_var, config_key in env_mappings.items():
+
+def _load_from_env(data: dict) -> dict:
+    for env_var, config_key in CONFIG_ENV_MAPPINGS.items():
         if env_var in os.environ:
             value = os.environ[env_var]
             if config_key in ("workers", "hash_threshold"):

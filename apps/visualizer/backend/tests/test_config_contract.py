@@ -10,7 +10,6 @@ from app import create_app
 from api.schemas.config import (
     ConfigCatalogGetResponse,
     ConfigCatalogPutResponse,
-    ConfigInstagramDumpGetResponse,
     ConfigStackDetectionGetResponse,
     ConfigStackDetectionPutResponse,
 )
@@ -19,7 +18,7 @@ from api.schemas.config import (
 @pytest.fixture
 def config_contract_client(tmp_path, monkeypatch):
     cfg_yaml = tmp_path / "config.yaml"
-    cfg_yaml.write_text("catalog_path: ''\ninstagram_dump_path: ''\nstack_burst_delta_ms: 500\n")
+    cfg_yaml.write_text("catalog_path: ''\nstack_burst_delta_ms: 500\n")
     monkeypatch.setattr("api.lt_config.LT_CONFIG_YAML", str(cfg_yaml))
     return create_app().test_client(), tmp_path
 
@@ -28,13 +27,6 @@ def test_config_catalog_get_round_trip(config_contract_client):
     client, _tmp = config_contract_client
     payload = client.get("/api/config/catalog").get_json()
     validated = ConfigCatalogGetResponse.model_validate(payload)
-    assert isinstance(validated.exists, bool)
-
-
-def test_config_instagram_dump_get_round_trip(config_contract_client):
-    client, _tmp = config_contract_client
-    payload = client.get("/api/config/instagram-dump").get_json()
-    validated = ConfigInstagramDumpGetResponse.model_validate(payload)
     assert isinstance(validated.exists, bool)
 
 

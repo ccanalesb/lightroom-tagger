@@ -26,27 +26,6 @@ class ConfigCatalogPutResponse(BaseModel):
     ok: bool
 
 
-class ConfigInstagramDumpGetResponse(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-
-    instagram_dump_path: str
-    resolved_path: str
-    exists: bool
-
-
-class ConfigInstagramDumpPutRequest(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-
-    instagram_dump_path: str
-
-
-class ConfigInstagramDumpPutResponse(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-
-    instagram_dump_path: str
-    ok: bool
-
-
 class ConfigStackDetectionGetResponse(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
