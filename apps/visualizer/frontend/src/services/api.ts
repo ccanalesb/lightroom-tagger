@@ -12,8 +12,6 @@ import type {
 import type {
   ConfigCatalogGetResponse,
   ConfigCatalogPutResponse,
-  ConfigInstagramDumpGetResponse,
-  ConfigInstagramDumpPutResponse,
   ConfigStackDetectionGetResponse,
   ConfigStackDetectionPutResponse,
 } from '../types/config'
@@ -311,22 +309,6 @@ export const ConfigAPI = {
     invalidateAll(['catalog.cache.stats'])
     invalidateAll(['jobs.health'])
     invalidateAll(['dashboard'])
-    return result
-  },
-
-  getInstagramDump: () =>
-    request<ConfigInstagramDumpGetResponse>('/config/instagram-dump'),
-
-  putInstagramDump: async (instagramDumpPath: string) => {
-    const result = await request<ConfigInstagramDumpPutResponse>(
-      '/config/instagram-dump',
-      {
-        method: 'PUT',
-        body: JSON.stringify({ instagram_dump_path: instagramDumpPath }),
-      },
-    )
-    invalidateAll(['images.instagram'])
-    invalidateAll(['jobs.health'])
     return result
   },
 

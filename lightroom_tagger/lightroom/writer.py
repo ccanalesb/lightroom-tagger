@@ -23,7 +23,6 @@ def raise_if_catalog_locked(catalog_path: str) -> None:
     return None
 
 
-# Backups run once per write call (update_lightroom_from_matches runs once per job invocation).
 def backup_catalog_if_needed(catalog_path: str, *, max_backups: int = 2) -> str:
     cat = Path(catalog_path)
     parent = cat.parent
@@ -207,47 +206,6 @@ def add_keyword_to_images_batch(conn: sqlite3.Connection, image_keys: list[str],
             print(f" Error adding keyword to {image_key}: {e}")
 
     return result
-
-
-def update_lightroom_from_matches(catalog_path: str, matches: list) -> dict:
-    """Add the configured Instagram keyword (Config.instagram_keyword, default Posted) to matched catalog images.
-
-    Args:
-        catalog_path: Path to Lightroom catalog
-        matches: List of match dicts with 'catalog_key' field
-
-    Returns:
-        dict with 'success', 'failed' counts
-    """
-    stats = {'success': 0, 'failed': 0}
-
-    if not matches:
-        return stats
-
-    from lightroom_tagger.core.config import load_config
-
-    keyword_name = load_config().instagram_keyword.strip() or "Posted"
-
-    raise_if_catalog_locked(catalog_path)
-    _backup_path = backup_catalog_if_needed(catalog_path, max_backups=2)
-
-    conn = connect_catalog(catalog_path)
-    keyword_id = get_or_create_keyword(conn, keyword_name)
-
-    for match in matches:
-        catalog_key = match.get('catalog_key')
-        if not catalog_key:
-            continue
-
-        image_id = get_image_local_id(conn, catalog_key)
-        if image_id and add_keyword_to_image(conn, image_id, keyword_id):
-            stats['success'] += 1
-        else:
-            stats['failed'] += 1
-
-    conn.commit()
-    conn.close()
-    return stats
 
 
 if __name__ == "__main__":
