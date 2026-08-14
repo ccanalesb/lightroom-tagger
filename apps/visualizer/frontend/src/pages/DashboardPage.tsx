@@ -1,7 +1,9 @@
 import { Suspense, useMemo } from 'react'
 import type { FilterSchema } from '../components/filters/types'
+import { InsightsActionCards } from '../components/insights/InsightsActionCards'
 import { InsightsKpiRow } from '../components/insights/InsightsKpiRow'
 import { InsightsQuickNav } from '../components/insights/InsightsQuickNav'
+import { PerspectiveCoverageList } from '../components/insights/PerspectiveCoverageList'
 import { TopPhotosStrip } from '../components/insights/TopPhotosStrip'
 import { Card, CardContent } from '../components/ui/Card'
 import { TabNav } from '../components/ui/Tabs'
@@ -12,6 +14,8 @@ import {
   INSIGHTS_PAGE_TITLE,
   INSIGHTS_SECTION_EXPLORE,
   INSIGHTS_SECTION_HIGHLIGHTS,
+  INSIGHTS_SECTION_NEXT_ACTIONS,
+  INSIGHTS_SECTION_PERSPECTIVE_COVERAGE,
   INSIGHTS_TOP_PHOTOS_REGION_ARIA,
   INSIGHTS_TOP_PHOTOS_TAB_ALL,
   INSIGHTS_TOP_PHOTOS_TAB_POSTED,
@@ -21,11 +25,10 @@ import { ErrorBoundary, ErrorState, useQuery } from '../data'
 import { useFilters } from '../hooks/useFilters'
 import {
   IdentityAPI,
-  JobsAPI,
   SystemAPI,
   type IdentityBestPhotoItem,
   type IdentityBestPhotosMeta,
-  type Stats,
+  type InsightsSummary,
 } from '../services/api'
 
 function errMessage(e: unknown): string {
@@ -44,29 +47,27 @@ type TopPhotosBucket = {
 }
 
 type DashboardBundle = {
-  stats: Stats | null
-  errStats: string | null
+  insights: InsightsSummary | null
+  errInsights: string | null
   topPhotosByTab: Record<TopPhotosTabKey, TopPhotosBucket>
-  activeJobs: number
 }
 
 async function fetchDashboardBundle(): Promise<DashboardBundle> {
   const results = await Promise.allSettled([
-    SystemAPI.stats(),
+    SystemAPI.insightsSummary(),
     IdentityAPI.getBestPhotos({ limit: 8, posted: false }),
     IdentityAPI.getBestPhotos({ limit: 8, posted: true }),
     IdentityAPI.getBestPhotos({ limit: 8 }),
-    JobsAPI.list(),
   ])
 
-  const [r0, r1, r2, r3, r4] = results
+  const [r0, r1, r2, r3] = results
 
-  let stats: Stats | null = null
-  let errStats: string | null = null
+  let insights: InsightsSummary | null = null
+  let errInsights: string | null = null
   if (r0.status === 'fulfilled') {
-    stats = r0.value
+    insights = r0.value
   } else {
-    errStats = errMessage(r0.reason)
+    errInsights = errMessage(r0.reason)
   }
 
   const mapBest = (
@@ -96,17 +97,10 @@ async function fetchDashboardBundle(): Promise<DashboardBundle> {
     all: mapBest(r3),
   }
 
-  let activeJobs = 0
-  if (r4.status === 'fulfilled') {
-    const jobsList = Array.isArray(r4.value?.data) ? r4.value.data : []
-    activeJobs = jobsList.filter((job) => job.status === 'pending' || job.status === 'running').length
-  }
-
   return {
-    stats,
-    errStats,
+    insights,
+    errInsights,
     topPhotosByTab,
-    activeJobs,
   }
 }
 
@@ -140,9 +134,9 @@ function DashboardPageInner() {
 
   const bundle = useQuery(['dashboard'] as const, () => fetchDashboardBundle())
 
-  const { stats, errStats, topPhotosByTab, activeJobs } = bundle
+  const { insights, errInsights, topPhotosByTab } = bundle
 
-  const loadingStats = false
+  const loadingInsights = false
 
   const rawTopPhotosPosted = filters.values.topPhotosPosted as string | undefined
   const activeTopPhotosTab: TopPhotosTabKey =
@@ -161,7 +155,7 @@ function DashboardPageInner() {
       : null
 
   const a11yErrors = [
-    errStats && `Stats: ${errStats}`,
+    errInsights && `Insights: ${errInsights}`,
     topPhotosByTab.unposted.error && `Best photos (unposted): ${topPhotosByTab.unposted.error}`,
     topPhotosByTab.posted.error && `Best photos (posted): ${topPhotosByTab.posted.error}`,
     topPhotosByTab.all.error && `Best photos (all): ${topPhotosByTab.all.error}`,
@@ -177,10 +171,9 @@ function DashboardPageInner() {
       </div>
 
       <InsightsKpiRow
-        stats={stats}
-        activeJobs={activeJobs}
-        loading={loadingStats}
-        error={errStats}
+        summary={insights}
+        loading={loadingInsights}
+        error={errInsights}
       />
 
       {a11yErrors ? (
@@ -214,6 +207,23 @@ function DashboardPageInner() {
             </div>
           </CardContent>
         </Card>
+      </section>
+
+      <section className="space-y-3" aria-labelledby="insights-next-actions-heading">
+        <h2 id="insights-next-actions-heading" className="text-card-title text-text">
+          {INSIGHTS_SECTION_NEXT_ACTIONS}
+        </h2>
+        <InsightsActionCards summary={insights} />
+      </section>
+
+      <section className="space-y-3" aria-labelledby="insights-coverage-heading">
+        <h2 id="insights-coverage-heading" className="text-card-title text-text">
+          {INSIGHTS_SECTION_PERSPECTIVE_COVERAGE}
+        </h2>
+        <PerspectiveCoverageList
+          rows={insights?.perspective_coverage ?? []}
+          catalogImages={insights?.catalog_images ?? 0}
+        />
       </section>
 
       <section className="space-y-3" aria-labelledby="insights-explore-heading">

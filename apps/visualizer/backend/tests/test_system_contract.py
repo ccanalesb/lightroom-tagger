@@ -9,6 +9,7 @@ from api.schemas.system import (
     CachePipelineStatus,
     CacheStatus,
     CatalogCacheReadyResponse,
+    InsightsSummary,
     Stats,
     SystemStatusResponse,
     VisionModelsResponse,
@@ -60,6 +61,14 @@ def test_stats_round_trip(system_contract_client, tmp_path, monkeypatch):
     validated = Stats.model_validate(payload)
     assert validated.catalog_images == 2
     assert validated.db_path == db_path
+
+
+def test_insights_summary_round_trip(system_contract_client):
+    payload = system_contract_client.get("/api/insights-summary").get_json()
+    validated = InsightsSummary.model_validate(payload)
+    assert validated.catalog_images == 2
+    assert validated.burst_stacks >= 0
+    assert len(validated.perspective_coverage) >= 0
 
 
 def test_vision_models_round_trip(system_contract_client):

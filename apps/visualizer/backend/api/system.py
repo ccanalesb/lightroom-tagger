@@ -7,6 +7,7 @@ from flask import Blueprint, current_app, has_app_context, jsonify
 from spectree import Response
 from lightroom_tagger.core.database import (
     get_all_images,
+    get_insights_summary,
     get_posted_images_count,
     init_database,
 )
@@ -17,6 +18,7 @@ from api.schemas.system import (
     CachePipelineStatus,
     CacheStatus,
     CatalogCacheReadyResponse,
+    InsightsSummary,
     Stats,
     SystemStatusResponse,
     VisionModelsResponse,
@@ -135,6 +137,27 @@ def get_stats():
 
         db.close()
         return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/insights-summary', methods=['GET'])
+@spec.validate(
+    resp=Response(HTTP_200=InsightsSummary, HTTP_404=ErrorBody, HTTP_500=ErrorBody),
+    tags=['system'],
+)
+def get_insights_summary_route():
+    try:
+        db_path = config.LIBRARY_DB
+        if not os.path.exists(db_path):
+            return jsonify({'error': 'Library database not found'}), 404
+
+        db = init_database(db_path)
+        try:
+            summary = get_insights_summary(db)
+        finally:
+            db.close()
+        return jsonify(summary)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

@@ -19,6 +19,26 @@ class Stats(BaseModel):
     db_path: str
 
 
+class PerspectiveCoverageRow(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    slug: str
+    display_name: str
+    active: bool
+    scored_images: int
+
+
+class InsightsSummary(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    catalog_images: int
+    scoring_9_plus: int
+    burst_stacks: int
+    unscored_on_active_perspectives: int
+    no_current_score: int
+    perspective_coverage: list[PerspectiveCoverageRow]
+
+
 class VisionModelEntry(BaseModel):
     model_config = ConfigDict(extra='forbid')
 

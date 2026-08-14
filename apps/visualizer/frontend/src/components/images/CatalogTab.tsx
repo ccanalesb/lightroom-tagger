@@ -45,6 +45,7 @@ import {
   CATALOG_FILTER_COLOR_PLACEHOLDER,
   CATALOG_FILTER_COLOR_ARIA,
   msgShowingOf,
+  INSIGHTS_KPI_BURST_STACKS,
 } from '../../constants/strings';
 import { formatMonth } from '../../utils/date';
 import { useFilters } from '../../hooks/useFilters';
@@ -219,11 +220,44 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
           { value: 'oldest', label: FILTER_SORT_DATE_OLDEST },
         ],
       },
+      {
+        type: 'select',
+        key: 'minScoreOnActive',
+        label: CATALOG_FILTER_LABEL_MIN_SCORE,
+        paramName: 'min_score_on_active',
+        numberValue: true,
+        options: [
+          { value: '', label: CATALOG_FILTER_SCORE_ANY },
+          ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => ({
+            value: String(n),
+            label: `${n}+`,
+          })),
+        ],
+      },
+      {
+        type: 'toggle',
+        key: 'burstStack',
+        label: INSIGHTS_KPI_BURST_STACKS,
+        paramName: 'burst_stack',
+        options: [
+          { value: undefined, label: CATALOG_FILTER_POSTED_ALL },
+          { value: true, label: INSIGHTS_KPI_BURST_STACKS },
+        ],
+      },
     ];
   }, [availableMonths, scorePerspectives]);
 
   const filters = useFilters(catalogSchema, { persistKey: FILTER_PERSIST_KEYS.imagesCatalog });
-  const { values: filterValues, rawValues: filterRawValues, toQueryParams, activeCount } = filters;
+  const { values: filterValues, rawValues: filterRawValues, toQueryParams, activeCount, setValues } = filters;
+
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    const patch: Record<string, unknown> = {};
+    const minScoreOnActive = sp.get('min_score_on_active');
+    if (minScoreOnActive) patch.minScoreOnActive = minScoreOnActive;
+    if (sp.get('burst_stack') === 'true') patch.burstStack = true;
+    if (Object.keys(patch).length > 0) setValues(patch);
+  }, [location.search, setValues]);
 
   const listParams = useMemo(
     () => ({
@@ -269,6 +303,8 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
     filterValues.dateRange,
     filterValues.scorePerspective,
     filterValues.minCatalogScore,
+    filterValues.minScoreOnActive,
+    filterValues.burstStack,
     filterValues.sortByScore,
     filterValues.sortByDate,
   ]);

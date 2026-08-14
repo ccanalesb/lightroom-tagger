@@ -6,25 +6,37 @@ import { DashboardPage } from './DashboardPage'
 import { invalidateAll } from '../data'
 import {
   IdentityAPI,
-  JobsAPI,
   SystemAPI,
 } from '../services/api'
 import {
   EMPTY_BEST_PHOTOS_META,
 } from '../__test-utils__/identityFixtures'
 import {
+  INSIGHTS_KPI_SCORING_9_PLUS,
   INSIGHTS_PAGE_TITLE,
   INSIGHTS_SECTION_EXPLORE,
   INSIGHTS_SECTION_HIGHLIGHTS,
+  INSIGHTS_SECTION_NEXT_ACTIONS,
+  INSIGHTS_SECTION_PERSPECTIVE_COVERAGE,
 } from '../constants/strings'
 
 describe('DashboardPage', () => {
   beforeEach(() => {
     invalidateAll(['dashboard'])
-    vi.spyOn(SystemAPI, 'stats').mockResolvedValue({
+    vi.spyOn(SystemAPI, 'insightsSummary').mockResolvedValue({
       catalog_images: 1,
-      posted_to_instagram: 0,
-      db_path: '/tmp/x.db',
+      scoring_9_plus: 2,
+      burst_stacks: 3,
+      unscored_on_active_perspectives: 4,
+      no_current_score: 5,
+      perspective_coverage: [
+        {
+          slug: 'framing',
+          display_name: 'Framing',
+          active: true,
+          scored_images: 1,
+        },
+      ],
     })
     vi.spyOn(IdentityAPI, 'getBestPhotos').mockImplementation(() =>
       Promise.resolve({
@@ -33,11 +45,6 @@ describe('DashboardPage', () => {
         meta: EMPTY_BEST_PHOTOS_META,
       }),
     )
-    vi.spyOn(JobsAPI, 'list').mockResolvedValue({
-      total: 0,
-      data: [],
-      pagination: { offset: 0, limit: 50, current_page: 1, total_pages: 0, has_more: false },
-    })
   })
 
   afterEach(() => {
@@ -68,8 +75,16 @@ describe('DashboardPage', () => {
       expect.objectContaining({ limit: 8, posted: true }),
     )
     expect(IdentityAPI.getBestPhotos).toHaveBeenCalledWith({ limit: 8 })
+    expect(SystemAPI.insightsSummary).toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: new RegExp(INSIGHTS_KPI_SCORING_9_PLUS) })).toBeInTheDocument()
     expect(
       screen.getByRole('heading', { level: 2, name: INSIGHTS_SECTION_HIGHLIGHTS }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 2, name: INSIGHTS_SECTION_NEXT_ACTIONS }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 2, name: INSIGHTS_SECTION_PERSPECTIVE_COVERAGE }),
     ).toBeInTheDocument()
     expect(
       screen.getByRole('heading', { level: 2, name: INSIGHTS_SECTION_EXPLORE }),

@@ -24,6 +24,12 @@ from .db_init import (
 )
 from .db_init_migrations import _library_db_file_path
 
+from .insights_summary import (
+    InsightsSummary,
+    PerspectiveCoverageRow,
+    get_insights_summary,
+)
+
 from .catalog_statistics import (
     CatalogSchemaFacets,
     catalog_schema_facets,
@@ -208,6 +214,7 @@ __all__ = (
     'get_image_description',
     'get_image_descriptions_by_type',
     'get_images_without_hash',
+    'get_insights_summary',
     'get_mood_tags_sample',
     'get_perspective_by_slug',
     'get_posted_images_count',
@@ -219,6 +226,7 @@ __all__ = (
     'init_database',
     'init_image_descriptions_table',
     'init_vision_cache_table',
+    'InsightsSummary',
     'insert_catalog_similarity_group',
     'insert_image_score',
     'insert_perspective',
@@ -236,6 +244,7 @@ __all__ = (
     'managed_library_db',
     'markdown_marks_optional',
     'migrate_unified_image_keys',
+    'PerspectiveCoverageRow',
     'query_catalog_images',
     'query_catalog_images_by_keys',
     'resolve_filepath',

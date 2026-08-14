@@ -68,6 +68,8 @@ import type {
   CachePipelineRun,
   CachePipelineStatus,
   CacheStatus,
+  InsightsSummary,
+  PerspectiveCoverageRow,
   Stats,
   SystemStatusResponse,
   VisionModelsResponse,
@@ -92,6 +94,8 @@ export type {
   CachePipelineRun,
   CachePipelineStatus,
   CacheStatus,
+  InsightsSummary,
+  PerspectiveCoverageRow,
   Stats,
   SystemStatusResponse,
   VisionModelsResponse,
@@ -349,6 +353,8 @@ export type CatalogListQueryParams = {
   description_search?: string
   score_perspective?: string
   min_score?: number
+  min_score_on_active?: number
+  burst_stack?: boolean
   sort_by_score?: 'asc' | 'desc'
   sort_by_date?: 'newest' | 'oldest'
   limit?: number
@@ -381,6 +387,11 @@ function appendCatalogListSearchParams(
   }
   if (params.score_perspective) searchParams.set('score_perspective', params.score_perspective)
   if (params.min_score !== undefined) searchParams.set('min_score', String(params.min_score))
+  if (params.min_score_on_active !== undefined) {
+    searchParams.set('min_score_on_active', String(params.min_score_on_active))
+  }
+  if (params.burst_stack === true) searchParams.set('burst_stack', 'true')
+  else if (params.burst_stack === false) searchParams.set('burst_stack', 'false')
   if (params.sort_by_score) searchParams.set('sort_by_score', params.sort_by_score)
   if (params.sort_by_date) searchParams.set('sort_by_date', params.sort_by_date)
   if (params.limit !== undefined) searchParams.set('limit', String(params.limit))
@@ -393,6 +404,9 @@ export const SystemAPI = {
 
   stats: () =>
     request<Stats>('/stats'),
+
+  insightsSummary: () =>
+    request<InsightsSummary>('/insights-summary'),
 
   visionModels: () =>
     request<VisionModelsResponse>('/vision-models'),

@@ -30,6 +30,8 @@ def filter_order_keys_in_catalog(
     analyzed: bool | None = None,
     score_perspective: str | None = None,
     min_score: int | None = None,
+    min_score_on_active: int | None = None,
+    burst_stack: bool | None = None,
     description_search: str | None = None,
     dominant_colors: list[str] | None = None,
     mood_tags: list[str] | None = None,
@@ -66,6 +68,8 @@ def filter_order_keys_in_catalog(
         color_label=color_label,
         analyzed=analyzed,
         min_score=min_score,
+        min_score_on_active=min_score_on_active,
+        burst_stack=burst_stack,
         description_search=description_search,
         dominant_colors=dominant_colors,
         mood_tags=mood_tags,
@@ -110,6 +114,8 @@ def query_catalog_images(
     analyzed: bool | None = None,
     score_perspective: str | None = None,
     min_score: int | None = None,
+    min_score_on_active: int | None = None,
+    burst_stack: bool | None = None,
     sort_by_score: str | None = None,
     sort_by_date: str | None = None,
     description_search: str | None = None,
@@ -162,6 +168,8 @@ def query_catalog_images(
 
     if min_score is not None and not (1 <= min_score <= 10):
         raise ValueError("min_score must be between 1 and 10")
+    if min_score_on_active is not None and not (1 <= min_score_on_active <= 10):
+        raise ValueError("min_score_on_active must be between 1 and 10")
 
     clauses: list[str] = ["1=1"]
     bindings: list = []
@@ -177,6 +185,8 @@ def query_catalog_images(
         color_label=color_label,
         analyzed=analyzed,
         min_score=min_score,
+        min_score_on_active=min_score_on_active,
+        burst_stack=burst_stack,
         description_search=description_search,
         dominant_colors=dominant_colors,
         mood_tags=mood_tags,
