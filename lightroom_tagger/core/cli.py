@@ -182,11 +182,7 @@ def cmd_search(args, config, db):
     results = []
 
     if args.keyword:
-        try:
-            results = search_by_keyword(db, args.keyword)
-        except ValueError as e:
-            print(f"Error: {e}")
-            return 1
+        results = search_by_keyword(db, args.keyword)
     elif args.rating is not None:
         results = search_by_rating(db, args.rating)
     elif args.color_label:

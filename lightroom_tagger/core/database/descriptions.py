@@ -56,6 +56,15 @@ def build_description_fts_query(raw: str | None) -> tuple[str | None, str | None
     return (" AND ".join(quoted), None)
 
 
+# Subquery yielding catalog image keys whose description matches an FTS ``?`` param.
+# Shared by the CLI ``search_by_keyword`` and the Images ``description_search`` filter.
+DESCRIPTION_FTS_KEY_SUBQUERY = (
+    "SELECT d2.image_key FROM image_descriptions d2 "
+    "INNER JOIN image_descriptions_fts ON image_descriptions_fts.rowid = d2.rowid "
+    "WHERE d2.image_type = 'catalog' AND image_descriptions_fts MATCH ?"
+)
+
+
 def _coerce_has_repetition(value) -> int | None:
     if value is None:
         return None
