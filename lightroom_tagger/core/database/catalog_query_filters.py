@@ -27,6 +27,8 @@ def _append_query_catalog_image_filters(
     color_label: str | None = None,
     analyzed: bool | None = None,
     min_score: int | None = None,
+    min_score_on_active: int | None = None,
+    burst_stack: bool | None = None,
     description_search: str | None = None,
     dominant_colors: list[str] | None = None,
     mood_tags: list[str] | None = None,
@@ -87,6 +89,31 @@ def _append_query_catalog_image_filters(
     if min_score is not None:
         clauses.append("s.score IS NOT NULL AND s.score >= ?")
         bindings.append(min_score)
+
+    if min_score_on_active is not None:
+        if not (1 <= min_score_on_active <= 10):
+            raise ValueError("min_score_on_active must be between 1 and 10")
+        clauses.append(
+            "EXISTS ("
+            "SELECT 1 FROM image_scores s_active "
+            "INNER JOIN perspectives p_active "
+            "  ON p_active.slug = s_active.perspective_slug AND p_active.active = 1 "
+            "WHERE s_active.image_key = i.key "
+            "  AND s_active.image_type = 'catalog' "
+            "  AND s_active.is_current = 1 "
+            "  AND s_active.score >= ?"
+            ")"
+        )
+        bindings.append(min_score_on_active)
+
+    if burst_stack is True:
+        clauses.append(
+            "st.stack_id IS NOT NULL AND st.stack_size > 1 AND i.key = st.representative_key"
+        )
+    elif burst_stack is False:
+        clauses.append(
+            "(st.stack_id IS NULL OR st.stack_size <= 1 OR i.key != st.representative_key)"
+        )
 
     if (description_search or "").strip():
         match_str, fts_err = build_description_fts_query(description_search)

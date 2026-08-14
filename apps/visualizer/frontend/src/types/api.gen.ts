@@ -549,6 +549,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/insights-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** get_insights_summary_route <GET> */
+        get: operations["get__api_insights-summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/catalog/status": {
         parameters: {
             query?: never;
@@ -1400,6 +1417,21 @@ export interface components {
             posted_to_instagram: number;
             /** Db Path */
             db_path: string;
+        };
+        /** InsightsSummary */
+        "InsightsSummary.36cf89b": {
+            /** Catalog Images */
+            catalog_images: number;
+            /** Scoring 9 Plus */
+            scoring_9_plus: number;
+            /** Burst Stacks */
+            burst_stacks: number;
+            /** Unscored On Active Perspectives */
+            unscored_on_active_perspectives: number;
+            /** No Current Score */
+            no_current_score: number;
+            /** Perspective Coverage */
+            perspective_coverage: components["schemas"]["InsightsSummary.36cf89b.PerspectiveCoverageRow"][];
         };
         /** CatalogCacheReadyResponse */
         "CatalogCacheReadyResponse.36cf89b": {
@@ -2939,6 +2971,17 @@ export interface components {
             provider_id: string | null;
             /** Default */
             default: boolean;
+        };
+        /** PerspectiveCoverageRow */
+        "InsightsSummary.36cf89b.PerspectiveCoverageRow": {
+            /** Slug */
+            slug: string;
+            /** Display Name */
+            display_name: string;
+            /** Active */
+            active: boolean;
+            /** Scored Images */
+            scored_images: number;
         };
         /** CachePipelineRun */
         "CachePipelineStatus.36cf89b.CachePipelineRun": {
@@ -5492,6 +5535,53 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Stats.36cf89b"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+        };
+    };
+    "get__api_insights-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightsSummary.36cf89b"];
                 };
             };
             /** @description Not Found */

@@ -5,6 +5,11 @@ export type SystemStatusResponse = components['schemas']['SystemStatusResponse.3
 
 export type Stats = components['schemas']['Stats.36cf89b']
 
+export type PerspectiveCoverageRow =
+  components['schemas']['InsightsSummary.36cf89b.PerspectiveCoverageRow']
+
+export type InsightsSummary = components['schemas']['InsightsSummary.36cf89b']
+
 export type VisionModelEntry =
   components['schemas']['VisionModelsResponse.36cf89b.VisionModelEntry']
 

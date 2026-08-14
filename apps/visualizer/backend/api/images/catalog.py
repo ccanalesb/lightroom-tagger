@@ -405,6 +405,24 @@ def list_catalog_images(db):
         if min_score is not None and not score_perspective_arg:
             return error_bad_request("min_score requires score_perspective")
 
+        min_score_on_active = None
+        if "min_score_on_active" in request.args:
+            raw = request.args.get("min_score_on_active")
+            if raw is not None and str(raw).strip() != "":
+                try:
+                    min_score_on_active = int(raw)
+                except (TypeError, ValueError):
+                    return error_bad_request("min_score_on_active must be an integer")
+                if min_score_on_active < 1 or min_score_on_active > 10:
+                    return error_bad_request("min_score_on_active must be between 1 and 10")
+
+        burst_stack = None
+        burst_stack_raw = request.args.get("burst_stack")
+        if burst_stack_raw == "true":
+            burst_stack = True
+        elif burst_stack_raw == "false":
+            burst_stack = False
+
         limit, offset = _clamp_pagination(
             request.args.get("limit", 50, type=int),
             request.args.get("offset", 0, type=int),
@@ -423,6 +441,8 @@ def list_catalog_images(db):
                 analyzed=analyzed_filter,
                 score_perspective=score_perspective_arg,
                 min_score=min_score,
+                min_score_on_active=min_score_on_active,
+                burst_stack=burst_stack,
                 sort_by_score=sort_by_score,
                 sort_by_date=sort_by_date,
                 description_search=description_search,
