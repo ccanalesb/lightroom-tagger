@@ -1323,7 +1323,6 @@ export interface components {
         };
         /** ProviderDefaults */
         "ProviderDefaults.3d6af5f": {
-            vision_comparison: components["schemas"]["ProviderDefaults.3d6af5f.ProviderDefaultsEntry"];
             description: components["schemas"]["ProviderDefaults.3d6af5f.ProviderDefaultsEntry"];
         };
         /** DescriptionModelsResponse */

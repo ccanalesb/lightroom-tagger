@@ -37,7 +37,6 @@ class ProviderDefaultsEntry(BaseModel):
 class ProviderDefaults(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
-    vision_comparison: ProviderDefaultsEntry
     description: ProviderDefaultsEntry
 
 

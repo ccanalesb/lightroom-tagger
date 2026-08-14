@@ -154,11 +154,9 @@ class ProviderRegistry:
         self._save_config()
 
     def update_defaults(self, defaults: dict) -> None:
-        allowed_keys = frozenset({"vision_comparison", "description"})
+        allowed_keys = frozenset({"description"})
         if not defaults:
-            raise ValueError(
-                "defaults must include at least one of vision_comparison, description"
-            )
+            raise ValueError("defaults must include description")
         for key, value in defaults.items():
             if key not in allowed_keys:
                 raise ValueError(f"Unknown defaults key: {key!r}")

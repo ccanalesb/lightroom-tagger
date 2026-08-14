@@ -30,12 +30,12 @@ function AnalyzeOptionsProviderImpl({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<AnalyzeOptions>({ ...DEFAULT_OPTIONS });
 
   useLayoutEffect(() => {
-    const visionComparison = defaultsPayload.vision_comparison;
-    if (visionComparison?.provider) {
+    const descriptionDefaults = defaultsPayload.description;
+    if (descriptionDefaults?.provider) {
       setOptions((prev) => ({
         ...prev,
-        providerId: visionComparison.provider,
-        providerModel: visionComparison.model ?? null,
+        providerId: descriptionDefaults.provider,
+        providerModel: descriptionDefaults.model ?? null,
       }));
     }
   }, [defaultsPayload]);

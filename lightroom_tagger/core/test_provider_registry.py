@@ -195,5 +195,4 @@ class TestFallbackOrder:
 
     def test_should_return_defaults_from_config(self, registry_factory):
         registry = registry_factory()
-        assert registry.defaults["vision_comparison"]["provider"] == "ollama"
         assert registry.defaults["description"]["provider"] == "ollama"

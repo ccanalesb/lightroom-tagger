@@ -6,11 +6,11 @@ import os
 from dataclasses import dataclass
 from typing import Literal
 
-from lightroom_tagger.core.config import get_description_model, get_vision_model
+from lightroom_tagger.core.config import get_description_model
 from lightroom_tagger.core.exceptions import ModelUnavailableError
 from lightroom_tagger.core.provider_registry import ProviderRegistry
 
-Kind = Literal["description", "vision_comparison"]
+Kind = Literal["description"]
 
 
 @dataclass(frozen=True)
@@ -21,9 +21,6 @@ class ResolvedModel:
 
 
 def _model_from_env(kind: Kind) -> str | None:
-    if kind == "vision_comparison":
-        value = os.environ.get("VISION_MODEL")
-        return value if value else None
     if "DESCRIPTION_VISION_MODEL" in os.environ:
         return os.environ["DESCRIPTION_VISION_MODEL"]
     value = os.environ.get("VISION_MODEL")
@@ -31,10 +28,7 @@ def _model_from_env(kind: Kind) -> str | None:
 
 
 def _model_from_config(kind: Kind) -> str | None:
-    if kind == "vision_comparison":
-        value = get_vision_model()
-    else:
-        value = get_description_model()
+    value = get_description_model()
     return value if value else None
 
 

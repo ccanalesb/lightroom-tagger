@@ -210,5 +210,5 @@ def test_detector_ignores_run_vision_op_callers() -> None:
 def test_detector_ignores_resolve_model_only() -> None:
     assert not _scan_source(
         "def pick():\n"
-        "  return resolve_model(kind='vision_comparison')\n"
+        "  return resolve_model(kind='description')\n"
     )

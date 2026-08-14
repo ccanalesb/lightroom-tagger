@@ -51,7 +51,6 @@
     }
   },
   "defaults": {
-    "vision_comparison": { "provider": "ollama", "model": null },
     "description": { "provider": "ollama", "model": null }
   },
   "fallback_order": ["ollama", "nvidia_nim", "openrouter"]
