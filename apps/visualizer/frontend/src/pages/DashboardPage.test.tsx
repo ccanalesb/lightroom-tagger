@@ -27,6 +27,7 @@ describe('DashboardPage', () => {
       catalog_images: 1,
       scoring_9_plus: 2,
       burst_stacks: 3,
+      pending_stack_suggestions: 6,
       unscored_on_active_perspectives: 4,
       no_current_score: 5,
       perspective_coverage: [

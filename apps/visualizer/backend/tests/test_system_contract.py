@@ -68,6 +68,7 @@ def test_insights_summary_round_trip(system_contract_client):
     validated = InsightsSummary.model_validate(payload)
     assert validated.catalog_images == 2
     assert validated.burst_stacks >= 0
+    assert validated.pending_stack_suggestions >= 0
     assert len(validated.perspective_coverage) >= 0
 
 

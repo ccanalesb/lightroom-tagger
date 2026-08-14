@@ -177,6 +177,24 @@ def _migrate_image_stacks(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migrate_catalog_similarity_rejections(conn: sqlite3.Connection) -> None:
+    """Persist user rejections for catalog similarity pairs across batch wipes."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS catalog_similarity_rejections (
+            key_a TEXT NOT NULL,
+            key_b TEXT NOT NULL,
+            rejected_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (key_a, key_b),
+            CHECK (key_a < key_b)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_catalog_similarity_rejections_rejected_at
+            ON catalog_similarity_rejections(rejected_at DESC);
+        """
+    )
+
+
 def _migrate_catalog_similarity(conn: sqlite3.Connection) -> None:
     """Idempotent derived tables for job-driven catalog visual similarity."""
     conn.executescript(

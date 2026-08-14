@@ -61,5 +61,44 @@ class StackRepresentativeResponse(BaseModel):
     stack: StackMetadata
 
 
+class StackSuggestionPairRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    image_key_a: str
+    image_key_b: str
+
+
+class StackSuggestion(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    group_id: int
+    image_a: CatalogImage
+    image_b: CatalogImage
+    similarity: float
+    why_matched: str
+    time_gap_seconds: int | None = None
+
+
+class StackSuggestionsResponse(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    items: list[StackSuggestion]
+    total: int
+
+
+class StackSuggestionAcceptResponse(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    stack: StackMetadata
+
+
+class StackSuggestionRejectResponse(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    image_key_a: str
+    image_key_b: str
+    rejected: bool
+
+
 def validate_stack_metadata(row: dict) -> dict:
     return StackMetadata.model_validate(row).model_dump(mode='json')

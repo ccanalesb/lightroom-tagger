@@ -15,6 +15,8 @@ from lightroom_tagger.core.database import (
     clear_catalog_similarity_results,
     insert_catalog_similarity_group,
     init_database,
+    is_blank_frame_catalog_key,
+    is_catalog_similarity_pair_rejected,
     library_write,
     list_catalog_keys_needing_clip_embedding,
     list_clip_embedded_catalog_keys_newest_first,
@@ -236,6 +238,8 @@ def _handle_catalog_similarity_inner(runner, job_id: str, metadata: dict) -> Non
             candidates_created = 0
             skipped_non_primary = 0
             skipped_no_embedding = 0
+            skipped_blank_frame = 0
+            skipped_rejected = 0
             seen_pairs: set[tuple[str, str]] = set()
 
             for idx, seed_key in enumerate(all_keys, start=1):
@@ -244,6 +248,9 @@ def _handle_catalog_similarity_inner(runner, job_id: str, metadata: dict) -> Non
                     return
                 if not catalog_key_is_primary_grid_row(lib_db, seed_key):
                     skipped_non_primary += 1
+                    continue
+                if is_blank_frame_catalog_key(lib_db, seed_key):
+                    skipped_blank_frame += 1
                     continue
                 try:
                     pairs, _meta = run_clip_similar_for_seed(
@@ -263,6 +270,12 @@ def _handle_catalog_similarity_inner(runner, job_id: str, metadata: dict) -> Non
                         continue
                     pair_key = tuple(sorted((seed_key, candidate_key)))
                     if pair_key in seen_pairs:
+                        continue
+                    if is_catalog_similarity_pair_rejected(lib_db, seed_key, candidate_key):
+                        skipped_rejected += 1
+                        continue
+                    if is_blank_frame_catalog_key(lib_db, candidate_key):
+                        skipped_blank_frame += 1
                         continue
                     seen_pairs.add(pair_key)
                     candidates.append(
@@ -298,6 +311,8 @@ def _handle_catalog_similarity_inner(runner, job_id: str, metadata: dict) -> Non
                 'embedded_catalog_images': int(total),
                 'skipped_non_primary': int(skipped_non_primary),
                 'skipped_no_embedding': int(skipped_no_embedding),
+                'skipped_blank_frame': int(skipped_blank_frame),
+                'skipped_rejected': int(skipped_rejected),
                 'min_similarity': float(min_similarity),
                 'limit_per_seed': int(limit_per_seed),
             }

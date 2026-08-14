@@ -290,6 +290,17 @@ def stack_merge_into(
     return {"stack": meta, "merged_stack_id": source_stack_id}
 
 
+def stack_id_for_image_key(db: sqlite3.Connection, image_key: str) -> int | None:
+    """Return the stack_id containing *image_key*, or None if it is a solo image."""
+    row = db.execute(
+        "SELECT stack_id FROM image_stack_members WHERE image_key = ? LIMIT 1",
+        (image_key,),
+    ).fetchone()
+    if not row:
+        return None
+    return int(row["stack_id"])
+
+
 def stack_set_representative(
     db: sqlite3.Connection, stack_id: int, new_representative_key: str
 ) -> dict:

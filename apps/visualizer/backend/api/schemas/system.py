@@ -34,6 +34,7 @@ class InsightsSummary(BaseModel):
     catalog_images: int
     scoring_9_plus: int
     burst_stacks: int
+    pending_stack_suggestions: int
     unscored_on_active_perspectives: int
     no_current_score: int
     perspective_coverage: list[PerspectiveCoverageRow]

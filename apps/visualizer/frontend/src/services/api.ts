@@ -49,6 +49,9 @@ import type {
   StackMergeResponse,
   StackRepresentativeResponse,
   StackSplitMemberResponse,
+  StackSuggestion,
+  StackSuggestionAcceptResponse,
+  StackSuggestionsResponse,
 } from '../types/stacks'
 import type {
   IdentityBestPhotoItem,
@@ -128,6 +131,9 @@ export type {
   StackMergeResponse,
   StackRepresentativeResponse,
   StackSplitMemberResponse,
+  StackSuggestion,
+  StackSuggestionAcceptResponse,
+  StackSuggestionsResponse,
 }
 export type {
   DescriptionModel,
@@ -458,6 +464,45 @@ export const ImagesAPI = {
     return request<CatalogSimilarityGroupsResponse>(
       `/images/catalog-similarity-groups${qs ? `?${qs}` : ''}`,
     )
+  },
+
+  listStackSuggestions: (params?: { limit?: number; offset?: number }) => {
+    const sp = new URLSearchParams()
+    if (params?.limit !== undefined) sp.set('limit', String(params.limit))
+    if (params?.offset !== undefined) sp.set('offset', String(params.offset))
+    const qs = sp.toString()
+    return request<StackSuggestionsResponse>(
+      `/images/stacks/suggestions${qs ? `?${qs}` : ''}`,
+    )
+  },
+
+  acceptStackSuggestion: async (imageKeyA: string, imageKeyB: string) => {
+    const result = await request<StackSuggestionAcceptResponse>(
+      '/images/stacks/suggestions/accept',
+      {
+        method: 'POST',
+        body: JSON.stringify({ image_key_a: imageKeyA, image_key_b: imageKeyB }),
+      },
+    )
+    invalidateAll(['stacks.suggestions'])
+    invalidateAll(['images.catalog'])
+    invalidateAll(['images.detail'])
+    invalidateAll(['dashboard'])
+    invalidateAll(['identity'])
+    return result
+  },
+
+  rejectStackSuggestion: async (imageKeyA: string, imageKeyB: string) => {
+    const result = await request<{ image_key_a: string; image_key_b: string; rejected: boolean }>(
+      '/images/stacks/suggestions/reject',
+      {
+        method: 'POST',
+        body: JSON.stringify({ image_key_a: imageKeyA, image_key_b: imageKeyB }),
+      },
+    )
+    invalidateAll(['stacks.suggestions'])
+    invalidateAll(['dashboard'])
+    return result
   },
 
   getStackMembers: (stackId: number) =>

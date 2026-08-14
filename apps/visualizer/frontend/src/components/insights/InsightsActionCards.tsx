@@ -5,9 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card'
 import {
   INSIGHTS_ACTION_CULL_BURST,
   INSIGHTS_ACTION_CULL_BURST_DESC,
+  INSIGHTS_ACTION_CONFIRM_STACKS,
+  INSIGHTS_ACTION_CONFIRM_STACKS_DESC,
   INSIGHTS_ACTION_FINISH_PASS,
   INSIGHTS_ACTION_FINISH_PASS_DESC,
   INSIGHTS_LINK_BURST_STACKS,
+  INSIGHTS_LINK_CONFIRM_STACKS,
   INSIGHTS_LINK_SCORE_JOB,
 } from '../../constants/strings'
 
@@ -17,6 +20,7 @@ export type InsightsActionCardsProps = {
 
 export function InsightsActionCards({ summary }: InsightsActionCardsProps) {
   const burstStacks = summary?.burst_stacks ?? 0
+  const pendingStacks = summary?.pending_stack_suggestions ?? 0
   const noCurrentScore = summary?.no_current_score ?? 0
 
   const cards = [
@@ -25,6 +29,13 @@ export function InsightsActionCards({ summary }: InsightsActionCardsProps) {
       value: burstStacks.toLocaleString(),
       description: INSIGHTS_ACTION_CULL_BURST_DESC,
       link: INSIGHTS_LINK_BURST_STACKS,
+      badge: 'accent' as const,
+    },
+    {
+      title: INSIGHTS_ACTION_CONFIRM_STACKS,
+      value: pendingStacks.toLocaleString(),
+      description: INSIGHTS_ACTION_CONFIRM_STACKS_DESC,
+      link: INSIGHTS_LINK_CONFIRM_STACKS,
       badge: 'accent' as const,
     },
     {
@@ -37,7 +48,7 @@ export function InsightsActionCards({ summary }: InsightsActionCardsProps) {
   ]
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       {cards.map((card) => (
         <Link key={card.title} to={card.link}>
           <Card hoverable padding="md">

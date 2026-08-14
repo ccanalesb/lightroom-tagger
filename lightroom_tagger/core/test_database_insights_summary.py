@@ -90,6 +90,7 @@ def test_insights_summary_counts_and_coverage(tmp_path) -> None:
     assert summary["catalog_images"] == 3
     assert summary["scoring_9_plus"] == 1
     assert summary["burst_stacks"] == 1
+    assert summary["pending_stack_suggestions"] == 0
     assert summary["unscored_on_active_perspectives"] == 2  # k2 missing beta, k3 missing both
     assert summary["no_current_score"] == 1
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlite3
 from typing import TypedDict
 
+from .stack_suggestions import count_pending_stack_suggestions
+
 
 class PerspectiveCoverageRow(TypedDict):
     slug: str
@@ -17,6 +19,7 @@ class InsightsSummary(TypedDict):
     catalog_images: int
     scoring_9_plus: int
     burst_stacks: int
+    pending_stack_suggestions: int
     unscored_on_active_perspectives: int
     no_current_score: int
     perspective_coverage: list[PerspectiveCoverageRow]
@@ -45,6 +48,8 @@ def get_insights_summary(conn: sqlite3.Connection) -> InsightsSummary:
     burst_stacks = int(
         conn.execute("SELECT COUNT(*) AS c FROM image_stacks").fetchone()["c"]
     )
+
+    pending_stack_suggestions = count_pending_stack_suggestions(conn)
 
     unscored_on_active_perspectives = int(
         conn.execute(
@@ -110,6 +115,7 @@ def get_insights_summary(conn: sqlite3.Connection) -> InsightsSummary:
         "catalog_images": catalog_images,
         "scoring_9_plus": scoring_9_plus,
         "burst_stacks": burst_stacks,
+        "pending_stack_suggestions": pending_stack_suggestions,
         "unscored_on_active_perspectives": unscored_on_active_perspectives,
         "no_current_score": no_current_score,
         "perspective_coverage": perspective_coverage,
