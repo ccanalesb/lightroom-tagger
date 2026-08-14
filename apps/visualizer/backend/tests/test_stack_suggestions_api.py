@@ -135,3 +135,40 @@ def test_stack_suggestion_accept_round_trip(tmp_path, monkeypatch) -> None:
     validated = StackSuggestionAcceptResponse.model_validate(payload)
     assert validated.stack.stack_member_count == 2
     assert client.get("/api/images/stacks/suggestions").get_json()["total"] == 0
+
+
+def test_stack_suggestion_accept_merges_two_stacks(tmp_path, monkeypatch) -> None:
+    """Accepting a pair whose images live in different stacks merges them (contract stays stack-only)."""
+    from lightroom_tagger.core.database import stack_create_from_keys
+
+    from app import create_app
+
+    db_path = str(tmp_path / "library.db")
+    conn = init_database(db_path)
+    keys = [
+        store_image(
+            conn,
+            {
+                "date_taken": f"2026-03-20T13:55:4{i}",
+                "filename": f"{i}.jpg",
+                "filepath": f"/{i}.jpg",
+            },
+        )
+        for i in range(4)
+    ]
+    for k in keys:
+        _score(conn, k, 8)
+    with library_write(conn):
+        stack_create_from_keys(conn, [keys[0], keys[1]])
+        stack_create_from_keys(conn, [keys[2], keys[3]])
+    conn.close()
+    monkeypatch.setattr("utils.db.LIBRARY_DB", db_path)
+    client = create_app().test_client()
+
+    resp = client.post(
+        "/api/images/stacks/suggestions/accept",
+        json={"image_key_a": keys[0], "image_key_b": keys[2]},
+    )
+    assert resp.status_code == 200
+    validated = StackSuggestionAcceptResponse.model_validate(resp.get_json())
+    assert validated.stack.stack_member_count == 4

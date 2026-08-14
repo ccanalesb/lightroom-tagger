@@ -114,7 +114,7 @@ export function StackSuggestionsList({
 
 export function StackSuggestionsPanel() {
   const [busyKey, setBusyKey] = useState<string | null>(null)
-  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<Error | null>(null)
   const listRev = busyKey ? 1 : 0
   const suggestions = useQuery(
     ['stacks.suggestions', listRev] as const,
@@ -131,7 +131,7 @@ export function StackSuggestionsPanel() {
       invalidateAll(['dashboard'])
       invalidateAll(['images.catalog'])
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e))
+      setActionError(e instanceof Error ? e : new Error(String(e)))
     } finally {
       setBusyKey(null)
     }
@@ -146,7 +146,7 @@ export function StackSuggestionsPanel() {
       invalidateAll(['stacks.suggestions'])
       invalidateAll(['dashboard'])
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e))
+      setActionError(e instanceof Error ? e : new Error(String(e)))
     } finally {
       setBusyKey(null)
     }

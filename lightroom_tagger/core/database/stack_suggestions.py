@@ -3,9 +3,17 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Sequence
 from datetime import datetime
 
 from lightroom_tagger.core.database.catalog_query_best_score import get_best_current_catalog_score
+from lightroom_tagger.core.database.stacks import (
+    select_stack_representative_key_for_keys,
+    stack_id_for_image_key,
+    stack_merge_into,
+    stack_metadata_for_api,
+)
+from lightroom_tagger.core.exceptions import StackMutationError
 
 # #226: blank-frame false positives average ~4.53 vs ~4.88 catalog-wide.
 BLANK_FRAME_SCORE_FLOOR = 4.5
@@ -121,6 +129,105 @@ def reject_catalog_similarity_pair(
         (a, b, datetime.now().isoformat()),
     )
     db.commit()
+
+
+def stack_create_from_keys(db: sqlite3.Connection, member_keys: Sequence[str]) -> dict:
+    """Create a new stack from *member_keys* (>= 2). Call inside :func:`library_write`."""
+    keys = [str(k) for k in member_keys if k]
+    unique_keys = sorted(set(keys))
+    if len(unique_keys) < 2:
+        raise StackMutationError("at least two distinct image keys required", status_code=400)
+    rep = select_stack_representative_key_for_keys(db, unique_keys)
+    if not rep or rep not in unique_keys:
+        raise StackMutationError("stack representative selection failed", status_code=500)
+    n = len(unique_keys)
+    cur = db.execute(
+        """
+        INSERT INTO image_stacks (representative_key, stack_size, user_modified)
+        VALUES (?, ?, 1)
+        """,
+        (rep, n),
+    )
+    stack_id = int(cur.lastrowid)
+    for mkey in unique_keys:
+        db.execute(
+            "INSERT INTO image_stack_members (stack_id, image_key) VALUES (?, ?)",
+            (stack_id, mkey),
+        )
+    meta = stack_metadata_for_api(db, stack_id)
+    assert meta is not None
+    return {"stack": meta}
+
+
+def stack_add_member(db: sqlite3.Connection, stack_id: int, image_key: str) -> dict:
+    """Add *image_key* to an existing stack. Call inside :func:`library_write`."""
+    stack_row = db.execute(
+        "SELECT stack_id FROM image_stacks WHERE stack_id = ?",
+        (stack_id,),
+    ).fetchone()
+    if not stack_row:
+        raise StackMutationError("stack not found", status_code=404)
+
+    existing = db.execute(
+        "SELECT stack_id FROM image_stack_members WHERE image_key = ? LIMIT 1",
+        (image_key,),
+    ).fetchone()
+    if existing:
+        sid = int(existing["stack_id"])
+        if sid == stack_id:
+            meta = stack_metadata_for_api(db, stack_id)
+            assert meta is not None
+            return {"stack": meta}
+        raise StackMutationError("image_key already belongs to another stack", status_code=400)
+
+    db.execute(
+        "INSERT INTO image_stack_members (stack_id, image_key) VALUES (?, ?)",
+        (stack_id, image_key),
+    )
+    member_rows = db.execute(
+        "SELECT image_key FROM image_stack_members WHERE stack_id = ?",
+        (stack_id,),
+    ).fetchall()
+    keys = [str(r["image_key"]) for r in member_rows]
+    n = len(keys)
+    db.execute(
+        """
+        UPDATE image_stacks
+        SET stack_size = ?, user_modified = 1
+        WHERE stack_id = ?
+        """,
+        (n, stack_id),
+    )
+    meta = stack_metadata_for_api(db, stack_id)
+    assert meta is not None
+    return {"stack": meta}
+
+
+def stack_accept_suggestion_pair(
+    db: sqlite3.Connection, key_a: str, key_b: str
+) -> dict:
+    """Create, extend, or merge stacks so *key_a* and *key_b* share one stack.
+
+    Call inside :func:`library_write`.
+    """
+    a, b = str(key_a), str(key_b)
+    if a == b:
+        raise StackMutationError("image keys must differ", status_code=400)
+
+    sid_a = stack_id_for_image_key(db, a)
+    sid_b = stack_id_for_image_key(db, b)
+
+    if sid_a is not None and sid_b is not None:
+        if sid_a == sid_b:
+            meta = stack_metadata_for_api(db, sid_a)
+            assert meta is not None
+            return {"stack": meta}
+        return stack_merge_into(db, sid_a, sid_b)
+    if sid_a is not None:
+        return stack_add_member(db, sid_a, b)
+    if sid_b is not None:
+        return stack_add_member(db, sid_b, a)
+    return stack_create_from_keys(db, [a, b])
 
 
 def count_pending_stack_suggestions(db: sqlite3.Connection) -> int:

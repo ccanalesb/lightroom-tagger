@@ -110,7 +110,9 @@ def post_stack_suggestion_accept(db):
             return error_bad_request("image_key_a and image_key_b required")
         with library_write(db):
             result = stack_accept_suggestion_pair(db, key_a.strip(), key_b.strip())
-        return jsonify(result), 200
+        # stack_accept_suggestion_pair may merge two stacks and return merged_stack_id;
+        # the accept contract is stack-only (extra='forbid'), so shape to {stack}.
+        return jsonify({"stack": result["stack"]}), 200
     except StackMutationError as e:
         if e.status_code == 404:
             return error_not_found("image")
