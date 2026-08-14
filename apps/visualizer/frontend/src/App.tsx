@@ -5,6 +5,7 @@ import { IdentityPage } from './pages/IdentityPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { ImagesPage } from './pages/ImagesPage'
 import { ProcessingPage } from './pages/ProcessingPage'
+import { StackSuggestionsPage } from './pages/StackSuggestionsPage'
 import { MatchOptionsProvider } from './stores/matchOptionsContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 
@@ -21,6 +22,7 @@ function App() {
               <Route path="analytics" element={<Navigate to="/images" replace />} />
               <Route path="identity" element={<ErrorBoundary><IdentityPage /></ErrorBoundary>} />
               <Route path="processing" element={<ErrorBoundary><ProcessingPage /></ErrorBoundary>} />
+              <Route path="stacks/confirm" element={<ErrorBoundary><StackSuggestionsPage /></ErrorBoundary>} />
               <Route path="instagram" element={<Navigate to="/images" replace />} />
               <Route path="matching" element={<Navigate to="/processing" replace />} />
               <Route

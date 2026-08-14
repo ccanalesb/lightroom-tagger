@@ -218,6 +218,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/images/stacks/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pending catalog-similarity pairs ranked as stacks to confirm. */
+        get: operations["get__api_images_stacks_suggestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/stacks/suggestions/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept a suggested pair by creating, extending, or merging stacks. */
+        post: operations["post__api_images_stacks_suggestions_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/stacks/suggestions/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject a suggested pair so it does not return on the next batch run. */
+        post: operations["post__api_images_stacks_suggestions_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/images/stacks/{stack_id}/members": {
         parameters: {
             query?: never;
@@ -1426,6 +1477,8 @@ export interface components {
             scoring_9_plus: number;
             /** Burst Stacks */
             burst_stacks: number;
+            /** Pending Stack Suggestions */
+            pending_stack_suggestions: number;
             /** Unscored On Active Perspectives */
             unscored_on_active_perspectives: number;
             /** No Current Score */
@@ -1827,6 +1880,33 @@ export interface components {
              * @default null
              */
             vision_score: number | null;
+        };
+        /** StackSuggestionsResponse */
+        "StackSuggestionsResponse.b12c71e": {
+            /** Items */
+            items: components["schemas"]["StackSuggestionsResponse.b12c71e.StackSuggestion"][];
+            /** Total */
+            total: number;
+        };
+        /** StackSuggestionPairRequest */
+        "StackSuggestionPairRequest.b12c71e": {
+            /** Image Key A */
+            image_key_a: string;
+            /** Image Key B */
+            image_key_b: string;
+        };
+        /** StackSuggestionAcceptResponse */
+        "StackSuggestionAcceptResponse.b12c71e": {
+            stack: components["schemas"]["StackSuggestionAcceptResponse.b12c71e.StackMetadata"];
+        };
+        /** StackSuggestionRejectResponse */
+        "StackSuggestionRejectResponse.b12c71e": {
+            /** Image Key A */
+            image_key_a: string;
+            /** Image Key B */
+            image_key_b: string;
+            /** Rejected */
+            rejected: boolean;
         };
         /** StackMembersResponse */
         "StackMembersResponse.b12c71e": {
@@ -3776,6 +3856,268 @@ export interface components {
          * CatalogImage
          * @description Catalog list / search row shape (``query_catalog_images`` + API transforms).
          */
+        "StackSuggestionsResponse.b12c71e.CatalogImage": {
+            /** Key */
+            key: string;
+            /**
+             * Id
+             * @default null
+             */
+            id: number | null;
+            /**
+             * Filename
+             * @default null
+             */
+            filename: string | null;
+            /**
+             * Filepath
+             * @default null
+             */
+            filepath: string | null;
+            /**
+             * Date Taken
+             * @default null
+             */
+            date_taken: string | null;
+            /**
+             * Rating
+             * @default null
+             */
+            rating: number | null;
+            /**
+             * Pick
+             * @default null
+             */
+            pick: boolean | null;
+            /**
+             * Color Label
+             * @default null
+             */
+            color_label: string | null;
+            /** Keywords */
+            keywords?: string[];
+            /**
+             * Title
+             * @default null
+             */
+            title: string | null;
+            /**
+             * Caption
+             * @default null
+             */
+            caption: string | null;
+            /**
+             * Description
+             * @default null
+             */
+            description: string | null;
+            /**
+             * Copyright
+             * @default null
+             */
+            copyright: string | null;
+            /**
+             * Width
+             * @default null
+             */
+            width: number | null;
+            /**
+             * Height
+             * @default null
+             */
+            height: number | null;
+            /**
+             * Instagram Posted
+             * @default null
+             */
+            instagram_posted: boolean | null;
+            /**
+             * Instagram Url
+             * @default null
+             */
+            instagram_url: string | null;
+            /**
+             * Image Hash
+             * @default null
+             */
+            image_hash: string | null;
+            /**
+             * Image Type
+             * @default null
+             */
+            image_type: "catalog" | null;
+            /**
+             * Ai Analyzed
+             * @default null
+             */
+            ai_analyzed: boolean | null;
+            /**
+             * Description Summary
+             * @default null
+             */
+            description_summary: string | null;
+            /**
+             * Description Best Perspective
+             * @default null
+             */
+            description_best_perspective: string | null;
+            /**
+             * Catalog Perspective Score
+             * @default null
+             */
+            catalog_perspective_score: number | null;
+            /**
+             * Catalog Score Perspective
+             * @default null
+             */
+            catalog_score_perspective: string | null;
+            /**
+             * Stack Id
+             * @default null
+             */
+            stack_id: number | null;
+            /**
+             * Stack Member Count
+             * @default null
+             */
+            stack_member_count: number | null;
+            /**
+             * Is Stack Representative
+             * @default null
+             */
+            is_stack_representative: boolean | null;
+            /**
+             * Analyzed At
+             * @default null
+             */
+            analyzed_at: string | null;
+            /**
+             * Aperture
+             * @default null
+             */
+            aperture: string | null;
+            /**
+             * Camera Make
+             * @default null
+             */
+            camera_make: string | null;
+            /**
+             * Camera Model
+             * @default null
+             */
+            camera_model: string | null;
+            /**
+             * Catalog Path
+             * @default null
+             */
+            catalog_path: string | null;
+            /**
+             * Exif
+             * @default null
+             */
+            exif: string | null;
+            /**
+             * File Size
+             * @default null
+             */
+            file_size: number | null;
+            /**
+             * Focal Length
+             * @default null
+             */
+            focal_length: string | null;
+            /**
+             * Gps Latitude
+             * @default null
+             */
+            gps_latitude: number | null;
+            /**
+             * Gps Longitude
+             * @default null
+             */
+            gps_longitude: number | null;
+            /**
+             * Instagram Index
+             * @default null
+             */
+            instagram_index: number | null;
+            /**
+             * Instagram Post Date
+             * @default null
+             */
+            instagram_post_date: string | null;
+            /**
+             * Iso
+             * @default null
+             */
+            iso: string | null;
+            /**
+             * Lens
+             * @default null
+             */
+            lens: string | null;
+            /**
+             * Phash
+             * @default null
+             */
+            phash: string | null;
+            /**
+             * Shutter Speed
+             * @default null
+             */
+            shutter_speed: string | null;
+            /**
+             * Similarity
+             * @default null
+             */
+            similarity: number | null;
+            /**
+             * Why Matched
+             * @default null
+             */
+            why_matched: string | null;
+            /**
+             * Thumbnail Url
+             * @default null
+             */
+            thumbnail_url: string | null;
+            /**
+             * Score
+             * @default null
+             */
+            score: number | null;
+        };
+        /** StackSuggestion */
+        "StackSuggestionsResponse.b12c71e.StackSuggestion": {
+            /** Group Id */
+            group_id: number;
+            image_a: components["schemas"]["StackSuggestionsResponse.b12c71e.CatalogImage"];
+            image_b: components["schemas"]["StackSuggestionsResponse.b12c71e.CatalogImage"];
+            /** Similarity */
+            similarity: number;
+            /** Why Matched */
+            why_matched: string;
+            /**
+             * Time Gap Seconds
+             * @default null
+             */
+            time_gap_seconds: number | null;
+        };
+        /** StackMetadata */
+        "StackSuggestionAcceptResponse.b12c71e.StackMetadata": {
+            /** Stack Id */
+            stack_id: number;
+            /** Representative Key */
+            representative_key: string;
+            /** Stack Member Count */
+            stack_member_count: number;
+            /** Member Keys */
+            member_keys: string[];
+        };
+        /**
+         * CatalogImage
+         * @description Catalog list / search row shape (``query_catalog_images`` + API transforms).
+         */
         "StackMembersResponse.b12c71e.CatalogImage": {
             /** Key */
             key: string;
@@ -4610,6 +4952,128 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    get__api_images_stacks_suggestions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StackSuggestionsResponse.b12c71e"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    post__api_images_stacks_suggestions_accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StackSuggestionPairRequest.b12c71e"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StackSuggestionAcceptResponse.b12c71e"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    post__api_images_stacks_suggestions_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StackSuggestionPairRequest.b12c71e"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StackSuggestionRejectResponse.b12c71e"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

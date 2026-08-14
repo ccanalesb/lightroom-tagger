@@ -21,6 +21,7 @@ tests/test_providers_api.py
 tests/test_catalog_contract.py
 tests/test_catalog_instagram_posted_api.py
 tests/test_stacks_contract.py
+tests/test_stack_suggestions_api.py
 tests/test_config_contract.py
 tests/test_descriptions_contract.py
 tests/test_scores_contract.py

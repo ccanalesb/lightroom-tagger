@@ -142,6 +142,19 @@ export const INSIGHTS_KPI_UNSCORED_ACTIVE_DESC = 'Missing at least one active le
 export const INSIGHTS_ACTION_CULL_BURST = 'Cull a burst stack'
 export const INSIGHTS_ACTION_CULL_BURST_DESC =
   'Stacks grouped by date_taken. Open a representative, pick the keeper, reject the rest.'
+export const INSIGHTS_ACTION_CONFIRM_STACKS = 'Stacks to confirm'
+export const INSIGHTS_ACTION_CONFIRM_STACKS_DESC =
+  'Visual matches date_taken missed — review pairs and confirm or reject.'
+export const INSIGHTS_LINK_CONFIRM_STACKS = '/stacks/confirm'
+export const STACK_SUGGESTIONS_PAGE_TITLE = 'Stacks to confirm'
+export const STACK_SUGGESTIONS_PAGE_SUBTITLE =
+  'Catalog similarity found images that belong together but were never grouped by date_taken.'
+export const STACK_SUGGESTIONS_EMPTY =
+  'No pending stack suggestions. Run catalog similarity from Processing when new images are embedded.'
+export const STACK_SUGGESTIONS_ACCEPT = 'Confirm stack'
+export const STACK_SUGGESTIONS_REJECT = 'Reject'
+export const STACK_SUGGESTIONS_TIME_GAP_SECONDS = (seconds: number) =>
+  seconds < 60 ? `${seconds}s apart` : `${Math.round(seconds / 60)}m apart`
 export const INSIGHTS_ACTION_FINISH_PASS = 'Undescribed + unscored'
 export const INSIGHTS_ACTION_FINISH_PASS_DESC =
   'Images with no current score — run a score pass on Processing.'

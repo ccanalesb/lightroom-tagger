@@ -17,11 +17,19 @@ from api.schemas.stacks import (
     StackRepresentativeResponse,
     StackSplitMemberRequest,
     StackSplitMemberResponse,
+    StackSuggestionAcceptResponse,
+    StackSuggestionPairRequest,
+    StackSuggestionRejectResponse,
+    StackSuggestionsResponse,
 )
 from lightroom_tagger.core.database import (
     StackMutationError,
     library_write,
+    list_pending_stack_suggestions,
     list_stack_member_keys,
+    query_catalog_images_by_keys,
+    reject_catalog_similarity_pair,
+    stack_accept_suggestion_pair,
     stack_exists,
     stack_merge_into,
     stack_set_representative,
@@ -31,6 +39,116 @@ from lightroom_tagger.core.database import (
 from .catalog import _query_catalog_rows_for_stack_member_keys, _rows_to_catalog_api_images
 
 stacks_bp = Blueprint("images_stacks", __name__)
+
+
+def _clamp_pagination(limit: int, offset: int) -> tuple[int, int]:
+    return max(1, min(int(limit), 100)), max(0, int(offset))
+
+
+@stacks_bp.route("/suggestions", methods=["GET"])
+@with_db
+@spec.validate(
+    resp=Response(HTTP_200=StackSuggestionsResponse),
+    tags=['images-stacks'],
+)
+def list_stack_suggestions(db):
+    """Pending catalog-similarity pairs ranked as stacks to confirm."""
+    try:
+        limit, offset = _clamp_pagination(
+            request.args.get("limit", 20, type=int),
+            request.args.get("offset", 0, type=int),
+        )
+        rows, total = list_pending_stack_suggestions(db, limit=limit, offset=offset)
+        items: list[dict] = []
+        for row in rows:
+            keys = [str(row["seed_key"]), str(row["candidate_key"])]
+            catalog_rows = query_catalog_images_by_keys(db, keys)
+            images = _rows_to_catalog_api_images(catalog_rows)
+            by_key = {img["key"]: img for img in images}
+            image_a = by_key.get(str(row["seed_key"]))
+            image_b = by_key.get(str(row["candidate_key"]))
+            if not image_a or not image_b:
+                continue
+            image_a["thumbnail_url"] = f"/api/images/catalog/{image_a['key']}/thumbnail"
+            image_b["thumbnail_url"] = f"/api/images/catalog/{image_b['key']}/thumbnail"
+            gap = row.get("time_gap_seconds")
+            items.append(
+                {
+                    "group_id": int(row["group_id"]),
+                    "image_a": image_a,
+                    "image_b": image_b,
+                    "similarity": float(row["similarity"] or 0.0),
+                    "why_matched": str(row["why_matched"] or ""),
+                    "time_gap_seconds": int(gap) if gap is not None else None,
+                }
+            )
+        return jsonify({"items": items, "total": total})
+    except Exception as e:
+        return error_server_error(str(e))
+
+
+@stacks_bp.route("/suggestions/accept", methods=["POST"])
+@with_db
+@spec.validate(
+    json=StackSuggestionPairRequest,
+    resp=Response(
+        HTTP_200=StackSuggestionAcceptResponse,
+        HTTP_400=ErrorBody,
+        HTTP_404=ErrorBody,
+    ),
+    tags=['images-stacks'],
+)
+def post_stack_suggestion_accept(db):
+    """Accept a suggested pair by creating, extending, or merging stacks."""
+    try:
+        body = request.get_json(silent=True)
+        if not body or not isinstance(body, dict):
+            return error_bad_request("JSON body required")
+        key_a = body.get("image_key_a")
+        key_b = body.get("image_key_b")
+        if not key_a or not isinstance(key_a, str) or not key_b or not isinstance(key_b, str):
+            return error_bad_request("image_key_a and image_key_b required")
+        with library_write(db):
+            result = stack_accept_suggestion_pair(db, key_a.strip(), key_b.strip())
+        return jsonify(result), 200
+    except StackMutationError as e:
+        if e.status_code == 404:
+            return error_not_found("image")
+        if e.status_code >= 500:
+            return error_server_error(str(e))
+        return error_bad_request(str(e))
+    except Exception as e:
+        return error_server_error(str(e))
+
+
+@stacks_bp.route("/suggestions/reject", methods=["POST"])
+@with_db
+@spec.validate(
+    json=StackSuggestionPairRequest,
+    resp=Response(HTTP_200=StackSuggestionRejectResponse, HTTP_400=ErrorBody),
+    tags=['images-stacks'],
+)
+def post_stack_suggestion_reject(db):
+    """Reject a suggested pair so it does not return on the next batch run."""
+    try:
+        body = request.get_json(silent=True)
+        if not body or not isinstance(body, dict):
+            return error_bad_request("JSON body required")
+        key_a = body.get("image_key_a")
+        key_b = body.get("image_key_b")
+        if not key_a or not isinstance(key_a, str) or not key_b or not isinstance(key_b, str):
+            return error_bad_request("image_key_a and image_key_b required")
+        a = key_a.strip()
+        b = key_b.strip()
+        if a == b:
+            return error_bad_request("image_key_a and image_key_b must differ")
+        with library_write(db):
+            reject_catalog_similarity_pair(db, a, b)
+        return jsonify({"image_key_a": a, "image_key_b": b, "rejected": True}), 200
+    except ValueError as e:
+        return error_bad_request(str(e))
+    except Exception as e:
+        return error_server_error(str(e))
 
 
 @stacks_bp.route("/<int:stack_id>/members", methods=["GET"])
