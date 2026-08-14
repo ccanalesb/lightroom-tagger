@@ -4,7 +4,7 @@
 workspace:
   name: lightroom-tagger
   root: /Users/ccanales/projects/lightroom-tagger
-  description: Instagram-Lightroom photo matching and tagging system
+  description: Index a Lightroom catalog into a local SQLite database, generate AI descriptions and perspective scores, and browse your library in a web UI.
 
 environment:
   # Python virtual environment (CRITICAL - activate before running Python)
@@ -58,18 +58,18 @@ context:
     - README.md
 
 notes: |
-  This workspace is for the lightroom-tagger project which matches Instagram
-  photos with Lightroom catalog images using vision models.
-  
+  Lightroom Tagger indexes a Lightroom catalog into a local SQLite database,
+  generates AI descriptions and perspective scores, and provides a web UI
+  to browse the library.
+
   Current providers: Ollama (local), NVIDIA NIM, OpenCode Go
   Goal: Add GitHub Copilot as additional provider via API gateway
-  
+
   Project structure:
   - lightroom_tagger/core/ - Core library (providers, vision client, config)
   - lightroom_tagger/lightroom/ - Lightroom catalog interaction
-  - lightroom_tagger/instagram/ - Instagram data handling
   - apps/visualizer/ - Flask backend + React frontend for UI
-  
+
   Testing:
   - Backend: python -m pytest <path> -v
   - Frontend: cd apps/visualizer/frontend && npx vitest run
