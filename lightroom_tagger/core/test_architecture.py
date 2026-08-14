@@ -78,6 +78,12 @@ def _gather_api_first_segments_from_module(tree: ast.Module) -> list[tuple[str, 
     return hits
 
 
+# Shared, non-route infrastructure under api/ that every route area is meant to
+# import (the OpenAPI spec singleton and the request/response schemas). The rule
+# forbids coupling between route *areas*, not imports of this shared plumbing.
+_SHARED_API_MODULES = frozenset({"openapi", "schemas"})
+
+
 def test_api_modules_do_not_import_sibling_api_modules() -> None:
     api_root = REPO_ROOT / "apps" / "visualizer" / "backend" / "api"
     for path in sorted(api_root.rglob("*.py")):
@@ -89,6 +95,8 @@ def test_api_modules_do_not_import_sibling_api_modules() -> None:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for target, lineno in _gather_api_first_segments_from_module(tree):
+            if target in _SHARED_API_MODULES:
+                continue
             assert target == anchor, (
                 f"{path.relative_to(REPO_ROOT)}:{lineno}: imports api.{target}.* "
                 f"but belongs under api/{anchor}/ (no cross-sibling api imports)"
