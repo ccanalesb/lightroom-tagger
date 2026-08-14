@@ -44,7 +44,6 @@ class Config:
     small_catalog_path: str = ""
     cloudflare_account_id: str = ""
     cloudflare_api_token: str = ""
-    instagram_session_id: str = ""
     vision_model: str = "gemma3:27b"
     vision_cache_dir: str = field(default_factory=lambda: os.path.expanduser("~/.cache/lightroom_tagger/vision"))
     vision_cache_enabled: bool = True
@@ -102,7 +101,6 @@ def load_config(config_path: str | None = None) -> Config:
         "stack_burst_delta_ms": 2000,
         "cloudflare_account_id": "",
         "cloudflare_api_token": "",
-        "instagram_session_id": "",
         "vision_model": "gemma3:27b",
         "vision_cache_dir": os.path.expanduser("~/.cache/lightroom_tagger/vision"),
         "vision_cache_enabled": True,
@@ -236,7 +234,6 @@ def _load_from_env(data: dict) -> dict:
         "LIGHTRoom_HASH_THRESHOLD": "hash_threshold",
         "CLOUDFLARE_ACCOUNT_ID": "cloudflare_account_id",
         "CLOUDFLARE_API_TOKEN": "cloudflare_api_token",
-        "INSTAGRAM_SESSION_ID": "instagram_session_id",
         "VISION_MODEL": "vision_model",
         "VISION_CACHE_DIR": "vision_cache_dir",
         "VISION_CACHE_ENABLED": "vision_cache_enabled",
