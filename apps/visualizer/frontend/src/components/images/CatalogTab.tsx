@@ -22,6 +22,7 @@ import {
   CATALOG_FILTER_LABEL_COLOR,
   CATALOG_FILTER_LABEL_SCORE_PERSPECTIVE,
   CATALOG_FILTER_LABEL_MIN_SCORE,
+  CATALOG_FILTER_LABEL_MIN_SCORE_ACTIVE,
   CATALOG_FILTER_LABEL_SORT_SCORE,
   FILTER_LABEL_SORT_DATE,
   FILTER_SORT_DATE_NEWEST,
@@ -223,7 +224,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
       {
         type: 'select',
         key: 'minScoreOnActive',
-        label: CATALOG_FILTER_LABEL_MIN_SCORE,
+        label: CATALOG_FILTER_LABEL_MIN_SCORE_ACTIVE,
         paramName: 'min_score_on_active',
         numberValue: true,
         options: [
