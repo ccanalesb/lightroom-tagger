@@ -130,15 +130,13 @@ class TestDefaults:
         data = resp.get_json()
 
         expected = stable_provider_registry.defaults
-        assert data["vision_comparison"]["provider"] == expected["vision_comparison"]["provider"]
         assert data["description"]["provider"] == expected["description"]["provider"]
 
     def test_put_defaults_should_update_defaults(self, client):
         from lightroom_tagger.core.provider_registry import ProviderRegistry
 
         merged_defaults = {
-            "vision_comparison": {"provider": "ollama", "model": "gemma3:27b"},
-            "description": {"provider": "ollama"},
+            "description": {"provider": "ollama", "model": "gemma3:27b"},
         }
 
         def merge_defaults(incoming: dict) -> None:
@@ -156,7 +154,7 @@ class TestDefaults:
                 resp = client.put(
                     "/api/providers/defaults",
                     json={
-                        "vision_comparison": {
+                        "description": {
                             "provider": "ollama",
                             "model": "gemma3:27b",
                         }
@@ -164,8 +162,8 @@ class TestDefaults:
                 )
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["vision_comparison"]["provider"] == "ollama"
-        assert data["vision_comparison"]["model"] == "gemma3:27b"
+        assert data["description"]["provider"] == "ollama"
+        assert data["description"]["model"] == "gemma3:27b"
 
     def test_put_defaults_should_reject_empty_body(self, client):
         resp = client.put("/api/providers/defaults", json={})

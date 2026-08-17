@@ -33,7 +33,7 @@ class TestVisionModels:
     def test_should_return_models_from_registry(self, client):
         registry_instance = MagicMock()
         registry_instance.defaults = {
-            "vision_comparison": {"provider": "ollama", "model": "gemma3:27b"},
+            "description": {"provider": "ollama", "model": "gemma3:27b"},
         }
         registry_instance.list_providers.return_value = [
             {"id": "ollama", "name": "Ollama", "available": True},
@@ -66,7 +66,7 @@ class TestVisionModels:
     def test_should_mark_default_model(self, client):
         registry_instance = MagicMock()
         registry_instance.defaults = {
-            "vision_comparison": {"provider": "ollama", "model": "gemma3:27b"},
+            "description": {"provider": "ollama", "model": "gemma3:27b"},
         }
         registry_instance.list_providers.return_value = [
             {"id": "ollama", "name": "Ollama", "available": True},

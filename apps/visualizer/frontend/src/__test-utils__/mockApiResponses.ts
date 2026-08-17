@@ -29,7 +29,6 @@ export function mockApiResponses(
       return Promise.resolve({
         ok: true,
         json: async () => ({
-          vision_comparison: { provider: defaultProvider, model: defaultModel },
           description: { provider: defaultProvider, model: defaultModel },
         }),
       });

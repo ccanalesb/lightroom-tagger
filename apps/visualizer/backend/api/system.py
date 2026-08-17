@@ -52,9 +52,9 @@ def get_vision_models():
 
         registry = ProviderRegistry()
         defaults = registry.defaults
-        default_comparison = defaults.get("vision_comparison", {})
-        default_provider = default_comparison.get("provider", "ollama")
-        default_model = default_comparison.get("model")
+        description_defaults = defaults.get("description", {})
+        default_provider = description_defaults.get("provider", "ollama")
+        default_model = description_defaults.get("model")
 
         all_models = []
         for provider in registry.list_providers():

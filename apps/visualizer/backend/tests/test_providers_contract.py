@@ -46,7 +46,6 @@ def test_provider_model_round_trip_from_config_models(registry):
 def test_provider_defaults_round_trip(registry):
     validated = ProviderDefaults.model_validate(registry.defaults)
 
-    assert validated.vision_comparison.provider
     assert validated.description.provider
 
 

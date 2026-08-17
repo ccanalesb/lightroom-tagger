@@ -195,5 +195,38 @@ class TestFallbackOrder:
 
     def test_should_return_defaults_from_config(self, registry_factory):
         registry = registry_factory()
-        assert registry.defaults["vision_comparison"]["provider"] == "ollama"
         assert registry.defaults["description"]["provider"] == "ollama"
+
+
+class TestRetiredDefaultsKinds:
+    """``providers.json`` is gitignored and owned by the user's machine, so a
+    file written before a resolution kind was retired still declares it. The
+    registry has to survive that: ``ProviderDefaults`` forbids extra keys, so a
+    leftover kind reaching the API response is a 500 on every existing install.
+    """
+
+    def _config_with_retired_kind(self, tmp_path: Path) -> Path:
+        config = json.loads(_EXAMPLE_CONFIG.read_text(encoding="utf-8"))
+        config["defaults"]["vision_comparison"] = {"provider": "ollama", "model": None}
+        path = tmp_path / "providers.json"
+        path.write_text(json.dumps(config), encoding="utf-8")
+        return path
+
+    def test_should_drop_retired_kind_from_defaults(self, tmp_path):
+        registry = ProviderRegistry(config_path=self._config_with_retired_kind(tmp_path))
+        assert "vision_comparison" not in registry.defaults
+        assert registry.defaults["description"]["provider"] == "ollama"
+
+    def test_should_leave_the_file_untouched(self, tmp_path):
+        path = self._config_with_retired_kind(tmp_path)
+        before = path.read_text(encoding="utf-8")
+        ProviderRegistry(config_path=path)
+        assert path.read_text(encoding="utf-8") == before
+
+    def test_should_not_write_retired_kind_back_on_update(self, tmp_path):
+        path = self._config_with_retired_kind(tmp_path)
+        registry = ProviderRegistry(config_path=path)
+        registry.update_defaults({"description": {"provider": "ollama", "model": "x"}})
+        written = json.loads(path.read_text(encoding="utf-8"))
+        assert "vision_comparison" not in written["defaults"]
+        assert written["defaults"]["description"]["model"] == "x"
