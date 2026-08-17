@@ -16,7 +16,7 @@ from lightroom_tagger.core.exceptions import (
     RateLimitError,
     TimeoutError,
 )
-from lightroom_tagger.core.vision_client import compare_images, generate_description
+from lightroom_tagger.core.vision_client import generate_description
 from lightroom_tagger.core.vision_client_ollama import (
     content_to_native as _ollama_content_to_native,
 )
@@ -48,57 +48,6 @@ def temp_image():
         os.unlink(path)
 
 
-class TestCompareImages:
-    def test_should_parse_json_confidence_response(self, temp_image):
-        client = _make_mock_client('{"confidence": 85, "reasoning": "same scene"}')
-        result = compare_images(client, "test-model", temp_image, temp_image)
-        assert result["confidence"] == 85
-        assert result["verdict"] == "SAME"
-        assert result["reasoning"] == "same scene"
-
-    def test_should_parse_low_confidence_as_different(self, temp_image):
-        client = _make_mock_client('{"confidence": 15, "reasoning": "different scenes"}')
-        result = compare_images(client, "test-model", temp_image, temp_image)
-        assert result["verdict"] == "DIFFERENT"
-
-    def test_should_parse_uncertain_range(self, temp_image):
-        client = _make_mock_client('{"confidence": 50, "reasoning": "unclear"}')
-        result = compare_images(client, "test-model", temp_image, temp_image)
-        assert result["verdict"] == "UNCERTAIN"
-
-    def test_should_send_two_images_in_message(self, temp_image):
-        client = _make_mock_client('{"confidence": 90, "reasoning": "same"}')
-        compare_images(client, "test-model", temp_image, temp_image)
-        call_args = client.chat.completions.create.call_args
-        content = call_args.kwargs["messages"][0]["content"]
-        image_parts = [p for p in content if p.get("type") == "image_url"]
-        assert len(image_parts) == 2
-
-    def test_should_use_provided_model(self, temp_image):
-        client = _make_mock_client('{"confidence": 90, "reasoning": "same"}')
-        compare_images(client, "my-custom-model", temp_image, temp_image)
-        call_args = client.chat.completions.create.call_args
-        assert call_args.kwargs["model"] == "my-custom-model"
-
-    def test_should_use_default_max_tokens(self, temp_image):
-        client = _make_mock_client('{"confidence": 90, "reasoning": "same"}')
-        compare_images(client, "test-model", temp_image, temp_image)
-        call_args = client.chat.completions.create.call_args
-        assert call_args.kwargs["max_tokens"] == 256
-
-    def test_should_use_custom_max_tokens(self, temp_image):
-        client = _make_mock_client('{"confidence": 90, "reasoning": "same"}')
-        compare_images(client, "test-model", temp_image, temp_image, max_tokens=4096)
-        call_args = client.chat.completions.create.call_args
-        assert call_args.kwargs["max_tokens"] == 4096
-
-    def test_should_invoke_log_callback(self, temp_image):
-        client = _make_mock_client('{"confidence": 90, "reasoning": "same"}')
-        log = MagicMock()
-        compare_images(client, "test-model", temp_image, temp_image, log_callback=log)
-        log.assert_called()
-
-
 class TestGenerateDescription:
     def test_should_return_raw_text(self, temp_image):
         client = _make_mock_client('{"summary": "A landscape photo"}')
@@ -121,6 +70,30 @@ class TestGenerateDescription:
         text_parts = [p for p in content if p.get("type") == "text"]
         assert len(text_parts) == 1
         assert "photo editor" in text_parts[0]["text"]
+
+    def test_should_use_provided_model(self, temp_image):
+        client = _make_mock_client("ok")
+        generate_description(client, "my-custom-model", temp_image)
+        call_args = client.chat.completions.create.call_args
+        assert call_args.kwargs["model"] == "my-custom-model"
+
+    def test_should_use_default_max_tokens(self, temp_image):
+        client = _make_mock_client("ok")
+        generate_description(client, "test-model", temp_image)
+        call_args = client.chat.completions.create.call_args
+        assert call_args.kwargs["max_tokens"] == 2048
+
+    def test_should_use_custom_max_tokens(self, temp_image):
+        client = _make_mock_client("ok")
+        generate_description(client, "test-model", temp_image, max_tokens=4096)
+        call_args = client.chat.completions.create.call_args
+        assert call_args.kwargs["max_tokens"] == 4096
+
+    def test_should_invoke_log_callback(self, temp_image):
+        client = _make_mock_client("some description text")
+        log = MagicMock()
+        generate_description(client, "test-model", temp_image, log_callback=log)
+        log.assert_called()
 
 
 class TestOllamaNativeHelpers:
@@ -262,7 +235,7 @@ class TestErrorMapping:
             openai_sdk.RateLimitError, 429
         )
         with pytest.raises(RateLimitError):
-            compare_images(client, "m", temp_image, temp_image)
+            generate_description(client, "m", temp_image)
 
     def test_should_map_auth_error(self, temp_image):
         client = MagicMock()
@@ -270,7 +243,7 @@ class TestErrorMapping:
             openai_sdk.AuthenticationError, 401
         )
         with pytest.raises(AuthenticationError):
-            compare_images(client, "m", temp_image, temp_image)
+            generate_description(client, "m", temp_image)
 
     def test_should_map_bad_request_error(self, temp_image):
         client = MagicMock()
@@ -278,7 +251,7 @@ class TestErrorMapping:
             openai_sdk.BadRequestError, 400
         )
         with pytest.raises(InvalidRequestError):
-            compare_images(client, "m", temp_image, temp_image)
+            generate_description(client, "m", temp_image)
 
     def test_should_map_timeout_error(self, temp_image):
         client = MagicMock()
@@ -286,7 +259,7 @@ class TestErrorMapping:
             request=MagicMock()
         )
         with pytest.raises(TimeoutError):
-            compare_images(client, "m", temp_image, temp_image)
+            generate_description(client, "m", temp_image)
 
     def test_should_map_connection_error(self, temp_image):
         client = MagicMock()
@@ -294,7 +267,7 @@ class TestErrorMapping:
             request=MagicMock()
         )
         with pytest.raises(ConnectionError):
-            compare_images(client, "m", temp_image, temp_image)
+            generate_description(client, "m", temp_image)
 
     def test_should_map_503_to_model_unavailable(self, temp_image):
         client = MagicMock()
@@ -305,7 +278,7 @@ class TestErrorMapping:
             "overloaded", response=mock_response, body=None
         )
         with pytest.raises(ModelUnavailableError):
-            compare_images(client, "m", temp_image, temp_image)
+            generate_description(client, "m", temp_image)
 
     def test_should_extract_retry_after_header(self, temp_image):
         client = MagicMock()
@@ -316,7 +289,7 @@ class TestErrorMapping:
             "rate limited", response=mock_response, body=None
         )
         with pytest.raises(RateLimitError) as exc_info:
-            compare_images(client, "m", temp_image, temp_image)
+            generate_description(client, "m", temp_image)
         assert exc_info.value.retry_after == 30.0
 
     def test_should_map_413_to_payload_too_large(self, temp_image):
@@ -328,7 +301,7 @@ class TestErrorMapping:
             "Request Entity Too Large", response=mock_response, body=None
         )
         with pytest.raises(PayloadTooLargeError):
-            compare_images(client, "m", temp_image, temp_image)
+            generate_description(client, "m", temp_image)
 
     def test_should_map_thinking_budget_tokens_to_context_length(self, temp_image):
         client = MagicMock()
@@ -341,7 +314,7 @@ class TestErrorMapping:
             body=None,
         )
         with pytest.raises(ContextLengthError):
-            compare_images(client, "m", temp_image, temp_image)
+            generate_description(client, "m", temp_image)
 
     def test_should_map_budget_tokens_to_context_length(self, temp_image):
         client = MagicMock()
@@ -354,7 +327,7 @@ class TestErrorMapping:
             body=None,
         )
         with pytest.raises(ContextLengthError):
-            compare_images(client, "m", temp_image, temp_image)
+            generate_description(client, "m", temp_image)
 
     def test_should_still_map_context_length_patterns(self, temp_image):
         client = MagicMock()
@@ -367,7 +340,7 @@ class TestErrorMapping:
             body=None,
         )
         with pytest.raises(ContextLengthError):
-            compare_images(client, "m", temp_image, temp_image)
+            generate_description(client, "m", temp_image)
 
     def test_should_still_map_generic_bad_request_to_invalid(self, temp_image):
         client = MagicMock()
@@ -380,4 +353,4 @@ class TestErrorMapping:
             body=None,
         )
         with pytest.raises(InvalidRequestError):
-            compare_images(client, "m", temp_image, temp_image)
+            generate_description(client, "m", temp_image)

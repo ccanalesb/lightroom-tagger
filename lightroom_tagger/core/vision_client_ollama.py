@@ -8,8 +8,7 @@ channel and returns empty ``content``. Routing Ollama through this native
 transport with ``think=False`` yields the actual answer (and is a harmless no-op
 for non-thinking Ollama models).
 
-Split out of ``vision_client`` to keep that module within the core line budget,
-mirroring the existing ``vision_client_batch`` split.
+Split out of ``vision_client`` to keep that module within the core line budget.
 """
 
 from __future__ import annotations
