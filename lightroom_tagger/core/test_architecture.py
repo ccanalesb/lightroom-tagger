@@ -8,11 +8,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+def _line_count_source(source: str) -> int:
+    if not source.endswith("\n"):
+        return source.count("\n") + 1
+    return source.count("\n")
+
+
 def _line_count(path: Path) -> int:
-    text = path.read_text(encoding="utf-8")
-    if not text.endswith("\n"):
-        return text.count("\n") + 1
-    return text.count("\n")
+    return _line_count_source(path.read_text(encoding="utf-8"))
 
 
 def _iter_core_py_files() -> list[Path]:
@@ -113,12 +116,6 @@ def _scan_apps_import_source(
 ) -> list[str]:
     tree = ast.parse(source, filename=filename)
     return _apps_import_violations(tree)
-
-
-def _line_count_source(source: str) -> int:
-    if not source.endswith("\n"):
-        return source.count("\n") + 1
-    return source.count("\n")
 
 
 def _scan_line_budget_source(source: str, budget: int = 400) -> bool:
