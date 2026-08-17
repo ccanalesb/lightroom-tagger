@@ -1609,11 +1609,6 @@ export interface components {
              */
             instagram_posted: boolean | null;
             /**
-             * Instagram Url
-             * @default null
-             */
-            instagram_url: string | null;
-            /**
              * Post Url
              * @default null
              */
@@ -1775,16 +1770,6 @@ export interface components {
              * @default null
              */
             gps_longitude: number | null;
-            /**
-             * Instagram Index
-             * @default null
-             */
-            instagram_index: number | null;
-            /**
-             * Instagram Post Date
-             * @default null
-             */
-            instagram_post_date: string | null;
             /**
              * Iso
              * @default null
@@ -3129,11 +3114,6 @@ export interface components {
              */
             instagram_posted: boolean | null;
             /**
-             * Instagram Url
-             * @default null
-             */
-            instagram_url: string | null;
-            /**
              * Image Hash
              * @default null
              */
@@ -3233,16 +3213,6 @@ export interface components {
              * @default null
              */
             gps_longitude: number | null;
-            /**
-             * Instagram Index
-             * @default null
-             */
-            instagram_index: number | null;
-            /**
-             * Instagram Post Date
-             * @default null
-             */
-            instagram_post_date: string | null;
             /**
              * Iso
              * @default null
@@ -3364,11 +3334,6 @@ export interface components {
              */
             instagram_posted: boolean | null;
             /**
-             * Instagram Url
-             * @default null
-             */
-            instagram_url: string | null;
-            /**
              * Image Hash
              * @default null
              */
@@ -3468,16 +3433,6 @@ export interface components {
              * @default null
              */
             gps_longitude: number | null;
-            /**
-             * Instagram Index
-             * @default null
-             */
-            instagram_index: number | null;
-            /**
-             * Instagram Post Date
-             * @default null
-             */
-            instagram_post_date: string | null;
             /**
              * Iso
              * @default null
@@ -3613,11 +3568,6 @@ export interface components {
              */
             instagram_posted: boolean | null;
             /**
-             * Instagram Url
-             * @default null
-             */
-            instagram_url: string | null;
-            /**
              * Image Hash
              * @default null
              */
@@ -3717,16 +3667,6 @@ export interface components {
              * @default null
              */
             gps_longitude: number | null;
-            /**
-             * Instagram Index
-             * @default null
-             */
-            instagram_index: number | null;
-            /**
-             * Instagram Post Date
-             * @default null
-             */
-            instagram_post_date: string | null;
             /**
              * Iso
              * @default null
@@ -3892,11 +3832,6 @@ export interface components {
              */
             instagram_posted: boolean | null;
             /**
-             * Instagram Url
-             * @default null
-             */
-            instagram_url: string | null;
-            /**
              * Image Hash
              * @default null
              */
@@ -3996,16 +3931,6 @@ export interface components {
              * @default null
              */
             gps_longitude: number | null;
-            /**
-             * Instagram Index
-             * @default null
-             */
-            instagram_index: number | null;
-            /**
-             * Instagram Post Date
-             * @default null
-             */
-            instagram_post_date: string | null;
             /**
              * Iso
              * @default null
@@ -4154,11 +4079,6 @@ export interface components {
              */
             instagram_posted: boolean | null;
             /**
-             * Instagram Url
-             * @default null
-             */
-            instagram_url: string | null;
-            /**
              * Image Hash
              * @default null
              */
@@ -4258,16 +4178,6 @@ export interface components {
              * @default null
              */
             gps_longitude: number | null;
-            /**
-             * Instagram Index
-             * @default null
-             */
-            instagram_index: number | null;
-            /**
-             * Instagram Post Date
-             * @default null
-             */
-            instagram_post_date: string | null;
             /**
              * Iso
              * @default null

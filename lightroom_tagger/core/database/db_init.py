@@ -13,6 +13,7 @@ import sqlite_vec
 
 from . import library_bootstrap_schema
 from .scores import markdown_marks_optional, migrate_legacy_description_scores_to_image_scores
+from .db_init_drop_instagram_index import _migrate_drop_instagram_index
 from .db_init_instagram_drop import _migrate_drop_instagram_dead_tables
 from .db_init_migrations import (
     _migrate_add_column,
@@ -202,6 +203,7 @@ def init_database(db_path: str) -> sqlite3.Connection:
     _migrate_catalog_similarity(conn)
     _migrate_catalog_similarity_rejections(conn)
     _migrate_drop_instagram_dead_tables(conn)
+    _migrate_drop_instagram_index(conn)
     seed_perspectives_from_prompts_dir(conn)
     conn.commit()
     return conn

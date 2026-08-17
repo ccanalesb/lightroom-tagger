@@ -40,7 +40,6 @@ export function fromCatalogListRow(row: CatalogImageInput): ImageView {
     width: row.width,
     height: row.height,
     instagram_posted: row.instagram_posted,
-    instagram_url: row.instagram_url,
     image_hash: row.image_hash,
     ai_analyzed: row.ai_analyzed,
     description_summary: row.description_summary,

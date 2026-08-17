@@ -194,7 +194,7 @@ def test_migration_exports_legacy_rows_and_drops_tables(tmp_path: Path) -> None:
     assert conn.execute(
         "SELECT COUNT(*) FROM image_descriptions WHERE image_type = 'instagram'"
     ).fetchone()[0] == 0
-    assert int(conn.execute("PRAGMA user_version").fetchone()[0]) == 7
+    assert int(conn.execute("PRAGMA user_version").fetchone()[0]) == 8
     conn.close()
 
 
@@ -211,5 +211,5 @@ def test_fresh_database_migration_records_absent_tables(tmp_path: Path) -> None:
     assert payload["image_descriptions_instagram"]["row_count"] == 0
 
     conn = sqlite3.connect(db_path)
-    assert int(conn.execute("PRAGMA user_version").fetchone()[0]) == 7
+    assert int(conn.execute("PRAGMA user_version").fetchone()[0]) == 8
     conn.close()

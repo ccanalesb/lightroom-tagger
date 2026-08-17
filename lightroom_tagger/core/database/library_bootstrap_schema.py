@@ -29,7 +29,6 @@ BASE_LIBRARY_SCHEMA_SQL = '''
             height INTEGER,
             file_size INTEGER,
             instagram_posted INTEGER DEFAULT 0,
-            instagram_index INTEGER DEFAULT 0,
             image_hash TEXT,
             analyzed_at TEXT,
             phash TEXT,
