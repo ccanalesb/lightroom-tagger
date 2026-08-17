@@ -184,9 +184,10 @@ def search_by_keyword(db: sqlite3.Connection, keyword: str) -> list[dict]:
     )
     bindings: list = [pattern, pattern, pattern, pattern]
 
-    match_str, fts_err = build_description_fts_query(keyword)
-    if fts_err:
-        raise ValueError(fts_err)
+    # The builder's short-query rule is the web API's (it answers with HTTP 400);
+    # here it only means "this term has no FTS half", so the Lightroom-metadata
+    # search still runs and a one-character keyword stays a legitimate query (#261).
+    match_str, _fts_err = build_description_fts_query(keyword)
     if match_str is not None:
         where = f"({where}) OR key IN ({DESCRIPTION_FTS_KEY_SUBQUERY})"
         bindings.append(match_str)

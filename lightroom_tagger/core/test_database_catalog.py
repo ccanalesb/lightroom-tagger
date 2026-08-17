@@ -270,7 +270,30 @@ class TestSearchByKeyword(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]['filename'], 'both.jpg')
 
-    def test_malformed_query_raises(self):
-        with self.assertRaises(ValueError) as ctx:
-            search_by_keyword(self.db, 'a')
-        self.assertIn('at least 2 characters', str(ctx.exception))
+    def test_short_keyword_falls_back_to_lightroom_metadata(self):
+        """One character is too short for FTS but fine for a LIKE over metadata (#261)."""
+        store_image(self.db, {
+            'date_taken': '2024-01-15',
+            'filename': 'plain.jpg',
+            'keywords': ['sunset'],
+        })
+        store_image(self.db, {
+            'date_taken': '2024-01-16',
+            'filename': 'other.jpg',
+            'keywords': ['portrait'],
+        })
+        # 'u' appears in sunset but not in portrait/other.jpg.
+        results = search_by_keyword(self.db, 'u')
+        self.assertEqual([r['filename'] for r in results], ['plain.jpg'])
+
+    def test_short_keyword_ignores_descriptions(self):
+        """The FTS half is skipped, not silently widened, for a sub-minimum term."""
+        store_image(self.db, {'date_taken': '2024-01-15', 'filename': 'described.jpg'})
+        store_image_description(self.db, {
+            'image_key': '2024-01-15_described.jpg',
+            'image_type': 'catalog',
+            'summary': 'A quiet dawn',
+            'model_used': 'test',
+        })
+        # 'q' is only in the description, which FTS cannot be asked about here.
+        self.assertEqual(search_by_keyword(self.db, 'q'), [])
