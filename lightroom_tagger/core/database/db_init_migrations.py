@@ -55,7 +55,6 @@ def _migrate_images_schema(conn: sqlite3.Connection) -> None:
         ("height", "INTEGER"),
         ("file_size", "INTEGER"),
         ("instagram_posted", "INTEGER DEFAULT 0"),
-        ("instagram_index", "INTEGER DEFAULT 0"),
         ("image_hash", "TEXT"),
         ("analyzed_at", "TEXT"),
         ("phash", "TEXT"),

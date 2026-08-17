@@ -41,7 +41,6 @@ class CatalogImage(BaseModel):
     width: int | None = None
     height: int | None = None
     instagram_posted: bool | None = None
-    instagram_url: str | None = None
     image_hash: str | None = None
     image_type: Literal['catalog'] | None = None
     ai_analyzed: bool | None = None
@@ -62,8 +61,6 @@ class CatalogImage(BaseModel):
     focal_length: str | None = None
     gps_latitude: float | None = None
     gps_longitude: float | None = None
-    instagram_index: int | None = None
-    instagram_post_date: str | None = None
     iso: str | None = None
     lens: str | None = None
     phash: str | None = None
@@ -159,7 +156,6 @@ class ImageView(BaseModel):
     width: int | None = None
     height: int | None = None
     instagram_posted: bool | None = None
-    instagram_url: str | None = None
     post_url: str | None = None
     image_hash: str | None = None
     stack_id: int | None = None
@@ -193,8 +189,6 @@ class ImageView(BaseModel):
     focal_length: str | None = None
     gps_latitude: float | None = None
     gps_longitude: float | None = None
-    instagram_index: int | None = None
-    instagram_post_date: str | None = None
     iso: str | None = None
     lens: str | None = None
     phash: str | None = None
