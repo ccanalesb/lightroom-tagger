@@ -15,7 +15,6 @@ _LIGHTROOM_ROOT = _REPO_ROOT / "lightroom_tagger"
 _ALLOWLISTED_FILES: frozenset[str] = frozenset(
     {
         "lightroom_tagger/core/vision_client.py",
-        "lightroom_tagger/core/vision_client_batch.py",
         "lightroom_tagger/core/fallback.py",
     }
 )
@@ -147,10 +146,7 @@ def test_guardrail_allowlists_probe_tool_calling() -> None:
 
 
 def test_guardrail_allowlists_vision_client_wrappers() -> None:
-    for rel in (
-        "lightroom_tagger/core/vision_client.py",
-        "lightroom_tagger/core/vision_client_batch.py",
-    ):
+    for rel in ("lightroom_tagger/core/vision_client.py",):
         assert rel in _ALLOWLISTED_FILES
 
 

@@ -1,9 +1,9 @@
 """Unified vision client functions using OpenAI-compatible API.
 
-Two plain functions — ``compare_images`` and ``generate_description`` — that
-accept any ``openai.OpenAI`` client (Ollama, NVIDIA NIM, OpenRouter) and a
-model identifier.  All provider-specific SDK errors are mapped into our
-``ProviderError`` hierarchy so callers never depend on the SDK directly.
+Plain functions that accept any ``openai.OpenAI`` client (Ollama, NVIDIA NIM,
+OpenRouter) and a model identifier.  All provider-specific SDK errors are
+mapped into our ``ProviderError`` hierarchy so callers never depend on the SDK
+directly.
 """
 
 from __future__ import annotations
@@ -17,7 +17,6 @@ from typing import Any, cast
 import openai as openai_sdk
 
 from lightroom_tagger.core.analyzer.description import build_description_prompt
-from lightroom_tagger.core.analyzer.vision_parse import parse_vision_response
 from lightroom_tagger.core.exceptions import (
     AuthenticationError,
     ConnectionError,
@@ -30,15 +29,6 @@ from lightroom_tagger.core.exceptions import (
     TimeoutError,
 )
 from lightroom_tagger.core.vision_client_ollama import is_ollama_client, native_chat
-
-COMPARISON_PROMPT = (
-    "You are comparing two images to determine if they depict the same photograph "
-    "(possibly with different crops, compression, or processing).\n\n"
-    "Respond with ONLY valid JSON, no other text:\n"
-    '{"confidence": <0-100>, "reasoning": "<one sentence>"}\n\n'
-    "confidence: 0 = definitely different photos, 100 = definitely the same photo.\n"
-    "Focus on semantic content (subject, scene, composition), not pixel-level differences."
-)
 
 SCORE_JSON_REPAIR_SYSTEM = (
     "You are a JSON repair tool. Output analysis is forbidden; emit data only.\n"
@@ -111,67 +101,6 @@ def _map_openai_error(
         return ProviderError(str(exc), provider=provider, model=model)
 
     return ProviderError(str(exc), provider=provider, model=model)
-
-
-def compare_images(
-    client: openai_sdk.OpenAI,
-    model: str,
-    local_path: str,
-    insta_path: str,
-    log_callback: LogCallback = None,
-    max_tokens: int = 256,
-) -> dict[str, Any]:
-    """Compare two images via chat completions. Returns parsed result dict."""
-    local_b64 = _encode_image(local_path)
-    insta_b64 = _encode_image(insta_path)
-
-    kwargs: dict[str, Any] = {}
-    if "claude" in model.lower():
-        kwargs["extra_body"] = {"reasoning_effort": "none"}
-
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=cast(
-                Any,
-                [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": COMPARISON_PROMPT},
-                            _image_url_part(local_b64),
-                            _image_url_part(insta_b64),
-                        ],
-                    }
-                ],
-            ),
-            max_tokens=max_tokens,
-            **kwargs,
-        )
-    except Exception as exc:
-        raise _map_openai_error(
-            exc, provider=getattr(client, "_provider_id", None), model=model
-        ) from exc
-
-    raw = response.choices[0].message.content or ""
-    result = parse_vision_response(raw)
-
-    if log_callback:
-        local_name = os.path.basename(local_path)
-        insta_name = os.path.basename(insta_path)
-        log_callback(
-            "debug",
-            f"[vision] {local_name} vs {insta_name} -> {result['verdict']} "
-            f"({result['confidence']}%) model={model}",
-        )
-
-    return result
-
-
-from lightroom_tagger.core.vision_client_batch import (
-    compare_descriptions_batch,
-    compare_images_batch,
-)
 
 
 def generate_description(
