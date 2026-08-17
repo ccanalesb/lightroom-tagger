@@ -84,6 +84,47 @@ def _gather_api_first_segments_from_module(tree: ast.Module) -> list[tuple[str, 
 _SHARED_API_MODULES = frozenset({"openapi", "schemas"})
 
 
+def _cross_sibling_api_import_violations(
+    tree: ast.Module, anchor: str,
+) -> list[tuple[str, int]]:
+    """Pairs of (target_first_segment, lineno) for forbidden cross-sibling api imports."""
+    hits: list[tuple[str, int]] = []
+    for target, lineno in _gather_api_first_segments_from_module(tree):
+        if target in _SHARED_API_MODULES:
+            continue
+        if target != anchor:
+            hits.append((target, lineno))
+    return hits
+
+
+def _scan_cross_sibling_api_source(
+    source: str, anchor: str, filename: str = "fake/api/scores/routes.py",
+) -> list[tuple[str, int]]:
+    tree = ast.parse(source, filename=filename)
+    return _cross_sibling_api_import_violations(tree, anchor)
+
+
+def _apps_import_violations(tree: ast.Module) -> list[str]:
+    return [name for name in _gather_imported_top_names(tree) if name == "apps"]
+
+
+def _scan_apps_import_source(
+    source: str, filename: str = "fake/core/module.py",
+) -> list[str]:
+    tree = ast.parse(source, filename=filename)
+    return _apps_import_violations(tree)
+
+
+def _line_count_source(source: str) -> int:
+    if not source.endswith("\n"):
+        return source.count("\n") + 1
+    return source.count("\n")
+
+
+def _scan_line_budget_source(source: str, budget: int = 400) -> bool:
+    return _line_count_source(source) > budget
+
+
 def test_api_modules_do_not_import_sibling_api_modules() -> None:
     api_root = REPO_ROOT / "apps" / "visualizer" / "backend" / "api"
     for path in sorted(api_root.rglob("*.py")):
@@ -94,10 +135,47 @@ def test_api_modules_do_not_import_sibling_api_modules() -> None:
         if anchor is None:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for target, lineno in _gather_api_first_segments_from_module(tree):
-            if target in _SHARED_API_MODULES:
-                continue
+        for target, lineno in _cross_sibling_api_import_violations(tree, anchor):
             assert target == anchor, (
                 f"{path.relative_to(REPO_ROOT)}:{lineno}: imports api.{target}.* "
                 f"but belongs under api/{anchor}/ (no cross-sibling api imports)"
             )
+
+
+def test_detector_flags_cross_sibling_api_import() -> None:
+    hits = _scan_cross_sibling_api_source(
+        "from api.perspectives import get_perspective\n",
+        anchor="scores",
+    )
+    assert hits == [("perspectives", 1)]
+
+
+def test_detector_ignores_shared_api_modules_and_same_anchor() -> None:
+    assert not _scan_cross_sibling_api_source(
+        "from api.openapi import spec\nfrom api.schemas import ScoreOut\n",
+        anchor="scores",
+    )
+    assert not _scan_cross_sibling_api_source(
+        "from api.scores import routes\n",
+        anchor="scores",
+    )
+
+
+def test_detector_flags_apps_package_import() -> None:
+    assert _scan_apps_import_source("from apps.visualizer.backend.api import x\n") == ["apps"]
+    assert _scan_apps_import_source("import apps.visualizer\n") == ["apps"]
+
+
+def test_detector_ignores_non_apps_top_level_imports() -> None:
+    assert not _scan_apps_import_source(
+        "from lightroom_tagger.core.config import load_config\nimport flask\n"
+    )
+
+
+def test_detector_flags_source_over_line_budget() -> None:
+    assert _scan_line_budget_source("x\n" * 401, budget=400)
+
+
+def test_detector_ignores_source_at_or_under_line_budget() -> None:
+    assert not _scan_line_budget_source("x\n" * 400, budget=400)
+    assert not _scan_line_budget_source("x\n" * 399, budget=400)

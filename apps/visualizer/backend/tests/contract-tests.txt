@@ -29,3 +29,11 @@ tests/test_identity_contract.py
 tests/test_system_contract.py
 tests/test_api_ts_contract_guardrail.py
 tests/test_readme_guardrail.py
+
+# Library guardrails — gated here because the backend contract job is the CI
+# drift gate; paths are relative to apps/visualizer/backend.
+../../../lightroom_tagger/core/test_architecture.py
+../../../lightroom_tagger/core/test_vision_op_guardrail.py
+../../../lightroom_tagger/core/test_provider_call_guardrail.py
+../../../lightroom_tagger/core/test_db_lifecycle_guardrail.py
+../../../lightroom_tagger/core/test_library_db_read_guardrail.py
