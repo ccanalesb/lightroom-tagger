@@ -4,6 +4,7 @@ returns configured openai.OpenAI clients."""
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import urllib.request
@@ -12,8 +13,16 @@ from typing import Any
 
 import openai
 
+logger = logging.getLogger(__name__)
+
 _CONFIG_PATH = Path(__file__).parent / "providers.json"
 _EXAMPLE_PATH = Path(__file__).parent / "providers.example.json"
+
+# The only resolution kinds a defaults block may declare. providers.json is
+# gitignored and owned by the user's machine, so files written before a kind was
+# retired still carry it — unknown keys are dropped on load with a warning rather
+# than failing, the same way load_config treats unknown config.yaml keys (#245).
+_DEFAULTS_KEYS = frozenset({"description"})
 
 # Lazy probe cache: provider_id → bool (process-lifetime, shared across instances)
 _tool_calling_probe_cache: dict[str, bool] = {}
@@ -40,6 +49,28 @@ class ProviderRegistry:
         self._providers: dict[str, dict] = self._config["providers"]
         self._retry_defaults: dict = self._config.get("retry_defaults", {})
         self._discovered_cache: dict[str, list[dict]] = {}
+        self._drop_unknown_defaults()
+
+    def _drop_unknown_defaults(self) -> None:
+        """Ignore defaults for resolution kinds that no longer exist.
+
+        Kept in memory only — the file is left untouched, so nothing is
+        destroyed on load. ``update_defaults`` merges onto the cleaned dict, so
+        a retired kind cannot be written back either.
+        """
+        defaults = self._config.get("defaults")
+        if not isinstance(defaults, dict):
+            return
+        unknown = [key for key in defaults if key not in _DEFAULTS_KEYS]
+        if not unknown:
+            return
+        for key in unknown:
+            del defaults[key]
+        logger.warning(
+            "Ignoring unknown defaults %s in %s (retired resolution kinds)",
+            ", ".join(sorted(unknown)),
+            self._config_path,
+        )
 
     @property
     def fallback_order(self) -> list[str]:
@@ -154,7 +185,7 @@ class ProviderRegistry:
         self._save_config()
 
     def update_defaults(self, defaults: dict) -> None:
-        allowed_keys = frozenset({"description"})
+        allowed_keys = _DEFAULTS_KEYS
         if not defaults:
             raise ValueError("defaults must include description")
         for key, value in defaults.items():
