@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'apps/visualizer/**'
+      - 'lightroom_tagger/**'
       - 'docs/adr/**'
 
 jobs:
