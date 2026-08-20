@@ -32,7 +32,6 @@ from .common import (
     _resolve_library_db_or_fail,
 )
 from .path_diagnostics import (
-    PREFLIGHT_FAIL_RATIO,
     PREFLIGHT_SAMPLE_SIZE,
     SKIP_DETAIL_LOG_LIMIT,
     PathSkipDiagnostics,
@@ -43,7 +42,6 @@ _BATCH_EMBED_IMAGE_SIZE = 8
 
 # Backward-compatible aliases for existing embed handler tests.
 _EMBED_PREFLIGHT_SAMPLE_SIZE = PREFLIGHT_SAMPLE_SIZE
-_EMBED_PREFLIGHT_FAIL_RATIO = PREFLIGHT_FAIL_RATIO
 _EMBED_SKIP_DETAIL_LOG_LIMIT = SKIP_DETAIL_LOG_LIMIT
 
 managed_library_db = make_managed_library_db(lambda p: init_database(p))
@@ -167,16 +165,13 @@ def _handle_batch_embed_image_inner(runner, job_id: str, metadata: dict) -> None
                 job_id,
                 lib_db,
                 job_label='batch_embed_image',
-                chain_mode=chain_mode,
                 log_action='image embed',
                 sample_size=_EMBED_PREFLIGHT_SAMPLE_SIZE,
-                fail_ratio=_EMBED_PREFLIGHT_FAIL_RATIO,
             )
             buf_keys: list[str] = []
             buf_paths: list[str] = []
 
-            if not path_diag.run_preflight(remaining):
-                return
+            path_diag.run_preflight(remaining)
 
             def persist_progress() -> bool:
                 if len(processed_pairs) > _CHECKPOINT_MAX_ENTRIES:

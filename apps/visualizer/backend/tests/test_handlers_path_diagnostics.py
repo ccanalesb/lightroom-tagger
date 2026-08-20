@@ -5,9 +5,13 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import jobs.handlers.analyze as analyze_mod
-import jobs.handlers.embed as embed_mod
 import jobs.handlers.path_diagnostics as path_diag_mod
-from lightroom_tagger.core.database import init_database, store_image
+from lightroom_tagger.core.database import (
+    init_database,
+    library_write,
+    store_image,
+    store_vision_cached_image,
+)
 from lightroom_tagger.core.vision_op import VisionOpOutcome
 
 
@@ -35,46 +39,24 @@ def _seed_bad_catalog(conn, count: int, *, prefix: str = 'bad') -> list[str]:
     return keys
 
 
-@patch('database.add_job_log')
-@patch('jobs.handlers.analyze._describe_single_image')
-def test_batch_describe_preflight_fails_fast_when_paths_inaccessible(
-    mock_describe, _mock_add_log, tmp_path, monkeypatch,
-) -> None:
-    from jobs.handlers import handle_batch_describe
-
-    db_path = tmp_path / 'library.db'
-    conn = init_database(str(db_path))
-    keys = _seed_bad_catalog(conn, 4)
-    conn.close()
-
-    monkeypatch.setattr(path_diag_mod, 'PREFLIGHT_SAMPLE_SIZE', 4)
-    monkeypatch.setattr(
-        analyze_mod,
-        '_select_catalog_keys',
-        lambda *args, **kwargs: [(k, 'catalog') for k in keys],
-    )
-    monkeypatch.setenv('LIBRARY_DB', str(db_path))
-    runner = _make_runner()
-    handle_batch_describe(runner, 'job-bd-preflight', {'image_type': 'catalog'})
-
-    runner.fail_job.assert_called_once()
-    fail_message = str(runner.fail_job.call_args[0][1])
-    assert 'network share' in fail_message
-    assert 'sampled paths unreachable' in fail_message
-    runner.complete_job.assert_not_called()
-    mock_describe.assert_not_called()
+def _warning_messages(mock_add_log) -> list[str]:
+    return [
+        str(c.args[3])
+        for c in mock_add_log.call_args_list
+        if len(c.args) > 3 and c.args[2] == 'warning'
+    ]
 
 
 @patch('database.add_job_log')
 @patch('jobs.handlers.analyze._describe_single_image')
-def test_batch_describe_preflight_continues_in_chain_mode(
+def test_batch_describe_preflight_continues_when_paths_inaccessible(
     mock_describe, mock_add_log, tmp_path, monkeypatch,
 ) -> None:
     from jobs.handlers import handle_batch_describe
 
     db_path = tmp_path / 'library.db'
     conn = init_database(str(db_path))
-    keys = _seed_bad_catalog(conn, 3)
+    keys = _seed_bad_catalog(conn, 4)
     conn.close()
 
     mock_describe.return_value = ('skipped', False, 'File not found')
@@ -86,23 +68,60 @@ def test_batch_describe_preflight_continues_in_chain_mode(
     )
     monkeypatch.setenv('LIBRARY_DB', str(db_path))
     runner = _make_runner()
-    handle_batch_describe(
-        runner,
-        'job-bd-chain',
-        {'image_type': 'catalog', '_catalog_cache_chain': True, 'force': True},
-    )
+    handle_batch_describe(runner, 'job-bd-preflight', {'image_type': 'catalog', 'force': True})
 
     runner.fail_job.assert_not_called()
     runner.complete_job.assert_called_once()
     result = runner.complete_job.call_args[0][1]
-    assert result['skipped'] == 3
-    assert result['skip_reason_counts']['unresolved_or_missing'] == 3
-    warnings = [
-        str(c.args[3])
-        for c in mock_add_log.call_args_list
-        if len(c.args) > 3 and c.args[2] == 'warning'
-    ]
+    assert result['skipped'] == 4
+    assert result['skip_reason_counts']['unresolved_or_missing'] == 4
+    assert mock_describe.call_count == 4
+    warnings = _warning_messages(mock_add_log)
     assert any('batch_describe preflight' in msg for msg in warnings), warnings
+    assert any('network share' in msg for msg in warnings), warnings
+
+
+@patch('database.add_job_log')
+@patch('jobs.handlers.analyze._describe_single_image')
+def test_batch_describe_preflight_no_warning_when_sample_clean(
+    mock_describe, mock_add_log, tmp_path, monkeypatch,
+) -> None:
+    from jobs.handlers import handle_batch_describe
+
+    good_jpg = tmp_path / 'good.jpg'
+    good_jpg.write_bytes(b'fake')
+
+    db_path = tmp_path / 'library.db'
+    conn = init_database(str(db_path))
+    keys = [
+        store_image(
+            conn,
+            {
+                'date_taken': f'2024-10-{i + 1:02d}',
+                'filename': f'good-{i}.jpg',
+                'filepath': str(good_jpg),
+                'rating': 1,
+            },
+        )
+        for i in range(3)
+    ]
+    conn.close()
+
+    mock_describe.return_value = ('described', True, None)
+    monkeypatch.setattr(path_diag_mod, 'PREFLIGHT_SAMPLE_SIZE', 3)
+    monkeypatch.setattr(
+        analyze_mod,
+        '_select_catalog_keys',
+        lambda *args, **kwargs: [(k, 'catalog') for k in keys],
+    )
+    monkeypatch.setenv('LIBRARY_DB', str(db_path))
+    runner = _make_runner()
+    handle_batch_describe(runner, 'job-bd-clean', {'image_type': 'catalog', 'force': True})
+
+    runner.fail_job.assert_not_called()
+    runner.complete_job.assert_called_once()
+    warnings = _warning_messages(mock_add_log)
+    assert not any('batch_describe preflight' in msg for msg in warnings), warnings
 
 
 @patch('database.add_job_log')
@@ -166,8 +185,8 @@ def test_batch_describe_reports_grouped_skip_reason_counts(
 
 @patch('database.add_job_log')
 @patch('jobs.handlers.analyze._score_single_image')
-def test_batch_score_preflight_aborts_when_majority_unreachable(
-    mock_score, _mock_add_log, tmp_path, monkeypatch,
+def test_batch_score_preflight_continues_when_majority_unreachable(
+    mock_score, mock_add_log, tmp_path, monkeypatch,
 ) -> None:
     from jobs.handlers import handle_batch_score
 
@@ -190,6 +209,7 @@ def test_batch_score_preflight_aborts_when_majority_unreachable(
     ]
     conn.close()
 
+    mock_score.return_value = VisionOpOutcome(status='skipped', reason='path unreachable')
     monkeypatch.setattr(
         analyze_mod,
         '_select_catalog_keys',
@@ -202,11 +222,124 @@ def test_batch_score_preflight_aborts_when_majority_unreachable(
     monkeypatch.setattr(path_diag_mod, 'PREFLIGHT_SAMPLE_SIZE', 8)
     monkeypatch.setenv('LIBRARY_DB', str(db_path))
     runner = _make_runner()
-    handle_batch_score(runner, 'job-bs-majority', {'image_type': 'catalog'})
+    handle_batch_score(
+        runner,
+        'job-bs-majority',
+        {'image_type': 'catalog', 'force': True, 'max_workers': 1},
+    )
 
-    runner.fail_job.assert_called_once()
-    runner.complete_job.assert_not_called()
-    mock_score.assert_not_called()
+    runner.fail_job.assert_not_called()
+    runner.complete_job.assert_called_once()
+    assert mock_score.call_count == 8
+    warnings = _warning_messages(mock_add_log)
+    assert any('batch_score preflight' in msg for msg in warnings), warnings
+
+
+@patch('database.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
+def test_batch_score_preflight_mixed_cached_and_unreachable(
+    mock_score, mock_add_log, tmp_path, monkeypatch,
+) -> None:
+    """Regression: cached thumbnails score even when the share is offline."""
+    from jobs.handlers import handle_batch_score
+
+    cached_jpg = tmp_path / 'cached.jpg'
+    cached_jpg.write_bytes(b'fake-jpeg')
+
+    db_path = tmp_path / 'library.db'
+    conn = init_database(str(db_path))
+    cached_keys: list[str] = []
+    for i in range(2):
+        key = store_image(
+            conn,
+            {
+                'date_taken': f'2024-11-{i + 1:02d}',
+                'filename': f'cached-{i}.jpg',
+                'filepath': f'/definitely/missing-original-{i}.jpg',
+                'rating': 1,
+            },
+        )
+        with library_write(conn):
+            store_vision_cached_image(conn, key, str(cached_jpg), None, 12345.0)
+        cached_keys.append(key)
+    bad_keys = _seed_bad_catalog(conn, 2, prefix='score-mix-bad')
+    conn.close()
+
+    def _score_side_effect(_db, key, *_args, **_kwargs):
+        if key in cached_keys:
+            return VisionOpOutcome(status='written')
+        return VisionOpOutcome(status='skipped', reason='path unreachable')
+
+    mock_score.side_effect = _score_side_effect
+    all_keys = cached_keys + bad_keys
+    monkeypatch.setattr(
+        analyze_mod,
+        '_select_catalog_keys',
+        lambda *args, **kwargs: [(k, 'catalog') for k in all_keys],
+    )
+    monkeypatch.setattr(
+        'lightroom_tagger.core.database.list_perspectives',
+        lambda *_a, **_k: [{'slug': 'test-p'}],
+    )
+    monkeypatch.setattr(path_diag_mod, 'PREFLIGHT_SAMPLE_SIZE', len(all_keys))
+    monkeypatch.setenv('LIBRARY_DB', str(db_path))
+    runner = _make_runner()
+    handle_batch_score(
+        runner,
+        'job-bs-mixed',
+        {'image_type': 'catalog', 'force': True, 'max_workers': 1},
+    )
+
+    runner.fail_job.assert_not_called()
+    runner.complete_job.assert_called_once()
+    result = runner.complete_job.call_args[0][1]
+    assert result['scored'] == 2
+    assert result['skipped'] == 2
+    assert result['skip_reason_counts']['unresolved_or_missing'] == 2
+    warnings = _warning_messages(mock_add_log)
+    assert any('batch_score preflight' in msg for msg in warnings), warnings
+
+
+@patch('database.add_job_log')
+@patch('jobs.handlers.analyze._score_single_image')
+def test_batch_score_preflight_all_unreachable_completes_with_skips(
+    mock_score, mock_add_log, tmp_path, monkeypatch,
+) -> None:
+    from jobs.handlers import handle_batch_score
+
+    db_path = tmp_path / 'library.db'
+    conn = init_database(str(db_path))
+    keys = _seed_bad_catalog(conn, 4, prefix='score-all-bad')
+    conn.close()
+
+    mock_score.return_value = VisionOpOutcome(status='skipped', reason='path unreachable')
+    monkeypatch.setattr(
+        analyze_mod,
+        '_select_catalog_keys',
+        lambda *args, **kwargs: [(k, 'catalog') for k in keys],
+    )
+    monkeypatch.setattr(
+        'lightroom_tagger.core.database.list_perspectives',
+        lambda *_a, **_k: [{'slug': 'test-p'}],
+    )
+    monkeypatch.setattr(path_diag_mod, 'PREFLIGHT_SAMPLE_SIZE', 4)
+    monkeypatch.setenv('LIBRARY_DB', str(db_path))
+    runner = _make_runner()
+    handle_batch_score(
+        runner,
+        'job-bs-all-bad',
+        {'image_type': 'catalog', 'force': True, 'max_workers': 1},
+    )
+
+    runner.fail_job.assert_not_called()
+    runner.complete_job.assert_called_once()
+    result = runner.complete_job.call_args[0][1]
+    assert result['scored'] == 0
+    assert result['skipped'] == 4
+    assert result['skip_reason_counts']['unresolved_or_missing'] == 4
+    warnings = _warning_messages(mock_add_log)
+    assert any('batch_score preflight' in msg for msg in warnings), warnings
+    assert any('network share' in msg for msg in warnings), warnings
 
 
 @patch('database.add_job_log')
@@ -265,8 +398,8 @@ def test_batch_analyze_merges_skip_reason_counts(
 
 @patch('database.add_job_log')
 @patch('jobs.handlers.analyze._describe_single_image')
-def test_single_describe_preflight_fails_on_unreachable_path(
-    mock_describe, _mock_add_log, tmp_path, monkeypatch,
+def test_single_describe_preflight_warns_but_per_image_skip_surfaces(
+    mock_describe, mock_add_log, tmp_path, monkeypatch,
 ) -> None:
     from jobs.handlers import handle_single_describe
 
@@ -283,16 +416,23 @@ def test_single_describe_preflight_fails_on_unreachable_path(
     )
     conn.close()
 
+    mock_describe.return_value = ('skipped', False, 'File not found: /definitely/missing.jpg')
     monkeypatch.setenv('LIBRARY_DB', str(db_path))
     runner = _make_runner()
     handle_single_describe(
         runner,
         'job-sd-preflight',
-        {'image_key': key, 'image_type': 'catalog'},
+        {'image_key': key, 'image_type': 'catalog', 'force': True},
     )
 
     runner.fail_job.assert_called_once()
-    mock_describe.assert_not_called()
+    fail_message = str(runner.fail_job.call_args[0][1])
+    assert 'File not found' in fail_message
+    assert 'sampled paths unreachable' not in fail_message
+    assert runner.fail_job.call_args.kwargs.get('severity') != 'critical'
+    mock_describe.assert_called_once()
+    warnings = _warning_messages(mock_add_log)
+    assert any('single_describe preflight' in msg for msg in warnings), warnings
 
 
 @patch('database.add_job_log')
