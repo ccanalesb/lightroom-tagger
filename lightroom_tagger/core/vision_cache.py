@@ -152,7 +152,7 @@ def resolve_vision_image(db, catalog_key: str, original_path: str) -> tuple[str 
             # ``cached`` is either the compressed cache file or (rare no-op) the
             # original itself; both are safe to pass with silent_compression=True.
             return cached, True
-        return original_path, False
+        return None, False
 
     # Original unreachable — use the pre-existing compressed cache if present.
     rec = get_vision_cached_image(db, catalog_key)

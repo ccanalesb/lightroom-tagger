@@ -190,3 +190,101 @@ def test_resolve_vision_image_no_cache_fallback_for_oversized_sentinel(temp_db, 
     path, silent = vc.resolve_vision_image(temp_db, "big", str(tmp_path / "gone.ARW"))
     assert path is None
     assert silent is False
+
+
+def test_resolve_vision_image_skips_when_reachable_but_unpreparable(temp_db, tmp_path):
+    """Reachable original with no usable compressed image → skip, not raw original."""
+    original = tmp_path / "scan.tif"
+    original.write_bytes(b"tiff")
+    with patch.object(vc, "get_or_create_cached_image", return_value=None):
+        path, silent = vc.resolve_vision_image(temp_db, "scan-key", str(original))
+    assert path is None
+    assert silent is False
+    assert path != str(original)
+
+
+def test_resolve_vision_image_unreachable_and_unpreparable_match(temp_db, tmp_path):
+    """Unreachable and reachable-but-unpreparable both yield no usable image."""
+    missing = str(tmp_path / "gone.tif")
+    reachable = tmp_path / "bad.tif"
+    reachable.write_bytes(b"tiff")
+
+    with patch.object(vc, "get_or_create_cached_image", return_value=None):
+        reachable_path, reachable_silent = vc.resolve_vision_image(
+            temp_db, "k", str(reachable),
+        )
+    missing_path, missing_silent = vc.resolve_vision_image(temp_db, "k", missing)
+
+    assert reachable_path is None
+    assert missing_path is None
+    assert reachable_silent is False
+    assert missing_silent is False
+
+
+def test_resolve_vision_image_small_original_still_silent_compressed(temp_db, tmp_path):
+    """Small files stored as-is in cache still resolve with silent_compression=True."""
+    small = tmp_path / "tiny.jpg"
+    small.write_bytes(b"jpeg")
+    with patch.object(vc, "get_or_create_cached_image", return_value=str(small)):
+        path, silent = vc.resolve_vision_image(temp_db, "tiny", str(small))
+    assert path == str(small)
+    assert silent is True
+
+
+def test_get_or_create_16_bit_tiff_caches_jpeg_under_ceiling(temp_db, tmp_path):
+    """16-bit TIFF source produces a normal cache entry, not the oversized sentinel."""
+    from PIL import Image
+
+    tiff = tmp_path / "scan.tif"
+    img = Image.new('I;16', (800, 600))
+    px = img.load()
+    for y in range(img.height):
+        for x in range(img.width):
+            px[x, y] = (x * 257 + y * 131) % 65536
+    img.save(tiff, 'TIFF')
+
+    cache_dir = str(tmp_path / "cache")
+    os.makedirs(cache_dir, exist_ok=True)
+
+    with patch.object(vc, "load_config") as cfg:
+        m = MagicMock()
+        m.vision_cache_enabled = True
+        m.vision_cache_dir = cache_dir
+        cfg.return_value = m
+        out = vc.get_or_create_cached_image(temp_db, "scan-key", str(tiff))
+
+    assert out is not None
+    assert out.endswith(".jpg")
+    assert os.path.getsize(out) / 1024 <= vc.MAX_CACHED_IMAGE_KB
+    row = get_vision_cached_image(temp_db, "scan-key")
+    assert row["compressed_path"] == out
+    assert row["compressed_path"] != VISION_CACHE_OVERSIZED_SENTINEL
+
+
+def test_get_or_create_records_oversized_after_successful_compression(temp_db, tmp_path):
+    """Compression that succeeds but exceeds the ceiling still records oversized sentinel."""
+    fd, orig = tempfile.mkstemp(suffix=".jpg", dir=tmp_path)
+    os.write(fd, b"orig")
+    os.close(fd)
+
+    fd2, compressed = tempfile.mkstemp(suffix=".jpg", dir=tmp_path)
+    os.write(fd2, b"y" * (600 * 1024))
+    os.close(fd2)
+
+    cache_dir = str(tmp_path / "cache")
+    os.makedirs(cache_dir, exist_ok=True)
+
+    with patch.object(vc, "load_config") as cfg:
+        m = MagicMock()
+        m.vision_cache_enabled = True
+        m.vision_cache_dir = cache_dir
+        cfg.return_value = m
+        with patch("lightroom_tagger.core.vision_cache.compress_image", return_value=compressed):
+            with patch("lightroom_tagger.core.vision_cache.get_viewable_path", return_value=orig):
+                with patch("lightroom_tagger.core.vision_cache.compute_phash", return_value="ph"):
+                    out = vc.get_or_create_cached_image(temp_db, "too-big", orig)
+
+    assert out is None
+    row = get_vision_cached_image(temp_db, "too-big")
+    assert row["compressed_path"] == VISION_CACHE_OVERSIZED_SENTINEL
+    os.unlink(orig)
