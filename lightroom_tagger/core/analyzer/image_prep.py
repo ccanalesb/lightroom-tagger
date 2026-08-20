@@ -38,25 +38,17 @@ def _convert_to_jpeg_writable(img):
     if mode in ('RGBA', 'LA', 'P'):
         return img.convert('RGB')
     if mode in _INTEGER_MODES_16:
-        # Scale the 16-bit sample range to 8-bit rather than truncating.
+        # Scale the fixed 16-bit sample range to 8-bit rather than truncating.
         scaled = [i * 255 // 65535 for i in _iter_samples(img)]
         return _scale_samples_to_l(img, scaled)
-    if mode == 'I':
+    if mode in ('I', 'F'):
+        # Wide integer / float samples: scale the actual value range into 8 bits.
         lo, hi = img.getextrema()
         if hi == lo:
             return Image.new('L', img.size, 0)
         span = hi - lo
         scaled = [int((i - lo) * 255 / span) for i in _iter_samples(img)]
         return _scale_samples_to_l(img, scaled)
-    if mode == 'F':
-        lo, hi = img.getextrema()
-        if hi == lo:
-            return Image.new('L', img.size, 0)
-        span = hi - lo
-        scaled = [int((i - lo) * 255 / span) for i in _iter_samples(img)]
-        return _scale_samples_to_l(img, scaled)
-    if mode == 'CMYK':
-        return img.convert('RGB')
     return img
 
 
