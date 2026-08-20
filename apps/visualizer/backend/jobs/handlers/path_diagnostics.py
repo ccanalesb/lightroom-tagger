@@ -16,7 +16,6 @@ from lightroom_tagger.core.database import (
 from lightroom_tagger.core.vision_cache import get_or_create_cached_image
 
 PREFLIGHT_SAMPLE_SIZE = 25
-PREFLIGHT_FAIL_RATIO = 0.5
 SKIP_DETAIL_LOG_LIMIT = 5
 SUMMARY_LOG_EVERY = 250
 
@@ -97,19 +96,15 @@ class PathSkipDiagnostics:
         lib_db,
         *,
         job_label: str,
-        chain_mode: bool = False,
         log_action: str = 'skipped',
         sample_size: int | None = None,
-        fail_ratio: float | None = None,
     ) -> None:
         self.runner = runner
         self.job_id = job_id
         self.lib_db = lib_db
         self.job_label = job_label
-        self.chain_mode = chain_mode
         self.log_action = log_action
         self.sample_size = PREFLIGHT_SAMPLE_SIZE if sample_size is None else sample_size
-        self.fail_ratio = PREFLIGHT_FAIL_RATIO if fail_ratio is None else fail_ratio
         self.skip_reason_counts = empty_skip_reason_counts()
         self._skip_detail_logged = dict.fromkeys(SKIP_REASON_BUCKETS, 0)
         self._summary_marker = 0
@@ -167,14 +162,11 @@ class PathSkipDiagnostics:
             f'{self.job_label}-summary {" ".join(parts)}',
         )
 
-    def run_preflight(self, keys: list[str]) -> bool:
-        """Sample keys for path accessibility.
-
-        Returns ``False`` when the job should abort (fatal preflight).
-        """
+    def run_preflight(self, keys: list[str]) -> None:
+        """Sample keys for path accessibility and log an advisory warning on failures."""
         sample_size = min(len(keys), self.sample_size)
         if sample_size <= 0:
-            return True
+            return
 
         sample_failures = {
             'no_row': 0,
@@ -205,9 +197,8 @@ class PathSkipDiagnostics:
             + sample_failures['empty_path']
             + sample_failures['unresolved_or_missing']
         )
-        fail_ratio = sample_failed_count / sample_size
-        if fail_ratio <= self.fail_ratio:
-            return True
+        if sample_failed_count <= 0:
+            return
 
         preflight_msg = (
             f'{self.job_label} preflight: {sample_failed_count}/{sample_size} sampled images '
@@ -216,25 +207,16 @@ class PathSkipDiagnostics:
             f"unresolved_or_missing={sample_failures['unresolved_or_missing']}). "
             f"Examples: no_row={sample_examples['no_row']}, "
             f"empty_path={sample_examples['empty_path']}, "
-            f"unresolved_or_missing={sample_examples['unresolved_or_missing']}."
+            f"unresolved_or_missing={sample_examples['unresolved_or_missing']}. "
+            'This usually means your network share is not mounted. '
+            'Continuing — unreachable images will be skipped individually.'
         )
-        if self.chain_mode:
-            database.add_job_log(
-                self.runner.db,
-                self.job_id,
-                'warning',
-                f'{preflight_msg} Continuing — missing files will be skipped per-image.',
-            )
-            return True
-
-        abort_msg = (
-            f'{sample_failed_count}/{sample_size} sampled paths unreachable — '
-            'this usually means your network share is not mounted. '
-            'Check your mount and retry.'
+        database.add_job_log(
+            self.runner.db,
+            self.job_id,
+            'warning',
+            preflight_msg,
         )
-        database.add_job_log(self.runner.db, self.job_id, 'error', abort_msg)
-        self.runner.fail_job(self.job_id, abort_msg, severity='critical')
-        return False
 
     def _maybe_log_skip_detail(self, reason: str, message: str) -> None:
         count = self._skip_detail_logged.get(reason, 0)

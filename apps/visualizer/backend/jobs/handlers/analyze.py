@@ -236,8 +236,7 @@ def handle_single_describe(runner, job_id: str, metadata: dict):
                 lib_db,
                 job_label='single_describe',
             )
-            if not path_diag.run_preflight([image_key]):
-                return
+            path_diag.run_preflight([image_key])
 
             status, success, error_msg = _describe_single_image(
                 lib_db, image_key, image_type, force, provider_id, provider_model,
@@ -311,8 +310,7 @@ def handle_single_score(runner, job_id: str, metadata: dict):
                 lib_db,
                 job_label='single_score',
             )
-            if not path_diag.run_preflight([image_key]):
-                return
+            path_diag.run_preflight([image_key])
 
             for slug in slugs:
                 outcome = _score_single_image(
@@ -545,12 +543,11 @@ def _run_describe_pass(
         job_id,
         lib_db,
         job_label='batch_describe',
-        chain_mode=bool(metadata.get('_catalog_cache_chain')),
         log_action='describe',
     )
     preflight_keys = [k for k, _t in images_to_describe]
-    if not isinstance(lib_db, MagicMock) and not path_diag.run_preflight(preflight_keys):
-        return None
+    if not isinstance(lib_db, MagicMock):
+        path_diag.run_preflight(preflight_keys)
 
     def record_done(desc_key: str, itype: str) -> bool:
         processed_pairs.add(pair_label(desc_key, itype))
@@ -1071,12 +1068,11 @@ def _run_score_pass(
         job_id,
         lib_db,
         job_label='batch_score',
-        chain_mode=bool(metadata.get('_catalog_cache_chain')),
         log_action='score',
     )
     preflight_keys = list(dict.fromkeys(k for k, _t, _s in work_triples))
-    if not isinstance(lib_db, MagicMock) and not path_diag.run_preflight(preflight_keys):
-        return None
+    if not isinstance(lib_db, MagicMock):
+        path_diag.run_preflight(preflight_keys)
 
     def record_done(score_key: str, itype: str, slug: str) -> bool:
         processed_triplets.add(triplet_label(score_key, itype, slug))
