@@ -121,6 +121,70 @@ def test_compress_image_handles_rgba():
             os.unlink(test_path)
 
 
+def test_compress_image_handles_16_bit_grayscale_tiff():
+    """16-bit film scans must compress to a JPEG under the vision cache ceiling."""
+    from PIL import Image
+
+    fd, test_path = tempfile.mkstemp(suffix='.tif')
+    os.close(fd)
+
+    try:
+        img = Image.new('I;16', (2288, 3395))
+        px = img.load()
+        for y in range(img.height):
+            for x in range(img.width):
+                px[x, y] = (x + y) % 65536
+        img.save(test_path, 'TIFF')
+
+        compressed_path = compress_image(test_path)
+
+        assert compressed_path != test_path
+        assert compressed_path.endswith('.jpg')
+        assert os.path.getsize(compressed_path) / 1024 <= 512
+
+        with Image.open(compressed_path) as compressed:
+            assert compressed.mode == 'RGB'
+            assert compressed.width <= 1024
+            assert compressed.height <= 1024
+
+        if compressed_path != test_path and os.path.exists(compressed_path):
+            os.unlink(compressed_path)
+    finally:
+        if os.path.exists(test_path):
+            os.unlink(test_path)
+
+
+def test_compress_image_16_bit_preserves_tonal_range():
+    """Scaling 16-bit samples must not crush mid-tones to black or white."""
+    from PIL import Image
+
+    fd, test_path = tempfile.mkstemp(suffix='.tif')
+    os.close(fd)
+
+    try:
+        img = Image.new('I;16', (64, 64))
+        px = img.load()
+        samples = (0, 16384, 32768, 49152, 65535)
+        for y in range(img.height):
+            for x in range(img.width):
+                px[x, y] = samples[(x + y) % len(samples)]
+        img.save(test_path, 'TIFF')
+
+        compressed_path = compress_image(test_path, max_size=(64, 64), quality=95)
+
+        with Image.open(compressed_path) as compressed:
+            values = sorted({compressed.getpixel((x, y))[0] for x in range(64) for y in range(64)})
+            assert values[0] < 30
+            assert values[-1] > 225
+            assert any(100 <= v <= 155 for v in values)
+
+        if compressed_path != test_path and os.path.exists(compressed_path):
+            os.unlink(compressed_path)
+    finally:
+        if os.path.exists(test_path):
+            os.unlink(test_path)
+
+
 def test_vision_config_environment_variables():
     """Vision compression should respect environment variables."""
     import lightroom_tagger.core.analyzer as analyzer_module

@@ -10,6 +10,47 @@ VIDEO_EXTENSIONS = {'.mov', '.mp4', '.avi', '.mkv', '.wmv', '.m4v', '.3gp', '.we
 VISION_MAX_DIMENSION = int(os.environ.get('VISION_MAX_DIMENSION', '1024'))
 VISION_COMPRESS_QUALITY = int(os.environ.get('VISION_COMPRESS_QUALITY', '80'))
 
+# PIL modes that cannot be written directly as JPEG.
+_INTEGER_MODES_16 = frozenset({'I;16', 'I;16B', 'I;16L', 'I;16N'})
+
+
+def _scale_samples_to_l(img, samples):
+    """Build an 8-bit L image from per-pixel sample values."""
+    from PIL import Image
+
+    out = Image.new('L', img.size)
+    out.putdata(samples)
+    return out
+
+
+def _iter_samples(img):
+    getter = getattr(img, 'get_flattened_data', None)
+    if getter is not None:
+        return getter()
+    return img.getdata()
+
+
+def _convert_to_jpeg_writable(img):
+    """Convert PIL image to a mode that JPEG encoding accepts."""
+    from PIL import Image
+
+    mode = img.mode
+    if mode in ('RGBA', 'LA', 'P'):
+        return img.convert('RGB')
+    if mode in _INTEGER_MODES_16:
+        # Scale the fixed 16-bit sample range to 8-bit rather than truncating.
+        scaled = [i * 255 // 65535 for i in _iter_samples(img)]
+        return _scale_samples_to_l(img, scaled)
+    if mode in ('I', 'F'):
+        # Wide integer / float samples: scale the actual value range into 8 bits.
+        lo, hi = img.getextrema()
+        if hi == lo:
+            return Image.new('L', img.size, 0)
+        span = hi - lo
+        scaled = [int((i - lo) * 255 / span) for i in _iter_samples(img)]
+        return _scale_samples_to_l(img, scaled)
+    return img
+
 
 def compress_image(
     input_path: str,
@@ -40,8 +81,8 @@ def compress_image(
 
     try:
         with Image.open(input_path) as img:
-            # Convert to RGB if necessary
-            if img.mode in ('RGBA', 'LA', 'P'):
+            img = _convert_to_jpeg_writable(img)
+            if img.mode == 'L':
                 img = img.convert('RGB')
 
             # Resize if larger than max_size
