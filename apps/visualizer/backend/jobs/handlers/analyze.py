@@ -1319,7 +1319,7 @@ def _run_frame_substance_pass(
     def _progress(pct: int, msg: str | None) -> None:
         runner.update_progress(job_id, _map_job_progress(progress_range, pct), msg)
 
-    prefix = f'{log_prefix}' if log_prefix else ''
+    prefix = log_prefix
     try:
         result = run_frame_substance_detection(
             lib_db,

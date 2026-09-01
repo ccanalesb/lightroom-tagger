@@ -5,13 +5,13 @@ from __future__ import annotations
 import sqlite3
 from typing import TypedDict
 
-from .stack_suggestions import count_pending_stack_suggestions
 from .frame_substance import (
     count_frame_substance_by_unknown_reason,
     count_frame_substance_flagged_net_of_overrides,
     count_frame_substance_never_judged,
     get_latest_finished_frame_substance_run,
 )
+from .stack_suggestions import count_pending_stack_suggestions
 
 
 class PerspectiveCoverageRow(TypedDict):

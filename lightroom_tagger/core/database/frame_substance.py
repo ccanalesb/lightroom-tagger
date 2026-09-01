@@ -256,11 +256,6 @@ def has_frame_substance_override(db: sqlite3.Connection, image_key: str) -> bool
     return row is not None
 
 
-def list_catalog_images_with_vision_cache(db: sqlite3.Connection) -> list[dict]:
-    """Catalog images left-joined to vision cache rows for batch detection."""
-    return list_catalog_images_for_frame_substance(db)
-
-
 def list_catalog_images_for_frame_substance(
     db: sqlite3.Connection,
     *,
