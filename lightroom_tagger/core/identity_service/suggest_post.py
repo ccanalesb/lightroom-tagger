@@ -27,7 +27,7 @@ def suggest_what_to_post_next(
     """Unposted, coverage-eligible catalog images with heuristic reasons (D-44–D-46).
 
     ``sort_by_date`` (``newest`` / ``oldest``) only controls the date tiebreaker;
-    peak within-perspective percentile remains the primary sort key.
+    corroboration-vetoed ranking percentile remains the primary sort key.
     """
     if sort_by_date is not None and sort_by_date not in ("newest", "oldest"):
         raise ValueError("sort_by_date must be 'newest' or 'oldest'")
@@ -70,24 +70,25 @@ def suggest_what_to_post_next(
     date_reverse = sort_by_date != "oldest"
     candidates_full.sort(key=lambda r: r["image_key"])
     candidates_full.sort(key=lambda r: r.get("date_taken") or "", reverse=date_reverse)
-    candidates_full.sort(key=lambda r: r["peak_percentile"], reverse=True)
+    candidates_full.sort(key=lambda r: r["ranking_percentile"], reverse=True)
 
-    unposted_peaks = [float(c["peak_percentile"]) for c in candidates_full]
-    if unposted_peaks:
-        sorted_peaks = sorted(unposted_peaks)
-        idx = max(0, int(round(0.9 * (len(sorted_peaks) - 1))))
-        p90 = sorted_peaks[idx]
+    unposted_rankings = [float(c["ranking_percentile"]) for c in candidates_full]
+    if unposted_rankings:
+        sorted_rankings = sorted(unposted_rankings)
+        idx = max(0, int(round(0.9 * (len(sorted_rankings) - 1))))
+        p90 = sorted_rankings[idx]
     else:
         p90 = 1.0
 
     suggestions_meta: dict[str, Any] = {
         "weighting": peak_meta.get("weighting"),
         "ranking_key": peak_meta.get("ranking_key"),
+        "corroboration_rule": peak_meta.get("corroboration_rule"),
         "min_perspectives_used": peak_meta.get("min_perspectives_used"),
         "coverage_rule": peak_meta.get("coverage_rule"),
         "high_score_rule": (
-            "reason code high_score_unposted when peak_percentile >= p90 of eligible "
-            "unposted images' peak within-perspective percentiles."
+            "reason code high_score_unposted when ranking_percentile >= p90 of eligible "
+            "unposted images' corroboration-vetoed ranking percentiles."
         ),
     }
 
@@ -99,13 +100,13 @@ def suggest_what_to_post_next(
     for cand in page:
         reasons: list[str] = []
         codes: list[str] = []
-        peak = float(cand["peak_percentile"])
+        ranking = float(cand["ranking_percentile"])
         lens_name = str(cand.get("peak_perspective_display_name") or "")
         is_sig = bool(cand.get("is_signature"))
-        if peak >= p90:
+        if ranking >= p90:
             reasons.append(
-                "Strong peak percentile among scored, unposted catalog images "
-                f"(peak_percentile={peak:.4f})."
+                "Strong ranking percentile among scored, unposted catalog images "
+                f"(ranking_percentile={ranking:.4f})."
             )
             codes.append("high_score_unposted")
 
@@ -120,7 +121,7 @@ def suggest_what_to_post_next(
         if not codes:
             reasons.append(
                 "Unposted catalog image with sufficient perspective coverage; "
-                "ranked by peak within-perspective percentile among eligible candidates."
+                "ranked by corroboration-vetoed ranking percentile among eligible candidates."
             )
             codes.append("eligible_unposted")
 

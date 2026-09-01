@@ -83,10 +83,10 @@ def rank_best_photos(
     sort_by_date: str | None = None,
     posted: bool | None = None,
 ) -> tuple[list[dict[str, Any]], int, dict[str, Any]]:
-    """Eligible images only, sorted by peak_percentile DESC, date_taken, key ASC.
+    """Eligible images only, sorted by ranking_percentile DESC, date_taken, key ASC.
 
     ``sort_by_date`` (``newest`` / ``oldest``) only controls the date tiebreaker;
-    peak within-perspective percentile remains the primary sort key.
+    corroboration-vetoed ranking percentile remains the primary sort key.
     """
     if sort_by_date is not None and sort_by_date not in ("newest", "oldest"):
         raise ValueError("sort_by_date must be 'newest' or 'oldest'")
@@ -123,7 +123,7 @@ def rank_best_photos(
     date_reverse = sort_by_date != "oldest"
     enriched.sort(key=lambda r: r["image_key"])
     enriched.sort(key=lambda r: r.get("date_taken") or "", reverse=date_reverse)
-    enriched.sort(key=lambda r: r["peak_percentile"], reverse=True)
+    enriched.sort(key=lambda r: r["ranking_percentile"], reverse=True)
 
     if posted is True:
         enriched = [r for r in enriched if bool(r.get("instagram_posted")) is True]

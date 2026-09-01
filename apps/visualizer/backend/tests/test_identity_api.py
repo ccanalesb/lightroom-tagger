@@ -29,7 +29,7 @@ def test_best_photos_200_shape(identity_client) -> None:
     assert isinstance(data["total"], int)
     assert "meta" in data
     assert data["meta"].get("weighting") == "peak_within_perspective_percentile"
-    assert data["meta"].get("ranking_key") == "peak_percentile"
+    assert data["meta"].get("ranking_key") == "ranking_percentile"
 
 
 def test_best_photos_posted_true_200(identity_client) -> None:
@@ -143,7 +143,7 @@ def test_suggestions_200_shape(identity_client) -> None:
     assert "total" in data
     assert isinstance(data["total"], int)
     assert "meta" in data
-    assert data["meta"].get("ranking_key") == "peak_percentile"
+    assert data["meta"].get("ranking_key") == "ranking_percentile"
     assert "empty_state" in data
 
 

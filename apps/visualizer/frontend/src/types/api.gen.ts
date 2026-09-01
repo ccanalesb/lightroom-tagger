@@ -2236,6 +2236,11 @@ export interface components {
              */
             ranking_key: string | null;
             /**
+             * Corroboration Rule
+             * @default null
+             */
+            corroboration_rule: string | null;
+            /**
              * Min Perspectives Used
              * @default null
              */
@@ -2562,6 +2567,11 @@ export interface components {
              * @default null
              */
             ranking_key: string | null;
+            /**
+             * Corroboration Rule
+             * @default null
+             */
+            corroboration_rule: string | null;
             /**
              * Min Perspectives Used
              * @default null

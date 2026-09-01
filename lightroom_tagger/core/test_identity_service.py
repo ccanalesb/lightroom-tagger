@@ -629,7 +629,7 @@ def test_suggestions_ranks_by_peak_percentile(tmp_path) -> None:
     assert out["candidates"]
     assert out["candidates"][0]["image_key"] == peak_winner
     assert out["candidates"][0]["peak_percentile"] >= out["candidates"][1]["peak_percentile"]
-    assert out["meta"]["ranking_key"] == "peak_percentile"
+    assert out["meta"]["ranking_key"] == "ranking_percentile"
 
 
 def test_suggestions_offset_returns_second_page(tmp_path) -> None:
@@ -995,3 +995,194 @@ def test_mirror_active_slugs_and_percentile_lookup_bounded(tmp_path, monkeypatch
     build_mirror(conn)
     assert slug_calls["n"] == 1
     assert lookup_calls["n"] == 1
+
+
+def _store_unposted(conn: sqlite3.Connection, name: str, *, day: str = "2025-06-01") -> str:
+    return store_image(
+        conn,
+        {"date_taken": day, "filename": name, "instagram_posted": False},
+    )
+
+
+def test_corroboration_veto_separates_identical_peaks_by_raw_floor(tmp_path) -> None:
+    """Leaf vs eclipse: same peak percentile, raw 1 ranks below raw 2."""
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    peak_lens, floor_lens = slugs[0], slugs[1]
+
+    for i, score in enumerate([7, 8, 9]):
+        k = _store_unposted(conn, f"base{i}.jpg", day=f"2025-06-{10 + i:02d}")
+        _add_score(conn, k, peak_lens, score)
+        _add_score(conn, k, floor_lens, 5)
+
+    eclipse = _store_unposted(conn, "eclipse.jpg", day="2025-06-20")
+    leaf = _store_unposted(conn, "leaf.jpg", day="2025-06-21")
+    _add_score(conn, eclipse, peak_lens, 9)
+    _add_score(conn, eclipse, floor_lens, 1)
+    _add_score(conn, leaf, peak_lens, 9)
+    _add_score(conn, leaf, floor_lens, 2)
+    conn.commit()
+
+    page, _total, meta = rank_best_photos(conn, limit=10, offset=0, min_perspectives=2)
+    eclipse_row = next(r for r in page if r["image_key"] == eclipse)
+    leaf_row = next(r for r in page if r["image_key"] == leaf)
+
+    assert eclipse_row["peak_percentile"] == leaf_row["peak_percentile"]
+    assert leaf_row["ranking_percentile"] > eclipse_row["ranking_percentile"]
+    keys = [r["image_key"] for r in page]
+    assert keys.index(leaf) < keys.index(eclipse)
+    assert meta["ranking_key"] == "ranking_percentile"
+    assert meta["corroboration_rule"]
+
+
+def test_corroboration_veto_spares_corroborated_frame(tmp_path) -> None:
+    """A raw 1 with strong backup stays well above a raw 1 with nothing behind peak."""
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=3)
+    void_lens, strong_a, strong_b = slugs[0], slugs[1], slugs[2]
+
+    for i in range(4):
+        k = _store_unposted(conn, f"fill{i}.jpg", day=f"2025-07-{10 + i:02d}")
+        _add_score(conn, k, void_lens, 5)
+        _add_score(conn, k, strong_a, 6 + i)
+        _add_score(conn, k, strong_b, 6)
+
+    corroborated = _store_unposted(conn, "corroborated.jpg", day="2025-07-20")
+    hollow = _store_unposted(conn, "hollow.jpg", day="2025-07-21")
+    _add_score(conn, corroborated, void_lens, 1)
+    _add_score(conn, corroborated, strong_a, 9)
+    _add_score(conn, corroborated, strong_b, 8)
+    _add_score(conn, hollow, void_lens, 1)
+    _add_score(conn, hollow, strong_a, 9)
+    conn.commit()
+
+    page, _total, _meta = rank_best_photos(conn, limit=10, offset=0, min_perspectives=2)
+    corroborated_row = next(r for r in page if r["image_key"] == corroborated)
+    hollow_row = next(r for r in page if r["image_key"] == hollow)
+
+    assert corroborated_row["ranking_percentile"] > hollow_row["ranking_percentile"]
+    keys = [r["image_key"] for r in page]
+    assert keys.index(corroborated) < keys.index(hollow)
+
+
+def test_corroboration_veto_untouched_when_floor_above_one(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    s0, s1 = slugs[0], slugs[1]
+
+    k = _store_unposted(conn, "clean.jpg")
+    _add_score(conn, k, s0, 8)
+    _add_score(conn, k, s1, 2)
+    conn.commit()
+
+    items, meta = compute_image_peak_percentile_scores(conn, min_perspectives=2)
+    row = next(i for i in items if i["image_key"] == k)
+
+    assert row["ranking_percentile"] == row["peak_percentile"]
+    assert row["corroboration_revoked"] is False
+    assert row["corroboration_revoked_by"] == ""
+    assert meta["ranking_key"] == "ranking_percentile"
+
+
+def test_corroboration_veto_flags_and_deterministic_revoked_by(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=3)
+    first, second, peak = sorted(slugs[:3])
+
+    k = _store_unposted(conn, "vetoed.jpg")
+    _add_score(conn, k, first, 1)
+    _add_score(conn, k, second, 1)
+    _add_score(conn, k, peak, 9)
+    conn.commit()
+
+    items, _meta = compute_image_peak_percentile_scores(conn, min_perspectives=2)
+    row = next(i for i in items if i["image_key"] == k)
+
+    assert row["corroboration_revoked"] is True
+    assert row["corroboration_revoked_by"] == first
+    assert row["peak_percentile"] == 1.0
+
+
+def test_corroboration_veto_single_lens_scoring_one(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=1)
+    slug = slugs[0]
+
+    k = _store_unposted(conn, "solo_void.jpg")
+    _add_score(conn, k, slug, 1)
+    conn.commit()
+
+    items, _meta = compute_image_peak_percentile_scores(conn, min_perspectives=1)
+    row = next(i for i in items if i["image_key"] == k)
+
+    assert row["ranking_percentile"] == 0.0
+    assert row["corroboration_revoked"] is True
+
+
+def test_corroboration_veto_preserves_peak_percentile(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    peak_lens, floor_lens = slugs[0], slugs[1]
+
+    for i, score in enumerate([7, 8]):
+        k = _store_unposted(conn, f"pop{i}.jpg", day=f"2025-08-{10 + i:02d}")
+        _add_score(conn, k, peak_lens, score)
+        _add_score(conn, k, floor_lens, 4)
+
+    k = _store_unposted(conn, "vetoed_peak.jpg", day="2025-08-20")
+    _add_score(conn, k, peak_lens, 9)
+    _add_score(conn, k, floor_lens, 1)
+    conn.commit()
+
+    lookup = compute_within_perspective_percentile_lookup(conn)
+    expected_peak = round(lookup[(k, peak_lens)], 6)
+
+    items, _meta = compute_image_peak_percentile_scores(conn, min_perspectives=2)
+    row = next(i for i in items if i["image_key"] == k)
+
+    assert row["peak_percentile"] == expected_peak
+    assert row["ranking_percentile"] < row["peak_percentile"]
+
+
+def test_corroboration_veto_ignores_excused_raw_one(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    s0, s1 = slugs[0], slugs[1]
+
+    k = _store_unposted(conn, "excused_void.jpg")
+    _add_score(conn, k, s0, 9)
+    _add_score(conn, k, s1, 1, not_attempted=1)
+    conn.commit()
+
+    items, _meta = compute_image_peak_percentile_scores(conn, min_perspectives=2)
+    row = next(i for i in items if i["image_key"] == k)
+
+    assert row["corroboration_revoked"] is False
+    assert row["ranking_percentile"] == row["peak_percentile"]
+
+
+def test_suggestions_adopts_ranking_percentile_and_vetoes_high_score(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=2)
+    peak_lens, floor_lens = slugs[0], slugs[1]
+
+    for i, score in enumerate([6, 7, 8, 9]):
+        k = _store_unposted(conn, f"stable{i}.jpg", day=f"2025-09-{10 + i:02d}")
+        _add_score(conn, k, peak_lens, score)
+        _add_score(conn, k, floor_lens, score)
+
+    vetoed = _store_unposted(conn, "vetoed_advisor.jpg", day="2025-09-20")
+    _add_score(conn, vetoed, peak_lens, 9)
+    _add_score(conn, vetoed, floor_lens, 1)
+    conn.commit()
+
+    out = suggest_what_to_post_next(conn, limit=20)
+    assert out["meta"]["ranking_key"] == "ranking_percentile"
+
+    vetoed_cand = next(c for c in out["candidates"] if c["image_key"] == vetoed)
+    assert vetoed_cand["peak_percentile"] >= 0.5
+    assert "high_score_unposted" not in vetoed_cand["reason_codes"]
+
+    keys = [c["image_key"] for c in out["candidates"]]
+    top_stable = next(c for c in out["candidates"] if c["image_key"] != vetoed)
+    assert keys.index(top_stable["image_key"]) < keys.index(vetoed)

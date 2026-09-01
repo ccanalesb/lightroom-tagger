@@ -68,6 +68,45 @@ def compute_within_perspective_percentile_lookup(
     return lookup
 
 
+_CORROBORATION_RULE = (
+    "If any lens scored 1, rank on second-highest percentile instead of peak."
+)
+
+
+def _corroboration_ranking_fields(
+    perspectives: list[dict[str, Any]], peak: float
+) -> dict[str, Any]:
+    """Derive ranking scalar and veto flags from raw scores plus percentiles."""
+    if not perspectives:
+        return {
+            "ranking_percentile": round(peak, 6),
+            "corroboration_revoked": False,
+            "corroboration_revoked_by": "",
+        }
+
+    min_score = min(int(p["score"]) for p in perspectives)
+    if min_score > 1:
+        return {
+            "ranking_percentile": round(peak, 6),
+            "corroboration_revoked": False,
+            "corroboration_revoked_by": "",
+        }
+
+    sorted_percentiles = sorted(
+        (float(p["percentile"]) for p in perspectives), reverse=True
+    )
+    ranking = sorted_percentiles[1] if len(sorted_percentiles) >= 2 else 0.0
+    revoking = sorted(
+        [p for p in perspectives if int(p["score"]) <= 1],
+        key=lambda p: (int(p["score"]), str(p["perspective_slug"])),
+    )
+    return {
+        "ranking_percentile": round(ranking, 6),
+        "corroboration_revoked": True,
+        "corroboration_revoked_by": str(revoking[0]["perspective_slug"]) if revoking else "",
+    }
+
+
 def compute_image_peak_percentile_scores(
     conn: sqlite3.Connection,
     *,
@@ -78,8 +117,10 @@ def compute_image_peak_percentile_scores(
     """Per-image peak within-perspective percentile plus per-perspective detail.
 
     Returns ``(items, meta)``. Each item includes ``peak_percentile`` (max
-    percentile across the image's scored lenses), ``perspectives_covered``,
-  ``eligible``, and ``per_perspective`` entries with ``percentile``.
+    percentile across the image's scored lenses), ``ranking_percentile`` (peak
+    or second-highest when corroboration is revoked), ``corroboration_revoked``,
+    ``corroboration_revoked_by``, ``perspectives_covered``, ``eligible``, and
+    ``per_perspective`` entries with ``percentile``.
     """
     active_slugs = _active_perspective_slugs(conn)
     active_count = len(active_slugs)
@@ -124,6 +165,7 @@ def compute_image_peak_percentile_scores(
     for image_key, perspectives in by_key.items():
         n = len(perspectives)
         peak = max(p["percentile"] for p in perspectives) if perspectives else 0.0
+        veto_fields = _corroboration_ranking_fields(perspectives, peak)
         eligible = n >= min_used
         if eligible:
             eligible_count += 1
@@ -146,6 +188,7 @@ def compute_image_peak_percentile_scores(
         row = {
             "image_key": image_key,
             "peak_percentile": round(peak, 6),
+            **veto_fields,
             "perspectives_covered": n,
             "eligible": eligible,
             "per_perspective": per_out,
@@ -158,7 +201,8 @@ def compute_image_peak_percentile_scores(
     meta: dict[str, Any] = {
         "active_perspectives": active_slugs,
         "weighting": "peak_within_perspective_percentile",
-        "ranking_key": "peak_percentile",
+        "ranking_key": "ranking_percentile",
+        "corroboration_rule": _CORROBORATION_RULE,
         "min_perspectives_used": min_used,
         "coverage_rule": coverage_rule,
         "total_catalog_images": total_catalog,

@@ -32,7 +32,10 @@ Parent initiative: #205 — reconceive the identity page (Mirror + Advisor).
    **[0, 1]** per `(image_key, perspective_slug)`, with **midrank** for ties.
 2. **Cross-perspective ranking key** for consumers that need a single sortable scalar:
    **peak within-perspective percentile** — `max(percentile)` across the image's
-   scored lenses ("most exceptional at something").
+   scored lenses ("most exceptional at something"). Consumers sort on
+   **`ranking_percentile`**, which equals peak unless corroboration is revoked (see
+   amendment below). **`peak_percentile`** remains exposed for display and still
+   means the max percentile across lenses.
 3. **Migrate `GET /api/identity/best-photos` first** (dashboard best-photos widgets;
    lowest-risk consumer: ranking-key change only, no UI restructure). Response exposes
    `peak_percentile` and per-perspective `percentile`; meta `weighting` becomes
@@ -40,6 +43,15 @@ Parent initiative: #205 — reconceive the identity page (Mirror + Advisor).
 4. **Keep `compute_image_aggregate_scores` temporarily** — Mirror and Advisor still
    consume the mean until their #205 slices land; delete the mean path in the final
    slice once the last consumer migrates.
+
+### Amendment (2026-09, #280 / #291)
+
+The cross-perspective **sort key** is now **`ranking_percentile`**: when any rendered
+lens scored raw **1** (rubric verdict: absent), the image ranks on its
+**second-highest** percentile instead of peak; a single lens scoring 1 with no backup
+gets `0.0`. `peak_percentile` is unchanged for display. Meta `ranking_key` is
+`ranking_percentile`; `corroboration_rule` documents the veto. Measurement and
+rationale: [#280](https://github.com/ccanalesb/lightroom-tagger/issues/280).
 
 ## Consequences
 - Best-photos and dashboard highlights rank on comparable cross-lens strength instead
