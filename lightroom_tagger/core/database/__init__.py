@@ -263,6 +263,7 @@ __all__ = (
     'init_vision_cache_table',
     'InsightsSummary',
     'has_frame_substance_override',
+    'insert_catalog_similarity_group',
     'insert_frame_substance_override',
     'insert_frame_substance_run',
     'insert_image_score',
