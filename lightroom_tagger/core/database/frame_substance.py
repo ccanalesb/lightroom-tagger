@@ -1,0 +1,236 @@
+"""Frame substance verdict storage and read helpers (#295)."""
+
+from __future__ import annotations
+
+import sqlite3
+from collections.abc import Iterable, Mapping, Sequence
+from datetime import datetime, timezone
+
+from .catalog import library_write
+
+FLAGGED_VERDICTS = frozenset({"void", "illegible"})
+
+_INSERT_RUN_SQL = """
+    INSERT INTO frame_substance_runs (started_at, detector_version)
+    VALUES (?, ?)
+"""
+
+_FINISH_RUN_SQL = """
+    UPDATE frame_substance_runs
+    SET finished_at = ?,
+        count_void = ?,
+        count_illegible = ?,
+        count_ok = ?,
+        count_unknown = ?,
+        breached = ?,
+        breach_reason = ?
+    WHERE run_id = ?
+"""
+
+_UPSERT_VERDICT_SQL = """
+    INSERT INTO image_frame_substance (
+        image_key, verdict, unknown_reason,
+        black_frac_25, blown_frac_235, lap_var, tile_max, entropy,
+        detector_version, judged_at, run_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(image_key) DO UPDATE SET
+        verdict = excluded.verdict,
+        unknown_reason = excluded.unknown_reason,
+        black_frac_25 = excluded.black_frac_25,
+        blown_frac_235 = excluded.blown_frac_235,
+        lap_var = excluded.lap_var,
+        tile_max = excluded.tile_max,
+        entropy = excluded.entropy,
+        detector_version = excluded.detector_version,
+        judged_at = excluded.judged_at,
+        run_id = excluded.run_id
+"""
+
+
+def insert_frame_substance_run(db: sqlite3.Connection, *, detector_version: str) -> int:
+    """Insert a started detection run and return its ``run_id``."""
+    started_at = datetime.now(timezone.utc).isoformat()
+    with library_write(db):
+        cur = db.execute(_INSERT_RUN_SQL, (started_at, detector_version))
+        run_id = int(cur.lastrowid)
+    return run_id
+
+
+def finish_frame_substance_run(
+    db: sqlite3.Connection,
+    run_id: int,
+    *,
+    count_void: int,
+    count_illegible: int,
+    count_ok: int,
+    count_unknown: int,
+    breached: bool,
+    breach_reason: str = "",
+) -> None:
+    """Finalize a detection run with per-verdict counts and breach metadata."""
+    finished_at = datetime.now(timezone.utc).isoformat()
+    with library_write(db):
+        db.execute(
+            _FINISH_RUN_SQL,
+            (
+                finished_at,
+                int(count_void),
+                int(count_illegible),
+                int(count_ok),
+                int(count_unknown),
+                1 if breached else 0,
+                breach_reason or "",
+                int(run_id),
+            ),
+        )
+
+
+def upsert_frame_substance_verdict(
+    db: sqlite3.Connection,
+    *,
+    image_key: str,
+    verdict: str,
+    unknown_reason: str,
+    black_frac_25: float | None,
+    blown_frac_235: float | None,
+    lap_var: float | None,
+    tile_max: float | None,
+    entropy: float | None,
+    detector_version: str,
+    run_id: int,
+) -> None:
+    """Overwrite one image's substance verdict row."""
+    judged_at = datetime.now(timezone.utc).isoformat()
+    with library_write(db):
+        db.execute(
+            _UPSERT_VERDICT_SQL,
+            (
+                image_key,
+                verdict,
+                unknown_reason or "",
+                black_frac_25,
+                blown_frac_235,
+                lap_var,
+                tile_max,
+                entropy,
+                detector_version,
+                judged_at,
+                int(run_id),
+            ),
+        )
+
+
+def upsert_frame_substance_verdicts(
+    db: sqlite3.Connection,
+    rows: Sequence[Mapping[str, object]],
+) -> None:
+    """Batch overwrite substance verdict rows inside one write transaction."""
+    if not rows:
+        return
+    params = [
+        (
+            str(row["image_key"]),
+            str(row["verdict"]),
+            str(row.get("unknown_reason") or ""),
+            row.get("black_frac_25"),
+            row.get("blown_frac_235"),
+            row.get("lap_var"),
+            row.get("tile_max"),
+            row.get("entropy"),
+            str(row["detector_version"]),
+            str(row.get("judged_at") or datetime.now(timezone.utc).isoformat()),
+            int(row["run_id"]),
+        )
+        for row in rows
+    ]
+    with library_write(db):
+        db.executemany(_UPSERT_VERDICT_SQL, params)
+
+
+def get_frame_substance_verdict(db: sqlite3.Connection, image_key: str) -> dict | None:
+    """Return one detached verdict row, or ``None`` when unjudged."""
+    row = db.execute(
+        "SELECT * FROM image_frame_substance WHERE image_key = ?",
+        (image_key,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def load_frame_substance_verdict_map(db: sqlite3.Connection) -> dict[str, dict]:
+    """Return all current verdict rows keyed by ``image_key``."""
+    rows = db.execute("SELECT * FROM image_frame_substance").fetchall()
+    return {str(r["image_key"]): dict(r) for r in rows}
+
+
+def get_latest_finished_frame_substance_run(db: sqlite3.Connection) -> dict | None:
+    """Return the most recent completed run row, if any."""
+    row = db.execute(
+        """
+        SELECT *
+        FROM frame_substance_runs
+        WHERE finished_at IS NOT NULL
+        ORDER BY run_id DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def count_frame_substance_by_verdict(db: sqlite3.Connection) -> dict[str, int]:
+    """Count current verdict rows grouped by ``verdict``."""
+    rows = db.execute(
+        """
+        SELECT verdict, COUNT(*) AS c
+        FROM image_frame_substance
+        GROUP BY verdict
+        """
+    ).fetchall()
+    return {str(r["verdict"]): int(r["c"]) for r in rows}
+
+
+def count_frame_substance_by_unknown_reason(db: sqlite3.Connection) -> dict[str, int]:
+    """Count ``unknown`` rows grouped by ``unknown_reason``."""
+    rows = db.execute(
+        """
+        SELECT unknown_reason, COUNT(*) AS c
+        FROM image_frame_substance
+        WHERE verdict = 'unknown'
+        GROUP BY unknown_reason
+        """
+    ).fetchall()
+    return {str(r["unknown_reason"]): int(r["c"]) for r in rows}
+
+
+def insert_frame_substance_override(db: sqlite3.Connection, image_key: str) -> None:
+    """Persist a user override that restores ranking eligibility."""
+    with library_write(db):
+        db.execute(
+            """
+            INSERT INTO frame_substance_overrides (image_key)
+            VALUES (?)
+            ON CONFLICT(image_key) DO NOTHING
+            """,
+            (image_key,),
+        )
+
+
+def has_frame_substance_override(db: sqlite3.Connection, image_key: str) -> bool:
+    """Return whether the user has overridden the detector for ``image_key``."""
+    row = db.execute(
+        "SELECT 1 AS o FROM frame_substance_overrides WHERE image_key = ?",
+        (image_key,),
+    ).fetchone()
+    return row is not None
+
+
+def list_catalog_images_with_vision_cache(db: sqlite3.Connection) -> list[dict]:
+    """Catalog images left-joined to vision cache rows for batch detection."""
+    rows = db.execute(
+        """
+        SELECT i.key AS image_key, vc.compressed_path AS compressed_path
+        FROM images i
+        LEFT JOIN vision_cache vc ON vc.key = i.key
+        ORDER BY i.key ASC
+        """
+    ).fetchall()
+    return [dict(r) for r in rows]

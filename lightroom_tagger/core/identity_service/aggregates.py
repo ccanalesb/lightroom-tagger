@@ -26,6 +26,17 @@ _SCORES_BASE_SQL = """
     WHERE s.is_current = 1
         AND s.image_type = 'catalog'
         AND s.not_attempted = 0
+        AND NOT EXISTS (
+            SELECT 1
+            FROM image_frame_substance fs
+            WHERE fs.image_key = s.image_key
+              AND fs.verdict IN ('void', 'illegible')
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM frame_substance_overrides o
+                  WHERE o.image_key = fs.image_key
+              )
+        )
 """
 
 _WORD_RE = re.compile(r"[\w']+", flags=re.UNICODE)

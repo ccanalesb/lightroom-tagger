@@ -33,6 +33,7 @@ from .handlers.analyze import (
 )
 from .handlers.catalog import handle_catalog_sync
 from .handlers.embed import handle_batch_embed_image
+from .handlers.frame_substance import handle_batch_frame_substance
 from .handlers.stacks import (
     handle_batch_catalog_similarity,
     handle_batch_stack_detect,
@@ -126,6 +127,15 @@ JOB_TYPES: list[JobType] = [
         build_batch_embed_image_checkpoint_body,
         'checkpoint mismatch: batch_embed_image fingerprint changed, starting fresh',
         requires_catalog=True,
+    ),
+    JobType(
+        'batch_frame_substance',
+        handle_batch_frame_substance,
+        None,
+        None,
+        None,
+        None,
+        requires_catalog=False,
     ),
     JobType(
         'catalog_sync',
