@@ -35,6 +35,7 @@ class IdentityBestPhotosMeta(BaseModel):
     active_perspectives: list[str] | None = None
     weighting: str | None = None
     ranking_key: str | None = None
+    corroboration_rule: str | None = None
     min_perspectives_used: int | None = None
     coverage_rule: str | None = None
     total_catalog_images: int | None = None
@@ -188,6 +189,7 @@ class PostNextSuggestionsMeta(BaseModel):
 
     weighting: str | None = None
     ranking_key: str | None = None
+    corroboration_rule: str | None = None
     min_perspectives_used: int | None = None
     coverage_rule: str | None = None
     high_score_rule: str | None = None

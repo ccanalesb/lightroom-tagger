@@ -10,6 +10,7 @@ export const EMPTY_BEST_PHOTOS_META: IdentityBestPhotosMeta = {
   active_perspectives: null,
   weighting: null,
   ranking_key: null,
+  corroboration_rule: null,
   min_perspectives_used: null,
   coverage_rule: null,
   total_catalog_images: null,
@@ -41,6 +42,7 @@ export const EMPTY_MIRROR_RESPONSE: MirrorResponse = {
 export const EMPTY_POST_NEXT_META: PostNextSuggestionsMeta = {
   weighting: null,
   ranking_key: null,
+  corroboration_rule: null,
   min_perspectives_used: null,
   coverage_rule: null,
   high_score_rule: null,
