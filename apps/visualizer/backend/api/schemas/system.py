@@ -28,6 +28,15 @@ class PerspectiveCoverageRow(BaseModel):
     scored_images: int
 
 
+class FrameSubstanceRunSummary(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+
+    detector_version: str
+    finished_at: str
+    breached: bool
+    breach_reason: str
+
+
 class InsightsSummary(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
@@ -38,6 +47,9 @@ class InsightsSummary(BaseModel):
     unscored_on_active_perspectives: int
     no_current_score: int
     perspective_coverage: list[PerspectiveCoverageRow]
+    frame_substance_flagged: int
+    frame_substance_unknown: dict[str, int]
+    frame_substance_run: FrameSubstanceRunSummary | None
 
 
 class VisionModelEntry(BaseModel):

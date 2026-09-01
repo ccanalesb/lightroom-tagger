@@ -30,6 +30,9 @@ describe('DashboardPage', () => {
       pending_stack_suggestions: 6,
       unscored_on_active_perspectives: 4,
       no_current_score: 5,
+      frame_substance_flagged: 2,
+      frame_substance_unknown: { never_judged: 10 },
+      frame_substance_run: null,
       perspective_coverage: [
         {
           slug: 'framing',

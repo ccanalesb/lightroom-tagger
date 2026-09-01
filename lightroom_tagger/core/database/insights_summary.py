@@ -5,6 +5,12 @@ from __future__ import annotations
 import sqlite3
 from typing import TypedDict
 
+from .frame_substance import (
+    count_frame_substance_by_unknown_reason,
+    count_frame_substance_flagged_net_of_overrides,
+    count_frame_substance_never_judged,
+    get_latest_finished_frame_substance_run,
+)
 from .stack_suggestions import count_pending_stack_suggestions
 
 
@@ -15,6 +21,13 @@ class PerspectiveCoverageRow(TypedDict):
     scored_images: int
 
 
+class FrameSubstanceRunSummary(TypedDict):
+    detector_version: str
+    finished_at: str
+    breached: bool
+    breach_reason: str
+
+
 class InsightsSummary(TypedDict):
     catalog_images: int
     scoring_9_plus: int
@@ -23,6 +36,9 @@ class InsightsSummary(TypedDict):
     unscored_on_active_perspectives: int
     no_current_score: int
     perspective_coverage: list[PerspectiveCoverageRow]
+    frame_substance_flagged: int
+    frame_substance_unknown: dict[str, int]
+    frame_substance_run: FrameSubstanceRunSummary | None
 
 
 def get_insights_summary(conn: sqlite3.Connection) -> InsightsSummary:
@@ -50,6 +66,22 @@ def get_insights_summary(conn: sqlite3.Connection) -> InsightsSummary:
     )
 
     pending_stack_suggestions = count_pending_stack_suggestions(conn)
+
+    frame_substance_flagged = count_frame_substance_flagged_net_of_overrides(conn)
+    frame_substance_unknown = dict(count_frame_substance_by_unknown_reason(conn))
+    never_judged = count_frame_substance_never_judged(conn)
+    if never_judged:
+        frame_substance_unknown["never_judged"] = never_judged
+
+    latest_run = get_latest_finished_frame_substance_run(conn)
+    frame_substance_run: FrameSubstanceRunSummary | None = None
+    if latest_run is not None:
+        frame_substance_run = {
+            "detector_version": str(latest_run["detector_version"]),
+            "finished_at": str(latest_run["finished_at"]),
+            "breached": bool(int(latest_run.get("breached") or 0)),
+            "breach_reason": str(latest_run.get("breach_reason") or ""),
+        }
 
     unscored_on_active_perspectives = int(
         conn.execute(
@@ -119,4 +151,7 @@ def get_insights_summary(conn: sqlite3.Connection) -> InsightsSummary:
         "unscored_on_active_perspectives": unscored_on_active_perspectives,
         "no_current_score": no_current_score,
         "perspective_coverage": perspective_coverage,
+        "frame_substance_flagged": frame_substance_flagged,
+        "frame_substance_unknown": frame_substance_unknown,
+        "frame_substance_run": frame_substance_run,
     }

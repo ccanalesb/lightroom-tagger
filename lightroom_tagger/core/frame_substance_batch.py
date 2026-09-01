@@ -12,7 +12,7 @@ from lightroom_tagger.core.database.frame_substance import (
     FLAGGED_VERDICTS,
     finish_frame_substance_run,
     insert_frame_substance_run,
-    list_catalog_images_with_vision_cache,
+    list_catalog_images_for_frame_substance,
     load_frame_substance_verdict_map,
     upsert_frame_substance_verdicts,
 )
@@ -163,15 +163,41 @@ def evaluate_breach(
 def run_frame_substance_detection(
     db: sqlite3.Connection,
     *,
+    image_keys: set[str] | frozenset[str] | None = None,
+    stale_only: bool = False,
     progress: Callable[[int, str | None], None] | None = None,
 ) -> dict[str, Any]:
-    """Scan the catalog, overwrite verdict rows, and finalize the run record."""
+    """Scan the catalog, overwrite verdict rows, and finalize the run record.
+
+    When ``image_keys`` is set, only those catalog rows are candidates. With
+    ``stale_only=True``, skip rows that already have a verdict newer than the
+    vision-cache preview (chain mode). Default is a full-catalog rescan.
+    """
+    catalog_rows = list_catalog_images_for_frame_substance(
+        db,
+        image_keys=image_keys,
+        stale_only=stale_only,
+    )
+    total = len(catalog_rows)
+    empty_result = {
+        "run_id": None,
+        "detector_version": detector_version(),
+        "total": 0,
+        "count_void": 0,
+        "count_illegible": 0,
+        "count_ok": 0,
+        "count_unknown": 0,
+        "flagged": 0,
+        "breached": False,
+        "breach_reason": "",
+    }
+    if total == 0:
+        return empty_result
+
     version = detector_version()
     previous_rows = load_frame_substance_verdict_map(db)
     run_id = insert_frame_substance_run(db, detector_version=version)
 
-    catalog_rows = list_catalog_images_with_vision_cache(db)
-    total = len(catalog_rows)
     new_rows: dict[str, dict[str, Any]] = {}
     batch: list[dict[str, Any]] = []
 

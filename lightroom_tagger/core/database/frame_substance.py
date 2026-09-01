@@ -201,6 +201,39 @@ def count_frame_substance_by_unknown_reason(db: sqlite3.Connection) -> dict[str,
     return {str(r["unknown_reason"]): int(r["c"]) for r in rows}
 
 
+def count_frame_substance_flagged_net_of_overrides(db: sqlite3.Connection) -> int:
+    """Count flagged verdict rows (``void`` + ``illegible``) minus user overrides."""
+    row = db.execute(
+        """
+        SELECT COUNT(*) AS c
+        FROM image_frame_substance fs
+        WHERE fs.verdict IN ('void', 'illegible')
+          AND NOT EXISTS (
+              SELECT 1
+              FROM frame_substance_overrides o
+              WHERE o.image_key = fs.image_key
+          )
+        """
+    ).fetchone()
+    return int(row["c"])
+
+
+def count_frame_substance_never_judged(db: sqlite3.Connection) -> int:
+    """Count catalog images with no substance verdict row."""
+    row = db.execute(
+        """
+        SELECT COUNT(*) AS c
+        FROM images i
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM image_frame_substance fs
+            WHERE fs.image_key = i.key
+        )
+        """
+    ).fetchone()
+    return int(row["c"])
+
+
 def insert_frame_substance_override(db: sqlite3.Connection, image_key: str) -> None:
     """Persist a user override that restores ranking eligibility."""
     with library_write(db):
@@ -223,14 +256,37 @@ def has_frame_substance_override(db: sqlite3.Connection, image_key: str) -> bool
     return row is not None
 
 
-def list_catalog_images_with_vision_cache(db: sqlite3.Connection) -> list[dict]:
-    """Catalog images left-joined to vision cache rows for batch detection."""
+def list_catalog_images_for_frame_substance(
+    db: sqlite3.Connection,
+    *,
+    image_keys: set[str] | frozenset[str] | None = None,
+    stale_only: bool = False,
+) -> list[dict]:
+    """Catalog images for detection, optionally scoped and staleness-filtered."""
+    conditions: list[str] = []
+    params: list[object] = []
+    if image_keys is not None:
+        if not image_keys:
+            return []
+        placeholders = ",".join("?" * len(image_keys))
+        conditions.append(f"i.key IN ({placeholders})")
+        params.extend(sorted(image_keys))
+    if stale_only:
+        conditions.append(
+            "(fs.image_key IS NULL OR vc.compressed_at > fs.judged_at)"
+        )
+    where = ""
+    if conditions:
+        where = "WHERE " + " AND ".join(conditions)
     rows = db.execute(
-        """
+        f"""
         SELECT i.key AS image_key, vc.compressed_path AS compressed_path
         FROM images i
         LEFT JOIN vision_cache vc ON vc.key = i.key
+        LEFT JOIN image_frame_substance fs ON fs.image_key = i.key
+        {where}
         ORDER BY i.key ASC
-        """
+        """,
+        tuple(params),
     ).fetchall()
     return [dict(r) for r in rows]

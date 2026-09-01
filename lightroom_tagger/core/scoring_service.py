@@ -194,6 +194,22 @@ def score_image_for_perspective(
             reason=f"Video file not scorable: {os.path.basename(filepath)}",
         )
 
+    from lightroom_tagger.core.database.frame_substance import (
+        get_frame_substance_verdict,
+        has_frame_substance_override,
+    )
+
+    substance = get_frame_substance_verdict(db, image_key)
+    if (
+        substance is not None
+        and str(substance.get("verdict")) == "void"
+        and not has_frame_substance_override(db, image_key)
+    ):
+        return VisionOpOutcome(
+            status="skipped",
+            reason="Frame substance verdict: void",
+        )
+
     prow = get_perspective_by_slug(db, perspective_slug)
     if not prow:
         return VisionOpOutcome(status="failed", reason=f"Unknown perspective slug: {perspective_slug!r}")

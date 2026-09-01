@@ -144,6 +144,11 @@ export const INSIGHTS_ACTION_CULL_BURST_DESC =
 export const INSIGHTS_ACTION_CONFIRM_STACKS = 'Stacks to confirm'
 export const INSIGHTS_ACTION_CONFIRM_STACKS_DESC =
   'Visual matches date_taken missed — review pairs and confirm or reject.'
+export const INSIGHTS_ACTION_FRAME_SUBSTANCE = 'Flagged frames'
+export const INSIGHTS_ACTION_FRAME_SUBSTANCE_DESC =
+  'Void or illegible frames withheld from ranking (net of overrides).'
+export const INSIGHTS_ACTION_FRAME_SUBSTANCE_BREACH =
+  'Latest detector run breached blast-radius guard'
 export const INSIGHTS_LINK_CONFIRM_STACKS = '/stacks/confirm'
 export const STACK_SUGGESTIONS_PAGE_TITLE = 'Stacks to confirm'
 export const STACK_SUGGESTIONS_PAGE_SUBTITLE =

@@ -9,6 +9,9 @@ import {
   INSIGHTS_ACTION_CONFIRM_STACKS_DESC,
   INSIGHTS_ACTION_FINISH_PASS,
   INSIGHTS_ACTION_FINISH_PASS_DESC,
+  INSIGHTS_ACTION_FRAME_SUBSTANCE,
+  INSIGHTS_ACTION_FRAME_SUBSTANCE_BREACH,
+  INSIGHTS_ACTION_FRAME_SUBSTANCE_DESC,
   INSIGHTS_LINK_BURST_STACKS,
   INSIGHTS_LINK_CONFIRM_STACKS,
   INSIGHTS_LINK_SCORE_JOB,
@@ -22,6 +25,14 @@ export function InsightsActionCards({ summary }: InsightsActionCardsProps) {
   const burstStacks = summary?.burst_stacks ?? 0
   const pendingStacks = summary?.pending_stack_suggestions ?? 0
   const noCurrentScore = summary?.no_current_score ?? 0
+  const flaggedFrames = summary?.frame_substance_flagged ?? 0
+  const frameSubstanceRun = summary?.frame_substance_run ?? null
+  const unknownReasons = summary?.frame_substance_unknown ?? {}
+  const unknownParts = Object.entries(unknownReasons)
+    .filter(([, count]) => count > 0)
+    .map(([reason, count]) => `${reason}: ${count.toLocaleString()}`)
+  const unknownSummary =
+    unknownParts.length > 0 ? ` Unjudged — ${unknownParts.join(', ')}.` : ''
 
   const cards = [
     {
@@ -37,6 +48,17 @@ export function InsightsActionCards({ summary }: InsightsActionCardsProps) {
       description: INSIGHTS_ACTION_CONFIRM_STACKS_DESC,
       link: INSIGHTS_LINK_CONFIRM_STACKS,
       badge: 'accent' as const,
+    },
+    {
+      title: INSIGHTS_ACTION_FRAME_SUBSTANCE,
+      value: flaggedFrames.toLocaleString(),
+      description: `${INSIGHTS_ACTION_FRAME_SUBSTANCE_DESC}${unknownSummary}${
+        frameSubstanceRun?.breached
+          ? ` ${INSIGHTS_ACTION_FRAME_SUBSTANCE_BREACH}: ${frameSubstanceRun.breach_reason}`
+          : ''
+      }`,
+      link: INSIGHTS_LINK_SCORE_JOB,
+      badge: frameSubstanceRun?.breached ? ('warning' as const) : ('default' as const),
     },
     {
       title: INSIGHTS_ACTION_FINISH_PASS,
