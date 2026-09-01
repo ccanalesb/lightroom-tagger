@@ -5,12 +5,17 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from lightroom_tagger.core.database import (
+    finish_frame_substance_run,
     get_insights_summary,
     init_database,
+    insert_frame_substance_override,
+    insert_frame_substance_run,
     insert_image_score,
     insert_perspective,
     store_image,
+    upsert_frame_substance_verdict,
 )
+from lightroom_tagger.core.frame_substance_detector import detector_version
 
 
 def _score(conn, image_key: str, slug: str, score: int) -> None:
@@ -91,6 +96,9 @@ def test_insights_summary_counts_and_coverage(tmp_path) -> None:
     assert summary["scoring_9_plus"] == 1
     assert summary["burst_stacks"] == 1
     assert summary["pending_stack_suggestions"] == 0
+    assert summary["frame_substance_flagged"] == 0
+    assert summary["frame_substance_unknown"] == {"never_judged": 3}
+    assert summary["frame_substance_run"] is None
     assert summary["unscored_on_active_perspectives"] == 2  # k2 missing beta, k3 missing both
     assert summary["no_current_score"] == 1
 
@@ -101,3 +109,92 @@ def test_insights_summary_counts_and_coverage(tmp_path) -> None:
     assert by_slug["legacy"]["scored_images"] == 0
 
     conn.close()
+
+
+def _upsert_verdict(conn, image_key: str, verdict: str, *, unknown_reason: str = "") -> int:
+    run_id = insert_frame_substance_run(conn, detector_version=detector_version())
+    upsert_frame_substance_verdict(
+        conn,
+        image_key=image_key,
+        verdict=verdict,
+        unknown_reason=unknown_reason,
+        black_frac_25=0.0,
+        blown_frac_235=0.0,
+        lap_var=1.0,
+        tile_max=10.0,
+        entropy=5.0,
+        detector_version=detector_version(),
+        run_id=run_id,
+    )
+    conn.commit()
+    return run_id
+
+
+def test_insights_summary_frame_substance_flagged_net_of_overrides(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    k1 = store_image(conn, {"date_taken": "2024-01-01", "filename": "a.jpg"})
+    k2 = store_image(conn, {"date_taken": "2024-01-02", "filename": "b.jpg"})
+    conn.commit()
+    _upsert_verdict(conn, k1, "void")
+    _upsert_verdict(conn, k2, "illegible")
+    insert_frame_substance_override(conn, k2)
+    conn.commit()
+
+    summary = get_insights_summary(conn)
+    assert summary["frame_substance_flagged"] == 1
+
+
+def test_insights_summary_frame_substance_unknown_breakdown(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    k1 = store_image(conn, {"date_taken": "2024-01-01", "filename": "a.jpg"})
+    k2 = store_image(conn, {"date_taken": "2024-01-02", "filename": "b.jpg"})
+    conn.commit()
+    _upsert_verdict(conn, k1, "unknown", unknown_reason="no_cache_row")
+    _upsert_verdict(conn, k2, "ok")
+
+    summary = get_insights_summary(conn)
+    assert summary["frame_substance_unknown"]["no_cache_row"] == 1
+    assert summary["frame_substance_unknown"].get("never_judged", 0) == 0
+    assert "ok" not in summary["frame_substance_unknown"]
+
+
+def test_insights_summary_frame_substance_run_breach(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    run_id = insert_frame_substance_run(conn, detector_version="det-v1")
+    finish_frame_substance_run(
+        conn,
+        run_id,
+        count_void=10,
+        count_illegible=0,
+        count_ok=0,
+        count_unknown=0,
+        breached=True,
+        breach_reason="absolute bound: 10 flagged > 250",
+    )
+    conn.commit()
+
+    summary = get_insights_summary(conn)
+    assert summary["frame_substance_run"] is not None
+    assert summary["frame_substance_run"]["breached"] is True
+    assert "absolute bound" in summary["frame_substance_run"]["breach_reason"]
+
+
+def test_insights_summary_frame_substance_clean_run(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    run_id = insert_frame_substance_run(conn, detector_version="det-v1")
+    finish_frame_substance_run(
+        conn,
+        run_id,
+        count_void=0,
+        count_illegible=0,
+        count_ok=1,
+        count_unknown=0,
+        breached=False,
+    )
+    conn.commit()
+
+    summary = get_insights_summary(conn)
+    assert summary["frame_substance_run"] is not None
+    assert summary["frame_substance_run"]["breached"] is False
+    assert summary["frame_substance_run"]["breach_reason"] == ""
+

@@ -196,7 +196,9 @@ def test_batch_analyze_sets_current_step_describing_then_scoring(
         if len(c.args) >= 3 and c.args[2] == 'current_step'
     ]
     values = [c.args[3] for c in current_step_calls]
-    assert values == ['Describing', 'Scoring'], f'unexpected current_step order: {values!r}'
+    assert values == ['Describing', 'Frame substance', 'Scoring'], (
+        f'unexpected current_step order: {values!r}'
+    )
 
 
 @patch('jobs.handlers.analyze.add_job_log')

@@ -50,6 +50,52 @@ def _failure_severity_from_exception(exc: BaseException) -> str:
     return 'error'
 
 
+_VOID_SUBSTANCE_SCORING_EXCLUDE_SQL = """
+    NOT EXISTS (
+        SELECT 1
+        FROM image_frame_substance fs
+        WHERE fs.image_key = i.key
+          AND fs.verdict = 'void'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM frame_substance_overrides o
+              WHERE o.image_key = fs.image_key
+          )
+    )
+"""
+
+
+def _filter_void_substance_from_scoring_selection(
+    lib_db,
+    selection: list[tuple[str, str]],
+) -> list[tuple[str, str]]:
+    """Drop Tier-A void frames (without override) from a scoring selection."""
+    if not selection:
+        return selection
+    keys = [k for k, _ in selection]
+    placeholders = ",".join("?" * len(keys))
+    void_keys = {
+        str(r["image_key"])
+        for r in lib_db.execute(
+            f"""
+            SELECT fs.image_key AS image_key
+            FROM image_frame_substance fs
+            WHERE fs.image_key IN ({placeholders})
+              AND fs.verdict = 'void'
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM frame_substance_overrides o
+                  WHERE o.image_key = fs.image_key
+              )
+            """,
+            keys,
+        ).fetchall()
+    }
+    if not void_keys:
+        return selection
+    return [(k, t) for k, t in selection if k not in void_keys]
+
+
 def _resolve_date_window(metadata: dict) -> tuple[int | None, str | None]:
     """Normalize date-range metadata into ``(months, year)``.
 
@@ -111,6 +157,7 @@ def _select_catalog_keys(
     year: str | None,
     min_rating: int | None,
     undescribed_only: bool,
+    exclude_void_substance: bool = False,
 ) -> list[tuple[str, str]]:
     """Select ``(key, 'catalog')`` tuples matching the given window.
 
@@ -142,6 +189,9 @@ def _select_catalog_keys(
         date_col = "i.date_taken"
         rating_col = "i.rating"
         conditions = []
+
+    if exclude_void_substance:
+        conditions.append(_VOID_SUBSTANCE_SCORING_EXCLUDE_SQL)
 
     if months:
         conditions.append(f"{date_col} >= date('now', ?)")

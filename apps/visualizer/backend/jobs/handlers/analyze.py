@@ -17,6 +17,7 @@ from .common import (
     _CHECKPOINT_MAX_ENTRIES,
     _CATALOG_NOT_VIDEO_SQL,
     _failure_severity_from_exception,
+    _filter_void_substance_from_scoring_selection,
     _resolve_date_window,
     _resolve_library_db_or_fail,
     _select_catalog_keys,
@@ -1295,6 +1296,81 @@ def _run_score_pass(
     return score_result
 
 
+def _run_frame_substance_pass(
+    runner,
+    job_id: str,
+    lib_db,
+    selection: list[tuple[str, str]],
+    *,
+    progress_range: tuple[float, float],
+    log_prefix: str = "",
+) -> bool:
+    """Run chained frame-substance detection for this analyze selection.
+
+    Returns ``False`` when the job was cancelled (caller should stop). On other
+    failures logs a warning and returns ``True`` so scoring can proceed.
+    """
+    from lightroom_tagger.core.frame_substance_batch import run_frame_substance_detection
+
+    image_keys = {k for k, _ in selection}
+    if not image_keys:
+        return True
+
+    def _progress(pct: int, msg: str | None) -> None:
+        runner.update_progress(job_id, _map_job_progress(progress_range, pct), msg)
+
+    prefix = f'{log_prefix}' if log_prefix else ''
+    try:
+        result = run_frame_substance_detection(
+            lib_db,
+            image_keys=image_keys,
+            stale_only=True,
+            progress=_progress,
+        )
+    except RuntimeError as exc:
+        if str(exc) == 'cancelled':
+            runner.finalize_cancelled(job_id)
+            return False
+        add_job_log(
+            runner.db,
+            job_id,
+            'warning',
+            f'{prefix}[analyze] stage=frame_substance status=failed {exc}',
+        )
+        return True
+    except Exception as exc:
+        add_job_log(
+            runner.db,
+            job_id,
+            'warning',
+            f'{prefix}[analyze] stage=frame_substance status=failed {exc}',
+        )
+        return True
+
+    if int(result.get('total') or 0) == 0:
+        add_job_log(
+            runner.db,
+            job_id,
+            'info',
+            f'{prefix}[analyze] stage=frame_substance status=skipped reason=no_stale_images',
+        )
+        return True
+
+    add_job_log(
+        runner.db,
+        job_id,
+        'info',
+        (
+            f'{prefix}[analyze] stage=frame_substance status=complete '
+            f"void={result.get('count_void', 0)} "
+            f"illegible={result.get('count_illegible', 0)} "
+            f"ok={result.get('count_ok', 0)} "
+            f"unknown={result.get('count_unknown', 0)}"
+        ),
+    )
+    return True
+
+
 def handle_batch_score(runner, job_id: str, metadata: dict):
     """Score catalog images in bulk (one vision call per image × perspective).
 
@@ -1339,6 +1415,7 @@ def _handle_batch_score_inner(runner, job_id: str, metadata: dict):
                 year=year,
                 min_rating=min_rating,
                 undescribed_only=False,
+                exclude_void_substance=True,
             )
 
             _run_score_pass(
@@ -1360,11 +1437,9 @@ def _handle_batch_score_inner(runner, job_id: str, metadata: dict):
 def handle_batch_analyze(runner, job_id: str, metadata: dict):
     """Unified analyze: run describe then score over a single shared (key, itype) selection.
 
-    Drives one job through two stages with split progress (``0..50`` describe, ``50..100`` score),
-    ``current_step`` updates (``'Describing'`` / ``'Scoring'``), nested ``batch_analyze``
-    checkpoints, and a combined ``complete_job`` payload (D-06 keys). ``force_describe`` /
-    ``force_score`` in ``metadata`` are normalized into per-stage ``force`` via shallow-merge
-    before hitting the helpers' fingerprint + pre-filter logic (D-11).
+    Drives one job through three stages with split progress (``0..48`` describe,
+    ``48..52`` frame substance, ``52..100`` score), ``current_step`` updates,
+    nested ``batch_analyze`` checkpoints, and a combined ``complete_job`` payload.
     """
     # See ``handle_batch_describe`` for cancel-scope rationale.
     with cancel_scope.install(lambda: runner.is_cancelled(job_id)):
@@ -1466,7 +1541,7 @@ def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
                     lib_db,
                     shared_selection,
                     db_path=db_path,
-                    progress_range=(0, 50),
+                    progress_range=(0, 48),
                     log_prefix='[describe] ',
                     finalize=False,
                     nested_analyze_checkpoint=True,
@@ -1474,15 +1549,30 @@ def _handle_batch_analyze_inner(runner, job_id: str, metadata: dict):
                 if describe_summary is None:
                     return
 
+            update_job_field(runner.db, job_id, 'current_step', 'Frame substance')
+            if not _run_frame_substance_pass(
+                runner,
+                job_id,
+                lib_db,
+                shared_selection,
+                progress_range=(48, 52),
+                log_prefix='[frame_substance] ',
+            ):
+                return
+
+            score_selection = _filter_void_substance_from_scoring_selection(
+                lib_db,
+                shared_selection,
+            )
             update_job_field(runner.db, job_id, 'current_step', 'Scoring')
             score_summary = _run_score_pass(
                 runner,
                 job_id,
                 metadata_for_score,
                 lib_db,
-                shared_selection,
+                score_selection,
                 db_path=db_path,
-                progress_range=(50, 100),
+                progress_range=(52, 100),
                 log_prefix='[score] ',
                 finalize=False,
                 nested_analyze_checkpoint=True,

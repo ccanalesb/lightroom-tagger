@@ -1445,6 +1445,13 @@ export interface components {
             no_current_score: number;
             /** Perspective Coverage */
             perspective_coverage: components["schemas"]["InsightsSummary.36cf89b.PerspectiveCoverageRow"][];
+            /** Frame Substance Flagged */
+            frame_substance_flagged: number;
+            /** Frame Substance Unknown */
+            frame_substance_unknown: {
+                [key: string]: number;
+            };
+            frame_substance_run: components["schemas"]["InsightsSummary.36cf89b.FrameSubstanceRunSummary"] | null;
         };
         /** CatalogCacheReadyResponse */
         "CatalogCacheReadyResponse.36cf89b": {
@@ -3006,6 +3013,17 @@ export interface components {
             provider_id: string | null;
             /** Default */
             default: boolean;
+        };
+        /** FrameSubstanceRunSummary */
+        "InsightsSummary.36cf89b.FrameSubstanceRunSummary": {
+            /** Detector Version */
+            detector_version: string;
+            /** Finished At */
+            finished_at: string;
+            /** Breached */
+            breached: boolean;
+            /** Breach Reason */
+            breach_reason: string;
         };
         /** PerspectiveCoverageRow */
         "InsightsSummary.36cf89b.PerspectiveCoverageRow": {

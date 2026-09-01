@@ -370,3 +370,59 @@ def test_verdicts_written_even_when_breach_detected(tmp_path, monkeypatch) -> No
     ).fetchone()
     assert row is not None
     assert row["verdict"] == "void"
+
+
+def test_chain_mode_judges_only_scoped_stale_images(tmp_path) -> None:
+    conn = init_database(str(tmp_path / "library.db"))
+    slugs = _active_slugs(conn, limit=1)
+
+    k_in_run = _seed_scored_image(
+        conn,
+        tmp_path,
+        filename="in_run.jpg",
+        grey=_noisy_mid_grey(),
+        score=7,
+        slugs=slugs,
+    )
+    k_outside = _seed_scored_image(
+        conn,
+        tmp_path,
+        filename="outside.jpg",
+        grey=_noisy_mid_grey(),
+        score=7,
+        slugs=slugs,
+    )
+    conn.commit()
+
+    run_frame_substance_detection(conn)
+    judged_at_outside = conn.execute(
+        "SELECT judged_at FROM image_frame_substance WHERE image_key = ?",
+        (k_outside,),
+    ).fetchone()["judged_at"]
+
+    conn.execute(
+        """
+        UPDATE vision_cache
+        SET compressed_at = datetime('now', '+1 hour')
+        WHERE key = ?
+        """,
+        (k_in_run,),
+    )
+    conn.commit()
+
+    run_frame_substance_detection(
+        conn,
+        image_keys={k_in_run},
+        stale_only=True,
+    )
+    judged_at_outside_after = conn.execute(
+        "SELECT judged_at FROM image_frame_substance WHERE image_key = ?",
+        (k_outside,),
+    ).fetchone()["judged_at"]
+    assert judged_at_outside_after == judged_at_outside
+
+    row_in_run = conn.execute(
+        "SELECT run_id FROM image_frame_substance WHERE image_key = ?",
+        (k_in_run,),
+    ).fetchone()
+    assert row_in_run is not None
