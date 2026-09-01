@@ -14,6 +14,7 @@ from .analyze import (
 )
 from .catalog import handle_catalog_sync
 from .embed import handle_batch_embed_image
+from .frame_substance import handle_batch_frame_substance
 from .stacks import (
     handle_batch_catalog_similarity,
     handle_batch_stack_detect,
@@ -45,6 +46,7 @@ __all__ = (
     'handle_batch_stack_detect',
     'handle_batch_catalog_similarity',
     'handle_batch_embed_image',
+    'handle_batch_frame_substance',
     'handle_catalog_sync',
     'handle_catalog_cache_build',
 )

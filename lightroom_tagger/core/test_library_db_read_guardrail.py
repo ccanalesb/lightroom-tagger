@@ -31,7 +31,8 @@ _LIBRARY_TABLE_RE = re.compile(
     r"image_stacks|"
     r"image_stack_members|vision_cache|"
     r"catalog_similarity_groups|catalog_similarity_candidates|"
-    r"image_clip_embeddings"
+    r"image_clip_embeddings|"
+    r"image_frame_substance|frame_substance_overrides|frame_substance_runs"
     r")\b",
     re.IGNORECASE,
 )
