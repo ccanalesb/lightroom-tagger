@@ -6,7 +6,6 @@ import sqlite3
 from collections.abc import Sequence
 from datetime import datetime
 
-from lightroom_tagger.core.database.catalog_query_best_score import get_best_current_catalog_score
 from lightroom_tagger.core.database.stacks import (
     select_stack_representative_key_for_keys,
     stack_id_for_image_key,
@@ -14,9 +13,6 @@ from lightroom_tagger.core.database.stacks import (
     stack_metadata_for_api,
 )
 from lightroom_tagger.core.exceptions import StackMutationError
-
-# #226: blank-frame false positives average ~4.53 vs ~4.88 catalog-wide.
-BLANK_FRAME_SCORE_FLOOR = 4.5
 
 _PENDING_PAIRS_SQL = """
 WITH pairs AS (
@@ -67,22 +63,14 @@ WHERE r.key_a IS NULL
   )
   AND NOT EXISTS (
       SELECT 1
-      FROM (
-          SELECT s1.image_key, s1.score
-          FROM image_scores s1
-          WHERE s1.image_type = 'catalog' AND s1.is_current = 1
-            AND NOT EXISTS (
-                SELECT 1 FROM image_scores s2
-                WHERE s2.image_key = s1.image_key
-                  AND s2.image_type = 'catalog' AND s2.is_current = 1
-                  AND (
-                      s2.score > s1.score
-                      OR (s2.score = s1.score AND s2.perspective_slug < s1.perspective_slug)
-                  )
-            )
-      ) best
-      WHERE best.image_key IN (p.seed_key, p.candidate_key)
-        AND best.score < ?
+      FROM image_frame_substance fs
+      WHERE fs.image_key IN (p.seed_key, p.candidate_key)
+        AND fs.verdict IN ('void', 'illegible')
+        AND NOT EXISTS (
+            SELECT 1
+            FROM frame_substance_overrides o
+            WHERE o.image_key = fs.image_key
+        )
   )
 """
 
@@ -93,12 +81,6 @@ def normalize_image_pair(key_a: str, key_b: str) -> tuple[str, str]:
     if a == b:
         raise ValueError("image keys must differ")
     return (a, b) if a < b else (b, a)
-
-
-def is_blank_frame_catalog_key(db: sqlite3.Connection, image_key: str) -> bool:
-    """True when the image has a current catalog score below the blank-frame floor."""
-    score, _slug = get_best_current_catalog_score(db, image_key)
-    return score is not None and float(score) < BLANK_FRAME_SCORE_FLOOR
 
 
 def is_catalog_similarity_pair_rejected(
@@ -231,10 +213,9 @@ def stack_accept_suggestion_pair(
 
 
 def count_pending_stack_suggestions(db: sqlite3.Connection) -> int:
-    """Pending stack-to-confirm pairs after rejection, blank-frame, and stack filters."""
+    """Pending stack-to-confirm pairs after rejection, flagged-frame, and stack filters."""
     row = db.execute(
         f"SELECT COUNT(*) AS c FROM ({_PENDING_PAIRS_SQL}) pending",
-        (BLANK_FRAME_SCORE_FLOOR,),
     ).fetchone()
     return int(row["c"]) if row else 0
 
@@ -251,6 +232,6 @@ def list_pending_stack_suggestions(
         ORDER BY stack_status_rank ASC, time_gap_seconds ASC, group_id DESC
         LIMIT ? OFFSET ?
         """,
-        (BLANK_FRAME_SCORE_FLOOR, int(limit), int(offset)),
+        (int(limit), int(offset)),
     ).fetchall()
     return [dict(r) for r in rows], total

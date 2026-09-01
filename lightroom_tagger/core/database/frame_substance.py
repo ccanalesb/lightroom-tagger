@@ -256,6 +256,16 @@ def has_frame_substance_override(db: sqlite3.Connection, image_key: str) -> bool
     return row is not None
 
 
+def is_frame_substance_flagged(db: sqlite3.Connection, image_key: str) -> bool:
+    """True when the image has a void/illegible verdict and no user override."""
+    verdict = get_frame_substance_verdict(db, image_key)
+    if verdict is None:
+        return False
+    if verdict["verdict"] not in FLAGGED_VERDICTS:
+        return False
+    return not has_frame_substance_override(db, image_key)
+
+
 def list_catalog_images_for_frame_substance(
     db: sqlite3.Connection,
     *,

@@ -154,6 +154,7 @@ from .frame_substance import (
     has_frame_substance_override,
     insert_frame_substance_override,
     insert_frame_substance_run,
+    is_frame_substance_flagged,
     list_catalog_images_for_frame_substance,
     load_frame_substance_verdict_map,
     upsert_frame_substance_verdict,
@@ -161,9 +162,7 @@ from .frame_substance import (
 )
 
 from .stack_suggestions import (
-    BLANK_FRAME_SCORE_FLOOR,
     count_pending_stack_suggestions,
-    is_blank_frame_catalog_key,
     is_catalog_similarity_pair_rejected,
     list_pending_stack_suggestions,
     normalize_image_pair,
@@ -206,7 +205,6 @@ __all__ = (
     '_serialize_json',
     '_sort_catalog_key_rows_newest_first',
     '_visual_attr_json',
-    'BLANK_FRAME_SCORE_FLOOR',
     'batch_update_hashes',
     'build_description_fts_query',
     'build_description_search_document',
@@ -272,8 +270,8 @@ __all__ = (
     'insert_frame_substance_run',
     'insert_image_score',
     'insert_perspective',
-    'is_blank_frame_catalog_key',
     'is_catalog_similarity_pair_rejected',
+    'is_frame_substance_flagged',
     'is_vision_cache_valid',
     'library_write',
     'list_all_scores_for_image',
