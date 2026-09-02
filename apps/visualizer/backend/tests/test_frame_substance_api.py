@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from app import create_app
+
 from lightroom_tagger.core.database import (
     get_frame_substance_verdict,
     has_frame_substance_override,
@@ -23,7 +24,6 @@ from lightroom_tagger.core.frame_substance_detector import detector_version
 from lightroom_tagger.core.identity_service import rank_best_photos
 from lightroom_tagger.lightroom.writer import (
     CULL_KEYWORD,
-    add_keyword_by_key,
     connect_catalog,
     image_has_keyword_by_key,
 )

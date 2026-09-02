@@ -3,7 +3,7 @@ import { Suspense } from 'react'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { deleteMatching } from '../../../data/cache'
 import { FrameSubstanceSection } from '../FrameSubstanceSection'
-import type { FrameSubstanceResponse } from '../../services/api'
+import type { FrameSubstanceResponse } from '../../../services/api'
 
 const mockGet = vi.fn()
 const mockCreateOverride = vi.fn()
@@ -12,7 +12,7 @@ const mockAddCull = vi.fn()
 const mockRemoveCull = vi.fn()
 
 vi.mock('../../../services/api', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../services/api')>()
+  const actual = await importOriginal<typeof import('../../../services/api')>()
   return {
     ...actual,
     FrameSubstanceAPI: {

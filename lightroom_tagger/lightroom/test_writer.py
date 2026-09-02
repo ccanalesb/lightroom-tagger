@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import io
 import sqlite3
-import sys
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path

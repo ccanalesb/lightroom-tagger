@@ -25,6 +25,17 @@ import type {
   ImageDescriptionPerspectives,
   ImageDescriptionTechnical,
 } from '../types/descriptions'
+import type {
+  CullKeywordMutationResponse,
+  FrameSubstanceOverrideResponse,
+  FrameSubstanceResponse,
+} from '../types/frameSubstance'
+export type {
+  CullKeywordMutationResponse,
+  FrameSubstanceInstrument,
+  FrameSubstanceOverrideResponse,
+  FrameSubstanceResponse,
+} from '../types/frameSubstance'
 import type { Job, JobsGetOptions, JobsHealth, JobsListResponse } from '../types/job'
 import type {
   PerspectiveDetail,
@@ -574,35 +585,6 @@ export const ImagesAPI = {
   },
 }
 
-export type FrameSubstanceInstrument = {
-  kind: 'pixel_detector' | 'excusal_channel'
-  verdict?: 'void' | 'illegible' | null
-  tier?: 'A' | 'B' | null
-  advisory: boolean
-}
-
-export type FrameSubstanceResponse = {
-  image_key: string
-  has_detection_run: boolean
-  verdict?: 'void' | 'illegible' | 'ok' | 'unknown' | null
-  unknown_reason?: string | null
-  detector_version?: string | null
-  judged_at?: string | null
-  is_stale: boolean
-  has_override: boolean
-  flagged: boolean
-  has_cull_keyword?: boolean | null
-  instrument?: FrameSubstanceInstrument | null
-  restore_tier?: 'A' | 'B' | null
-  catalog_write_available: boolean
-  catalog_write_unavailable_reason?: string | null
-}
-
-export type CullKeywordMutationResponse = {
-  image_key: string
-  result: 'added' | 'already_present' | 'image_not_found' | 'removed' | 'not_present'
-}
-
 export const FrameSubstanceAPI = {
   get: (imageKey: string) =>
     request<FrameSubstanceResponse>(
@@ -610,13 +592,13 @@ export const FrameSubstanceAPI = {
     ),
 
   createOverride: (imageKey: string) =>
-    request<{ image_key: string; has_override: boolean }>(
+    request<FrameSubstanceOverrideResponse>(
       `/images/catalog/${encodeURIComponent(imageKey)}/frame-substance/override`,
       { method: 'POST' },
     ),
 
   deleteOverride: (imageKey: string) =>
-    request<{ image_key: string; has_override: boolean }>(
+    request<FrameSubstanceOverrideResponse>(
       `/images/catalog/${encodeURIComponent(imageKey)}/frame-substance/override`,
       { method: 'DELETE' },
     ),

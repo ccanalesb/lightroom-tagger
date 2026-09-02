@@ -140,10 +140,17 @@ describe('ImageDetailModal — cross-entry parity', () => {
       image_key: SHARED_KEY,
       has_detection_run: false,
       verdict: null,
+      unknown_reason: null,
+      detector_version: null,
+      judged_at: null,
       is_stale: false,
       has_override: false,
       flagged: false,
+      has_cull_keyword: null,
+      instrument: null,
+      restore_tier: null,
       catalog_write_available: true,
+      catalog_write_unavailable_reason: null,
     })
   })
 
