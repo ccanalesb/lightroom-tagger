@@ -7,9 +7,8 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 
 from .catalog import library_write
+from .frame_substance_sql import FLAGGED_VERDICTS
 from .vision_cache import get_vision_cached_image
-
-FLAGGED_VERDICTS = frozenset({"void", "illegible"})
 
 _INSERT_RUN_SQL = """
     INSERT INTO frame_substance_runs (started_at, detector_version)

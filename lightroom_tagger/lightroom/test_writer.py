@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 from lightroom_tagger.lightroom.writer import (
     CULL_KEYWORD,
     add_keyword_by_key,
-    backup_catalog_if_needed,
     add_keyword_to_image,
+    backup_catalog_if_needed,
     connect_catalog,
     create_keyword,
     get_keyword_id,

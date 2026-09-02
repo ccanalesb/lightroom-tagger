@@ -6,6 +6,7 @@ import sqlite3
 from collections.abc import Sequence
 from datetime import datetime
 
+from lightroom_tagger.core.database.frame_substance_sql import flagged_exists_sql
 from lightroom_tagger.core.database.stacks import (
     select_stack_representative_key_for_keys,
     stack_id_for_image_key,
@@ -14,7 +15,7 @@ from lightroom_tagger.core.database.stacks import (
 )
 from lightroom_tagger.core.exceptions import StackMutationError
 
-_PENDING_PAIRS_SQL = """
+_PENDING_PAIRS_SQL = f"""
 WITH pairs AS (
     SELECT
         g.group_id,
@@ -61,17 +62,7 @@ WHERE r.key_a IS NULL
       AND m2.stack_id IS NOT NULL
       AND m1.stack_id = m2.stack_id
   )
-  AND NOT EXISTS (
-      SELECT 1
-      FROM image_frame_substance fs
-      WHERE fs.image_key IN (p.seed_key, p.candidate_key)
-        AND fs.verdict IN ('void', 'illegible')
-        AND NOT EXISTS (
-            SELECT 1
-            FROM frame_substance_overrides o
-            WHERE o.image_key = fs.image_key
-        )
-  )
+  AND NOT {flagged_exists_sql("p.seed_key", "p.candidate_key")}
 """
 
 
