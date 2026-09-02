@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 from lightroom_tagger.lightroom.writer import (
     CULL_KEYWORD,
     add_keyword_by_key,
+    backup_catalog_if_needed,
     add_keyword_to_image,
     connect_catalog,
     create_keyword,
@@ -211,6 +212,28 @@ class TestWriterIntegration(unittest.TestCase):
             add_keyword_by_key(self.conn, "missing-key", CULL_KEYWORD)
             remove_keyword_by_key(self.conn, self.image_key, CULL_KEYWORD)
         self.assertEqual(buf.getvalue(), "")
+
+    def test_repeated_writes_reuse_one_backup(self):
+        """The toggle must not copy a multi-GB catalog on every click.
+
+        With max_backups = 2, copying per click also evicts the only
+        snapshot that predates our writes.
+        """
+        first = backup_catalog_if_needed(str(self.catalog_path))
+        Path(first).write_text("pristine")
+        second = backup_catalog_if_needed(str(self.catalog_path))
+        self.assertEqual(second, first)
+        self.assertEqual(Path(first).read_text(), "pristine")
+        backups = list(self.catalog_path.parent.glob(f"{self.catalog_path.name}.backup-*"))
+        self.assertEqual(len(backups), 1)
+
+    def test_backup_taken_again_once_the_interval_has_passed(self):
+        first = backup_catalog_if_needed(str(self.catalog_path))
+        Path(first).write_text("stale")
+        backup_catalog_if_needed(str(self.catalog_path), min_interval_seconds=0)
+        # The backup name has one-second resolution, so a same-second retake
+        # reuses the path; what matters is that a fresh copy was written.
+        self.assertNotEqual(Path(first).read_text(errors="replace"), "stale")
 
     def test_locked_catalog_raises_clear_error(self):
         lock_path = self.catalog_path.parent / f"{self.catalog_path.stem}.lrcat-lock"

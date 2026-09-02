@@ -1,6 +1,7 @@
 import logging
 import shutil
 import sqlite3
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +13,9 @@ KeywordAddResult = Literal["added", "already_present", "image_not_found"]
 KeywordRemoveResult = Literal["removed", "not_present", "image_not_found"]
 
 CULL_KEYWORD = "lrt-cull"
+
+# One backup per day of activity. See backup_catalog_if_needed.
+BACKUP_MIN_INTERVAL_SECONDS = 24 * 60 * 60
 
 
 def _catalog_lock_candidates(catalog_path: str) -> list[Path]:
@@ -29,10 +33,35 @@ def raise_if_catalog_locked(catalog_path: str) -> None:
     return None
 
 
-def backup_catalog_if_needed(catalog_path: str, *, max_backups: int = 2) -> str:
+def backup_catalog_if_needed(
+    catalog_path: str,
+    *,
+    max_backups: int = 2,
+    min_interval_seconds: float = BACKUP_MIN_INTERVAL_SECONDS,
+) -> str:
+    """Copy the catalog aside before writing to it, at most once per interval.
+
+    The per-click copy this function used to do was actively harmful: with
+    ``max_backups = 2`` the second write evicts the only snapshot that
+    predates every write we made, so backing up more often leaves *less*
+    to recover from. A real catalog here is 3 GB, so it also cost ~3 s and
+    6 GB of disk per toggle. When a backup younger than
+    ``min_interval_seconds`` already exists, that one is reused and nothing
+    is copied; its path is returned either way.
+    """
     cat = Path(catalog_path)
     parent = cat.parent
     pattern = f"{cat.name}.backup-*"
+    if min_interval_seconds > 0:
+        existing = sorted(parent.glob(pattern), key=lambda x: x.stat().st_mtime)
+        if existing:
+            newest = existing[-1]
+            age = time.time() - newest.stat().st_mtime
+            if age < min_interval_seconds:
+                logger.info(
+                    "Catalog backup %s is %.0fs old; reusing it.", newest, age
+                )
+                return str(newest)
     while True:
         existing = sorted(parent.glob(pattern), key=lambda x: x.stat().st_mtime)
         if len(existing) < max_backups:
