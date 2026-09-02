@@ -257,10 +257,28 @@ repo's slicing convention), not build-then-wire.
    `pilResize` (bicubic/lanczos), `pilGreyscale`, `centerCrop`, the CLIP
    preprocessing chain, the phash port, and the CLIP embedding service.
 1. **First vertical slice: `/api/system`** — proves the whole contract chain from a TS
-   route through OpenAPI to `api.gen.ts` with the drift gate green. Highest-value
-   slice: it de-risks ADR-0013 before any domain work.
-2. **Read-only route groups** — catalog/images, scores, descriptions, perspectives,
-   identity, providers, stacks, frame substance.
+   route through OpenAPI to `api.gen.ts`. **Done** (`/status`, `/stats`,
+   `/catalog/status`), with the emitted OpenAPI diffed route-by-route against Flask.
+2. **Route groups.** 12 of 52 OpenAPI paths so far. `tests/openapi-paths.test.ts`
+   pins every emitted path and method against a captured inventory of the Flask
+   document and ratchets the migrated count, so a group cannot silently regress or
+   invent a path.
+
+   | Group | Status |
+   |---|---|
+   | system (3 of 7 paths) | done |
+   | scores | done |
+   | perspectives | done, including writes |
+   | config | done |
+   | descriptions | reads done; `POST /generate` needs the vision pipeline |
+   | **catalog + stacks** | next — coupled: `stacks` reuses catalog's row shaping and `CatalogImage` |
+   | identity | needs `identity_service` (1,220 LOC of ranking/mirror logic) — service slice, not a route port |
+   | providers | needs the provider registry |
+   | frame substance | needs the `.lrcat` writer, sequenced last |
+   | jobs | needs the job engine (step 3) |
+
+   Sequencing note: the remaining groups are gated on domain code, not on route
+   work. `catalog`+`stacks` is the last large block that is DB-only.
 3. **Job engine** — worker_threads runner, `JOB_TYPES` registry, transitions state
    machine, checkpoints, socket.io progress. Preserve the ADR-0010 guardrails.
 4. **Job handlers**, one family per slice — catalog sync, embed, analyze/score,
@@ -268,7 +286,8 @@ repo's slicing convention), not build-then-wire.
 5. **Library core** — database package, scoring, identity, vision providers, prompt
    builder, frame substance detector, hasher, image prep, RAW/vision cache.
 6. **CLI** — replaces the `lightroom-tagger` console script.
-7. **Cutover** — back up `library.db`, run the full CLIP reindex (~14 min), switch.
+7. **Cutover** — back up `library.db`, point the Vite proxy at the TS backend, and
+   delete the Flask tree. No CLIP reindex: embeddings are already drop-in compatible.
 
 ## Risks
 
