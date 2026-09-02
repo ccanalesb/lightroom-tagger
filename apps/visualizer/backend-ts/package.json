@@ -18,8 +18,10 @@
   "dependencies": {
     "@hono/node-server": "^2.1.1",
     "@hono/zod-openapi": "^1.6.2",
+    "@huggingface/transformers": "^4.2.0",
     "better-sqlite3": "^13.0.3",
     "hono": "^4.13.5",
+    "sharp": "^0.34.5",
     "socket.io": "^4.8.3",
     "sqlite-vec": "^0.1.9",
     "yaml": "^2.9.0",
@@ -31,5 +33,9 @@
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"
-  }
+  },
+  "overrides": {
+    "sharp": "^0.34.5"
+  },
+  "//overrides": "sharp must resolve to ONE copy. @huggingface/transformers depends on sharp ^0.34.5 and bundles its own @img/sharp-libvips; installing a newer sharp alongside it loads two libvips into the process, which macOS reports as duplicate Objective-C classes and warns 'may cause spurious casting failures and mysterious crashes'. Keep this override in step with the transformers dependency when upgrading, and re-run the imaging and parity tests afterwards."
 }

@@ -122,11 +122,17 @@ The ONNX weights are numerically exact to 2.6e-12. Every bit of the drift comes 
 PIL bicubic. (Its source comment claims PIL parity; that claim is wrong, and upstream
 issues #482/#595/#816 have tracked it unfixed since 2023.)
 
-**Consequence — a strictly better plan than reindexing:** port Pillow's resampler
-(~90–110 lines, fixed-point) and feed our own tensor, bypassing `RawImage.resize`.
-Node then writes vectors that are drop-in compatible with the 43,451 already stored,
-and **no reindex is required**. Re-embedding everything stays available as a fallback
-if the port proves troublesome: ~14 min single-threaded, ~3.5 min over 4 workers.
+**This is now done and the reindex is eliminated.** `src/imaging/pil-resample.ts`
+ports Pillow's resampler and `src/imaging/clip-preprocess.ts` builds the tensor,
+bypassing `RawImage.resize`. Measured against the stored corpus over 8 images spread
+across the catalog (`tests/clip-parity.test.ts`):
+
+- **worst cosine 1.000000000**, worst `1 - cos` = **3.52e-12**
+- **top-10 neighbour lists identical** to the stored query vectors, up from 5.3/10
+
+Node now writes vectors that are drop-in compatible with the 43,451 already stored.
+Re-embedding remains available as a fallback (~14 min single-threaded) but is no
+longer part of the plan.
 
 ### Perceptual hashing — viable, reimplement directly
 
@@ -134,12 +140,25 @@ if the port proves troublesome: ~14 min single-threaded, ~3.5 min over 4 workers
 8×8 → threshold at median. Reimplemented over `sharp` and compared against the
 phashes Python stored in `vision_cache`:
 
-- **7/12 exact matches**, mean Hamming distance **0.83 bits of 64**
-- residual differences are 2 bits, from PIL-vs-libvips LANCZOS differences
+With the Pillow-exact resampler it reproduces Python's stored hashes **12/12
+exactly, max Hamming distance 0 of 64 bits** (`tests/phash-parity.test.ts`).
 
-Duplicate thresholds are far above 2 bits, so this is safe even as-is — and the same
-Pillow resampler port that CLIP needs makes it **bit-exact**, since the 2-bit residual
-has exactly the same cause. This is the second consumer of that shared module.
+One correction to an earlier measurement here. A first pass using `sharp` for the
+resize scored 7/12 exact with ~2 bits of drift, and that was attributed purely to
+resampling — but it also compared the wrong input. `vision_cache` hashes the
+*viewable* image, not the compressed cache file:
+
+```python
+viewable_path = get_viewable_path(original_path)
+temp_path = compress_image(viewable_path)
+phash = compute_phash(viewable_path)   # the viewable, not the cache JPEG
+```
+
+So part of that 2-bit drift was comparing a different image at a different
+resolution. The parity test therefore restricts itself to originals that are already
+JPEG, where `get_viewable_path` returns the path unchanged and the input is
+reproducible. For RAW originals the viewable was a temp file that no longer exists,
+so those rows cannot be used to verify a hash — worth knowing before anyone tries.
 
 No wavelet library is needed: `imagehash.whash` is reachable only from
 `compute_multiple_hashes`, which **nothing in production calls**. It is dead code —
@@ -157,9 +176,28 @@ value already in the database came through Pillow. `sharp` is not a substitute:
 | phash | 7/12 exact, ~2 bits drift |
 | whash (if it were live) | only 33% exact, up to 22/64 bits wrong |
 
-Budget this as **one deliberate shared module** with a fixture test asserting
-bit-exactness against Pillow output. The trap is that `sharp` runs fine and looks
-right while being quietly wrong.
+There is a **third** silent divergence beyond the resize, not covered by the research:
+`sharp().greyscale()` disagrees with PIL `convert("L")` on **23.7% of pixels** (max 11
+levels) on a real cache JPEG. PIL uses ITU-R 601-2 luma in fixed point,
+`(R*19595 + G*38470 + B*7471 + 0x8000) >> 16`, which `pilGreyscale` implements. Since
+phash greyscales *before* resizing, using sharp here would corrupt every hash.
+
+What is NOT a problem: **JPEG/PNG decoding is byte-identical.** sharp and PIL produced
+the same 2,098,176 bytes with zero differences on a real cache JPEG, so decoding can
+be delegated to sharp and only the resize and colour conversion need porting.
+
+This is built as **one shared module**, `src/imaging/pil-resample.ts`, pinned by
+golden files generated from Pillow itself
+(`tests/fixtures/imaging/regenerate-fixtures.py`, 80 bit-exact resize comparisons
+across bicubic and lanczos, RGB and single-channel planes). The trap it guards is that
+`sharp` runs fine and looks right while being quietly wrong.
+
+One caveat found while wiring it up: `@huggingface/transformers` depends on
+`sharp ^0.34.5` and bundles its own libvips. Installing a newer sharp alongside it
+loads **two** libvips into the process, which macOS flags as duplicate Objective-C
+classes and warns "may cause spurious casting failures and mysterious crashes". An
+npm `overrides` entry pins sharp to a single copy; keep it in step with the
+transformers dependency.
 
 ### Everything else
 
@@ -215,8 +253,9 @@ repo's slicing convention), not build-then-wire.
 0. **Foundation** — TS project, config loader, `better-sqlite3` + `sqlite-vec` layer,
    `utils/responses` equivalents, Hono app shell with OpenAPI document. **Done.**
 0b. **PIL-exact resampler** — the shared module CLIP and phash both depend on, with a
-   fixture test asserting bit-exact agreement with Pillow. Do this before any image
-   work, because everything downstream inherits its correctness.
+   fixture test asserting bit-exact agreement with Pillow. **Done.** Includes
+   `pilResize` (bicubic/lanczos), `pilGreyscale`, `centerCrop`, the CLIP
+   preprocessing chain, the phash port, and the CLIP embedding service.
 1. **First vertical slice: `/api/system`** — proves the whole contract chain from a TS
    route through OpenAPI to `api.gen.ts` with the drift gate green. Highest-value
    slice: it de-risks ADR-0013 before any domain work.
@@ -233,13 +272,11 @@ repo's slicing convention), not build-then-wire.
 
 ## Risks
 
-1. **Everything image-derived depends on the resampler port.** If it is not
-   bit-exact, CLIP embeddings drift into the near-duplicate band and silently corrupt
-   stack detection and catalog similarity (top-10 overlap 5.3/10). It fails quietly,
-   not loudly. Gate it with a Pillow-comparison fixture test before wiring any
-   consumer, and back up `library.db` before the first write-path run. If the port is
-   abandoned, the fallback is a single all-or-nothing reindex of all 43,451
-   embeddings (~14 min) — never a partial one.
+1. ~~**Everything image-derived depends on the resampler port.**~~ **Retired.** The
+   port is done and pinned: CLIP reproduces the stored corpus to `1 - cos` = 3.52e-12
+   with identical neighbour rankings, and phash matches 12/12 exactly. The residual
+   risk is regression, which the golden-file tests and the two gated parity tests now
+   cover. Still back up `library.db` before the first write-path run.
 2. **RAW decode cost.** Measured 872 ms/image over a 60-image soak, so a full
    vision-cache rebuild of ~41,000 files is ~10 hours single-threaded (~2.5 h over 4
    workers). `halfSize` being ignored for DNG makes 17,590 files the dominant share.
