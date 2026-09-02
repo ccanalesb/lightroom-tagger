@@ -8,11 +8,11 @@
  *
  * Load `.env` with `node --env-file=.env` rather than a dotenv dependency.
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 /** Monorepo root — `apps/visualizer/backend-ts/src` → four levels up. */
@@ -65,12 +65,25 @@ export const config = {
   get THUMBNAIL_DIR(): string {
     return resolvePath(process.env.THUMBNAIL_DIR ?? 'apps/visualizer/thumbnails');
   },
+  /**
+   * The repo-level `config.yaml` that `/api/config/*` reads and WRITES.
+   *
+   * Overridable via `LT_CONFIG_YAML` specifically so tests never rewrite the
+   * user's real config. The Python route hard-coded the repo path, which meant a
+   * test of the PUT handler would have clobbered it.
+   */
+  get LT_CONFIG_YAML(): string {
+    return resolvePath(process.env.LT_CONFIG_YAML ?? 'config.yaml');
+  },
 } as const;
 
 // --- library config.yaml ----------------------------------------------------
 
 export interface LibraryConfig {
   catalogPath: string | null;
+  /** The raw, unexpanded value as written in config.yaml. `/api/config/catalog`
+   *  returns both this and the expanded form, so it cannot be normalized away. */
+  catalogPathRaw: string;
   dbPath: string | null;
   mountPoint: string | null;
   workers: number;
@@ -78,10 +91,12 @@ export interface LibraryConfig {
   visionCacheDir: string;
   visionCacheEnabled: boolean;
   ollamaHost: string;
+  stackBurstDeltaMs: number;
 }
 
 const CONFIG_DEFAULTS = {
   workers: 4,
+  stackBurstDeltaMs: 2000,
   visionCacheDir: join(homedir(), '.cache', 'lightroom_tagger', 'vision'),
   visionCacheEnabled: true,
   ollamaHost: 'http://localhost:11434',
@@ -103,6 +118,7 @@ export function loadLibraryConfig(configPath = join(REPO_ROOT, 'config.yaml')): 
   };
   return {
     catalogPath: pathField('catalog_path'),
+    catalogPathRaw: typeof raw.catalog_path === 'string' ? raw.catalog_path : '',
     dbPath: pathField('db_path'),
     // A mount point is an absolute filesystem location; never repo-relative.
     mountPoint: typeof raw.mount_point === 'string' ? expandUser(raw.mount_point) : null,
@@ -118,5 +134,47 @@ export function loadLibraryConfig(configPath = join(REPO_ROOT, 'config.yaml')): 
         : CONFIG_DEFAULTS.visionCacheEnabled,
     ollamaHost:
       typeof raw.ollama_host === 'string' ? raw.ollama_host : CONFIG_DEFAULTS.ollamaHost,
+    stackBurstDeltaMs:
+      typeof raw.stack_burst_delta_ms === 'number'
+        ? Math.trunc(raw.stack_burst_delta_ms)
+        : CONFIG_DEFAULTS.stackBurstDeltaMs,
   };
+}
+
+/**
+ * Read `config.yaml` as a plain map, merge one key, and write it back.
+ *
+ * Preserves every other key and their order, matching
+ * `yaml.safe_dump(..., sort_keys=False)` in `lightroom_tagger/core/config.py`. This
+ * file is user-owned, so a rewrite must not reorder or drop anything it does not
+ * understand.
+ */
+function updateConfigYaml(configFile: string, key: string, value: unknown): void {
+  let data: Record<string, unknown> = {};
+  if (existsSync(configFile)) {
+    data = (parseYaml(readFileSync(configFile, 'utf8')) as Record<string, unknown>) ?? {};
+  } else {
+    mkdirSync(dirname(configFile), { recursive: true });
+  }
+  data[key] = value;
+  writeFileSync(configFile, stringifyYaml(data, { lineWidth: 0 }), 'utf8');
+}
+
+/** Write `catalog_path` into `config.yaml`, preserving other keys. */
+export function updateConfigYamlCatalogPath(configFile: string, catalogPath: string): void {
+  const stripped = catalogPath.trim();
+  if (!stripped) throw new Error('catalog_path must be non-empty');
+  updateConfigYaml(configFile, 'catalog_path', stripped);
+}
+
+/** Write `stack_burst_delta_ms` into `config.yaml`, preserving other keys. */
+export function updateConfigYamlStackBurstDeltaMs(configFile: string, value: number): void {
+  const intValue = Math.trunc(value);
+  if (intValue < 1) throw new Error('stack_burst_delta_ms must be at least 1');
+  updateConfigYaml(configFile, 'stack_burst_delta_ms', intValue);
+}
+
+/** `Path(value).expanduser()` — the only expansion the config routes apply. */
+export function expandUserPath(p: string): string {
+  return expandUser(p);
 }

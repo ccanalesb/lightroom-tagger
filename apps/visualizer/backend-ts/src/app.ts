@@ -9,6 +9,8 @@
 import { cors } from 'hono/cors';
 import { config } from './config.js';
 import { createOpenApiApp, openApiDoc } from './api/openapi.js';
+import { descriptionsRoutes } from './api/descriptions.js';
+import { ltConfigRoutes } from './api/lt-config.js';
 import { perspectivesRoutes } from './api/perspectives.js';
 import { scoresRoutes } from './api/scores.js';
 import { systemRoutes } from './api/system.js';
@@ -27,6 +29,8 @@ export function createApp() {
   // One route group per domain area, mirroring the Flask blueprint layout and its
   // url_prefix values exactly — the frontend and the OpenAPI contract depend on them.
   app.route('/api', systemRoutes);
+  app.route('/api', descriptionsRoutes);
+  app.route('/api', ltConfigRoutes);
   app.route('/api', perspectivesRoutes);
   app.route('/api/scores', scoresRoutes);
 
