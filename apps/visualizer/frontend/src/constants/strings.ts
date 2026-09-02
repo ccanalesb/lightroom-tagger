@@ -286,7 +286,12 @@ export const FRAME_SUBSTANCE_MOUNT_SHARE =
   'Preview unavailable — mount the share and re-run frame substance detection.'
 export const FRAME_SUBSTANCE_DECODE_FAILED =
   'Preview could not be decoded — this file is broken and will not fix itself.'
-export const FRAME_SUBSTANCE_UNKNOWN_OK = 'Judged OK by the pixel detector.'
+export const FRAME_SUBSTANCE_OK = 'Judged OK by the pixel detector.'
+// Deliberately not the OK message: an unknown verdict means the detector
+// could not read the image, which is not the same as reading it and
+// finding it fine.
+export const FRAME_SUBSTANCE_UNKNOWN_UNSPECIFIED =
+  'Not judged — the detector could not read this image, for a reason it did not record.'
 export const FRAME_SUBSTANCE_PIXEL_VOID = 'Pixel detector: void frame (Tier A — excluded from scoring).'
 export const FRAME_SUBSTANCE_PIXEL_ILLEGIBLE =
   'Pixel detector: illegible frame (Tier B — ranked with existing scores).'

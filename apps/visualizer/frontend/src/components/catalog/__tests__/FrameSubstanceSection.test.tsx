@@ -89,6 +89,51 @@ describe('FrameSubstanceSection', () => {
     ).toBeInTheDocument()
   })
 
+  it('tells an unmounted share and a broken file apart', async () => {
+    mockGet.mockResolvedValue(
+      basePayload({
+        verdict: 'unknown',
+        unknown_reason: 'cache_file_missing',
+        flagged: false,
+        instrument: null,
+        restore_tier: null,
+      }),
+    )
+    const { unmount } = renderSection()
+    expect(await screen.findByText(/mount the share/i)).toBeInTheDocument()
+    unmount()
+    cleanup()
+    deleteMatching(() => true)
+
+    mockGet.mockResolvedValue(
+      basePayload({
+        verdict: 'unknown',
+        unknown_reason: 'decode_failed',
+        flagged: false,
+        instrument: null,
+        restore_tier: null,
+      }),
+    )
+    renderSection()
+    expect(await screen.findByText(/will not fix itself/i)).toBeInTheDocument()
+    expect(screen.queryByText(/mount the share/i)).not.toBeInTheDocument()
+  })
+
+  it('never renders an unknown verdict as OK, even with no reason recorded', async () => {
+    mockGet.mockResolvedValue(
+      basePayload({
+        verdict: 'unknown',
+        unknown_reason: null,
+        flagged: false,
+        instrument: null,
+        restore_tier: null,
+      }),
+    )
+    renderSection()
+    expect(await screen.findByText(/Not judged/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Judged OK/i)).not.toBeInTheDocument()
+  })
+
   it('warns Tier A restore needs rescore and not Tier B', async () => {
     mockGet.mockResolvedValue(basePayload())
     const { unmount } = renderSection()

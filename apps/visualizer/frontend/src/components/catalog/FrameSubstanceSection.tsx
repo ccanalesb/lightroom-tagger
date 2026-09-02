@@ -17,7 +17,8 @@ import {
   FRAME_SUBSTANCE_PIXEL_ILLEGIBLE,
   FRAME_SUBSTANCE_RESTORED,
   FRAME_SUBSTANCE_STALE,
-  FRAME_SUBSTANCE_UNKNOWN_OK,
+  FRAME_SUBSTANCE_OK,
+  FRAME_SUBSTANCE_UNKNOWN_UNSPECIFIED,
   FRAME_SUBSTANCE_CATALOG_UNAVAILABLE,
 } from '../../constants/strings'
 
@@ -26,6 +27,9 @@ interface FrameSubstanceSectionProps {
   onDataChanged?: () => void
 }
 
+// An unknown verdict never falls back to the OK message: absence of a
+// reading is not a clean reading, and reading silence as approval is the
+// one thing this section must never do.
 function unknownReasonMessage(reason: string | null | undefined): string {
   switch (reason) {
     case 'no_cache_row':
@@ -35,7 +39,9 @@ function unknownReasonMessage(reason: string | null | undefined): string {
     case 'decode_failed':
       return FRAME_SUBSTANCE_DECODE_FAILED
     default:
-      return reason ? `Unknown: ${reason}` : FRAME_SUBSTANCE_UNKNOWN_OK
+      return reason
+        ? `${FRAME_SUBSTANCE_UNKNOWN_UNSPECIFIED} (${reason})`
+        : FRAME_SUBSTANCE_UNKNOWN_UNSPECIFIED
   }
 }
 
@@ -50,7 +56,7 @@ function verdictSummary(data: FrameSubstanceResponse): string {
     return unknownReasonMessage(data.unknown_reason)
   }
   if (data.verdict === 'ok') {
-    return FRAME_SUBSTANCE_UNKNOWN_OK
+    return FRAME_SUBSTANCE_OK
   }
   if (data.instrument?.kind === 'pixel_detector') {
     return data.verdict === 'void'
