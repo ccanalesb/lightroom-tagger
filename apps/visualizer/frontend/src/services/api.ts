@@ -343,6 +343,7 @@ export type CatalogListQueryParams = {
   min_score?: number
   min_score_on_active?: number
   burst_stack?: boolean
+  flagged?: boolean
   sort_by_score?: 'asc' | 'desc'
   sort_by_date?: 'newest' | 'oldest'
   limit?: number
@@ -380,6 +381,8 @@ function appendCatalogListSearchParams(
   }
   if (params.burst_stack === true) searchParams.set('burst_stack', 'true')
   else if (params.burst_stack === false) searchParams.set('burst_stack', 'false')
+  if (params.flagged === true) searchParams.set('flagged', 'true')
+  else if (params.flagged === false) searchParams.set('flagged', 'false')
   if (params.sort_by_score) searchParams.set('sort_by_score', params.sort_by_score)
   if (params.sort_by_date) searchParams.set('sort_by_date', params.sort_by_date)
   if (params.limit !== undefined) searchParams.set('limit', String(params.limit))
@@ -569,6 +572,66 @@ export const ImagesAPI = {
     invalidateAll(['identity'])
     return result
   },
+}
+
+export type FrameSubstanceInstrument = {
+  kind: 'pixel_detector' | 'excusal_channel'
+  verdict?: 'void' | 'illegible' | null
+  tier?: 'A' | 'B' | null
+  advisory: boolean
+}
+
+export type FrameSubstanceResponse = {
+  image_key: string
+  has_detection_run: boolean
+  verdict?: 'void' | 'illegible' | 'ok' | 'unknown' | null
+  unknown_reason?: string | null
+  detector_version?: string | null
+  judged_at?: string | null
+  is_stale: boolean
+  has_override: boolean
+  flagged: boolean
+  has_cull_keyword?: boolean | null
+  instrument?: FrameSubstanceInstrument | null
+  restore_tier?: 'A' | 'B' | null
+  catalog_write_available: boolean
+  catalog_write_unavailable_reason?: string | null
+}
+
+export type CullKeywordMutationResponse = {
+  image_key: string
+  result: 'added' | 'already_present' | 'image_not_found' | 'removed' | 'not_present'
+}
+
+export const FrameSubstanceAPI = {
+  get: (imageKey: string) =>
+    request<FrameSubstanceResponse>(
+      `/images/catalog/${encodeURIComponent(imageKey)}/frame-substance`,
+    ),
+
+  createOverride: (imageKey: string) =>
+    request<{ image_key: string; has_override: boolean }>(
+      `/images/catalog/${encodeURIComponent(imageKey)}/frame-substance/override`,
+      { method: 'POST' },
+    ),
+
+  deleteOverride: (imageKey: string) =>
+    request<{ image_key: string; has_override: boolean }>(
+      `/images/catalog/${encodeURIComponent(imageKey)}/frame-substance/override`,
+      { method: 'DELETE' },
+    ),
+
+  addCullKeyword: (imageKey: string) =>
+    request<CullKeywordMutationResponse>(
+      `/images/catalog/${encodeURIComponent(imageKey)}/cull-keyword`,
+      { method: 'POST' },
+    ),
+
+  removeCullKeyword: (imageKey: string) =>
+    request<CullKeywordMutationResponse>(
+      `/images/catalog/${encodeURIComponent(imageKey)}/cull-keyword`,
+      { method: 'DELETE' },
+    ),
 }
 
 export const DescriptionsAPI = {

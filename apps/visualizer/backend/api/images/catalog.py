@@ -423,6 +423,13 @@ def list_catalog_images(db):
         elif burst_stack_raw == "false":
             burst_stack = False
 
+        flagged = None
+        flagged_raw = request.args.get("flagged")
+        if flagged_raw == "true":
+            flagged = True
+        elif flagged_raw == "false":
+            flagged = False
+
         limit, offset = _clamp_pagination(
             request.args.get("limit", 50, type=int),
             request.args.get("offset", 0, type=int),
@@ -443,6 +450,7 @@ def list_catalog_images(db):
                 min_score=min_score,
                 min_score_on_active=min_score_on_active,
                 burst_stack=burst_stack,
+                flagged=flagged,
                 sort_by_score=sort_by_score,
                 sort_by_date=sort_by_date,
                 description_search=description_search,

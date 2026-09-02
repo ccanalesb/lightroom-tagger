@@ -166,6 +166,7 @@ export const INSIGHTS_COVERAGE_INACTIVE = 'Inactive'
 export const INSIGHTS_LINK_CATALOG = '/images?tab=catalog'
 export const INSIGHTS_LINK_SCORING_9_PLUS = '/images?tab=catalog&min_score_on_active=9'
 export const INSIGHTS_LINK_BURST_STACKS = '/images?tab=catalog&burst_stack=true'
+export const INSIGHTS_LINK_FRAME_SUBSTANCE_FLAGGED = '/images?tab=catalog&flagged=true'
 export const INSIGHTS_LINK_SCORE_JOB = '/processing?tab=analyze'
 
 // Actions
@@ -275,6 +276,31 @@ export const FILTER_DESCRIPTION_SEARCH_ARIA =
   'Search AI-generated description (summary and subjects), not Lightroom keywords'
 export const CATALOG_FILTER_COLOR_PLACEHOLDER = 'e.g. Red'
 export const CATALOG_FILTER_COLOR_ARIA = 'Color label'
+
+export const CATALOG_FILTER_LABEL_FRAME_SUBSTANCE = 'Flagged frames'
+export const CATALOG_FILTER_FRAME_SUBSTANCE_ONLY = 'Flagged only'
+
+export const FRAME_SUBSTANCE_LABEL = 'Frame substance'
+export const FRAME_SUBSTANCE_NO_RUN = 'Not judged yet — no detection run has recorded a verdict for this image.'
+export const FRAME_SUBSTANCE_MOUNT_SHARE =
+  'Preview unavailable — mount the share and re-run frame substance detection.'
+export const FRAME_SUBSTANCE_DECODE_FAILED =
+  'Preview could not be decoded — this file is broken and will not fix itself.'
+export const FRAME_SUBSTANCE_UNKNOWN_OK = 'Judged OK by the pixel detector.'
+export const FRAME_SUBSTANCE_PIXEL_VOID = 'Pixel detector: void frame (Tier A — excluded from scoring).'
+export const FRAME_SUBSTANCE_PIXEL_ILLEGIBLE =
+  'Pixel detector: illegible frame (Tier B — ranked with existing scores).'
+export const FRAME_SUBSTANCE_STALE =
+  'This verdict was judged against an older preview. Re-run detection to refresh it.'
+export const FRAME_SUBSTANCE_ADVISORY_LABEL =
+  'Advisory excusal hint — all optional lenses scored not attempted. No automatic exclusion.'
+export const FRAME_SUBSTANCE_OVERRIDE_RESTORE = 'Restore to ranking'
+export const FRAME_SUBSTANCE_OVERRIDE_RESCORE_WARN =
+  'Restoring this void frame will return it to ranking after the next scoring run.'
+export const FRAME_SUBSTANCE_RESTORED = 'Restored to ranking via your override.'
+export const FRAME_SUBSTANCE_CULL_MARK = 'Mark for cull (lrt-cull)'
+export const FRAME_SUBSTANCE_CULL_UNMARK = 'Remove cull mark'
+export const FRAME_SUBSTANCE_CATALOG_UNAVAILABLE = 'Lightroom catalog unavailable'
 
 // Phase 06 — stack expand/collapse (STACK-03). On-demand similarity copy was removed in Phase 9 (SIM-02 pivoted to job-driven materialized groups).
 export const CATALOG_STACK_SHOW = 'Show stack'

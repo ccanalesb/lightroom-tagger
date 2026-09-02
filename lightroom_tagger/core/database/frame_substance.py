@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 
 from .catalog import library_write
+from .vision_cache import get_vision_cached_image
 
 FLAGGED_VERDICTS = frozenset({"void", "illegible"})
 
@@ -247,6 +248,16 @@ def insert_frame_substance_override(db: sqlite3.Connection, image_key: str) -> N
         )
 
 
+def delete_frame_substance_override(db: sqlite3.Connection, image_key: str) -> bool:
+    """Remove a user override. Returns True when a row was deleted."""
+    with library_write(db):
+        cur = db.execute(
+            "DELETE FROM frame_substance_overrides WHERE image_key = ?",
+            (image_key,),
+        )
+    return cur.rowcount > 0
+
+
 def has_frame_substance_override(db: sqlite3.Connection, image_key: str) -> bool:
     """Return whether the user has overridden the detector for ``image_key``."""
     row = db.execute(
@@ -264,6 +275,61 @@ def is_frame_substance_flagged(db: sqlite3.Connection, image_key: str) -> bool:
     if verdict["verdict"] not in FLAGGED_VERDICTS:
         return False
     return not has_frame_substance_override(db, image_key)
+
+
+def is_frame_substance_verdict_stale(
+    db: sqlite3.Connection,
+    image_key: str,
+    *,
+    verdict_row: dict | None = None,
+) -> bool:
+    """True when the preview cache is newer than the stored verdict timestamp."""
+    verdict = (
+        verdict_row
+        if verdict_row is not None
+        else get_frame_substance_verdict(db, image_key)
+    )
+    if verdict is None:
+        return False
+    judged_at = verdict.get("judged_at")
+    if not judged_at:
+        return False
+    cache = get_vision_cached_image(db, image_key)
+    if not cache or not cache.get("compressed_at"):
+        return False
+    return str(cache["compressed_at"]) > str(judged_at)
+
+
+def has_excusal_channel_hint(db: sqlite3.Connection, image_key: str) -> bool:
+    """True when every active optional perspective scored ``not_attempted``."""
+    optional_count = int(
+        db.execute(
+            "SELECT COUNT(*) AS c FROM perspectives WHERE optional = 1 AND active = 1"
+        ).fetchone()["c"]
+    )
+    if optional_count == 0:
+        return False
+    excused_count = int(
+        db.execute(
+            """
+            SELECT COUNT(*) AS c
+            FROM perspectives p
+            WHERE p.optional = 1
+              AND p.active = 1
+              AND EXISTS (
+                  SELECT 1
+                  FROM image_scores s
+                  WHERE s.image_key = ?
+                    AND s.image_type = 'catalog'
+                    AND s.perspective_slug = p.slug
+                    AND s.is_current = 1
+                    AND s.not_attempted = 1
+              )
+            """,
+            (image_key,),
+        ).fetchone()["c"]
+    )
+    return excused_count == optional_count
 
 
 def list_catalog_images_for_frame_substance(

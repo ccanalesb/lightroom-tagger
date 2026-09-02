@@ -29,6 +29,7 @@ def _append_query_catalog_image_filters(
     min_score: int | None = None,
     min_score_on_active: int | None = None,
     burst_stack: bool | None = None,
+    flagged: bool | None = None,
     description_search: str | None = None,
     dominant_colors: list[str] | None = None,
     mood_tags: list[str] | None = None,
@@ -113,6 +114,39 @@ def _append_query_catalog_image_filters(
     elif burst_stack is False:
         clauses.append(
             "(st.stack_id IS NULL OR st.stack_size <= 1 OR i.key != st.representative_key)"
+        )
+
+    if flagged is True:
+        clauses.append(
+            """
+            EXISTS (
+                SELECT 1
+                FROM image_frame_substance fs
+                WHERE fs.image_key = i.key
+                  AND fs.verdict IN ('void', 'illegible')
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM frame_substance_overrides o
+                      WHERE o.image_key = fs.image_key
+                  )
+            )
+            """
+        )
+    elif flagged is False:
+        clauses.append(
+            """
+            NOT EXISTS (
+                SELECT 1
+                FROM image_frame_substance fs
+                WHERE fs.image_key = i.key
+                  AND fs.verdict IN ('void', 'illegible')
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM frame_substance_overrides o
+                      WHERE o.image_key = fs.image_key
+                  )
+            )
+            """
         )
 
     if (description_search or "").strip():

@@ -14,6 +14,7 @@ import {
   INSIGHTS_ACTION_FRAME_SUBSTANCE_DESC,
   INSIGHTS_LINK_BURST_STACKS,
   INSIGHTS_LINK_CONFIRM_STACKS,
+  INSIGHTS_LINK_FRAME_SUBSTANCE_FLAGGED,
   INSIGHTS_LINK_SCORE_JOB,
 } from '../../constants/strings'
 
@@ -57,7 +58,7 @@ export function InsightsActionCards({ summary }: InsightsActionCardsProps) {
           ? ` ${INSIGHTS_ACTION_FRAME_SUBSTANCE_BREACH}: ${frameSubstanceRun.breach_reason}`
           : ''
       }`,
-      link: INSIGHTS_LINK_SCORE_JOB,
+      link: INSIGHTS_LINK_FRAME_SUBSTANCE_FLAGGED,
       badge: frameSubstanceRun?.breached ? ('warning' as const) : ('default' as const),
     },
     {

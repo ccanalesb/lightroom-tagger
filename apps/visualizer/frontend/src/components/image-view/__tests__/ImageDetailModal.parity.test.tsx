@@ -3,6 +3,7 @@ import { render, screen, waitFor, within, cleanup } from '@testing-library/react
 import { NULLABLE_BEST_PHOTO_FIELDS } from '../../../__test-utils__/identityFixtures'
 import {
   DescriptionsAPI,
+  FrameSubstanceAPI,
   ImagesAPI,
   PerspectivesAPI,
   ProvidersAPI,
@@ -135,6 +136,15 @@ describe('ImageDetailModal — cross-entry parity', () => {
     vi.spyOn(DescriptionsAPI, 'get').mockResolvedValue({
       description: null,
     } as unknown as Awaited<ReturnType<typeof DescriptionsAPI.get>>)
+    vi.spyOn(FrameSubstanceAPI, 'get').mockResolvedValue({
+      image_key: SHARED_KEY,
+      has_detection_run: false,
+      verdict: null,
+      is_stale: false,
+      has_override: false,
+      flagged: false,
+      catalog_write_available: true,
+    })
   })
 
   afterEach(() => {

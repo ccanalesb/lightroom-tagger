@@ -18,10 +18,18 @@ const mockListPerspectives = vi.fn()
 const mockGetCurrentScores = vi.fn()
 
 const mockSetInstagramPosted = vi.fn()
+const mockGetFrameSubstance = vi.fn()
 
 vi.mock('../../../services/api', () => ({
   ImagesAPI: {
     setInstagramPosted: (...args: unknown[]) => mockSetInstagramPosted(...args),
+  },
+  FrameSubstanceAPI: {
+    get: (...args: unknown[]) => mockGetFrameSubstance(...args),
+    createOverride: vi.fn(),
+    deleteOverride: vi.fn(),
+    addCullKeyword: vi.fn(),
+    removeCullKeyword: vi.fn(),
   },
   JobsAPI: {
     create: (...args: unknown[]) => mockCreate(...args),
@@ -77,6 +85,17 @@ describe('CatalogImageDetailSections — modal two-section layout', () => {
     mockGetDefaults.mockReset()
     mockListPerspectives.mockReset()
     mockGetCurrentScores.mockReset()
+    mockGetFrameSubstance.mockReset()
+
+    mockGetFrameSubstance.mockResolvedValue({
+      image_key: BASE_IMAGE.key,
+      has_detection_run: true,
+      verdict: 'ok',
+      is_stale: false,
+      has_override: false,
+      flagged: false,
+      catalog_write_available: true,
+    })
 
     mockGetDefaults.mockResolvedValue({
       description: { provider: 'ollama', model: 'llava' },
@@ -157,6 +176,17 @@ describe('CatalogImageDetailSections — scoring regenerate control', () => {
     mockGetDefaults.mockReset()
     mockListPerspectives.mockReset()
     mockGetCurrentScores.mockReset()
+    mockGetFrameSubstance.mockReset()
+
+    mockGetFrameSubstance.mockResolvedValue({
+      image_key: BASE_IMAGE.key,
+      has_detection_run: true,
+      verdict: 'ok',
+      is_stale: false,
+      has_override: false,
+      flagged: false,
+      catalog_write_available: true,
+    })
 
     mockGetDefaults.mockResolvedValue({
       description: { provider: 'ollama', model: 'llava' },

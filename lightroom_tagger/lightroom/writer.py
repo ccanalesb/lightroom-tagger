@@ -4,8 +4,14 @@ import sqlite3
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 logger = logging.getLogger(__name__)
+
+KeywordAddResult = Literal["added", "already_present", "image_not_found"]
+KeywordRemoveResult = Literal["removed", "not_present", "image_not_found"]
+
+CULL_KEYWORD = "lrt-cull"
 
 
 def _catalog_lock_candidates(catalog_path: str) -> list[Path]:
@@ -157,19 +163,71 @@ def add_keyword_to_image(conn: sqlite3.Connection, image_id: int, keyword_id: in
     return True
 
 
-def add_keyword_by_key(conn: sqlite3.Connection, image_key: str, keyword_name: str) -> bool:
-    """Add keyword to image by our key format.
+def add_keyword_by_key(
+    conn: sqlite3.Connection, image_key: str, keyword_name: str
+) -> KeywordAddResult:
+    """Add keyword to image by our key format."""
+    image_id = get_image_local_id(conn, image_key)
+    if not image_id:
+        return "image_not_found"
+
+    keyword_id = get_or_create_keyword(conn, keyword_name)
+    if add_keyword_to_image(conn, image_id, keyword_id):
+        return "added"
+    return "already_present"
+
+
+def remove_keyword_from_image(
+    conn: sqlite3.Connection, image_id: int, keyword_id: int
+) -> bool:
+    """Remove a keyword link from an image.
 
     Returns:
-        True if added, False if already existed or error
+        True if a link was removed, False if the image did not have the keyword.
+    """
+    if not image_has_keyword(conn, image_id, keyword_id):
+        return False
+
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM AgLibraryKeywordImage WHERE image = ? AND tag = ?",
+        (image_id, keyword_id),
+    )
+    conn.commit()
+    return True
+
+
+def remove_keyword_by_key(
+    conn: sqlite3.Connection, image_key: str, keyword_name: str
+) -> KeywordRemoveResult:
+    """Remove keyword from image by our key format.
+
+    Leaves the keyword row in the catalog when the last image loses it.
     """
     image_id = get_image_local_id(conn, image_key)
     if not image_id:
-        print(f"  Warning: Could not find image for key: {image_key}")
-        return False
+        return "image_not_found"
 
-    keyword_id = get_or_create_keyword(conn, keyword_name)
-    return add_keyword_to_image(conn, image_id, keyword_id)
+    keyword_id = get_keyword_id(conn, keyword_name)
+    if not keyword_id:
+        return "not_present"
+
+    if remove_keyword_from_image(conn, image_id, keyword_id):
+        return "removed"
+    return "not_present"
+
+
+def image_has_keyword_by_key(
+    conn: sqlite3.Connection, image_key: str, keyword_name: str
+) -> bool:
+    """Return whether the catalog image currently carries ``keyword_name``."""
+    image_id = get_image_local_id(conn, image_key)
+    if not image_id:
+        return False
+    keyword_id = get_keyword_id(conn, keyword_name)
+    if not keyword_id:
+        return False
+    return image_has_keyword(conn, image_id, keyword_id)
 
 
 def add_keyword_to_images_batch(conn: sqlite3.Connection, image_keys: list[str],
@@ -188,7 +246,7 @@ def add_keyword_to_images_batch(conn: sqlite3.Connection, image_keys: list[str],
             image_id = get_image_local_id(conn, image_key)
             if not image_id:
                 result['errors'] += 1
-                print(f" Error: Image not found: {image_key}")
+                logger.warning("Image not found for keyword batch add: %s", image_key)
                 continue
 
             if dry_run:
@@ -203,7 +261,7 @@ def add_keyword_to_images_batch(conn: sqlite3.Connection, image_keys: list[str],
                     result['skipped'] += 1
         except Exception as e:
             result['errors'] += 1
-            print(f" Error adding keyword to {image_key}: {e}")
+            logger.warning("Error adding keyword to %s: %s", image_key, e)
 
     return result
 
@@ -227,8 +285,13 @@ if __name__ == "__main__":
     conn = connect_catalog(catalog_path)
 
     if image_key:
-        success = add_keyword_by_key(conn, image_key, keyword)
-        print(f"Keyword '{keyword}' {'added' if success else 'already exists'} for {image_key}")
+        outcome = add_keyword_by_key(conn, image_key, keyword)
+        if outcome == "added":
+            print(f"Keyword '{keyword}' added for {image_key}")
+        elif outcome == "already_present":
+            print(f"Keyword '{keyword}' already present for {image_key}")
+        else:
+            print(f"Image not found for key: {image_key}")
     else:
         keyword_id = get_or_create_keyword(conn, keyword)
         print(f"Keyword '{keyword}' has ID: {keyword_id}")
