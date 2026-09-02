@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .frame_substance_sql import flagged_exists_sql
+
 
 def _non_empty_str_list_for_json_array_filter(values: list[str] | None) -> list[str] | None:
     """Strip elements, drop blank entries; return None if no filter should apply.
@@ -29,6 +31,7 @@ def _append_query_catalog_image_filters(
     min_score: int | None = None,
     min_score_on_active: int | None = None,
     burst_stack: bool | None = None,
+    flagged: bool | None = None,
     description_search: str | None = None,
     dominant_colors: list[str] | None = None,
     mood_tags: list[str] | None = None,
@@ -114,6 +117,11 @@ def _append_query_catalog_image_filters(
         clauses.append(
             "(st.stack_id IS NULL OR st.stack_size <= 1 OR i.key != st.representative_key)"
         )
+
+    if flagged is True:
+        clauses.append(flagged_exists_sql("i.key"))
+    elif flagged is False:
+        clauses.append(f"NOT {flagged_exists_sql('i.key')}")
 
     if (description_search or "").strip():
         match_str, fts_err = build_description_fts_query(description_search)

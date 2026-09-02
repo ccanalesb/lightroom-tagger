@@ -218,6 +218,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/images/catalog/{image_key}/frame-substance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** get_catalog_frame_substance <GET> */
+        get: operations["get__api_images_catalog_{image_key}_frame-substance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/catalog/{image_key}/frame-substance/override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** post_catalog_frame_substance_override <POST> */
+        post: operations["post__api_images_catalog_{image_key}_frame-substance_override"];
+        /** delete_catalog_frame_substance_override <DELETE> */
+        delete: operations["delete__api_images_catalog_{image_key}_frame-substance_override"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/catalog/{image_key}/cull-keyword": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** post_catalog_cull_keyword <POST> */
+        post: operations["post__api_images_catalog_{image_key}_cull-keyword"];
+        /** delete_catalog_cull_keyword <DELETE> */
+        delete: operations["delete__api_images_catalog_{image_key}_cull-keyword"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/images/stacks/suggestions": {
         parameters: {
             query?: never;
@@ -1832,6 +1885,84 @@ export interface components {
              * @default null
              */
             vision_score: number | null;
+        };
+        /** FrameSubstanceResponse */
+        "FrameSubstanceResponse.5b34979": {
+            /** Image Key */
+            image_key: string;
+            /** Has Detection Run */
+            has_detection_run: boolean;
+            /**
+             * Verdict
+             * @default null
+             */
+            verdict: ("void" | "illegible" | "ok" | "unknown") | null;
+            /**
+             * Unknown Reason
+             * @default null
+             */
+            unknown_reason: string | null;
+            /**
+             * Detector Version
+             * @default null
+             */
+            detector_version: string | null;
+            /**
+             * Judged At
+             * @default null
+             */
+            judged_at: string | null;
+            /**
+             * Is Stale
+             * @default false
+             */
+            is_stale: boolean;
+            /**
+             * Has Override
+             * @default false
+             */
+            has_override: boolean;
+            /**
+             * Flagged
+             * @default false
+             */
+            flagged: boolean;
+            /**
+             * Has Cull Keyword
+             * @default null
+             */
+            has_cull_keyword: boolean | null;
+            /** @default null */
+            instrument: components["schemas"]["FrameSubstanceResponse.5b34979.FrameSubstanceInstrument"] | null;
+            /**
+             * Restore Tier
+             * @default null
+             */
+            restore_tier: ("A" | "B") | null;
+            /** Catalog Write Available */
+            catalog_write_available: boolean;
+            /**
+             * Catalog Write Unavailable Reason
+             * @default null
+             */
+            catalog_write_unavailable_reason: string | null;
+        };
+        /** FrameSubstanceOverrideResponse */
+        "FrameSubstanceOverrideResponse.5b34979": {
+            /** Image Key */
+            image_key: string;
+            /** Has Override */
+            has_override: boolean;
+        };
+        /** CullKeywordMutationResponse */
+        "CullKeywordMutationResponse.5b34979": {
+            /** Image Key */
+            image_key: string;
+            /**
+             * Result
+             * @description Three-way writer outcome; never collapsed into a boolean.
+             */
+            result: ("added" | "already_present" | "image_not_found") | ("removed" | "not_present" | "image_not_found");
         };
         /** StackSuggestionsResponse */
         "StackSuggestionsResponse.b12c71e": {
@@ -3780,6 +3911,29 @@ export interface components {
             /** Rationale Preview */
             rationale_preview: string;
         };
+        /** FrameSubstanceInstrument */
+        "FrameSubstanceResponse.5b34979.FrameSubstanceInstrument": {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "pixel_detector" | "excusal_channel";
+            /**
+             * Verdict
+             * @default null
+             */
+            verdict: ("void" | "illegible") | null;
+            /**
+             * Tier
+             * @default null
+             */
+            tier: ("A" | "B") | null;
+            /**
+             * Advisory
+             * @default false
+             */
+            advisory: boolean;
+        };
         /**
          * CatalogImage
          * @description Catalog list / search row shape (``query_catalog_images`` + API transforms).
@@ -4837,6 +4991,224 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImageView.573ec44"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "get__api_images_catalog_{image_key}_frame-substance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FrameSubstanceResponse.5b34979"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "post__api_images_catalog_{image_key}_frame-substance_override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FrameSubstanceOverrideResponse.5b34979"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "delete__api_images_catalog_{image_key}_frame-substance_override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FrameSubstanceOverrideResponse.5b34979"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "post__api_images_catalog_{image_key}_cull-keyword": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CullKeywordMutationResponse.5b34979"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody.45d9b59"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationError.6a07bef"];
+                };
+            };
+        };
+    };
+    "delete__api_images_catalog_{image_key}_cull-keyword": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                image_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CullKeywordMutationResponse.5b34979"];
                 };
             };
             /** @description Bad Request */

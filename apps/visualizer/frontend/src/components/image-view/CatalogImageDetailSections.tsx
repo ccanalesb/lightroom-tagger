@@ -3,6 +3,7 @@ import { ImagesAPI } from '../../services/api'
 import { invalidateAll } from '../../data'
 import { AIDescriptionSection } from '../DescriptionPanel'
 import { AIPerspectiveSection } from '../catalog/AIPerspectiveSection'
+import { FrameSubstanceSection } from '../catalog/FrameSubstanceSection'
 import { Badge } from '../ui/badges'
 import { MetadataRow } from '../ui/MetadataRow'
 import {
@@ -123,6 +124,8 @@ export function CatalogImageDetailSections({
           </div>
         </div>
       ) : null}
+
+      <FrameSubstanceSection imageKey={image.key} onDataChanged={onDataChanged} />
 
       <AIDescriptionSection
         imageKey={image.key}

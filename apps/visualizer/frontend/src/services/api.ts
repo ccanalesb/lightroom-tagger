@@ -25,6 +25,17 @@ import type {
   ImageDescriptionPerspectives,
   ImageDescriptionTechnical,
 } from '../types/descriptions'
+import type {
+  CullKeywordMutationResponse,
+  FrameSubstanceOverrideResponse,
+  FrameSubstanceResponse,
+} from '../types/frameSubstance'
+export type {
+  CullKeywordMutationResponse,
+  FrameSubstanceInstrument,
+  FrameSubstanceOverrideResponse,
+  FrameSubstanceResponse,
+} from '../types/frameSubstance'
 import type { Job, JobsGetOptions, JobsHealth, JobsListResponse } from '../types/job'
 import type {
   PerspectiveDetail,
@@ -343,6 +354,7 @@ export type CatalogListQueryParams = {
   min_score?: number
   min_score_on_active?: number
   burst_stack?: boolean
+  flagged?: boolean
   sort_by_score?: 'asc' | 'desc'
   sort_by_date?: 'newest' | 'oldest'
   limit?: number
@@ -380,6 +392,8 @@ function appendCatalogListSearchParams(
   }
   if (params.burst_stack === true) searchParams.set('burst_stack', 'true')
   else if (params.burst_stack === false) searchParams.set('burst_stack', 'false')
+  if (params.flagged === true) searchParams.set('flagged', 'true')
+  else if (params.flagged === false) searchParams.set('flagged', 'false')
   if (params.sort_by_score) searchParams.set('sort_by_score', params.sort_by_score)
   if (params.sort_by_date) searchParams.set('sort_by_date', params.sort_by_date)
   if (params.limit !== undefined) searchParams.set('limit', String(params.limit))
@@ -569,6 +583,37 @@ export const ImagesAPI = {
     invalidateAll(['identity'])
     return result
   },
+}
+
+export const FrameSubstanceAPI = {
+  get: (imageKey: string) =>
+    request<FrameSubstanceResponse>(
+      `/images/catalog/${encodeURIComponent(imageKey)}/frame-substance`,
+    ),
+
+  createOverride: (imageKey: string) =>
+    request<FrameSubstanceOverrideResponse>(
+      `/images/catalog/${encodeURIComponent(imageKey)}/frame-substance/override`,
+      { method: 'POST' },
+    ),
+
+  deleteOverride: (imageKey: string) =>
+    request<FrameSubstanceOverrideResponse>(
+      `/images/catalog/${encodeURIComponent(imageKey)}/frame-substance/override`,
+      { method: 'DELETE' },
+    ),
+
+  addCullKeyword: (imageKey: string) =>
+    request<CullKeywordMutationResponse>(
+      `/images/catalog/${encodeURIComponent(imageKey)}/cull-keyword`,
+      { method: 'POST' },
+    ),
+
+  removeCullKeyword: (imageKey: string) =>
+    request<CullKeywordMutationResponse>(
+      `/images/catalog/${encodeURIComponent(imageKey)}/cull-keyword`,
+      { method: 'DELETE' },
+    ),
 }
 
 export const DescriptionsAPI = {

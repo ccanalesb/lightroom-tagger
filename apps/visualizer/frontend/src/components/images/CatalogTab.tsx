@@ -47,6 +47,8 @@ import {
   CATALOG_FILTER_COLOR_ARIA,
   msgShowingOf,
   INSIGHTS_KPI_BURST_STACKS,
+  CATALOG_FILTER_LABEL_FRAME_SUBSTANCE,
+  CATALOG_FILTER_FRAME_SUBSTANCE_ONLY,
 } from '../../constants/strings';
 import { formatMonth } from '../../utils/date';
 import { useFilters } from '../../hooks/useFilters';
@@ -245,6 +247,15 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
           { value: true, label: INSIGHTS_KPI_BURST_STACKS },
         ],
       },
+      {
+        type: 'toggle',
+        key: 'flagged',
+        label: CATALOG_FILTER_LABEL_FRAME_SUBSTANCE,
+        options: [
+          { value: undefined, label: CATALOG_FILTER_POSTED_ALL },
+          { value: true, label: CATALOG_FILTER_FRAME_SUBSTANCE_ONLY },
+        ],
+      },
     ];
   }, [availableMonths, scorePerspectives]);
 
@@ -257,6 +268,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
     const minScoreOnActive = sp.get('min_score_on_active');
     if (minScoreOnActive) patch.minScoreOnActive = minScoreOnActive;
     if (sp.get('burst_stack') === 'true') patch.burstStack = true;
+    if (sp.get('flagged') === 'true') patch.flagged = true;
     if (Object.keys(patch).length > 0) setValues(patch);
   }, [location.search, setValues]);
 
@@ -306,6 +318,7 @@ export function CatalogTab({ onPostedFilterChange }: CatalogTabProps = {}) {
     filterValues.minCatalogScore,
     filterValues.minScoreOnActive,
     filterValues.burstStack,
+    filterValues.flagged,
     filterValues.sortByScore,
     filterValues.sortByDate,
   ]);

@@ -6,10 +6,11 @@ import re
 import sqlite3
 from typing import Any
 
+from lightroom_tagger.core.database.frame_substance_sql import flagged_exists_sql
 from lightroom_tagger.core.text_constants import EN_STOPWORDS as _EN_STOPWORDS
 
 # Current catalog scores only — identity aggregation excludes non-catalog rows (D-40 / phase 10).
-_SCORES_BASE_SQL = """
+_SCORES_BASE_SQL = f"""
     SELECT
         s.image_key,
         s.image_type,
@@ -26,17 +27,7 @@ _SCORES_BASE_SQL = """
     WHERE s.is_current = 1
         AND s.image_type = 'catalog'
         AND s.not_attempted = 0
-        AND NOT EXISTS (
-            SELECT 1
-            FROM image_frame_substance fs
-            WHERE fs.image_key = s.image_key
-              AND fs.verdict IN ('void', 'illegible')
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM frame_substance_overrides o
-                  WHERE o.image_key = fs.image_key
-              )
-        )
+        AND NOT {flagged_exists_sql("s.image_key")}
 """
 
 _WORD_RE = re.compile(r"[\w']+", flags=re.UNICODE)

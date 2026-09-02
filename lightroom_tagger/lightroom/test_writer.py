@@ -1,16 +1,63 @@
+"""Integration tests for reversible Lightroom keyword writes."""
+
+from __future__ import annotations
+
+import io
 import sqlite3
 import unittest
+from contextlib import redirect_stdout
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from lightroom_tagger.lightroom.writer import (
+    CULL_KEYWORD,
+    add_keyword_by_key,
     add_keyword_to_image,
+    backup_catalog_if_needed,
     connect_catalog,
     create_keyword,
     get_keyword_id,
     get_or_create_keyword,
     image_has_keyword,
     keyword_exists,
+    raise_if_catalog_locked,
+    remove_keyword_by_key,
+    remove_keyword_from_image,
 )
+
+
+def _make_catalog(path: Path) -> sqlite3.Connection:
+    conn = sqlite3.connect(str(path))
+    conn.row_factory = sqlite3.Row
+    conn.executescript(
+        """
+        CREATE TABLE AgLibraryKeyword (
+            id_local INTEGER PRIMARY KEY AUTOINCREMENT,
+            id_global TEXT,
+            name TEXT,
+            lc_name TEXT,
+            dateCreated TEXT,
+            keywordType INTEGER
+        );
+        CREATE TABLE AgLibraryFile (
+            id_local INTEGER PRIMARY KEY,
+            baseName TEXT
+        );
+        CREATE TABLE Adobe_images (
+            id_local INTEGER PRIMARY KEY,
+            rootFile INTEGER
+        );
+        CREATE TABLE AgLibraryKeywordImage (
+            id_local INTEGER PRIMARY KEY AUTOINCREMENT,
+            image INTEGER,
+            tag INTEGER
+        );
+        INSERT INTO AgLibraryFile (id_local, baseName) VALUES (1, 'L1007324');
+        INSERT INTO Adobe_images (id_local, rootFile) VALUES (100, 1);
+        """
+    )
+    conn.commit()
+    return conn
 
 
 class TestWriter(unittest.TestCase):
@@ -113,6 +160,91 @@ class TestWriter(unittest.TestCase):
             result = add_keyword_to_image(self.mock_conn, 1, 42)
             self.assertTrue(result)
             self.mock_conn.commit.assert_called_once()
+
+
+class TestWriterIntegration(unittest.TestCase):
+    """Catalog-backed tests for add/remove keyword behavior."""
+
+    def setUp(self):
+        import tempfile
+
+        self.tmp = Path(tempfile.mkdtemp(prefix="writer-test-"))
+        self.catalog_path = self.tmp / "test.lrcat"
+        self.conn = _make_catalog(self.catalog_path)
+        self.image_key = "2026-01-01_L1007324.JPG"
+
+    def tearDown(self):
+        self.conn.close()
+        import shutil
+
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_add_reports_three_outcomes(self):
+        self.assertEqual(add_keyword_by_key(self.conn, self.image_key, CULL_KEYWORD), "added")
+        self.assertEqual(add_keyword_by_key(self.conn, self.image_key, CULL_KEYWORD), "already_present")
+        self.assertEqual(
+            add_keyword_by_key(self.conn, "2026-01-01_missing.jpg", CULL_KEYWORD),
+            "image_not_found",
+        )
+
+    def test_remove_untags_image_and_leaves_keyword_row(self):
+        add_keyword_by_key(self.conn, self.image_key, CULL_KEYWORD)
+        kw_id = get_keyword_id(self.conn, CULL_KEYWORD)
+        assert kw_id is not None
+
+        self.assertEqual(remove_keyword_by_key(self.conn, self.image_key, CULL_KEYWORD), "removed")
+        self.assertEqual(remove_keyword_by_key(self.conn, self.image_key, CULL_KEYWORD), "not_present")
+        self.assertIsNotNone(get_keyword_id(self.conn, CULL_KEYWORD))
+
+    def test_add_remove_add_toggle(self):
+        self.assertEqual(add_keyword_by_key(self.conn, self.image_key, CULL_KEYWORD), "added")
+        self.assertEqual(remove_keyword_by_key(self.conn, self.image_key, CULL_KEYWORD), "removed")
+        self.assertEqual(add_keyword_by_key(self.conn, self.image_key, CULL_KEYWORD), "added")
+
+    def test_remove_keyword_from_image_noop_when_absent(self):
+        kw_id = get_or_create_keyword(self.conn, CULL_KEYWORD)
+        self.assertFalse(remove_keyword_from_image(self.conn, 100, kw_id))
+
+    def test_write_path_does_not_print_to_stdout(self):
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            add_keyword_by_key(self.conn, self.image_key, CULL_KEYWORD)
+            add_keyword_by_key(self.conn, "missing-key", CULL_KEYWORD)
+            remove_keyword_by_key(self.conn, self.image_key, CULL_KEYWORD)
+        self.assertEqual(buf.getvalue(), "")
+
+    def test_repeated_writes_reuse_one_backup(self):
+        """The toggle must not copy a multi-GB catalog on every click.
+
+        With max_backups = 2, copying per click also evicts the only
+        snapshot that predates our writes.
+        """
+        first = backup_catalog_if_needed(str(self.catalog_path))
+        Path(first).write_text("pristine")
+        second = backup_catalog_if_needed(str(self.catalog_path))
+        self.assertEqual(second, first)
+        self.assertEqual(Path(first).read_text(), "pristine")
+        backups = list(self.catalog_path.parent.glob(f"{self.catalog_path.name}.backup-*"))
+        self.assertEqual(len(backups), 1)
+
+    def test_backup_taken_again_once_the_interval_has_passed(self):
+        first = backup_catalog_if_needed(str(self.catalog_path))
+        Path(first).write_text("stale")
+        backup_catalog_if_needed(str(self.catalog_path), min_interval_seconds=0)
+        # The backup name has one-second resolution, so a same-second retake
+        # reuses the path; what matters is that a fresh copy was written.
+        self.assertNotEqual(Path(first).read_text(errors="replace"), "stale")
+
+    def test_locked_catalog_raises_clear_error(self):
+        lock_path = self.catalog_path.parent / f"{self.catalog_path.stem}.lrcat-lock"
+        lock_path.write_text("locked")
+        try:
+            with self.assertRaises(RuntimeError) as ctx:
+                raise_if_catalog_locked(str(self.catalog_path))
+            self.assertIn("Close Lightroom", str(ctx.exception))
+        finally:
+            lock_path.unlink(missing_ok=True)
+
 
 if __name__ == "__main__":
     unittest.main()
