@@ -1,0 +1,173 @@
+{
+ "note": "Path+method inventory of the Flask backend OpenAPI document, captured from apps/visualizer/backend/scripts/export_openapi.py. The TypeScript backend must emit these paths byte-identically: the frontend generates src/types/api.gen.ts keyed on these exact strings and CI fails on drift. Regenerate only when the Flask spec legitimately changes.",
+ "paths": {
+  "/api/jobs/": [
+   "get",
+   "post"
+  ],
+  "/api/jobs/{job_id}": [
+   "delete",
+   "get"
+  ],
+  "/api/jobs/{job_id}/retry": [
+   "post"
+  ],
+  "/api/jobs/active": [
+   "get"
+  ],
+  "/api/jobs/health": [
+   "get"
+  ],
+  "/api/jobs/_processor_health": [
+   "get"
+  ],
+  "/api/images/catalog/months": [
+   "get"
+  ],
+  "/api/images/catalog/": [
+   "get"
+  ],
+  "/api/images/catalog": [
+   "get"
+  ],
+  "/api/images/catalog/{image_key}/similar": [
+   "get"
+  ],
+  "/api/images/catalog/{image_key}/instagram-posted": [
+   "patch"
+  ],
+  "/api/images/catalog/{image_key}": [
+   "get"
+  ],
+  "/api/images/catalog/{image_key}/frame-substance": [
+   "get"
+  ],
+  "/api/images/catalog/{image_key}/frame-substance/override": [
+   "delete",
+   "post"
+  ],
+  "/api/images/catalog/{image_key}/cull-keyword": [
+   "delete",
+   "post"
+  ],
+  "/api/images/stacks/suggestions": [
+   "get"
+  ],
+  "/api/images/stacks/suggestions/accept": [
+   "post"
+  ],
+  "/api/images/stacks/suggestions/reject": [
+   "post"
+  ],
+  "/api/images/stacks/{stack_id}/members": [
+   "get"
+  ],
+  "/api/images/stacks/{stack_id}/split-member": [
+   "post"
+  ],
+  "/api/images/stacks/{target_stack_id}/merge": [
+   "post"
+  ],
+  "/api/images/stacks/{stack_id}/representative": [
+   "post"
+  ],
+  "/api/images/catalog-similarity-groups": [
+   "get"
+  ],
+  "/api/descriptions/": [
+   "get"
+  ],
+  "/api/descriptions/{image_key}": [
+   "get"
+  ],
+  "/api/descriptions/{image_key}/generate": [
+   "post"
+  ],
+  "/api/providers/": [
+   "get"
+  ],
+  "/api/providers/fallback-order": [
+   "get",
+   "put"
+  ],
+  "/api/providers/defaults": [
+   "get",
+   "put"
+  ],
+  "/api/providers/models/description": [
+   "get"
+  ],
+  "/api/providers/{provider_id}/health": [
+   "get"
+  ],
+  "/api/providers/{provider_id}/models/{model_id}": [
+   "delete"
+  ],
+  "/api/providers/{provider_id}/models/order": [
+   "put"
+  ],
+  "/api/providers/{provider_id}/models": [
+   "get",
+   "post"
+  ],
+  "/api/status": [
+   "get"
+  ],
+  "/api/vision-models": [
+   "get"
+  ],
+  "/api/stats": [
+   "get"
+  ],
+  "/api/insights-summary": [
+   "get"
+  ],
+  "/api/catalog/status": [
+   "get"
+  ],
+  "/api/cache/pipeline-status": [
+   "get"
+  ],
+  "/api/cache/status": [
+   "get"
+  ],
+  "/api/config/catalog": [
+   "get",
+   "put"
+  ],
+  "/api/config/stack-detection": [
+   "get",
+   "put"
+  ],
+  "/api/perspectives/": [
+   "get",
+   "post"
+  ],
+  "/api/perspectives/{slug}": [
+   "delete",
+   "get",
+   "put"
+  ],
+  "/api/perspectives/{slug}/reset-default": [
+   "post"
+  ],
+  "/api/scores/{image_key}/history": [
+   "get"
+  ],
+  "/api/scores/{image_key}": [
+   "get"
+  ],
+  "/api/identity/best-photos": [
+   "get"
+  ],
+  "/api/identity/mirror": [
+   "get"
+  ],
+  "/api/identity/mirror/lens/{slug}/exemplars": [
+   "get"
+  ],
+  "/api/identity/suggestions": [
+   "get"
+  ]
+ }
+}

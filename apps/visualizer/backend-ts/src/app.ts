@@ -9,6 +9,8 @@
 import { cors } from 'hono/cors';
 import { config } from './config.js';
 import { createOpenApiApp, openApiDoc } from './api/openapi.js';
+import { perspectivesRoutes } from './api/perspectives.js';
+import { scoresRoutes } from './api/scores.js';
 import { systemRoutes } from './api/system.js';
 
 export function createApp() {
@@ -22,8 +24,11 @@ export function createApp() {
     }),
   );
 
-  // One route group per domain area, mirroring the Flask blueprint layout.
+  // One route group per domain area, mirroring the Flask blueprint layout and its
+  // url_prefix values exactly — the frontend and the OpenAPI contract depend on them.
   app.route('/api', systemRoutes);
+  app.route('/api', perspectivesRoutes);
+  app.route('/api/scores', scoresRoutes);
 
   // Backend-authoritative OpenAPI (ADR-0013). `scripts/export-openapi.ts` reads this.
   app.doc('/apidoc/openapi.json', openApiDoc());
