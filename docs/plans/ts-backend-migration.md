@@ -278,7 +278,7 @@ repo's slicing convention), not build-then-wire.
    | frame substance | done, including the `.lrcat` keyword writer |
    | jobs | routes, runner and processor done; handlers landing one family at a time (step 4) |
 
-   The route surface being complete does not mean the backend is: nine of the
+   The route surface being complete does not mean the backend is: eight of the
    eleven `JOB_TYPES` still carry `handler: null`, so those jobs fail on enqueue.
    That is step 4.
 3. **Job engine — done.** worker_threads runner, `JOB_TYPES` registry, transitions
@@ -291,14 +291,15 @@ repo's slicing convention), not build-then-wire.
    three shared pieces every later family needs: `jobs/checkpoint.ts`,
    `jobs/handlers/path-diagnostics.ts` and `jobs/handlers/common.ts` (catalog
    selection, date windows, failure severity, the library-DB lifecycle).
+   **Embed is done** too, on top of those plus `db/library/embeddings.ts`.
 
    | Family | Types | Status |
    |---|---|---|
    | describe | `single_describe`, `batch_describe` | done |
+   | embed | `batch_embed_image` | done |
    | score | `single_score`, `batch_score` | not started — needs `scoring_service` (step 5) |
    | analyze | `batch_analyze` | not started — composes the describe and score passes |
    | stacks | `batch_stack_detect`, `batch_catalog_similarity`, `catalog_cache_build` | not started |
-   | embed | `batch_embed_image` | not started; the CLIP service is already ported |
    | frame substance | `batch_frame_substance` | not started — needs the detector (step 5) |
    | catalog | `catalog_sync` | not started — needs `catalog_sync` (step 5) |
 
@@ -311,9 +312,22 @@ repo's slicing convention), not build-then-wire.
    cancellation is an explicit `cancelCheck` passed down rather than the
    thread-local `cancel_scope`, which the retry backoff already honours.
 
+   Embed added a third departure of the same kind. Python buffered eight paths
+   and called `encode_images(paths, batch_size=8)` with a per-image retry loop
+   for when the batch threw; here `encodeImages` is a sequential loop over
+   `encodePixels`, because the ONNX session is already internally threaded and
+   batching bought only peak memory. That makes the buffer an indirection around
+   a one-element list and the retry a re-run of work that never shared a fate, so
+   both are gone — and with them a double-count in the original, where a file
+   that failed the batch *and* the retry was tallied under `encode_failed` twice.
+
+   Two things deliberately left out, both for callers that do not exist yet.
    `batch_analyze` will need `runDescribePass` generalized with the
-   `progress_range` / `log_prefix` / nested-checkpoint options Python carries;
-   they were left out rather than built for a caller that does not exist yet.
+   `progress_range` / `log_prefix` / nested-checkpoint options Python carries.
+   And `batch_embed_image` has no `_catalog_cache_chain` branch: only
+   `catalog_cache_build` sets that flag, and when the stacks family lands it will
+   need the same suppression of logging and checkpointing in all three of the
+   handlers it chains, which is better designed once than guessed at three times.
 
    The checkpoint fingerprints hash **bytes identical to
    `json.dumps(sort_keys=True)`**, pinned by golden digests generated from the
@@ -366,6 +380,12 @@ repo's slicing convention), not build-then-wire.
    shape `init_database` produces, where the same statement is correct. Fixed on
    both sides ([#303](https://github.com/ccanalesb/lightroom-tagger/pull/303) for
    Python).
+
+   `batch_embed_image` carried a smaller one of the same kind, not worth a Python
+   PR but worth recording: when a file failed both the batch encode and the
+   per-image retry, `encode_failed` was incremented twice, once by `record_skip`
+   and once by the `vec is None` branch. The TS port has no fallback loop, so it
+   cannot reproduce it.
 
    Two working rules for the remaining slices. Build fixtures from the *production*
    schema, not from what `init_database` happens to create — the two have already
