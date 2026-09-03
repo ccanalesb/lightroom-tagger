@@ -22,6 +22,7 @@ import {
   updateJobStatus,
   type JobLogLevel,
 } from '../db/jobs/jobs.js';
+import { CHECKPOINT_VERSION } from './checkpoint.js';
 
 export type EmitProgress = (jobId: string, progress: number, currentStep: string) => void;
 
@@ -57,6 +58,20 @@ export class JobRunner {
   /** Append a log entry. Kept as a method so handlers need no DB handle. */
   log(jobId: string, level: JobLogLevel, message: string): void {
     addJobLog(this.db, jobId, level, message);
+  }
+
+  /** The job's metadata, including any `checkpoint` a previous run persisted. */
+  readMetadata(jobId: string): Record<string, unknown> {
+    const row = getJob(this.db, jobId, { logsLimit: 0 });
+    const meta = row?.metadata;
+    return meta && typeof meta === 'object' && !Array.isArray(meta)
+      ? (meta as Record<string, unknown>)
+      : {};
+  }
+
+  /** Whether the job has already settled, e.g. failed from inside a handler. */
+  hasFailed(jobId: string): boolean {
+    return getJob(this.db, jobId, { logsLimit: 0 })?.status === 'failed';
   }
 
   /**
@@ -157,12 +172,21 @@ export class JobRunner {
     if (flag) flag.cancelled = true;
   }
 
-  /** Merge versioned checkpoint data into `jobs.metadata`. */
+  /**
+   * Merge versioned checkpoint data into `jobs.metadata`.
+   *
+   * The version is stamped here rather than by the caller, because
+   * `recoverOrphanedJobs` re-queues on it — a handler that forgot it would have
+   * its job failed on restart instead of resumed.
+   */
   persistCheckpoint(jobId: string, checkpointBody: Record<string, unknown>): void {
     const row = getJob(this.db, jobId, { logsLimit: 0 });
     if (!row) return;
     const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
-    updateJobField(this.db, jobId, 'metadata', { ...meta, checkpoint: checkpointBody });
+    updateJobField(this.db, jobId, 'metadata', {
+      ...meta,
+      checkpoint: { checkpoint_version: CHECKPOINT_VERSION, ...checkpointBody },
+    });
   }
 
   /** Drop the resume checkpoint, e.g. after a clean completion. */

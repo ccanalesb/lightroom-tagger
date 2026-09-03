@@ -11,7 +11,11 @@
  * `requiresCatalog` gates job creation and `/api/jobs/health` publishes the list.
  */
 import type { JobRunner } from './runner.js';
-import { handleSingleDescribe } from './handlers/describe.js';
+import {
+  BATCH_DESCRIBE_CHECKPOINT_MISMATCH,
+  handleBatchDescribe,
+  handleSingleDescribe,
+} from './handlers/describe.js';
 
 /**
  * A handler owns the job's outcome: it calls `completeJob` or `failJob` itself.
@@ -41,10 +45,9 @@ export interface JobType {
 export const JOB_TYPES: readonly JobType[] = [
   {
     name: 'batch_describe',
-    handler: null,
+    handler: handleBatchDescribe,
     requiresCatalog: true,
-    checkpointMismatchMessage:
-      'checkpoint mismatch: batch_describe fingerprint changed, starting fresh',
+    checkpointMismatchMessage: BATCH_DESCRIBE_CHECKPOINT_MISMATCH,
   },
   {
     name: 'single_describe',

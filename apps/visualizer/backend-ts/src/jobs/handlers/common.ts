@@ -69,3 +69,153 @@ export function asMetadata(metadata: unknown): Record<string, unknown> {
     ? (metadata as Record<string, unknown>)
     : {};
 }
+
+/** A metadata value read as an int, or `null` when it is not one. */
+export function readIntOrNull(raw: unknown): number | null {
+  if (raw === null || raw === undefined || typeof raw === 'boolean') return null;
+  const n = typeof raw === 'number' ? raw : Number(String(raw).trim());
+  return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
+/**
+ * Exclude videos in SQL rather than after the fact, so a worker slot is never
+ * spent opening a `.mov` only to discover it is not describable.
+ */
+const CATALOG_NOT_VIDEO_SQL = [
+  '.mov',
+  '.mp4',
+  '.avi',
+  '.mkv',
+  '.wmv',
+  '.m4v',
+  '.3gp',
+  '.webm',
+  '.mts',
+  '.m2ts',
+]
+  .map((ext) => `LOWER(i.filepath) NOT LIKE '%${ext}'`)
+  .join(' AND ');
+
+/** Legacy `date_filter` tokens, still sent by older clients and checkpoints. */
+const LEGACY_DATE_FILTER_MONTHS: Record<string, number> = {
+  '3months': 3,
+  '6months': 6,
+  '12months': 12,
+};
+
+export interface DateWindow {
+  months: number | null;
+  year: string | null;
+}
+
+/**
+ * Normalize the date-range metadata into `(months, year)`.
+ *
+ * `last_months` wins over `year` deliberately: ANDing both would silently
+ * intersect them into a window narrower than either, which no caller means.
+ */
+export function resolveDateWindow(metadata: Record<string, unknown>): DateWindow {
+  let months: number | null = null;
+  let year: string | null = null;
+
+  const rawLastMonths = metadata['last_months'];
+  if (typeof rawLastMonths !== 'boolean') {
+    const n = readIntOrNull(rawLastMonths);
+    if (n !== null && n > 0) months = n;
+  }
+
+  if (months === null) {
+    const rawYear = metadata['year'];
+    if (typeof rawYear === 'number' && rawYear >= 1900 && rawYear <= 9999) {
+      year = String(rawYear);
+    } else if (typeof rawYear === 'string' && /^\d{4}$/.test(rawYear.trim())) {
+      year = rawYear.trim();
+    }
+  }
+
+  if (months === null && year === null) {
+    const dateFilter = String(metadata['date_filter'] ?? 'all');
+    months = LEGACY_DATE_FILTER_MONTHS[dateFilter] ?? null;
+  }
+
+  return { months, year };
+}
+
+export interface CatalogSelectionOptions {
+  months: number | null;
+  year: string | null;
+  minRating: number | null;
+  /** Skip images that already carry a catalog description. */
+  undescribedOnly: boolean;
+}
+
+/** Newest first, undated last — the order the UI lists the catalog in. */
+const CATALOG_SELECTION_ORDER =
+  ' ORDER BY (i.date_taken IS NULL) DESC, i.date_taken DESC, i.key DESC';
+
+/** `(key, 'catalog')` pairs matching the window. */
+export function selectCatalogKeys(
+  db: Db,
+  opts: CatalogSelectionOptions,
+): [string, string][] {
+  const params: unknown[] = [];
+  const conditions = [CATALOG_NOT_VIDEO_SQL];
+
+  let sql = opts.undescribedOnly
+    ? "SELECT i.key AS key FROM images i " +
+      "LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog' " +
+      'WHERE d.image_key IS NULL'
+    : 'SELECT i.key AS key FROM images i WHERE 1=1';
+
+  if (opts.months) {
+    conditions.push("i.date_taken >= date('now', ?)");
+    params.push(`-${opts.months} months`);
+  }
+  if (opts.year !== null) {
+    conditions.push("strftime('%Y', i.date_taken) = ?");
+    params.push(opts.year);
+  }
+  if (opts.minRating !== null) {
+    conditions.push('i.rating >= ?');
+    params.push(opts.minRating);
+  }
+
+  sql += ` AND ${conditions.join(' AND ')}${CATALOG_SELECTION_ORDER}`;
+  const rows = db.prepare(sql).all(...(params as never[])) as { key: string }[];
+  return rows.map((r) => [r.key, 'catalog']);
+}
+
+/**
+ * Catalog images whose description row predates the visual-tag columns.
+ *
+ * `dominant_colors IS NULL` is the marker: those rows were written before the
+ * colour and mood fields existed, and a backfill re-describes exactly them.
+ */
+export function selectCatalogKeysMissingVisualTags(
+  db: Db,
+  opts: Omit<CatalogSelectionOptions, 'undescribedOnly'>,
+): [string, string][] {
+  const params: unknown[] = [];
+  const conditions = [CATALOG_NOT_VIDEO_SQL];
+
+  if (opts.months) {
+    conditions.push("i.date_taken >= date('now', ?)");
+    params.push(`-${opts.months} months`);
+  }
+  if (opts.year !== null) {
+    conditions.push("strftime('%Y', i.date_taken) = ?");
+    params.push(opts.year);
+  }
+  if (opts.minRating !== null) {
+    conditions.push('i.rating >= ?');
+    params.push(opts.minRating);
+  }
+
+  const sql =
+    'SELECT i.key AS key FROM images i WHERE EXISTS (' +
+    '  SELECT 1 FROM image_descriptions d' +
+    "  WHERE d.image_key = i.key AND d.image_type = 'catalog' AND d.dominant_colors IS NULL" +
+    `) AND ${conditions.join(' AND ')}${CATALOG_SELECTION_ORDER}`;
+  const rows = db.prepare(sql).all(...(params as never[])) as { key: string }[];
+  return rows.map((r) => [r.key, 'catalog']);
+}
