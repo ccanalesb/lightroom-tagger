@@ -278,7 +278,7 @@ repo's slicing convention), not build-then-wire.
    | frame substance | done, including the `.lrcat` keyword writer |
    | jobs | routes, runner and processor done; handlers landing one family at a time (step 4) |
 
-   The route surface being complete does not mean the backend is: eight of the
+   The route surface being complete does not mean the backend is: six of the
    eleven `JOB_TYPES` still carry `handler: null`, so those jobs fail on enqueue.
    That is step 4.
 3. **Job engine — done.** worker_threads runner, `JOB_TYPES` registry, transitions
@@ -291,15 +291,19 @@ repo's slicing convention), not build-then-wire.
    three shared pieces every later family needs: `jobs/checkpoint.ts`,
    `jobs/handlers/path-diagnostics.ts` and `jobs/handlers/common.ts` (catalog
    selection, date windows, failure severity, the library-DB lifecycle).
-   **Embed is done** too, on top of those plus `db/library/embeddings.ts`.
+   **Embed is done** too, on top of those plus `db/library/embeddings.ts`, and so
+   are the two standalone **stacks** jobs, which needed only the similarity write
+   helpers — the CLIP KNN and the representative query were already ported for
+   the routes.
 
    | Family | Types | Status |
    |---|---|---|
    | describe | `single_describe`, `batch_describe` | done |
    | embed | `batch_embed_image` | done |
+   | stacks | `batch_stack_detect`, `batch_catalog_similarity` | done |
+   | stacks | `catalog_cache_build` | blocked — its first stage is `catalog_sync` |
    | score | `single_score`, `batch_score` | not started — needs `scoring_service` (step 5) |
    | analyze | `batch_analyze` | not started — composes the describe and score passes |
-   | stacks | `batch_stack_detect`, `batch_catalog_similarity`, `catalog_cache_build` | not started |
    | frame substance | `batch_frame_substance` | not started — needs the detector (step 5) |
    | catalog | `catalog_sync` | not started — needs `catalog_sync` (step 5) |
 
@@ -321,13 +325,30 @@ repo's slicing convention), not build-then-wire.
    both are gone — and with them a double-count in the original, where a file
    that failed the batch *and* the retry was tallied under `encode_failed` twice.
 
-   Two things deliberately left out, both for callers that do not exist yet.
+   Stack detection contributed one more, plus a trap. Python selected the work
+   list, then re-fetched the same rows in 500-key `IN (...)` chunks and
+   substituted a null-dated row for any key the second query failed to return —
+   but both queries read `images`, so that fallback covers a case the first query
+   cannot produce; here it is one query. The trap is `date_taken` parsing:
+   Python's `fromisoformat` yields a naive datetime that the handler then stamps
+   as UTC, while `new Date('2024-01-15T10:00:00')` reads the same text as *local*
+   time. Left alone that would move where a burst begins by the machine's offset
+   from Greenwich, so `parseDateTakenUtc` parses the string by hand — and keeps
+   sub-millisecond precision, because the gap is compared against `delta_ms` as a
+   float.
+
+   Three things deliberately left out, all for callers that do not exist yet.
    `batch_analyze` will need `runDescribePass` generalized with the
    `progress_range` / `log_prefix` / nested-checkpoint options Python carries.
-   And `batch_embed_image` has no `_catalog_cache_chain` branch: only
-   `catalog_cache_build` sets that flag, and when the stacks family lands it will
-   need the same suppression of logging and checkpointing in all three of the
-   handlers it chains, which is better designed once than guessed at three times.
+   Neither `batch_embed_image` nor the two stacks handlers have a
+   `_catalog_cache_chain` branch: only `catalog_cache_build` sets that flag, and
+   it cannot run until `catalog_sync` is ported, so the suppression of logging
+   and checkpointing that flag selects lands with the composite that needs it
+   rather than being guessed at three times. Note that most of what
+   `_CatalogCacheStageRunner` does — mapping a stage's 5–100% into a quarter of
+   the bar, capturing `complete_job`, swallowing checkpoints — is a wrapper
+   around the runner and needs nothing from the handlers; only the log
+   suppression is a real branch inside them.
 
    The checkpoint fingerprints hash **bytes identical to
    `json.dumps(sort_keys=True)`**, pinned by golden digests generated from the
