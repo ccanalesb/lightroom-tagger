@@ -170,11 +170,7 @@ export async function tick(db: Db, activeRunner: JobRunner): Promise<void> {
     try {
       if (entry?.handler) {
         try {
-          await (entry.handler as (r: JobRunner, id: string, m: unknown) => Promise<void>)(
-            activeRunner,
-            jobId,
-            job.metadata,
-          );
+          await entry.handler(activeRunner, jobId, job.metadata);
         } catch (e) {
           // Only fail a job the handler left running: a handler that already
           // reported failure or completion has said its piece.

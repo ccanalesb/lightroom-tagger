@@ -6,17 +6,27 @@
  * greppable, no decorators, no auto-discovery, so adding a job type is a visible
  * edit rather than a side effect of importing a module.
  *
- * The handlers are not wired up yet: they are 3,394 lines that depend on the vision
- * client, the description and scoring services, the RAW decode pipeline and the
- * `.lrcat` reader. `handler: null` marks a type whose dispatch is still to come —
- * the *declaration* has to exist first, because `requiresCatalog` gates job creation
- * and `/api/jobs/health` publishes the list.
+ * The handlers are being wired one family at a time. `handler: null` marks a type
+ * whose dispatch is still to come — the *declaration* has to exist first, because
+ * `requiresCatalog` gates job creation and `/api/jobs/health` publishes the list.
  */
+import type { JobRunner } from './runner.js';
+import { handleSingleDescribe } from './handlers/describe.js';
+
+/**
+ * A handler owns the job's outcome: it calls `completeJob` or `failJob` itself.
+ * The processor only steps in for a handler that throws and leaves it running.
+ */
+export type JobHandler = (
+  runner: JobRunner,
+  jobId: string,
+  metadata: unknown,
+) => Promise<void>;
 
 export interface JobType {
   name: string;
   /** `null` until the handler is ported; the runner reports such a job as failed. */
-  handler: null;
+  handler: JobHandler | null;
   /**
    * Whether the handler opens the Lightroom catalog mirror.
    *
@@ -36,7 +46,12 @@ export const JOB_TYPES: readonly JobType[] = [
     checkpointMismatchMessage:
       'checkpoint mismatch: batch_describe fingerprint changed, starting fresh',
   },
-  { name: 'single_describe', handler: null, requiresCatalog: true, checkpointMismatchMessage: null },
+  {
+    name: 'single_describe',
+    handler: handleSingleDescribe,
+    requiresCatalog: true,
+    checkpointMismatchMessage: null,
+  },
   { name: 'single_score', handler: null, requiresCatalog: true, checkpointMismatchMessage: null },
   {
     name: 'batch_score',
