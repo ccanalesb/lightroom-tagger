@@ -259,33 +259,42 @@ repo's slicing convention), not build-then-wire.
 1. **First vertical slice: `/api/system`** — proves the whole contract chain from a TS
    route through OpenAPI to `api.gen.ts`. **Done** (`/status`, `/stats`,
    `/catalog/status`), with the emitted OpenAPI diffed route-by-route against Flask.
-2. **Route groups.** 12 of 52 OpenAPI paths so far. `tests/openapi-paths.test.ts`
-   pins every emitted path and method against a captured inventory of the Flask
-   document and ratchets the migrated count, so a group cannot silently regress or
-   invent a path.
+2. **Route groups. Done — 52 of 52 OpenAPI paths.**
+   `tests/openapi-contract.test.ts` pins every emitted path and method against a
+   captured inventory of the Flask document and ratchets the migrated count, so a
+   group cannot silently regress or invent a path. At 52 the ratchet is an
+   equality check in practice: every path Flask serves has a TS equivalent.
 
    | Group | Status |
    |---|---|
-   | system (3 of 7 paths) | done |
+   | system | done |
    | scores | done |
    | perspectives | done, including writes |
    | config | done |
-   | descriptions | reads done; `POST /generate` needs the vision pipeline |
-   | **catalog + stacks** | next — coupled: `stacks` reuses catalog's row shaping and `CatalogImage` |
-   | identity | needs `identity_service` (1,220 LOC of ranking/mirror logic) — service slice, not a route port |
-   | providers | needs the provider registry |
-   | frame substance | needs the `.lrcat` writer, sequenced last |
-   | jobs | needs the job engine (step 3) |
+   | descriptions | done, including `POST /generate` and the vision pipeline behind it |
+   | catalog + stacks | done |
+   | identity | done |
+   | providers | done |
+   | frame substance | done, including the `.lrcat` keyword writer |
+   | jobs | routes, runner and processor done; **handlers are not wired** (step 4) |
 
-   Sequencing note: the remaining groups are gated on domain code, not on route
-   work. `catalog`+`stacks` is the last large block that is DB-only.
-3. **Job engine** — worker_threads runner, `JOB_TYPES` registry, transitions state
-   machine, checkpoints, socket.io progress. Preserve the ADR-0010 guardrails.
+   The route surface being complete does not mean the backend is: `JOB_TYPES`
+   declares all 11 types with `handler: null`, so any job that is enqueued fails.
+   That is step 4.
+3. **Job engine — done.** worker_threads runner, `JOB_TYPES` registry, transitions
+   state machine, checkpoints, socket.io progress, with the ADR-0010 guardrails
+   preserved.
 4. **Job handlers**, one family per slice — catalog sync, embed, analyze/score,
-   describe, stacks, frame substance, path diagnostics.
-5. **Library core** — database package, scoring, identity, vision providers, prompt
-   builder, frame substance detector, hasher, image prep, RAW/vision cache.
-6. **CLI** — replaces the `lightroom-tagger` console script.
+   describe, stacks, frame substance, path diagnostics. ~3,394 lines of Python.
+   The describe family is the least work: `vision/description-service.ts` and the
+   whole provider stack under it already landed with the descriptions group.
+5. **Library core — partly done.** The `library.db` read/write seam, providers,
+   vision op, identity, imaging and the Lightroom writer are ported. Still Python
+   only: `scoring_service` / `score_perspective` / `structured_output`,
+   `catalog_sync`, `frame_substance_detector` and `frame_substance_batch`,
+   `lightroom/reader` + `enricher` + `schema`, and the small shared utilities
+   (`managed_connections`, `path_utils`, `cancel_scope`, `text_constants`).
+6. **CLI** — replaces the `lightroom-tagger` console script. Not started.
 7. **Cutover** — back up `library.db`, point the Vite proxy at the TS backend, and
    delete the Flask tree. No CLIP reindex: embeddings are already drop-in compatible.
 
@@ -314,6 +323,23 @@ repo's slicing convention), not build-then-wire.
 6. **Lightroom catalog writes.** `utils/lr_catalog_write.py` and
    `lightroom_tagger/lightroom/writer.py` mutate a live `.lrcat`. Port last, behind the
    existing write-serialization discipline.
+7. **A faithful port inherits the original's latent bugs, and the new tests find
+   them.** Porting `store_image_description` line by line carried over an FTS5
+   defect: on the external-content `image_descriptions_fts` that every real catalog
+   has, `DELETE ... WHERE rowid = ?` removes the wrong terms, so a regenerated
+   description stays searchable under its old text — silently, with
+   `integrity-check` still passing. It surfaced only because the TS fixture builds
+   the table in the production shape, while every Python test builds the standalone
+   shape `init_database` produces, where the same statement is correct. Fixed on
+   both sides ([#303](https://github.com/ccanalesb/lightroom-tagger/pull/303) for
+   Python).
+
+   Two working rules for the remaining slices. Build fixtures from the *production*
+   schema, not from what `init_database` happens to create — the two have already
+   diverged, and migrations gated on `user_version` mean an existing catalog never
+   converges. And when a ported test fails, establish whether Python actually
+   passes the same case before assuming the port is wrong; here it was the original
+   that was broken.
 
 ---
 Created using Anthropic Claude. This line should stay on internal versions until a
