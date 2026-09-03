@@ -57,6 +57,7 @@ import {
 } from '../schemas/catalog.js';
 import { ErrorBody } from '../schemas/errors.js';
 import { catalogThumbnailRoots, isPathUnderAllowedRoots } from './common.js';
+import { registerFrameSubstanceRoutes } from './frame-substance.js';
 import { parseCatalogListParams, parseCatalogSimilarParams } from './query-params.js';
 import {
   catalogThumbnailUrl,
@@ -73,7 +74,12 @@ export const catalogRoutes = createOpenApiApp<LibraryEnv>();
  * does not match a path with nothing after the prefix.
  */
 catalogRoutes.use('/images/catalog', libraryDb());
-catalogRoutes.use('/images/catalog/*', libraryDb({ writeForMethods: ['PATCH'] }));
+// PATCH is instagram-posted; POST and DELETE are the frame-substance override and
+// the cull keyword, registered onto this group by `registerFrameSubstanceRoutes`.
+catalogRoutes.use(
+  '/images/catalog/*',
+  libraryDb({ writeForMethods: ['PATCH', 'POST', 'DELETE'] }),
+);
 catalogRoutes.use('/images/catalog-similarity-groups', libraryDb());
 
 /**
@@ -470,3 +476,10 @@ catalogRoutes.openapi(detailRoute, (c) => {
     return c.json(out as z.infer<typeof ImageView>, 200);
   }
 });
+
+// --- frame substance --------------------------------------------------------
+
+// Registered last, after the `/{image_key}` catch-all above, so route order in the
+// emitted document matches Flask's. The paths are all deeper than one segment, so
+// the catch-all cannot shadow them either way.
+registerFrameSubstanceRoutes(catalogRoutes);

@@ -10,6 +10,11 @@ Every request is a GET, so this cannot modify the catalog. Even so, point
 LIBRARY_DB at a *copy*: the Flask app opens the database read-write and would
 apply pending schema migrations to it.
 
+Two captured endpoints read outside library.db. ``/api/cache/pipeline-status``
+reads the jobs table in ``visualizer.db``, and the frame-substance responses read
+``config.yaml`` and — when a Lightroom catalog is configured and unlocked — open
+the ``.lrcat`` read-only to check for the cull keyword. Both are reads.
+
 Usage, from the repo root::
 
     cp library.db /tmp/library-parity.db
@@ -88,6 +93,13 @@ REQUESTS = [
     '/api/images/stacks/suggestions?limit=2',
     '/api/images/stacks/suggestions?limit=2&offset=5',
     f'/api/images/stacks/{stack_id}/members',
+    '/api/insights-summary',
+    '/api/cache/status',
+    '/api/cache/pipeline-status',
+    '/api/catalog/status',
+    '/api/stats',
+    f'/api/images/catalog/{key_scored}/frame-substance',
+    f'/api/images/catalog/{key_stacked}/frame-substance',
     '/api/descriptions/?limit=3',
     f'/api/descriptions/{key_scored}',
     f'/api/scores/{key_scored}',

@@ -154,6 +154,18 @@ export class LibraryFixture {
         image_key TEXT PRIMARY KEY,
         overridden_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
+      CREATE TABLE frame_substance_runs (
+        run_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        started_at TEXT NOT NULL,
+        finished_at TEXT,
+        detector_version TEXT NOT NULL,
+        count_void INTEGER NOT NULL DEFAULT 0,
+        count_illegible INTEGER NOT NULL DEFAULT 0,
+        count_ok INTEGER NOT NULL DEFAULT 0,
+        count_unknown INTEGER NOT NULL DEFAULT 0,
+        breached INTEGER NOT NULL DEFAULT 0,
+        breach_reason TEXT NOT NULL DEFAULT ''
+      );
       CREATE TABLE vision_cache (
         key TEXT PRIMARY KEY,
         compressed_path TEXT,

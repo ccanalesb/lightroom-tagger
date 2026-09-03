@@ -9,6 +9,32 @@
   "stacked": "2014-01-11__DSC7876"
  },
  "responses": {
+  "/api/cache/pipeline-status": {
+   "json": {
+    "catalog_cache_build": null,
+    "catalog_similarity": null,
+    "catalog_sync": null,
+    "embed_catalog": null,
+    "stack_detect": null
+   },
+   "status": 200
+  },
+  "/api/cache/status": {
+   "json": {
+    "cache_dir": "/Users/ccanales/.cache/lightroom_tagger/vision",
+    "cache_size_mb": 4021.35,
+    "cached_images": 43502,
+    "missing": 292,
+    "total_images": 43794
+   },
+   "status": 200
+  },
+  "/api/catalog/status": {
+   "json": {
+    "cached": true
+   },
+   "status": 200
+  },
   "/api/descriptions/2014-01-05__DSC7827": {
    "json": {
     "description": {
@@ -978,6 +1004,25 @@
    },
    "status": 200
   },
+  "/api/images/catalog/2014-01-05__DSC7827/frame-substance": {
+   "json": {
+    "catalog_write_available": false,
+    "catalog_write_unavailable_reason": "No Lightroom catalog configured.",
+    "detector_version": "v1-847ab31c",
+    "flagged": false,
+    "has_cull_keyword": null,
+    "has_detection_run": true,
+    "has_override": false,
+    "image_key": "2014-01-05__DSC7827",
+    "instrument": null,
+    "is_stale": false,
+    "judged_at": "2026-09-02T14:29:56.059923+00:00",
+    "restore_tier": null,
+    "unknown_reason": null,
+    "verdict": "ok"
+   },
+   "status": 200
+  },
   "/api/images/catalog/2014-01-05__DSC7827/similar?limit=3": {
    "json": {
     "images": [
@@ -1265,6 +1310,25 @@
     "stack_member_count": 3,
     "title": "",
     "width": 6000
+   },
+   "status": 200
+  },
+  "/api/images/catalog/2014-01-11__DSC7876/frame-substance": {
+   "json": {
+    "catalog_write_available": false,
+    "catalog_write_unavailable_reason": "No Lightroom catalog configured.",
+    "detector_version": "v1-847ab31c",
+    "flagged": false,
+    "has_cull_keyword": null,
+    "has_detection_run": true,
+    "has_override": false,
+    "image_key": "2014-01-11__DSC7876",
+    "instrument": null,
+    "is_stale": false,
+    "judged_at": "2026-09-02T14:29:56.059940+00:00",
+    "restore_tier": null,
+    "unknown_reason": null,
+    "verdict": "ok"
    },
    "status": 200
   },
@@ -4260,6 +4324,91 @@
    },
    "status": 200
   },
+  "/api/insights-summary": {
+   "json": {
+    "burst_stacks": 7989,
+    "catalog_images": 43794,
+    "frame_substance_flagged": 44,
+    "frame_substance_run": {
+     "breach_reason": "",
+     "breached": false,
+     "detector_version": "v1-847ab31c",
+     "finished_at": "2026-09-02T14:32:36.400921+00:00"
+    },
+    "frame_substance_unknown": {
+     "never_judged": 318,
+     "no_cache_row": 746,
+     "oversized_sentinel": 50
+    },
+    "no_current_score": 797,
+    "pending_stack_suggestions": 38838,
+    "perspective_coverage": [
+     {
+      "active": false,
+      "display_name": "Color Theory",
+      "scored_images": 38060,
+      "slug": "color_theory"
+     },
+     {
+      "active": true,
+      "display_name": "Compositional Cleanliness",
+      "scored_images": 42997,
+      "slug": "compositional-cleanliness"
+     },
+     {
+      "active": false,
+      "display_name": "Documentary",
+      "scored_images": 38060,
+      "slug": "documentary"
+     },
+     {
+      "active": true,
+      "display_name": "Depth & Environmental Context",
+      "scored_images": 42997,
+      "slug": "environmental-context-legibility"
+     },
+     {
+      "active": true,
+      "display_name": "Framing",
+      "scored_images": 42997,
+      "slug": "framing"
+     },
+     {
+      "active": true,
+      "display_name": "Interpretive & Human Charge",
+      "scored_images": 42997,
+      "slug": "intensity-suggestion"
+     },
+     {
+      "active": false,
+      "display_name": "Layering",
+      "scored_images": 649,
+      "slug": "layering"
+     },
+     {
+      "active": false,
+      "display_name": "Publisher",
+      "scored_images": 0,
+      "slug": "publisher"
+     },
+     {
+      "active": false,
+      "display_name": "Street",
+      "scored_images": 38060,
+      "slug": "street"
+     },
+     {
+      "active": false,
+      "display_name": "Tension & Human Element",
+      "scored_images": 95,
+      "slug": "tension-human-element"
+     }
+    ],
+    "scoring_9_plus": 125,
+    "unscored_on_active_perspectives": 797
+   },
+   "status": 200
+  },
   "/api/perspectives/": {
    "json": [
     {
@@ -4469,6 +4618,14 @@
     ],
     "image_key": "2014-01-05__DSC7827",
     "image_type": "catalog"
+   },
+   "status": 200
+  },
+  "/api/stats": {
+   "json": {
+    "catalog_images": 43794,
+    "db_path": "/private/tmp/claude-501/-Users-ccanales-projects-lightroom-tagger/dad1199f-3a74-482f-b989-61a0a39969ee/scratchpad/library-probe.db",
+    "posted_to_instagram": 223
    },
    "status": 200
   }
