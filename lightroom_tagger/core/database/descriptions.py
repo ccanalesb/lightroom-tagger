@@ -83,6 +83,45 @@ def _visual_attr_json(value) -> str | None:
     return None
 
 
+def _fts_is_external_content(db: sqlite3.Connection) -> bool:
+    """Whether ``image_descriptions_fts`` is an external-content FTS5 table.
+
+    Both forms are in the wild and they need opposite removal statements. The
+    catalogs in use carry ``content='image_descriptions'``, while
+    :func:`_migrate_image_descriptions_fts` builds a standalone table for fresh
+    databases and only re-runs below ``user_version`` 3 — so an existing catalog
+    keeps whichever form it was created with.
+    """
+    row = db.execute(
+        "SELECT sql FROM sqlite_master WHERE name = 'image_descriptions_fts'"
+    ).fetchone()
+    return bool(row) and re.search(r"\bcontent\s*=", row["sql"] or "") is not None
+
+
+def _remove_description_fts_row(
+    db: sqlite3.Connection, rowid: int, indexed_document: str
+) -> None:
+    """Drop *rowid* from the FTS index, given the document text that was indexed.
+
+    An external-content table must go through FTS5's ``'delete'`` command. The
+    obvious ``DELETE ... WHERE rowid = ?`` makes FTS5 re-tokenize whatever the
+    content table holds *now*, which raises ``database disk image is malformed``
+    against an empty index and silently strips the wrong terms against a
+    populated one — leaving the previous description searchable for ever while
+    still passing an ``integrity-check``. A standalone table is the mirror
+    image: it rejects the ``'delete'`` command and needs the plain statement.
+    """
+    if _fts_is_external_content(db):
+        db.execute(
+            "INSERT INTO image_descriptions_fts"
+            "(image_descriptions_fts, rowid, description_search_document) "
+            "VALUES('delete', ?, ?)",
+            (rowid, indexed_document),
+        )
+    else:
+        db.execute("DELETE FROM image_descriptions_fts WHERE rowid = ?", (rowid,))
+
+
 def init_image_descriptions_table(db: sqlite3.Connection):
     """No-op: table is created in init_database."""
     pass
@@ -112,6 +151,15 @@ def store_image_description(db: sqlite3.Connection, record: dict) -> str:
         description_search_document = None
 
     with library_write(db):
+        # Read before the upsert: removing the old index entry needs the text
+        # that was indexed, and only a previous catalog write with a non-empty
+        # document indexed anything at all.
+        previous = db.execute(
+            "SELECT rowid, image_type, description_search_document "
+            "FROM image_descriptions WHERE image_key = ?",
+            (image_key,),
+        ).fetchone()
+
         db.execute("""
             INSERT INTO image_descriptions
                 (image_key, image_type, summary, composition,
@@ -143,7 +191,10 @@ def store_image_description(db: sqlite3.Connection, record: dict) -> str:
         ).fetchone()
         if row is not None:
             rowid = row["rowid"]
-            db.execute("DELETE FROM image_descriptions_fts WHERE rowid = ?", (rowid,))
+            if previous is not None and previous["image_type"] == "catalog":
+                indexed = previous["description_search_document"]
+                if indexed and str(indexed).strip():
+                    _remove_description_fts_row(db, previous["rowid"], indexed)
             doc = description_search_document
             if image_type == "catalog" and doc and str(doc).strip():
                 db.execute(
