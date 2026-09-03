@@ -382,11 +382,16 @@ export class LibraryFixture {
     return groupId;
   }
 
-  /** A stored CLIP vector, so a test can assert what the embed job leaves alone. */
-  addClipEmbedding(imageKey: string, fill = 0): this {
+  /**
+   * A stored CLIP vector: a constant fill for tests that only care whether a row
+   * exists, or an explicit vector for tests that rank against it.
+   */
+  addClipEmbedding(imageKey: string, vector: number | Float32Array = 0): this {
     const db = this.open();
     db.prepare('INSERT INTO image_clip_embeddings(embedding, image_key) VALUES (?, ?)').run(
-      serializeFloat32(new Float32Array(512).fill(fill)),
+      serializeFloat32(
+        typeof vector === 'number' ? new Float32Array(512).fill(vector) : vector,
+      ),
       imageKey,
     );
     db.close();
@@ -400,6 +405,15 @@ export class LibraryFixture {
       `INSERT INTO vision_cache (key, compressed_path, phash, compressed_at, original_mtime)
        VALUES (?, ?, NULL, datetime('now'), 12345.0)`,
     ).run(imageKey, compressedPath);
+    db.close();
+    return this;
+  }
+
+  /** A user "not a duplicate" verdict; the table's CHECK needs the pair sorted. */
+  addSimilarityRejection(keyA: string, keyB: string): this {
+    const [a, b] = [keyA, keyB].sort();
+    const db = this.open();
+    db.prepare('INSERT INTO catalog_similarity_rejections (key_a, key_b) VALUES (?, ?)').run(a, b);
     db.close();
     return this;
   }

@@ -14,9 +14,11 @@ import {
   CHECKPOINT_VERSION,
   buildBatchDescribeCheckpointBody,
   buildBatchEmbedImageCheckpointBody,
+  buildBatchStackDetectCheckpointBody,
   canonicalJson,
   fingerprintBatchDescribe,
   fingerprintBatchEmbedImage,
+  fingerprintBatchStackDetect,
   loadResumeState,
 } from '../src/jobs/checkpoint.js';
 
@@ -134,6 +136,39 @@ describe('fingerprintBatchEmbedImage', () => {
   });
 });
 
+describe('fingerprintBatchStackDetect', () => {
+  it('matches the digests Python produces for the same inputs', async () => {
+    await expect(
+      fingerprintBatchStackDetect([], { resolvedDeltaMs: 2000, forceMode: 'incremental' }),
+    ).resolves.toBe('bb8c918ab959d1d0075e25ec09614709de73c034155294043e94ccc13e15e944');
+    await expect(
+      fingerprintBatchStackDetect(['b', 'a', 'c'], { resolvedDeltaMs: 1500, forceMode: 'full' }),
+    ).resolves.toBe('984368b5ae78677b565122a56eca7a31bf358c57df7c21c8bf2b30181dbfa74a');
+    await expect(
+      fingerprintBatchStackDetect(['2024-01-01__café', 'z'], {
+        resolvedDeltaMs: 2000,
+        forceMode: 'preserve_edited',
+      }),
+    ).resolves.toBe('15f2b6ad444c54dfb06a96ac039e81742bf9c2b366e3424dfcb8463b74df33a1');
+  });
+
+  /**
+   * Both are resolved rather than raw metadata: `delta_ms` falls back to
+   * `config.yaml` and an absent `force` means incremental, so a run whose grouping
+   * changed for either reason has to discard the checkpoint.
+   */
+  it('changes when the burst gap or the force mode does', async () => {
+    const base = { resolvedDeltaMs: 2000, forceMode: 'incremental' };
+    const baseline = await fingerprintBatchStackDetect(['a'], base);
+    await expect(
+      fingerprintBatchStackDetect(['a'], { ...base, resolvedDeltaMs: 2001 }),
+    ).resolves.not.toBe(baseline);
+    await expect(fingerprintBatchStackDetect(['a'], { ...base, forceMode: 'full' })).resolves.not.toBe(
+      baseline,
+    );
+  });
+});
+
 describe('loadResumeState', () => {
   const body = (over: Record<string, unknown> = {}) => ({
     checkpoint: {
@@ -197,6 +232,24 @@ describe('buildBatchEmbedImageCheckpointBody', () => {
       job_type: 'batch_embed_image',
       fingerprint: 'fp',
       processed_pairs: ['a', 'b'],
+      total_at_start: 2,
+    });
+  });
+});
+
+describe('buildBatchStackDetectCheckpointBody', () => {
+  /** A third name for the same list, again because Flask wrote it that way. */
+  it('stores catalog keys under processed_image_keys', () => {
+    expect(
+      buildBatchStackDetectCheckpointBody({
+        fingerprint: 'fp',
+        processed: new Set(['b', 'a']),
+        totalAtStart: 2,
+      }),
+    ).toEqual({
+      job_type: 'batch_stack_detect',
+      fingerprint: 'fp',
+      processed_image_keys: ['a', 'b'],
       total_at_start: 2,
     });
   });

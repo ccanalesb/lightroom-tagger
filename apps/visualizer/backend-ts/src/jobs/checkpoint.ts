@@ -15,6 +15,9 @@
  * catalog keys. The key name is not a mistake to tidy up: it is what the Flask
  * backend already wrote, and renaming it here would strand every checkpoint the
  * cutover is meant to resume.
+ *
+ * `batch_stack_detect` — bare catalog keys again, but under
+ * `processed_image_keys`. Same reason: the name is the Flask backend's.
  */
 import { CLIP_EMBED_DIM, CLIP_EMBED_MODEL_ID } from '../imaging/clip-embed.js';
 
@@ -125,6 +128,28 @@ export function fingerprintBatchEmbedImage(
   );
 }
 
+/**
+ * Identity of a `batch_stack_detect` run: the work list, the burst gap, and the
+ * force mode.
+ *
+ * The gap and the mode arrive resolved, not read from the metadata, because both
+ * have a default the metadata does not spell — `delta_ms` falls back to
+ * `config.yaml` and an absent `force` means `incremental`. A run resumed after the
+ * config changed is a different grouping of the same photos, so it must not match.
+ */
+export function fingerprintBatchStackDetect(
+  imageKeys: readonly string[],
+  opts: { resolvedDeltaMs: number; forceMode: string },
+): Promise<string> {
+  return sha256Hex(
+    canonicalJson({
+      delta_ms: Math.trunc(opts.resolvedDeltaMs),
+      force_mode: String(opts.forceMode),
+      keys: [...imageKeys].sort(),
+    }),
+  );
+}
+
 export function buildBatchDescribeCheckpointBody(args: {
   fingerprint: string;
   processed: ReadonlySet<string>;
@@ -147,6 +172,19 @@ export function buildBatchEmbedImageCheckpointBody(args: {
     job_type: 'batch_embed_image',
     fingerprint: args.fingerprint,
     processed_pairs: [...args.processed].sort(),
+    total_at_start: args.totalAtStart,
+  };
+}
+
+export function buildBatchStackDetectCheckpointBody(args: {
+  fingerprint: string;
+  processed: ReadonlySet<string>;
+  totalAtStart: number;
+}): Record<string, unknown> {
+  return {
+    job_type: 'batch_stack_detect',
+    fingerprint: args.fingerprint,
+    processed_image_keys: [...args.processed].sort(),
     total_at_start: args.totalAtStart,
   };
 }

@@ -17,6 +17,11 @@ import {
   handleSingleDescribe,
 } from './handlers/describe.js';
 import { BATCH_EMBED_IMAGE_CHECKPOINT_MISMATCH, handleBatchEmbedImage } from './handlers/embed.js';
+import {
+  BATCH_STACK_DETECT_CHECKPOINT_MISMATCH,
+  handleBatchCatalogSimilarity,
+  handleBatchStackDetect,
+} from './handlers/stacks.js';
 
 /**
  * A handler owns the job's outcome: it calls `completeJob` or `failJob` itself.
@@ -67,14 +72,13 @@ export const JOB_TYPES: readonly JobType[] = [
   { name: 'batch_analyze', handler: null, requiresCatalog: true, checkpointMismatchMessage: null },
   {
     name: 'batch_stack_detect',
-    handler: null,
+    handler: handleBatchStackDetect,
     requiresCatalog: true,
-    checkpointMismatchMessage:
-      'checkpoint mismatch: batch_stack_detect fingerprint changed, starting fresh',
+    checkpointMismatchMessage: BATCH_STACK_DETECT_CHECKPOINT_MISMATCH,
   },
   {
     name: 'batch_catalog_similarity',
-    handler: null,
+    handler: handleBatchCatalogSimilarity,
     requiresCatalog: true,
     checkpointMismatchMessage: null,
   },
