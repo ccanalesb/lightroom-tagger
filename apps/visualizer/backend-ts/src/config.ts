@@ -75,6 +75,20 @@ export const config = {
   get LT_CONFIG_YAML(): string {
     return resolvePath(process.env.LT_CONFIG_YAML ?? 'config.yaml');
   },
+  /**
+   * `providers.json` — provider endpoints, models and defaults, which
+   * `/api/providers/*` reads and WRITES.
+   *
+   * Gitignored and user-owned; the registry bootstraps it from
+   * `providers.example.json` on first use. Overridable for the same reason
+   * `LT_CONFIG_YAML` is: a test of the PUT handlers would otherwise rewrite the
+   * user's real provider list, including their configured models.
+   */
+  get LT_PROVIDERS_JSON(): string {
+    return resolvePath(
+      process.env.LT_PROVIDERS_JSON ?? 'lightroom_tagger/core/providers.json',
+    );
+  },
 } as const;
 
 // --- library config.yaml ----------------------------------------------------

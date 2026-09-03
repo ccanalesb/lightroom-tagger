@@ -2,12 +2,13 @@
  * System routes — health, stats, catalog cache readiness.
  * Port of the corresponding routes in `api/system.py`.
  */
-import { createRoute } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
 import { existsSync } from 'node:fs';
 import { config, loadLibraryConfig } from '../config.js';
 import { ERROR_DB_NOT_FOUND } from '../constants/errors.js';
 import { openDb, openLibraryDb } from '../db/connection.js';
 import { getCachePipelineStatus } from '../db/jobs/pipeline-status.js';
+import { getUserModels } from '../db/jobs/user-models.js';
 import { getInsightsSummary } from '../db/library/insights.js';
 import {
   getCacheStats,
@@ -15,6 +16,7 @@ import {
   getPostedImagesCount,
   hasCachedEntries,
 } from '../db/library/statistics.js';
+import { ProviderRegistry } from '../providers/registry.js';
 import { createOpenApiApp } from './openapi.js';
 import { jsonBody, withValidationError } from './route-helpers.js';
 import { ErrorBody } from './schemas/errors.js';
@@ -25,6 +27,7 @@ import {
   InsightsSummary,
   Stats,
   SystemStatusResponse,
+  VisionModelsResponse,
 } from './schemas/system.js';
 
 export const systemRoutes = createOpenApiApp();
@@ -200,5 +203,88 @@ systemRoutes.openapi(cachePipelineStatusRoute, (c) => {
     return c.json({ error: e instanceof Error ? e.message : String(e) }, 500);
   } finally {
     db.close();
+  }
+});
+
+// --- vision models ----------------------------------------------------------
+
+const visionModelsRoute = createRoute({
+  method: 'get',
+  path: '/vision-models',
+  tags: ['system'],
+  responses: withValidationError({
+    200: { description: 'Vision-capable models', content: jsonBody(VisionModelsResponse) },
+  }),
+});
+
+/**
+ * Vision-capable models from every available provider, plus user-added rows.
+ *
+ * Never fails: any error — an unreadable `providers.json`, a provider that throws
+ * while listing — falls back to `gemma3:27b` with `fallback: true`, so the
+ * description UI always has something selectable. That is deliberate in the
+ * original and kept here; a 500 would leave the page with an empty dropdown and no
+ * explanation.
+ */
+systemRoutes.openapi(visionModelsRoute, async (c) => {
+  // Not `as const`: the response type needs a mutable array of the schema's shape.
+  const fallbackBody = (): z.infer<typeof VisionModelsResponse> => ({
+    models: [{ name: 'gemma3:27b', default: true }],
+    fallback: true,
+  });
+  try {
+    const registry = new ProviderRegistry();
+    const descriptionDefaults = registry.defaults.description;
+    const defaultProvider = descriptionDefaults?.provider ?? 'ollama';
+    const defaultModel = descriptionDefaults?.model ?? null;
+
+    const allModels: { name: string; provider_id: string; default: boolean }[] = [];
+    for (const provider of await registry.listProviders()) {
+      if (!provider.available) continue;
+      let models;
+      try {
+        models = await registry.listModels(provider.id);
+      } catch {
+        // One broken provider must not empty the whole dropdown.
+        continue;
+      }
+      for (const model of models) {
+        if (!model.vision) continue;
+        // The first match for the configured default wins, and only one entry is
+        // ever marked — hence the check against what has already been added.
+        const isDefault =
+          provider.id === defaultProvider &&
+          (defaultModel === null || defaultModel === model.id) &&
+          !allModels.some((entry) => entry.default);
+        allModels.push({ name: model.id, provider_id: provider.id, default: isDefault });
+      }
+    }
+
+    if (existsSync(config.VISUALIZER_DB)) {
+      const db = openDb(config.VISUALIZER_DB, { readonly: true, vec: false });
+      try {
+        const seen = new Set(allModels.map((entry) => `${entry.provider_id}\u0000${entry.name}`));
+        for (const userModel of getUserModels(db)) {
+          if (!userModel.vision) continue;
+          const key = `${userModel.provider_id}\u0000${userModel.model_id}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          allModels.push({
+            name: userModel.model_id,
+            provider_id: userModel.provider_id,
+            default: false,
+          });
+        }
+      } finally {
+        db.close();
+      }
+    }
+
+    if (allModels.length === 0) return c.json(fallbackBody(), 200);
+    // Something must be selected, even when no provider matched the default.
+    if (!allModels.some((entry) => entry.default)) allModels[0]!.default = true;
+    return c.json({ models: allModels, fallback: false }, 200);
+  } catch {
+    return c.json(fallbackBody(), 200);
   }
 });

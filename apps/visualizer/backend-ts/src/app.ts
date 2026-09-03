@@ -16,6 +16,7 @@ import { catalogRoutes } from './api/images/catalog.js';
 import { stacksRoutes } from './api/images/stacks.js';
 import { ltConfigRoutes } from './api/lt-config.js';
 import { perspectivesRoutes } from './api/perspectives.js';
+import { providersRoutes } from './api/providers.js';
 import { scoresRoutes } from './api/scores.js';
 import { systemRoutes } from './api/system.js';
 
@@ -43,6 +44,7 @@ export function createApp() {
   app.route('/api', descriptionsRoutes);
   app.route('/api', ltConfigRoutes);
   app.route('/api', perspectivesRoutes);
+  app.route('/api', providersRoutes);
   app.route('/api', identityRoutes);
   app.route('/api/scores', scoresRoutes);
 
