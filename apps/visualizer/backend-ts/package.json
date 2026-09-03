@@ -23,6 +23,7 @@
     "@huggingface/transformers": "^4.2.0",
     "better-sqlite3": "^13.0.3",
     "hono": "^4.13.5",
+    "libraw-wasm": "^1.6.0",
     "sharp": "^0.34.5",
     "socket.io": "^4.8.3",
     "sqlite-vec": "^0.1.9",

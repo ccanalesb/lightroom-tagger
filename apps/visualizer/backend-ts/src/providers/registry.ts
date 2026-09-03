@@ -18,6 +18,7 @@
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { config, REPO_ROOT } from '../config.js';
+import type { ProviderClient } from './vision-client.js';
 
 /** The shipped template the registry bootstraps from on first use. */
 const EXAMPLE_PATH = join(REPO_ROOT, 'lightroom_tagger', 'core', 'providers.example.json');
@@ -221,6 +222,25 @@ export class ProviderRegistry {
       data?: { id?: string }[];
     };
     return (body.data ?? []).map((m) => String(m.id)).filter(Boolean);
+  }
+
+  /**
+   * A resolved endpoint for the vision client.
+   *
+   * Python returned a configured `openai.OpenAI` and stamped `_provider_id` on
+   * it so downstream code could tell an Ollama client apart. The id is a plain
+   * field here rather than a monkey-patched attribute.
+   */
+  getClient(providerId: string): ProviderClient {
+    const cfg = this.providers[providerId];
+    if (!cfg) throw new UnknownProviderError(providerId);
+    return {
+      providerId,
+      baseUrl: this.resolveBaseUrl(cfg),
+      apiKey: this.resolveApiKey(cfg),
+      extraHeaders: cfg.extra_headers ?? {},
+      timeoutMs: Number(cfg.request_timeout_seconds ?? 120) * 1000,
+    };
   }
 
   /** Merged retry config for a provider. Consumed by the job engine, not the API. */

@@ -103,7 +103,8 @@ export interface LibraryConfig {
   dbPath: string | null;
   mountPoint: string | null;
   workers: number;
-  visionModel: string | null;
+  /** Falls back to the dataclass default, not null — see `getVisionModel`. */
+  visionModel: string;
   visionCacheDir: string;
   visionCacheEnabled: boolean;
   ollamaHost: string;
@@ -112,6 +113,9 @@ export interface LibraryConfig {
 
 const CONFIG_DEFAULTS = {
   workers: 4,
+  // The Python `Config` dataclass default. Not null: something has to be
+  // selectable when neither the env nor config.yaml names a model.
+  visionModel: 'gemma3:27b',
   stackBurstDeltaMs: 2000,
   visionCacheDir: join(homedir(), '.cache', 'lightroom_tagger', 'vision'),
   visionCacheEnabled: true,
@@ -141,7 +145,10 @@ export function loadLibraryConfig(configPath = join(REPO_ROOT, 'config.yaml')): 
     // A mount point is an absolute filesystem location; never repo-relative.
     mountPoint: typeof raw.mount_point === 'string' ? expandUser(raw.mount_point) : null,
     workers: typeof raw.workers === 'number' ? raw.workers : CONFIG_DEFAULTS.workers,
-    visionModel: typeof raw.vision_model === 'string' ? raw.vision_model : null,
+    visionModel:
+      typeof raw.vision_model === 'string' && raw.vision_model
+        ? raw.vision_model
+        : CONFIG_DEFAULTS.visionModel,
     visionCacheDir:
       typeof raw.vision_cache_dir === 'string'
         ? expandUser(raw.vision_cache_dir)
@@ -195,4 +202,19 @@ export function updateConfigYamlStackBurstDeltaMs(configFile: string, value: num
 /** `Path(value).expanduser()` — the only expansion the config routes apply. */
 export function expandUserPath(p: string): string {
   return expandUser(p);
+}
+
+/**
+ * The vision model to use, by the documented precedence.
+ *
+ * `VISION_MODEL` overrides config.yaml; `DESCRIPTION_VISION_MODEL` overrides
+ * both for the describe path specifically, which is how the
+ * `/api/descriptions/{key}/generate` route honours a per-request `model`.
+ */
+export function getVisionModel(): string {
+  return process.env.VISION_MODEL ?? loadLibraryConfig(config.LT_CONFIG_YAML).visionModel;
+}
+
+export function getDescriptionModel(): string {
+  return process.env.DESCRIPTION_VISION_MODEL ?? getVisionModel();
 }

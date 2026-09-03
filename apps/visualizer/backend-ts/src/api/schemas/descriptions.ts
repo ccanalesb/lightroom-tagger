@@ -90,6 +90,30 @@ export const DescriptionGetResponse = z
   .strict()
   .openapi('DescriptionGetResponse');
 
+/**
+ * Not `.strict()`: the pydantic model has no `extra='forbid'`, so an unknown key
+ * in the body is ignored rather than rejected. Tightening it would 422 requests
+ * Flask accepts.
+ *
+ * `image_type` is validated in the handler, not here — Flask answers 400 with
+ * `Invalid image_type: …` for a bad value, and a Zod enum would make it a 422.
+ */
+export const DescriptionGenerateRequest = z
+  .object({
+    force: z.boolean().default(false),
+    image_type: z.string().default('catalog'),
+    model: z.string().nullish().default(null),
+    provider_id: z.string().nullish().default(null),
+    /**
+     * The model name passed *through* to the provider, distinct from `model`:
+     * `model` sets `DESCRIPTION_VISION_MODEL` for the call and is only honoured
+     * when no `provider_id` is given, while `provider_model` names the model
+     * within an explicitly chosen provider.
+     */
+    provider_model: z.string().nullish().default(null),
+  })
+  .openapi('DescriptionGenerateRequest');
+
 export const DescriptionGenerateResponse = z
   .object({
     generated: z.boolean(),

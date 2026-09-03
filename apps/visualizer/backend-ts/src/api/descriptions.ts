@@ -1,11 +1,5 @@
 /**
- * Image description read routes. Port of the GET routes in `api/descriptions.py`.
- *
- * NOT YET PORTED: `POST /api/descriptions/{image_key}/generate`. It calls
- * `describe_matched_image`, which needs the vision provider pipeline from the
- * library core — a later slice. Omitting the whole path (rather than serving it
- * with a stub) keeps the contract honest: the OpenAPI document simply does not
- * advertise it yet, and `tests/openapi-paths.test.ts` lists it as remaining.
+ * Image description routes. Port of `api/descriptions.py`.
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import {
@@ -13,18 +7,31 @@ import {
   getImageDescription,
 } from '../db/library/descriptions.js';
 import { libraryDb, type LibraryEnv } from '../db/library/with-db.js';
+import {
+  AuthenticationError,
+  ModelUnavailableError,
+  ProviderConnectionError,
+  RateLimitError,
+} from '../providers/errors.js';
+import { UnknownProviderError } from '../providers/registry.js';
 import { HttpError } from '../utils/responses.js';
+import { describeMatchedImage } from '../vision/description-service.js';
 import { createOpenApiApp } from './openapi.js';
 import { jsonBody, redirectToTrailingSlash, withValidationError } from './route-helpers.js';
 import { ErrorBody } from './schemas/errors.js';
 import {
+  DescriptionGenerateRequest,
+  DescriptionGenerateResponse,
   DescriptionGetResponse,
+  DescriptionProviderError,
   DescriptionsListResponse,
+  ImageDescription,
 } from './schemas/descriptions.js';
 
 export const descriptionsRoutes = createOpenApiApp<LibraryEnv>();
 
-descriptionsRoutes.use('/descriptions/*', libraryDb());
+// Only `POST /{image_key}/generate` writes; the two list/detail reads stay read-only.
+descriptionsRoutes.use('/descriptions/*', libraryDb({ writeForMethods: ['POST'] }));
 redirectToTrailingSlash(descriptionsRoutes, '/descriptions');
 
 /**
@@ -101,4 +108,98 @@ descriptionsRoutes.openapi(detailRoute, (c) => {
   // the UI renders an empty panel rather than treating it as an error.
   const desc = getImageDescription(c.get('libraryDb'), c.req.param('image_key'));
   return c.json({ description: desc as z.infer<typeof DescriptionGetResponse>['description'] }, 200);
+});
+
+type GenerateDescription = z.infer<typeof ImageDescription> | null;
+
+const generateRoute = createRoute({
+  method: 'post',
+  path: '/descriptions/{image_key}/generate',
+  tags: ['descriptions'],
+  summary: 'Generate AI description for a single image.',
+  request: {
+    params: z.object({ image_key: z.string() }),
+    body: { required: true, content: jsonBody(DescriptionGenerateRequest) },
+  },
+  responses: withValidationError({
+    200: { description: 'OK', content: jsonBody(DescriptionGenerateResponse) },
+    400: { description: 'Bad Request', content: jsonBody(ErrorBody) },
+    401: { description: 'Unauthorized', content: jsonBody(DescriptionProviderError) },
+    429: { description: 'Too Many Requests', content: jsonBody(DescriptionProviderError) },
+    503: { description: 'Service Unavailable', content: jsonBody(DescriptionProviderError) },
+  }),
+});
+
+descriptionsRoutes.openapi(generateRoute, async (c) => {
+  const db = c.get('libraryDb');
+  const imageKey = c.req.param('image_key');
+  const body = c.req.valid('json');
+  const providerId = body.provider_id ?? null;
+
+  // Catalog-only since #218. Validated here rather than as a Zod enum because
+  // Flask answers 400 with this message; a schema-level enum would make it a 422.
+  if (body.image_type !== '' && body.image_type !== 'catalog') {
+    return c.json({ error: `Invalid image_type: ${body.image_type}` }, 400);
+  }
+
+  // Flask smuggled a bare `model` down to `resolve_model` by setting
+  // `DESCRIPTION_VISION_MODEL` and restoring it in a `finally`. That is a race
+  // between concurrent requests — two describes in flight would read each
+  // other's model — so the model is passed as an argument instead. The result is
+  // identical, because `resolveModel` already ranks an explicit model above the
+  // env var. `provider_model` still wins over `model`, and a bare `model` is
+  // ignored when an explicit `provider_id` is given, both as in Flask.
+  const model = body.provider_model ?? (providerId ? null : body.model ?? null);
+
+  const respond = (generated: boolean, desc: unknown) =>
+    c.json({ generated, description: (desc ?? null) as GenerateDescription }, 200);
+
+  try {
+    const outcome = await describeMatchedImage(db, imageKey, {
+      force: body.force,
+      providerId,
+      model,
+    });
+
+    // A skipped or failed outcome still returns whatever description already
+    // exists, so the UI can show the old text instead of blanking the panel.
+    if (!outcome.wrote) return respond(false, getImageDescription(db, imageKey));
+    return respond(true, getImageDescription(db, imageKey));
+  } catch (e) {
+    // Only an explicitly requested provider turns into a 400. Without
+    // `provider_id` the unknown provider came from config, which is a server
+    // fault, so it rethrows to the 500 handler exactly as Flask's bare `raise`
+    // does.
+    if (e instanceof UnknownProviderError) {
+      if (!providerId) throw e;
+      return c.json(
+        { error: 'invalid_provider', message: `Unknown provider: ${providerId}` },
+        400,
+      );
+    }
+    // `provider` falls back to the requested id: the exception often lacks it
+    // when the failure happened before any provider was contacted, and the UI
+    // needs to name the provider it asked for.
+    if (e instanceof RateLimitError) {
+      return c.json(
+        { error: 'rate_limit', message: e.message, provider: e.provider ?? providerId },
+        429,
+      );
+    }
+    if (e instanceof AuthenticationError) {
+      return c.json(
+        { error: 'auth_error', message: e.message, provider: e.provider ?? providerId },
+        401,
+      );
+    }
+    if (e instanceof ModelUnavailableError || e instanceof ProviderConnectionError) {
+      return c.json(
+        { error: 'provider_unavailable', message: e.message, provider: e.provider ?? providerId },
+        503,
+      );
+    }
+    // Everything else — including ProviderTimeoutError and InvalidRequestError,
+    // which Flask also leaves uncaught here — becomes a 500 via `app.onError`.
+    throw e;
+  }
 });
