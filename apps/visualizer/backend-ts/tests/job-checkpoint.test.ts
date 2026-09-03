@@ -13,8 +13,10 @@ import { describe, expect, it } from 'vitest';
 import {
   CHECKPOINT_VERSION,
   buildBatchDescribeCheckpointBody,
+  buildBatchEmbedImageCheckpointBody,
   canonicalJson,
   fingerprintBatchDescribe,
+  fingerprintBatchEmbedImage,
   loadResumeState,
 } from '../src/jobs/checkpoint.js';
 
@@ -90,6 +92,48 @@ describe('fingerprintBatchDescribe', () => {
   });
 });
 
+describe('fingerprintBatchEmbedImage', () => {
+  const noWindow = { resolvedMonths: null, resolvedYear: null };
+
+  it('matches the digests Python produces for the same inputs', async () => {
+    await expect(fingerprintBatchEmbedImage({}, [], noWindow)).resolves.toBe(
+      'fe6a73865c32858e8090ded4f6fee96197abf1331225b5c850b6d6dfded8d9c6',
+    );
+    await expect(
+      fingerprintBatchEmbedImage({ force: true, min_rating: '3' }, ['b', 'a'], {
+        resolvedMonths: 6,
+        resolvedYear: null,
+      }),
+    ).resolves.toBe('ef0759fe43429139bf2640ec1bb79e063405b655052b60f7693f3ebcfeeb6ed6');
+    await expect(
+      fingerprintBatchEmbedImage({ min_rating: 'not-a-number' }, ['Café__ñ', '日本'], {
+        resolvedMonths: null,
+        resolvedYear: '2024',
+      }),
+    ).resolves.toBe('b805ee423c6843488bb3152dd85b9d0c8fefde7896ce41cdfed0f0708d8ae062');
+  });
+
+  /**
+   * The window is fingerprinted after resolution, so the several spellings of one
+   * window do not each discard the previous run's checkpoint.
+   */
+  it('ignores how the date window was spelled, and notices when it changes', async () => {
+    const sixMonths = { resolvedMonths: 6, resolvedYear: null };
+    await expect(fingerprintBatchEmbedImage({ date_filter: '6months' }, ['a'], sixMonths)).resolves.toBe(
+      await fingerprintBatchEmbedImage({ last_months: 6 }, ['a'], sixMonths),
+    );
+    await expect(fingerprintBatchEmbedImage({}, ['a'], sixMonths)).resolves.not.toBe(
+      await fingerprintBatchEmbedImage({}, ['a'], { resolvedMonths: 3, resolvedYear: null }),
+    );
+  });
+
+  it('does not depend on the order the work list arrives in', async () => {
+    await expect(fingerprintBatchEmbedImage({}, ['b', 'a'], noWindow)).resolves.toBe(
+      await fingerprintBatchEmbedImage({}, ['a', 'b'], noWindow),
+    );
+  });
+});
+
 describe('loadResumeState', () => {
   const body = (over: Record<string, unknown> = {}) => ({
     checkpoint: {
@@ -136,6 +180,24 @@ describe('buildBatchDescribeCheckpointBody', () => {
       fingerprint: 'fp',
       processed_pairs: ['a|catalog', 'b|catalog'],
       total_at_start: 5,
+    });
+  });
+});
+
+describe('buildBatchEmbedImageCheckpointBody', () => {
+  /** `processed_pairs` holding bare keys is the shape Flask already wrote. */
+  it('stores bare catalog keys under the processed_pairs name', () => {
+    expect(
+      buildBatchEmbedImageCheckpointBody({
+        fingerprint: 'fp',
+        processed: new Set(['b', 'a']),
+        totalAtStart: 2,
+      }),
+    ).toEqual({
+      job_type: 'batch_embed_image',
+      fingerprint: 'fp',
+      processed_pairs: ['a', 'b'],
+      total_at_start: 2,
     });
   });
 });

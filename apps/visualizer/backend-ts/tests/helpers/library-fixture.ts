@@ -11,6 +11,8 @@ import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import * as sqliteVec from 'sqlite-vec';
+import { serializeFloat32 } from '../../src/db/connection.js';
 
 export interface PerspectiveSeed {
   slug: string;
@@ -63,7 +65,7 @@ export class LibraryFixture {
   constructor() {
     this.dir = mkdtempSync(join(tmpdir(), 'lt-lib-'));
     this.dbPath = join(this.dir, 'library.db');
-    const db = new Database(this.dbPath);
+    const db = this.open();
     db.exec(`
       CREATE TABLE images (
         key TEXT PRIMARY KEY,
@@ -221,12 +223,20 @@ export class LibraryFixture {
         repaired_from_malformed INTEGER NOT NULL DEFAULT 0,
         not_attempted INTEGER NOT NULL DEFAULT 0
       );
+      CREATE VIRTUAL TABLE image_clip_embeddings USING vec0(
+        embedding float[512] distance_metric=cosine,
+        image_key TEXT
+      );
     `);
     db.close();
   }
 
   private open(): Database.Database {
-    return new Database(this.dbPath);
+    const db = new Database(this.dbPath);
+    // `image_clip_embeddings` is a `vec0` virtual table, so even reading it needs
+    // the extension the production connection loads.
+    sqliteVec.load(db);
+    return db;
   }
 
   addPerspectives(...seeds: PerspectiveSeed[]): this {
@@ -370,6 +380,28 @@ export class LibraryFixture {
     });
     db.close();
     return groupId;
+  }
+
+  /** A stored CLIP vector, so a test can assert what the embed job leaves alone. */
+  addClipEmbedding(imageKey: string, fill = 0): this {
+    const db = this.open();
+    db.prepare('INSERT INTO image_clip_embeddings(embedding, image_key) VALUES (?, ?)').run(
+      serializeFloat32(new Float32Array(512).fill(fill)),
+      imageKey,
+    );
+    db.close();
+    return this;
+  }
+
+  /** Point an image at a cached JPEG, the way `prepare_catalog` leaves the row. */
+  addVisionCache(imageKey: string, compressedPath: string): this {
+    const db = this.open();
+    db.prepare(
+      `INSERT INTO vision_cache (key, compressed_path, phash, compressed_at, original_mtime)
+       VALUES (?, ?, NULL, datetime('now'), 12345.0)`,
+    ).run(imageKey, compressedPath);
+    db.close();
+    return this;
   }
 
   /** Condemn a frame, which removes it from suggestions and the flagged filter. */

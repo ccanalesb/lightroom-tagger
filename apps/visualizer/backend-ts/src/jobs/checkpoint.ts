@@ -10,7 +10,14 @@
  *
  * `batch_describe` — `job_type`, `fingerprint`, `processed_pairs` (`"key|itype"`),
  * `total_at_start`.
+ *
+ * `batch_embed_image` — the same shape, except `processed_pairs` holds bare
+ * catalog keys. The key name is not a mistake to tidy up: it is what the Flask
+ * backend already wrote, and renaming it here would strand every checkpoint the
+ * cutover is meant to resume.
  */
+import { CLIP_EMBED_DIM, CLIP_EMBED_MODEL_ID } from '../imaging/clip-embed.js';
+
 export const CHECKPOINT_VERSION = 1;
 
 /** Refuse to grow a checkpoint past this; `jobs.metadata` is one JSON column. */
@@ -87,6 +94,37 @@ export function fingerprintBatchDescribe(
   );
 }
 
+/**
+ * Identity of a `batch_embed_image` run.
+ *
+ * The date window arrives already resolved rather than being re-read from the
+ * metadata, because the same window has several spellings — `date_filter:
+ * '3months'` and `last_months: 3` mean one thing — and fingerprinting the raw
+ * text would discard a checkpoint over a change of wording.
+ *
+ * The model id and dimension are in the payload because a re-embed under a
+ * different model is a different run: resuming across that would leave the table
+ * holding two incompatible vector spaces.
+ */
+export function fingerprintBatchEmbedImage(
+  metadata: Record<string, unknown>,
+  orderedKeys: readonly string[],
+  window: { resolvedMonths: number | null; resolvedYear: string | null },
+): Promise<string> {
+  return sha256Hex(
+    canonicalJson({
+      embedding_dim: CLIP_EMBED_DIM,
+      embedding_model_id: CLIP_EMBED_MODEL_ID,
+      force: Boolean(metadata['force']),
+      image_type: 'catalog',
+      min_rating: asIntOrNull(metadata['min_rating']),
+      pairs: [...orderedKeys].sort(),
+      resolved_months: window.resolvedMonths,
+      resolved_year: window.resolvedYear,
+    }),
+  );
+}
+
 export function buildBatchDescribeCheckpointBody(args: {
   fingerprint: string;
   processed: ReadonlySet<string>;
@@ -94,6 +132,19 @@ export function buildBatchDescribeCheckpointBody(args: {
 }): Record<string, unknown> {
   return {
     job_type: 'batch_describe',
+    fingerprint: args.fingerprint,
+    processed_pairs: [...args.processed].sort(),
+    total_at_start: args.totalAtStart,
+  };
+}
+
+export function buildBatchEmbedImageCheckpointBody(args: {
+  fingerprint: string;
+  processed: ReadonlySet<string>;
+  totalAtStart: number;
+}): Record<string, unknown> {
+  return {
+    job_type: 'batch_embed_image',
     fingerprint: args.fingerprint,
     processed_pairs: [...args.processed].sort(),
     total_at_start: args.totalAtStart,

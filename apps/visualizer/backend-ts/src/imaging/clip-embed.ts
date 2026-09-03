@@ -15,6 +15,7 @@
  */
 import { CLIPVisionModelWithProjection, Tensor, env } from '@huggingface/transformers';
 import sharp from 'sharp';
+import { serializeFloat32 } from '../db/connection.js';
 import { CLIP_PIXEL_VALUES_SHAPE, clipPixelValues } from './clip-preprocess.js';
 import type { Plane } from './pil-resample.js';
 
@@ -86,4 +87,18 @@ export async function encodeImages(paths: string[]): Promise<Float32Array[]> {
     out.push(await encodePixels(await decodeRgb(path)));
   }
   return out;
+}
+
+/**
+ * The `vec0` blob for one embedding. Port of `numpy_to_clip_vec_blob`.
+ *
+ * The dimension check is the Python assertion kept deliberately: `vec0` stores
+ * whatever bytes it is handed, so a wrong-length vector would be written and only
+ * surface later as a KNN that silently returns nothing.
+ */
+export function clipVecBlob(vector: Float32Array): Buffer {
+  if (vector.length !== CLIP_EMBED_DIM) {
+    throw new Error(`CLIP embedding must be ${CLIP_EMBED_DIM}-d, got ${vector.length}`);
+  }
+  return serializeFloat32(vector);
 }

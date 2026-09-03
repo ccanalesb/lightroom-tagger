@@ -16,6 +16,7 @@ import {
   handleBatchDescribe,
   handleSingleDescribe,
 } from './handlers/describe.js';
+import { BATCH_EMBED_IMAGE_CHECKPOINT_MISMATCH, handleBatchEmbedImage } from './handlers/embed.js';
 
 /**
  * A handler owns the job's outcome: it calls `completeJob` or `failJob` itself.
@@ -79,10 +80,9 @@ export const JOB_TYPES: readonly JobType[] = [
   },
   {
     name: 'batch_embed_image',
-    handler: null,
+    handler: handleBatchEmbedImage,
     requiresCatalog: true,
-    checkpointMismatchMessage:
-      'checkpoint mismatch: batch_embed_image fingerprint changed, starting fresh',
+    checkpointMismatchMessage: BATCH_EMBED_IMAGE_CHECKPOINT_MISMATCH,
   },
   {
     name: 'batch_frame_substance',
