@@ -22,14 +22,22 @@ export const VALIDATION_ERROR_RESPONSE = {
 } as const;
 
 /**
- * Add the standard 422 to a route's response map.
+ * Add the standard 422 to a route's response map, unless the route declares one.
  *
  * Use on every route so no group silently omits it and drifts the contract.
+ *
+ * An explicit 422 wins: `POST /api/jobs/` answers 422 with
+ * `CatalogUnavailableError` when the Lightroom catalog is missing, and spectree
+ * likewise let the route's own `HTTP_422` replace the implicit validation one.
+ * Spreading unconditionally would have overwritten it and typed the response as
+ * `never`.
  */
-export function withValidationError<R extends Record<number | string, unknown>>(responses: R) {
-  return { ...responses, 422: VALIDATION_ERROR_RESPONSE } as R & {
-    422: typeof VALIDATION_ERROR_RESPONSE;
-  };
+export function withValidationError<R extends Record<number | string, unknown>>(
+  responses: R,
+): R extends { 422: unknown } ? R : R & { 422: typeof VALIDATION_ERROR_RESPONSE } {
+  type Result = R extends { 422: unknown } ? R : R & { 422: typeof VALIDATION_ERROR_RESPONSE };
+  if (422 in responses) return responses as Result;
+  return { ...responses, 422: VALIDATION_ERROR_RESPONSE } as Result;
 }
 
 /**

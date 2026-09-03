@@ -82,18 +82,36 @@ export function shapeOf(schema: unknown, doc: OpenApiDoc, seen: Set<string> = ne
   // carry the nullability across.
   if (Array.isArray(s.allOf)) {
     const members = s.allOf.map((m) => shapeOf(m, doc, seen));
-    const substantive =
-      members.find((m) => m.t === 'object' && Object.keys(m.props).length > 0) ??
-      members.find((m) => m.t === 'array' || m.t === 'cycle') ??
-      members.find((m) => m.t === 'scalar' && m.type !== 'null' && m.type !== 'object') ??
-      members[0] ??
-      ({ t: 'any' } as Shape);
     const nullable = members.some(
       (m) =>
         (m.t === 'scalar' && m.type === 'null') ||
         (m.t === 'union' && m.of.some((o) => o.t === 'scalar' && o.type === 'null')),
     );
-    return nullable ? union([substantive, { t: 'scalar', type: 'null' }]) : substantive;
+
+    // An intersection of objects is the union of their properties, so members are
+    // merged rather than one being chosen. A later member overriding an earlier
+    // property is how `.extend()` replaces a field.
+    const objects = members.filter((m) => m.t === 'object') as Extract<Shape, { t: 'object' }>[];
+    let merged: Shape;
+    if (objects.length > 0) {
+      const props: Record<string, Shape> = {};
+      const required = new Set<string>();
+      let open = true;
+      for (const obj of objects) {
+        Object.assign(props, obj.props);
+        for (const r of obj.required) required.add(r);
+        // Closed wins: an intersection is only open if every member is.
+        if (!obj.open) open = false;
+      }
+      merged = { t: 'object', props, required: [...required].sort(), open };
+    } else {
+      merged =
+        members.find((m) => m.t === 'array' || m.t === 'cycle') ??
+        members.find((m) => m.t === 'scalar' && m.type !== 'null' && m.type !== 'object') ??
+        members[0] ??
+        ({ t: 'any' } as Shape);
+    }
+    return nullable ? union([merged, { t: 'scalar', type: 'null' }]) : merged;
   }
 
   const variants = (s.anyOf ?? s.oneOf) as unknown[] | undefined;

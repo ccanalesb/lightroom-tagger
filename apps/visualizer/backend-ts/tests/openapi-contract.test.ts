@@ -180,6 +180,6 @@ describe('OpenAPI contract vs the Flask backend', () => {
           .join(', ')}`,
     );
     // Ratchet: once a group is migrated it must stay migrated.
-    expect(sharedPaths.length).toBeGreaterThanOrEqual(45);
+    expect(sharedPaths.length).toBeGreaterThanOrEqual(51);
   });
 });

@@ -12,6 +12,7 @@ import { HttpError } from './utils/responses.js';
 import { createOpenApiApp, openApiDoc } from './api/openapi.js';
 import { descriptionsRoutes } from './api/descriptions.js';
 import { identityRoutes } from './api/identity.js';
+import { jobsRoutes } from './api/jobs.js';
 import { catalogRoutes } from './api/images/catalog.js';
 import { stacksRoutes } from './api/images/stacks.js';
 import { ltConfigRoutes } from './api/lt-config.js';
@@ -38,6 +39,7 @@ export function createApp() {
   // `/images/catalog-similarity-groups` must be registered before the
   // `/images/catalog/{image_key}` catch-all, or they are matched as image keys.
   // `catalogRoutes` declares them in that order internally.
+  app.route('/api', jobsRoutes);
   app.route('/api', catalogRoutes);
   app.route('/api', stacksRoutes);
   app.route('/api', systemRoutes);
