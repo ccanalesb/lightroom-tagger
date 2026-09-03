@@ -3,6 +3,7 @@
  * Port of `lightroom_tagger/core/database/scores.py`.
  */
 import type { Db } from '../connection.js';
+import { nowIsoUtc } from '../../utils/datetime.js';
 
 /**
  * The yt-to-photo-prompt-lab exporter marks an optional (excusable) dimension with
@@ -60,7 +61,7 @@ export function insertPerspective(
     sourceFilename?: string | null;
   },
 ): void {
-  const now = new Date().toISOString();
+  const now = nowIsoUtc();
   const optional = markdownMarksOptional(args.promptMarkdown);
   db.prepare(
     `INSERT INTO perspectives (
@@ -123,7 +124,7 @@ export function updatePerspective(
   if (fields.length === 0) return false;
 
   fields.push('updated_at = ?');
-  values.push(new Date().toISOString());
+  values.push(nowIsoUtc());
   values.push(slug);
 
   const info = db

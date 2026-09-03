@@ -33,6 +33,17 @@ export interface LibraryDbOptions {
    * loud failure rather than a corrupted `library.db`.
    */
   write?: boolean;
+  /**
+   * Open writable only for these HTTP methods, read-only for the rest.
+   *
+   * Needed by groups that mix reads and writes under one path prefix — the images
+   * groups serve `GET /images/catalog/{key}` and `PATCH
+   * /images/catalog/{key}/instagram-posted` from the same tree. Registering two
+   * `use()` middlewares cannot express that: `app.route()` flattens a child's
+   * middleware into the parent, so a second registration would also run for
+   * sibling groups and open a redundant connection.
+   */
+  writeForMethods?: readonly string[];
 }
 
 /**
@@ -47,9 +58,13 @@ export function libraryDb(opts: LibraryDbOptions = {}): MiddlewareHandler<Librar
       return c.json({ error: ERROR_DB_NOT_FOUND }, 404);
     }
 
+    const write =
+      opts.write ??
+      (opts.writeForMethods?.includes(c.req.method.toUpperCase()) || false);
+
     let db: Db | undefined;
     try {
-      db = openLibraryDb(dbPath, { readonly: !opts.write });
+      db = openLibraryDb(dbPath, { readonly: !write });
       c.set('libraryDb', db);
       await next();
       return;

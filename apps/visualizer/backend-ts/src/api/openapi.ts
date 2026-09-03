@@ -18,16 +18,32 @@ export const OPENAPI_VERSION = '1.0.0';
 /**
  * Build the OpenAPI-aware Hono app.
  *
- * Validation failures are shaped as `{ error }` so they match the `ErrorBody`
- * contract the rest of the API returns; the default hook emits a Zod error dump.
+ * Request-validation failures return **422** with a pydantic-shaped error array,
+ * matching the `ValidationError` schema spectree attached to every route. Verified
+ * against the running Flask app: `PUT /api/config/catalog {}` answers 422 with
+ * `[{"loc": ["catalog_path"], "msg": "Field required", "type": "missing", ...}]`.
+ *
+ * One deliberate divergence, and it is a bug fix rather than a port. On routes
+ * wrapped by the `with_db` decorator, spectree's 422 was raised as a Werkzeug
+ * `HTTPException` *inside* `with_db`'s `except Exception` handler, which swallowed
+ * it and returned `500 {"error": "??? Unknown Error: None"}`. So the documented 422
+ * was unreachable for every images/stacks/scores route — `POST
+ * /api/images/stacks/999999/split-member {}` really does answer 500 with that
+ * string. This returns the documented 422 instead. Anything relying on the 500
+ * was relying on a decorator-ordering accident.
  */
 export function createOpenApiApp<E extends Env = Env>(): OpenAPIHono<E> {
   return new OpenAPIHono<E>({
     defaultHook: (result, c) => {
       if (!result.success) {
-        const first = result.error.issues[0];
-        const where = first?.path.join('.') || 'request';
-        return c.json({ error: `Invalid request parameters: ${where}` }, 400);
+        // `input` and `url` appear in pydantic's real output but are absent from the
+        // declared schema; they are not fabricated here.
+        const issues = result.error.issues.map((issue) => ({
+          loc: issue.path.map(String),
+          msg: issue.message,
+          type: issue.code,
+        }));
+        return c.json(issues, 422);
       }
       return undefined;
     },

@@ -83,11 +83,8 @@ const listRoute = createRoute({
   method: 'get',
   path: '/perspectives/',
   tags: ['perspectives'],
-  request: { query: z.object({ active_only: z.string().optional() }) },
   responses: withValidationError({
     200: { description: 'Perspectives', content: jsonBody(PerspectiveListResponse) },
-    404: { description: 'Library database not found', content: jsonBody(ErrorBody) },
-    500: { description: 'Server error', content: jsonBody(ErrorBody) },
   }),
 });
 
@@ -107,7 +104,6 @@ const detailRoute = createRoute({
   responses: withValidationError({
     200: { description: 'One perspective', content: jsonBody(PerspectiveDetail) },
     404: { description: 'Not found', content: jsonBody(ErrorBody) },
-    500: { description: 'Server error', content: jsonBody(ErrorBody) },
   }),
 });
 
@@ -126,8 +122,6 @@ const createPerspectiveRoute = createRoute({
   responses: withValidationError({
     201: { description: 'Created', content: jsonBody(PerspectiveDetail) },
     400: { description: 'Invalid request', content: jsonBody(ErrorBody) },
-    404: { description: 'Library database not found', content: jsonBody(ErrorBody) },
-    500: { description: 'Server error', content: jsonBody(ErrorBody) },
   }),
 });
 
@@ -188,7 +182,11 @@ perspectivesRoutes.openapi(createPerspectiveRoute, async (c) => {
   }
 
   const created = getPerspectiveBySlug(db, slug);
-  if (!created) return c.json({ error: 'perspective vanished after insert' }, 500);
+  // Thrown, not returned: spectree documented no 500 for the perspectives routes,
+  // so declaring one here would widen the contract. `app.onError` renders it as the
+  // same 500 body Flask produced. This is a can't-happen read-after-write on the
+  // connection that just wrote the row.
+  if (!created) throw new Error('perspective vanished after insert');
   return c.json(rowDetail(created), 201);
 });
 
@@ -203,7 +201,6 @@ const updateRoute = createRoute({
     200: { description: 'Updated', content: jsonBody(PerspectiveDetail) },
     400: { description: 'Invalid request', content: jsonBody(ErrorBody) },
     404: { description: 'Not found', content: jsonBody(ErrorBody) },
-    500: { description: 'Server error', content: jsonBody(ErrorBody) },
   }),
 });
 
@@ -257,7 +254,7 @@ perspectivesRoutes.openapi(updateRoute, async (c) => {
   if (!updated) return c.json({ error: 'no valid fields to update' }, 400);
 
   const row = getPerspectiveBySlug(db, slug);
-  if (!row) return c.json({ error: 'perspective vanished after update' }, 500);
+  if (!row) throw new Error('perspective vanished after update');
   return c.json(rowDetail(row), 200);
 });
 
@@ -271,7 +268,6 @@ const deleteRoute = createRoute({
   responses: withValidationError({
     204: { description: 'Deleted' },
     404: { description: 'Not found', content: jsonBody(ErrorBody) },
-    500: { description: 'Server error', content: jsonBody(ErrorBody) },
   }),
 });
 
@@ -293,7 +289,6 @@ const resetRoute = createRoute({
     200: { description: 'Reset to the on-disk default', content: jsonBody(PerspectiveDetail) },
     400: { description: 'Invalid request', content: jsonBody(ErrorBody) },
     404: { description: 'Not found', content: jsonBody(ErrorBody) },
-    500: { description: 'Server error', content: jsonBody(ErrorBody) },
   }),
 });
 
@@ -340,6 +335,6 @@ perspectivesRoutes.openapi(resetRoute, (c) => {
 
   updatePerspective(db, slug, { promptMarkdown: text });
   const refreshed = getPerspectiveBySlug(db, slug);
-  if (!refreshed) return c.json({ error: 'perspective vanished after reset' }, 500);
+  if (!refreshed) throw new Error('perspective vanished after reset');
   return c.json(rowDetail(refreshed), 200);
 });

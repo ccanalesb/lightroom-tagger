@@ -11,29 +11,6 @@ let fx: LibraryFixture;
 const app = createApp();
 const json = async <T>(res: Response): Promise<T> => (await res.json()) as T;
 
-/** `image_descriptions` is only needed by this group, so it is created here. */
-function withDescriptionsTable(fixture: LibraryFixture): LibraryFixture {
-  const db = new Database(fixture.dbPath);
-  db.exec(`
-    CREATE TABLE image_descriptions (
-      image_key TEXT NOT NULL,
-      image_type TEXT NOT NULL DEFAULT 'catalog',
-      summary TEXT,
-      composition TEXT,
-      perspectives TEXT,
-      technical TEXT,
-      subjects TEXT,
-      dominant_colors TEXT,
-      mood_tags TEXT,
-      best_perspective TEXT,
-      model_used TEXT,
-      described_at TEXT
-    );
-  `);
-  db.close();
-  return fixture;
-}
-
 function addDescription(
   fixture: LibraryFixture,
   row: {
@@ -69,7 +46,7 @@ function addDescription(
 }
 
 beforeEach(() => {
-  fx = withDescriptionsTable(new LibraryFixture().activate());
+  fx = new LibraryFixture().activate();
 });
 afterEach(() => fx.cleanup());
 

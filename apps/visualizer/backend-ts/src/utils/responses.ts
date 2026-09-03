@@ -12,6 +12,26 @@ import {
   ERROR_INTERNAL_SERVER,
 } from '../constants/errors.js';
 
+/**
+ * An error response whose status the route deliberately does not *declare*.
+ *
+ * Some Flask routes returned a status spectree never listed: `GET
+ * /api/descriptions/` answers 400 for an unknown `image_type`, but its documented
+ * responses are only 200 and 422. Declaring the 400 in `createRoute` would widen
+ * the published contract and change `api.gen.ts`; returning it inline would fail
+ * the typed-response check against the declared statuses. Throwing it keeps both
+ * the behaviour and the document honest — `app.onError` renders it.
+ */
+export class HttpError extends Error {
+  readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 503;
+
+  constructor(status: HttpError['status'], message: string) {
+    super(message);
+    this.name = 'HttpError';
+    this.status = status;
+  }
+}
+
 export type ResourceType = 'image' | 'media' | 'database' | 'file' | (string & {});
 
 const NOT_FOUND_MESSAGES: Record<string, string> = {

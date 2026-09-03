@@ -5,7 +5,7 @@
  * file. Without that override the suite would rewrite the user's real config.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
@@ -119,14 +119,26 @@ describe('PUT /api/config/catalog', () => {
   });
 
   it.each([
-    [{}, 'catalog_path is required'],
-    [{ catalog_path: 5 }, 'catalog_path must be a string'],
     [{ catalog_path: '/tmp/notacatalog.txt' }, 'catalog_path must be a .lrcat file'],
     [{ catalog_path: '/nope/missing.lrcat' }, 'catalog_path must be an existing file'],
-  ])('rejects %j', async (body, message) => {
+  ])('rejects %j with a 400', async (body, message) => {
     const res = await put('/api/config/catalog', body);
     expect(res.status).toBe(400);
     expect(await json(res)).toEqual({ error: message });
+  });
+
+  it.each([
+    [{}, 'a missing field'],
+    [{ catalog_path: 5 }, 'a non-string'],
+    [{ catalog_path: '/nope/missing.lrcat', extra: 1 }, 'an unexpected field'],
+  ])('answers 422 for %o (%s)', async (body, _why) => {
+    // Schema violations are 422, not 400. Verified against the running Flask app:
+    // spectree validated `json=ConfigCatalogPutRequest` before the handler ran, so
+    // the handler's own 'catalog_path is required' / 'must be a string' branches
+    // were already unreachable there. `extra: 1` is 422 because the model sets
+    // `extra='forbid'`.
+    const res = await put('/api/config/catalog', body);
+    expect(res.status).toBe(422);
   });
 
   it('accepts a .LRCAT extension case-insensitively', async () => {
@@ -168,23 +180,35 @@ describe('PUT /api/config/stack-detection', () => {
   });
 
   it.each([
-    [{}, 'stack_burst_delta_ms is required'],
-    [{ stack_burst_delta_ms: '900' }, 'stack_burst_delta_ms must be an integer'],
-    [{ stack_burst_delta_ms: 12.5 }, 'stack_burst_delta_ms must be an integer'],
     [{ stack_burst_delta_ms: 0 }, 'stack_burst_delta_ms must be at least 1'],
     [{ stack_burst_delta_ms: -5 }, 'stack_burst_delta_ms must be at least 1'],
-  ])('rejects %j', async (body, message) => {
+  ])('rejects %j with a 400', async (body, message) => {
     const res = await put('/api/config/stack-detection', body);
     expect(res.status).toBe(400);
     expect(await json(res)).toEqual({ error: message });
   });
 
-  it('rejects a boolean, which Python excluded via exact type check', async () => {
-    // In Python `type(True) is not int` is True, so booleans were rejected there
-    // despite bool subclassing int. JSON true must not become 1ms.
-    const res = await put('/api/config/stack-detection', { stack_burst_delta_ms: true });
-    expect(res.status).toBe(400);
-    expect(await json(res)).toEqual({ error: 'stack_burst_delta_ms must be an integer' });
+  it.each([
+    [{}, 'a missing field'],
+    [{ stack_burst_delta_ms: 12.5 }, 'a fractional number'],
+    [{ stack_burst_delta_ms: '900' }, 'a numeric string'],
+    [{ stack_burst_delta_ms: true }, 'a boolean'],
+  ])('answers 422 for %o (%s)', async (body, _why) => {
+    // The first two match Flask exactly (verified: 422 from spectree, since the
+    // model requires an int and pydantic rejects a non-integral float).
+    //
+    // The last two are a deliberate divergence, and the reason is pydantic's lax
+    // mode: it coerced `"900"` to 900 and `true` to 1, so validation *passed* and
+    // the handler then rejected the raw value with its own 400 "must be an
+    // integer". Zod does not coerce, so the rejection happens one layer earlier
+    // and reports 422. Both backends refuse the value; only the status and message
+    // differ. Reproducing pydantic's coercion table in Zod would mean making the
+    // validator disagree with the published schema (which says integer) for every
+    // numeric field in the API, so the schema is taken at its word instead.
+    const res = await put('/api/config/stack-detection', body);
+    expect(res.status).toBe(422);
+    // Nothing reached the writer: the file is not even created.
+    expect(existsSync(cfgPath)).toBe(false);
   });
 
   it('accepts the minimum of 1', async () => {

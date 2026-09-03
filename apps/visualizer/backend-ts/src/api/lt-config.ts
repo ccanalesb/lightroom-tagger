@@ -17,8 +17,10 @@ import { createOpenApiApp } from './openapi.js';
 import { jsonBody, withValidationError } from './route-helpers.js';
 import {
   ConfigCatalogGetResponse,
+  ConfigCatalogPutRequest,
   ConfigCatalogPutResponse,
   ConfigStackDetectionGetResponse,
+  ConfigStackDetectionPutRequest,
   ConfigStackDetectionPutResponse,
 } from './schemas/config.js';
 import { ErrorBody } from './schemas/errors.js';
@@ -69,6 +71,7 @@ const putCatalogRoute = createRoute({
   method: 'put',
   path: '/config/catalog',
   tags: ['config'],
+  request: { body: { content: jsonBody(ConfigCatalogPutRequest) } },
   responses: withValidationError({
     200: { description: 'Saved', content: jsonBody(ConfigCatalogPutResponse) },
     400: { description: 'Invalid request', content: jsonBody(ErrorBody) },
@@ -119,6 +122,7 @@ const putStackDetectionRoute = createRoute({
   method: 'put',
   path: '/config/stack-detection',
   tags: ['config'],
+  request: { body: { content: jsonBody(ConfigStackDetectionPutRequest) } },
   responses: withValidationError({
     200: { description: 'Saved', content: jsonBody(ConfigStackDetectionPutResponse) },
     400: { description: 'Invalid request', content: jsonBody(ErrorBody) },

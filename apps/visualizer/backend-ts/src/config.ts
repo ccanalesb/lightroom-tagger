@@ -84,6 +84,8 @@ export interface LibraryConfig {
   /** The raw, unexpanded value as written in config.yaml. `/api/config/catalog`
    *  returns both this and the expanded form, so it cannot be normalized away. */
   catalogPathRaw: string;
+  /** Optional reduced-size `.lrcat` used for fast test runs; `''` when unset. */
+  smallCatalogPath: string;
   dbPath: string | null;
   mountPoint: string | null;
   workers: number;
@@ -119,6 +121,8 @@ export function loadLibraryConfig(configPath = join(REPO_ROOT, 'config.yaml')): 
   return {
     catalogPath: pathField('catalog_path'),
     catalogPathRaw: typeof raw.catalog_path === 'string' ? raw.catalog_path : '',
+    smallCatalogPath:
+      typeof raw.small_catalog_path === 'string' ? raw.small_catalog_path : '',
     dbPath: pathField('db_path'),
     // A mount point is an absolute filesystem location; never repo-relative.
     mountPoint: typeof raw.mount_point === 'string' ? expandUser(raw.mount_point) : null,

@@ -60,18 +60,10 @@ const historyRoute = createRoute({
   method: 'get',
   path: '/{image_key}/history',
   tags: ['scores'],
-  request: {
-    params: z.object({ image_key: z.string() }),
-    query: z.object({
-      image_type: z.string().optional(),
-      perspective_slug: z.string().optional(),
-    }),
-  },
+  request: { params: z.object({ image_key: z.string() }) },
   responses: withValidationError({
     200: { description: 'Score history for one perspective', content: jsonBody(ScoresHistoryResponse) },
     400: { description: 'Invalid request', content: jsonBody(ErrorBody) },
-    404: { description: 'Library database not found', content: jsonBody(ErrorBody) },
-    500: { description: 'Server error', content: jsonBody(ErrorBody) },
   }),
 });
 
@@ -107,15 +99,10 @@ const currentRoute = createRoute({
   method: 'get',
   path: '/{image_key}',
   tags: ['scores'],
-  request: {
-    params: z.object({ image_key: z.string() }),
-    query: z.object({ image_type: z.string().optional() }),
-  },
+  request: { params: z.object({ image_key: z.string() }) },
   responses: withValidationError({
     200: { description: 'Current scores for an image', content: jsonBody(ScoresCurrentResponse) },
     400: { description: 'Invalid request', content: jsonBody(ErrorBody) },
-    404: { description: 'Library database not found', content: jsonBody(ErrorBody) },
-    500: { description: 'Server error', content: jsonBody(ErrorBody) },
   }),
 });
 

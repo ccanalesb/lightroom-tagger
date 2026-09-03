@@ -1,0 +1,173 @@
+/**
+ * Per-image aggregate scores over active critique perspectives.
+ * Port of `core/identity_service/aggregates.py`.
+ */
+import type { Db } from '../db/connection.js';
+import { flaggedExistsSql } from '../db/library/frame-substance-sql.js';
+
+/**
+ * Current catalog scores on active perspectives only.
+ *
+ * Four conditions carry weight and none is incidental: `is_current = 1` keeps
+ * superseded scores out, `image_type = 'catalog'` excludes the retired Instagram
+ * scope (D-40), `not_attempted = 0` drops the excusable-dimension placeholders so
+ * they cannot drag a mean down, and the frame-substance clause removes condemned
+ * frames from identity entirely (#301).
+ */
+const SCORES_BASE_SQL = `
+    SELECT
+        s.image_key,
+        s.image_type,
+        s.perspective_slug,
+        s.score,
+        s.rationale,
+        s.model_used,
+        s.prompt_version,
+        s.scored_at,
+        p.display_name AS perspective_display_name
+    FROM image_scores s
+    INNER JOIN perspectives p
+        ON p.slug = s.perspective_slug AND p.active = 1
+    WHERE s.is_current = 1
+        AND s.image_type = 'catalog'
+        AND s.not_attempted = 0
+        AND NOT ${flaggedExistsSql('s.image_key')}
+`;
+
+const RATIONALE_PREVIEW_MAX = 240;
+
+export interface IdentityPerPerspective {
+  perspective_slug: string;
+  display_name: string;
+  score: number;
+  prompt_version: string;
+  model_used: string;
+  scored_at: string;
+  rationale_preview: string;
+}
+
+export interface IdentityAggregate {
+  image_key: string;
+  aggregate_score: number;
+  perspectives_covered: number;
+  eligible: boolean;
+  per_perspective: IdentityPerPerspective[];
+}
+
+function activePerspectiveSlugs(db: Db): string[] {
+  const rows = db
+    .prepare('SELECT slug FROM perspectives WHERE active = 1 ORDER BY slug ASC')
+    .all() as { slug: string }[];
+  return rows.map((r) => String(r.slug));
+}
+
+/**
+ * Minimum perspectives required for eligibility.
+ *
+ * Currently a constant 1 regardless of how many perspectives are active. Kept as a
+ * function of the active count because that is the shape the Python signature has
+ * and the threshold is the knob most likely to change.
+ */
+function defaultMinPerspectives(_activeCount: number): number {
+  return 1;
+}
+
+/**
+ * Round to 4 decimals, matching `round(value, 4)`.
+ *
+ * Python rounds halves to even and JavaScript rounds them up, but the difference
+ * cannot surface here: this only ever rounds a mean of integer scores over the
+ * number of active perspectives, and for every count that yields a terminating
+ * decimal the result already has at most three places, while the repeating cases
+ * never land exactly on a half at the fourth.
+ */
+function round4(value: number): number {
+  return Math.round(value * 1e4) / 1e4;
+}
+
+/**
+ * Trim a rationale to a preview length, appending an ellipsis when cut.
+ *
+ * Slices by code point rather than UTF-16 code unit, as Python does, so a rationale
+ * containing an emoji cannot be cut through the middle of a surrogate pair and
+ * produce a replacement character in the UI.
+ */
+function truncateRationale(text: string | null | undefined, maxChars = RATIONALE_PREVIEW_MAX): string {
+  if (!text) return '';
+  const t = text.trim();
+  const chars = [...t];
+  if (chars.length <= maxChars) return t;
+  return `${chars.slice(0, maxChars - 1).join('').replace(/\s+$/u, '')}…`;
+}
+
+interface ScoreRow {
+  perspective_slug: string;
+  perspective_display_name: string | null;
+  score: number;
+  rationale: string | null;
+  model_used: string | null;
+  prompt_version: string | null;
+  scored_at: string | null;
+}
+
+/**
+ * Aggregate identity scores for a single catalog image, or `null` when it has no
+ * current catalog scores on active perspectives.
+ *
+ * Perspectives are equally weighted — the aggregate is a plain mean, so adding a
+ * perspective changes every image's score, which is why the count is reported
+ * alongside it.
+ */
+export function computeSingleImageAggregateScores(
+  db: Db,
+  imageKey: string,
+): IdentityAggregate | null {
+  const activeSlugs = activePerspectiveSlugs(db);
+  if (activeSlugs.length === 0) return null;
+  const slugSet = new Set(activeSlugs);
+  const minUsed = defaultMinPerspectives(activeSlugs.length);
+
+  const rows = db
+    .prepare(`${SCORES_BASE_SQL}\n        AND s.image_key = ?`)
+    .all(imageKey) as ScoreRow[];
+
+  // The SQL already joins active perspectives, so this filter is redundant today.
+  // It is kept because it is the guarantee the aggregate depends on, and it costs
+  // nothing to state twice.
+  const perspectives = rows
+    .filter((r) => slugSet.has(String(r.perspective_slug)))
+    .map((r) => ({
+      perspective_slug: String(r.perspective_slug),
+      display_name: r.perspective_display_name || String(r.perspective_slug),
+      score: Math.trunc(r.score),
+      rationale: r.rationale ?? '',
+      model_used: r.model_used ?? '',
+      prompt_version: r.prompt_version ?? '',
+      scored_at: r.scored_at ?? '',
+    }));
+
+  if (perspectives.length === 0) return null;
+
+  const n = perspectives.length;
+  const agg = perspectives.reduce((sum, p) => sum + p.score, 0) / n;
+
+  const perOut = [...perspectives]
+    .sort((a, b) => (a.perspective_slug < b.perspective_slug ? -1 : a.perspective_slug > b.perspective_slug ? 1 : 0))
+    .map((p) => ({
+      perspective_slug: p.perspective_slug,
+      display_name: p.display_name,
+      score: p.score,
+      prompt_version: p.prompt_version,
+      model_used: p.model_used,
+      scored_at: p.scored_at,
+      rationale_preview: truncateRationale(p.rationale),
+    }));
+
+  return {
+    image_key: String(imageKey),
+    aggregate_score: round4(agg),
+    perspectives_covered: n,
+    eligible: n >= minUsed,
+    per_perspective: perOut,
+  };
+}

@@ -13,6 +13,7 @@ import {
   getImageDescription,
 } from '../db/library/descriptions.js';
 import { libraryDb, type LibraryEnv } from '../db/library/with-db.js';
+import { HttpError } from '../utils/responses.js';
 import { createOpenApiApp } from './openapi.js';
 import { jsonBody, redirectToTrailingSlash, withValidationError } from './route-helpers.js';
 import { ErrorBody } from './schemas/errors.js';
@@ -42,27 +43,20 @@ const listRoute = createRoute({
   method: 'get',
   path: '/descriptions/',
   tags: ['descriptions'],
-  request: {
-    query: z.object({
-      image_type: z.string().optional(),
-      described_only: z.string().optional(),
-      limit: z.string().optional(),
-      offset: z.string().optional(),
-    }),
-  },
   responses: withValidationError({
     200: { description: 'Images with descriptions', content: jsonBody(DescriptionsListResponse) },
-    400: { description: 'Invalid request', content: jsonBody(ErrorBody) },
-    404: { description: 'Library database not found', content: jsonBody(ErrorBody) },
-    500: { description: 'Server error', content: jsonBody(ErrorBody) },
   }),
 });
 
 descriptionsRoutes.openapi(listRoute, (c) => {
   const imageType = c.req.query('image_type');
   // Catalog-only since #218; anything else is a client error, not empty results.
+  //
+  // Thrown rather than returned: spectree documented only 200 and 422 for this
+  // route, so declaring the 400 would change the published contract even though
+  // Flask really does answer 400 here. See `HttpError`.
   if (imageType !== undefined && imageType !== '' && imageType !== 'catalog') {
-    return c.json({ error: `Invalid image_type: ${imageType}` }, 400);
+    throw new HttpError(400, `Invalid image_type: ${imageType}`);
   }
 
   const describedOnly = c.req.query('described_only') === 'true';
@@ -99,8 +93,6 @@ const detailRoute = createRoute({
   request: { params: z.object({ image_key: z.string() }) },
   responses: withValidationError({
     200: { description: 'One description, or null', content: jsonBody(DescriptionGetResponse) },
-    404: { description: 'Library database not found', content: jsonBody(ErrorBody) },
-    500: { description: 'Server error', content: jsonBody(ErrorBody) },
   }),
 });
 

@@ -96,3 +96,41 @@ export function getAllImagesWithDescriptions(
 
   return { items, total };
 }
+
+/**
+ * Build an FTS5 `MATCH` string (AND-joined tokens) for `description_search`
+ * (NLS-02, D-11–D-13).
+ *
+ * Returns `{ match, error }` where `match` is suitable as the sole bound parameter
+ * to `... MATCH ?`, or `null` when no FTS filter should apply. `error` is non-null
+ * only for the short-query rule (D-12), which the caller turns into a 400.
+ *
+ * Tokenization: maximal ASCII alphanumeric runs on the trimmed input, so punctuation
+ * and FTS/SQL metacharacters can never reach the match string. Tokens shorter than
+ * two characters are dropped; if none remain, no filter applies (D-13).
+ */
+export function buildDescriptionFtsQuery(raw: string | null | undefined): {
+  match: string | null;
+  error: string | null;
+} {
+  if (raw === null || raw === undefined) return { match: null, error: null };
+  const s = raw.trim();
+  if (!s) return { match: null, error: null };
+  if (s.length < 2) {
+    return { match: null, error: 'description_search must be at least 2 characters' };
+  }
+  const words = (s.match(/[A-Za-z0-9]+/g) ?? []).filter((t) => t.length >= 2);
+  if (words.length === 0) return { match: null, error: null };
+  // Double-quote each term so FTS5 reserved words (OR, AND, NOT) stay literals.
+  const quoted = words.map((t) => `"${t.replaceAll('"', '""')}"`);
+  return { match: quoted.join(' AND '), error: null };
+}
+
+/**
+ * Subquery yielding catalog image keys whose description matches an FTS `?` param.
+ * Shared by the CLI keyword search and the catalog `description_search` filter.
+ */
+export const DESCRIPTION_FTS_KEY_SUBQUERY =
+  'SELECT d2.image_key FROM image_descriptions d2 ' +
+  'INNER JOIN image_descriptions_fts ON image_descriptions_fts.rowid = d2.rowid ' +
+  "WHERE d2.image_type = 'catalog' AND image_descriptions_fts MATCH ?";
