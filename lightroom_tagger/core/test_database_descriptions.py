@@ -194,6 +194,86 @@ class TestImageDescriptions(unittest.TestCase):
         self.assertEqual(n, 0)
 
 
+    def test_store_image_description_retires_previous_fts_terms(self):
+        key = "fts-regen-1"
+        store_image_description(self.db, {
+            "image_key": key, "image_type": "catalog",
+            "summary": "a red bicycle", "subjects": ["bicycle"], "model_used": "m",
+        })
+        store_image_description(self.db, {
+            "image_key": key, "image_type": "catalog",
+            "summary": "a blue canoe", "subjects": ["canoe"], "model_used": "m",
+        })
+
+        def hits(term):
+            return self.db.execute(
+                "SELECT COUNT(*) AS n FROM image_descriptions_fts "
+                "WHERE image_descriptions_fts MATCH ?",
+                (term,),
+            ).fetchone()["n"]
+
+        self.assertEqual(hits("bicycle"), 0, "old description is still searchable")
+        self.assertEqual(hits("canoe"), 1)
+
+
+class TestExternalContentDescriptionFts(unittest.TestCase):
+    """``store_image_description`` against the external-content FTS5 form.
+
+    Catalogs in the field carry ``content='image_descriptions'`` rather than the
+    standalone table :func:`init_database` builds, and the two need opposite
+    removal statements. ``init_database`` cannot reach this shape — the FTS
+    migration is gated below ``user_version`` 3 — so the table is rebuilt here.
+    Without this the external-content path has no coverage at all, which is how
+    it came to raise ``database disk image is malformed`` on a first write.
+    """
+
+    def setUp(self):
+        fd, self.temp_db_path = tempfile.mkstemp(suffix='.db')
+        os.close(fd)
+        self.db = init_database(self.temp_db_path)
+        self.db.execute("DROP TABLE IF EXISTS image_descriptions_fts")
+        self.db.execute(
+            "CREATE VIRTUAL TABLE image_descriptions_fts USING fts5("
+            "description_search_document, tokenize='porter unicode61', "
+            "content='image_descriptions', content_rowid='rowid')"
+        )
+        self.db.commit()
+
+    def tearDown(self):
+        self.db.close()
+        os.unlink(self.temp_db_path)
+
+    def _hits(self, term):
+        return self.db.execute(
+            "SELECT COUNT(*) AS n FROM image_descriptions_fts "
+            "WHERE image_descriptions_fts MATCH ?",
+            (term,),
+        ).fetchone()["n"]
+
+    def test_first_write_indexes_without_corrupting(self):
+        store_image_description(self.db, {
+            "image_key": "ext-1", "image_type": "catalog",
+            "summary": "a red bicycle", "subjects": ["bicycle"], "model_used": "m",
+        })
+        self.assertEqual(self._hits("bicycle"), 1)
+
+    def test_regenerate_retires_previous_terms(self):
+        for summary, subject in (("a red bicycle", "bicycle"), ("a blue canoe", "canoe")):
+            store_image_description(self.db, {
+                "image_key": "ext-2", "image_type": "catalog",
+                "summary": summary, "subjects": [subject], "model_used": "m",
+            })
+
+        self.assertEqual(self._hits("bicycle"), 0, "old description is still searchable")
+        self.assertEqual(self._hits("canoe"), 1)
+        # A plain DELETE leaves the index self-consistent while being wrong, so
+        # the term assertions above are the real check; this only catches damage.
+        self.db.execute(
+            "INSERT INTO image_descriptions_fts(image_descriptions_fts) "
+            "VALUES('integrity-check')"
+        )
+
+
 class TestBuildDescriptionFtsQuery(unittest.TestCase):
     """``build_description_fts_query`` — AND tokens, NLS-02 sanitization."""
 
