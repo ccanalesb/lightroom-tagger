@@ -161,6 +161,3683 @@
    },
    "status": 200
   },
+  "/api/identity/mirror": {
+   "json": {
+    "meta": {
+     "active_perspectives": [
+      "compositional-cleanliness",
+      "environmental-context-legibility",
+      "framing",
+      "intensity-suggestion"
+     ],
+     "crowning_rule": "one-sided binomial test p < 0.05 on coverage-corrected win rate",
+     "descriptor_min_count": 5,
+     "exemplar_initial_limit": 24,
+     "exemplar_page_size": 12,
+     "fallback_active": false,
+     "low_coverage_threshold": 0.5,
+     "scores_are_advisory": "Rankings reflect model/rubric versions at time of scoring (is_current rows).",
+     "total_catalog_images": 43794,
+     "voting_rule": "strict argmax on within-perspective percentile among images scored on >= 2 lenses"
+    },
+    "other_lenses": [
+     {
+      "chance_rate": 0.298336,
+      "coverage": 0.9807,
+      "display_name": "Compositional Cleanliness",
+      "exemplar_total": 28110,
+      "low_coverage": false,
+      "perspective_slug": "compositional-cleanliness",
+      "photos_on": 42948,
+      "strength_label": "Leading, but not strongly distinctive",
+      "votes": 10231,
+      "win_rate": 0.238218,
+      "z_score": -27.23
+     }
+    ],
+    "population": 42948,
+    "sections": [
+     {
+      "chance_rate": 0.298087,
+      "coverage": 0.9789,
+      "crowned": true,
+      "descriptors": [
+       {
+        "count": 19386,
+        "log_odds": 1.1187,
+        "token": "charge"
+       },
+       {
+        "count": 8793,
+        "log_odds": 1.1187,
+        "token": "reports"
+       },
+       {
+        "count": 6313,
+        "log_odds": 1.1187,
+        "token": "prompts"
+       },
+       {
+        "count": 3695,
+        "log_odds": 1.1187,
+        "token": "prompted"
+       },
+       {
+        "count": 3250,
+        "log_odds": 1.1187,
+        "token": "unanswered"
+       },
+       {
+        "count": 2474,
+        "log_odds": 1.1187,
+        "token": "prompt"
+       },
+       {
+        "count": 1755,
+        "log_odds": 1.1187,
+        "token": "captioned"
+       },
+       {
+        "count": 1738,
+        "log_odds": 1.1187,
+        "token": "metaphoric"
+       },
+       {
+        "count": 1200,
+        "log_odds": 1.1187,
+        "token": "unstated"
+       },
+       {
+        "count": 1044,
+        "log_odds": 1.1187,
+        "token": "occurred"
+       },
+       {
+        "count": 718,
+        "log_odds": 1.1187,
+        "token": "compelled"
+       },
+       {
+        "count": 652,
+        "log_odds": 1.1187,
+        "token": "interpretively"
+       },
+       {
+        "count": 632,
+        "log_odds": 1.1187,
+        "token": "affection"
+       },
+       {
+        "count": 605,
+        "log_odds": 1.1187,
+        "token": "rethink"
+       },
+       {
+        "count": 522,
+        "log_odds": 1.1187,
+        "token": "replaceable"
+       }
+      ],
+      "display_name": "Interpretive & Human Charge",
+      "exemplar_total": 28049,
+      "exemplars": [
+       {
+        "date_taken": "2019-11-08T18:21:46",
+        "filename": "_CC10090",
+        "image_key": "2019-11-08__CC10090",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.624201,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 6
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.999953,
+          "perspective_slug": "intensity-suggestion",
+          "score": 9
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 37.6,
+        "rating": 0,
+        "rationale_preview": "The image generates powerful suggestion through a decisive, ironic gesture: an elderly woman with white hair holds up a cooking pot and spoon toward armed soldiers in helmets, transforming domestic objects into instruments of protest. The\u2026",
+        "score": 9,
+        "stack_id": 1623,
+        "stack_size": 3
+       },
+       {
+        "date_taken": "2019-11-01T17:59:32",
+        "filename": "_CC19629",
+        "image_key": "2019-11-01__CC19629",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.873452,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 6
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.973544,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 8
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.999953,
+          "perspective_slug": "intensity-suggestion",
+          "score": 9
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 2.6,
+        "rating": 0,
+        "rationale_preview": "The image carries intense human charge through staged theatrical protest: four figures arranged as corpses or victims\u2014bound wrists, theatrical blood, collapsed poses\u2014under a banner reading 'Y EN NOSOTROS NUESTROS MUERTOS, PA' QUE NADIE QUE\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2019-11-01T17:59:38",
+        "filename": "_CC19631",
+        "image_key": "2019-11-01__CC19631",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.873452,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 6
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.973544,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 8
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.999953,
+          "perspective_slug": "intensity-suggestion",
+          "score": 9
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 2.6,
+        "rating": 0,
+        "rationale_preview": "The image carries intense interpretive and human charge through multiple layers of unresolved tension. Four figures occupy a bus stop in staged poses of injury and exhaustion\u2014bound wrists, simulated blood, a woman splayed as if fallen, oth\u2026",
+        "score": 9,
+        "stack_id": 1518,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2024-03-01T23:19:14",
+        "filename": "L1002341",
+        "image_key": "2024-03-01_L1002341",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.055376,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 3
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.134812,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 3
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.071988,
+          "perspective_slug": "framing",
+          "score": 2
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 86.1,
+        "rating": 0,
+        "rationale_preview": "The foreground man's intense, sidelong glare\u2014tight jaw, furrowed brow, eyes directed past the camera\u2014creates immediate unresolved tension against the tender, softly lit embrace behind him. The couple's dance (her lace sleeve, his vest, her\u2026",
+        "score": 8,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2019-12-13T19:10:37",
+        "filename": "_CC13413",
+        "image_key": "2019-12-13__CC13413",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.055376,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 3
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.259584,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 4
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 73.6,
+        "rating": 0,
+        "rationale_preview": "The photograph carries strong interpretive charge through multiple layers of unresolved tension. The green laser beams cutting through smoke-filled air suggest weaponized crowd control or protest tactics, while the flames and raised phones\u2026",
+        "score": 8,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2019-12-13T19:11:44",
+        "filename": "_CC13417",
+        "image_key": "2019-12-13__CC13417",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.005495,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 2
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.259584,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 4
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 73.6,
+        "rating": 0,
+        "rationale_preview": "The photograph generates strong interpretive charge through layered tension: the nocturnal crowd surging upward, green laser beams cutting through smoke, and flames creating an atmosphere of uprising rather than mere gathering. The Chilean\u2026",
+        "score": 8,
+        "stack_id": 1829,
+        "stack_size": 3
+       },
+       {
+        "date_taken": "2019-11-29T16:39:15",
+        "filename": "_CC13045",
+        "image_key": "2019-11-29__CC13045",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.267659,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 4
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.259584,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 4
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 72.8,
+        "rating": 0,
+        "rationale_preview": "The image carries strong interpretive charge through multiple layered elements. The foreground figures wear blindfolds\u2014immediately creating ambiguity: are they protesters, performers, witnesses to something unseen? The blindfolded woman wi\u2026",
+        "score": 8,
+        "stack_id": 1760,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2024-02-27T17:53:32",
+        "filename": "L1001678",
+        "image_key": "2024-02-27_L1001678",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.267659,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 4
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.259584,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 4
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 72.8,
+        "rating": 0,
+        "rationale_preview": "The overhead perspective creates a charged domestic tableau: a woman in star-patterned sleeves with fist slightly raised (a gesture of tension or protectiveness), a small dog reaching upward toward her, and an infant positioned upside-down\u2026",
+        "score": 8,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2018-11-29T15:49:21",
+        "filename": "_CC16640",
+        "image_key": "2018-11-29__CC16640",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.267659,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 4
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.259584,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 4
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.275856,
+          "perspective_slug": "framing",
+          "score": 3
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 71.9,
+        "rating": 0,
+        "rationale_preview": "The photograph carries substantial human charge through multiple interpretive channels. The central embrace between two men is physically intense\u2014one figure's raised fist with extended thumb creates an ambiguous gesture that hovers between\u2026",
+        "score": 8,
+        "stack_id": 856,
+        "stack_size": 4
+       },
+       {
+        "date_taken": "2019-11-04T17:38:01",
+        "filename": "_CC19743",
+        "image_key": "2019-11-04__CC19743",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.267659,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 4
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 57.6,
+        "rating": 0,
+        "rationale_preview": "The giant puppet\u2014caricaturing political authority with its oversized head, presidential sash, and blood-like stains\u2014creates immediate unease and open narrative possibility. Shot at sunset against backlighting, the figure becomes a looming\u2026",
+        "score": 8,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2019-11-15T18:14:41.000",
+        "filename": "_CC10432",
+        "image_key": "2019-11-15__CC10432",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.055376,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 3
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 57.6,
+        "rating": 0,
+        "rationale_preview": "The image carries strong human charge through multiple layers: the central figures covered in what appears to be blood or red paint create visceral ambiguity\u2014are they wounded, performing, protesting? Their upward-reaching gestures toward t\u2026",
+        "score": 8,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2019-12-13T19:10:26",
+        "filename": "_CC13410",
+        "image_key": "2019-12-13__CC13410",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.267659,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 4
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 57.6,
+        "rating": 0,
+        "rationale_preview": "The image carries strong interpretive charge through multiple layered tensions. The central monument\u2014likely a heroic national symbol\u2014has been repurposed as a platform for bodies climbing and claiming it, while Chilean flags wave below, cre\u2026",
+        "score": 8,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2019-12-13T19:10:45",
+        "filename": "_CC13414",
+        "image_key": "2019-12-13__CC13414",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.055376,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 3
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.275856,
+          "perspective_slug": "framing",
+          "score": 3
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 57.6,
+        "rating": 0,
+        "rationale_preview": "The image carries strong interpretive charge through layered tension: green laser beams cutting through smoke create a sci-fi/anarchic atmosphere that reads as both celebratory and militarized; the silhouetted figures climbing the monument\u2026",
+        "score": 8,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2019-12-19T11:28:02",
+        "filename": "_CC13498",
+        "image_key": "2019-12-19__CC13498",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.267659,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 4
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 57.6,
+        "rating": 0,
+        "rationale_preview": "The photograph carries strong interpretive charge through the deliberate juxtaposition of classical memorial architecture\u2014columns, ornate stonework, a winged victory statue\u2014with shocking red handprints and splatters covering the facade. Th\u2026",
+        "score": 8,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2019-12-31T22:41:48",
+        "filename": "_CC14156",
+        "image_key": "2019-12-31__CC14156",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.267659,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 4
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 57.6,
+        "rating": 0,
+        "rationale_preview": "The green laser beams slicing through night sky create immediate visual metaphor\u2014they read as both weapon and resistance symbol, ambiguous in intent. The banner 'NO + REPRESION' grounds this in political protest context, yet the beams' ori\u2026",
+        "score": 8,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2024-02-05T20:09:07",
+        "filename": "DSCF1253-positive",
+        "image_key": "2024-02-05_DSCF1253-positive",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.055376,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 3
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.275856,
+          "perspective_slug": "framing",
+          "score": 3
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 57.6,
+        "rating": 0,
+        "rationale_preview": "The image carries strong human charge through a cluster of charged interactions: the central figure in the Adidas tracksuit and bucket hat gazes upward with an expression suspended between alertness and reverie, while a hand from outside t\u2026",
+        "score": 8,
+        "stack_id": 5180,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2024-02-05T20:09:31",
+        "filename": "DSCF1257-positive",
+        "image_key": "2024-02-05_DSCF1257-positive",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.267659,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 4
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 57.6,
+        "rating": 0,
+        "rationale_preview": "The photograph pulses with unresolved narrative energy: the raised forearm in the foreground creates a barrier and a question\u2014is this a gesture of celebration, documentation, or something more aggressive? The central figure's ecstatic, wid\u2026",
+        "score": 8,
+        "stack_id": 5184,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2024-02-27T17:52:06",
+        "filename": "L1001664",
+        "image_key": "2024-02-27_L1001664",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.267659,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 4
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.134812,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 3
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.525118,
+          "perspective_slug": "framing",
+          "score": 4
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 47.0,
+        "rating": 0,
+        "rationale_preview": "The photograph carries strong human charge through its intimate, overlapping composition of family bodies in repose. The newborn's face\u2014eyes closed, mouth slightly open\u2014sits at the center of a visual vortex created by converging adult gaze\u2026",
+        "score": 8,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2024-03-01T11:42:50",
+        "filename": "DSCF5331",
+        "image_key": "2024-03-01_DSCF5331",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.267659,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 4
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.525118,
+          "perspective_slug": "framing",
+          "score": 4
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 47.0,
+        "rating": 0,
+        "rationale_preview": "The photograph carries strong human charge through the intimate embrace between two women at what appears to be a wedding or significant life ritual. The bride's contorted face\u2014simultaneously laughing and weeping\u2014creates interpretive ambig\u2026",
+        "score": 8,
+        "stack_id": 5497,
+        "stack_size": 3
+       },
+       {
+        "date_taken": "2018-02-11T10:26:28",
+        "filename": "_CC11695",
+        "image_key": "2018-02-11__CC11695",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.259584,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 4
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 37.3,
+        "rating": 0,
+        "rationale_preview": "The image carries strong interpretive charge through its deliberate, unsettling juxtaposition of prehistoric human figures engaged in what appears to be a burial or ritual preparation of a skeleton. The key tension arises from multiple unr\u2026",
+        "score": 8,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2018-07-20T10:42:45",
+        "filename": "_CC14878",
+        "image_key": "2018-07-20__CC14878",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 37.3,
+        "rating": 0,
+        "rationale_preview": "The image carries strong human charge through a charged, ambiguous embrace between an adult man in formal business attire and a child in a bright red jacket. The gesture is at peak tension: the man bows his head over the child, hand cradli\u2026",
+        "score": 8,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2018-07-20T15:55:40",
+        "filename": "_CC14915",
+        "image_key": "2018-07-20__CC14915",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.044401,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 2
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 37.3,
+        "rating": 0,
+        "rationale_preview": "The photograph carries strong human charge through an intimate embrace captured at a narrative peak. The woman's visible face\u2014eyes softly closed, mouth slightly parted, cheek pressed against fabric\u2014suggests tenderness, relief, or possibly\u2026",
+        "score": 8,
+        "stack_id": 592,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2018-07-20T15:58:22",
+        "filename": "_CC14931",
+        "image_key": "2018-07-20__CC14931",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.044401,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 2
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 37.3,
+        "rating": 0,
+        "rationale_preview": "The overhead angle creates disorientation and intimacy simultaneously, making the viewer a voyeur into a private moment. The woman's face is obscured by hair and angle\u2014her identity withheld\u2014while the man's eyes are closed, his hand grippin\u2026",
+        "score": 8,
+        "stack_id": 597,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2018-11-29T18:09:30",
+        "filename": "_CC16853",
+        "image_key": "2018-11-29__CC16853",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.525118,
+          "perspective_slug": "framing",
+          "score": 4
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.995335,
+          "perspective_slug": "intensity-suggestion",
+          "score": 8
+         }
+        ],
+        "percentile": 99.5,
+        "purity": 37.3,
+        "rating": 0,
+        "rationale_preview": "The embrace is captured at a moment of peak emotional tension\u2014the man's closed eyes and buried face suggest vulnerability and surrender, while the woman's arm wraps him in a gesture of protection or consolation. The unseen faces create nar\u2026",
+        "score": 8,
+        "stack_id": 924,
+        "stack_size": 2
+       }
+      ],
+      "leading_not_distinctive": false,
+      "low_coverage": false,
+      "perspective_slug": "intensity-suggestion",
+      "photos_on": 42872,
+      "strength_label": "A defining strength",
+      "votes": 13959,
+      "win_rate": 0.325597,
+      "z_score": 12.45
+     },
+     {
+      "chance_rate": 0.250201,
+      "coverage": 0.4173,
+      "crowned": true,
+      "descriptors": [
+       {
+        "count": 1157,
+        "log_odds": 2.2505,
+        "token": "encircles"
+       },
+       {
+        "count": 299,
+        "log_odds": 2.2505,
+        "token": "unframed"
+       },
+       {
+        "count": 164,
+        "log_odds": 2.2505,
+        "token": "employing"
+       },
+       {
+        "count": 51,
+        "log_odds": 2.2505,
+        "token": "subordinating"
+       },
+       {
+        "count": 35,
+        "log_odds": 2.2505,
+        "token": "employ"
+       },
+       {
+        "count": 14,
+        "log_odds": 2.2505,
+        "token": "jambs"
+       },
+       {
+        "count": 7,
+        "log_odds": 2.2505,
+        "token": "compartmentalize"
+       },
+       {
+        "count": 7,
+        "log_odds": 2.2505,
+        "token": "doorjamb"
+       },
+       {
+        "count": 7,
+        "log_odds": 2.2505,
+        "token": "encases"
+       },
+       {
+        "count": 7,
+        "log_odds": 2.2505,
+        "token": "loosest"
+       },
+       {
+        "count": 181,
+        "log_odds": 2.2505,
+        "token": "unenclosed"
+       },
+       {
+        "count": 15,
+        "log_odds": 2.2505,
+        "token": "effacing"
+       },
+       {
+        "count": 13,
+        "log_odds": 2.2505,
+        "token": "inexorably"
+       },
+       {
+        "count": 12,
+        "log_odds": 2.2505,
+        "token": "irresistibly"
+       },
+       {
+        "count": 12,
+        "log_odds": 2.2505,
+        "token": "succeeding"
+       }
+      ],
+      "display_name": "Framing",
+      "exemplar_total": 12571,
+      "exemplars": [
+       {
+        "date_taken": "2023-05-11T22:47:01",
+        "filename": "DSCF0058-positive",
+        "image_key": "2023-05-11_DSCF0058-positive",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.134812,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 3
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 37.6,
+        "rating": 0,
+        "rationale_preview": "The film strip border serves as an exceptionally clear and self-aware framing device, creating a perfect rectangular enclosure around the landscape photograph. The sprocket holes and dark emulsion edges form a geometric frame that is both\u2026",
+        "score": 9,
+        "stack_id": 4390,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2018-10-30T17:30:26",
+        "filename": "_CC15850",
+        "image_key": "2018-10-30__CC15850",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.624201,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 6
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 37.4,
+        "rating": 0,
+        "rationale_preview": "A thick, weathered arched opening serves as a strong natural framing device, creating a well-defined portal that completely encircles the townscape view. The arch's substantial concrete texture and organic wear integrate naturally into wha\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2023-05-11T22:52:34",
+        "filename": "DSCF0083-positive",
+        "image_key": "2023-05-11_DSCF0083-positive",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.267659,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 4
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.624201,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 6
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 37.4,
+        "rating": 0,
+        "rationale_preview": "The film strip border with its sprocket holes creates a deliberate, self-referential framing device that strongly encloses the photographic image within. This meta-framing functions as a natural structural frame\u2014the black filmstrip edges w\u2026",
+        "score": 9,
+        "stack_id": 4415,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2023-04-07T17:02:08",
+        "filename": "raw0220",
+        "image_key": "2023-04-07_raw0220",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.624201,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 6
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.667363,
+          "perspective_slug": "intensity-suggestion",
+          "score": 5
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 33.1,
+        "rating": 0,
+        "rationale_preview": "The circular mirror serves as an exceptionally effective framing device, creating a clean, self-contained oval that perfectly encloses the self-portrait subject. The mirror's dark rim provides a bold, consistent border that separates the r\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2023-04-07T17:03:12",
+        "filename": "raw0221",
+        "image_key": "2023-04-07_raw0221",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.624201,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 6
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.667363,
+          "perspective_slug": "intensity-suggestion",
+          "score": 5
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 33.1,
+        "rating": 0,
+        "rationale_preview": "The circular mirror serves as an exceptionally clear and well-formed framing device, creating a perfect geometric enclosure that contains the two photographers and reflected room interior. The mirror's dark rim provides crisp definition ag\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2023-04-07T17:04:16",
+        "filename": "raw0222",
+        "image_key": "2023-04-07_raw0222",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.624201,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 6
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.667363,
+          "perspective_slug": "intensity-suggestion",
+          "score": 5
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 33.1,
+        "rating": 0,
+        "rationale_preview": "The circular mirror serves as a near-perfect natural framing device, creating a self-contained oval within the rectangular frame that cleanly isolates the reflected photographer and the room beyond. The mirror's dark rim functions as a def\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2023-05-11T22:44:43",
+        "filename": "DSCF0044-positive",
+        "image_key": "2023-05-11_DSCF0044-positive",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.267659,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 4
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.134812,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 3
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.667363,
+          "perspective_slug": "intensity-suggestion",
+          "score": 5
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 33.1,
+        "rating": 0,
+        "rationale_preview": "The film strip border serves as a deliberate, self-referential framing device that encloses the central image. The sprocket holes and perforated edges create a complete rectangular frame-within-a-frame, naturally integrating with the photo\u2026",
+        "score": 9,
+        "stack_id": 4376,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2017-02-23T12:05:03",
+        "filename": "_DSC5038",
+        "image_key": "2017-02-23__DSC5038",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.873452,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 6
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.259584,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 4
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.667363,
+          "perspective_slug": "intensity-suggestion",
+          "score": 5
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 12.5,
+        "rating": 0,
+        "rationale_preview": "The arched stone doorway serves as a strong framing device, creating a natural tunnel that draws the eye directly to the narrow vertical slit of light at the terminus. The arch forms a complete, well-defined shape that integrates organical\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2019-12-21T15:38:11",
+        "filename": "_CC14045",
+        "image_key": "2019-12-21__CC14045",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.873452,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 6
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.624201,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 6
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.667363,
+          "perspective_slug": "intensity-suggestion",
+          "score": 5
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 12.5,
+        "rating": 0,
+        "rationale_preview": "The cave mouth itself serves as a powerful natural framing device, with the dark overhanging rock creating a rough arch that completely encircles the bright exterior landscape. This stark silhouette forms an organic, cave-specific shape\u2014co\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2023-05-11T22:42:13",
+        "filename": "DSCF0034-positive",
+        "image_key": "2023-05-11_DSCF0034-positive",
+        "instagram_posted": true,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.873452,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 6
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 12.5,
+        "rating": 0,
+        "rationale_preview": "The film strip border serves as a deliberate, self-aware framing device that literally encases the photographic subject within its sprocketed edges. The black perforations and rebate edges create a clean, geometric enclosure that unmistaka\u2026",
+        "score": 9,
+        "stack_id": 4366,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2023-05-18T17:04:37.1",
+        "filename": "DSCF0241-HDR",
+        "image_key": "2023-05-18_DSCF0241-HDR",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.873452,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 6
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.259584,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 4
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 12.5,
+        "rating": 0,
+        "rationale_preview": "The film strip border serves as a deliberate, self-aware framing device that completely encircles the photograph of the sleeping cat. This meta-framing creates a nested viewing experience: the sprocket holes and film edges form a clean, ge\u2026",
+        "score": 9,
+        "stack_id": 4490,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2025-01-04T13:53:33",
+        "filename": "L1005021",
+        "image_key": "2025-01-04_L1005021",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.873452,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 6
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.624201,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 6
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 12.5,
+        "rating": 0,
+        "rationale_preview": "The entire tunnel structure functions as a powerful framing device: repeating wooden trusses and side beams create concentric geometric layers that progressively narrow toward the bright exit, forming a natural arrow-like shape that drives\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2022-11-04T16:43:32",
+        "filename": "L1006576",
+        "image_key": "2022-11-04_L1006576",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.667363,
+          "perspective_slug": "intensity-suggestion",
+          "score": 5
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 3.4,
+        "rating": 0,
+        "rationale_preview": "The autumn ivy creates a dense, organic natural frame that fully encircles the window, leaving only a clean rectangular aperture of glass and leaded panes at center. The living foliage forms a soft, irregular border with rich tonal variati\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2022-12-10T18:05:29",
+        "filename": "L1006815",
+        "image_key": "2022-12-10_L1006815",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.171573,
+          "perspective_slug": "intensity-suggestion",
+          "score": 3
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 3.4,
+        "rating": 0,
+        "rationale_preview": "A large, illuminated Christmas bauble-shaped arch serves as a powerful framing device, creating a complete, symmetrical circle around the standing subject. The bright yellow-green structure naturally draws the eye inward while fully enclos\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2023-02-04T15:15:22",
+        "filename": "L1007262",
+        "image_key": "2023-02-04_L1007262",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.843174,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 7
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.960113,
+          "perspective_slug": "intensity-suggestion",
+          "score": 7
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 3.4,
+        "rating": 0,
+        "rationale_preview": "The car window opening serves as an exceptionally strong framing device. The window frame and interior door panel create a complete rectangular enclosure that tightly bounds the elk's head, while the glass pane itself becomes a transparent\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2023-05-17T22:38:36.1",
+        "filename": "DSCF0136-HDR",
+        "image_key": "2023-05-17_DSCF0136-HDR",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.134812,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 3
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.860617,
+          "perspective_slug": "intensity-suggestion",
+          "score": 6
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 3.4,
+        "rating": 0,
+        "rationale_preview": "The film strip border serves as an explicit, self-aware framing device that structurally encloses the entire image. The sprocket holes and gray borders create a complete rectangular frame-within-frame that isolates the aerial subject\u2014a pal\u2026",
+        "score": 9,
+        "stack_id": 4459,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2024-02-24T18:24:17",
+        "filename": "L1001570",
+        "image_key": "2024-02-24_L1001570",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.667363,
+          "perspective_slug": "intensity-suggestion",
+          "score": 5
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 3.4,
+        "rating": 0,
+        "rationale_preview": "The circular stairwell opening creates a powerful, well-formed frame that fully encloses the sky and treetops. The dark silhouette of the surrounding architecture wraps completely around the subject, forming an organic oval shape that draw\u2026",
+        "score": 9,
+        "stack_id": 5381,
+        "stack_size": 3
+       },
+       {
+        "date_taken": "2024-02-24T18:24:23",
+        "filename": "L1001573",
+        "image_key": "2024-02-24_L1001573",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.134812,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 3
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 3.4,
+        "rating": 0,
+        "rationale_preview": "A dark circular architectural opening creates a strong, well-formed frame around the glass building and sky beyond. The circular silhouette encloses the subject completely, creating an appealing geometric shape that naturally integrates in\u2026",
+        "score": 9,
+        "stack_id": 5382,
+        "stack_size": 3
+       },
+       {
+        "date_taken": "2026-08-08T16:12:25.000",
+        "filename": "L1008771",
+        "image_key": "2026-08-08_L1008771",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.419757,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 5
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 3.4,
+        "rating": 0,
+        "rationale_preview": "The window frame serves as a strong, well-formed natural framing device. The deep, dark interior wall creates a thick, rounded-rectangular border that completely encloses the exterior scene, isolating the view of greenery, white structural\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2026-08-26T18:05:19.000",
+        "filename": "L1009170",
+        "image_key": "2026-08-26_L1009170",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.624201,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 6
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.860617,
+          "perspective_slug": "intensity-suggestion",
+          "score": 6
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 3.4,
+        "rating": 0,
+        "rationale_preview": "The window frame serves as an exceptionally effective and natural framing device. The wooden window structure creates a complete rectangular enclosure that cleanly contains both the cat silhouette and the cityscape beyond. The frame is sub\u2026",
+        "score": 9,
+        "stack_id": 7989,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2018-02-09T16:26:01",
+        "filename": "_CC11531",
+        "image_key": "2018-02-09__CC11531",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.973544,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 8
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.667363,
+          "perspective_slug": "intensity-suggestion",
+          "score": 5
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 2.5,
+        "rating": 0,
+        "rationale_preview": "The cave entrance creates a dark, organic arch that perfectly encircles the coastal scene beyond. The rough, silhouetted edges form an appealing natural frame that contrasts sharply with the bright exterior, immediately directing the eye t\u2026",
+        "score": 9,
+        "stack_id": 310,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2018-10-27T10:45:29",
+        "filename": "_CC15305",
+        "image_key": "2018-10-27__CC15305",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.973544,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 8
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 2.5,
+        "rating": 0,
+        "rationale_preview": "The architectural arch and surrounding white masonry create a powerful, well-formed framing device that cleanly encircles the central mural. The curved archway acts as a natural proscenium, isolating the battle scene and drawing the eye di\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2019-12-21T17:53:59",
+        "filename": "_MG_3233",
+        "image_key": "2019-12-21__MG_3233",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.973544,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 8
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.667363,
+          "perspective_slug": "intensity-suggestion",
+          "score": 5
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 2.5,
+        "rating": 0,
+        "rationale_preview": "The cave mouth forms a powerful, organic natural frame that completely encircles the exterior landscape. The dark, silhouetted rock overhead creates a distinct arch shape with irregular drip-like formations along its edge, while the slopin\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2023-02-09T17:27:13",
+        "filename": "L1007687",
+        "image_key": "2023-02-09_L1007687",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.873452,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 6
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.973544,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 8
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.998249,
+          "perspective_slug": "framing",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.667363,
+          "perspective_slug": "intensity-suggestion",
+          "score": 5
+         }
+        ],
+        "percentile": 99.8,
+        "purity": 2.5,
+        "rating": 0,
+        "rationale_preview": "A large stone arch in the foreground creates a powerful, well-formed framing device that fully encloses the scene beyond. The arch's clean geometric curve contrasts with the ornate interior architecture and silhouetted figures, creating de\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       }
+      ],
+      "leading_not_distinctive": false,
+      "low_coverage": true,
+      "perspective_slug": "framing",
+      "photos_on": 18275,
+      "strength_label": "A defining strength",
+      "votes": 5153,
+      "win_rate": 0.28197,
+      "z_score": 9.92
+     },
+     {
+      "chance_rate": 0.298092,
+      "coverage": 0.9792,
+      "crowned": true,
+      "descriptors": [
+       {
+        "count": 390,
+        "log_odds": 1.1567,
+        "token": "parseable"
+       },
+       {
+        "count": 351,
+        "log_odds": 1.1567,
+        "token": "navigable"
+       },
+       {
+        "count": 264,
+        "log_odds": 1.1567,
+        "token": "countable"
+       },
+       {
+        "count": 148,
+        "log_odds": 1.1567,
+        "token": "theory"
+       },
+       {
+        "count": 98,
+        "log_odds": 1.1567,
+        "token": "finer"
+       },
+       {
+        "count": 93,
+        "log_odds": 1.1567,
+        "token": "middleground's"
+       },
+       {
+        "count": 91,
+        "log_odds": 1.1567,
+        "token": "broadest"
+       },
+       {
+        "count": 58,
+        "log_odds": 1.1567,
+        "token": "expense"
+       },
+       {
+        "count": 55,
+        "log_odds": 1.1567,
+        "token": "farthest"
+       },
+       {
+        "count": 53,
+        "log_odds": 1.1567,
+        "token": "tack"
+       },
+       {
+        "count": 41,
+        "log_odds": 1.1567,
+        "token": "counted"
+       },
+       {
+        "count": 32,
+        "log_odds": 1.1567,
+        "token": "impressionistic"
+       },
+       {
+        "count": 30,
+        "log_odds": 1.1567,
+        "token": "interactivity"
+       },
+       {
+        "count": 29,
+        "log_odds": 1.1567,
+        "token": "subtropical"
+       },
+       {
+        "count": 28,
+        "log_odds": 1.1567,
+        "token": "separable"
+       }
+      ],
+      "display_name": "Depth & Environmental Context",
+      "exemplar_total": 28075,
+      "exemplars": [
+       {
+        "date_taken": "2018-11-03T14:23:32",
+        "filename": "_CC16313",
+        "image_key": "2018-11-03__CC16313",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.038476,
+          "perspective_slug": "intensity-suggestion",
+          "score": 2
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 37.8,
+        "rating": 0,
+        "rationale_preview": "Foreground shows sharply defined canal edges, service roads, vehicles, and small buildings; middleground presents the lock chambers with water levels, lock machinery, and a ship entering; background reveals distant hills, industrial struct\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2026-05-16T08:36:07.000",
+        "filename": "R0001371",
+        "image_key": "2026-05-16_R0001371",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 37.8,
+        "rating": 0,
+        "rationale_preview": "Foreground (checkered balloon), middleground (colorful balloon, scattered trees, buildings, roads), and background (distant balloons, town, mountains) are all sharply legible and interact to create clear spatial depth. The viewer can read\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2026-05-16T08:44:21.000",
+        "filename": "R0001383",
+        "image_key": "2026-05-16_R0001383",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 37.8,
+        "rating": 0,
+        "rationale_preview": "Exceptional depth and environmental context. Foreground shows grounded balloons, vehicles, and building rooftops with crisp detail. Middleground features multiple balloons at varying altitudes casting long shadows across terrain, with read\u2026",
+        "score": 9,
+        "stack_id": 7492,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2024-04-13T22:00:55",
+        "filename": "DSCF1543-positive",
+        "image_key": "2024-04-13_DSCF1543-positive",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.75145,
+          "perspective_slug": "framing",
+          "score": 5
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.860617,
+          "perspective_slug": "intensity-suggestion",
+          "score": 6
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 13.9,
+        "rating": 0,
+        "rationale_preview": "Three distinct planes operate with exceptional clarity and mutual reinforcement. Foreground: swimming pool edge and wet wooden deck with visible grain and water marks, anchoring the viewer at the waterline. Middleground: six seated figures\u2026",
+        "score": 9,
+        "stack_id": 5888,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2017-02-27T09:23:31",
+        "filename": "_DSC5371",
+        "image_key": "2017-02-27__DSC5371",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.873452,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 6
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.171573,
+          "perspective_slug": "intensity-suggestion",
+          "score": 3
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 12.6,
+        "rating": 0,
+        "rationale_preview": "Three exceptionally legible planes stack distinctly: foreground with tents, hammock, figure, and cabins; middleground of dense varied forest showing tree species differentiation and texture; background of massive granite mountain face with\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2018-02-16T09:26:14",
+        "filename": "_CC12269",
+        "image_key": "2018-02-16__CC12269",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.873452,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 6
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 12.6,
+        "rating": 0,
+        "rationale_preview": "Exceptional depth and environmental legibility. The foreground (wooden pews), middleground (two figures and altar area), and background (detailed altarpiece with multiple statues, columns, and niches) each read crisply and interact to buil\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2024-04-13T22:00:34",
+        "filename": "DSCF1540-positive",
+        "image_key": "2024-04-13_DSCF1540-positive",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.873452,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 6
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.860617,
+          "perspective_slug": "intensity-suggestion",
+          "score": 6
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 12.6,
+        "rating": 0,
+        "rationale_preview": "Three distinct planes operate with exceptional clarity and narrative interaction. Foreground: weathered wooden deck with visible grain and pool edge. Middleground: swimmers and throwers actively engaged with a visible ball trajectory, wate\u2026",
+        "score": 9,
+        "stack_id": 5885,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2026-05-16T08:39:08.000",
+        "filename": "R0001373",
+        "image_key": "2026-05-16_R0001373",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.873452,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 6
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.667363,
+          "perspective_slug": "intensity-suggestion",
+          "score": 5
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 12.6,
+        "rating": 0,
+        "rationale_preview": "Three exceptionally legible planes interlock to create strong spatial depth and rich narrative context. Foreground: modern buildings, roads, vehicles, and curved perimeter path anchor the viewer at ground level. Middleground: the massive P\u2026",
+        "score": 9,
+        "stack_id": 7494,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2026-05-16T12:56:30.000",
+        "filename": "R0001437",
+        "image_key": "2026-05-16_R0001437",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.873452,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 6
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.75145,
+          "perspective_slug": "framing",
+          "score": 5
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.171573,
+          "perspective_slug": "intensity-suggestion",
+          "score": 3
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 12.6,
+        "rating": 0,
+        "rationale_preview": "Foreground shows stone platform edges and clustered tourists with clear texture and scale; middleground reveals the Avenue of the Dead with scattered visitors, smaller ruins, and central platform; background presents the Pyramid of the Sun\u2026",
+        "score": 9,
+        "stack_id": 7480,
+        "stack_size": 3
+       },
+       {
+        "date_taken": "2016-12-20T17:20:00",
+        "filename": "_DSC2473",
+        "image_key": "2016-12-20__DSC2473",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.622066,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 5
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.960113,
+          "perspective_slug": "intensity-suggestion",
+          "score": 7
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 4.0,
+        "rating": 0,
+        "rationale_preview": "Three distinct planes are exceptionally legible and interactive: foreground weathered red roofs anchor the viewer at street level; middleground murals with detailed figural imagery provide narrative focus and cultural texture; background h\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2017-03-01T13:28:27",
+        "filename": "_DSC5817",
+        "image_key": "2017-03-01__DSC5817",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.171573,
+          "perspective_slug": "intensity-suggestion",
+          "score": 3
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 3.6,
+        "rating": 0,
+        "rationale_preview": "Three distinct planes are sharply legible and reinforce one another: textured volcanic rocks and rushing whitewater in the foreground establish immediate physical presence and scale; the forested midground provides ecological transition an\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2017-06-18T09:46:12",
+        "filename": "_DSC8498",
+        "image_key": "2017-06-18__DSC8498",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.960113,
+          "perspective_slug": "intensity-suggestion",
+          "score": 7
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 3.6,
+        "rating": 0,
+        "rationale_preview": "Three distinct planes function exceptionally well: foreground shows trees and small human figures at the building's base providing scale; middleground features the sculptural Bah\u00e1'\u00ed Temple with its detailed geometric panels fully readable;\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2018-02-17T09:53:48",
+        "filename": "_CC12649",
+        "image_key": "2018-02-17__CC12649",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.171573,
+          "perspective_slug": "intensity-suggestion",
+          "score": 3
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 3.6,
+        "rating": 0,
+        "rationale_preview": "Three distinct planes are clearly legible and interact: foreground wetland with water pools and vegetation texture, middleground arid plain with a visible winding road establishing scale and human presence, and background snow-capped mount\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2018-02-17T10:33:08",
+        "filename": "_CC12664",
+        "image_key": "2018-02-17__CC12664",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.275856,
+          "perspective_slug": "framing",
+          "score": 3
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 3.6,
+        "rating": 0,
+        "rationale_preview": "Three distinct planes operate with exceptional clarity and mutual reinforcement: the foreground of rugged reddish-brown boulders reads with full textural detail and occupies substantial frame space; the middleground of sloped desert terrai\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2018-02-17T17:31:34",
+        "filename": "_CC12793",
+        "image_key": "2018-02-17__CC12793",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.171573,
+          "perspective_slug": "intensity-suggestion",
+          "score": 3
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 3.6,
+        "rating": 0,
+        "rationale_preview": "Foreground rocky ridges, middleground eroded formations with shadow play, and background flat horizon with distant clouds all read distinctly and interact to create clear spatial depth. The terrain's texture and color shifts across planes\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2018-02-18T11:14:03",
+        "filename": "_CC12858",
+        "image_key": "2018-02-18__CC12858",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 3.6,
+        "rating": 0,
+        "rationale_preview": "Foreground eroded badlands are sharply textured and distinct; middleground plateau slopes create a clear transitional plane; background snow-capped volcanoes and desert plain establish vast spatial depth with atmospheric haze. All three pl\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2019-12-21T10:56:35",
+        "filename": "_CC13808",
+        "image_key": "2019-12-21__CC13808",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.171573,
+          "perspective_slug": "intensity-suggestion",
+          "score": 3
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 3.6,
+        "rating": 0,
+        "rationale_preview": "Three distinct planes are clearly legible and mutually reinforcing: foreground textured grassland with small bushes and rolling hills, middleground two calm lakes with visible shorelines and color variations, and background massive granite\u2026",
+        "score": 9,
+        "stack_id": 1891,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2019-12-21T13:50:23",
+        "filename": "_MG_3148",
+        "image_key": "2019-12-21__MG_3148",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 3.6,
+        "rating": 0,
+        "rationale_preview": "Three distinct planes are sharply legible and mutually reinforcing: foreground brush and wooden post provide immediate spatial grounding; middleground reveals buildings, trees, bridge with pedestrians, and island geography against turquois\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2020-03-01T09:17:07",
+        "filename": "_CC14771",
+        "image_key": "2020-03-01__CC14771",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Framing",
+          "percentile": 0.75145,
+          "perspective_slug": "framing",
+          "score": 5
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 3.6,
+        "rating": 0,
+        "rationale_preview": "The photograph of a framed painting exhibits excellent depth across three distinct planes. The foreground shows textured snow with clear hoofprints and individual calves in sharp detail; the middleground presents the main cattle group and\u2026",
+        "score": 9,
+        "stack_id": 2131,
+        "stack_size": 2
+       },
+       {
+        "date_taken": "2022-07-23T12:04:49",
+        "filename": "DSCF0086",
+        "image_key": "2022-07-23_DSCF0086",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.171573,
+          "perspective_slug": "intensity-suggestion",
+          "score": 3
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 3.6,
+        "rating": 0,
+        "rationale_preview": "Three distinct planes function excellently: foreground snow-dusted ridge with textured shrubs and shadow patterns, middleground darker rocky mountains with partial snow defining form, and background snow-capped peaks fading into atmospheri\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2022-07-23T12:08:16",
+        "filename": "DSCF0093",
+        "image_key": "2022-07-23_DSCF0093",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.171573,
+          "perspective_slug": "intensity-suggestion",
+          "score": 3
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 3.6,
+        "rating": 0,
+        "rationale_preview": "The image builds exceptionally legible spatial depth across three distinct planes: foreground snow-dusted ridge with scattered vegetation and bushes, middleground darker brown mountain slopes with partial snow cover, and background snow-ca\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2022-10-26T13:38:08",
+        "filename": "L1006421",
+        "image_key": "2022-10-26_L1006421",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.96382,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 7
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.405531,
+          "perspective_slug": "intensity-suggestion",
+          "score": 4
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 3.6,
+        "rating": 0,
+        "rationale_preview": "All three planes are sharply legible and mutually reinforcing. Foreground: expansive stone plaza with stepped terraces establishing ground plane and scale. Middleground: the National War Memorial as clear subject with bronze sculptures, ar\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2018-02-16T16:35:10",
+        "filename": "_CC12413",
+        "image_key": "2018-02-16__CC12413",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.99475,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 8
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.038476,
+          "perspective_slug": "intensity-suggestion",
+          "score": 2
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 0.5,
+        "rating": 0,
+        "rationale_preview": "Foreground (flat desert plain), middleground (reddish-brown hills with clear texture), and background (snow-capped mountains under layered clouds) are all distinct, legible, and interact to create substantial spatial depth. The viewer can\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       },
+       {
+        "date_taken": "2018-02-17T09:32:54",
+        "filename": "_CC12627",
+        "image_key": "2018-02-17__CC12627",
+        "instagram_posted": false,
+        "per_perspective": [
+         {
+          "display_name": "Compositional Cleanliness",
+          "percentile": 0.99475,
+          "perspective_slug": "compositional-cleanliness",
+          "score": 8
+         },
+         {
+          "display_name": "Depth & Environmental Context",
+          "percentile": 0.999627,
+          "perspective_slug": "environmental-context-legibility",
+          "score": 9
+         },
+         {
+          "display_name": "Interpretive & Human Charge",
+          "percentile": 0.171573,
+          "perspective_slug": "intensity-suggestion",
+          "score": 3
+         }
+        ],
+        "percentile": 100.0,
+        "purity": 0.5,
+        "rating": 0,
+        "rationale_preview": "Foreground dirt road with tire tracks and roadside signs reads clearly; middleground extends through flat desert plain with two road signs creating spatial anchors; background snow-capped mountains and volcanic cones sit distinctly against\u2026",
+        "score": 9,
+        "stack_id": null,
+        "stack_size": null
+       }
+      ],
+      "leading_not_distinctive": false,
+      "low_coverage": false,
+      "perspective_slug": "environmental-context-legibility",
+      "photos_on": 42883,
+      "strength_label": "A defining strength",
+      "votes": 13605,
+      "win_rate": 0.317259,
+      "z_score": 8.68
+     }
+    ]
+   },
+   "status": 200
+  },
+  "/api/identity/mirror/lens/compositional-cleanliness/exemplars?limit=4": {
+   "json": {
+    "items": [
+     {
+      "date_taken": "2018-02-18T14:40:22",
+      "filename": "_CC12919",
+      "image_key": "2018-02-18__CC12919",
+      "instagram_posted": false,
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "percentile": 0.999779,
+        "perspective_slug": "compositional-cleanliness",
+        "score": 9
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "percentile": 0.044401,
+        "perspective_slug": "environmental-context-legibility",
+        "score": 2
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "percentile": 0.038476,
+        "perspective_slug": "intensity-suggestion",
+        "score": 2
+       }
+      ],
+      "percentile": 100.0,
+      "purity": 95.5,
+      "rating": 0,
+      "rationale_preview": "Exceptionally clean composition: the wind turbine is isolated against a flawless blue sky with zero competing elements. Negative space is abundant and purposeful, edges are completely controlled with no intrusions, and the subject reads im\u2026",
+      "score": 9,
+      "stack_id": null,
+      "stack_size": null
+     },
+     {
+      "date_taken": "2023-01-15T15:49:38",
+      "filename": "L1007051",
+      "image_key": "2023-01-15_L1007051",
+      "instagram_posted": false,
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "percentile": 0.999779,
+        "perspective_slug": "compositional-cleanliness",
+        "score": 9
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "percentile": 0.044401,
+        "perspective_slug": "environmental-context-legibility",
+        "score": 2
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "percentile": 0.038476,
+        "perspective_slug": "intensity-suggestion",
+        "score": 2
+       }
+      ],
+      "percentile": 100.0,
+      "purity": 95.5,
+      "rating": 0,
+      "rationale_preview": "Extremely clean composition with a single leaf centered in vast, uniform negative space. No competing elements, no edge distractions, and the grayscale snow creates a minimalist field that makes the subject read immediately and unmistakabl\u2026",
+      "score": 9,
+      "stack_id": null,
+      "stack_size": null
+     },
+     {
+      "date_taken": "2018-02-17T10:01:14",
+      "filename": "_CC12651",
+      "image_key": "2018-02-17__CC12651",
+      "instagram_posted": false,
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "percentile": 0.999779,
+        "perspective_slug": "compositional-cleanliness",
+        "score": 9
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "percentile": 0.134812,
+        "perspective_slug": "environmental-context-legibility",
+        "score": 3
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "percentile": 0.038476,
+        "perspective_slug": "intensity-suggestion",
+        "score": 2
+       }
+      ],
+      "percentile": 100.0,
+      "purity": 86.5,
+      "rating": 0,
+      "rationale_preview": "Exceptionally clean composition with only three elements: sky, cloud, and earth. No distracting elements, edges are precisely controlled with the horizon line placed low, and the cloud reads immediately as the primary subject against vast\u2026",
+      "score": 9,
+      "stack_id": null,
+      "stack_size": null
+     },
+     {
+      "date_taken": "2018-02-16T10:30:29",
+      "filename": "_CC12277",
+      "image_key": "2018-02-16__CC12277",
+      "instagram_posted": false,
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "percentile": 0.999779,
+        "perspective_slug": "compositional-cleanliness",
+        "score": 9
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "percentile": 0.134812,
+        "perspective_slug": "environmental-context-legibility",
+        "score": 3
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "percentile": 0.171573,
+        "perspective_slug": "intensity-suggestion",
+        "score": 3
+       }
+      ],
+      "percentile": 100.0,
+      "purity": 82.8,
+      "rating": 0,
+      "rationale_preview": "Extremely clean and intentional composition. The vast negative space of clear blue sky dominates the frame, creating deliberate minimalism that isolates Mount Fuji. No distracting elements, no edge intrusions, no competing subjects. The pr\u2026",
+      "score": 9,
+      "stack_id": null,
+      "stack_size": null
+     }
+    ],
+    "total": 28110
+   },
+   "status": 200
+  },
+  "/api/identity/mirror/lens/compositional-cleanliness/exemplars?limit=4&offset=9": {
+   "json": {
+    "items": [
+     {
+      "date_taken": "2025-01-10T18:49:36",
+      "filename": "L1005082",
+      "image_key": "2025-01-10_L1005082",
+      "instagram_posted": false,
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "percentile": 0.999779,
+        "perspective_slug": "compositional-cleanliness",
+        "score": 9
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "percentile": 0.044401,
+        "perspective_slug": "environmental-context-legibility",
+        "score": 2
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "percentile": 0.405531,
+        "perspective_slug": "intensity-suggestion",
+        "score": 4
+       }
+      ],
+      "percentile": 100.0,
+      "purity": 59.4,
+      "rating": 0,
+      "rationale_preview": "Exceptionally clean composition with a single, isolated subject centered against a vast, uniform blue field. No competing elements, no edge intrusions, and negative space is deliberately controlled to amplify the jellyfish's presence. The\u2026",
+      "score": 9,
+      "stack_id": 6207,
+      "stack_size": 2
+     },
+     {
+      "date_taken": "2023-05-19T21:39:08",
+      "filename": "L1009314",
+      "image_key": "2023-05-19_L1009314",
+      "instagram_posted": false,
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "percentile": 0.999779,
+        "perspective_slug": "compositional-cleanliness",
+        "score": 9
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "percentile": 0.044401,
+        "perspective_slug": "environmental-context-legibility",
+        "score": 2
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "percentile": 0.667363,
+        "perspective_slug": "intensity-suggestion",
+        "score": 5
+       }
+      ],
+      "percentile": 100.0,
+      "purity": 33.2,
+      "rating": 0,
+      "rationale_preview": "Extremely clean and intentional composition. The frame is stripped to essentials: the tower diagonal against pure negative space. No competing elements, no edge intrusions, no clutter. The black sky isolates the subject completely; the neo\u2026",
+      "score": 9,
+      "stack_id": 4532,
+      "stack_size": 2
+     },
+     {
+      "date_taken": "2023-02-08T22:38:27",
+      "filename": "L1007424",
+      "image_key": "2023-02-08_L1007424",
+      "instagram_posted": false,
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "percentile": 0.999779,
+        "perspective_slug": "compositional-cleanliness",
+        "score": 9
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "percentile": 0.134812,
+        "perspective_slug": "environmental-context-legibility",
+        "score": 3
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "percentile": 0.860617,
+        "perspective_slug": "intensity-suggestion",
+        "score": 6
+       }
+      ],
+      "percentile": 100.0,
+      "purity": 13.9,
+      "rating": 0,
+      "rationale_preview": "Exceptionally clean composition with complete elimination of distractions. The Statue of Liberty is isolated as the sole illuminated element against pure black negative space, with controlled edges and a clear vertical reflection that rein\u2026",
+      "score": 9,
+      "stack_id": null,
+      "stack_size": null
+     },
+     {
+      "date_taken": "2023-02-08T23:14:31",
+      "filename": "L1007467",
+      "image_key": "2023-02-08_L1007467",
+      "instagram_posted": false,
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "percentile": 0.999779,
+        "perspective_slug": "compositional-cleanliness",
+        "score": 9
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "percentile": 0.134812,
+        "perspective_slug": "environmental-context-legibility",
+        "score": 3
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "percentile": 0.860617,
+        "perspective_slug": "intensity-suggestion",
+        "score": 6
+       }
+      ],
+      "percentile": 100.0,
+      "purity": 13.9,
+      "rating": 0,
+      "rationale_preview": "Extremely clean and intentional composition. The vast majority of the frame is pure negative space (black sky and water), which isolates and dramatizes the single primary subject\u2014the lit Statue of Liberty. No competing elements, no edge in\u2026",
+      "score": 9,
+      "stack_id": null,
+      "stack_size": null
+     }
+    ],
+    "total": 28110
+   },
+   "status": 200
+  },
+  "/api/identity/suggestions?limit=3": {
+   "json": {
+    "candidates": [
+     {
+      "date_taken": "2019-12-13T19:10:31",
+      "filename": "_CC13411",
+      "image_key": "2019-12-13__CC13411",
+      "is_signature": true,
+      "peak_percentile": 0.999953,
+      "peak_perspective_display_name": "Interpretive & Human Charge",
+      "peak_perspective_slug": "intensity-suggestion",
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.055376,
+        "perspective_slug": "compositional-cleanliness",
+        "prompt_version": "compositional-cleanliness:8b6cd47d215e7ce3",
+        "rationale_preview": "The frame is visually chaotic with competing elements throughout: smoke, fire, laser beams, numerous phone screens, flags, and dense crowds all demand attention. The primary subject\u2014the monument with figures\u2014is partially obscured and fight\u2026",
+        "score": 3,
+        "scored_at": "2026-08-17T01:46:16+00:00"
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.843174,
+        "perspective_slug": "environmental-context-legibility",
+        "prompt_version": "environmental-context-legibility:33d4d1ddd41a452c",
+        "rationale_preview": "Three distinct planes operate with clear interaction: the foreground shows raised phones and flags with soft but legible silhouettes; the middleground features the climbed monument with figures, waving Chilean flags, and laser beams cuttin\u2026",
+        "score": 7,
+        "scored_at": "2026-08-17T01:46:16+00:00"
+       },
+       {
+        "display_name": "Framing",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.275856,
+        "perspective_slug": "framing",
+        "prompt_version": "framing:d7c07915f5a66f07",
+        "rationale_preview": "No deliberate framing device is employed. The composition is an open, chaotic scene with scattered elements\u2014crowd, flags, smoke, fire, laser lights\u2014none of which encircle or enclose the monument subject. The dark foreground crowd and flag\u2026",
+        "score": 3,
+        "scored_at": "2026-08-17T01:46:17+00:00"
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.999953,
+        "perspective_slug": "intensity-suggestion",
+        "prompt_version": "intensity-suggestion:ed5020dec935b28e",
+        "rationale_preview": "The photograph pulses with unresolved energy: a monument overrun by bodies climbing its heights, Chilean flags caught mid-wave against encroaching darkness, green laser beams slicing through smoke like stray bullets or signals of resistanc\u2026",
+        "score": 9,
+        "scored_at": "2026-08-17T01:46:20+00:00"
+       }
+      ],
+      "perspectives_covered": 4,
+      "rating": 0,
+      "reason_codes": [
+       "high_score_unposted"
+      ],
+      "reasons": [
+       "Strong ranking percentile among scored, unposted catalog images (ranking_percentile=1.0000).",
+       "Peak lens is Interpretive & Human Charge, one of your crowned signature techniques."
+      ]
+     },
+     {
+      "date_taken": "2019-11-08T18:22:04",
+      "filename": "_CC10094",
+      "image_key": "2019-11-08__CC10094",
+      "is_signature": true,
+      "peak_percentile": 0.999953,
+      "peak_perspective_display_name": "Interpretive & Human Charge",
+      "peak_perspective_slug": "intensity-suggestion",
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.622066,
+        "perspective_slug": "compositional-cleanliness",
+        "prompt_version": "compositional-cleanliness:8b6cd47d215e7ce3",
+        "rationale_preview": "The primary interaction between the older woman and the officer is reasonably clear, but the composition suffers from significant distractions. The vertical orientation (or rotated presentation) creates awkward edge management with street\u2026",
+        "score": 5,
+        "scored_at": "2026-08-17T02:43:54+00:00"
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.843174,
+        "perspective_slug": "environmental-context-legibility",
+        "prompt_version": "environmental-context-legibility:33d4d1ddd41a452c",
+        "rationale_preview": "The image presents three clear planes: foreground with the soldier in sharp focus showing uniform details and helmet; middleground with the elderly woman interacting directly with the soldier, her gesture and clothing readable; and backgro\u2026",
+        "score": 7,
+        "scored_at": "2026-08-17T02:43:54+00:00"
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.999953,
+        "perspective_slug": "intensity-suggestion",
+        "prompt_version": "intensity-suggestion:ed5020dec935b28e",
+        "rationale_preview": "The photograph carries intense interpretive charge through a single, loaded gesture: an elderly woman with white hair and face mask extends a small metal pan toward a helmeted officer in riot gear, who looks upward at her with visible wari\u2026",
+        "score": 9,
+        "scored_at": "2026-08-17T02:44:00+00:00"
+       }
+      ],
+      "perspectives_covered": 3,
+      "rating": 0,
+      "reason_codes": [
+       "high_score_unposted"
+      ],
+      "reasons": [
+       "Strong ranking percentile among scored, unposted catalog images (ranking_percentile=1.0000).",
+       "Peak lens is Interpretive & Human Charge, one of your crowned signature techniques."
+      ]
+     },
+     {
+      "date_taken": "2019-11-08T18:21:46",
+      "filename": "_CC10090",
+      "image_key": "2019-11-08__CC10090",
+      "is_signature": true,
+      "peak_percentile": 0.999953,
+      "peak_perspective_display_name": "Interpretive & Human Charge",
+      "peak_perspective_slug": "intensity-suggestion",
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.622066,
+        "perspective_slug": "compositional-cleanliness",
+        "prompt_version": "compositional-cleanliness:8b6cd47d215e7ce3",
+        "rationale_preview": "The primary subject (the elderly woman with the pot) reads reasonably clearly and is positioned with intentional action, but the frame suffers from notable distractions. The left edge has a partially visible figure that intrudes without pu\u2026",
+        "score": 5,
+        "scored_at": "2026-08-17T02:44:07+00:00"
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.624201,
+        "perspective_slug": "environmental-context-legibility",
+        "prompt_version": "environmental-context-legibility:33d4d1ddd41a452c",
+        "rationale_preview": "The image presents three distinguishable planes: foreground (the elderly woman with pot and spoon, sharply in focus), middleground (uniformed officers in helmets, slightly soft but clearly identifiable as law enforcement), and background (\u2026",
+        "score": 6,
+        "scored_at": "2026-08-17T02:44:08+00:00"
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.999953,
+        "perspective_slug": "intensity-suggestion",
+        "prompt_version": "intensity-suggestion:ed5020dec935b28e",
+        "rationale_preview": "The image generates powerful suggestion through a decisive, ironic gesture: an elderly woman with white hair holds up a cooking pot and spoon toward armed soldiers in helmets, transforming domestic objects into instruments of protest. The\u2026",
+        "score": 9,
+        "scored_at": "2026-08-17T02:44:12+00:00"
+       }
+      ],
+      "perspectives_covered": 3,
+      "rating": 0,
+      "reason_codes": [
+       "high_score_unposted"
+      ],
+      "reasons": [
+       "Strong ranking percentile among scored, unposted catalog images (ranking_percentile=1.0000).",
+       "Peak lens is Interpretive & Human Charge, one of your crowned signature techniques."
+      ]
+     }
+    ],
+    "empty_state": null,
+    "meta": {
+     "corroboration_rule": "If any lens scored 1, rank on second-highest percentile instead of peak.",
+     "coverage_rule": "eligible when perspectives_covered >= min_perspectives (default 1)",
+     "high_score_rule": "reason code high_score_unposted when ranking_percentile >= p90 of eligible unposted images' corroboration-vetoed ranking percentiles.",
+     "min_perspectives_used": 1,
+     "ranking_key": "ranking_percentile",
+     "weighting": "peak_within_perspective_percentile"
+    },
+    "total": 42730
+   },
+   "status": 200
+  },
+  "/api/identity/suggestions?limit=3&offset=5": {
+   "json": {
+    "candidates": [
+     {
+      "date_taken": "2025-01-10T18:49:36",
+      "filename": "L1005082",
+      "image_key": "2025-01-10_L1005082",
+      "is_signature": false,
+      "peak_percentile": 0.999779,
+      "peak_perspective_display_name": "Compositional Cleanliness",
+      "peak_perspective_slug": "compositional-cleanliness",
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.999779,
+        "perspective_slug": "compositional-cleanliness",
+        "prompt_version": "compositional-cleanliness:8b6cd47d215e7ce3",
+        "rationale_preview": "Exceptionally clean composition with a single, isolated subject centered against a vast, uniform blue field. No competing elements, no edge intrusions, and negative space is deliberately controlled to amplify the jellyfish's presence. The\u2026",
+        "score": 9,
+        "scored_at": "2026-07-27T06:41:00+00:00"
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.044401,
+        "perspective_slug": "environmental-context-legibility",
+        "prompt_version": "environmental-context-legibility:33d4d1ddd41a452c",
+        "rationale_preview": "The image is severely flattened: a single jellyfish floats against a uniform blue void with no foreground, middleground, or background separation. The blue field reads as an undifferentiated color wash rather than a readable aquatic enviro\u2026",
+        "score": 2,
+        "scored_at": "2026-07-27T06:41:01+00:00"
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.405531,
+        "perspective_slug": "intensity-suggestion",
+        "prompt_version": "intensity-suggestion:ed5020dec935b28e",
+        "rationale_preview": "The jellyfish's bioluminescent glow against the deep blue creates a mood of otherworldly suspension, and the tangled, almost violent intimacy of the two organisms suggests something beyond pure nature documentary\u2014there is a faint erotic or\u2026",
+        "score": 4,
+        "scored_at": "2026-07-27T06:41:04+00:00"
+       }
+      ],
+      "perspectives_covered": 3,
+      "rating": 0,
+      "reason_codes": [
+       "high_score_unposted"
+      ],
+      "reasons": [
+       "Strong ranking percentile among scored, unposted catalog images (ranking_percentile=0.9998).",
+       "Peak lens is Compositional Cleanliness."
+      ]
+     },
+     {
+      "date_taken": "2025-01-10T18:49:25",
+      "filename": "L1005081",
+      "image_key": "2025-01-10_L1005081",
+      "is_signature": false,
+      "peak_percentile": 0.999779,
+      "peak_perspective_display_name": "Compositional Cleanliness",
+      "peak_perspective_slug": "compositional-cleanliness",
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.999779,
+        "perspective_slug": "compositional-cleanliness",
+        "prompt_version": "compositional-cleanliness:8b6cd47d215e7ce3",
+        "rationale_preview": "Exceptionally clean composition with a single, isolated subject against a uniform blue field. The jellyfish is centered with ample controlled negative space on all sides, no edge intrusions, and zero competing elements. The high contrast b\u2026",
+        "score": 9,
+        "scored_at": "2026-07-27T06:41:03+00:00"
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.044401,
+        "perspective_slug": "environmental-context-legibility",
+        "prompt_version": "environmental-context-legibility:33d4d1ddd41a452c",
+        "rationale_preview": "The image presents a single jellyfish against a uniform, undifferentiated blue field. There is no foreground, middleground, or background\u2014only a subject suspended in a color void with no spatial planes, no readable environment, and no cont\u2026",
+        "score": 2,
+        "scored_at": "2026-07-27T06:41:04+00:00"
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.171573,
+        "perspective_slug": "intensity-suggestion",
+        "prompt_version": "intensity-suggestion:ed5020dec935b28e",
+        "rationale_preview": "The jellyfish against blue water is pure nature documentation with zero human presence and no interpretive or narrative ambition. The color contrast is visually striking but offers only one reading: 'a jellyfish swims.' There is no ambigui\u2026",
+        "score": 3,
+        "scored_at": "2026-07-27T06:41:06+00:00"
+       }
+      ],
+      "perspectives_covered": 3,
+      "rating": 0,
+      "reason_codes": [
+       "high_score_unposted"
+      ],
+      "reasons": [
+       "Strong ranking percentile among scored, unposted catalog images (ranking_percentile=0.9998).",
+       "Peak lens is Compositional Cleanliness."
+      ]
+     },
+     {
+      "date_taken": "2024-02-05T20:13:45",
+      "filename": "DSCF1283",
+      "image_key": "2024-02-05_DSCF1283",
+      "is_signature": false,
+      "peak_percentile": 0.999779,
+      "peak_perspective_display_name": "Compositional Cleanliness",
+      "peak_perspective_slug": "compositional-cleanliness",
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.999779,
+        "perspective_slug": "compositional-cleanliness",
+        "prompt_version": "compositional-cleanliness:8b6cd47d215e7ce3",
+        "rationale_preview": "Extremely clean and controlled composition. The frame is dominated by uniform negative space with minimal, regularly spaced elements along top and bottom edges only. The primary subject reads immediately as a flat, textured plane with edge\u2026",
+        "score": 9,
+        "scored_at": "2026-08-03T02:07:55+00:00"
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.038476,
+        "perspective_slug": "intensity-suggestion",
+        "prompt_version": "intensity-suggestion:ed5020dec935b28e",
+        "rationale_preview": "This image presents a flat, uniform surface\u2014likely a semiconductor die or circuit board\u2014with evenly spaced metallic pads along two edges. There is no human presence, gesture, trace, or intervention visible. The composition offers no ambigu\u2026",
+        "score": 2,
+        "scored_at": "2026-08-03T02:07:58+00:00"
+       }
+      ],
+      "perspectives_covered": 2,
+      "rating": 0,
+      "reason_codes": [
+       "high_score_unposted"
+      ],
+      "reasons": [
+       "Strong ranking percentile among scored, unposted catalog images (ranking_percentile=0.9998).",
+       "Peak lens is Compositional Cleanliness."
+      ]
+     }
+    ],
+    "empty_state": null,
+    "meta": {
+     "corroboration_rule": "If any lens scored 1, rank on second-highest percentile instead of peak.",
+     "coverage_rule": "eligible when perspectives_covered >= min_perspectives (default 1)",
+     "high_score_rule": "reason code high_score_unposted when ranking_percentile >= p90 of eligible unposted images' corroboration-vetoed ranking percentiles.",
+     "min_perspectives_used": 1,
+     "ranking_key": "ranking_percentile",
+     "weighting": "peak_within_perspective_percentile"
+    },
+    "total": 42730
+   },
+   "status": 200
+  },
+  "/api/identity/suggestions?limit=3&sort_by_date=oldest": {
+   "json": {
+    "candidates": [
+     {
+      "date_taken": "2019-11-01T17:59:32",
+      "filename": "_CC19629",
+      "image_key": "2019-11-01__CC19629",
+      "is_signature": true,
+      "peak_percentile": 0.999953,
+      "peak_perspective_display_name": "Interpretive & Human Charge",
+      "peak_perspective_slug": "intensity-suggestion",
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.873452,
+        "perspective_slug": "compositional-cleanliness",
+        "prompt_version": "compositional-cleanliness:8b6cd47d215e7ce3",
+        "rationale_preview": "The composition is reasonably controlled with the banner and four figures forming a clear horizontal band across the mid-ground. The negative space above and below is functional. However, several elements slightly dilute the primary subjec\u2026",
+        "score": 6,
+        "scored_at": "2026-08-17T03:04:51+00:00"
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.973544,
+        "perspective_slug": "environmental-context-legibility",
+        "prompt_version": "environmental-context-legibility:33d4d1ddd41a452c",
+        "rationale_preview": "Foreground shows the street surface with handwritten signs; middleground presents four demonstrators in distinct poses with theatrical blood and bandages, a bus shelter bench, and candles; background reveals graffitied architecture, additi\u2026",
+        "score": 8,
+        "scored_at": "2026-08-17T03:04:51+00:00"
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.999953,
+        "perspective_slug": "intensity-suggestion",
+        "prompt_version": "intensity-suggestion:ed5020dec935b28e",
+        "rationale_preview": "The image carries intense human charge through staged theatrical protest: four figures arranged as corpses or victims\u2014bound wrists, theatrical blood, collapsed poses\u2014under a banner reading 'Y EN NOSOTROS NUESTROS MUERTOS, PA' QUE NADIE QUE\u2026",
+        "score": 9,
+        "scored_at": "2026-08-17T03:04:57+00:00"
+       }
+      ],
+      "perspectives_covered": 3,
+      "rating": 0,
+      "reason_codes": [
+       "high_score_unposted"
+      ],
+      "reasons": [
+       "Strong ranking percentile among scored, unposted catalog images (ranking_percentile=1.0000).",
+       "Peak lens is Interpretive & Human Charge, one of your crowned signature techniques."
+      ]
+     },
+     {
+      "date_taken": "2019-11-01T17:59:38",
+      "filename": "_CC19631",
+      "image_key": "2019-11-01__CC19631",
+      "is_signature": true,
+      "peak_percentile": 0.999953,
+      "peak_perspective_display_name": "Interpretive & Human Charge",
+      "peak_perspective_slug": "intensity-suggestion",
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.873452,
+        "perspective_slug": "compositional-cleanliness",
+        "prompt_version": "compositional-cleanliness:8b6cd47d215e7ce3",
+        "rationale_preview": "The composition is reasonably controlled with the banner and four figures forming a clear horizontal band that reads as the primary subject. The bus stop structure creates natural framing, and the background building/trees provide context\u2026",
+        "score": 6,
+        "scored_at": "2026-08-17T03:04:45+00:00"
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.973544,
+        "perspective_slug": "environmental-context-legibility",
+        "prompt_version": "environmental-context-legibility:33d4d1ddd41a452c",
+        "rationale_preview": "Foreground, middleground, and background are all sharply legible and actively interact. The foreground shows protesters with fake wounds, candles, and handwritten signs on the curb. The middleground features the banner with bold text and t\u2026",
+        "score": 8,
+        "scored_at": "2026-08-17T03:04:46+00:00"
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.999953,
+        "perspective_slug": "intensity-suggestion",
+        "prompt_version": "intensity-suggestion:ed5020dec935b28e",
+        "rationale_preview": "The image carries intense interpretive and human charge through multiple layers of unresolved tension. Four figures occupy a bus stop in staged poses of injury and exhaustion\u2014bound wrists, simulated blood, a woman splayed as if fallen, oth\u2026",
+        "score": 9,
+        "scored_at": "2026-08-17T03:04:49+00:00"
+       }
+      ],
+      "perspectives_covered": 3,
+      "rating": 0,
+      "reason_codes": [
+       "high_score_unposted"
+      ],
+      "reasons": [
+       "Strong ranking percentile among scored, unposted catalog images (ranking_percentile=1.0000).",
+       "Peak lens is Interpretive & Human Charge, one of your crowned signature techniques."
+      ]
+     },
+     {
+      "date_taken": "2019-11-08T18:21:46",
+      "filename": "_CC10090",
+      "image_key": "2019-11-08__CC10090",
+      "is_signature": true,
+      "peak_percentile": 0.999953,
+      "peak_perspective_display_name": "Interpretive & Human Charge",
+      "peak_perspective_slug": "intensity-suggestion",
+      "per_perspective": [
+       {
+        "display_name": "Compositional Cleanliness",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.622066,
+        "perspective_slug": "compositional-cleanliness",
+        "prompt_version": "compositional-cleanliness:8b6cd47d215e7ce3",
+        "rationale_preview": "The primary subject (the elderly woman with the pot) reads reasonably clearly and is positioned with intentional action, but the frame suffers from notable distractions. The left edge has a partially visible figure that intrudes without pu\u2026",
+        "score": 5,
+        "scored_at": "2026-08-17T02:44:07+00:00"
+       },
+       {
+        "display_name": "Depth & Environmental Context",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.624201,
+        "perspective_slug": "environmental-context-legibility",
+        "prompt_version": "environmental-context-legibility:33d4d1ddd41a452c",
+        "rationale_preview": "The image presents three distinguishable planes: foreground (the elderly woman with pot and spoon, sharply in focus), middleground (uniformed officers in helmets, slightly soft but clearly identifiable as law enforcement), and background (\u2026",
+        "score": 6,
+        "scored_at": "2026-08-17T02:44:08+00:00"
+       },
+       {
+        "display_name": "Interpretive & Human Charge",
+        "model_used": "ollama:kimi-k2.6:cloud",
+        "percentile": 0.999953,
+        "perspective_slug": "intensity-suggestion",
+        "prompt_version": "intensity-suggestion:ed5020dec935b28e",
+        "rationale_preview": "The image generates powerful suggestion through a decisive, ironic gesture: an elderly woman with white hair holds up a cooking pot and spoon toward armed soldiers in helmets, transforming domestic objects into instruments of protest. The\u2026",
+        "score": 9,
+        "scored_at": "2026-08-17T02:44:12+00:00"
+       }
+      ],
+      "perspectives_covered": 3,
+      "rating": 0,
+      "reason_codes": [
+       "high_score_unposted"
+      ],
+      "reasons": [
+       "Strong ranking percentile among scored, unposted catalog images (ranking_percentile=1.0000).",
+       "Peak lens is Interpretive & Human Charge, one of your crowned signature techniques."
+      ]
+     }
+    ],
+    "empty_state": null,
+    "meta": {
+     "corroboration_rule": "If any lens scored 1, rank on second-highest percentile instead of peak.",
+     "coverage_rule": "eligible when perspectives_covered >= min_perspectives (default 1)",
+     "high_score_rule": "reason code high_score_unposted when ranking_percentile >= p90 of eligible unposted images' corroboration-vetoed ranking percentiles.",
+     "min_perspectives_used": 1,
+     "ranking_key": "ranking_percentile",
+     "weighting": "peak_within_perspective_percentile"
+    },
+    "total": 42730
+   },
+   "status": 200
+  },
   "/api/images/catalog-similarity-groups?limit=2": {
    "json": {
     "items": [

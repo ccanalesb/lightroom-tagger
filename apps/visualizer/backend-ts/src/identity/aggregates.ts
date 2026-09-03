@@ -4,6 +4,7 @@
  */
 import type { Db } from '../db/connection.js';
 import { flaggedExistsSql } from '../db/library/frame-substance-sql.js';
+import { EN_STOPWORDS } from '../constants/text.js';
 
 /**
  * Current catalog scores on active perspectives only.
@@ -14,7 +15,7 @@ import { flaggedExistsSql } from '../db/library/frame-substance-sql.js';
  * they cannot drag a mean down, and the frame-substance clause removes condemned
  * frames from identity entirely (#301).
  */
-const SCORES_BASE_SQL = `
+export const SCORES_BASE_SQL = `
     SELECT
         s.image_key,
         s.image_type,
@@ -34,7 +35,7 @@ const SCORES_BASE_SQL = `
         AND NOT ${flaggedExistsSql('s.image_key')}
 `;
 
-const RATIONALE_PREVIEW_MAX = 240;
+export const RATIONALE_PREVIEW_MAX = 240;
 
 export interface IdentityPerPerspective {
   perspective_slug: string;
@@ -54,7 +55,7 @@ export interface IdentityAggregate {
   per_perspective: IdentityPerPerspective[];
 }
 
-function activePerspectiveSlugs(db: Db): string[] {
+export function activePerspectiveSlugs(db: Db): string[] {
   const rows = db
     .prepare('SELECT slug FROM perspectives WHERE active = 1 ORDER BY slug ASC')
     .all() as { slug: string }[];
@@ -68,7 +69,7 @@ function activePerspectiveSlugs(db: Db): string[] {
  * function of the active count because that is the shape the Python signature has
  * and the threshold is the knob most likely to change.
  */
-function defaultMinPerspectives(_activeCount: number): number {
+export function defaultMinPerspectives(_activeCount: number): number {
   return 1;
 }
 
@@ -81,7 +82,7 @@ function defaultMinPerspectives(_activeCount: number): number {
  * decimal the result already has at most three places, while the repeating cases
  * never land exactly on a half at the fourth.
  */
-function round4(value: number): number {
+export function round4(value: number): number {
   return Math.round(value * 1e4) / 1e4;
 }
 
@@ -92,7 +93,10 @@ function round4(value: number): number {
  * containing an emoji cannot be cut through the middle of a surrogate pair and
  * produce a replacement character in the UI.
  */
-function truncateRationale(text: string | null | undefined, maxChars = RATIONALE_PREVIEW_MAX): string {
+export function truncateRationale(
+  text: string | null | undefined,
+  maxChars = RATIONALE_PREVIEW_MAX,
+): string {
   if (!text) return '';
   const t = text.trim();
   const chars = [...t];
@@ -100,7 +104,9 @@ function truncateRationale(text: string | null | undefined, maxChars = RATIONALE
   return `${chars.slice(0, maxChars - 1).join('').replace(/\s+$/u, '')}…`;
 }
 
-interface ScoreRow {
+/** One row of `SCORES_BASE_SQL`. */
+export interface ScoreRow {
+  image_key: string;
   perspective_slug: string;
   perspective_display_name: string | null;
   score: number;
@@ -108,6 +114,25 @@ interface ScoreRow {
   model_used: string | null;
   prompt_version: string | null;
   scored_at: string | null;
+}
+
+/**
+ * Lowercase word tokens of length >= 3, minimal English stopwords dropped (D-43).
+ *
+ * Python's `[\w']+` under `re.UNICODE` matches letters, digits, underscore and
+ * combining marks; JavaScript's `\w` is ASCII-only, so the class is spelled out
+ * with Unicode property escapes instead. Leading and trailing apostrophes are
+ * stripped, so `'the'` and `the` collapse to the same token.
+ */
+export function tokenizeRationale(text: string | null | undefined): string[] {
+  if (!text) return [];
+  const out: string[] = [];
+  for (const match of text.toLowerCase().matchAll(/[\p{L}\p{N}\p{M}_']+/gu)) {
+    const w = match[0].replace(/^'+|'+$/gu, '');
+    if (w.length < 3 || EN_STOPWORDS.has(w)) continue;
+    out.push(w);
+  }
+  return out;
 }
 
 /**

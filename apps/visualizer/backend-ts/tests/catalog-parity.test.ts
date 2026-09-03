@@ -47,7 +47,9 @@ describe.skipIf(!enabled)('catalog parity with the Flask backend', () => {
     expect(paths.length).toBeGreaterThan(0);
   });
 
-  it.each(paths)('%s', async (path) => {
+  // The Mirror scans every score in the catalog and tokenizes 147,000 rationales;
+  // a few seconds is expected here, and the default 5s timeout is not enough.
+  it.each(paths)('%s', { timeout: 60_000 }, async (path) => {
     const expected = baseline.responses[path]!;
     const res = await app.request(path);
     expect(res.status, `${path}: status`).toBe(expected.status);

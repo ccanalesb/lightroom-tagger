@@ -11,6 +11,7 @@ import { config } from './config.js';
 import { HttpError } from './utils/responses.js';
 import { createOpenApiApp, openApiDoc } from './api/openapi.js';
 import { descriptionsRoutes } from './api/descriptions.js';
+import { identityRoutes } from './api/identity.js';
 import { catalogRoutes } from './api/images/catalog.js';
 import { stacksRoutes } from './api/images/stacks.js';
 import { ltConfigRoutes } from './api/lt-config.js';
@@ -42,6 +43,7 @@ export function createApp() {
   app.route('/api', descriptionsRoutes);
   app.route('/api', ltConfigRoutes);
   app.route('/api', perspectivesRoutes);
+  app.route('/api', identityRoutes);
   app.route('/api/scores', scoresRoutes);
 
   /**

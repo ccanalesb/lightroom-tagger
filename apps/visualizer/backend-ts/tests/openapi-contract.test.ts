@@ -30,9 +30,65 @@ import {
   requestBodyShape,
   responseShapes,
   type OpenApiDoc,
+  type Shape,
 } from './helpers/openapi-shape.js';
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
+
+/**
+ * Response fields the TypeScript backend adds on purpose, with the reason.
+ *
+ * The bar for an entry here is high: the Flask contract is the invariant, and the
+ * only justification so far is a contract that cannot be served at all. Each entry
+ * is *asserted* to be present, so if Flask is ever fixed to match, the stale entry
+ * fails rather than silently hiding a new difference — and every other field of the
+ * same response is still compared exactly.
+ */
+const INTENTIONAL_ADDED_FIELDS: Record<
+  string,
+  { paths: string[]; reason: string }
+> = {
+  'get /api/identity/best-photos 200': {
+    paths: [
+      'items[].ranking_percentile',
+      'items[].corroboration_revoked',
+      'items[].corroboration_revoked_by',
+    ],
+    reason:
+      'The corroboration veto (#292, f8b6662) started returning these three fields ' +
+      "from rank_best_photos, but IdentityBestPhotoItem sets extra='forbid' and was " +
+      'never updated — so spectree rejects the payload and the Flask endpoint answers ' +
+      '500 on the real catalog. Declaring them is the only way to serve the page.',
+  },
+};
+
+/** Remove a `parent[].child` path from a normalized shape, in place. */
+function stripPath(shape: Shape | undefined, path: string): boolean {
+  const [head, ...rest] = path.split('.');
+  if (head === undefined) return false;
+  const isArray = head.endsWith('[]');
+  const name = isArray ? head.slice(0, -2) : head;
+
+  if (shape?.t !== 'object') return false;
+  let child = shape.props[name];
+  if (child === undefined) return false;
+  if (isArray) {
+    if (child.t !== 'array') return false;
+    child = child.items;
+  }
+  if (rest.length === 0) {
+    // Leaf: the parent holds it directly.
+    return false;
+  }
+  if (rest.length === 1 && child.t === 'object') {
+    const leaf = rest[0]!;
+    if (!(leaf in child.props)) return false;
+    delete child.props[leaf];
+    child.required = child.required.filter((r) => r !== leaf);
+    return true;
+  }
+  return stripPath(child, rest.join('.'));
+}
 
 const flask = JSON.parse(
   readFileSync(join(import.meta.dirname, 'fixtures', 'flask-openapi.json'), 'utf8'),
@@ -86,8 +142,21 @@ describe('OpenAPI contract vs the Flask backend', () => {
 
       for (const status of Object.keys(flaskResponses)) {
         if (!(status in tsResponses)) continue; // reported above
+        const tsShape = tsResponses[status]!;
+
+        const intentional = INTENTIONAL_ADDED_FIELDS[`${method} ${path} ${status}`];
+        if (intentional) {
+          for (const fieldPath of intentional.paths) {
+            expect(
+              stripPath(tsShape, fieldPath),
+              `${path} ${method} → ${status}: expected to add ${fieldPath} ` +
+                `(${intentional.reason}) but it is not there — is the entry stale?`,
+            ).toBe(true);
+          }
+        }
+
         expect(
-          canonical(tsResponses[status]!),
+          canonical(tsShape),
           `${path} ${method} → ${status}: response body shape`,
         ).toBe(canonical(flaskResponses[status]!));
       }
@@ -111,6 +180,6 @@ describe('OpenAPI contract vs the Flask backend', () => {
           .join(', ')}`,
     );
     // Ratchet: once a group is migrated it must stay migrated.
-    expect(sharedPaths.length).toBeGreaterThanOrEqual(32);
+    expect(sharedPaths.length).toBeGreaterThanOrEqual(36);
   });
 });
