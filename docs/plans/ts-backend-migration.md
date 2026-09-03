@@ -276,18 +276,51 @@ repo's slicing convention), not build-then-wire.
    | identity | done |
    | providers | done |
    | frame substance | done, including the `.lrcat` keyword writer |
-   | jobs | routes, runner and processor done; **handlers are not wired** (step 4) |
+   | jobs | routes, runner and processor done; handlers landing one family at a time (step 4) |
 
-   The route surface being complete does not mean the backend is: `JOB_TYPES`
-   declares all 11 types with `handler: null`, so any job that is enqueued fails.
+   The route surface being complete does not mean the backend is: nine of the
+   eleven `JOB_TYPES` still carry `handler: null`, so those jobs fail on enqueue.
    That is step 4.
 3. **Job engine — done.** worker_threads runner, `JOB_TYPES` registry, transitions
    state machine, checkpoints, socket.io progress, with the ADR-0010 guardrails
    preserved.
 4. **Job handlers**, one family per slice — catalog sync, embed, analyze/score,
    describe, stacks, frame substance, path diagnostics. ~3,394 lines of Python.
-   The describe family is the least work: `vision/description-service.ts` and the
-   whole provider stack under it already landed with the descriptions group.
+
+   **Describe is done** (`single_describe`, `batch_describe`), and it carried the
+   three shared pieces every later family needs: `jobs/checkpoint.ts`,
+   `jobs/handlers/path-diagnostics.ts` and `jobs/handlers/common.ts` (catalog
+   selection, date windows, failure severity, the library-DB lifecycle).
+
+   | Family | Types | Status |
+   |---|---|---|
+   | describe | `single_describe`, `batch_describe` | done |
+   | score | `single_score`, `batch_score` | not started — needs `scoring_service` (step 5) |
+   | analyze | `batch_analyze` | not started — composes the describe and score passes |
+   | stacks | `batch_stack_detect`, `batch_catalog_similarity`, `catalog_cache_build` | not started |
+   | embed | `batch_embed_image` | not started; the CLIP service is already ported |
+   | frame substance | `batch_frame_substance` | not started — needs the detector (step 5) |
+   | catalog | `catalog_sync` | not started — needs `catalog_sync` (step 5) |
+
+   Two structural departures from the Python, both worth repeating in the
+   remaining families. Concurrency is a bounded **async pool over one
+   connection**, not a `ThreadPoolExecutor` with a connection per worker: the time
+   is spent waiting on the provider's HTTP response, so threads bought nothing,
+   and the pool deletes Python's duplicated `max_workers == 1` branch — which had
+   already drifted to different log messages than its parallel twin. And
+   cancellation is an explicit `cancelCheck` passed down rather than the
+   thread-local `cancel_scope`, which the retry backoff already honours.
+
+   `batch_analyze` will need `runDescribePass` generalized with the
+   `progress_range` / `log_prefix` / nested-checkpoint options Python carries;
+   they were left out rather than built for a caller that does not exist yet.
+
+   The checkpoint fingerprints hash **bytes identical to
+   `json.dumps(sort_keys=True)`**, pinned by golden digests generated from the
+   Python function. That is load-bearing for cutover: a `batch_describe`
+   checkpointed by Flask has to resume under the TS backend rather than
+   re-describing 40,000 images, and `JSON.stringify` differs from Python on both
+   key order and non-ASCII escaping.
 5. **Library core — partly done.** The `library.db` read/write seam, providers,
    vision op, identity, imaging and the Lightroom writer are ported. Still Python
    only: `scoring_service` / `score_perspective` / `structured_output`,
