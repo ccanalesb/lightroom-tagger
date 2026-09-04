@@ -1,7 +1,7 @@
 ---
 description: Check if the backend is running before and after backend changes; restart it if it was live
 globs:
-  - "apps/visualizer/backend-ts/**"
+  - "apps/visualizer/backend/**"
 alwaysApply: false
 ---
 
@@ -42,4 +42,4 @@ sleep 3 && curl -fsS http://localhost:5001/api/jobs/ >/dev/null && echo "Backend
 - **Never leave the backend dead** after a change session. If it was up when you started, it must be up when you finish.
 - **Never kill the backend** without immediately restarting it (unless the user explicitly asks to stop it).
 - **If the backend was not running** before your changes, leave it stopped — don't start it uninvited.
-- This applies to changes anywhere in `apps/visualizer/backend-ts/src/`.
+- This applies to changes anywhere in `apps/visualizer/backend/src/`.

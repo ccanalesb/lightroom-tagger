@@ -13,12 +13,12 @@ Index a Lightroom catalog into a local SQLite database, generate AI descriptions
 Node 24 or newer. There is no Python step; the backend and CLI are TypeScript.
 
 ```bash
-cd apps/visualizer/backend-ts && npm install && npm link && cd ../../..
+cd apps/visualizer/backend && npm install && npm link && cd ../../..
 cd apps/visualizer/frontend && npm install --legacy-peer-deps && cd ../../..
 ```
 
 `npm link` puts `lightroom-tagger` on your PATH. Without it, run any of the
-commands below as `npm run cli -- <command>` from `apps/visualizer/backend-ts`.
+commands below as `npm run cli -- <command>` from `apps/visualizer/backend`.
 
 ## Quick Start (CLI)
 
@@ -46,7 +46,7 @@ lightroom-tagger sync --catalog "/path/to/Catalog.lrcat" --db library.db
 ## Visualizer (Web UI)
 
 ```bash
-cp apps/visualizer/backend-ts/.env.example apps/visualizer/backend-ts/.env
+cp apps/visualizer/backend/.env.example apps/visualizer/backend/.env
 # Edit .env: set LIBRARY_DB to the absolute path of library.db
 
 make dev
@@ -91,7 +91,7 @@ stack_burst_delta_ms: 2000
 vision_cache_enabled: true
 ```
 
-All keys above are fields on `LibraryConfig` in `apps/visualizer/backend-ts/src/config.ts`. Unknown keys in an existing `config.yaml` are ignored with a warning.
+All keys above are fields on `LibraryConfig` in `apps/visualizer/backend/src/config.ts`. Unknown keys in an existing `config.yaml` are ignored with a warning.
 
 Environment overrides (common): `VISION_MODEL`, `LIGHTRoom_CATALOG`, `LIGHTRoom_DB`, `OLLAMA_HOST`.
 
@@ -111,7 +111,7 @@ Environment overrides (common): `VISION_MODEL`, `LIGHTRoom_CATALOG`, `LIGHTRoom_
 
 ```bash
 # Backend tests
-cd apps/visualizer/backend-ts && npm test
+cd apps/visualizer/backend && npm test
 
 # Frontend tests
 cd apps/visualizer/frontend && npm test -- --run

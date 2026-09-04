@@ -48,9 +48,9 @@ response validation.
 
 | Piece | Was | Now |
 |---|---|---|
-| Schema registry | `backend/api/openapi.py` | `backend-ts/src/api/openapi.ts` |
-| Schemas | `backend/api/schemas/` (pydantic) | `backend-ts/src/api/schemas/` (zod) |
-| OpenAPI export | `backend/scripts/export_openapi.py` | `backend-ts/scripts/export-openapi.ts` |
+| Schema registry | `backend/api/openapi.py` | `backend/src/api/openapi.ts` |
+| Schemas | `backend/api/schemas/` (pydantic) | `backend/src/api/schemas/` (zod) |
+| OpenAPI export | `backend/scripts/export_openapi.py` | `backend/scripts/export-openapi.ts` |
 
 Two things about the emitted document changed with the toolchain, and both reached
 the committed `api.gen.ts`. spectree namespaced every component per blueprint

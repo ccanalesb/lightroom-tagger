@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-/** Monorepo root — `apps/visualizer/backend-ts/src` → four levels up. */
+/** Monorepo root — `apps/visualizer/backend/src` → four levels up. */
 export const REPO_ROOT = resolve(HERE, '..', '..', '..', '..');
 
 function expandUser(p: string): string {
@@ -85,7 +85,7 @@ export const config = {
    */
   get LT_PROVIDERS_JSON(): string {
     return resolvePath(
-      process.env.LT_PROVIDERS_JSON ?? 'apps/visualizer/backend-ts/providers.json',
+      process.env.LT_PROVIDERS_JSON ?? 'apps/visualizer/backend/providers.json',
     );
   },
 } as const;

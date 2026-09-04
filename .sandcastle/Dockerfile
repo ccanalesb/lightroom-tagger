@@ -30,7 +30,7 @@ ENV PATH="/home/agent/.local/bin:$PATH"
 # here, so this layer caches across code changes. A runtime hook symlinks
 # node_modules into the bind-mounted worktree.
 WORKDIR /home/agent/.be-deps
-COPY apps/visualizer/backend-ts/package.json apps/visualizer/backend-ts/package-lock.json ./
+COPY apps/visualizer/backend/package.json apps/visualizer/backend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 # Pre-bake the frontend deps too (same rationale). Skip Playwright's browser

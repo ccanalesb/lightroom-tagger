@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BACKEND_DIR="$ROOT_DIR/apps/visualizer/backend-ts"
+BACKEND_DIR="$ROOT_DIR/apps/visualizer/backend"
 FRONTEND_DIR="$ROOT_DIR/apps/visualizer/frontend"
 RUN_DIR="$ROOT_DIR/.run"
 BACKEND_PID_FILE="$RUN_DIR/backend.pid"
@@ -15,7 +15,7 @@ if [[ -f "$BACKEND_DIR/.env" ]]; then
 fi
 
 if [[ ! -d "$BACKEND_DIR" || ! -d "$FRONTEND_DIR" ]]; then
-  echo "Expected apps/visualizer/backend-ts/ and apps/visualizer/frontend/ under: $ROOT_DIR"
+  echo "Expected apps/visualizer/backend/ and apps/visualizer/frontend/ under: $ROOT_DIR"
   exit 1
 fi
 

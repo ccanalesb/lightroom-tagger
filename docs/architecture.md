@@ -1,6 +1,6 @@
 # Module boundaries and layering
 
-This document is the authoritative boundary policy for `apps/visualizer/backend-ts/src/`.
+This document is the authoritative boundary policy for `apps/visualizer/backend/src/`.
 
 ## Layers
 
@@ -30,10 +30,12 @@ about `Context`, request parsing or response shaping.
 ## History
 
 Until the TypeScript cutover this policy governed a Python package at
-`lightroom_tagger/` and a Flask backend at `apps/visualizer/backend/`, with the
-layer split enforced by `test_architecture.py` and a 400-line cap on
-`lightroom_tagger/core/` (`make check-core-sizes`). Both trees are gone and the
-rules above are the same boundaries restated for the tree that replaced them.
+`lightroom_tagger/` and a Flask backend at this same `apps/visualizer/backend/`
+path, with the layer split enforced by `test_architecture.py` and a 400-line cap
+on `lightroom_tagger/core/` (`make check-core-sizes`). Both trees are gone; the
+replacement was built alongside them as `backend-ts/` and took over the name once
+the Flask tree was deleted. The rules above are the same boundaries restated for
+it.
 
 Neither enforcement mechanism survived the port. The import rules above are a
 convention today; ten files under `src/` are already over the old 400-line cap,

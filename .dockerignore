@@ -9,10 +9,10 @@
 apps/*
 !apps/visualizer
 apps/visualizer/*
-!apps/visualizer/backend-ts
-apps/visualizer/backend-ts/*
-!apps/visualizer/backend-ts/package.json
-!apps/visualizer/backend-ts/package-lock.json
+!apps/visualizer/backend
+apps/visualizer/backend/*
+!apps/visualizer/backend/package.json
+!apps/visualizer/backend/package-lock.json
 !apps/visualizer/frontend
 apps/visualizer/frontend/*
 !apps/visualizer/frontend/package.json

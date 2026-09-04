@@ -16,7 +16,7 @@ echo "==> 3/5 Frontend tests"
 npx vitest run
 
 echo "==> 4/5 Typecheck backend"
-cd "$ROOT/backend-ts"
+cd "$ROOT/backend"
 npm run typecheck
 
 echo "==> 5/5 Backend tests"

@@ -704,7 +704,7 @@ repo's slicing convention), not build-then-wire.
    Flask tree: `make dev` and `restart-backend.sh` (now `node
    --env-file-if-exists=.env --import tsx src/server.ts`, with Node port probes
    instead of Python ones, so the dev loop needs no virtualenv),
-   `generate-api-types.mjs` (now `backend-ts/scripts/export-openapi.ts`), and CI.
+   `generate-api-types.mjs` (now `backend/scripts/export-openapi.ts`), and CI.
 
    **Switching the OpenAPI source found two contract differences that had been
    hiding behind spectree.** Neither is a wire change; both reached the
@@ -760,14 +760,14 @@ repo's slicing convention), not build-then-wire.
 
    What was actually load-bearing was `core/providers.json` and
    `core/providers.example.json`, read at runtime by `config.ts` and
-   `providers/registry.ts`. Both moved to `apps/visualizer/backend-ts/`.
+   `providers/registry.ts`. Both moved to `apps/visualizer/backend/`.
 
    Deleted rather than fixed: `scripts/verify_readme.py`, whose CLI oracle is the
    Python command registry and whose clean-clone smoke boots `backend/app.py`; the
    three perspective scripts (`sync_perspectives.py`, `seed_yt_perspectives.py`,
    `merge_perspectives_6_to_4.py`), covered by `seedPerspectivesFromPromptsDir`
    and the per-slug reset route; `check_core_file_sizes.sh`, which capped a tree
-   that no longer exists and cannot be repointed at `backend-ts/src/` without
+   that no longer exists and cannot be repointed at `backend/src/` without
    refactoring the ten files already over 400 lines (folded into
    [#306](https://github.com/ccanalesb/lightroom-tagger/issues/306)); and
    `tests/fixtures/frame-substance/regenerate-fixtures.py`, which imported the
@@ -780,6 +780,12 @@ repo's slicing convention), not build-then-wire.
    pre-baked, `npm test` in place of pytest, and contract guidance in terms of Zod
    schemas and `createRoute`. `.dockerignore` still whitelisted `pyproject.toml`
    and `uv.lock`, which would have broken the image build.
+
+   **`backend-ts/` is now `backend/`.** The suffix only ever existed so the port
+   could be built beside the Flask tree; with that tree gone it named the only
+   backend there is. The old path still held 54 orphaned `.pyc` files, which went
+   with it. Anything in this plan written before this point says `backend-ts/`
+   where the tree is now `backend/`.
 
 ## Risks
 

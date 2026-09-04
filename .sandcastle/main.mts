@@ -17,7 +17,7 @@ const task = process.env.SANDCASTLE_TASK?.trim();
 const commitNote =
   "When done and tests pass, stage and commit ALL changes " +
   '(`git add -A && git commit -m "..."`), then output <promise>COMPLETE</promise>. ' +
-  "IMPORTANT: if you changed any backend Zod schema (`apps/visualizer/backend-ts/src/api/schemas/**`) " +
+  "IMPORTANT: if you changed any backend Zod schema (`apps/visualizer/backend/src/api/schemas/**`) " +
   "or a route's `createRoute` definition, first run " +
   "`cd apps/visualizer/frontend && npm run generate:api` and commit the regenerated " +
   "`src/types/api.gen.ts` (a committed CI gate fails on drift). Binary routes stay off " +
@@ -40,7 +40,7 @@ Compare the diff against the task text. Quote the relevant task line for each fi
 (c) requirements that look implemented but are implemented wrong.
 
 ## Axis 2 — Standards (does it follow this repo's conventions?)
-Check the diff against the documented conventions in \`docs/architecture.md\` and \`CONTEXT-MAP.md\` (the layer split under \`apps/visualizer/backend-ts/src/\`, the import rules, existing patterns). Cite the doc + rule for each violation.
+Check the diff against the documented conventions in \`docs/architecture.md\` and \`CONTEXT-MAP.md\` (the layer split under \`apps/visualizer/backend/src/\`, the import rules, existing patterns). Cite the doc + rule for each violation.
 Then scan for these code smells — judgement calls, not hard rules; a documented repo convention overrides them, and skip anything tooling already enforces:
 - Mysterious Name — name doesn't reveal intent.
 - Duplicated Code — same shape in >1 place → extract.
@@ -56,14 +56,14 @@ Then scan for these code smells — judgement calls, not hard rules; a documente
 - Refused Bequest — subclass ignores most of what it inherits.
 
 ## Tests
-Ensure coverage is adequate and the suite passes: \`cd apps/visualizer/backend-ts && npm test\`.
+Ensure coverage is adequate and the suite passes: \`cd apps/visualizer/backend && npm test\`.
 
 ## Contract (backend-authoritative OpenAPI → generated TS)
-This repo generates the frontend's types from the backend OpenAPI spec (ADR-0013); the generated file \`apps/visualizer/frontend/src/types/api.gen.ts\` is committed and a CI gate fails on drift. If the diff touches ANY Zod schema (\`apps/visualizer/backend-ts/src/api/schemas/**\`) or a route's \`createRoute\` definition, the committed types may be stale. Verify and FIX before finishing:
+This repo generates the frontend's types from the backend OpenAPI spec (ADR-0013); the generated file \`apps/visualizer/frontend/src/types/api.gen.ts\` is committed and a CI gate fails on drift. If the diff touches ANY Zod schema (\`apps/visualizer/backend/src/api/schemas/**\`) or a route's \`createRoute\` definition, the committed types may be stale. Verify and FIX before finishing:
 
 - \`cd apps/visualizer/frontend && npm run generate:api\` — regenerate the committed types.
 - \`git diff --exit-code src/types/api.gen.ts\` must be clean afterwards. If it is not, the regen changed the file → **commit the regenerated \`api.gen.ts\`** (this is the #1 cause of gate failures — do not skip it).
-- \`npx tsc --noEmit\` must pass, in the frontend and in \`apps/visualizer/backend-ts\`.
+- \`npx tsc --noEmit\` must pass, in the frontend and in \`apps/visualizer/backend\`.
 
 Also: binary and streaming routes (thumbnails, file downloads) are registered as plain Hono handlers, never through \`createRoute\`/\`.openapi()\`. They do not belong in the JSON contract.
 
@@ -85,7 +85,7 @@ await using sandbox = await createSandbox({
       onSandboxReady: [
         { command: "git config user.email agent@sandcastle.local" },
         { command: "git config user.name 'Sandcastle Agent'" },
-        { command: "ln -sfn /home/agent/.be-deps/node_modules apps/visualizer/backend-ts/node_modules" },
+        { command: "ln -sfn /home/agent/.be-deps/node_modules apps/visualizer/backend/node_modules" },
         { command: "ln -sfn /home/agent/.fe-deps/node_modules apps/visualizer/frontend/node_modules" },
       ],
     },

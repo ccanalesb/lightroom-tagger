@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_DIR="$ROOT_DIR/.run"
 BACKEND_PID_FILE="$RUN_DIR/backend.pid"
 FRONTEND_PID_FILE="$RUN_DIR/frontend.pid"
-BACKEND_DIR="$ROOT_DIR/apps/visualizer/backend-ts"
+BACKEND_DIR="$ROOT_DIR/apps/visualizer/backend"
 
 BACKEND_PORT=5001
 if [[ -f "$BACKEND_DIR/.env" ]]; then

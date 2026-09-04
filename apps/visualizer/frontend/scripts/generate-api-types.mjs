@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const frontendRoot = join(__dirname, '..');
-const backendRoot = join(frontendRoot, '..', 'backend-ts');
+const backendRoot = join(frontendRoot, '..', 'backend');
 const outFile = join(frontendRoot, 'src', 'types', 'api.gen.ts');
 const specFile = join(frontendRoot, '.openapi', 'openapi.json');
 

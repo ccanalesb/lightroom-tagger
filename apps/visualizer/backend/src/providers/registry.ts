@@ -25,7 +25,7 @@ const EXAMPLE_PATH = join(
   REPO_ROOT,
   'apps',
   'visualizer',
-  'backend-ts',
+  'backend',
   'providers.example.json',
 );
 

@@ -16,7 +16,7 @@ The library database stores file paths as Lightroom recorded them—often UNC-st
 //tnas/ccanales/Photos/2024/IMG_1234.jpg
 ```
 
-At runtime, `resolveCatalogPath()` in `apps/visualizer/backend-ts/src/utils/path-resolve.ts` maps UNC paths to a **local mount point** on the backend host:
+At runtime, `resolveCatalogPath()` in `apps/visualizer/backend/src/utils/path-resolve.ts` maps UNC paths to a **local mount point** on the backend host:
 
 | Platform | Typical mount |
 |----------|----------------|
@@ -91,7 +91,7 @@ If the mount is missing, mount the share before retrying jobs. On Linux this is 
 Pick a UNC path from your library (Processing → Catalog cache shows cache location; or query `images.filepath` in `library.db`):
 
 ```bash
-cd apps/visualizer/backend-ts && npx tsx -e "
+cd apps/visualizer/backend && npx tsx -e "
 import { resolveCatalogPath } from './src/utils/path-resolve.ts';
 const p = '//tnas/ccanales/Photos/example.jpg';  // replace with a real path
 console.log('resolved:', JSON.stringify(resolveCatalogPath(p)));

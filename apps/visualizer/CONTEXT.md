@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The visualizer is the web product that surfaces library data to the user. It consists of a Hono backend (`apps/visualizer/backend-ts/`) and a React SPA (`apps/visualizer/frontend/`). They are developed and deployed together — backend and frontend share the same domain model and API contracts. The backend also carries the library itself (catalog reader, vision pipeline, CLIP, scoring) and the `lightroom-tagger` CLI; there is no separate library package.
+The visualizer is the web product that surfaces library data to the user. It consists of a Hono backend (`apps/visualizer/backend/`) and a React SPA (`apps/visualizer/frontend/`). They are developed and deployed together — backend and frontend share the same domain model and API contracts. The backend also carries the library itself (catalog reader, vision pipeline, CLIP, scoring) and the `lightroom-tagger` CLI; there is no separate library package.
 
 ## Domain language
 
@@ -19,7 +19,7 @@ The visualizer is the web product that surfaces library data to the user. It con
 | **visualizer DB** | `visualizer.db` — SQLite database holding jobs, logs, and visualizer-specific state. Separate from `library.db`. |
 | **library DB** | `library.db` — the shared library database (images, scores, descriptions), read and written through `db/library/`. Legacy Instagram-matching data lives in `instagram-matching-export.json` beside the DB ([#228](https://github.com/ccanalesb/lightroom-tagger/issues/228)). |
 | **library-DB lifecycle seam** | Job handlers open `library.db` via `withLibraryDb` in `jobs/handlers/common.ts`; never hand-roll `initLibraryDb(...)` + manual `close()` in handler bodies. See ADR-0011. |
-| **route group** | An `OpenAPIHono` router under `apps/visualizer/backend-ts/src/api/`, mounted in `app.ts`. One per domain area (jobs, images, descriptions, providers, scores, identity, system). Successor to the Flask blueprint, and the mount prefixes are unchanged. |
+| **route group** | An `OpenAPIHono` router under `apps/visualizer/backend/src/api/`, mounted in `app.ts`. One per domain area (jobs, images, descriptions, providers, scores, identity, system). Successor to the Flask blueprint, and the mount prefixes are unchanged. |
 | **response helpers** | `utils/responses.ts` — `errorNotFound`, `errorBadRequest`, `successPaginated`, etc. Always use these for consistent JSON shapes. |
 | **WebSocket / SocketIO** | Real-time job progress pushed from backend to frontend via socket.io + socket.io-client. |
 | **perspective** | Named scoring lens shown in the UI (matches the library concept). |
@@ -36,7 +36,7 @@ The Images page is catalog-only in the UI ([#225](https://github.com/ccanalesb/l
 
 | File | Role |
 |---|---|
-Paths are relative to `apps/visualizer/backend-ts/src/`.
+Paths are relative to `apps/visualizer/backend/src/`.
 
 | File | Role |
 |---|---|

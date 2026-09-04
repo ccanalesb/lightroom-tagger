@@ -19,6 +19,6 @@ else
 fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT_DIR/apps/visualizer/backend-ts"
+cd "$ROOT_DIR/apps/visualizer/backend"
 
 exec node --env-file-if-exists=.env --import tsx src/server.ts
