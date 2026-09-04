@@ -5,7 +5,11 @@ NOT part of the runtime. The backend is pure TypeScript; this script exists only
 the golden files can be reproduced and audited, and it is the one place Pillow is
 still allowed to appear. Run it by hand after a deliberate Pillow upgrade:
 
-    ../../../../../.venv/bin/python regenerate-fixtures.py
+    python3 -m venv /tmp/imaging-fixtures
+    /tmp/imaging-fixtures/bin/pip install numpy scipy pillow
+    /tmp/imaging-fixtures/bin/python regenerate-fixtures.py
+
+The repo no longer ships a Python environment, so a throwaway venv it is.
 
 Images are synthetic and deterministic — gradients, high-frequency checkerboards and
 pseudo-random noise from a fixed seed — chosen to exercise the filter edges. Nothing
