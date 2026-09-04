@@ -278,8 +278,8 @@ repo's slicing convention), not build-then-wire.
    | frame substance | done, including the `.lrcat` keyword writer |
    | jobs | routes, runner and processor done; handlers landing one family at a time (step 4) |
 
-   The route surface being complete does not mean the backend is: two of the
-   eleven `JOB_TYPES` still carry `handler: null`, so those jobs fail on enqueue.
+   The route surface being complete does not mean the backend is: one of the
+   eleven `JOB_TYPES` still carries `handler: null`, so that job fails on enqueue.
    That is step 4.
 3. **Job engine — done.** worker_threads runner, `JOB_TYPES` registry, transitions
    state machine, checkpoints, socket.io progress, with the ADR-0010 guardrails
@@ -305,7 +305,7 @@ repo's slicing convention), not build-then-wire.
    | score | `single_score`, `batch_score` | done, with the scoring library core underneath them |
    | analyze | `batch_analyze` | done, all three stages |
    | frame substance | `batch_frame_substance` | done, with the detector and batch driver underneath it |
-   | catalog | `catalog_sync` | not started — needs `catalog_sync` (step 5) |
+   | catalog | `catalog_sync` | done, with the Lightroom reader and the sync driver underneath it |
 
    Two structural departures from the Python, both worth repeating in the
    remaining families. Concurrency is a bounded **async pool over one
@@ -417,11 +417,19 @@ repo's slicing convention), not build-then-wire.
    `selectDescribeCandidates`, parameterized on the force flag they read from
    different metadata keys.
 
+   `catalog_sync` is the last handler before the composite, and the smallest:
+   the job owns two refusals — no catalog configured, and the configured one is
+   not there — and hands everything else to the driver. Its `chain_mode` branch
+   is deliberately absent for the same reason the `_catalog_cache_chain` flag is
+   (below), which leaves `catalog_cache_build` as the only `handler: null` left.
+   One departure: Python installs a `cancel_scope` that nothing on this path
+   consults, so cancelling a 43,000-image sync did nothing until it finished.
+   Here the fetch loop checks between images and writes what it already has.
+
    Neither `batch_embed_image` nor the two stacks handlers have a
-   `_catalog_cache_chain` branch: only `catalog_cache_build` sets that flag, and
-   it cannot run until `catalog_sync` is ported, so the suppression of logging
-   and checkpointing that flag selects lands with the composite that needs it
-   rather than being guessed at three times. Note that most of what
+   `_catalog_cache_chain` branch: only `catalog_cache_build` sets that flag, so
+   the suppression of logging and checkpointing that flag selects lands with the
+   composite that needs it rather than being guessed at three times. Note that most of what
    `_CatalogCacheStageRunner` does — mapping a stage's 5–100% into a quarter of
    the bar, capturing `complete_job`, swallowing checkpoints — is a wrapper
    around the runner and needs nothing from the handlers; only the log
@@ -470,9 +478,40 @@ repo's slicing convention), not build-then-wire.
    verdicts anyway, because a detector that suddenly condemns a tenth of the
    catalog is something the user has to see.
 
-   Still Python only: `catalog_sync`, `lightroom/reader` + `enricher` + `schema`,
-   and the small shared utilities (`managed_connections`, `path_utils`,
-   `cancel_scope`, `text_constants`).
+   **`catalog_sync` and the Lightroom reader are done.** The sync itself is one
+   set difference and barely 100 lines: reading full metadata for 43,000 images
+   takes minutes, reading their ids takes one query, so the expensive join runs
+   only for ids `library.db` has never seen. Nothing is ever deleted — an image
+   missing from the catalog is counted as `stale` and left alone, because every
+   score and description hangs off its key.
+
+   The reader gets its own connection function, `connectCatalogReadOnly`, rather
+   than reusing `writer.connectCatalog`: browsing and syncing must not be able to
+   mutate a file Lightroom owns. `readonly: true` is what Python's
+   `file:…?mode=ro` URI asks for, `timeout: 30_000` is its 30-second busy wait,
+   and the `LIGHTROOM_CATALOG_LOCKING_MODE` escape hatch (with its NORMAL
+   fallback) survives because it is the documented way into a catalog on SMB/NAS
+   that otherwise will not open at all. Its legacy `LIGHTRoom_*` spelling survives
+   with it, even though the config loader dropped that whole family in step 0 —
+   the difference is that these two are somebody's only way in.
+
+   Two things about writing catalog rows are worth knowing. `?? default` is wrong
+   throughout the reader and `|| default` is right, because Python coalesces on
+   *falsiness*: a zero focal length reads as `''`, a `pick` of `-1` reads as
+   `true`, and GPS at exactly zero reads as no coordinate. And every JavaScript
+   number binds as SQLite REAL, so `images.id` — a TEXT column — received
+   `'100.0'` where Python's int bind gives `'100'`. That one is load-bearing
+   rather than cosmetic: the sync diffs on that column and parses it back as an
+   integer, so `'100.0'` reads as no id and every sync re-fetches the entire
+   catalog, forever. A BigInt is the only way to ask better-sqlite3 for
+   `sqlite3_bind_int64`. The *other* numeric columns are deliberately left as
+   doubles, because Lightroom types `isoSpeedRating`, `focalLength` and
+   `aperture` as REAL and the 43,794 rows already stored read `'800.0'` and
+   `'50.0'` — which is exactly what a double bind produces.
+
+   Still Python only: `enricher` + `schema` (both CLI-only), and the small shared
+   utilities (`managed_connections`, `path_utils`, `cancel_scope`,
+   `text_constants`).
 6. **CLI** — replaces the `lightroom-tagger` console script. Not started.
 7. **Cutover** — back up `library.db`, point the Vite proxy at the TS backend, and
    delete the Flask tree. No CLIP reindex: embeddings are already drop-in compatible.
@@ -525,6 +564,21 @@ repo's slicing convention), not build-then-wire.
    catalog scan. Nothing in the current cache is that small, which is why nobody
    has hit it; the TS port catches it into the `unknown` verdict that every other
    unreadable preview already gets.
+
+   The Lightroom reader carried a fourth, and this one costs the user a feature.
+   `_get_keywords_for_image` matches `AgLibraryKeywordImage.image` against the
+   `AgLibraryFile.id_local` its caller was given, but that column references
+   `Adobe_images.id_local` — the exact mix-up `writer.py` documents at length.
+   The two id spaces do not overlap in a real catalog, so it returns nothing:
+   `keywords` is `[]` on all 43,794 rows in `library.db`, and the `keywords LIKE`
+   half of `search_by_keyword` has never matched anything.
+
+   Ported as-is, with a test pinning the empty result, because the one-line join
+   fix is the smaller half of the repair. The sync is additions-only, so fixing
+   the join populates keywords for newly imported photos and leaves the existing
+   43,794 empty — keyword search that works for last week's import and silently
+   fails for the whole catalog is a worse bug than one that is uniformly silent.
+   Repairing it properly means a backfill pass, which is its own slice.
 
    Two working rules for the remaining slices. Build fixtures from the *production*
    schema, not from what `init_database` happens to create — the two have already

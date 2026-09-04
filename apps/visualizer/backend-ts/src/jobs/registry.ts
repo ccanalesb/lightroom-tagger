@@ -9,9 +9,11 @@
  * The handlers are being wired one family at a time. `handler: null` marks a type
  * whose dispatch is still to come — the *declaration* has to exist first, because
  * `requiresCatalog` gates job creation and `/api/jobs/health` publishes the list.
+ * One is left: `catalog_cache_build`.
  */
 import type { JobRunner } from './runner.js';
 import { handleBatchAnalyze } from './handlers/analyze.js';
+import { handleCatalogSync } from './handlers/catalog.js';
 import {
   BATCH_DESCRIBE_CHECKPOINT_MISMATCH,
   handleBatchDescribe,
@@ -113,7 +115,12 @@ export const JOB_TYPES: readonly JobType[] = [
     requiresCatalog: false,
     checkpointMismatchMessage: null,
   },
-  { name: 'catalog_sync', handler: null, requiresCatalog: true, checkpointMismatchMessage: null },
+  {
+    name: 'catalog_sync',
+    handler: handleCatalogSync,
+    requiresCatalog: true,
+    checkpointMismatchMessage: null,
+  },
   {
     name: 'catalog_cache_build',
     handler: null,

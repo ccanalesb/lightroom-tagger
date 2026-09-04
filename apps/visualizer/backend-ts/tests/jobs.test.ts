@@ -636,14 +636,14 @@ describe('restart recovery', () => {
 describe('the processor loop', () => {
   it('fails a job whose handler is not wired up yet', async () => {
     await withDbAsync(async (db) => {
-      const jobId = createJob(db, 'catalog_sync', {});
+      const jobId = createJob(db, 'catalog_cache_build', {});
       await tick(db, new JobRunner(db));
 
       const job = getJob(db, jobId)!;
-      // The handlers are still to be ported; the registry declaration exists so
-      // enqueueing is gated, and the runner reports the gap rather than hanging.
+      // The last unported handler; the registry declaration exists so enqueueing
+      // is gated, and the runner reports the gap rather than hanging.
       expect(job.status).toBe('failed');
-      expect(job.error).toBe('Unknown job type: catalog_sync');
+      expect(job.error).toBe('Unknown job type: catalog_cache_build');
       expect(job.error_severity).toBe('error');
     });
   });
