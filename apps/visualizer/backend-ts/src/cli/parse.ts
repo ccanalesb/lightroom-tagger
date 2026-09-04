@@ -1,6 +1,5 @@
 /**
- * Flag parsing and help for the `lightroom-tagger` CLI. Port of `_build_parser`
- * and `run` in `core/cli.py`.
+ * Flag parsing and help for the `lightroom-tagger` CLI.
  *
  * Hand-rolled over `node:util`'s `parseArgs` rather than an argument library:
  * the surface is seven subcommands with three flag kinds between them, and the

@@ -1,6 +1,5 @@
 /**
  * Resolve the Lightroom catalog SQLite mirror path used by job handlers.
- * Port of `library_db.py`.
  *
  * Resolution order, first hit wins:
  *   1. the `LIBRARY_DB` environment variable

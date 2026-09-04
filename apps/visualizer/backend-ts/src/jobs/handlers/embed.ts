@@ -1,5 +1,5 @@
 /**
- * The CLIP embedding job handler. Port of `jobs/handlers/embed.py`.
+ * The CLIP embedding job handler.
  *
  * This job writes nothing a user reads directly: it fills
  * `image_clip_embeddings`, which stack detection and catalog similarity then rank

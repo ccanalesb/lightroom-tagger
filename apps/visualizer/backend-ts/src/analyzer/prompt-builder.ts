@@ -1,6 +1,6 @@
 /**
  * Assemble the prose-only description prompt and the per-perspective scoring
- * prompt. Port of `core/prompt_builder.py`.
+ * prompt.
  *
  * These strings are the product, not incidental configuration: they are what
  * decides whether a model returns parseable JSON and whether its critique is

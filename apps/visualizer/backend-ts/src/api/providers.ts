@@ -1,6 +1,5 @@
 /**
  * Providers API — list providers, manage models, fallback order and defaults.
- * Port of `api/providers.py`.
  *
  * A fresh `ProviderRegistry` per request, matching `_get_registry()`. That is not
  * an oversight: `providers.json` is user-editable on disk, and a long-lived

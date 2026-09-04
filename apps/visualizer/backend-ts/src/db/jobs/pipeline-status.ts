@@ -1,6 +1,5 @@
 /**
  * Latest run per Catalog Cache pipeline trigger.
- * Port of `_CACHE_PIPELINE_BUCKETS` / `_last_job_for_bucket` in `api/system.py`.
  *
  * Reads `visualizer.db`, not `library.db` — jobs live in the app's own database.
  */

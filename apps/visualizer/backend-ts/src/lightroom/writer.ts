@@ -1,6 +1,5 @@
 /**
- * Keyword writes into a live Lightroom `.lrcat`. Port of
- * `lightroom_tagger/lightroom/writer.py`.
+ * Keyword writes into a live Lightroom `.lrcat`.
  *
  * This is the only code in the backend that mutates a file Lightroom itself owns,
  * so the safety rules are load-bearing rather than defensive:

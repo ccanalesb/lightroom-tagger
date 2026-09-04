@@ -1,5 +1,5 @@
 /**
- * The per-perspective scoring vision operation. Port of `core/analyzer/scoring.py`.
+ * The per-perspective scoring vision operation.
  *
  * Structurally the twin of `buildDescriptionOpSpec`: same image preparation, same
  * cleanup discipline, same one-call-per-op factory. Only the parser differs, and

@@ -1,6 +1,5 @@
 /**
  * Score catalog images per perspective into `image_scores`.
- * Port of `core/scoring_service.py`.
  *
  * The describe twin of this module writes one row per image; this one writes one
  * row per image *and rubric version*, which is why so much of it is bookkeeping.

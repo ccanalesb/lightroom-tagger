@@ -1,6 +1,5 @@
 /**
- * System route tests. Mirrors `tests/test_system_stats_api.py` and
- * `tests/test_system_contract.py`.
+ * System route tests.
  *
  * Fixtures build a real SQLite file rather than mocking the DB layer: the queries
  * are the thing most likely to break in the port, so they must actually run.

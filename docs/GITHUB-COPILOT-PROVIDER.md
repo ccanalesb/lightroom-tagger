@@ -354,7 +354,6 @@ def smart_describe(photo_path, rating):
 
 ## 🔗 Related Documentation
 
-- **Hermes setup:** `~/.hermes/MODEL-SWITCHING-GUIDE.md`
 - **OpenWebUI setup:** `~/openwebui-setup-instructions.txt`
 - **Gateway management:** `~/COPILOT-SETUP-COMPLETE.md`
 - **Lightroom Tagger docs:** `docs/` directory
@@ -369,7 +368,7 @@ GitHub Copilot is now available in lightroom-tagger with:
 ✅ Highest priority in fallback chain
 ✅ Unlimited batch tagging with GPT-4o
 ✅ Premium models for special photos
-✅ Same gateway as Hermes and OpenWebUI
+✅ Same gateway as OpenWebUI
 
 **Start using it now:**
 

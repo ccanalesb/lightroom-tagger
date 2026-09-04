@@ -1,5 +1,5 @@
 /**
- * Explicit job-type registry. Port of `jobs/registry.py`.
+ * Explicit job-type registry.
  *
  * `JOB_TYPES` is the single source of truth for dispatch, catalog requirements and
  * checkpoint co-location. Mirrors ADR-0006's explicit CLI `COMMANDS` list —

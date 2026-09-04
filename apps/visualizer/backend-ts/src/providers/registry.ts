@@ -1,6 +1,6 @@
 /**
  * Provider registry — loads `providers.json`, auto-discovers Ollama models, and
- * resolves credentials. Port of `core/provider_registry.py`.
+ * resolves credentials.
  *
  * `providers.json` is gitignored and owned by the user's machine, so it is treated
  * as untrusted input in one specific way: a `defaults` block may name a resolution

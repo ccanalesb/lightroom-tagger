@@ -1,5 +1,5 @@
 /**
- * Scores route tests. Mirrors `tests/test_scores_api.py` / `test_scores_contract.py`.
+ * Scores route tests.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';

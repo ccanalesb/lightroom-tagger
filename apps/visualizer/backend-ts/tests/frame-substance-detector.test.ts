@@ -1,7 +1,6 @@
 /**
- * Frame substance detector parity. Mirrors `core/test_frame_substance_detector.py`,
- * and pins the five statistics against the numpy values in
- * `fixtures/frame-substance/manifest.json`.
+ * Frame substance detector parity — pins the five statistics against the numpy
+ * values in `fixtures/frame-substance/manifest.json`.
  *
  * Every verdict row in `library.db` was written by the numpy detector, so a rerun
  * of this one has to agree with it or the catalog silently re-judges itself. The

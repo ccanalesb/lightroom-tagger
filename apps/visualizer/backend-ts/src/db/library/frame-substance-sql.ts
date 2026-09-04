@@ -1,6 +1,5 @@
 /**
- * The one SQL phrasing of "this frame is condemned" (#301). Port of
- * `core/database/frame_substance_sql.py`.
+ * The one SQL phrasing of "this frame is condemned" (#301).
  *
  * A leaf module on purpose: the identity ranking, stack suggestions and the catalog
  * listing all need this fragment and sit on both sides of `frame_substance`'s own

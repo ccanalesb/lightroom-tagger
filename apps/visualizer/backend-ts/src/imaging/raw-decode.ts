@@ -1,6 +1,5 @@
 /**
- * RAW decode via libraw-wasm. Replaces `rawpy` in
- * `core/analyzer/image_prep.convert_raw_to_jpg`.
+ * RAW decode via libraw-wasm.
  *
  * This was the single hardest dependency in the migration and it needed three
  * shims, because libraw-wasm ships an Emscripten build written for a browser:

@@ -1,6 +1,5 @@
 /**
  * Vision calls against OpenAI-compatible providers.
- * Port of `core/vision_client.py` and `core/vision_client_ollama.py`.
  *
  * The Python module wrapped the `openai` SDK and mapped its exception classes
  * onto the `ProviderError` hierarchy. Here the requests are plain `fetch` and the

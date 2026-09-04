@@ -1,6 +1,5 @@
 /**
- * Runtime configuration. Mirrors the Python backend's `config.py` (env-var driven)
- * plus the library's `config.yaml` loader from `lightroom_tagger/core/config.py`.
+ * Runtime configuration.
  *
  * Values are exposed as **getters**, read on each access. The Python module captured
  * `os.getenv` at import time, which meant tests had to reload the module to change a

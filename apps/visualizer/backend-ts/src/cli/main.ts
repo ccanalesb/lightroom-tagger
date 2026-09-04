@@ -1,6 +1,5 @@
 /**
- * The `lightroom-tagger` program. Port of `main` and `run` in `core/cli.py`;
- * `bin.ts` is the executable that calls it.
+ * The `lightroom-tagger` program; `bin.ts` is the executable that calls it.
  *
  * It lives under the visualizer backend rather than in a package of its own
  * because it is the same program: config loader, `library.db` seam, Lightroom

@@ -1,5 +1,5 @@
 /**
- * Config route tests. Mirrors `tests/test_lt_config_api.py` / `test_config_contract.py`.
+ * Config route tests.
  *
  * These routes WRITE `config.yaml`, so every test points `LT_CONFIG_YAML` at a temp
  * file. Without that override the suite would rewrite the user's real config.

@@ -1,6 +1,5 @@
 /**
  * Coordinate the job lifecycle between the processor loop and the handlers.
- * Port of `jobs/runner.py`.
  *
  * The Python runner handed out thread-local SQLite connections, because sharing
  * one `sqlite3.Connection` across the processor, four worker threads and the HTTP

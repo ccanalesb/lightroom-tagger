@@ -1,6 +1,5 @@
 /**
- * Descriptions route tests. Mirrors `tests/test_descriptions_api.py` /
- * `test_descriptions_contract.py`.
+ * Descriptions route tests.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3';

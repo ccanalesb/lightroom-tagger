@@ -1,5 +1,5 @@
 /**
- * Shared error bodies. Ported from the `ErrorBody` family in `api/schemas/jobs.py`.
+ * Shared error bodies.
  *
  * `ErrorBody` deliberately does NOT forbid extra properties — subclasses such as
  * `CatalogUnavailableError` extend it with `code` and `library_db`.

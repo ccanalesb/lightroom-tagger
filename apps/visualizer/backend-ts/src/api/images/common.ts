@@ -1,6 +1,5 @@
 /**
  * Cross-cutting helpers for the images API routes (D-08).
- * Port of `api/images/common.py`.
  *
  * The containment check here is the only thing standing between the thumbnail route
  * and arbitrary file disclosure: image keys come from the URL, and the paths they

@@ -1,6 +1,5 @@
 /**
  * Path preflight and skip-reason diagnostics for path-dependent jobs.
- * Port of `jobs/handlers/path_diagnostics.py`.
  *
  * Every image job depends on a file that may not be there: the catalog records a
  * path on a NAS that is routinely unmounted. Without this, such a run logs tens of

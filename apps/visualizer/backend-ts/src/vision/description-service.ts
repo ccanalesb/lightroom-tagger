@@ -1,5 +1,5 @@
 /**
- * Describe catalog images on demand. Port of `core/description_service.py`.
+ * Describe catalog images on demand.
  */
 import { extname } from 'node:path';
 import { getDescriptionModel } from '../config.js';

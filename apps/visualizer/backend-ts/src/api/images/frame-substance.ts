@@ -1,6 +1,5 @@
 /**
  * Frame substance per-image read and mutation routes.
- * Port of `api/images/frame_substance.py`.
  *
  * Registered ONTO the catalog group rather than as a group of its own, matching
  * `@catalog_bp.route` in Python. That is not cosmetic: these paths live under

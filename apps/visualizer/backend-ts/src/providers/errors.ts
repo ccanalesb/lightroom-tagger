@@ -1,6 +1,5 @@
 /**
  * Exception hierarchy for vision provider errors.
- * Port of `core/exceptions/provider_errors.py`.
  *
  * The split between retryable and not is the whole point of the file. A
  * retryable error is retried with backoff and then cascaded to the next

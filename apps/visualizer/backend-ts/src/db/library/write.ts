@@ -1,6 +1,5 @@
 /**
- * Single-writer discipline for `library.db`. Port of `library_write` in
- * `core/database/catalog_write.py`.
+ * Single-writer discipline for `library.db`.
  *
  * The Python version needed two things: a process-wide `RLock` (because parallel
  * describe/score threads shared one process and raced the SQLite writer seat) and

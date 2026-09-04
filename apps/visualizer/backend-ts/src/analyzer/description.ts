@@ -1,5 +1,5 @@
 /**
- * The structured description pipeline. Port of `core/analyzer/description.py`.
+ * The structured description pipeline.
  */
 import { unlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';

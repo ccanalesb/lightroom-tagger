@@ -1,5 +1,5 @@
 /**
- * Shared text-processing constants. Port of `lightroom_tagger/core/text_constants.py`.
+ * Shared text-processing constants.
  *
  * A deliberately minimal stopword list, not a full NLTK set: it exists so the
  * Mirror's distinctive-descriptor log-odds are not dominated by articles and

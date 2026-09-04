@@ -1,5 +1,5 @@
 /**
- * Identity API response models. Port of `api/schemas/identity.py`.
+ * Identity API response models.
  *
  * One deliberate difference from the Python models, and it is a bug fix rather than
  * a port: `IdentityBestPhotoItem` gains `ranking_percentile`,

@@ -1,6 +1,5 @@
 /**
  * Frame substance detector — preview statistics and verdict rules (#295).
- * Port of `core/frame_substance_detector.py`.
  *
  * Five numbers per image and three thresholds over them decide whether a frame is
  * a lens cap (`void`), a blown or crushed frame with nothing legible in it

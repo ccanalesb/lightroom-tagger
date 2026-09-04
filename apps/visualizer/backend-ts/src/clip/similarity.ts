@@ -1,6 +1,5 @@
 /**
  * CLIP-only visual similarity (KNN over `image_clip_embeddings`), SIM-02 / D-05.
- * Port of `core/clip_similarity.py`.
  *
  * Runs against the sqlite-vec `vec0` table already in `library.db` — 43,451 rows of
  * 512-d float32 written by the Python backend, read here with no migration. The

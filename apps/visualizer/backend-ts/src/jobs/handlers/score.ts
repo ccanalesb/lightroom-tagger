@@ -1,5 +1,5 @@
 /**
- * Score job handlers. Port of the score half of `jobs/handlers/analyze.py`.
+ * Score job handlers.
  *
  * The unit of work is an image × perspective pair, and the two handlers disagree
  * on what a failure means. `single_score` stops at the first one, because a

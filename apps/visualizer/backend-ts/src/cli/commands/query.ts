@@ -1,7 +1,5 @@
 /**
  * The three commands that only read `library.db`: `search`, `export`, `stats`.
- * Port of `cmd_search` in `core/cli.py` and `cmd_export` / `cmd_stats` in
- * `core/cli_cmds_extra.py`.
  *
  * All three take the same shape — resolve one filter, run one whole-table query,
  * print a count — because that is what the CLI has always been next to the

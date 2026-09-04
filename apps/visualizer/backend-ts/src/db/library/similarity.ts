@@ -1,5 +1,5 @@
 /**
- * Catalog similarity job output. Port of `core/database/similarity.py`.
+ * Catalog similarity job output.
  *
  * `batch_catalog_similarity` materializes these rows; the API only reads them.
  */

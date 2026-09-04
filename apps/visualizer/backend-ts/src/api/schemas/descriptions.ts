@@ -1,5 +1,5 @@
 /**
- * Descriptions API response models. Port of `api/schemas/descriptions.py`.
+ * Descriptions API response models.
  *
  * Note the differing strictness, which is deliberate and mirrors pydantic:
  *   - list/envelope models forbid extra properties (`extra='forbid'`)

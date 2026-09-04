@@ -1,6 +1,5 @@
 /**
  * Within-perspective percentile ranks over the eligible identity population.
- * Port of `core/identity_service/percentiles.py`.
  *
  * A raw 1–10 score is not comparable across perspectives: one lens may hand out
  * 8s freely while another rarely exceeds 5. Ranking on the *percentile within each

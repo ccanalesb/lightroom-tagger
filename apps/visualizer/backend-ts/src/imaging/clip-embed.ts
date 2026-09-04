@@ -1,5 +1,5 @@
 /**
- * CLIP image embeddings. Port of `lightroom_tagger/core/clip_embedding_service.py`.
+ * CLIP image embeddings.
  *
  * Two decisions here are load-bearing and must not be "simplified":
  *
@@ -90,7 +90,7 @@ export async function encodeImages(paths: string[]): Promise<Float32Array[]> {
 }
 
 /**
- * The `vec0` blob for one embedding. Port of `numpy_to_clip_vec_blob`.
+ * The `vec0` blob for one embedding.
  *
  * The dimension check is the Python assertion kept deliberately: `vec0` stores
  * whatever bytes it is handed, so a wrong-length vector would be written and only

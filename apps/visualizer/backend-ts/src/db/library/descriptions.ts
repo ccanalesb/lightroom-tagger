@@ -1,6 +1,5 @@
 /**
- * Image description queries. Port of the read paths in
- * `lightroom_tagger/core/database/descriptions.py`.
+ * Image description queries.
  */
 import type { Db } from '../connection.js';
 import { nowIsoLocal } from '../../utils/datetime.js';

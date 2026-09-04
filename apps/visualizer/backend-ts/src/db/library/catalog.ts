@@ -1,6 +1,5 @@
 /**
- * Catalog image rows. Port of the read/write helpers the images API uses from
- * `core/database/catalog.py` and `core/database/catalog_statistics.py`.
+ * Catalog image rows.
  */
 import { existsSync } from 'node:fs';
 import type { Db } from '../connection.js';

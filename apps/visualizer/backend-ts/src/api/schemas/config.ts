@@ -1,4 +1,4 @@
-/** Lightroom config API models (`/api/config/*`). Port of `api/schemas/config.py`. */
+/** Lightroom config API models (`/api/config/*`). */
 import { z } from '@hono/zod-openapi';
 
 export const ConfigCatalogGetResponse = z

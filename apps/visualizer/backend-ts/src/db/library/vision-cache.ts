@@ -1,5 +1,5 @@
 /**
- * Vision cache rows. Port of the read helpers in `core/database/vision_cache.py`.
+ * Vision cache rows.
  */
 import type { Db } from '../connection.js';
 

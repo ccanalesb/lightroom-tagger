@@ -1,6 +1,5 @@
 /**
  * Pluggable error escalation policies for the fallback dispatcher.
- * Port of `core/error_policy.py`.
  *
  * Two separate concerns live here. `ConsecutiveAbortTracker` is a *session*
  * counter — it exists so a batch of 40,000 images stops after three consecutive

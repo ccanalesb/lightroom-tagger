@@ -1,6 +1,5 @@
 /**
  * Validate `score_perspective` values by catalog row existence.
- * Port of `core/score_perspective.py`.
  */
 import type { Db } from '../db/connection.js';
 import { getPerspectiveBySlug } from '../db/library/scores.js';

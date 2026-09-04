@@ -1,5 +1,5 @@
 /**
- * Frame substance route tests. Mirrors `tests/test_frame_substance_api.py`.
+ * Frame substance route tests.
  *
  * The cull-keyword routes write to a live Lightroom `.lrcat`, so every test here
  * builds a **fake catalog** with the three tables the writer touches and points

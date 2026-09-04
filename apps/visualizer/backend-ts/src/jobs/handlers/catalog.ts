@@ -1,5 +1,5 @@
 /**
- * The `catalog_sync` job handler. Port of `jobs/handlers/catalog.py`.
+ * The `catalog_sync` job handler.
  *
  * The handler is thin because the work is in `lightroom/catalog-sync.ts`; what it
  * owns is the two ways the job can be unrunnable — no catalog configured, or the

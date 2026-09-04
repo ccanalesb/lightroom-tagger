@@ -1,6 +1,5 @@
 /**
- * User-added provider models. Port of the `provider_models` helpers in
- * `apps/visualizer/backend/database.py`.
+ * User-added provider models.
  *
  * Lives in `visualizer.db` rather than `library.db`: these are app settings, not
  * catalog data.

@@ -1,6 +1,5 @@
 /**
- * Job rows and their logs, in `visualizer.db`. Port of the job helpers in
- * `apps/visualizer/backend/database.py`.
+ * Job rows and their logs, in `visualizer.db`.
  *
  * The log storage design is load-bearing and its history is worth keeping. Logs
  * used to be a growing JSON array on the `jobs` row, so every `addJobLog` did

@@ -1,6 +1,5 @@
 /**
  * Image preparation — viewable paths and vision compression.
- * Port of `core/analyzer/image_prep.py`.
  *
  * `compressImage` uses sharp rather than the Pillow-exact resampler in
  * `pil-resample.ts`, and that is a deliberate split. The Pillow port exists

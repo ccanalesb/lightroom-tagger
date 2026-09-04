@@ -1,6 +1,5 @@
 /**
  * Best current catalog perspective score, for list and detail queries.
- * Port of `core/database/catalog_query_best_score.py`.
  */
 import type { Db } from '../connection.js';
 

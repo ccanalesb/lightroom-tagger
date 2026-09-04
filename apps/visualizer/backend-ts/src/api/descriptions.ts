@@ -1,5 +1,5 @@
 /**
- * Image description routes. Port of `api/descriptions.py`.
+ * Image description routes.
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import {

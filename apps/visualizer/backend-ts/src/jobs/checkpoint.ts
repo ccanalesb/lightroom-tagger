@@ -1,6 +1,5 @@
 /**
  * Resume checkpoints, stored in `jobs.metadata.checkpoint`.
- * Port of `jobs/checkpoint.py`.
  *
  * A batch job describes tens of thousands of images through a paid API, so a
  * restart must not re-run the work already paid for. The checkpoint records which

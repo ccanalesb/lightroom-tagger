@@ -1,6 +1,5 @@
 /**
  * Read-only REST API for persisted `image_scores` rows (library DB).
- * Port of `api/scores.py`.
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import {

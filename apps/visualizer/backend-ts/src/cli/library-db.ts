@@ -1,6 +1,5 @@
 /**
- * Library-DB path resolution and connection lifecycle for the CLI. Port of
- * `core/cli_library_db.py`.
+ * Library-DB path resolution and connection lifecycle for the CLI.
  *
  * Python spells this as two decorators, `@map_cli_errors` and
  * `@with_library_db(must_exist=…)`. Here it is one function a command body sits

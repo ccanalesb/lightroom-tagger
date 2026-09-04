@@ -1,6 +1,5 @@
 /**
  * Best-photo ranking with stack enrichment.
- * Port of `core/identity_service/ranking.py`.
  */
 import type { Db } from '../db/connection.js';
 import { computeImagePeakPercentileScores, type PeakPercentileItem, type PeakPercentileMeta } from './percentiles.js';

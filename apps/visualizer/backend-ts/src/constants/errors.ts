@@ -1,5 +1,5 @@
-/** Backend error message constants. Ported from `constants/errors.py` verbatim —
- * these strings are asserted on by tests and surfaced in the UI. */
+/** Backend error message constants. These exact strings are asserted on by tests
+ * and surfaced in the UI, so rewording one is a breaking change. */
 
 // Database errors
 export const ERROR_DB_NOT_FOUND = 'Library database not found';

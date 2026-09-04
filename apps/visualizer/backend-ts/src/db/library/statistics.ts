@@ -1,7 +1,5 @@
 /**
  * Catalog statistics queries against `library.db`.
- * Ports the parts of `lightroom_tagger/core/database/catalog_statistics.py`,
- * `catalog.py` and `vision_cache.py` that the system routes need.
  */
 import { statSync } from 'node:fs';
 import type { Db } from '../connection.js';

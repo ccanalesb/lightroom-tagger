@@ -1,5 +1,5 @@
 /**
- * Perceptual hash of a file on disk. Port of `core/hasher.compute_phash`.
+ * Perceptual hash of a file on disk.
  *
  * Split from `phash.ts` so that module stays pure pixel arithmetic and testable
  * from a fixture array; this one is the I/O boundary.

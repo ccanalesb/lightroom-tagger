@@ -1,7 +1,5 @@
 /**
  * `POST /api/descriptions/{image_key}/generate` and the description service.
- * Mirrors `tests/test_descriptions_api.py` and
- * `core/test_description_service.py`.
  *
  * These run against a real HTTP server rather than a mocked provider client, so
  * the OpenAI-compatible request path, the HTTP-status→`ProviderError` mapping and

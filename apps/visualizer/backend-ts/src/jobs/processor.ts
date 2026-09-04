@@ -1,6 +1,5 @@
 /**
- * The background job processor. Port of the `_job_processor` loop, the watchdog
- * and the orphan recovery in `app.py`.
+ * The background job processor.
  *
  * Structural difference from Python, and it removes a whole class of bug: the
  * Python loop ran on a `threading.Thread` restarted by a watchdog, and

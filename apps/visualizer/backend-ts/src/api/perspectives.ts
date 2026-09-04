@@ -1,5 +1,5 @@
 /**
- * REST API for the library `perspectives` registry. Port of `api/perspectives.py`.
+ * REST API for the library `perspectives` registry.
  *
  * List responses expose `id`, `slug`, `display_name`, `description`, `active`,
  * `optional`, `source_filename`, `updated_at` — no `prompt_markdown` on the list.

@@ -1,4 +1,4 @@
-/** Burst stack API models. Port of `api/schemas/stacks.py`. */
+/** Burst stack API models. */
 import { z } from '@hono/zod-openapi';
 import { CatalogImage } from './catalog.js';
 

@@ -1,5 +1,5 @@
 /**
- * OpenAPI configuration. Replaces `api/openapi.py` (spectree).
+ * OpenAPI configuration.
  *
  * ADR-0013 makes the backend authoritative for API shape: Zod schemas here are the
  * single source of truth, the OpenAPI document is generated from them, and the

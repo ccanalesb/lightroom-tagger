@@ -1,6 +1,5 @@
 /**
  * The `catalog_cache_build` chain, driven through the processor.
- * Mirrors `tests/test_handlers_catalog_cache_build.py`.
  *
  * Python patches all four stage functions out and asserts on the order they were
  * called in, which tests the chain's bookkeeping and nothing else. Here the

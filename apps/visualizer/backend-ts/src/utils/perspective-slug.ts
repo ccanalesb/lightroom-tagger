@@ -1,4 +1,4 @@
-/** Shared perspective slug validation. Port of `utils/perspective_slug.py`. */
+/** Shared perspective slug validation. */
 
 export const PERSPECTIVE_SLUG_RE = /^[a-z][a-z0-9_-]{0,63}$/;
 

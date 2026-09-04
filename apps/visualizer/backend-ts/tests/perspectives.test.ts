@@ -1,6 +1,5 @@
 /**
- * Perspectives route tests. Mirrors `tests/test_perspectives_api.py` /
- * `test_perspectives_contract.py`.
+ * Perspectives route tests.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';

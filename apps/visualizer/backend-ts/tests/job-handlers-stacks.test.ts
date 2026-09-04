@@ -1,7 +1,6 @@
 /**
  * The `batch_stack_detect` and `batch_catalog_similarity` handlers, driven through
- * the processor. Mirrors `tests/test_handlers_batch_stack_detect.py` and
- * `tests/test_handlers_batch_catalog_similarity.py`.
+ * the processor.
  *
  * Nothing is stubbed here. Both jobs are pure SQLite, so the real `vec0` KNN runs
  * against real vectors — which is the point, since the parts most likely to break

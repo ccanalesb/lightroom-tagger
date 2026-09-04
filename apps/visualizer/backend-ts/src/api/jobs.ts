@@ -1,6 +1,5 @@
 /**
  * Jobs API — list, create, inspect, cancel and retry background jobs.
- * Port of `api/jobs.py`.
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { config } from '../config.js';

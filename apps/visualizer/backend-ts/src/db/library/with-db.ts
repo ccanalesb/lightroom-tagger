@@ -1,5 +1,5 @@
 /**
- * Library-DB access for routes. Port of the `with_db` decorator in `utils/db.py`.
+ * Library-DB access for routes.
  *
  * Implemented as Hono middleware rather than a handler wrapper. A wrapper that
  * returns responses on the handler's behalf erases the typed-response information

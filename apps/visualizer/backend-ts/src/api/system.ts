@@ -1,6 +1,5 @@
 /**
  * System routes — health, stats, catalog cache readiness.
- * Port of the corresponding routes in `api/system.py`.
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { existsSync } from 'node:fs';

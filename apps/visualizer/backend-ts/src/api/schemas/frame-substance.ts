@@ -1,4 +1,4 @@
-/** Frame substance per-image API models. Port of `api/schemas/frame_substance.py`. */
+/** Frame substance per-image API models. */
 import { z } from '@hono/zod-openapi';
 
 /**

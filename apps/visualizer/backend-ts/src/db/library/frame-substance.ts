@@ -1,6 +1,5 @@
 /**
  * Frame substance verdict storage and read helpers (#295).
- * Port of `core/database/frame_substance.py`.
  *
  * A "condemned" frame is one the pixel detector judged `void` or `illegible` and the
  * user has not overridden. That rule is expressed as SQL in

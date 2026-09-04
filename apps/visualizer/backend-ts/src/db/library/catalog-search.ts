@@ -1,6 +1,5 @@
 /**
- * Whole-table `images` queries. Port of the `search_by_*` family in
- * `core/database/catalog.py`.
+ * Whole-table `images` queries.
  *
  * These predate the grid's filter builder and are coarser than it: no paging, no
  * ordering, no joins, `SELECT *` over the whole table. The CLI is the only caller

@@ -1,6 +1,5 @@
 /**
  * Lightroom catalog write availability for keyword mutations.
- * Port of `utils/lr_catalog_write.py`.
  *
  * Availability is re-checked on every call rather than cached: the user can quit or
  * launch Lightroom between two requests, and a stale "available" would mean writing

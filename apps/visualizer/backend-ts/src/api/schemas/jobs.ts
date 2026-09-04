@@ -1,5 +1,5 @@
 /**
- * Jobs API and socket payload models. Port of `api/schemas/jobs.py`.
+ * Jobs API and socket payload models.
  *
  * `Job` is shared by the REST endpoints and the `job_created` / `job_updated`
  * socket emits, which is the point: the frontend applies a socket payload straight

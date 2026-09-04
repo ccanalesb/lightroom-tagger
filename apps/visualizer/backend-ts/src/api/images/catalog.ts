@@ -1,6 +1,5 @@
 /**
  * Catalog list, thumbnails, CLIP similar, similarity groups, and image detail.
- * Port of `api/images/catalog.py`.
  *
  * Two contract details worth stating up front, because both are easy to break:
  *

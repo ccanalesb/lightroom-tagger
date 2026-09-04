@@ -1,6 +1,5 @@
 /**
  * The Lightroom reader, the incremental sync driver and the `catalog_sync` job.
- * Mirrors `core/test_catalog_sync.py` and `tests/test_handlers_catalog_sync.py`.
  *
  * Python mocks `connect_catalog` and `get_image_by_id` out; here the `.lrcat` is a
  * real SQLite file with the tables the metadata join actually reads. That costs a

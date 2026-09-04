@@ -1,6 +1,6 @@
 /**
  * Incremental catalog sync — additions-only refresh from a `.lrcat` into
- * `library.db`. Port of `lightroom_tagger/core/catalog_sync.py`.
+ * `library.db`.
  *
  * The whole design is one set difference. Reading full metadata for 43,000 images
  * takes minutes; reading their ids takes one query, so the expensive join runs only

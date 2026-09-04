@@ -1,5 +1,5 @@
 /**
- * Burst stack membership and mutations. Port of `core/database/stacks.py`.
+ * Burst stack membership and mutations.
  *
  * Every mutation here must run inside `libraryWrite` so it is one atomic
  * transaction — a half-applied split leaves `image_stacks.stack_size` disagreeing

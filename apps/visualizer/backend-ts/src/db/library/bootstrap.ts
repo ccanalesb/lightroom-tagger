@@ -1,5 +1,5 @@
 /**
- * Create a `library.db`. Port of `init_database` in `core/database/db_init.py`.
+ * Create a `library.db`.
  *
  * Python spells the schema as a base DDL script followed by fifteen migration
  * functions, replayed on **every** open. Here it is one script that produces the

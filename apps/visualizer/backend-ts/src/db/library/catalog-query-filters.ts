@@ -1,6 +1,5 @@
 /**
  * Shared WHERE-clause fragments for catalog image listing queries.
- * Port of `core/database/catalog_query_filters.py`.
  */
 import { buildDescriptionFtsQuery, DESCRIPTION_FTS_KEY_SUBQUERY } from './descriptions.js';
 import { flaggedExistsSql } from './frame-substance-sql.js';

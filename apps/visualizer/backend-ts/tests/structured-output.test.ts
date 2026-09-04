@@ -1,10 +1,9 @@
 /**
  * Score payload validation and repair.
  *
- * Mirrors `lightroom_tagger/core/test_structured_output.py` case for case, since
- * the two implementations have to agree on which malformed answers are salvaged
- * and which are rejected — a payload Python accepted and this rejects would show
- * up as a catalog that stops scoring after cutover.
+ * Which malformed answers get salvaged and which get rejected is the whole
+ * subject: a payload that should have been repaired but is rejected shows up as
+ * a catalog that quietly stops scoring.
  */
 import { describe, expect, it, vi } from 'vitest';
 import {

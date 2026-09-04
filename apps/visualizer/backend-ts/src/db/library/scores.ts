@@ -1,6 +1,5 @@
 /**
  * Perspective registry and image-score queries.
- * Port of `lightroom_tagger/core/database/scores.py`.
  */
 import type { Db } from '../connection.js';
 import { nowIsoUtc } from '../../utils/datetime.js';

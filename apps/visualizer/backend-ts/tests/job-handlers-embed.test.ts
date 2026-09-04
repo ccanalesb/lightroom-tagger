@@ -1,6 +1,5 @@
 /**
  * The `batch_embed_image` job handler, driven through the processor.
- * Mirrors `tests/test_handlers_batch_embed_image.py`.
  *
  * The CLIP encoder is the one thing stubbed, for the same reason Python
  * monkeypatches `encode_images`: running the real vision tower would download a

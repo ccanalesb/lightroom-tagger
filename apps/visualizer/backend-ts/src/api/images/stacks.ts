@@ -1,5 +1,5 @@
 /**
- * Burst stack members and mutations. Port of `api/images/stacks.py`.
+ * Burst stack members and mutations.
  *
  * Reuses catalog's row shaping so a stack member looks exactly like the same image
  * in the grid — that is the whole point of the endpoint, and a divergence would show

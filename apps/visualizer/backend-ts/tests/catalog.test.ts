@@ -1,5 +1,5 @@
 /**
- * Catalog route tests. Mirrors `tests/test_images_api.py` / `test_catalog_contract.py`.
+ * Catalog route tests.
  *
  * The filter and sort assertions matter more than usual here: the SQL was
  * transcribed clause by clause, and clause order determines positional binding

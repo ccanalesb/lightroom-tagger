@@ -1,5 +1,5 @@
 /**
- * Resume checkpoints. Mirrors `tests/test_job_checkpoint.py`.
+ * Resume checkpoints.
  *
  * The fingerprint digests below were produced by running Python's
  * `jobs.checkpoint.fingerprint_batch_describe` over the same inputs, and they are

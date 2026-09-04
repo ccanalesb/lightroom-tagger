@@ -1,6 +1,5 @@
 /**
  * Try the selected provider, then cascade through the fallback order.
- * Port of `core/fallback.py`.
  *
  * The attempt list is wider than it looks: every vision model in the primary
  * provider (requested one first), then the first vision model from each fallback

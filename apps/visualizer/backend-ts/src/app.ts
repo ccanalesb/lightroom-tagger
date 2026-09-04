@@ -1,5 +1,5 @@
 /**
- * Application factory. Port of `create_app()` in `app.py`.
+ * Application factory.
  *
  * Deliberately side-effect free: constructing the app must not start the job
  * processor or write to stdout. The Python `create_app()` printed the auto-detected

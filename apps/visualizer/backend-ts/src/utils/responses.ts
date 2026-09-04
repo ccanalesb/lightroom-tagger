@@ -1,5 +1,5 @@
 /**
- * Standardized response helpers. Port of `utils/responses.py`.
+ * Standardized response helpers.
  *
  * Architectural constraint carried over from the Flask backend: routes must always
  * shape JSON through these helpers, never by hand-rolling a body and status code.

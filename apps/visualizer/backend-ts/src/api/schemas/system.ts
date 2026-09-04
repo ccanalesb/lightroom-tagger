@@ -1,5 +1,5 @@
 /**
- * System and cache health API response models. Port of `api/schemas/system.py`.
+ * System and cache health API response models.
  *
  * Every model there sets `ConfigDict(extra='forbid')`, which spectree emits as
  * `additionalProperties: false`. `.strict()` is the Zod equivalent — keep it, or the

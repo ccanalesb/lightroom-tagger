@@ -1,6 +1,5 @@
 /**
- * The unified analyze job. Port of `handle_batch_analyze` in
- * `jobs/handlers/analyze.py`.
+ * The unified analyze job.
  *
  * Describe then score, over **one** selection. That sharing is the whole point:
  * running the two batch jobs back to back selects twice, and between the two

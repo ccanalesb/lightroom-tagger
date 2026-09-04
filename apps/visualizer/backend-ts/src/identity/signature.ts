@@ -1,6 +1,5 @@
 /**
  * Mirror scan value object plus the crowning statistics primitive.
- * Port of `core/identity_service/signature.py`.
  *
  * "Crowning" asks whether a lens wins the argmax more often than chance. Chance is
  * not 1/(number of lenses): each photo was scored on a different number of lenses,

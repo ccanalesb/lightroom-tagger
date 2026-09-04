@@ -1,6 +1,5 @@
 /**
- * Cross-family helpers shared by job handlers. Port of `jobs/handlers/common.py`
- * and the `managed_library_db` lifecycle in `jobs/handlers/db_lifecycle.py`.
+ * Cross-family helpers shared by job handlers.
  */
 import { openLibraryDb, type Db } from '../../db/connection.js';
 import type { JobLogLevel } from '../../db/jobs/jobs.js';

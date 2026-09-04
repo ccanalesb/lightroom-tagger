@@ -1,5 +1,5 @@
 /**
- * Perspectives API response models. Port of `api/schemas/perspectives.py`.
+ * Perspectives API response models.
  *
  * `optional` is read-only over HTTP — it is derived from the markdown marker on
  * write (ADR-0012), never accepted from a request body.

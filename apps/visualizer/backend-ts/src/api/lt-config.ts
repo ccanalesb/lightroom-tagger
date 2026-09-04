@@ -1,5 +1,5 @@
 /**
- * Read and write the repo-level `config.yaml`. Port of `api/lt_config.py`.
+ * Read and write the repo-level `config.yaml`.
  *
  * These routes do not touch `library.db` — they edit the user's own config file,
  * so no library-DB middleware here.

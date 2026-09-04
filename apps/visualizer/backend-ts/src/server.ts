@@ -1,5 +1,5 @@
 /**
- * Server entrypoint. Port of the `__main__` block in `app.py`.
+ * Server entrypoint.
  *
  * Binds 5001 by default (see config): macOS AirPlay Receiver owns :5000 and
  * answers requests there, which masquerades as a broken backend.

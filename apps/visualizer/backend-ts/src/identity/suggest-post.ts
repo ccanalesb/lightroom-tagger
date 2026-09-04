@@ -1,6 +1,5 @@
 /**
  * Post-next suggestions from coverage-eligible catalog gaps.
- * Port of `core/identity_service/suggest_post.py`.
  */
 import type { Db } from '../db/connection.js';
 import { computeImagePeakPercentileScores, type PeakPercentileItem } from './percentiles.js';

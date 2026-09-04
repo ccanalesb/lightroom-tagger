@@ -1,6 +1,5 @@
 /**
  * The frame substance batch driver and the `batch_frame_substance` job.
- * Mirrors `core/test_frame_substance_batch.py`.
  *
  * Real greyscale JPEGs on disk and a real `library.db`: the detector is the point
  * of the job, so stubbing it would leave only the loop under test. The images are

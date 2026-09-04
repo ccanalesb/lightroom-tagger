@@ -1,6 +1,5 @@
 /**
  * Identity API: best-photos ranking, mirror signature, post-next suggestions.
- * Port of `api/identity.py`.
  *
  * Thumbnails are not inlined: responses carry `image_key` and `filename` so the
  * frontend reuses the catalog thumbnail route.

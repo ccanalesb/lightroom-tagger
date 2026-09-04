@@ -1,6 +1,5 @@
 /**
  * The vision operation engine — one provider call plus a persist stage.
- * Port of `core/vision_op.py`.
  *
  * The shape exists so that "resolve a model, dispatch with fallback, parse the
  * answer" is written once. Describe and score differ only in their prompt, their

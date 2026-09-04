@@ -1,6 +1,5 @@
 /**
  * Configurable retry with exponential backoff for provider calls.
- * Port of `core/retry.py`.
  *
  * The Python version needed `_interruptible_sleep` and a thread-local
  * `cancel_scope`, because `time.sleep(32)` inside a backoff held the worker for

@@ -1,6 +1,5 @@
 /**
- * `init` — create an empty `library.db`. Port of `cmd_init` in
- * `core/cli_cmds_extra.py`.
+ * `init` — create an empty `library.db`.
  *
  * The command itself is a print, in both languages: opening a library DB with
  * `mustExist: false` is what applies the schema, so `init` is the name for doing

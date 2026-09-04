@@ -1,6 +1,5 @@
 /**
  * The two commands that read a `.lrcat` into `library.db`: `scan` and `sync`.
- * Port of `cmd_scan` and `cmd_sync` in `core/cli.py`.
  *
  * `scan` reads the whole catalog and upserts every row; `sync` diffs catalog ids
  * against the ones already indexed and fetches only what is missing. Both run on

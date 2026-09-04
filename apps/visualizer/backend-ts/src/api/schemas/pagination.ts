@@ -1,5 +1,5 @@
 /**
- * Shared pagination envelope. Port of `PaginationMeta` in `api/schemas/jobs.py`.
+ * Shared pagination envelope.
  *
  * Lives in its own module rather than under `jobs`: several groups import it, and
  * the module-boundary policy forbids one `api` area importing a sibling.

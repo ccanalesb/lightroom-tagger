@@ -1,6 +1,5 @@
 /**
- * Burst stack route tests. Mirrors `tests/test_stacks_api.py` /
- * `test_stacks_contract.py` and `core/test_database_stacks.py`.
+ * Burst stack route tests.
  *
  * The mutations get the most attention: each one has to leave
  * `image_stacks.stack_size` in agreement with `image_stack_members`, and a stack of

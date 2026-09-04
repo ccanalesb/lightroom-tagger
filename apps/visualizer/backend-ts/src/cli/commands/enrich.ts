@@ -1,6 +1,5 @@
 /**
- * `enrich-catalog`. Port of `cmd_enrich_catalog` in `core/cli_cmds_extra.py`,
- * reduced to its cache-warming half.
+ * `enrich-catalog`, reduced to its cache-warming half.
  *
  * Python's command has two modes. `--cache-only` warms the vision cache, which is
  * what this does. The default mode calls `lightroom/enricher.py`, and that half

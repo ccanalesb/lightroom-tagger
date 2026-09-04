@@ -1,5 +1,5 @@
 /**
- * Vision image caching. Port of `core/vision_cache.py`.
+ * Vision image caching.
  *
  * The cache is what makes the whole pipeline usable offline: the originals live
  * on a NAS, and a 1024px JPEG per image is ~50–135 KB, so the entire 43,000-image

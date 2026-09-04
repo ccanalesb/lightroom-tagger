@@ -1,6 +1,5 @@
 /**
  * The single provider/model resolution seam — one precedence ladder per kind.
- * Port of `core/provider_resolution.py`.
  *
  * Having exactly one ladder is the point. Before this existed the describe path,
  * the scoring path and the UI each resolved a model slightly differently, so the

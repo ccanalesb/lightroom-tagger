@@ -1,6 +1,5 @@
 /**
- * Providers route tests. Mirrors `tests/test_providers_api.py` and
- * `core/test_provider_registry.py`.
+ * Providers route tests.
  *
  * Every test points `LT_PROVIDERS_JSON` at a temp file. Without that these would
  * rewrite the user's real provider list — `PUT /fallback-order`, `PUT /defaults`,

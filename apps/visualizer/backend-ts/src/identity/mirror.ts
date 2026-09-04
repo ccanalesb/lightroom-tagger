@@ -1,6 +1,5 @@
 /**
  * Mirror signature and exemplars from within-perspective percentile ranks.
- * Port of `core/identity_service/mirror.py`.
  *
  * One subtlety that must not be tidied away: the Mirror's scan cells hold **raw**
  * percentiles, while `percentiles.ts` rounds its cells to six decimals. The Mirror

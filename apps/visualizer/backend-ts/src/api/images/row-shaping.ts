@@ -1,6 +1,5 @@
 /**
  * Turn `queryCatalogImages` rows into API image objects.
- * Port of `_rows_to_catalog_api_images` in `api/images/catalog.py`.
  *
  * Shared by the catalog list, visual similarity, similarity groups, stack
  * suggestions and stack members. Every one of those returns `CatalogImage`, so the

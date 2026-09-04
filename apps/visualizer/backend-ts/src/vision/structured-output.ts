@@ -1,6 +1,5 @@
 /**
  * Validation and deterministic JSON repair for score-shaped model output.
- * Port of `core/structured_output.py`.
  *
  * Every payload bound for `image_scores` goes through here, because a score row
  * is a number the ranking trusts: a malformed answer that quietly became an empty

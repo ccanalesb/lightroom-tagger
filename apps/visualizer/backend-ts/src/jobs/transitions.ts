@@ -1,6 +1,5 @@
 /**
  * Pure job status transitions — no HTTP dependencies.
- * Port of `jobs/transitions.py`.
  *
  * Kept separate from the route because the transition rules are the part with
  * edges: cancelling an already-cancelled job is a *noop*, not an error, but it

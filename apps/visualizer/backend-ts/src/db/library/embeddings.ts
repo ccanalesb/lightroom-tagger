@@ -1,6 +1,5 @@
 /**
  * Writing and selecting CLIP embedding rows.
- * Port of `lightroom_tagger/core/database/embeddings.py`.
  *
  * `image_clip_embeddings` is a sqlite-vec `vec0` virtual table, which has no
  * UPDATE path for the vector column — a re-embed is a delete followed by an

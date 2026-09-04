@@ -1,6 +1,5 @@
 /**
- * Socket.IO wiring. Port of `websocket/events.py` plus the emit call sites in
- * `app.py` and `api/jobs.py`.
+ * Socket.IO wiring.
  *
  * The server instance is held in a module-level slot rather than threaded through
  * every caller. Emits happen from three places — the jobs routes, the orphan

@@ -1,5 +1,5 @@
 /**
- * `GET /api/insights-summary` tests. Mirrors `core/test_database_insights_summary.py`.
+ * `GET /api/insights-summary` tests.
  *
  * Each tile is a separate whole-catalog aggregate, and several are easy to get
  * subtly wrong — "unscored on active perspectives" means missing *any* active

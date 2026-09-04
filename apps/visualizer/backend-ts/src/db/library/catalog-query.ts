@@ -1,6 +1,5 @@
 /**
  * Structured catalog filtering and listing queries.
- * Port of `core/database/catalog_query.py`.
  *
  * The SQL is transcribed rather than rewritten. It is the part of the port most
  * likely to change behaviour invisibly — clause order determines positional binding

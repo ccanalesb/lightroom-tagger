@@ -1,6 +1,5 @@
 /**
- * Identity route tests. Mirrors `core/test_identity_service.py` and
- * `tests/test_identity_api.py`.
+ * Identity route tests.
  *
  * The percentile maths is the part worth testing at unit scale, because on the real
  * catalog every value is plausible and only the parity test can tell right from

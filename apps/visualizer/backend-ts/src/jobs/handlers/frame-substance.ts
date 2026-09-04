@@ -1,7 +1,6 @@
 /**
  * Frame substance detection: the batch driver and the `batch_frame_substance`
- * job. Port of `core/frame_substance_batch.py` and
- * `jobs/handlers/frame_substance.py`.
+ * job.
  *
  * The driver lives beside the handler rather than under `imaging/` for the same
  * reason `runDescribePass` lives in `describe.ts`: `batch_analyze` chains it as a

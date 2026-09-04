@@ -1,6 +1,5 @@
 /**
- * Jobs route, transition and processor tests. Mirrors `tests/test_jobs_api.py`,
- * `jobs/test_transitions.py` and the processor tests in `test_app.py`.
+ * Jobs route, transition and processor tests.
  *
  * `DATABASE_PATH` points at a temp file per test so nothing touches the user's real
  * `visualizer.db`, and `LIBRARY_DB` is set explicitly because the catalog-required

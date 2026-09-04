@@ -1,4 +1,4 @@
-/** Providers API models. Port of `api/schemas/providers.py`. */
+/** Providers API models. */
 import { z } from '@hono/zod-openapi';
 
 export const ProviderModelSource = z.enum(['config', 'discovered', 'user']);

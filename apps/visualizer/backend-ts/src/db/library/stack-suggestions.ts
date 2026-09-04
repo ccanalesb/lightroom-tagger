@@ -1,6 +1,5 @@
 /**
  * Catalog similarity pairs reframed as stack suggestions (#226 / #231).
- * Port of `core/database/stack_suggestions.py`.
  */
 import type { Db } from '../connection.js';
 import { flaggedExistsSql } from './frame-substance-sql.js';

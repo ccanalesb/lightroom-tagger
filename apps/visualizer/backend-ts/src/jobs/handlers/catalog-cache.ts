@@ -1,6 +1,5 @@
 /**
- * The `catalog_cache_build` composite. Port of `handle_catalog_cache_build` in
- * `jobs/handlers/stacks.py`.
+ * The `catalog_cache_build` composite.
  *
  * Sync, embed, detect stacks, group near-duplicates — the four jobs a user would
  * otherwise start by hand, in the only order that works, since each stage reads

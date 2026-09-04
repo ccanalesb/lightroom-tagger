@@ -1,6 +1,6 @@
 /**
- * Explicit command registry for the CLI. Port of `core/cli_commands.py`, and the
- * original of the pattern `jobs/registry.ts` follows (ADR-0006).
+ * Explicit command registry for the CLI, and the original of the pattern
+ * `jobs/registry.ts` follows (ADR-0006).
  *
  * One list, greppable, no decorators and no auto-discovery: adding a command is
  * a visible edit here rather than a side effect of importing a module. The flags

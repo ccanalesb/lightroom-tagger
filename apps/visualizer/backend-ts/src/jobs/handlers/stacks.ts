@@ -1,6 +1,5 @@
 /**
- * Burst-stack detection and catalog CLIP similarity. Port of the two standalone
- * handlers in `jobs/handlers/stacks.py`.
+ * Burst-stack detection and catalog CLIP similarity.
  *
  * Both jobs read the vectors `batch_embed_image` wrote and turn them into
  * something the grid shows: stacks collapse a burst to one row, similarity groups

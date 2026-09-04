@@ -1,6 +1,5 @@
 /**
- * Reads image metadata out of a Lightroom `.lrcat`. Port of
- * `lightroom_tagger/lightroom/reader.py`.
+ * Reads image metadata out of a Lightroom `.lrcat`.
  *
  * The counterpart to `writer.ts`, and deliberately a separate connection function:
  * this one opens the catalog **read-only** so a browse or a sync cannot mutate a

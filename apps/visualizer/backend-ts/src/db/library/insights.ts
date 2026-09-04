@@ -1,5 +1,5 @@
 /**
- * Insights landing-page aggregates. Port of `core/database/insights_summary.py`.
+ * Insights landing-page aggregates.
  *
  * All of these are whole-catalog counts, so they are written as single SQL
  * aggregates rather than loops — on 43k images the difference is a page that loads

@@ -1,6 +1,5 @@
 /**
  * Scores API response models — single source of truth for `image_scores` shapes.
- * Port of `api/schemas/scores.py`.
  */
 import { z } from '@hono/zod-openapi';
 

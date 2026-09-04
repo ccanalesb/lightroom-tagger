@@ -1,6 +1,5 @@
 /**
  * Catalog browse, similarity, and image-detail API models.
- * Port of `api/schemas/catalog.py`.
  *
  * Every model here is `.strict()`, matching pydantic's `extra='forbid'`. That is
  * load-bearing rather than stylistic: the catalog row is built by spreading a

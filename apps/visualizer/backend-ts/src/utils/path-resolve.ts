@@ -1,7 +1,5 @@
 /**
  * Resolve catalog file paths recorded as UNC/network locations.
- * Port of `resolve_filepath` (`core/database/catalog.py`) and `resolve_catalog_path`
- * (`core/path_utils.py`).
  *
  * Lightroom stores NAS paths as `//tnas/ccanales/Foo/bar.jpg`, which no local API
  * can open. On macOS the same share appears under `/Volumes/<share>`, sometimes with

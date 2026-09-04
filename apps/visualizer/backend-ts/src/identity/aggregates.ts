@@ -1,6 +1,5 @@
 /**
  * Per-image aggregate scores over active critique perspectives.
- * Port of `core/identity_service/aggregates.py`.
  */
 import type { Db } from '../db/connection.js';
 import { flaggedExistsSql } from '../db/library/frame-substance-sql.js';

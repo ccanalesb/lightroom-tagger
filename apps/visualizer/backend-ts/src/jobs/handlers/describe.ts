@@ -1,5 +1,5 @@
 /**
- * Describe job handlers. Port of the describe half of `jobs/handlers/analyze.py`.
+ * Describe job handlers.
  *
  * `describeMatchedImage` already reports `written` / `skipped` / `failed`, but a
  * skip carries no reason a user could act on — the service does not care *why* an
