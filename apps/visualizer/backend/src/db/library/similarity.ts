@@ -3,6 +3,7 @@
  *
  * `batch_catalog_similarity` materializes these rows; the API only reads them.
  */
+import { nowIsoLocal } from '../../utils/datetime.js';
 import type { Db } from '../connection.js';
 
 export interface SimilarityGroupRow {
@@ -69,7 +70,7 @@ export function insertCatalogSimilarityGroup(
       args.candidates.length,
       bestSimilarity,
       args.jobId ?? null,
-      localIsoNow(),
+      nowIsoLocal(),
     );
   const groupId = Number(info.lastInsertRowid);
 
@@ -90,21 +91,6 @@ export function insertCatalogSimilarityGroup(
     );
   });
   return groupId;
-}
-
-/**
- * Local ISO timestamp without timezone offset.
- *
- * Existing `created_at` values use naive local time; the groups list sorts the
- * column as text, so UTC or offset-bearing strings would order incorrectly.
- */
-function localIsoNow(): string {
-  const d = new Date();
-  const p = (n: number, width = 2): string => String(n).padStart(width, '0');
-  return (
-    `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` +
-    `T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}000`
-  );
 }
 
 export function getSimilarityGroupsCount(db: Db): number {

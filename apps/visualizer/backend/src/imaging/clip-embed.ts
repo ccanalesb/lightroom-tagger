@@ -6,9 +6,9 @@
  * Weights stay fp32; quantized models measured no faster.
  */
 import { CLIPVisionModelWithProjection, Tensor, env } from '@huggingface/transformers';
-import sharp from 'sharp';
 import { serializeFloat32 } from '../db/connection.js';
 import { CLIP_PIXEL_VALUES_SHAPE, clipPixelValues } from './clip-preprocess.js';
+import { decodePlaneFromFile } from './decode-plane.js';
 import type { Plane } from './pil-resample.js';
 
 /** Must match the model id recorded alongside the stored vectors. */
@@ -34,17 +34,7 @@ function getModel(): Promise<VisionModel> {
 
 /** Decode an image file to interleaved RGB. */
 export async function decodeRgb(path: string): Promise<Plane> {
-  const { data, info } = await sharp(path)
-    .removeAlpha()
-    .toColourspace('srgb')
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  return {
-    data: new Uint8Array(data),
-    width: info.width,
-    height: info.height,
-    channels: info.channels,
-  };
+  return decodePlaneFromFile(path, { colourspace: 'srgb', removeAlpha: true });
 }
 
 function l2Normalize(v: Float32Array): Float32Array {

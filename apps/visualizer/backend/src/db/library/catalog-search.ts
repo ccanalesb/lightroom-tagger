@@ -16,10 +16,6 @@ export function getAllImages(db: Db): Row[] {
   return all(db, 'SELECT * FROM images');
 }
 
-export function getImageCount(db: Db): number {
-  return Number((db.prepare('SELECT COUNT(*) AS cnt FROM images').get() as { cnt: number }).cnt);
-}
-
 /**
  * Substring match across the Lightroom metadata, widened by an FTS5 match over
  * the AI descriptions.

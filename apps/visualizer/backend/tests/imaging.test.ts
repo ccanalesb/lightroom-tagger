@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import sharp from 'sharp';
+import { decodePlaneFromFile } from '../src/imaging/decode-plane.js';
 import { centerCrop, pilGreyscale, pilResize, type Plane } from '../src/imaging/pil-resample.js';
 import { clipPixelValues, resizeShortestEdgeSize } from '../src/imaging/clip-preprocess.js';
 import { hammingDistance, phash, phashDctBlock } from '../src/imaging/phash.js';
@@ -44,27 +44,9 @@ const manifest = JSON.parse(readFileSync(join(DIR, 'manifest.json'), 'utf8')) as
   images: ImageEntry[];
 };
 
-/**
- * Decode a fixture PNG to interleaved samples. PNG is lossless, so this is exact.
- *
- * `.raw()` alone is not enough: libvips promotes a 1-channel ("b-w") PNG to 3
- * channels on the way out, so a greyscale golden would come back as RGB and be
- * compared against a 1-channel result. Pin the output colourspace to whatever the
- * file actually declares.
- */
+/** Decode a fixture PNG to interleaved samples. PNG is lossless, so this is exact. */
 async function loadPng(file: string): Promise<Plane> {
-  const path = join(DIR, file);
-  const meta = await sharp(path).metadata();
-  const { data, info } = await sharp(path)
-    .toColourspace(meta.channels === 1 ? 'b-w' : 'srgb')
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-  return {
-    data: new Uint8Array(data),
-    width: info.width,
-    height: info.height,
-    channels: info.channels,
-  };
+  return decodePlaneFromFile(join(DIR, file));
 }
 
 const loadRgb = (name: string) => loadPng(`${name}.png`);

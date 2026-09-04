@@ -6,12 +6,12 @@ import type { Db } from '../../db/connection.js';
 import type { Row } from '../../db/library/catalog.js';
 import {
   getAllImages,
-  getImageCount,
   searchByColorLabel,
   searchByDate,
   searchByKeyword,
   searchByRating,
 } from '../../db/library/catalog-search.js';
+import { getImageCount } from '../../db/library/statistics.js';
 import { withLibraryDb } from '../library-db.js';
 import { intFlag, stringFlag } from '../parse.js';
 import type { CommandContext } from '../registry.js';

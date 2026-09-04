@@ -3,11 +3,9 @@
  */
 import type { Db } from '../connection.js';
 import { nowIsoLocal } from '../../utils/datetime.js';
+import { decodeJsonColumns } from './row-decode.js';
 
-/**
- * Columns stored as JSON text. They are decoded on read; a value that fails to
- * parse is left as the raw string rather than raising.
- */
+/** Columns stored as JSON text and decoded on read. */
 const JSON_COLUMNS = [
   'composition',
   'perspectives',
@@ -19,27 +17,14 @@ const JSON_COLUMNS = [
 
 export type DescriptionRow = Record<string, unknown>;
 
-function decodeJsonColumns(row: DescriptionRow): DescriptionRow {
-  const out = { ...row };
-  for (const col of JSON_COLUMNS) {
-    const val = out[col];
-    if (typeof val === 'string') {
-      try {
-        out[col] = JSON.parse(val);
-      } catch {
-        // Leave the raw string in place.
-      }
-    }
-  }
-  return out;
-}
+const decodeRow = (row: DescriptionRow): DescriptionRow => decodeJsonColumns(row, JSON_COLUMNS);
 
 /** One `image_descriptions` row by image key, JSON columns decoded. */
 export function getImageDescription(db: Db, imageKey: string): DescriptionRow | null {
   const row = db
     .prepare('SELECT * FROM image_descriptions WHERE image_key = ?')
     .get(imageKey) as DescriptionRow | undefined;
-  return row ? decodeJsonColumns(row) : null;
+  return row ? decodeRow(row) : null;
 }
 
 export interface DescriptionListItem {

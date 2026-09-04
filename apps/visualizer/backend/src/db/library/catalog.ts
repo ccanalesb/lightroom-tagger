@@ -3,13 +3,13 @@
  */
 import { existsSync } from 'node:fs';
 import type { Db } from '../connection.js';
+import { decodeJsonColumns, type Row } from './row-decode.js';
 
-export type Row = Record<string, unknown>;
+export type { Row };
 
 /**
  * Columns stored as JSON text and decoded on read.
  *
- * A value that fails to parse is left as the raw string rather than raising.
  * `exif` is JSON-eligible even though the API types it as a string; in practice
  * the column is empty on every row.
  */
@@ -20,17 +20,7 @@ const BOOL_COLUMNS = ['instagram_posted', 'processed', 'is_stack_representative'
 
 /** Decode JSON columns and coerce 0/1 columns to booleans, in place on a copy. */
 export function deserializeRow<T extends Row>(row: T): T {
-  const out = { ...row };
-  for (const col of JSON_COLUMNS) {
-    const val = out[col];
-    if (typeof val === 'string') {
-      try {
-        (out as Row)[col] = JSON.parse(val);
-      } catch {
-        // Leave the raw string in place.
-      }
-    }
-  }
+  const out = decodeJsonColumns(row, JSON_COLUMNS);
   for (const col of BOOL_COLUMNS) {
     // `is_stack_representative` stays null when absent from a stack; the other bool
     // columns coerce whenever the key is present.

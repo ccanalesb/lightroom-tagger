@@ -5,7 +5,7 @@
  * disagrees with ITU-R 601-2 luma on a quarter of pixels. See `pil-resample.ts`.
  */
 import { createHash } from 'node:crypto';
-import sharp from 'sharp';
+import { decodePlaneFromFile } from './decode-plane.js';
 import { pilGreyscale, type Plane } from './pil-resample.js';
 
 /** Trigger thresholds — inherited from the prototype's FFmpeg `blackdetect` rules. */
@@ -171,17 +171,7 @@ function tileMax(grey: Plane): number {
  */
 export async function computeStatisticsFromPath(path: string): Promise<FrameStatistics | null> {
   try {
-    const meta = await sharp(path, { limitInputPixels: false }).metadata();
-    const { data, info } = await sharp(path, { limitInputPixels: false })
-      .toColourspace(meta.channels === 1 ? 'b-w' : 'srgb')
-      .raw()
-      .toBuffer({ resolveWithObject: true });
-    const plane: Plane = {
-      data: new Uint8Array(data),
-      width: info.width,
-      height: info.height,
-      channels: info.channels,
-    };
+    const plane = await decodePlaneFromFile(path, { limitInputPixels: false });
     return computeStatisticsFromGreyscale(pilGreyscale(plane));
   } catch {
     return null;
