@@ -12,4 +12,4 @@ Canonical triage vocabulary using the default label names (`needs-triage`, `need
 
 ### Domain docs
 
-Multi-context layout: `CONTEXT-MAP.md` at the root points to per-context `CONTEXT.md` files for the library/CLI and the visualizer product. See `docs/agents/domain.md`.
+Single-context layout: `CONTEXT-MAP.md` at the root points to `apps/visualizer/CONTEXT.md`, which covers the whole product — API, CLI, jobs and UI. See `docs/agents/domain.md`.

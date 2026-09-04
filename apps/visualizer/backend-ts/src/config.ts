@@ -86,7 +86,7 @@ export const config = {
    */
   get LT_PROVIDERS_JSON(): string {
     return resolvePath(
-      process.env.LT_PROVIDERS_JSON ?? 'lightroom_tagger/core/providers.json',
+      process.env.LT_PROVIDERS_JSON ?? 'apps/visualizer/backend-ts/providers.json',
     );
   },
 } as const;

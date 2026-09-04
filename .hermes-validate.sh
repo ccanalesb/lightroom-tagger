@@ -79,7 +79,7 @@ fi
 
 # Check 6: Project structure
 echo -n "Checking lightroom-tagger project... "
-if [ -f "$PROJECT_ROOT/lightroom_tagger/core/providers.json" ]; then
+if [ -f "$PROJECT_ROOT/apps/visualizer/backend-ts/providers.json" ]; then
     echo -e "${GREEN}✓${NC} Found"
 else
     echo -e "${RED}✗ Project structure invalid${NC}"

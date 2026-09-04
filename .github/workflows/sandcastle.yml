@@ -29,15 +29,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Install Node deps
         run: npm ci
 
       - name: Build sandbox image
         # --dockerfile makes the build context the repo root, so the Dockerfile
-        # can COPY pyproject.toml + uv.lock to pre-bake deps (.dockerignore keeps
-        # the context to just those files).
+        # can COPY the backend and frontend package manifests to pre-bake deps
+        # (.dockerignore keeps the context to just those files).
         run: npx @ai-hero/sandcastle docker build-image --dockerfile .sandcastle/Dockerfile
 
       - name: Run sandcastle pipeline

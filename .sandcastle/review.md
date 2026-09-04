@@ -27,9 +27,8 @@ if it is present in the sandbox). Flag:
 ## Axis 2 — Standards (does it follow this repo's conventions?)
 
 Check the diff against the documented conventions in `docs/architecture.md` and
-`CONTEXT-MAP.md` (package layout under `lightroom_tagger/`, module
-boundary/size policy, existing patterns). Cite the doc + rule for each
-violation.
+`CONTEXT-MAP.md` (the layer split under `apps/visualizer/backend-ts/src/`, the
+import rules, existing patterns). Cite the doc + rule for each violation.
 
 Then scan for these code smells — judgement calls, not hard rules; a documented
 repo convention overrides them, and skip anything tooling already enforces:
@@ -49,7 +48,7 @@ repo convention overrides them, and skip anything tooling already enforces:
 
 ## Tests
 
-Ensure coverage is adequate and the suite passes (`python -m pytest -q`).
+Ensure coverage is adequate and the suite passes (`cd apps/visualizer/backend-ts && npm test`).
 
 # Done
 

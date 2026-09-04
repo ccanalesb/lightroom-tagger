@@ -21,7 +21,13 @@ import { config, REPO_ROOT } from '../config.js';
 import type { ProviderClient } from './vision-client.js';
 
 /** The shipped template the registry bootstraps from on first use. */
-const EXAMPLE_PATH = join(REPO_ROOT, 'lightroom_tagger', 'core', 'providers.example.json');
+const EXAMPLE_PATH = join(
+  REPO_ROOT,
+  'apps',
+  'visualizer',
+  'backend-ts',
+  'providers.example.json',
+);
 
 /**
  * The only resolution kinds a `defaults` block may declare.

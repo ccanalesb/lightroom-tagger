@@ -8,6 +8,12 @@
  * two pixel fractions are exact rationals and compared exactly; the other three
  * are compared to a relative tolerance because numpy accumulates them in float32
  * and this port accumulates in float64.
+ *
+ * The manifest is frozen. The numpy detector that produced it was deleted with the
+ * Python package, so there is nothing left to regenerate it from — which is the
+ * point: it is the independent second opinion this port is measured against. A
+ * deliberate threshold change means recovering the detector from git history, not
+ * rewriting these numbers from the TypeScript side.
  */
 import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';

@@ -46,11 +46,11 @@ plans:
 context:
   # Important files for context
   key_files:
-    - lightroom_tagger/core/provider_registry.py
-    - lightroom_tagger/core/vision_client.py
-    - lightroom_tagger/core/providers.json
+    - apps/visualizer/backend-ts/src/providers/registry.ts
+    - apps/visualizer/backend-ts/src/providers/vision-client.ts
+    - apps/visualizer/backend-ts/providers.json
     - config.yaml
-    - pyproject.toml
+    - apps/visualizer/backend-ts/package.json
   
   # Documentation
   docs:
@@ -66,10 +66,10 @@ notes: |
   Goal: Add GitHub Copilot as additional provider via API gateway
 
   Project structure:
-  - lightroom_tagger/core/ - Core library (providers, vision client, config)
-  - lightroom_tagger/lightroom/ - Lightroom catalog interaction
-  - apps/visualizer/ - Flask backend + React frontend for UI
+  - apps/visualizer/backend-ts/src/providers/ - Providers, vision client, config
+  - apps/visualizer/backend-ts/src/lightroom/ - Lightroom catalog interaction
+  - apps/visualizer/ - Hono backend + React frontend for UI
 
   Testing:
-  - Backend: python -m pytest <path> -v
+  - Backend: cd apps/visualizer/backend-ts && npx vitest run <path>
   - Frontend: cd apps/visualizer/frontend && npx vitest run

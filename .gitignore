@@ -86,7 +86,7 @@ library.db*.bak-wal
 node_modules/
 .env.local
 thumbnails/
-lightroom_tagger/core/providers.json
+apps/visualizer/backend-ts/providers.json
 *.db-journal
 *.db-wal
 *.db-shm

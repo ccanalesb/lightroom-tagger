@@ -32,11 +32,16 @@ about `Context`, request parsing or response shaping.
 Until the TypeScript cutover this policy governed a Python package at
 `lightroom_tagger/` and a Flask backend at `apps/visualizer/backend/`, with the
 layer split enforced by `test_architecture.py` and a 400-line cap on
-`lightroom_tagger/core/` (`make check-core-sizes`). The Flask tree is gone and the
-rules above are the same boundaries restated for the tree that replaced it.
+`lightroom_tagger/core/` (`make check-core-sizes`). Both trees are gone and the
+rules above are the same boundaries restated for the tree that replaced them.
 
-`lightroom_tagger/` is still on disk but nothing runs it. It is kept for one
-reason: `db/library/bootstrap.ts` creates the schema at version 8 and refuses any
-`library.db` below that, so the Python migration ladder in
-`core/database/db_init_migrations.py` is the only way to open an older backup. See
-[docs/plans/ts-backend-migration.md](plans/ts-backend-migration.md).
+Neither enforcement mechanism survived the port. The import rules above are a
+convention today; ten files under `src/` are already over the old 400-line cap,
+so reinstating it needs refactoring first. Tracked in
+[#306](https://github.com/ccanalesb/lightroom-tagger/issues/306).
+
+The Python package took the `library.db` migration ladder with it, so
+`db/library/bootstrap.ts` is now the only schema authority: it creates version 8
+and refuses anything below. Backups predating version 8 are no longer openable by
+anything in this repo — recover the ladder from git history if one ever needs
+upgrading. See [docs/plans/ts-backend-migration.md](plans/ts-backend-migration.md).

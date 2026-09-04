@@ -106,7 +106,7 @@ This means if you don't specify a provider, lightroom-tagger will try GitHub Cop
 
 ## 🔧 Configuration
 
-The provider is configured in `lightroom_tagger/core/providers.json`:
+The provider is configured in `apps/visualizer/backend-ts/providers.json`:
 
 ```json
 {

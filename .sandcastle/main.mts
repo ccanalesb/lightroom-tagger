@@ -17,11 +17,11 @@ const task = process.env.SANDCASTLE_TASK?.trim();
 const commitNote =
   "When done and tests pass, stage and commit ALL changes " +
   '(`git add -A && git commit -m "..."`), then output <promise>COMPLETE</promise>. ' +
-  "IMPORTANT: if you changed any backend response model (`apps/visualizer/backend/api/schemas/**`) " +
-  "or a route's `@spec.validate` decorator, first run " +
+  "IMPORTANT: if you changed any backend Zod schema (`apps/visualizer/backend-ts/src/api/schemas/**`) " +
+  "or a route's `createRoute` definition, first run " +
   "`cd apps/visualizer/frontend && npm run generate:api` and commit the regenerated " +
-  "`src/types/api.gen.ts` (a committed CI gate fails on drift). Never put `@spec.validate` " +
-  "on a `send_file`/binary route.";
+  "`src/types/api.gen.ts` (a committed CI gate fails on drift). Binary routes stay off " +
+  "`createRoute` — register them as plain Hono handlers.";
 
 // Two-axis review (ported from the code-review skill): Spec = does the diff
 // match what was asked; Standards = does it follow repo conventions + the
@@ -40,7 +40,7 @@ Compare the diff against the task text. Quote the relevant task line for each fi
 (c) requirements that look implemented but are implemented wrong.
 
 ## Axis 2 — Standards (does it follow this repo's conventions?)
-Check the diff against the documented conventions in \`docs/architecture.md\` and \`CONTEXT-MAP.md\` (package layout under \`lightroom_tagger/\`, module boundary/size policy, existing patterns). Cite the doc + rule for each violation.
+Check the diff against the documented conventions in \`docs/architecture.md\` and \`CONTEXT-MAP.md\` (the layer split under \`apps/visualizer/backend-ts/src/\`, the import rules, existing patterns). Cite the doc + rule for each violation.
 Then scan for these code smells — judgement calls, not hard rules; a documented repo convention overrides them, and skip anything tooling already enforces:
 - Mysterious Name — name doesn't reveal intent.
 - Duplicated Code — same shape in >1 place → extract.
@@ -56,16 +56,16 @@ Then scan for these code smells — judgement calls, not hard rules; a documente
 - Refused Bequest — subclass ignores most of what it inherits.
 
 ## Tests
-Ensure coverage is adequate and the suite passes: \`python -m pytest -q\`.
+Ensure coverage is adequate and the suite passes: \`cd apps/visualizer/backend-ts && npm test\`.
 
 ## Contract (backend-authoritative OpenAPI → generated TS)
-This repo generates the frontend's types from the backend OpenAPI spec (ADR-0013); the generated file \`apps/visualizer/frontend/src/types/api.gen.ts\` is committed and a CI gate fails on drift. If the diff touches ANY pydantic response model (\`backend/api/schemas/**\`) or a route's \`@spec.validate\` decorator, the committed types may be stale. Verify and FIX before finishing:
+This repo generates the frontend's types from the backend OpenAPI spec (ADR-0013); the generated file \`apps/visualizer/frontend/src/types/api.gen.ts\` is committed and a CI gate fails on drift. If the diff touches ANY Zod schema (\`apps/visualizer/backend-ts/src/api/schemas/**\`) or a route's \`createRoute\` definition, the committed types may be stale. Verify and FIX before finishing:
 
 - \`cd apps/visualizer/frontend && npm run generate:api\` — regenerate the committed types.
 - \`git diff --exit-code src/types/api.gen.ts\` must be clean afterwards. If it is not, the regen changed the file → **commit the regenerated \`api.gen.ts\`** (this is the #1 cause of gate failures — do not skip it).
-- \`npx tsc --noEmit\` must pass.
+- \`npx tsc --noEmit\` must pass, in the frontend and in \`apps/visualizer/backend-ts\`.
 
-Also: never wrap a \`send_file\`/binary/streaming route in \`@spec.validate\` — validation reads the response body and 500s with "direct passthrough mode". Binary endpoints do not belong in the JSON contract.
+Also: binary and streaming routes (thumbnails, file downloads) are registered as plain Hono handlers, never through \`createRoute\`/\`.openapi()\`. They do not belong in the JSON contract.
 
 ## Done
 Fix the issues you find directly and keep fixes minimal. Then stage and commit ALL changes (including the implementer's work if still uncommitted):
@@ -75,17 +75,17 @@ Then output <promise>COMPLETE</promise>.`;
 await using sandbox = await createSandbox({
   branch,
   sandbox: docker(),
-  // On sandbox start: give git an identity (so agents can commit) and install
-  // the editable project into the pre-baked venv (deps already present, so this
-  // is fast). Both run steps can then just `python -m pytest`.
+  // On sandbox start: give git an identity (so agents can commit) and link the
+  // pre-baked dependency trees into the bind-mounted worktree, so both the test
+  // suite and the contract check (generate:api + tsc) run without a per-run
+  // npm ci. The backend link has to come first: generate:api shells out to the
+  // backend's tsx to export the OpenAPI document.
   hooks: {
     sandbox: {
       onSandboxReady: [
         { command: "git config user.email agent@sandcastle.local" },
         { command: "git config user.name 'Sandcastle Agent'" },
-        { command: "uv pip install -e . --no-deps" },
-        // Link the pre-baked frontend deps into the worktree so the contract
-        // check (npm run generate:api + tsc) can run without a per-run npm ci.
+        { command: "ln -sfn /home/agent/.be-deps/node_modules apps/visualizer/backend-ts/node_modules" },
         { command: "ln -sfn /home/agent/.fe-deps/node_modules apps/visualizer/frontend/node_modules" },
       ],
     },

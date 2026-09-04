@@ -91,7 +91,7 @@ stack_burst_delta_ms: 2000
 vision_cache_enabled: true
 ```
 
-All keys above are fields on `Config` in `lightroom_tagger/core/config.py`. Unknown keys in an existing `config.yaml` are ignored with a warning.
+All keys above are fields on `LibraryConfig` in `apps/visualizer/backend-ts/src/config.ts`. Unknown keys in an existing `config.yaml` are ignored with a warning.
 
 Environment overrides (common): `VISION_MODEL`, `LIGHTRoom_CATALOG`, `LIGHTRoom_DB`, `OLLAMA_HOST`.
 
@@ -101,9 +101,9 @@ Environment overrides (common): `VISION_MODEL`, `LIGHTRoom_CATALOG`, `LIGHTRoom_
 
 | Doc | Audience |
 |-----|----------|
-| [CONTEXT-MAP.md](CONTEXT-MAP.md) | Where to find library vs visualizer context |
-| [lightroom_tagger/CONTEXT.md](lightroom_tagger/CONTEXT.md) | CLI, `library.db`, vision pipeline |
-| [apps/visualizer/CONTEXT.md](apps/visualizer/CONTEXT.md) | HTTP API, jobs, React SPA |
+| [CONTEXT-MAP.md](CONTEXT-MAP.md) | Where the context lives |
+| [apps/visualizer/CONTEXT.md](apps/visualizer/CONTEXT.md) | HTTP API, CLI, jobs, `library.db`, vision pipeline, React SPA |
+| [docs/architecture.md](docs/architecture.md) | Backend layer boundaries and import rules |
 | [AGENTS.md](AGENTS.md) | Agent workflow and issue tracker |
 | [docs/parked/](docs/parked/) | Retired capabilities (Instagram matching, etc.) |
 

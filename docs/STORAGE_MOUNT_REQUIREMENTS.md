@@ -16,7 +16,7 @@ The library database stores file paths as Lightroom recorded them—often UNC-st
 //tnas/ccanales/Photos/2024/IMG_1234.jpg
 ```
 
-At runtime, `resolve_filepath()` in `lightroom_tagger/core/database/catalog.py` maps UNC paths to a **local mount point** on the backend host:
+At runtime, `resolveCatalogPath()` in `apps/visualizer/backend-ts/src/utils/path-resolve.ts` maps UNC paths to a **local mount point** on the backend host:
 
 | Platform | Typical mount |
 |----------|----------------|
@@ -91,18 +91,17 @@ If the mount is missing, mount the share before retrying jobs. On Linux this is 
 Pick a UNC path from your library (Processing → Catalog cache shows cache location; or query `images.filepath` in `library.db`):
 
 ```bash
-python3 -c "
-from lightroom_tagger.core.database import resolve_filepath
-p = '//tnas/ccanales/Photos/example.jpg'  # replace with a real path
-r = resolve_filepath(p)
-print('resolved:', r)
-import os
-print('exists:', os.path.isfile(r))
+cd apps/visualizer/backend-ts && npx tsx -e "
+import { resolveCatalogPath } from './src/utils/path-resolve.ts';
+const p = '//tnas/ccanales/Photos/example.jpg';  // replace with a real path
+console.log('resolved:', JSON.stringify(resolveCatalogPath(p)));
 "
 ```
 
-- If `resolved` still looks like `//...`, no usable local path was produced. Either no mount mapping matched (set `mount_point` / `NAS_MOUNT_POINT`) **or** the mapping worked but the file is not there. Map the path by hand and test it before assuming the mount is at fault—if the hand-mapped file exists, the mount is fine and the resolver simply could not confirm it.
-- If `resolved` is a local path but `exists: False`, the mount is wrong or the file moved.
+The resolver only returns a path it has confirmed exists, so the output is binary:
+
+- An empty string means unreachable. Either no mount mapping matched (set `mount_point` / `NAS_MOUNT_POINT`) **or** the mapping worked but the file is not there. Map the path by hand and test it before assuming the mount is at fault—if the hand-mapped file exists, the mount is fine and the resolver simply could not confirm it.
+- A local path means resolution and the mount are both working for that file.
 - A catalog that has outlived some of its files will always have a residue of paths that resolve nowhere. Those images can never be cached, and no mount fixes them.
 
 Restart the visualizer backend after changing `config.yaml` or mount env vars so `NAS_MOUNT_POINT` is picked up.

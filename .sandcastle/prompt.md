@@ -1,9 +1,10 @@
 # Context
 
-Project: a Python tool (`lightroom-tagger`) that indexes a Lightroom catalog,
-tags images with vision models, and matches against Instagram. Package source
-is under `lightroom_tagger/`, tests under the repo. Conventions live in
-`docs/architecture.md` and `CONTEXT-MAP.md`.
+Project: a TypeScript tool (`lightroom-tagger`) that indexes a Lightroom catalog,
+tags images with vision models, and matches against Instagram. Source and tests
+live under `apps/visualizer/backend-ts/`, with a React frontend in
+`apps/visualizer/frontend/`. Conventions live in `docs/architecture.md` and
+`CONTEXT-MAP.md`.
 
 Recent history:
 
@@ -17,22 +18,22 @@ Recent history:
 
 The visualizer's frontend types are generated from the backend OpenAPI spec
 (ADR-0013); `apps/visualizer/frontend/src/types/api.gen.ts` is committed and a CI
-gate fails on drift. If you touch a pydantic response model
-(`apps/visualizer/backend/api/schemas/**`) or a route's `@spec.validate`
-decorator, you MUST regenerate and commit the types:
+gate fails on drift. If you touch a Zod schema
+(`apps/visualizer/backend-ts/src/api/schemas/**`) or a route's `createRoute`
+definition, you MUST regenerate and commit the types:
 
     cd apps/visualizer/frontend && npm run generate:api   # then commit src/types/api.gen.ts
     npx tsc --noEmit                                       # must pass
 
-Never wrap a `send_file`/binary/streaming route in `@spec.validate` — it 500s
-with "direct passthrough mode". Binary endpoints are not part of the JSON contract.
+Binary and streaming routes (thumbnails, downloads) are registered as plain Hono
+handlers, never through `createRoute`/`.openapi()`. They are not part of the JSON
+contract.
 
 # Done
 
-The project and its dev deps are already installed in the active venv, so run
-the test suite with:
+Dependencies are already installed, so run the test suite with:
 
-!`echo "Run: python -m pytest -q"`
+!`echo "Run: cd apps/visualizer/backend-ts && npm test"`
 
 When the task is complete and tests pass, stage and commit ALL your changes
 (including any regenerated `api.gen.ts`):
