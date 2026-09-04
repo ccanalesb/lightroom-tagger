@@ -1,7 +1,7 @@
 # ADR-0009: One dispatcher for all provider/LLM calls
 
 ## Status
-Accepted (2026-07)
+Accepted (2026-07). Point 3 amended (2026-09) — see *Amendment*.
 
 ## Context
 Provider/LLM HTTP calls were scattered across scoring, description, vision compare,
@@ -43,3 +43,30 @@ Legitimate exceptions (allow-listed in the guardrail):
 - Slight indirection via `fn_factory`; acceptable for one place to audit calls.
 - Tool-calling and multimodal paths share the same error-mapping and fallback
   story as text-only and vision paths.
+
+## Amendment (2026-09): point 3 was never implemented, and is withdrawn
+
+The escalation policies existed but nothing ever ran them. `FallbackDispatcher`
+stored the injected `ErrorPolicy` and never called `on_escalation_error`; no
+production caller constructed a policy or a `ConsecutiveAbortTracker`, and the
+only references to either were their own unit tests. The TypeScript port carried
+the whole arrangement over faithfully, dispatcher field included, so it inherited
+a subsystem that this ADR vouched for and the code never reached.
+
+What actually happened on a context-length error was three retries at the same
+`max_tokens`, then a cascade to the next provider — never a token bump, never a
+payload split, never a session blacklist.
+
+`ContextLengthEscalationPolicy`, `VisionBatchErrorPolicy`, `NoOpErrorPolicy` and
+`ConsecutiveAbortTracker` are therefore deleted rather than wired: wiring them
+would be adding unproven behaviour to a migration, and the ladder they implement
+has never been measured against a real provider. Points 1, 2 and 4 stand —
+`callWithFallback` remains the single seam, and it still owns retry, cascade and
+cooperative cancellation.
+
+The error *classes* the policies switched on (`ContextLengthError`,
+`PayloadTooLargeError`, `RateLimitError`, `InvalidRequestError`) are unaffected:
+`vision-client.ts` still maps HTTP statuses onto them and the retry classifier
+still reads them. If token escalation is wanted later, it belongs in the
+dispatcher loop with a test that proves it fires — not in a policy object the
+dispatcher holds and ignores.

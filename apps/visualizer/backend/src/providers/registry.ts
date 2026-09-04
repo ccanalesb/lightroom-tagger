@@ -14,6 +14,7 @@
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { config, REPO_ROOT } from '../config.js';
+import { requestJson } from './http.js';
 import type { ProviderClient } from './vision-client.js';
 
 /** The shipped template the registry bootstraps from on first use. */
@@ -66,6 +67,8 @@ export interface ProviderConfig {
   api_key?: string;
   api_key_env?: string;
   auto_discover?: boolean;
+  /** Use Ollama's native `/api/chat` for vision calls. See `ProviderClient`. */
+  native_chat?: boolean;
   extra_headers?: Record<string, string>;
   request_timeout_seconds?: number;
   retry?: Record<string, unknown>;
@@ -229,6 +232,10 @@ export class ProviderRegistry {
       apiKey: this.resolveApiKey(cfg),
       extraHeaders: cfg.extra_headers ?? {},
       timeoutMs: Number(cfg.request_timeout_seconds ?? 120) * 1000,
+      // Defaulting on the id covers `providers.json` files written before the
+      // flag existed. Renaming that provider without setting `native_chat` is
+      // the one case this gets wrong, and it degrades to the compat endpoint.
+      nativeChat: cfg.native_chat ?? providerId === 'ollama',
     };
   }
 
@@ -387,27 +394,32 @@ export class ProviderRegistry {
     return cfg.api_key_env ? (process.env[cfg.api_key_env] ?? '') : '';
   }
 
-  /** One OpenAI-compatible request, with the provider's headers and timeout. */
+  /**
+   * One OpenAI-compatible request, with the provider's headers and timeout.
+   *
+   * Failures stay plain `Error`s carrying the status line: every caller here is a
+   * probe, and `probeConnection` puts this message straight in front of the user
+   * as the reason a provider is unavailable.
+   */
   private async fetchJson(
     cfg: ProviderConfig,
     path: string,
     opts: { timeoutMs: number; method?: string; body?: unknown },
   ): Promise<unknown> {
-    const base = this.resolveBaseUrl(cfg).replace(/\/+$/, '');
-    const res = await fetch(`${base}${path}`, {
-      method: opts.method ?? 'GET',
-      headers: {
-        Authorization: `Bearer ${this.resolveApiKey(cfg)}`,
-        ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
-        ...(cfg.extra_headers ?? {}),
+    return requestJson(
+      {
+        baseUrl: this.resolveBaseUrl(cfg),
+        apiKey: this.resolveApiKey(cfg),
+        extraHeaders: cfg.extra_headers ?? {},
+        timeoutMs: opts.timeoutMs,
       },
-      ...(opts.body ? { body: JSON.stringify(opts.body) } : {}),
-      signal: AbortSignal.timeout(opts.timeoutMs),
-    });
-    if (!res.ok) {
-      throw new Error(`${res.status} ${res.statusText}`);
-    }
-    return res.json();
+      path,
+      {
+        method: opts.method ?? 'GET',
+        body: opts.body,
+        onHttpError: (res) => new Error(`${res.status} ${res.statusText}`),
+      },
+    );
   }
 
   /**

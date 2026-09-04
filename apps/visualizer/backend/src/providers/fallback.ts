@@ -7,15 +7,12 @@
  * batch to a paid API, and a paid API that is rate-limiting should not stall the
  * batch when a local model is available.
  */
-import type { ConsecutiveAbortTracker, ErrorPolicy } from './error-policy.js';
-import { NoOpErrorPolicy } from './error-policy.js';
 import {
   InvalidRequestError,
   isRetryableError,
   ModelUnavailableError,
   ProviderConnectionError,
   ProviderError,
-  RateLimitError,
 } from './errors.js';
 import type { ProviderRegistry } from './registry.js';
 import type { ProviderClient } from './vision-client.js';
@@ -45,11 +42,9 @@ function logCascade(
 
 export class FallbackDispatcher {
   private readonly registry: ProviderRegistry;
-  readonly errorPolicy: ErrorPolicy;
 
-  constructor(registry: ProviderRegistry, errorPolicy?: ErrorPolicy) {
+  constructor(registry: ProviderRegistry) {
     this.registry = registry;
-    this.errorPolicy = errorPolicy ?? new NoOpErrorPolicy();
   }
 
   /**
@@ -67,7 +62,6 @@ export class FallbackDispatcher {
       model: string;
       logCallback?: LogCallback;
       cancelCheck?: CancelCheck;
-      abortTracker?: ConsecutiveAbortTracker | null;
     },
   ): Promise<{ result: T; providerId: string; model: string }> {
     const { attempts, emptyFallbacks } = await this.buildAttempts(opts.providerId, opts.model);
@@ -75,7 +69,6 @@ export class FallbackDispatcher {
 
     const logCallback = opts.logCallback ?? null;
     const cancelCheck = opts.cancelCheck ?? null;
-    const abortTracker = opts.abortTracker ?? null;
     let lastError: unknown = null;
 
     for (const [index, [pid, mid]] of attempts.entries()) {
@@ -86,27 +79,19 @@ export class FallbackDispatcher {
         throw new CancelledRetryError('cancel requested before fallback attempt');
       }
 
-      if (abortTracker?.rateLimitAbortReached) {
-        throw new RateLimitError('consecutive rate-limit abort threshold reached');
-      }
-
       const client = this.registry.getClient(pid);
       const retryConfig = this.registry.getRetryConfig(pid);
       const fn = opts.fnFactory(client, mid);
 
       try {
         const result = await retryWithBackoff(fn, retryConfig, { logCallback, cancelCheck });
-        abortTracker?.recordSuccess();
         return { result, providerId: pid, model: mid };
       } catch (e) {
         // A cancel is surfaced directly — it must not fall through to the next
         // provider, which would be doing work the user asked us to stop.
         if (e instanceof CancelledRetryError) throw e;
 
-        if (e instanceof InvalidRequestError) {
-          abortTracker?.recordFatal();
-          throw e;
-        }
+        if (e instanceof InvalidRequestError) throw e;
 
         if (isRetryableError(e) || e instanceof ProviderConnectionError) {
           // `ProviderConnectionError` is not retryable — a refused connection is
@@ -128,9 +113,6 @@ export class FallbackDispatcher {
       throw new ModelUnavailableError(
         `No models available for fallback provider(s): ${emptyFallbacks.join(', ')}`,
       );
-    }
-    if (abortTracker !== null && lastError !== null) {
-      abortTracker.recordDispatchOutcome(lastError);
     }
     throw lastError;
   }

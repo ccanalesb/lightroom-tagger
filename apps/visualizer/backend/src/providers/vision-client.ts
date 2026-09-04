@@ -21,6 +21,7 @@ import {
   ProviderTimeoutError,
   RateLimitError,
 } from './errors.js';
+import { requestJson } from './http.js';
 import type { LogCallback } from './retry.js';
 
 /** A resolved provider endpoint: everything a request needs and nothing more. */
@@ -30,6 +31,16 @@ export interface ProviderClient {
   apiKey: string;
   extraHeaders: Record<string, string>;
   timeoutMs: number;
+  /**
+   * Send vision calls to Ollama's native `/api/chat` instead of the OpenAI-compat
+   * `/v1/chat/completions`.
+   *
+   * A capability, not an identity: the compat endpoint silently ignores `think`,
+   * so a thinking model answers with its reasoning inline and the parse fails.
+   * The registry decides this from config; nothing downstream should be asking
+   * which provider it is talking to.
+   */
+  nativeChat: boolean;
 }
 
 interface ChatMessageContentPart {
@@ -116,27 +127,13 @@ async function postJson(
   body: unknown,
   model: string,
 ): Promise<unknown> {
-  const base = client.baseUrl.replace(/\/+$/, '');
   const ctx = { provider: client.providerId, model };
-  let res: Response;
-  try {
-    res = await fetch(`${base}${path}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${client.apiKey}`,
-        'Content-Type': 'application/json',
-        ...client.extraHeaders,
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(client.timeoutMs),
-    });
-  } catch (e) {
-    throw mapTransportError(e, ctx);
-  }
-  if (!res.ok) {
-    throw mapHttpError(res.status, await res.text(), res.headers, ctx);
-  }
-  return res.json();
+  return requestJson(client, path, {
+    method: 'POST',
+    body,
+    onHttpError: (res, text) => mapHttpError(res.status, text, res.headers, ctx),
+    onTransportError: (e) => mapTransportError(e, ctx),
+  });
 }
 
 /** Ollama's native `/api/chat` URL, derived from its OpenAI-compat base. */
@@ -146,9 +143,6 @@ export function nativeChatUrl(baseUrl: string): string {
   return `${trimmed}/api/chat`;
 }
 
-export function isOllamaClient(client: ProviderClient): boolean {
-  return client.providerId === 'ollama';
-}
 
 /**
  * Split OpenAI-style content into Ollama's `(text, images)` shape.
@@ -249,7 +243,7 @@ export async function generateDescription(
   ];
 
   let raw: string;
-  if (isOllamaClient(client)) {
+  if (client.nativeChat) {
     raw = await nativeChat(client, model, messages, { maxTokens, think });
   } else {
     const body = (await postJson(

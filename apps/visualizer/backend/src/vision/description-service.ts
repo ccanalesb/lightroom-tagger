@@ -7,7 +7,6 @@ import { buildDescriptionOpSpec, type DescriptionStructured } from '../analyzer/
 import { VIDEO_EXTENSIONS } from '../imaging/raw-decode.js';
 import type { ProviderRegistry } from '../providers/registry.js';
 import type { CancelCheck, LogCallback } from '../providers/retry.js';
-import type { ConsecutiveAbortTracker, ErrorPolicy } from '../providers/error-policy.js';
 import { buildDescriptionUserPrompt } from '../analyzer/prompt-builder.js';
 import { getImage } from '../db/library/catalog.js';
 import { getImageDescription, storeImageDescription } from '../db/library/descriptions.js';
@@ -117,8 +116,6 @@ export interface DescribeOptions {
   model?: string | null;
   logCallback?: LogCallback;
   registry?: ProviderRegistry | null;
-  errorPolicy?: ErrorPolicy | null;
-  abortTracker?: ConsecutiveAbortTracker | null;
   cancelCheck?: CancelCheck;
   telemetry?: DescribeTelemetry | null;
 }
@@ -169,9 +166,6 @@ export async function describeMatchedImage(
     registry: opts.registry ?? null,
     cancelCheck: opts.cancelCheck ?? null,
   });
-  spec.errorPolicy = opts.errorPolicy ?? null;
-  spec.abortTracker = opts.abortTracker ?? null;
-
   const outcome = await runVisionOpPersist(spec, {
     acceptResult: descriptionStructuredIsValid,
     persist: (structured, provider, modelUsed) => {

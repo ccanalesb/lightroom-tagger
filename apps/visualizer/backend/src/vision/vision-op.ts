@@ -6,7 +6,6 @@
  * parser and what they store; every retry, cascade and cancellation rule is
  * shared, which is the only way those rules stay consistent between them.
  */
-import type { ConsecutiveAbortTracker, ErrorPolicy } from '../providers/error-policy.js';
 import { FallbackDispatcher, type FnFactory } from '../providers/fallback.js';
 import type { ProviderRegistry } from '../providers/registry.js';
 import { resolveModel, type Kind } from '../providers/resolution.js';
@@ -50,8 +49,6 @@ export interface VisionOpSpec<TParsed> {
   parseResponse: (raw: string, provider: string, model: string) => TParsed | Promise<TParsed>;
   logCallback?: LogCallback;
   registry?: ProviderRegistry | null;
-  errorPolicy?: ErrorPolicy | null;
-  abortTracker?: ConsecutiveAbortTracker | null;
   cancelCheck?: CancelCheck;
   /** Always runs, so temp files are removed even when the cascade throws. */
   cleanup?: (() => void | Promise<void>) | null;
@@ -80,7 +77,7 @@ export async function runVisionOp<TParsed>(
     ({ registry, providerId, model } = resolved);
   }
 
-  const dispatcher = new FallbackDispatcher(registry, spec.errorPolicy ?? undefined);
+  const dispatcher = new FallbackDispatcher(registry);
   try {
     const fnFactory = await spec.fnFactory();
     const { result, providerId: actualProvider, model: actualModel } =
@@ -91,7 +88,6 @@ export async function runVisionOp<TParsed>(
         model,
         logCallback: spec.logCallback ?? null,
         cancelCheck: spec.cancelCheck ?? null,
-        abortTracker: spec.abortTracker ?? null,
       });
     const parsed = await spec.parseResponse(result, actualProvider, actualModel);
     return { parsed, provider: actualProvider, model: actualModel };

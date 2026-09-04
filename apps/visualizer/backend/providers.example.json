@@ -12,6 +12,7 @@
       "base_url_default": "http://localhost:11434/v1",
       "api_key": "ollama",
       "auto_discover": true,
+      "native_chat": true,
       "extra_headers": {},
       "retry": { "max_retries": 2, "backoff_seconds": [1, 3] },
       "models": []

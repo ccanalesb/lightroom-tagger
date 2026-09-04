@@ -27,7 +27,6 @@ import {
 } from '../db/library/scores.js';
 import { libraryWrite } from '../db/library/write.js';
 import { VIDEO_EXTENSIONS } from '../imaging/raw-decode.js';
-import type { ConsecutiveAbortTracker, ErrorPolicy } from '../providers/error-policy.js';
 import type { ProviderRegistry } from '../providers/registry.js';
 import type { CancelCheck, LogCallback } from '../providers/retry.js';
 import { nowIsoUtcSeconds } from '../utils/datetime.js';
@@ -61,8 +60,6 @@ export interface ScoreOptions {
   model?: string | null;
   logCallback?: LogCallback;
   registry?: ProviderRegistry | null;
-  errorPolicy?: ErrorPolicy | null;
-  abortTracker?: ConsecutiveAbortTracker | null;
   cancelCheck?: CancelCheck;
 }
 
@@ -137,9 +134,6 @@ export async function scoreImageForPerspective(
     registry: opts.registry ?? null,
     cancelCheck: opts.cancelCheck ?? null,
   });
-  spec.errorPolicy = opts.errorPolicy ?? null;
-  spec.abortTracker = opts.abortTracker ?? null;
-
   try {
     const outcome = await runVisionOpPersist(spec, {
       acceptResult: ({ parsed }) => {
