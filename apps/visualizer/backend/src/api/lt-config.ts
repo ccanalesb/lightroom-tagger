@@ -35,15 +35,6 @@ function isFile(path: string): boolean {
   }
 }
 
-async function readJsonBody(c: { req: { json: () => Promise<unknown> } }): Promise<unknown> {
-  try {
-    return await c.req.json();
-  } catch {
-    // Unparseable JSON body returns null, matching silent-failure semantics elsewhere.
-    return null;
-  }
-}
-
 // --- catalog ----------------------------------------------------------------
 
 const getCatalogRoute = createRoute({
@@ -78,15 +69,11 @@ const putCatalogRoute = createRoute({
   }),
 });
 
-ltConfigRoutes.openapi(putCatalogRoute, async (c) => {
-  const data = await readJsonBody(c);
-  if (data === null || typeof data !== 'object' || !('catalog_path' in data)) {
-    return c.json({ error: 'catalog_path is required' }, 400);
-  }
-  const value = (data as { catalog_path: unknown }).catalog_path;
-  if (typeof value !== 'string') {
-    return c.json({ error: 'catalog_path must be a string' }, 400);
-  }
+// Presence and type are the schema's job and answer 422 before this runs. What is
+// left is the two checks Zod cannot make: the extension, and whether the file is
+// really there.
+ltConfigRoutes.openapi(putCatalogRoute, (c) => {
+  const { catalog_path: value } = c.req.valid('json');
   if (!value.toLowerCase().endsWith('.lrcat')) {
     return c.json({ error: 'catalog_path must be a .lrcat file' }, 400);
   }
@@ -128,17 +115,10 @@ const putStackDetectionRoute = createRoute({
   }),
 });
 
-ltConfigRoutes.openapi(putStackDetectionRoute, async (c) => {
-  const data = await readJsonBody(c);
-  if (data === null || typeof data !== 'object' || !('stack_burst_delta_ms' in data)) {
-    return c.json({ error: 'stack_burst_delta_ms is required' }, 400);
-  }
-  const value = (data as { stack_burst_delta_ms: unknown }).stack_burst_delta_ms;
-
-  // Reject booleans and non-integers; JSON numbers arrive as `number`, not `int`.
-  if (typeof value !== 'number' || !Number.isInteger(value)) {
-    return c.json({ error: 'stack_burst_delta_ms must be an integer' }, 400);
-  }
+// `z.int()` already rejects a missing field, a fractional number, a numeric string
+// and a boolean with 422. The floor is the one rule left to enforce.
+ltConfigRoutes.openapi(putStackDetectionRoute, (c) => {
+  const { stack_burst_delta_ms: value } = c.req.valid('json');
   if (value < 1) {
     return c.json({ error: 'stack_burst_delta_ms must be at least 1' }, 400);
   }

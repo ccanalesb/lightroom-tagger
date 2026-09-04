@@ -234,7 +234,7 @@ providersRoutes.openapi(healthRoute, async (c) => {
   const registry = new ProviderRegistry();
   let probe;
   try {
-    probe = await registry.probeConnection(c.req.param('provider_id'));
+    probe = await registry.probeConnection(c.req.valid('param').provider_id);
   } catch (e) {
     if (e instanceof UnknownProviderError) return c.json({ error: 'Unknown provider' }, 404);
     throw e;
@@ -265,7 +265,7 @@ providersRoutes.openapi(modelsOrderRoute, async (c) => {
     return c.json({ error: 'order is required' }, 400);
   }
   try {
-    registry.reorderModels(c.req.param('provider_id'), (data as { order: unknown }).order);
+    registry.reorderModels(c.req.valid('param').provider_id, (data as { order: unknown }).order);
     return c.json({ success: true }, 200);
   } catch (e) {
     if (e instanceof UnknownProviderError) return c.json({ error: e.message }, 404);
@@ -291,7 +291,7 @@ const modelsListRoute = createRoute({
 
 providersRoutes.openapi(modelsListRoute, async (c) => {
   const registry = new ProviderRegistry();
-  const providerId = c.req.param('provider_id');
+  const providerId = c.req.valid('param').provider_id;
   if (!registry.hasProvider(providerId)) {
     return c.json({ error: `Unknown provider: ${providerId}` }, 404);
   }
@@ -337,7 +337,7 @@ const modelsCreateRoute = createRoute({
 
 providersRoutes.openapi(modelsCreateRoute, async (c) => {
   const registry = new ProviderRegistry();
-  const providerId = c.req.param('provider_id');
+  const providerId = c.req.valid('param').provider_id;
   if (!registry.hasProvider(providerId)) {
     return c.json({ error: `Unknown provider: ${providerId}` }, 404);
   }
@@ -418,7 +418,7 @@ const modelDeleteRoute = createRoute({
  * requests; the `openapi()` registration puts the path in the document.
  */
 providersRoutes.openapi(modelDeleteRoute, async (c) => {
-  const result = await deleteModel(c.req.param('provider_id'), c.req.param('model_id'));
+  const result = await deleteModel(c.req.valid('param').provider_id, c.req.valid('param').model_id);
   return result.status === 200
     ? c.json(result.body as { deleted: true }, 200)
     : c.json(result.body as { error: string }, 404);

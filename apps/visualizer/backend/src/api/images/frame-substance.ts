@@ -120,7 +120,7 @@ export function registerFrameSubstanceRoutes(app: OpenAPIHono<LibraryEnv>): void
 
   app.openapi(getRoute, (c) => {
     const db = c.get('libraryDb');
-    const imageKey = c.req.param('image_key');
+    const imageKey = c.req.valid('param').image_key;
     if (!getImage(db, imageKey)) return c.json({ error: ERROR_IMAGE_NOT_FOUND }, 404);
     return c.json(buildFrameSubstanceResponse(db, imageKey), 200);
   });
@@ -142,7 +142,7 @@ export function registerFrameSubstanceRoutes(app: OpenAPIHono<LibraryEnv>): void
 
   app.openapi(postOverrideRoute, (c) => {
     const db = c.get('libraryDb');
-    const imageKey = c.req.param('image_key');
+    const imageKey = c.req.valid('param').image_key;
     if (!getImage(db, imageKey)) return c.json({ error: ERROR_IMAGE_NOT_FOUND }, 404);
 
     libraryWrite(db, () => insertFrameSubstanceOverride(db, imageKey));
@@ -160,7 +160,7 @@ export function registerFrameSubstanceRoutes(app: OpenAPIHono<LibraryEnv>): void
 
   app.openapi(deleteOverrideRoute, (c) => {
     const db = c.get('libraryDb');
-    const imageKey = c.req.param('image_key');
+    const imageKey = c.req.valid('param').image_key;
     if (!getImage(db, imageKey)) return c.json({ error: ERROR_IMAGE_NOT_FOUND }, 404);
 
     libraryWrite(db, () => deleteFrameSubstanceOverride(db, imageKey));
@@ -186,7 +186,7 @@ export function registerFrameSubstanceRoutes(app: OpenAPIHono<LibraryEnv>): void
 
   app.openapi(postCullRoute, (c) => {
     const db = c.get('libraryDb');
-    const imageKey = c.req.param('image_key');
+    const imageKey = c.req.valid('param').image_key;
     if (!getImage(db, imageKey)) return c.json({ error: ERROR_IMAGE_NOT_FOUND }, 404);
 
     try {
@@ -211,7 +211,7 @@ export function registerFrameSubstanceRoutes(app: OpenAPIHono<LibraryEnv>): void
 
   app.openapi(deleteCullRoute, (c) => {
     const db = c.get('libraryDb');
-    const imageKey = c.req.param('image_key');
+    const imageKey = c.req.valid('param').image_key;
     if (!getImage(db, imageKey)) return c.json({ error: ERROR_IMAGE_NOT_FOUND }, 404);
 
     try {

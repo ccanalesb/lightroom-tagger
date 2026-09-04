@@ -102,7 +102,7 @@ const detailRoute = createRoute({
 });
 
 perspectivesRoutes.openapi(detailRoute, (c) => {
-  const row = getPerspectiveBySlug(c.get('libraryDb'), c.req.param('slug'));
+  const row = getPerspectiveBySlug(c.get('libraryDb'), c.req.valid('param').slug);
   if (!row) return c.json({ error: 'resource not found' }, 404);
   return c.json(rowDetail(row), 200);
 });
@@ -196,7 +196,7 @@ const updateRoute = createRoute({
 });
 
 perspectivesRoutes.openapi(updateRoute, async (c) => {
-  const slug = c.req.param('slug');
+  const slug = c.req.valid('param').slug;
   const db = c.get('libraryDb');
   if (!getPerspectiveBySlug(db, slug)) return c.json({ error: 'resource not found' }, 404);
 
@@ -263,7 +263,7 @@ const deleteRoute = createRoute({
 });
 
 perspectivesRoutes.openapi(deleteRoute, (c) => {
-  if (!deletePerspective(c.get('libraryDb'), c.req.param('slug'))) {
+  if (!deletePerspective(c.get('libraryDb'), c.req.valid('param').slug)) {
     return c.json({ error: 'resource not found' }, 404);
   }
   return c.body(null, 204);
@@ -284,7 +284,7 @@ const resetRoute = createRoute({
 });
 
 perspectivesRoutes.openapi(resetRoute, (c) => {
-  const slug = c.req.param('slug');
+  const slug = c.req.valid('param').slug;
   const db = c.get('libraryDb');
   const row = getPerspectiveBySlug(db, slug);
   if (!row) return c.json({ error: 'resource not found' }, 404);

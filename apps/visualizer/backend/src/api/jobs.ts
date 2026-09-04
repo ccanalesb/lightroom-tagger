@@ -283,7 +283,7 @@ const detailRoute = createRoute({
 });
 
 jobsRoutes.openapi(detailRoute, (c) => {
-  const jobId = c.req.param('job_id');
+  const jobId = c.req.valid('param').job_id;
 
   // Resolved before the job is loaded, so `getJob` only pulls the rows the client
   // actually needs. The modal asks for 200–1000 in steady state; anything larger
@@ -323,7 +323,7 @@ const cancelRoute = createRoute({
 });
 
 jobsRoutes.openapi(cancelRoute, (c) => {
-  const jobId = c.req.param('job_id');
+  const jobId = c.req.valid('param').job_id;
   try {
     const result = withJobsDb((db) => {
       const outcome = transitionCancel(db, jobId);
@@ -373,7 +373,7 @@ const retryRoute = createRoute({
 });
 
 jobsRoutes.openapi(retryRoute, (c) => {
-  const jobId = c.req.param('job_id');
+  const jobId = c.req.valid('param').job_id;
   try {
     const result = withJobsDb((db) => {
       const outcome = transitionRetry(db, jobId);

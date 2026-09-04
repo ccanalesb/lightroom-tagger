@@ -103,7 +103,7 @@ const detailRoute = createRoute({
 descriptionsRoutes.openapi(detailRoute, (c) => {
   // A missing description is `{"description": null}` with a 200, not a 404 —
   // the UI renders an empty panel rather than treating it as an error.
-  const desc = getImageDescription(c.get('libraryDb'), c.req.param('image_key'));
+  const desc = getImageDescription(c.get('libraryDb'), c.req.valid('param').image_key);
   return c.json({ description: desc as z.infer<typeof DescriptionGetResponse>['description'] }, 200);
 });
 
@@ -129,7 +129,7 @@ const generateRoute = createRoute({
 
 descriptionsRoutes.openapi(generateRoute, async (c) => {
   const db = c.get('libraryDb');
-  const imageKey = c.req.param('image_key');
+  const imageKey = c.req.valid('param').image_key;
   const body = c.req.valid('json');
   const providerId = body.provider_id ?? null;
 

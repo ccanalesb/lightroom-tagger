@@ -59,7 +59,7 @@ const historyRoute = createRoute({
 });
 
 scoresRoutes.openapi(historyRoute, (c) => {
-  const imageKey = c.req.param('image_key');
+  const imageKey = c.req.valid('param').image_key;
   const imageType = readImageType(c.req.query('image_type'));
   if (!imageType.ok) return c.json({ error: 'image_type must be catalog' }, 400);
 
@@ -98,7 +98,7 @@ const currentRoute = createRoute({
 });
 
 scoresRoutes.openapi(currentRoute, (c) => {
-  const imageKey = c.req.param('image_key');
+  const imageKey = c.req.valid('param').image_key;
   const imageType = readImageType(c.req.query('image_type'));
   if (!imageType.ok) return c.json({ error: 'image_type must be catalog' }, 400);
 

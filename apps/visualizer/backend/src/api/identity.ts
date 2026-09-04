@@ -33,22 +33,19 @@ identityRoutes.use('/identity/*', libraryDb());
 type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
 /**
- * `min_perspectives`: an integer of at least 1, silently capped at 50.
+ * `min_perspectives`: at least 1, silently capped at 50.
  *
- * The cap is a clamp rather than a rejection — asking for 200 perspectives is not a
- * client error, there just are not that many.
+ * `intParam` has already rejected a non-integer with 422, so the floor and the cap
+ * are all that is left. The cap is a clamp rather than a rejection — asking for 200
+ * perspectives is not a client error, there just are not that many.
  */
-function parseMinPerspectives(raw: string | undefined): Parsed<number | null> {
-  if (raw === undefined || raw.trim() === '') return { ok: true, value: null };
-  if (!/^\s*[+-]?\d+\s*$/.test(raw)) {
-    return { ok: false, error: 'min_perspectives must be an integer' };
-  }
-  const v = Number.parseInt(raw.trim(), 10);
-  if (v < 1) return { ok: false, error: 'min_perspectives must be at least 1' };
-  return { ok: true, value: Math.min(v, 50) };
+function parseMinPerspectives(raw: number | null | undefined): Parsed<number | null> {
+  if (raw === null || raw === undefined) return { ok: true, value: null };
+  if (raw < 1) return { ok: false, error: 'min_perspectives must be at least 1' };
+  return { ok: true, value: Math.min(raw, 50) };
 }
 
-function parseSortByDate(raw: string | undefined): Parsed<'newest' | 'oldest' | null> {
+function parseSortByDate(raw: string | null | undefined): Parsed<'newest' | 'oldest' | null> {
   const value = (raw ?? '').trim().toLowerCase();
   if (!value) return { ok: true, value: null };
   if (value !== 'newest' && value !== 'oldest') {
@@ -63,8 +60,8 @@ function parseSortByDate(raw: string | undefined): Parsed<'newest' | 'oldest' | 
  * Unlike the catalog list — which silently ignores an unrecognized value — this one
  * rejects it, and accepts `1`/`yes`/`0`/`no` as well as the booleans.
  */
-function parsePosted(raw: string | undefined): Parsed<boolean | null> {
-  if (raw === undefined || raw.trim() === '') return { ok: true, value: null };
+function parsePosted(raw: string | null | undefined): Parsed<boolean | null> {
+  if (raw === null || raw === undefined || raw.trim() === '') return { ok: true, value: null };
   const key = raw.trim().toLowerCase();
   if (['true', '1', 'yes'].includes(key)) return { ok: true, value: true };
   if (['false', '0', 'no'].includes(key)) return { ok: true, value: false };
@@ -97,12 +94,13 @@ const bestPhotosRoute = createRoute({
 });
 
 identityRoutes.openapi(bestPhotosRoute, (c) => {
-  const { limit, offset } = clampPagination(c.req.query('limit'), c.req.query('offset'));
-  const minP = parseMinPerspectives(c.req.query('min_perspectives'));
+  const query = c.req.valid('query');
+  const { limit, offset } = clampPagination(query.limit, query.offset);
+  const minP = parseMinPerspectives(query.min_perspectives);
   if (!minP.ok) return c.json({ error: minP.error }, 400);
-  const sortByDate = parseSortByDate(c.req.query('sort_by_date'));
+  const sortByDate = parseSortByDate(query.sort_by_date);
   if (!sortByDate.ok) return c.json({ error: sortByDate.error }, 400);
-  const posted = parsePosted(c.req.query('posted'));
+  const posted = parsePosted(query.posted);
   if (!posted.ok) return c.json({ error: posted.error }, 400);
 
   const { items, total, meta } = rankBestPhotos(c.get('libraryDb'), {
@@ -147,11 +145,12 @@ const lensExemplarsRoute = createRoute({
 });
 
 identityRoutes.openapi(lensExemplarsRoute, (c) => {
+  const query = c.req.valid('query');
   // Default 24, not the shared helper's 50 — it is the initial exemplar rail size.
-  const { limit, offset } = clampPagination(c.req.query('limit'), c.req.query('offset'), 24);
+  const { limit, offset } = clampPagination(query.limit, query.offset, 24);
   try {
     return c.json(
-      buildLensExemplars(c.get('libraryDb'), c.req.param('slug'), { offset, limit }),
+      buildLensExemplars(c.get('libraryDb'), c.req.valid('param').slug, { offset, limit }),
       200,
     );
   } catch (e) {
@@ -185,9 +184,10 @@ const suggestionsRoute = createRoute({
 });
 
 identityRoutes.openapi(suggestionsRoute, (c) => {
+  const query = c.req.valid('query');
   // Default 20 here.
-  const { limit, offset } = clampPagination(c.req.query('limit'), c.req.query('offset'), 20);
-  const sortByDate = parseSortByDate(c.req.query('sort_by_date'));
+  const { limit, offset } = clampPagination(query.limit, query.offset, 20);
+  const sortByDate = parseSortByDate(query.sort_by_date);
   if (!sortByDate.ok) return c.json({ error: sortByDate.error }, 400);
 
   const payload = suggestWhatToPostNext(c.get('libraryDb'), {

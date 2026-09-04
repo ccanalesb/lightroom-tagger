@@ -217,7 +217,7 @@ const similarRoute = createRoute({
 });
 
 catalogRoutes.openapi(similarRoute, (c) => {
-  const imageKey = c.req.param('image_key');
+  const imageKey = c.req.valid('param').image_key;
   const db = c.get('libraryDb');
   {
     if (getImage(db, imageKey) === null) return c.json({ error: ERROR_IMAGE_NOT_FOUND }, 404);
@@ -364,7 +364,7 @@ const instagramPostedRoute = createRoute({
 });
 
 catalogRoutes.openapi(instagramPostedRoute, (c) => {
-  const imageKey = c.req.param('image_key');
+  const imageKey = c.req.valid('param').image_key;
   const db = c.get('libraryDb');
 
   // The schema requires `posted` as boolean; non-boolean input is 422 before here.
@@ -400,7 +400,7 @@ const detailRoute = createRoute({
 });
 
 catalogRoutes.openapi(detailRoute, (c) => {
-  const imageKey = c.req.param('image_key');
+  const imageKey = c.req.valid('param').image_key;
   const db = c.get('libraryDb');
 
   // Validated before the try block: a bad perspective is 400 even though unused below.

@@ -201,7 +201,7 @@ const membersRoute = createRoute({
 
 stacksRoutes.openapi(membersRoute, (c) => {
   const db = c.get('libraryDb');
-  const stackId = parseStackId(c.req.param('stack_id'));
+  const stackId = parseStackId(c.req.valid('param').stack_id);
   if (stackId === null) return c.json({ error: 'stack not found' }, 404);
   if (!stackExists(db, stackId)) return c.json({ error: 'stack not found' }, 404);
 
@@ -238,7 +238,7 @@ const splitMemberRoute = createRoute({
 
 stacksRoutes.openapi(splitMemberRoute, (c) => {
   const db = c.get('libraryDb');
-  const stackId = parseStackId(c.req.param('stack_id'));
+  const stackId = parseStackId(c.req.valid('param').stack_id);
   if (stackId === null) return c.json({ error: 'stack not found' }, 404);
 
   const imageKey = nonEmpty(c.req.valid('json').image_key);
@@ -272,7 +272,7 @@ const mergeRoute = createRoute({
 
 stacksRoutes.openapi(mergeRoute, (c) => {
   const db = c.get('libraryDb');
-  const targetStackId = parseStackId(c.req.param('target_stack_id'));
+  const targetStackId = parseStackId(c.req.valid('param').target_stack_id);
   if (targetStackId === null) return c.json({ error: 'stack not found' }, 404);
 
   const sourceStackId = c.req.valid('json').source_stack_id;
@@ -301,7 +301,7 @@ const representativeRoute = createRoute({
 
 stacksRoutes.openapi(representativeRoute, (c) => {
   const db = c.get('libraryDb');
-  const stackId = parseStackId(c.req.param('stack_id'));
+  const stackId = parseStackId(c.req.valid('param').stack_id);
   if (stackId === null) return c.json({ error: 'stack not found' }, 404);
 
   const imageKey = nonEmpty(c.req.valid('json').image_key);
