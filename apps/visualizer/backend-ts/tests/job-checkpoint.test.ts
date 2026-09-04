@@ -22,6 +22,7 @@ import {
   fingerprintBatchEmbedImage,
   fingerprintBatchScore,
   fingerprintBatchStackDetect,
+  fingerprintCatalogCacheBuild,
   loadResumeState,
   persistAnalyzeStageCheckpoint,
   readAnalyzeCheckpoint,
@@ -230,6 +231,41 @@ describe('fingerprintBatchStackDetect', () => {
     ).resolves.not.toBe(baseline);
     await expect(fingerprintBatchStackDetect(['a'], { ...base, forceMode: 'full' })).resolves.not.toBe(
       baseline,
+    );
+  });
+});
+
+describe('fingerprintCatalogCacheBuild', () => {
+  it('matches the digests Python produces for the same inputs', async () => {
+    await expect(
+      fingerprintCatalogCacheBuild({}, { resolvedMonths: null, resolvedYear: null }),
+    ).resolves.toBe('d1437c4a9a2c7fa10220ee5189c20882b49cfcc145fd3ca3801af8f919f4247b');
+    await expect(
+      fingerprintCatalogCacheBuild(
+        { force_embed: true, force_stack: 'preserve_edited', min_rating: '3', year: 2024 },
+        { resolvedMonths: null, resolvedYear: '2024' },
+      ),
+    ).resolves.toBe('e5540856ed42be83e708a14e5014583d7bebdf47d30b556c854be7bad8ee3195');
+    await expect(
+      fingerprintCatalogCacheBuild(
+        { last_months: 6, month: 'café' },
+        { resolvedMonths: 6, resolvedYear: null },
+      ),
+    ).resolves.toBe('a44e5fec6a2f59207f1d75bcb9ea94c45946d8b1d4cdf98646b0a18457664d15');
+  });
+
+  /**
+   * `preserve_edited` is a third stack mode, not a second boolean, but the
+   * fingerprint only records that forcing was asked for — same as Python. Two
+   * runs differing only in which kind of full rebuild they do hash alike.
+   */
+  it('flattens the force flags to booleans, as Python does', async () => {
+    const window = { resolvedMonths: null, resolvedYear: null };
+    await expect(fingerprintCatalogCacheBuild({ force_stack: true }, window)).resolves.toBe(
+      await fingerprintCatalogCacheBuild({ force_stack: 'preserve_edited' }, window),
+    );
+    await expect(fingerprintCatalogCacheBuild({ force_embed: true }, window)).resolves.not.toBe(
+      await fingerprintCatalogCacheBuild({ force_stack: true }, window),
     );
   });
 });

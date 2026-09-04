@@ -185,6 +185,37 @@ export function fingerprintBatchStackDetect(
   );
 }
 
+/**
+ * Identity of a `catalog_cache_build` run: the knobs its four stages read.
+ *
+ * No key list, unlike every other fingerprint here, because each stage selects
+ * its own and all four move with the catalog — a chain identified by them would
+ * have a different identity on every run. Nothing resumes on this: the chain
+ * keeps no checkpoint, and the value exists so a completed run's result says
+ * which set of knobs produced it.
+ */
+export function fingerprintCatalogCacheBuild(
+  metadata: Record<string, unknown>,
+  window: { resolvedMonths: number | null; resolvedYear: string | null },
+): Promise<string> {
+  return sha256Hex(
+    canonicalJson({
+      embedding_dim: CLIP_EMBED_DIM,
+      embedding_model_id: CLIP_EMBED_MODEL_ID,
+      force_embed: Boolean(metadata['force_embed']),
+      force_similarity: Boolean(metadata['force_similarity']),
+      force_stack: Boolean(metadata['force_stack']),
+      image_type: 'catalog',
+      last_months: metadata['last_months'] ?? null,
+      min_rating: asIntOrNull(metadata['min_rating']),
+      month: metadata['month'] ?? null,
+      resolved_months: window.resolvedMonths,
+      resolved_year: window.resolvedYear,
+      year: metadata['year'] ?? null,
+    }),
+  );
+}
+
 export function buildBatchDescribeCheckpointBody(args: {
   fingerprint: string;
   processed: ReadonlySet<string>;

@@ -160,28 +160,38 @@ export function filterVoidSubstanceFromScoringSelection(
 }
 
 /**
- * How a describe or score pass reports when it is one stage of a composite job.
+ * How a pass reports when it is one stage of a composite job rather than a job.
  *
- * Absent, the pass owns the job: the whole progress bar, unprefixed logs, its own
- * flat checkpoint, and it completes the job itself. Present, it owns a slice:
- * progress maps into `progressRange`, logs carry `logPrefix`, the resume state
- * lives in a sub-object of the composite's checkpoint, and the summary comes back
- * for the caller to combine rather than being written as the job's result.
+ * Absent, the pass owns the job: the whole progress bar, unprefixed logs, and it
+ * completes the job itself. Present, it owns a slice — progress maps into
+ * `progressRange`, logs carry `logPrefix`, and the summary comes back for the
+ * caller to combine rather than being written as the job's result.
+ *
+ * `catalog_cache_build` passes this bare, because its four stages keep no resume
+ * state: the chain is re-runnable end to end, and a checkpoint written under the
+ * composite's job id would be read back by whichever stage ran last.
+ */
+export interface StageBand {
+  /** The slice of the job's 0–100 bar this pass reports into. */
+  progressRange: readonly [number, number];
+  logPrefix: string;
+}
+
+/**
+ * A `StageBand` for the two passes `batch_analyze` composes, which do resume:
+ * their processed-unit set lives in a sub-object of the composite's checkpoint.
  *
  * Python spells this as four independent parameters — `progress_range`,
  * `log_prefix`, `finalize`, `nested_analyze_checkpoint` — but only these two
  * combinations of them exist, so one optional argument says the same thing.
  */
-export interface PassStage {
-  /** The slice of the job's 0–100 bar this pass reports into. */
-  progressRange: readonly [number, number];
-  logPrefix: string;
+export interface PassStage extends StageBand {
   /** Which sub-object of the `batch_analyze` checkpoint holds the resume state. */
   checkpointKey: AnalyzeStage;
 }
 
 /** Map a pass's own 0–100 onto the slice of the bar it was given. */
-export function mapStageProgress(stage: PassStage | undefined, pct: number): number {
+export function mapStageProgress(stage: StageBand | undefined, pct: number): number {
   if (stage === undefined) return pct;
   const [lo, hi] = stage.progressRange;
   return Math.trunc(lo + ((hi - lo) * pct) / 100);

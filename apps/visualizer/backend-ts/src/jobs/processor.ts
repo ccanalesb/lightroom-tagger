@@ -168,7 +168,7 @@ export async function tick(db: Db, activeRunner: JobRunner): Promise<void> {
     health.current_job_id = jobId;
     health.current_job_started_at = nowSeconds();
     try {
-      if (entry?.handler) {
+      if (entry) {
         try {
           await entry.handler(activeRunner, jobId, job.metadata);
         } catch (e) {
@@ -181,9 +181,9 @@ export async function tick(db: Db, activeRunner: JobRunner): Promise<void> {
         }
       } else {
         const after = getJob(db, jobId, { logsLimit: 0 });
+        // A type no longer in the registry, most likely a row queued by an older
+        // build. Reported rather than left running, so it is visible.
         if (after?.status === 'running') {
-          // Covers both an unregistered type and a registered one whose handler
-          // has not been ported yet.
           activeRunner.failJob(jobId, `Unknown job type: ${jobType}`);
         }
       }

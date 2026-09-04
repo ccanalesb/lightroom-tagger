@@ -33,10 +33,12 @@ import type { JobRunner } from '../runner.js';
 import {
   asMetadata,
   failureSeverityFromError,
+  mapStageProgress,
   readIntOrNull,
   resolveDateWindow,
   resolveLibraryDbOrFail,
   withLibraryDb,
+  type StageBand,
 } from './common.js';
 import { PathSkipDiagnostics, emptySkipReasonCounts } from './path-diagnostics.js';
 
@@ -80,21 +82,34 @@ export async function handleBatchEmbedImage(
   }
 }
 
-async function runEmbedPass(
+/**
+ * Embed every catalog image in the window.
+ *
+ * Returns the summary when running as a stage of `catalog_cache_build`, and
+ * `null` whenever the job has already been settled, exactly as the describe and
+ * score passes do. A stage keeps no checkpoint: the chain has one job id, and a
+ * flat checkpoint written under it would be read back by whichever of the four
+ * stages ran last.
+ */
+export async function runEmbedPass(
   runner: JobRunner,
   jobId: string,
   metadata: Record<string, unknown>,
   db: Db,
-): Promise<void> {
-  runner.log(jobId, 'info', `batch_embed_image: model=${CLIP_EMBED_MODEL_ID}`);
-  runner.log(jobId, 'info', PRECOMPUTE_NOTICE);
+  stage?: StageBand,
+): Promise<BatchEmbedImageResult | null> {
+  const prefix = stage?.logPrefix ?? '';
+  const log = (message: string): void => runner.log(jobId, 'info', `${prefix}${message}`);
+  const progress = (pct: number, message: string): void =>
+    runner.updateProgress(jobId, mapStageProgress(stage, pct), `${prefix}${message}`);
+
+  log(`batch_embed_image: model=${CLIP_EMBED_MODEL_ID}`);
+  log(PRECOMPUTE_NOTICE);
 
   const { months, year } = resolveDateWindow(metadata);
   const minRating = readIntOrNull(metadata['min_rating']);
   const force = Boolean(metadata['force']);
-  runner.log(
-    jobId,
-    'info',
+  log(
     `batch_embed_image filters: force=${force}, months=${months}, year=${year}, ` +
       `min_rating=${minRating}`,
   );
@@ -110,36 +125,40 @@ async function runEmbedPass(
     resolvedYear: year,
   });
 
-  const processed = loadResumeState({
-    metadata: runner.readMetadata(jobId),
-    jobType: 'batch_embed_image',
-    resumeKey: 'processed_pairs',
-    fingerprint,
-    mismatchMessage: BATCH_EMBED_IMAGE_CHECKPOINT_MISMATCH,
-    log: (message) => runner.log(jobId, 'info', message),
-  });
+  const processed =
+    stage === undefined
+      ? loadResumeState({
+          metadata: runner.readMetadata(jobId),
+          jobType: 'batch_embed_image',
+          resumeKey: 'processed_pairs',
+          fingerprint,
+          mismatchMessage: BATCH_EMBED_IMAGE_CHECKPOINT_MISMATCH,
+          log: (message) => runner.log(jobId, 'info', message),
+        })
+      : new Set<string>();
 
   const pending = fullList.filter((key) => !processed.has(key));
   const alreadyDone = totalAtStart - pending.length;
   const progressFor = (done: number): number =>
     Math.trunc(5 + (done / Math.max(totalAtStart, 1)) * 95);
 
-  runner.updateProgress(
-    jobId,
+  progress(
     progressFor(alreadyDone),
     `Found ${totalAtStart} images to embed (${pending.length} remaining)`,
   );
 
   if (totalAtStart === 0) {
-    runner.clearCheckpoint(jobId);
-    runner.completeJob(jobId, {
+    const empty: BatchEmbedImageResult = {
       embedded: 0,
       skipped: 0,
       failed: 0,
       total: 0,
       skip_reason_counts: emptySkipReasonCounts(),
-    });
-    return;
+    };
+    if (stage !== undefined) return empty;
+    runner.clearCheckpoint(jobId);
+    runner.completeJob(jobId, empty);
+    return null;
   }
 
   const diag = new PathSkipDiagnostics(runner, jobId, db, {
@@ -155,9 +174,11 @@ async function runEmbedPass(
   /**
    * Mark a key done and persist. Returns false once the checkpoint has outgrown
    * what belongs in one metadata column, which stops the run rather than letting
-   * the jobs row grow without bound.
+   * the jobs row grow without bound. Nothing to do for a chain stage, which keeps
+   * no resume state and tracks its progress by the counters below.
    */
   const recordDone = (key: string): boolean => {
+    if (stage !== undefined) return true;
     processed.add(key);
     if (processed.size > CHECKPOINT_MAX_ENTRIES) {
       runner.failJob(jobId, 'checkpoint too large: exceeds 100000 entries');
@@ -173,7 +194,7 @@ async function runEmbedPass(
   for (const key of pending) {
     if (runner.isCancelled(jobId)) {
       runner.finalizeCancelled(jobId);
-      return;
+      return null;
     }
 
     const { path, reason, detail } = await diag.classify(key);
@@ -197,11 +218,10 @@ async function runEmbedPass(
 
     // Failures are recorded too: the file is unreadable, so a resume that retried
     // it would fail again at the same cost.
-    if (!recordDone(key)) return;
+    if (!recordDone(key)) return null;
 
     const done = embedded + skipped + failed;
-    runner.updateProgress(
-      jobId,
+    progress(
       progressFor(alreadyDone + done),
       `Embedded ${embedded}/${totalAtStart}${skipped > 0 ? ` (skipped ${skipped})` : ''}`,
     );
@@ -210,7 +230,7 @@ async function runEmbedPass(
 
   if (runner.isCancelled(jobId)) {
     runner.finalizeCancelled(jobId);
-    return;
+    return null;
   }
 
   const summary: BatchEmbedImageResult = {
@@ -220,6 +240,8 @@ async function runEmbedPass(
     total: totalAtStart,
     skip_reason_counts: diag.skipReasonCounts,
   };
+  if (stage !== undefined) return summary;
   runner.clearCheckpoint(jobId);
   runner.completeJob(jobId, summary);
+  return null;
 }

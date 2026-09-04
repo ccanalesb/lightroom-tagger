@@ -9,11 +9,11 @@
  * to match the 43,451 keys Python already wrote.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { stringify as stringifyYaml } from 'yaml';
+import { makeFakeCatalog, type CatalogFile } from './helpers/fake-catalog.js';
 import { LibraryFixture } from './helpers/library-fixture.js';
 import { openLibraryDb, type Db } from '../src/db/connection.js';
 import { createJob, getJob, initJobsDb } from '../src/db/jobs/jobs.js';
@@ -41,94 +41,6 @@ let dir: string;
 let lrcatPath: string;
 let cfgPath: string;
 let jobsDbPath: string;
-
-interface CatalogFile {
-  id: number;
-  baseName: string;
-  extension?: string;
-  captureTime?: string | null;
-  rating?: number | null;
-  pick?: number | null;
-  keywords?: string[];
-  gpsLatitude?: number | null;
-  focalLength?: number | null;
-  caption?: string | null;
-}
-
-/**
- * The slice of the Lightroom schema the metadata join touches. `Adobe_images` is
- * keyed separately from `AgLibraryFile` on purpose: the sync diffs on the file id
- * while EXIF and IPTC hang off the image id, and swapping them silently returns
- * another photo's metadata.
- */
-function makeFakeCatalog(path: string, files: CatalogFile[]): void {
-  const db = new Database(path);
-  db.exec(`
-    CREATE TABLE AgLibraryRootFolder (id_local INTEGER PRIMARY KEY, absolutePath TEXT);
-    CREATE TABLE AgLibraryFolder (
-      id_local INTEGER PRIMARY KEY, rootFolder INTEGER, pathFromRoot TEXT
-    );
-    CREATE TABLE AgLibraryFile (
-      id_local INTEGER PRIMARY KEY, folder INTEGER, baseName TEXT, extension TEXT
-    );
-    CREATE TABLE Adobe_images (
-      id_local INTEGER PRIMARY KEY, rootFile INTEGER, rating REAL, pick REAL,
-      colorLabels TEXT, fileWidth INTEGER, fileHeight INTEGER, captureTime TEXT
-    );
-    CREATE TABLE AgHarvestedExifMetadata (
-      image INTEGER, aperture REAL, focalLength REAL, shutterSpeed REAL,
-      isoSpeedRating REAL, gpsLatitude REAL, gpsLongitude REAL
-    );
-    CREATE TABLE AgLibraryIPTC (image INTEGER, caption TEXT, copyright TEXT);
-    CREATE TABLE AgLibraryKeyword (id_local INTEGER PRIMARY KEY, name TEXT);
-    CREATE TABLE AgLibraryKeywordImage (image INTEGER, tag INTEGER);
-    INSERT INTO AgLibraryRootFolder (id_local, absolutePath) VALUES (1, '/Volumes/photos/');
-    INSERT INTO AgLibraryFolder (id_local, rootFolder, pathFromRoot) VALUES (1, 1, '2024/');
-  `);
-
-  const insertFile = db.prepare(
-    'INSERT INTO AgLibraryFile (id_local, folder, baseName, extension) VALUES (?, 1, ?, ?)',
-  );
-  const insertImage = db.prepare(
-    `INSERT INTO Adobe_images
-       (id_local, rootFile, rating, pick, colorLabels, fileWidth, fileHeight, captureTime)
-     VALUES (?, ?, ?, ?, 'blue', 6000, 4000, ?)`,
-  );
-  const insertExif = db.prepare(
-    `INSERT INTO AgHarvestedExifMetadata
-       (image, aperture, focalLength, shutterSpeed, isoSpeedRating, gpsLatitude, gpsLongitude)
-     VALUES (?, 2.8, ?, 0.004, 400, ?, -70.65)`,
-  );
-  const insertIptc = db.prepare(
-    "INSERT INTO AgLibraryIPTC (image, caption, copyright) VALUES (?, ?, '')",
-  );
-  const insertKeyword = db.prepare('INSERT INTO AgLibraryKeyword (id_local, name) VALUES (?, ?)');
-  const linkKeyword = db.prepare(
-    'INSERT INTO AgLibraryKeywordImage (image, tag) VALUES (?, ?)',
-  );
-
-  let keywordId = 0;
-  for (const f of files) {
-    // Image ids deliberately in a different range, so a file/image id mix-up fails.
-    const imageId = 900_000 + f.id;
-    insertFile.run(f.id, f.baseName, f.extension ?? 'jpg');
-    insertImage.run(
-      imageId,
-      f.id,
-      f.rating ?? null,
-      f.pick ?? null,
-      f.captureTime === undefined ? '2024-06-01T12:00:00' : f.captureTime,
-    );
-    insertExif.run(imageId, f.focalLength ?? 35, f.gpsLatitude ?? 42.36);
-    insertIptc.run(imageId, f.caption ?? null);
-    for (const name of f.keywords ?? []) {
-      keywordId += 1;
-      insertKeyword.run(keywordId, name);
-      linkKeyword.run(imageId, keywordId);
-    }
-  }
-  db.close();
-}
 
 function withCatalog<T>(fn: (conn: Db) => T): T {
   const conn = connectCatalogReadOnly(lrcatPath);

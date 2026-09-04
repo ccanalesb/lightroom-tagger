@@ -276,16 +276,15 @@ repo's slicing convention), not build-then-wire.
    | identity | done |
    | providers | done |
    | frame substance | done, including the `.lrcat` keyword writer |
-   | jobs | routes, runner and processor done; handlers landing one family at a time (step 4) |
-
-   The route surface being complete does not mean the backend is: one of the
-   eleven `JOB_TYPES` still carries `handler: null`, so that job fails on enqueue.
-   That is step 4.
+   | jobs | routes, runner, processor and all eleven handlers done |
 3. **Job engine — done.** worker_threads runner, `JOB_TYPES` registry, transitions
    state machine, checkpoints, socket.io progress, with the ADR-0010 guardrails
    preserved.
-4. **Job handlers**, one family per slice — catalog sync, embed, analyze/score,
-   describe, stacks, frame substance, path diagnostics. ~3,394 lines of Python.
+4. **Job handlers — done.** One family per slice: catalog sync, embed,
+   analyze/score, describe, stacks, frame substance, path diagnostics. ~3,394
+   lines of Python. All eleven `JOB_TYPES` now dispatch, so `JobType.handler`
+   is no longer nullable and the processor's "Unknown job type" covers only a
+   type that has left the registry.
 
    **Describe is done** (`single_describe`, `batch_describe`), and it carried the
    three shared pieces every later family needs: `jobs/checkpoint.ts`,
@@ -301,7 +300,7 @@ repo's slicing convention), not build-then-wire.
    | describe | `single_describe`, `batch_describe` | done |
    | embed | `batch_embed_image` | done |
    | stacks | `batch_stack_detect`, `batch_catalog_similarity` | done |
-   | stacks | `catalog_cache_build` | blocked — its first stage is `catalog_sync` |
+   | stacks | `catalog_cache_build` | done, chaining the other four passes |
    | score | `single_score`, `batch_score` | done, with the scoring library core underneath them |
    | analyze | `batch_analyze` | done, all three stages |
    | frame substance | `batch_frame_substance` | done, with the detector and batch driver underneath it |
@@ -417,23 +416,39 @@ repo's slicing convention), not build-then-wire.
    `selectDescribeCandidates`, parameterized on the force flag they read from
    different metadata keys.
 
-   `catalog_sync` is the last handler before the composite, and the smallest:
-   the job owns two refusals — no catalog configured, and the configured one is
-   not there — and hands everything else to the driver. Its `chain_mode` branch
-   is deliberately absent for the same reason the `_catalog_cache_chain` flag is
-   (below), which leaves `catalog_cache_build` as the only `handler: null` left.
-   One departure: Python installs a `cancel_scope` that nothing on this path
-   consults, so cancelling a 43,000-image sync did nothing until it finished.
-   Here the fetch loop checks between images and writes what it already has.
+   `catalog_sync` is the smallest handler: the job owns two refusals — no catalog
+   configured, and the configured one is not there — and hands everything else to
+   the driver. One departure: Python installs a `cancel_scope` that nothing on
+   this path consults, so cancelling a 43,000-image sync did nothing until it
+   finished. Here the fetch loop checks between images and writes what it already
+   has.
 
-   Neither `batch_embed_image` nor the two stacks handlers have a
-   `_catalog_cache_chain` branch: only `catalog_cache_build` sets that flag, so
-   the suppression of logging and checkpointing that flag selects lands with the
-   composite that needs it rather than being guessed at three times. Note that most of what
-   `_CatalogCacheStageRunner` does — mapping a stage's 5–100% into a quarter of
-   the bar, capturing `complete_job`, swallowing checkpoints — is a wrapper
-   around the runner and needs nothing from the handlers; only the log
-   suppression is a real branch inside them.
+   `catalog_cache_build` is the last handler, and it needed no new machinery,
+   only a smaller version of what `batch_analyze` already had. Python drives its
+   four stages through `_CatalogCacheStageRunner`, a proxy wrapped around the
+   runner that intercepts `complete_job`, remaps `update_progress` into a quarter
+   of the bar and swallows checkpoints, plus a `_catalog_cache_chain` metadata
+   flag the three inner handlers each branch on. Here the four passes already
+   take an optional stage argument for exactly this — `PassStage` lost its
+   `checkpointKey` to a new base `StageBand`, since the chain keeps no resume
+   state — so there is nothing to intercept: a pass given a band maps its
+   progress, prefixes its logs and returns its summary instead of completing the
+   job. Cancellation needs no capture either, because the composite *is* the job
+   the pass would settle.
+
+   Two things about the chain are worth knowing. Stage 0 is the only forgiving
+   one: the three after it read `library.db`, which is there and worth indexing
+   whether or not today's additions arrived, so a sync that cannot open the
+   catalog is a `{skipped}` or `{failed}` stage result the chain logs and steps
+   over — every later stage failing is the job failing. And each stage reads
+   `force` under its own name (`force_embed`, `force_stack`), so a bare `force`
+   aimed at one of the standalone jobs does not silently rebuild everything.
+
+   One latent bug not carried over. Python's chain writes no checkpoint but still
+   fails the job at `_CHECKPOINT_MAX_ENTRIES`, so `catalog_cache_build` over a
+   catalog of more than 100,000 images dies in the embed stage complaining about
+   a checkpoint it never wrote. Here the guard sits behind the same `stage ===
+   undefined` branch as the write it protects.
 
    The checkpoint fingerprints hash **bytes identical to
    `json.dumps(sort_keys=True)`**, pinned by golden digests generated from the
@@ -557,6 +572,11 @@ repo's slicing convention), not build-then-wire.
    per-image retry, `encode_failed` was incremented twice, once by `record_skip`
    and once by the `vec is None` branch. The TS port has no fallback loop, so it
    cannot reproduce it.
+
+   `catalog_cache_build` carried a third: its stages write no checkpoint but keep
+   the 100,000-entry guard on one, so the chain fails on a catalog large enough
+   to trip a limit that protects nothing. Left behind, along with the reason, in
+   step 4 above.
 
    The frame substance detector carried a third. `compute_statistics_from_path`
    catches decode failures but not the reshape, so a cached preview under 32

@@ -6,14 +6,14 @@
  * greppable, no decorators, no auto-discovery, so adding a job type is a visible
  * edit rather than a side effect of importing a module.
  *
- * The handlers are being wired one family at a time. `handler: null` marks a type
- * whose dispatch is still to come — the *declaration* has to exist first, because
+ * Every type here now has a handler. Through the migration the field was
+ * nullable, because a declaration had to exist before its handler did —
  * `requiresCatalog` gates job creation and `/api/jobs/health` publishes the list.
- * One is left: `catalog_cache_build`.
  */
 import type { JobRunner } from './runner.js';
 import { handleBatchAnalyze } from './handlers/analyze.js';
 import { handleCatalogSync } from './handlers/catalog.js';
+import { handleCatalogCacheBuild } from './handlers/catalog-cache.js';
 import {
   BATCH_DESCRIBE_CHECKPOINT_MISMATCH,
   handleBatchDescribe,
@@ -44,8 +44,7 @@ export type JobHandler = (
 
 export interface JobType {
   name: string;
-  /** `null` until the handler is ported; the runner reports such a job as failed. */
-  handler: JobHandler | null;
+  handler: JobHandler;
   /**
    * Whether the handler opens the Lightroom catalog mirror.
    *
@@ -123,7 +122,7 @@ export const JOB_TYPES: readonly JobType[] = [
   },
   {
     name: 'catalog_cache_build',
-    handler: null,
+    handler: handleCatalogCacheBuild,
     requiresCatalog: true,
     checkpointMismatchMessage: null,
   },

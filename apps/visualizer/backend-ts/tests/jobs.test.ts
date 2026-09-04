@@ -634,25 +634,15 @@ describe('restart recovery', () => {
 });
 
 describe('the processor loop', () => {
-  it('fails a job whose handler is not wired up yet', async () => {
-    await withDbAsync(async (db) => {
-      const jobId = createJob(db, 'catalog_cache_build', {});
-      await tick(db, new JobRunner(db));
-
-      const job = getJob(db, jobId)!;
-      // The last unported handler; the registry declaration exists so enqueueing
-      // is gated, and the runner reports the gap rather than hanging.
-      expect(job.status).toBe('failed');
-      expect(job.error).toBe('Unknown job type: catalog_cache_build');
-      expect(job.error_severity).toBe('error');
-    });
-  });
-
-  it('fails an unregistered job type with the same message', async () => {
+  it('fails an unregistered job type rather than leaving it running', async () => {
     await withDbAsync(async (db) => {
       const jobId = createJob(db, 'not_a_real_type', {});
       await tick(db, new JobRunner(db));
-      expect(getJob(db, jobId)!.error).toBe('Unknown job type: not_a_real_type');
+
+      const job = getJob(db, jobId)!;
+      expect(job.status).toBe('failed');
+      expect(job.error).toBe('Unknown job type: not_a_real_type');
+      expect(job.error_severity).toBe('error');
     });
   });
 

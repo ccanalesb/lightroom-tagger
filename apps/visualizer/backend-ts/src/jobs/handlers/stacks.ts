@@ -8,10 +8,8 @@
  * are pure SQLite work — the cost is the KNN, not IO.
  *
  * `catalog_cache_build`, the third type in this family, chains sync → embed →
- * stack → similarity and is not here: its first stage needs `catalog_sync`, which
- * is still Python. It is also the only caller of the `_catalog_cache_chain` flag,
- * so the log-and-checkpoint suppression that flag selects is left unbuilt rather
- * than guessed at in three handlers at once.
+ * stack → similarity; it lives in `catalog-cache.ts` and drives the two passes
+ * below through their `stage` argument.
  */
 import { clipSimilarityWhyMatchedLine } from '../../api/images/row-shaping.js';
 import { NoClipEmbeddingError, runClipSimilarForSeed } from '../../clip/similarity.js';
@@ -38,9 +36,11 @@ import type { JobRunner } from '../runner.js';
 import {
   asMetadata,
   failureSeverityFromError,
+  mapStageProgress,
   readIntOrNull,
   resolveLibraryDbOrFail,
   withLibraryDb,
+  type StageBand,
 } from './common.js';
 
 /** Re-report progress every this many seeds; a per-seed update is pure noise. */
@@ -89,12 +89,25 @@ function clampedNumber(raw: unknown, fallback: number, lo: number, hi: number): 
   return Math.min(hi, Math.max(lo, Number.isFinite(n) ? n : fallback));
 }
 
-function runSimilarityPass(
+/**
+ * Group the catalog's near-duplicates.
+ *
+ * Returns the summary when running as a stage of `catalog_cache_build`, and
+ * `null` whenever the job has already been settled — the contract every pass in
+ * this backend follows.
+ */
+export function runSimilarityPass(
   runner: JobRunner,
   jobId: string,
   metadata: Record<string, unknown>,
   db: Db,
-): void {
+  stage?: StageBand,
+): BatchCatalogSimilarityResult | null {
+  const prefix = stage?.logPrefix ?? '';
+  const log = (message: string): void => runner.log(jobId, 'info', `${prefix}${message}`);
+  const progress = (pct: number, message: string): void =>
+    runner.updateProgress(jobId, mapStageProgress(stage, pct), `${prefix}${message}`);
+
   const minSimilarity = clampedNumber(metadata['min_similarity'], 0.9, 0, 1);
   const limitPerSeed = Math.trunc(
     clampedNumber(readIntOrNull(metadata['limit_per_seed']) ?? 8, 8, 1, 50),
@@ -102,14 +115,12 @@ function runSimilarityPass(
 
   const allKeys = listClipEmbeddedCatalogKeysNewestFirst(db);
   const total = allKeys.length;
-  runner.log(
-    jobId,
-    'info',
+  log(
     'batch_catalog_similarity stage=find_similar_photos ' +
       `min_similarity=${minSimilarity.toFixed(2)}, limit_per_seed=${limitPerSeed}, ` +
       `embedded_catalog_images=${total}`,
   );
-  runner.updateProgress(jobId, 5, `Found ${total} embedded catalog images`);
+  progress(5, `Found ${total} embedded catalog images`);
 
   // The whole table, not a diff: this job has no checkpoint, so a rerun that kept
   // the old rows would double every group it re-derives.
@@ -129,7 +140,7 @@ function runSimilarityPass(
   for (const [index, seedKey] of allKeys.entries()) {
     if (runner.isCancelled(jobId)) {
       runner.finalizeCancelled(jobId);
-      return;
+      return null;
     }
     if (!catalogKeyIsPrimaryGridRow(db, seedKey)) {
       skippedNonPrimary += 1;
@@ -182,8 +193,7 @@ function runSimilarityPass(
 
     const done = index + 1;
     if (done % CATALOG_SIMILARITY_SUMMARY_EVERY === 0 || done === total) {
-      runner.updateProgress(
-        jobId,
+      progress(
         Math.min(100, Math.trunc(5 + (done / Math.max(total, 1)) * 95)),
         `Similarity scan ${done}/${total}: groups=${groupsCreated}, ` +
           `candidates=${candidatesCreated}, skipped_non_primary=${skippedNonPrimary}`,
@@ -202,15 +212,15 @@ function runSimilarityPass(
     min_similarity: minSimilarity,
     limit_per_seed: limitPerSeed,
   };
-  runner.log(
-    jobId,
-    'info',
+  log(
     `Catalog similarity complete: groups_created=${groupsCreated}, ` +
       `candidates_created=${candidatesCreated}, embedded_catalog_images=${total}, ` +
       `skipped_non_primary=${skippedNonPrimary}, skipped_no_embedding=${skippedNoEmbedding}, ` +
       `skipped_flagged_frame=${skippedFlaggedFrame}, skipped_rejected=${skippedRejected}`,
   );
+  if (stage !== undefined) return result;
   runner.completeJob(jobId, result);
+  return null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -374,14 +384,26 @@ function resolveBurstDeltaMs(
   return parsed;
 }
 
-async function runStackDetectPass(
+/**
+ * Group the catalog into burst stacks.
+ *
+ * Returns the summary when running as a stage of `catalog_cache_build`, and
+ * `null` whenever the job has already been settled. A stage keeps no checkpoint,
+ * for the reason given on `runEmbedPass`.
+ */
+export async function runStackDetectPass(
   runner: JobRunner,
   jobId: string,
   metadata: Record<string, unknown>,
   db: Db,
-): Promise<void> {
+  stage?: StageBand,
+): Promise<BatchStackDetectResult | null> {
+  const prefix = stage?.logPrefix ?? '';
+  const progress = (pct: number, message: string): void =>
+    runner.updateProgress(jobId, mapStageProgress(stage, pct), `${prefix}${message}`);
+
   const deltaMs = resolveBurstDeltaMs(runner, jobId, metadata);
-  if (deltaMs === null) return;
+  if (deltaMs === null) return null;
   const forceMode = normalizeStackDetectForce(metadata);
 
   // Reported only for an incremental run, where it explains the shortfall between
@@ -424,53 +446,57 @@ async function runStackDetectPass(
     forceMode,
   });
 
-  const processed = loadResumeState({
-    metadata: runner.readMetadata(jobId),
-    jobType: 'batch_stack_detect',
-    resumeKey: 'processed_image_keys',
-    fingerprint,
-    mismatchMessage: BATCH_STACK_DETECT_CHECKPOINT_MISMATCH,
-    log: (message) => runner.log(jobId, 'info', message),
-  });
+  const processed =
+    stage === undefined
+      ? loadResumeState({
+          metadata: runner.readMetadata(jobId),
+          jobType: 'batch_stack_detect',
+          resumeKey: 'processed_image_keys',
+          fingerprint,
+          mismatchMessage: BATCH_STACK_DETECT_CHECKPOINT_MISMATCH,
+          log: (message) => runner.log(jobId, 'info', message),
+        })
+      : new Set<string>();
 
-  const finish = (result: BatchStackDetectResult): void => {
+  /** Log the summary, then either complete the job or hand it to the chain. */
+  const finish = (result: BatchStackDetectResult): BatchStackDetectResult | null => {
     runner.log(
       jobId,
       'info',
-      `Stack detection complete: stacks_created=${result.stacks_created}, ` +
+      `${prefix}Stack detection complete: stacks_created=${result.stacks_created}, ` +
         `images_stacked=${result.images_stacked}, ` +
         `images_skipped_no_date=${result.images_skipped_no_date}, ` +
         `images_skipped_already_stacked=${result.images_skipped_already_stacked}`,
     );
+    if (stage !== undefined) return result;
     runner.clearCheckpoint(jobId);
     runner.completeJob(jobId, result);
+    return null;
   };
 
   if (totalAtStart === 0) {
-    runner.updateProgress(jobId, 5, 'No catalog images in stack-detect work list');
-    finish({
+    progress(5, 'No catalog images in stack-detect work list');
+    return finish({
       stacks_created: 0,
       stacks_updated: 0,
       images_stacked: 0,
       images_skipped_no_date: 0,
       images_skipped_already_stacked: imagesSkippedAlreadyStacked,
     });
-    return;
   }
 
-  runner.updateProgress(jobId, 5, `Found ${totalAtStart} images to scan for stacks`);
+  progress(5, `Found ${totalAtStart} images to scan for stacks`);
 
   const { segments, skippedNoDate } = buildBurstSegments(rows, deltaMs);
   const totalWorkUnits = segments.reduce((n, seg) => n + seg.length, 0);
   if (totalWorkUnits === 0) {
-    finish({
+    return finish({
       stacks_created: 0,
       stacks_updated: 0,
       images_stacked: 0,
       images_skipped_no_date: skippedNoDate,
       images_skipped_already_stacked: imagesSkippedAlreadyStacked,
     });
-    return;
   }
 
   let stacksCreated = 0;
@@ -481,8 +507,7 @@ async function runStackDetectPass(
     const done = processed.size;
     if (!force && done - lastSummaryAt < STACK_DETECT_SUMMARY_EVERY) return;
     lastSummaryAt = done;
-    runner.updateProgress(
-      jobId,
+    progress(
       Math.min(100, Math.trunc(5 + (done / Math.max(totalWorkUnits, 1)) * 95)),
       `Stack scan ${done}/${totalWorkUnits}: stacks_created=${stacksCreated}, ` +
         `images_stacked=${imagesStacked}, skipped_no_date=${skippedNoDate}`,
@@ -496,6 +521,9 @@ async function runStackDetectPass(
    */
   const recordDone = (segment: readonly string[]): boolean => {
     for (const key of segment) processed.add(key);
+    // A chain stage writes no checkpoint, so the set is only a progress counter
+    // and cannot outgrow anything.
+    if (stage !== undefined) return true;
     if (processed.size > CHECKPOINT_MAX_ENTRIES) {
       runner.failJob(jobId, 'checkpoint too large: exceeds 100000 entries');
       return false;
@@ -510,7 +538,7 @@ async function runStackDetectPass(
   for (const segment of segments) {
     if (runner.isCancelled(jobId)) {
       runner.finalizeCancelled(jobId);
-      return;
+      return null;
     }
     if (segment.length === 0) continue;
     if (segment.every((key) => processed.has(key))) continue;
@@ -521,7 +549,7 @@ async function runStackDetectPass(
       const representative = selectStackRepresentativeKeyForKeys(db, segment);
       if (representative === null || !segment.includes(representative)) {
         runner.failJob(jobId, 'Stack representative selection failed (internal error)');
-        return;
+        return null;
       }
       libraryWrite(db, () => {
         const info = db
@@ -540,19 +568,19 @@ async function runStackDetectPass(
       imagesStacked += segment.length;
     }
 
-    if (!recordDone(segment)) return;
+    if (!recordDone(segment)) return null;
     emitSummary();
   }
 
   if (runner.isCancelled(jobId)) {
     runner.finalizeCancelled(jobId);
-    return;
+    return null;
   }
   // `recordDone` may already have failed the job; do not overwrite that outcome.
-  if (runner.hasFailed(jobId)) return;
+  if (runner.hasFailed(jobId)) return null;
 
   emitSummary(true);
-  finish({
+  return finish({
     stacks_created: stacksCreated,
     // Always 0: this job only ever creates stacks. The field is in the result
     // because the UI reads it, and STACK-05's edit-preserving mode will fill it.

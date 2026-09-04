@@ -9,7 +9,7 @@
  * the handler directly: the thing worth pinning is that a registry entry, the
  * runner's lifecycle writes and the handler's own `completeJob`/`failJob` calls
  * agree. A direct call would test the handler while leaving the wiring — the part
- * that was `handler: null` until now — unexercised.
+ * this slice added — unexercised.
  *
  * The provider is a real HTTP server for the same reason `description-generate`
  * uses one, and the three env overrides keep the user's providers, vision cache
