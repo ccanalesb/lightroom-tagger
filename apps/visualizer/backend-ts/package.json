@@ -6,9 +6,13 @@
   "engines": {
     "node": ">=24"
   },
+  "bin": {
+    "lightroom-tagger": "./dist/cli/bin.js"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
+    "cli": "tsx src/cli/bin.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

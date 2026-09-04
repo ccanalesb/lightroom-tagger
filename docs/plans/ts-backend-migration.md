@@ -524,10 +524,62 @@ repo's slicing convention), not build-then-wire.
    `aperture` as REAL and the 43,794 rows already stored read `'800.0'` and
    `'50.0'` — which is exactly what a double bind produces.
 
-   Still Python only: `enricher` + `schema` (both CLI-only), and the small shared
-   utilities (`managed_connections`, `path_utils`, `cancel_scope`,
-   `text_constants`).
-6. **CLI** — replaces the `lightroom-tagger` console script. Not started.
+   Still Python only, after checking each one rather than trusting this list —
+   four of the six named here previously were already done or never needed:
+   `enricher` (only `enrich-catalog` calls it), and `init_database` — the
+   `library.db` bootstrap schema and its migration ladder, ~850 lines across
+   `db_init`, `library_bootstrap_schema`, `db_init_migrations` and
+   `db_init_instagram_drop`. Nothing in TS creates a `library.db`; it has only
+   ever opened one Python made. That is fine until `lightroom-tagger init` needs
+   to exist, and it is worth knowing before the cutover, which assumes the file
+   on disk is already at the current schema version.
+
+   `managed_connections` is `db/library/with-db.ts` and the handlers' managed-DB
+   helper. `path_utils` is `utils/path-resolve.ts`. `text_constants` is
+   `constants/text.ts`. `cancel_scope` has no CLI caller at all — it is
+   job-handler and retry infrastructure, and the TS jobs express the same thing
+   as `runner.isCancelled`, so there is nothing left to port. `schema` is a
+   standalone catalog explorer that `[project.scripts]` never exposed; it is a
+   dev tool, not part of the console script.
+6. **CLI** — replaces the `lightroom-tagger` console script: 562 lines across
+   `core/cli.py`, `cli_commands.py`, `cli_cmds_extra.py` and `cli_library_db.py`,
+   seven commands, argparse and `print()`.
+
+   **Slice 1 is done: the shell, plus `search`, `export` and `stats`.** The three
+   read-only commands first because they need nothing that is not already
+   ported — `must_exist: true` means no bootstrap schema — so the slice is the
+   entry point itself: `cli/parse.ts`, `cli/registry.ts` (the ADR-0006 list that
+   `jobs/registry.ts` was modelled on), `cli/library-db.ts`, and
+   `db/library/catalog-search.ts` for the `search_by_*` family. `bin.ts` is the
+   executable and `main.ts` is the program, so tests drive `run()` directly
+   instead of spawning a subprocess.
+
+   Output is byte-identical to Python's, checked by diffing both CLIs against the
+   same `library.db` across eight `search`/`stats` invocations, the JSON export,
+   and both error paths. The one exception is the CSV export, in two cells:
+   `csv.DictWriter` calls `str()` on a non-string, so Python writes
+   `['sunset', 'beach']` and `False` where TS writes `["sunset","beach"]` and
+   `false`. Those are Python reprs leaking into a data format rather than
+   anything with a reader on the other end — the JSON export, which does have
+   one, matches exactly — so the divergence is asserted in a test rather than
+   emulated.
+
+   Remaining commands, in order: `init` (needs the bootstrap schema above),
+   `scan` and `sync` (the reader and sync driver are ported; `scan`'s
+   `workers` parallelism is the open question), then `enrich-catalog`. Each is
+   declared in the registry with `handler: null` already, so an unported command
+   says so instead of reading as a typo.
+
+   **One deliberate divergence in the shell.** Every global flag is also declared
+   by at least one subcommand, and argparse reparses a subcommand into a fresh
+   namespace and copies *all* of it back — so an absent subcommand `--db`
+   overwrites the global one with `None`. `lightroom-tagger --db library.db
+   search` therefore ignores the path and silently falls through to
+   `config.yaml`; `--catalog`, `--limit` and `--workers` go the same way. Every
+   documented invocation puts its flags after the subcommand, which is why this
+   has never been hit. TS reads the subcommand's value first and the global
+   second, so both positions work. Reproducing the argparse behaviour would have
+   been more code than fixing it.
 7. **Cutover** — back up `library.db`, point the Vite proxy at the TS backend, and
    delete the Flask tree. No CLIP reindex: embeddings are already drop-in compatible.
 
@@ -578,14 +630,14 @@ repo's slicing convention), not build-then-wire.
    to trip a limit that protects nothing. Left behind, along with the reason, in
    step 4 above.
 
-   The frame substance detector carried a third. `compute_statistics_from_path`
+   The frame substance detector carried a fourth. `compute_statistics_from_path`
    catches decode failures but not the reshape, so a cached preview under 32
    pixels a side raises a `ValueError` out of the loop and fails the whole
    catalog scan. Nothing in the current cache is that small, which is why nobody
    has hit it; the TS port catches it into the `unknown` verdict that every other
    unreadable preview already gets.
 
-   The Lightroom reader carried a fourth, and this one costs the user a feature.
+   The Lightroom reader carried a fifth, and this one costs the user a feature.
    `_get_keywords_for_image` matches `AgLibraryKeywordImage.image` against the
    `AgLibraryFile.id_local` its caller was given, but that column references
    `Adobe_images.id_local` — the exact mix-up `writer.py` documents at length.

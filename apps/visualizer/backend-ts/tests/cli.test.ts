@@ -1,0 +1,285 @@
+/**
+ * The `lightroom-tagger` CLI: parsing, dispatch, error mapping, and the three
+ * read-only commands.
+ *
+ * Driven through `run()` rather than a subprocess, so a failing assertion points
+ * at a line instead of at a captured stream. `run()` is the whole program below
+ * `bin.ts`, so nothing about dispatch or exit codes is stubbed out.
+ */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { loadLibraryConfig, type LibraryConfig } from '../src/config.js';
+import { parseArgv, UsageError } from '../src/cli/parse.js';
+import { COMMANDS } from '../src/cli/registry.js';
+import { run } from '../src/cli/main.js';
+import { LibraryFixture } from './helpers/library-fixture.js';
+
+/** Config with nothing in it: every path has to come from a flag. */
+const EMPTY_CONFIG = (): LibraryConfig => loadLibraryConfig('/nonexistent/config.yaml');
+
+interface Outcome {
+  code: number;
+  lines: string[];
+  text: string;
+}
+
+function cli(argv: string[], config: LibraryConfig = EMPTY_CONFIG()): Outcome {
+  const lines: string[] = [];
+  const code = run(argv, { out: (line) => lines.push(line), config });
+  return { code, lines, text: lines.join('\n') };
+}
+
+describe('argv parsing', () => {
+  it('splits global flags from the subcommand’s own', () => {
+    const args = parseArgv(['--db', 'g.db', 'search', '--keyword', 'sunset'], COMMANDS);
+    expect(args.command).toBe('search');
+    expect(args.global['db']).toBe('g.db');
+    expect(args.local['keyword']).toBe('sunset');
+  });
+
+  it('accepts short aliases and --flag=value for globals', () => {
+    const args = parseArgv(['-d', 'g.db', '--config=other.yaml', 'stats'], COMMANDS);
+    expect(args.global['db']).toBe('g.db');
+    expect(args.global['config']).toBe('other.yaml');
+  });
+
+  it('parses int flags as numbers and boolean flags as switches', () => {
+    const args = parseArgv(['enrich-catalog', '--limit', '25', '--cache-only'], COMMANDS);
+    expect(args.local['limit']).toBe(25);
+    expect(args.local['cache-only']).toBe(true);
+  });
+
+  /**
+   * The divergence from Python. argparse reparses a subcommand into a fresh
+   * namespace and copies all of it back, so an absent subcommand `--db`
+   * overwrites the global one with `None` and `--db X search` silently reads
+   * `config.yaml` instead. Both positions work here.
+   */
+  it('lets a subcommand flag override a global one, and honours the global alone', () => {
+    const overridden = parseArgv(['--db', 'global.db', 'search', '--db', 'local.db'], COMMANDS);
+    const globalOnly = parseArgv(['--db', 'global.db', 'search'], COMMANDS);
+    expect(overridden.local['db'] ?? overridden.global['db']).toBe('local.db');
+    expect(globalOnly.local['db'] ?? globalOnly.global['db']).toBe('global.db');
+  });
+
+  it.each([
+    [[], 'no command given'],
+    [['nope'], 'unknown command: nope'],
+    [['search', '--nope'], 'unrecognized arguments: --nope'],
+    [['search', '--keyword'], 'argument --keyword: expected one argument'],
+    [['search', '--rating', 'high'], "argument --rating: invalid int value: 'high'"],
+    [['export', '--format', 'xml'], "argument --format: invalid choice: 'xml'"],
+    [['export'], 'the following arguments are required: --output'],
+    [['search', 'stray'], 'unexpected argument: stray'],
+  ])('rejects %j', (argv, message) => {
+    expect(() => parseArgv(argv, COMMANDS)).toThrow(UsageError);
+    expect(() => parseArgv(argv, COMMANDS)).toThrow(message);
+  });
+});
+
+describe('run', () => {
+  it('prints help and exits 1 when no command is given', () => {
+    const r = cli([]);
+    expect(r.code).toBe(1);
+    expect(r.text).toContain('usage: lightroom-tagger');
+    expect(r.text).toContain('enrich-catalog');
+  });
+
+  it('reports an unported command as such, not as an unknown one', () => {
+    const r = cli(['scan']);
+    expect(r.code).toBe(1);
+    expect(r.text).toBe('Error: scan is not ported to the TypeScript CLI yet');
+  });
+
+  it('refuses a command with no database path anywhere', () => {
+    const r = cli(['stats']);
+    expect(r.code).toBe(1);
+    expect(r.text).toBe('Error: No database path provided. Use --db or config.yaml');
+  });
+
+  it.each(['search', 'export', 'stats'])('refuses %s when the database is absent', (name) => {
+    const missing = '/nonexistent/library.db';
+    const argv = name === 'export' ? [name, '--output', '/tmp/x.json'] : [name];
+    const r = cli([...argv, '--db', missing]);
+    expect(r.code).toBe(1);
+    expect(r.text).toBe(`Error: Database not found: ${missing}`);
+  });
+
+  it('maps an unexpected throw to Error: … and exit 1', () => {
+    // A directory is a path that exists, so it clears the must-exist guard and
+    // fails inside the command — the case Python's bare `except Exception` covers.
+    const fixture = new LibraryFixture();
+    try {
+      const r = cli(['stats', '--db', fixture.dir]);
+      expect(r.code).toBe(1);
+      expect(r.lines[0]).toMatch(/^Error: /);
+    } finally {
+      fixture.cleanup();
+    }
+  });
+});
+
+describe('read-only commands', () => {
+  let fixture: LibraryFixture;
+
+  beforeEach(() => {
+    fixture = new LibraryFixture();
+    fixture
+      .addImage({
+        key: '2026-01-01_a.jpg',
+        filename: 'a.jpg',
+        rating: 5,
+        color_label: 'Red',
+        date_taken: '2026-01-01T10:00:00',
+        keywords: '["sunset","beach"]',
+      })
+      .addImage({
+        key: '2026-02-01_b.jpg',
+        filename: 'b.jpg',
+        rating: 3,
+        color_label: 'blue',
+        date_taken: '2026-02-01T10:00:00',
+        keywords: '["forest"]',
+      })
+      .addImage({
+        key: '2026-03-01_c.jpg',
+        filename: 'c.jpg',
+        rating: 0,
+        date_taken: '2026-03-01T10:00:00',
+      });
+  });
+
+  afterEach(() => fixture.cleanup());
+
+  const search = (...flags: string[]): Outcome =>
+    cli(['search', '--db', fixture.dbPath, ...flags]);
+
+  it('lists every image when given no filter', () => {
+    const r = search();
+    expect(r.code).toBe(0);
+    expect(r.lines[0]).toBe('Found 3 images');
+    expect(r.lines[1]).toBe('  2026-01-01_a.jpg: a.jpg (rating: 5)');
+  });
+
+  /**
+   * `--keyword` is seeded with real `keywords` JSON here, which no row in the
+   * live `library.db` has: the reader's id mix-up means that column is `[]` on
+   * all 43,794 of them, so the `keywords LIKE` half has never matched in
+   * production. Seeded anyway, because the query is what is under test.
+   */
+  it.each([
+    [['--keyword', 'sunset'], 1],
+    [['--keyword', 'forest'], 1],
+    [['--keyword', 'b.jpg'], 1],
+    [['--rating', '3'], 2],
+    [['--rating', '0'], 3],
+    [['--color-label', 'RED'], 1],
+    [['--date-start', '2026-02-01'], 2],
+    [['--date-start', '2026-01-01', '--date-end', '2026-02-28'], 2],
+  ])('filters with %j', (flags, expected) => {
+    expect(search(...flags).lines[0]).toBe(`Found ${expected} images`);
+  });
+
+  it('applies the first filter given rather than intersecting them', () => {
+    // `--keyword` is checked before `--rating`, so the rating is not consulted.
+    expect(search('--keyword', 'sunset', '--rating', '5').lines[0]).toBe('Found 1 images');
+    expect(search('--keyword', 'forest', '--rating', '5').lines[0]).toBe('Found 1 images');
+  });
+
+  it('truncates with --limit, and treats --limit 0 as no limit', () => {
+    expect(search('--limit', '2').lines[0]).toBe('Found 2 images');
+    expect(search('--limit', '0').lines[0]).toBe('Found 3 images');
+  });
+
+  it('honours --db written before the subcommand', () => {
+    const r = cli(['--db', fixture.dbPath, 'search']);
+    expect(r.code).toBe(0);
+    expect(r.lines[0]).toBe('Found 3 images');
+  });
+
+  it('falls back to db_path from config.yaml', () => {
+    const config = { ...EMPTY_CONFIG(), dbPath: fixture.dbPath };
+    expect(cli(['search'], config).lines[0]).toBe('Found 3 images');
+  });
+
+  it('reports counts and a rating histogram for stats', () => {
+    const r = cli(['stats', '--db', fixture.dbPath]);
+    expect(r.code).toBe(0);
+    expect(r.lines).toEqual([
+      `Database: ${fixture.dbPath}`,
+      'Total images: 3',
+      'Ratings breakdown:',
+      '  0 star: 1',
+      '  3 star: 1',
+      '  5 star: 1',
+    ]);
+  });
+
+  it('exports JSON with the decoded keyword column', () => {
+    const out = join(fixture.dir, 'export.json');
+    const r = cli(['export', '--db', fixture.dbPath, '--output', out]);
+    expect(r.code).toBe(0);
+    expect(r.text).toBe(`Exported 3 images to ${out}`);
+
+    const parsed = JSON.parse(readFileSync(out, 'utf8')) as Record<string, unknown>[];
+    expect(parsed).toHaveLength(3);
+    expect(parsed[0]!['keywords']).toEqual(['sunset', 'beach']);
+    expect(parsed[0]!['instagram_posted']).toBe(false);
+  });
+
+  it('exports CSV with a header row and one line per image', () => {
+    const out = join(fixture.dir, 'export.csv');
+    const r = cli([
+      'export',
+      '--db',
+      fixture.dbPath,
+      '--output',
+      out,
+      '--format',
+      'csv',
+      '--rating',
+      '3',
+    ]);
+    expect(r.code).toBe(0);
+    expect(r.text).toBe(`Exported 2 images to ${out}`);
+
+    const rows = readFileSync(out, 'utf8').trimEnd().split('\r\n');
+    expect(rows).toHaveLength(3);
+    expect(rows[0]!.split(',')[0]).toBe('key');
+    expect(rows[1]).toContain('2026-01-01_a.jpg');
+  });
+
+  /**
+   * The one place the CLI does not match Python byte-for-byte. `csv.DictWriter`
+   * `str()`s a decoded column, so Python writes `['sunset', 'beach']` and
+   * `False` where these write JSON and `false`. Asserted so the divergence stays
+   * a decision rather than becoming a surprise.
+   */
+  it('writes JSON and lowercase booleans in CSV where Python writes reprs', () => {
+    const out = join(fixture.dir, 'repr.csv');
+    cli(['export', '--db', fixture.dbPath, '--output', out, '--format', 'csv']);
+    const body = readFileSync(out, 'utf8');
+    expect(body).toContain('"[""sunset"",""beach""]"');
+    expect(body).not.toContain("['sunset', 'beach']");
+    expect(body).toContain(',false,');
+  });
+
+  it('writes no file for an empty CSV export, as Python does', () => {
+    const out = join(fixture.dir, 'empty.csv');
+    const r = cli([
+      'export',
+      '--db',
+      fixture.dbPath,
+      '--output',
+      out,
+      '--format',
+      'csv',
+      '--keyword',
+      'nothingmatchesthis',
+    ]);
+    expect(r.code).toBe(0);
+    expect(r.text).toBe(`Exported 0 images to ${out}`);
+    expect(() => readFileSync(out, 'utf8')).toThrow();
+  });
+});
