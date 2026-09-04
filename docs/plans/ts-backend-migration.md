@@ -741,28 +741,45 @@ repo's slicing convention), not build-then-wire.
    rule, are conventions with nothing behind them. Filed as
    [#306](https://github.com/ccanalesb/lightroom-tagger/issues/306).
 
-   **`lightroom_tagger/` is still on disk, and deliberately so.** Of its 79
-   modules, ten are unported, and seven of those are safe to lose: `schema.py`
+   **`lightroom_tagger/` was left on disk for one step, then deleted.** Of its 79
+   modules, ten were unported, and seven of those were safe to lose: `schema.py`
    and `schema_explorer.py` are byte-identical copies of a `.lrcat` explorer
    nothing imports, `cleanup_wrong_links.py` is a spent one-off repair,
    `extract_exif` was only ever called by the enricher, `cancel_scope.py` was
    Flask-only, and `enricher.py` is the `enrich-catalog` half slice 4 already
-   argued against. The other three are the `library.db` **migration ladder**.
-   `bootstrap.ts` creates the schema at version 8 and refuses anything below it,
-   pointing the user at Python `init` — and while the live catalog is at 8, two
-   of the owner's own backups are not (`pre-drop-228.bak` is v6,
-   `pre-key-migration.bak` is v0). Deleting the package makes those unopenable.
-   `core/providers.json` and `core/providers.example.json` are also still read at
-   runtime by `config.ts` and `providers/registry.ts`.
+   argued against. The other three were the `library.db` **migration ladder**,
+   which is what the package was initially kept for: `bootstrap.ts` creates the
+   schema at version 8 and refuses anything below it, and two of the owner's own
+   backups were not at 8 (`pre-drop-228.bak` v6, `pre-key-migration.bak` v0).
 
-   Left broken rather than fixed blind: `scripts/verify_readme.py`, whose CLI
-   oracle is the Python command registry and whose clean-clone smoke boots
-   `backend/app.py`. Nothing calls it any more — the README reference is gone and
-   the guardrail test that ran it was deleted with the Flask tree. The three
-   perspective scripts (`sync_perspectives.py`, `seed_yt_perspectives.py`,
-   `merge_perspectives_6_to_4.py`) still import `lightroom_tagger.core.database`
-   and still work. `check_core_file_sizes.sh` caps a tree nothing builds from.
-   `ollama_autopilot.py` is a pure HTTP client and is unaffected.
+   That reprieve did not survive review. A pre-v8 backup is only useful as a
+   rollback target, and rolling back to a schema two versions behind the live
+   catalog is a downgrade rather than a recovery; the ladder is also still in git
+   history, so a database that genuinely needs upgrading can have it back in one
+   checkout. Both stale backups were deleted and the package with them.
+
+   What was actually load-bearing was `core/providers.json` and
+   `core/providers.example.json`, read at runtime by `config.ts` and
+   `providers/registry.ts`. Both moved to `apps/visualizer/backend-ts/`.
+
+   Deleted rather than fixed: `scripts/verify_readme.py`, whose CLI oracle is the
+   Python command registry and whose clean-clone smoke boots `backend/app.py`; the
+   three perspective scripts (`sync_perspectives.py`, `seed_yt_perspectives.py`,
+   `merge_perspectives_6_to_4.py`), covered by `seedPerspectivesFromPromptsDir`
+   and the per-slug reset route; `check_core_file_sizes.sh`, which capped a tree
+   that no longer exists and cannot be repointed at `backend-ts/src/` without
+   refactoring the ten files already over 400 lines (folded into
+   [#306](https://github.com/ccanalesb/lightroom-tagger/issues/306)); and
+   `tests/fixtures/frame-substance/regenerate-fixtures.py`, which imported the
+   deleted numpy detector. Its manifest stays frozen on purpose — it is the
+   independent second opinion the TypeScript detector is measured against.
+   `ollama_autopilot.py` is a pure HTTP client and survives untouched, so Python
+   is now a dependency of one optional tool rather than the repo.
+
+   `.sandcastle` was migrated with the rest: node:24 with the backend deps
+   pre-baked, `npm test` in place of pytest, and contract guidance in terms of Zod
+   schemas and `createRoute`. `.dockerignore` still whitelisted `pyproject.toml`
+   and `uv.lock`, which would have broken the image build.
 
 ## Risks
 
