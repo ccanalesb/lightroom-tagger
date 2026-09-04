@@ -2,41 +2,41 @@ import type { components } from './api.gen'
 
 /** Generated from backend OpenAPI — see ADR-0013. */
 export type IdentityBestPhotoItem =
-  components['schemas']['IdentityBestPhotosResponse.00d7522.IdentityBestPhotoItem']
+  components['schemas']['IdentityBestPhotoItem']
 
 export type IdentityBestPhotosMeta =
-  components['schemas']['IdentityBestPhotosResponse.00d7522.IdentityBestPhotosMeta']
+  components['schemas']['IdentityBestPhotosMeta']
 
 export type IdentityBestPhotosResponse =
-  components['schemas']['IdentityBestPhotosResponse.00d7522']
+  components['schemas']['IdentityBestPhotosResponse']
 
 export type MirrorDescriptor =
-  components['schemas']['MirrorResponse.00d7522.MirrorDescriptor']
+  components['schemas']['MirrorDescriptor']
 
 export type MirrorExemplar =
-  components['schemas']['MirrorResponse.00d7522.MirrorExemplar']
+  components['schemas']['MirrorExemplar']
 
 export type MirrorExemplarPerPerspective =
-  components['schemas']['MirrorResponse.00d7522.MirrorExemplarPerPerspective']
+  components['schemas']['MirrorExemplarPerPerspective']
 
-export type MirrorMeta = components['schemas']['MirrorResponse.00d7522.MirrorMeta']
+export type MirrorMeta = components['schemas']['MirrorMeta']
 
 export type MirrorOtherLens =
-  components['schemas']['MirrorResponse.00d7522.MirrorOtherLens']
+  components['schemas']['MirrorOtherLens']
 
-export type MirrorResponse = components['schemas']['MirrorResponse.00d7522']
+export type MirrorResponse = components['schemas']['MirrorResponse']
 
 export type MirrorLensExemplarsResponse =
-  components['schemas']['MirrorLensExemplarsResponse.00d7522']
+  components['schemas']['MirrorLensExemplarsResponse']
 
 export type MirrorTechniqueSection =
-  components['schemas']['MirrorResponse.00d7522.MirrorTechniqueSection']
+  components['schemas']['MirrorTechniqueSection']
 
 export type PostNextCandidate =
-  components['schemas']['PostNextSuggestionsResponse.00d7522.PostNextCandidate']
+  components['schemas']['PostNextCandidate']
 
 export type PostNextSuggestionsMeta =
-  components['schemas']['PostNextSuggestionsResponse.00d7522.PostNextSuggestionsMeta']
+  components['schemas']['PostNextSuggestionsMeta']
 
 export type PostNextSuggestionsResponse =
-  components['schemas']['PostNextSuggestionsResponse.00d7522']
+  components['schemas']['PostNextSuggestionsResponse']

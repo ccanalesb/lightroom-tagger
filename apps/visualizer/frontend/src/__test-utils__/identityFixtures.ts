@@ -54,4 +54,8 @@ export const NULLABLE_BEST_PHOTO_FIELDS = {
   stack_id: null,
   stack_member_count: null,
   is_stack_representative: null,
+  // The corroboration veto ranks on these; unrevoked rows carry the peak.
+  ranking_percentile: 0,
+  corroboration_revoked: false,
+  corroboration_revoked_by: '',
 } as const satisfies Partial<import('../services/api').IdentityBestPhotoItem>

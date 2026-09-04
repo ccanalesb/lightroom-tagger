@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_DIR="$ROOT_DIR/.run"
 BACKEND_PID_FILE="$RUN_DIR/backend.pid"
 FRONTEND_PID_FILE="$RUN_DIR/frontend.pid"
-BACKEND_DIR="$ROOT_DIR/apps/visualizer/backend"
+BACKEND_DIR="$ROOT_DIR/apps/visualizer/backend-ts"
 
 BACKEND_PORT=5001
 if [[ -f "$BACKEND_DIR/.env" ]]; then
@@ -40,24 +40,17 @@ wait_for_port_to_clear() {
   local label="$2"
   local attempt
 
-  if ! command -v python3 >/dev/null 2>&1; then
+  if ! command -v node >/dev/null 2>&1; then
     return
   fi
 
   for attempt in {1..20}; do
-    if python3 - "$port" <<'PY'
-import socket
-import sys
-
-port = int(sys.argv[1])
-s = socket.socket()
-try:
-    s.bind(("127.0.0.1", port))
-except OSError:
-    raise SystemExit(1)
-finally:
-    s.close()
-PY
+    if node -e '
+const net = require("node:net");
+const s = net.createServer();
+s.once("error", () => process.exit(1));
+s.listen(Number(process.argv[1]), "127.0.0.1", () => s.close(() => process.exit(0)));
+' "$port"
     then
       if [[ "$attempt" -gt 1 ]]; then
         echo "$label: port $port is now free"

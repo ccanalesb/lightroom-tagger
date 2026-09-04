@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BACKEND_DIR="$ROOT_DIR/apps/visualizer/backend"
+BACKEND_DIR="$ROOT_DIR/apps/visualizer/backend-ts"
 FRONTEND_DIR="$ROOT_DIR/apps/visualizer/frontend"
 RUN_DIR="$ROOT_DIR/.run"
 BACKEND_PID_FILE="$RUN_DIR/backend.pid"
@@ -15,7 +15,7 @@ if [[ -f "$BACKEND_DIR/.env" ]]; then
 fi
 
 if [[ ! -d "$BACKEND_DIR" || ! -d "$FRONTEND_DIR" ]]; then
-  echo "Expected apps/visualizer/backend/ and apps/visualizer/frontend/ under: $ROOT_DIR"
+  echo "Expected apps/visualizer/backend-ts/ and apps/visualizer/frontend/ under: $ROOT_DIR"
   exit 1
 fi
 
@@ -41,9 +41,12 @@ if [[ ! -x "$FRONTEND_DIR/node_modules/.bin/vite" ]]; then
   )
 fi
 
-PYTHON_BIN="python3"
-if [[ -x "$ROOT_DIR/.venv/bin/python" ]]; then
-  PYTHON_BIN="$ROOT_DIR/.venv/bin/python"
+if [[ ! -x "$BACKEND_DIR/node_modules/.bin/tsx" ]]; then
+  echo "Backend dependencies missing; installing..."
+  (
+    cd "$BACKEND_DIR"
+    npm install
+  )
 fi
 
 # Wait until a port is bindable, retrying briefly. A just-stopped server can
@@ -55,16 +58,12 @@ wait_for_port_free() {
   local attempt
 
   for attempt in {1..20}; do
-    if "$PYTHON_BIN" - "$port" <<'PY'
-import socket, sys
-s = socket.socket()
-try:
-    s.bind(("127.0.0.1", int(sys.argv[1])))
-except OSError:
-    raise SystemExit(1)
-finally:
-    s.close()
-PY
+    if node -e '
+const net = require("node:net");
+const s = net.createServer();
+s.once("error", () => process.exit(1));
+s.listen(Number(process.argv[1]), "127.0.0.1", () => s.close(() => process.exit(0)));
+' "$port"
     then
       if [[ "$attempt" -gt 1 ]]; then
         echo "Port $port is now free."
@@ -86,7 +85,8 @@ wait_for_port_free 5173 || exit 1
 echo "Starting backend on http://127.0.0.1:$BACKEND_PORT ..."
 (
   cd "$BACKEND_DIR"
-  exec env PYTHONPATH="$ROOT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$PYTHON_BIN" app.py
+  # `node --env-file-if-exists` rather than a dotenv dependency; see src/config.ts.
+  exec node --env-file-if-exists=.env --import tsx src/server.ts
 ) &
 BACKEND_PID=$!
 echo "$BACKEND_PID" > "$BACKEND_PID_FILE"
