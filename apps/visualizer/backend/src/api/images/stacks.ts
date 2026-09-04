@@ -19,7 +19,7 @@ import {
   stackSetRepresentative,
   stackSplitMemberOut,
 } from '../../db/library/stacks.js';
-import { libraryDb, type LibraryEnv } from '../../db/library/with-db.js';
+import { libraryDb, type LibraryEnv } from '../library-db.js';
 import { libraryWrite } from '../../db/library/write.js';
 import { HttpError } from '../../utils/responses.js';
 import { createOpenApiApp } from '../openapi.js';

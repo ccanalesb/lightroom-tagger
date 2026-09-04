@@ -6,7 +6,7 @@ import {
   getAllImagesWithDescriptions,
   getImageDescription,
 } from '../db/library/descriptions.js';
-import { libraryDb, type LibraryEnv } from '../db/library/with-db.js';
+import { libraryDb, type LibraryEnv } from './library-db.js';
 import {
   AuthenticationError,
   ModelUnavailableError,

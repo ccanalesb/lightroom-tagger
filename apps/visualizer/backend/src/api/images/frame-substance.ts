@@ -17,7 +17,7 @@ import {
   isFrameSubstanceFlagged,
   isFrameSubstanceVerdictStale,
 } from '../../db/library/frame-substance.js';
-import type { LibraryEnv } from '../../db/library/with-db.js';
+import type { LibraryEnv } from '../library-db.js';
 import { libraryWrite } from '../../db/library/write.js';
 import type { Db } from '../../db/connection.js';
 import {

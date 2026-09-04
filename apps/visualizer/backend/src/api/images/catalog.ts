@@ -29,7 +29,7 @@ import {
 } from '../../db/library/similarity.js';
 import { catalogImageStackRowFields } from '../../db/library/stacks.js';
 import { getVisionCachedImage } from '../../db/library/vision-cache.js';
-import { libraryDb, type LibraryEnv } from '../../db/library/with-db.js';
+import { libraryDb, type LibraryEnv } from '../library-db.js';
 import { libraryWrite } from '../../db/library/write.js';
 import { computeSingleImageAggregateScores } from '../../identity/aggregates.js';
 import { resolveCatalogPath } from '../../utils/path-resolve.js';

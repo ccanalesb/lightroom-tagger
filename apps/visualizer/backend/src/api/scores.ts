@@ -7,7 +7,7 @@ import {
   listScoreHistoryForPerspective,
   type ImageScoreRow as DbScoreRow,
 } from '../db/library/scores.js';
-import { libraryDb, type LibraryEnv } from '../db/library/with-db.js';
+import { libraryDb, type LibraryEnv } from './library-db.js';
 import { isValidPerspectiveSlug } from '../utils/perspective-slug.js';
 import { createOpenApiApp } from './openapi.js';
 import { jsonBody, withValidationError } from './route-helpers.js';

@@ -10,9 +10,9 @@
  */
 import type { Env, MiddlewareHandler } from 'hono';
 import { existsSync } from 'node:fs';
-import { config } from '../../config.js';
-import { ERROR_DB_NOT_FOUND } from '../../constants/errors.js';
-import { openLibraryDb, type Db } from '../connection.js';
+import { config } from '../config.js';
+import { ERROR_DB_NOT_FOUND } from '../constants/errors.js';
+import { openLibraryDb, type Db } from '../db/connection.js';
 
 /** Env for route groups that read `library.db`. */
 export interface LibraryEnv extends Env {

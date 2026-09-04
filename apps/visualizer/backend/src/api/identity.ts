@@ -8,7 +8,7 @@
  * use `z.coerce` so string query values like `"4"` parse as integers.
  */
 import { createRoute, z } from '@hono/zod-openapi';
-import { libraryDb, type LibraryEnv } from '../db/library/with-db.js';
+import { libraryDb, type LibraryEnv } from './library-db.js';
 import { buildLensExemplars, buildMirror } from '../identity/mirror.js';
 import { rankBestPhotos } from '../identity/ranking.js';
 import { suggestWhatToPostNext } from '../identity/suggest-post.js';
