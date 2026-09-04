@@ -27,13 +27,14 @@ import {
   asMetadata,
   failureSeverityFromError,
   jobLogLevel,
-  mapStageProgress,
+  mapPassProgress,
+  OWN_JOB,
   readIntOrNull,
   resolveDateWindow,
   resolveLibraryDbOrFail,
   selectCatalogKeys,
   withLibraryDb,
-  type PassStage,
+  type PassContext,
 } from './common.js';
 import { PathSkipDiagnostics, emptySkipReasonCounts } from './path-diagnostics.js';
 
@@ -206,7 +207,7 @@ export async function handleBatchScore(
         excludeVoidSubstance: true,
       });
 
-      await runScorePass(runner, jobId, metadata, db, selection);
+      await runScorePass(runner, jobId, metadata, db, selection, OWN_JOB);
     });
   } catch (e) {
     runner.failJob(jobId, e instanceof Error ? e.message : String(e), failureSeverityFromError(e));
@@ -257,13 +258,13 @@ export async function runScorePass(
   metadata: Record<string, unknown>,
   db: Db,
   selection: readonly (readonly [string, string])[],
-  stage?: PassStage,
+  ctx: PassContext,
 ): Promise<BatchScoreResult | null> {
-  const prefix = stage?.logPrefix ?? '';
+  const prefix = ctx.logPrefix;
   const log = (level: JobLogLevel, message: string): void =>
     runner.log(jobId, level, `${prefix}${message}`);
   const progress = (pct: number, message: string): void =>
-    runner.updateProgress(jobId, mapStageProgress(stage, pct), `${prefix}${message}`);
+    runner.updateProgress(jobId, mapPassProgress(ctx, pct), `${prefix}${message}`);
 
   const imageType = String(metadata['image_type'] ?? 'catalog');
   const dateFilter = String(metadata['date_filter'] ?? 'all');
@@ -289,9 +290,9 @@ export async function runScorePass(
     resumeKey: 'processed_triplets',
     fingerprint,
     mismatchMessage:
-      stage === undefined ? BATCH_SCORE_CHECKPOINT_MISMATCH : ANALYZE_SCORE_CHECKPOINT_MISMATCH,
+      ctx.checkpoint.mode === 'nested' ? ANALYZE_SCORE_CHECKPOINT_MISMATCH : BATCH_SCORE_CHECKPOINT_MISMATCH,
     log: (message) => log('info', message),
-    analyzeStage: stage?.checkpointKey,
+    analyzeStage: ctx.checkpoint.mode === 'nested' ? ctx.checkpoint.key : undefined,
   });
 
   const tripletLabel = (key: string, itype: string, slug: string): string =>
@@ -346,7 +347,7 @@ export async function runScorePass(
       force,
       skip_reason_counts: emptySkipReasonCounts(),
     };
-    if (stage !== undefined) return empty;
+    if (ctx.settle === 'stage') return empty;
     runner.clearCheckpoint(jobId);
     runner.completeJob(jobId, {
       scored: 0,
@@ -382,16 +383,17 @@ export async function runScorePass(
       runner.failJob(jobId, 'checkpoint too large: exceeds 100000 entries');
       return false;
     }
-    if (stage === undefined) {
+    const { checkpoint } = ctx;
+    if (checkpoint.mode === 'flat') {
       runner.persistCheckpoint(
         jobId,
         buildBatchScoreCheckpointBody({ fingerprint, processed: processedTriplets, totalAtStart }),
       );
-    } else {
+    } else if (checkpoint.mode === 'nested') {
       persistAnalyzeStageCheckpoint(
         runner,
         jobId,
-        stage.checkpointKey,
+        checkpoint.key,
         buildAnalyzeStagePayload({
           fingerprint,
           processed: processedTriplets,
@@ -489,7 +491,7 @@ export async function runScorePass(
     force,
     skip_reason_counts: diag.skipReasonCounts,
   };
-  if (stage !== undefined) return summary;
+  if (ctx.settle === 'stage') return summary;
   runner.clearCheckpoint(jobId);
   runner.completeJob(jobId, summary);
   return null;

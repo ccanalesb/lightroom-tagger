@@ -35,11 +35,12 @@ import type { JobRunner } from '../runner.js';
 import {
   asMetadata,
   failureSeverityFromError,
-  mapStageProgress,
+  mapPassProgress,
+  OWN_JOB,
   readIntOrNull,
   resolveLibraryDbOrFail,
   withLibraryDb,
-  type StageBand,
+  type PassContext,
 } from './common.js';
 
 /** Re-report progress every this many seeds; a per-seed update is pure noise. */
@@ -75,7 +76,7 @@ export async function handleBatchCatalogSimilarity(
     const dbPath = resolveLibraryDbOrFail(runner, jobId);
     if (dbPath === null) return;
     await withLibraryDb(dbPath, async (db) => {
-      runSimilarityPass(runner, jobId, metadata, db);
+      runSimilarityPass(runner, jobId, metadata, db, OWN_JOB);
     });
   } catch (e) {
     runner.failJob(jobId, e instanceof Error ? e.message : String(e), failureSeverityFromError(e));
@@ -100,12 +101,12 @@ export function runSimilarityPass(
   jobId: string,
   metadata: Record<string, unknown>,
   db: Db,
-  stage?: StageBand,
+  ctx: PassContext,
 ): BatchCatalogSimilarityResult | null {
-  const prefix = stage?.logPrefix ?? '';
+  const prefix = ctx.logPrefix;
   const log = (message: string): void => runner.log(jobId, 'info', `${prefix}${message}`);
   const progress = (pct: number, message: string): void =>
-    runner.updateProgress(jobId, mapStageProgress(stage, pct), `${prefix}${message}`);
+    runner.updateProgress(jobId, mapPassProgress(ctx, pct), `${prefix}${message}`);
 
   const minSimilarity = clampedNumber(metadata['min_similarity'], 0.9, 0, 1);
   const limitPerSeed = Math.trunc(
@@ -217,7 +218,7 @@ export function runSimilarityPass(
       `skipped_non_primary=${skippedNonPrimary}, skipped_no_embedding=${skippedNoEmbedding}, ` +
       `skipped_flagged_frame=${skippedFlaggedFrame}, skipped_rejected=${skippedRejected}`,
   );
-  if (stage !== undefined) return result;
+  if (ctx.settle === 'stage') return result;
   runner.completeJob(jobId, result);
   return null;
 }
@@ -343,7 +344,7 @@ export async function handleBatchStackDetect(
   try {
     const dbPath = resolveLibraryDbOrFail(runner, jobId);
     if (dbPath === null) return;
-    await withLibraryDb(dbPath, (db) => runStackDetectPass(runner, jobId, metadata, db));
+    await withLibraryDb(dbPath, (db) => runStackDetectPass(runner, jobId, metadata, db, OWN_JOB));
   } catch (e) {
     runner.failJob(jobId, e instanceof Error ? e.message : String(e), failureSeverityFromError(e));
   }
@@ -393,11 +394,11 @@ export async function runStackDetectPass(
   jobId: string,
   metadata: Record<string, unknown>,
   db: Db,
-  stage?: StageBand,
+  ctx: PassContext,
 ): Promise<BatchStackDetectResult | null> {
-  const prefix = stage?.logPrefix ?? '';
+  const prefix = ctx.logPrefix;
   const progress = (pct: number, message: string): void =>
-    runner.updateProgress(jobId, mapStageProgress(stage, pct), `${prefix}${message}`);
+    runner.updateProgress(jobId, mapPassProgress(ctx, pct), `${prefix}${message}`);
 
   const deltaMs = resolveBurstDeltaMs(runner, jobId, metadata);
   if (deltaMs === null) return null;
@@ -439,7 +440,7 @@ export async function runStackDetectPass(
   });
 
   const processed =
-    stage === undefined
+    ctx.checkpoint.mode === 'flat'
       ? loadResumeState({
           metadata: runner.readMetadata(jobId),
           jobType: 'batch_stack_detect',
@@ -460,7 +461,7 @@ export async function runStackDetectPass(
         `images_skipped_no_date=${result.images_skipped_no_date}, ` +
         `images_skipped_already_stacked=${result.images_skipped_already_stacked}`,
     );
-    if (stage !== undefined) return result;
+    if (ctx.settle === 'stage') return result;
     runner.clearCheckpoint(jobId);
     runner.completeJob(jobId, result);
     return null;
@@ -515,7 +516,7 @@ export async function runStackDetectPass(
     for (const key of segment) processed.add(key);
     // A chain stage writes no checkpoint, so the set is only a progress counter
     // and cannot outgrow anything.
-    if (stage !== undefined) return true;
+    if (ctx.checkpoint.mode === 'none') return true;
     if (processed.size > CHECKPOINT_MAX_ENTRIES) {
       runner.failJob(jobId, 'checkpoint too large: exceeds 100000 entries');
       return false;

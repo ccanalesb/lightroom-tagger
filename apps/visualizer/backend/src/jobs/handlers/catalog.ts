@@ -25,10 +25,11 @@ import {
   asMetadata,
   failureSeverityFromError,
   jobLogLevel,
-  mapStageProgress,
+  mapPassProgress,
+  OWN_JOB,
   resolveLibraryDbOrFail,
   withLibraryDb,
-  type StageBand,
+  type PassContext,
 } from './common.js';
 
 /**
@@ -69,7 +70,7 @@ export async function handleCatalogSync(
   if (dbPath === null) return;
 
   await withLibraryDb(dbPath, async (libDb) => {
-    runCatalogSyncPass(runner, jobId, metadata, libDb);
+    runCatalogSyncPass(runner, jobId, metadata, libDb, OWN_JOB);
   });
 }
 
@@ -86,11 +87,11 @@ export function runCatalogSyncPass(
   jobId: string,
   metadata: Record<string, unknown>,
   libDb: Db,
-  stage?: StageBand,
+  ctx: PassContext,
 ): CatalogSyncStageResult | null {
-  const prefix = stage?.logPrefix ?? '';
+  const prefix = ctx.logPrefix;
   const unrunnable = (message: string): CatalogSyncStageResult | null => {
-    if (stage === undefined) {
+    if (ctx.settle === 'job') {
       runner.failJob(jobId, message, 'warning');
       return null;
     }
@@ -105,7 +106,7 @@ export function runCatalogSyncPass(
   if (!existsSync(catalogPath)) return unrunnable(`Catalog not found: ${catalogPath}`);
 
   const progress = (pct: number, message: string): void =>
-    runner.updateProgress(jobId, mapStageProgress(stage, pct), `${prefix}${message}`);
+    runner.updateProgress(jobId, mapPassProgress(ctx, pct), `${prefix}${message}`);
   progress(5, 'Connecting to Lightroom catalog...');
 
   let outcome: SyncCatalogOutcome;
@@ -121,7 +122,7 @@ export function runCatalogSyncPass(
     // one is worth replacing with the reason it almost always has.
     const isSyncError = e instanceof CatalogSyncError;
     const message = isSyncError ? raw || CATALOG_LOCKED_MSG : raw;
-    if (stage !== undefined) {
+    if (ctx.settle === 'stage') {
       runner.log(jobId, 'warning', `${prefix}status=failed error=${message}`);
       return { failed: true, error: message, added: 0, stale: 0 };
     }
@@ -134,7 +135,7 @@ export function runCatalogSyncPass(
     runner.finalizeCancelled(jobId);
     return null;
   }
-  if (stage !== undefined) return outcome.result;
+  if (ctx.settle === 'stage') return outcome.result;
   runner.completeJob(jobId, outcome.result);
   return null;
 }

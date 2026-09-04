@@ -7,9 +7,8 @@
  * ordering enforceable: four separately queued jobs can be started out of order,
  * and stack detection over a half-filled embedding table quietly produces less.
  *
- * The stages are the same passes the standalone jobs run with a `StageBand`: each
- * reports into a quarter of the bar and hands its summary back instead of completing
- * the job.
+ * The stages are the same passes the standalone jobs run: each is given a quarter
+ * of the progress bar and hands its summary back instead of completing the job.
  *
  * Stage 0 is the exception to "each stage reads what the one before wrote": the
  * three after it read `library.db`, which is there whether or not today's
@@ -28,7 +27,7 @@ import {
   resolveDateWindow,
   resolveLibraryDbOrFail,
   withLibraryDb,
-  type StageBand,
+  chainStage,
 } from './common.js';
 import { runEmbedPass, type BatchEmbedImageResult } from './embed.js';
 import {
@@ -46,10 +45,10 @@ import {
  * that varies with how much of the catalog is already embedded would make the
  * bar's meaning depend on the previous run.
  */
-const SYNC_STAGE: StageBand = { progressRange: [5, 29], logPrefix: '[sync] ' };
-const EMBED_STAGE: StageBand = { progressRange: [29, 52], logPrefix: '[embed] ' };
-const STACK_STAGE: StageBand = { progressRange: [52, 76], logPrefix: '[stack] ' };
-const SIMILARITY_STAGE: StageBand = { progressRange: [76, 100], logPrefix: '[similarity] ' };
+const SYNC_STAGE = chainStage([5, 29], '[sync] ');
+const EMBED_STAGE = chainStage([29, 52], '[embed] ');
+const STACK_STAGE = chainStage([52, 76], '[stack] ');
+const SIMILARITY_STAGE = chainStage([76, 100], '[similarity] ');
 
 export interface CatalogCacheBuildResult {
   catalog_cache_build: true;

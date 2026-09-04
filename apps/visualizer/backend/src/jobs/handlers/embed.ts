@@ -27,12 +27,13 @@ import type { JobRunner } from '../runner.js';
 import {
   asMetadata,
   failureSeverityFromError,
-  mapStageProgress,
+  mapPassProgress,
+  OWN_JOB,
   readIntOrNull,
   resolveDateWindow,
   resolveLibraryDbOrFail,
   withLibraryDb,
-  type StageBand,
+  type PassContext,
 } from './common.js';
 import { PathSkipDiagnostics, emptySkipReasonCounts } from './path-diagnostics.js';
 
@@ -70,7 +71,7 @@ export async function handleBatchEmbedImage(
     const dbPath = resolveLibraryDbOrFail(runner, jobId);
     if (dbPath === null) return;
 
-    await withLibraryDb(dbPath, (db) => runEmbedPass(runner, jobId, metadata, db));
+    await withLibraryDb(dbPath, (db) => runEmbedPass(runner, jobId, metadata, db, OWN_JOB));
   } catch (e) {
     runner.failJob(jobId, e instanceof Error ? e.message : String(e), failureSeverityFromError(e));
   }
@@ -90,12 +91,12 @@ export async function runEmbedPass(
   jobId: string,
   metadata: Record<string, unknown>,
   db: Db,
-  stage?: StageBand,
+  ctx: PassContext,
 ): Promise<BatchEmbedImageResult | null> {
-  const prefix = stage?.logPrefix ?? '';
+  const prefix = ctx.logPrefix;
   const log = (message: string): void => runner.log(jobId, 'info', `${prefix}${message}`);
   const progress = (pct: number, message: string): void =>
-    runner.updateProgress(jobId, mapStageProgress(stage, pct), `${prefix}${message}`);
+    runner.updateProgress(jobId, mapPassProgress(ctx, pct), `${prefix}${message}`);
 
   log(`batch_embed_image: model=${CLIP_EMBED_MODEL_ID}`);
   log(PRECOMPUTE_NOTICE);
@@ -120,7 +121,7 @@ export async function runEmbedPass(
   });
 
   const processed =
-    stage === undefined
+    ctx.checkpoint.mode === 'flat'
       ? loadResumeState({
           metadata: runner.readMetadata(jobId),
           jobType: 'batch_embed_image',
@@ -149,7 +150,7 @@ export async function runEmbedPass(
       total: 0,
       skip_reason_counts: emptySkipReasonCounts(),
     };
-    if (stage !== undefined) return empty;
+    if (ctx.settle === 'stage') return empty;
     runner.clearCheckpoint(jobId);
     runner.completeJob(jobId, empty);
     return null;
@@ -172,7 +173,7 @@ export async function runEmbedPass(
    * no resume state and tracks its progress by the counters below.
    */
   const recordDone = (key: string): boolean => {
-    if (stage !== undefined) return true;
+    if (ctx.checkpoint.mode === 'none') return true;
     processed.add(key);
     if (processed.size > CHECKPOINT_MAX_ENTRIES) {
       runner.failJob(jobId, 'checkpoint too large: exceeds 100000 entries');
@@ -234,7 +235,7 @@ export async function runEmbedPass(
     total: totalAtStart,
     skip_reason_counts: diag.skipReasonCounts,
   };
-  if (stage !== undefined) return summary;
+  if (ctx.settle === 'stage') return summary;
   runner.clearCheckpoint(jobId);
   runner.completeJob(jobId, summary);
   return null;

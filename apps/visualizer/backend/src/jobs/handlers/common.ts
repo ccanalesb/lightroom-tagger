@@ -158,36 +158,65 @@ export function filterVoidSubstanceFromScoringSelection(
 }
 
 /**
- * How a pass reports when it is one stage of a composite job rather than a job.
+ * Where a pass keeps the units it has finished, so an interrupted run resumes.
  *
- * Absent, the pass owns the job: the whole progress bar, unprefixed logs, and it
- * completes the job itself. Present, it owns a slice — progress maps into
- * `progressRange`, logs carry `logPrefix`, and the summary comes back for the
- * caller to combine rather than being written as the job's result.
- *
- * `catalog_cache_build` passes this bare, because its four stages keep no resume
- * state: the chain is re-runnable end to end, and a checkpoint written under the
+ * Three genuinely different answers, which is why this is a union rather than an
+ * optional key. `flat` is a pass running as its own job, writing the checkpoint
+ * on its job row. `nested` is a `batch_analyze` stage, whose set lives in a
+ * sub-object of the composite's checkpoint. `none` is a `catalog_cache_build`
+ * stage: that chain is re-runnable end to end, and a checkpoint written under the
  * composite's job id would be read back by whichever stage ran last.
  */
-export interface StageBand {
-  /** The slice of the job's 0–100 bar this pass reports into. */
-  progressRange: readonly [number, number];
-  logPrefix: string;
-}
+export type PassCheckpoint =
+  | { mode: 'flat' }
+  | { mode: 'nested'; key: AnalyzeStage }
+  | { mode: 'none' };
 
 /**
- * A `StageBand` for the two passes `batch_analyze` composes, which do resume:
- * their processed-unit set lives in a sub-object of the composite's checkpoint.
+ * Everything a pass needs to know about the job it is running inside.
+ *
+ * Every pass owns a band of the progress bar and a log prefix; a pass running
+ * standalone owns the whole bar and an empty prefix, which is why this is
+ * required rather than an optional "am I a stage" argument. The only real
+ * question is who settles the job at the end — `job` means this pass calls
+ * `completeJob`/`failJob` and returns null, `stage` means it hands its summary
+ * back for the composite to combine.
  */
-export interface PassStage extends StageBand {
-  /** Which sub-object of the `batch_analyze` checkpoint holds the resume state. */
-  checkpointKey: AnalyzeStage;
+export interface PassContext {
+  progressRange: readonly [number, number];
+  logPrefix: string;
+  settle: 'job' | 'stage';
+  checkpoint: PassCheckpoint;
+}
+
+/** A pass that is the whole job: the full bar, no prefix, its own checkpoint. */
+export const OWN_JOB: PassContext = {
+  progressRange: [0, 100],
+  logPrefix: '',
+  settle: 'job',
+  checkpoint: { mode: 'flat' },
+};
+
+/** A `catalog_cache_build` stage: a band of the bar, and no resume state. */
+export function chainStage(
+  progressRange: readonly [number, number],
+  logPrefix: string,
+): PassContext {
+  return { progressRange, logPrefix, settle: 'stage', checkpoint: { mode: 'none' } };
+}
+
+/** A `batch_analyze` stage, which resumes into a sub-object of the composite's. */
+export function analyzeStage(
+  progressRange: readonly [number, number],
+  logPrefix: string,
+  key: AnalyzeStage,
+): PassContext {
+  return { progressRange, logPrefix, settle: 'stage', checkpoint: { mode: 'nested', key } };
 }
 
 /** Map a pass's own 0–100 onto the slice of the bar it was given. */
-export function mapStageProgress(stage: StageBand | undefined, pct: number): number {
-  if (stage === undefined) return pct;
-  const [lo, hi] = stage.progressRange;
+export function mapPassProgress(ctx: PassContext, pct: number): number {
+  const [lo, hi] = ctx.progressRange;
   return Math.trunc(lo + ((hi - lo) * pct) / 100);
 }
 

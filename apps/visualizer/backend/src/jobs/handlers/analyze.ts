@@ -10,7 +10,7 @@
  *
  * Everything that makes a pass behave as a stage rather than as its own job — the
  * progress band, the log prefix, the checkpoint slot, who calls `completeJob` —
- * is carried by the `PassStage` argument the passes take.
+ * is carried by the `PassContext` argument the passes take.
  */
 import type { Db } from '../../db/connection.js';
 import { fingerprintBatchDescribe, readAnalyzeCheckpoint } from '../checkpoint.js';
@@ -21,7 +21,7 @@ import {
   filterVoidSubstanceFromScoringSelection,
   resolveLibraryDbOrFail,
   withLibraryDb,
-  type PassStage,
+  analyzeStage,
 } from './common.js';
 import { runDescribePass, selectDescribeCandidates } from './describe.js';
 import {
@@ -36,19 +36,11 @@ import { runScorePass } from './score.js';
  * points between them going to frame-substance detection — cheap next to a vision
  * call per image, which is why it is worth so little of the bar.
  */
-const DESCRIBE_STAGE: PassStage = {
-  progressRange: [0, 48],
-  logPrefix: '[describe] ',
-  checkpointKey: 'describe',
-};
+const DESCRIBE_STAGE = analyzeStage([0, 48], '[describe] ', 'describe');
 
 const FRAME_SUBSTANCE_RANGE: readonly [number, number] = [48, 52];
 
-const SCORE_STAGE: PassStage = {
-  progressRange: [52, 100],
-  logPrefix: '[score] ',
-  checkpointKey: 'score',
-};
+const SCORE_STAGE = analyzeStage([52, 100], '[score] ', 'score');
 
 /** What the composite needs from a stage, under names that fit both passes. */
 interface StageOutcome {

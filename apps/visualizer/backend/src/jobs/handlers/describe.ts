@@ -32,14 +32,15 @@ import type { JobRunner } from '../runner.js';
 import {
   asMetadata,
   failureSeverityFromError,
-  mapStageProgress,
+  mapPassProgress,
+  OWN_JOB,
   readIntOrNull,
   resolveDateWindow,
   resolveLibraryDbOrFail,
   selectCatalogKeys,
   selectCatalogKeysMissingVisualTags,
   withLibraryDb,
-  type PassStage,
+  type PassContext,
 } from './common.js';
 import { PathSkipDiagnostics, emptySkipReasonCounts } from './path-diagnostics.js';
 
@@ -228,7 +229,7 @@ export async function handleBatchDescribe(
         metadata,
         Boolean(metadata['force']),
       );
-      await runDescribePass(runner, jobId, metadata, db, selection);
+      await runDescribePass(runner, jobId, metadata, db, selection, OWN_JOB);
     });
   } catch (e) {
     runner.failJob(
@@ -306,13 +307,13 @@ export async function runDescribePass(
   metadata: Record<string, unknown>,
   db: Db,
   selection: readonly (readonly [string, string])[],
-  stage?: PassStage,
+  ctx: PassContext,
 ): Promise<BatchDescribeResult | null> {
-  const prefix = stage?.logPrefix ?? '';
+  const prefix = ctx.logPrefix;
   const log = (level: 'info' | 'warning' | 'error', message: string): void =>
     runner.log(jobId, level, `${prefix}${message}`);
   const progress = (pct: number, message: string): void =>
-    runner.updateProgress(jobId, mapStageProgress(stage, pct), `${prefix}${message}`);
+    runner.updateProgress(jobId, mapPassProgress(ctx, pct), `${prefix}${message}`);
 
   const imageType = String(metadata['image_type'] ?? 'catalog');
   const dateFilter = String(metadata['date_filter'] ?? 'all');
@@ -334,9 +335,9 @@ export async function runDescribePass(
     resumeKey: 'processed_pairs',
     fingerprint,
     mismatchMessage:
-      stage === undefined ? BATCH_DESCRIBE_CHECKPOINT_MISMATCH : ANALYZE_DESCRIBE_CHECKPOINT_MISMATCH,
+      ctx.checkpoint.mode === 'nested' ? ANALYZE_DESCRIBE_CHECKPOINT_MISMATCH : BATCH_DESCRIBE_CHECKPOINT_MISMATCH,
     log: (message) => log('info', message),
-    analyzeStage: stage?.checkpointKey,
+    analyzeStage: ctx.checkpoint.mode === 'nested' ? ctx.checkpoint.key : undefined,
   });
 
   const pairLabel = (key: string, itype: string): string => `${key}|${itype}`;
@@ -391,7 +392,7 @@ export async function runDescribePass(
       force,
       skip_reason_counts: emptySkipReasonCounts(),
     };
-    if (stage !== undefined) return empty;
+    if (ctx.settle === 'stage') return empty;
     runner.clearCheckpoint(jobId);
     runner.completeJob(jobId, {
       described: 0,
@@ -430,16 +431,17 @@ export async function runDescribePass(
       runner.failJob(jobId, 'checkpoint too large: exceeds 100000 entries');
       return false;
     }
-    if (stage === undefined) {
+    const { checkpoint } = ctx;
+    if (checkpoint.mode === 'flat') {
       runner.persistCheckpoint(
         jobId,
         buildBatchDescribeCheckpointBody({ fingerprint, processed: processedPairs, totalAtStart }),
       );
-    } else {
+    } else if (checkpoint.mode === 'nested') {
       persistAnalyzeStageCheckpoint(
         runner,
         jobId,
-        stage.checkpointKey,
+        checkpoint.key,
         buildAnalyzeStagePayload({
           fingerprint,
           processed: processedPairs,
@@ -540,7 +542,7 @@ export async function runDescribePass(
     force,
     skip_reason_counts: diag.skipReasonCounts,
   };
-  if (stage !== undefined) return summary;
+  if (ctx.settle === 'stage') return summary;
   runner.clearCheckpoint(jobId);
   runner.completeJob(jobId, summary);
   return null;
