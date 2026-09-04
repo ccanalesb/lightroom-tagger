@@ -3,7 +3,8 @@
  */
 import type { Db } from '../db/connection.js';
 import { computeImagePeakPercentileScores, type PeakPercentileItem } from './percentiles.js';
-import { buildMirrorScan } from './mirror.js';
+import { buildCatalogScoreIndex } from './score-index.js';
+import { sortByRanking } from './sort.js';
 import { imageMetaMap } from './ranking.js';
 import { computeSignatureStats } from './signature.js';
 
@@ -76,12 +77,11 @@ export function suggestWhatToPostNext(
   }
   const offset = opts.offset ?? 0;
 
-  // The scan is built first and its percentile lookup reused, so the whole score
-  // table is scanned once rather than three times.
-  const scan = buildMirrorScan(db);
-  const { items, meta: peakMeta } = computeImagePeakPercentileScores(db, {
+  // One index, three consumers: the score table is scanned once rather than
+  // three times.
+  const scan = buildCatalogScoreIndex(db);
+  const { items, meta: peakMeta } = computeImagePeakPercentileScores(scan, {
     includeIneligible: false,
-    percentileLookup: scan.percentileLookup,
   });
   const crowned = new Set(
     computeSignatureStats(scan)
@@ -121,14 +121,7 @@ export function suggestWhatToPostNext(
     });
   }
 
-  const dateDescending = sortByDate !== 'oldest';
-  const cmpStr = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
-  candidatesFull.sort((a, b) => cmpStr(String(a.image_key), String(b.image_key)));
-  candidatesFull.sort((a, b) => {
-    const c = cmpStr(a.date_taken ?? '', b.date_taken ?? '');
-    return dateDescending ? -c : c;
-  });
-  candidatesFull.sort((a, b) => b.ranking_percentile - a.ranking_percentile);
+  sortByRanking(candidatesFull, sortByDate);
 
   // p90 of the *unposted eligible* population, not the whole catalog: the reason
   // code means "strong among what you have left to post".

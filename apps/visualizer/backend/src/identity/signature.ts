@@ -6,30 +6,12 @@
  * so the per-photo win probability varies and the null is a Poisson-binomial.
  */
 import { erfc } from '../utils/erf.js';
+import type { CatalogScoreIndex } from './score-index.js';
 
 export const LOW_COVERAGE_THRESHOLD = 0.5;
 export const MIN_VOTING_LENSES = 2;
 export const CROWN_ALPHA = 0.05;
 
-export interface MirrorCell {
-  perspective_slug: string;
-  display_name: string;
-  score: number;
-  /** Raw, NOT rounded — the Mirror ranks on full precision. */
-  percentile: number;
-  rationale: string;
-}
-
-export interface MirrorScan {
-  activeSlugs: string[];
-  slugSet: Set<string>;
-  displayBySlug: Map<string, string>;
-  byImage: Map<string, MirrorCell[]>;
-  rationalesBySlug: Map<string, string[]>;
-  corpusRationales: string[];
-  percentileLookup: Map<string, number>;
-  totalCatalog: number;
-}
 
 export interface SignatureStat {
   perspective_slug: string;
@@ -124,7 +106,7 @@ export function signatureZ(
 }
 
 /** Per-lens vote counts, z-scores, p-values and crowning flags. */
-export function computeSignatureStats(scan: MirrorScan): SignatureStats {
+export function computeSignatureStats(scan: CatalogScoreIndex): SignatureStats {
   const votes = new Map<string, number>();
   const photosOn = new Map<string, number>();
   const expectedWins = new Map<string, number>(scan.activeSlugs.map((s) => [s, 0]));

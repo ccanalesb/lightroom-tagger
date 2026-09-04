@@ -6,13 +6,8 @@
  * perspective* is what makes "this photo's strongest lens" mean something.
  */
 import type { Db } from '../db/connection.js';
-import {
-  activePerspectiveSlugs,
-  defaultMinPerspectives,
-  SCORES_BASE_SQL,
-  truncateRationale,
-  type ScoreRow,
-} from './aggregates.js';
+import { defaultMinPerspectives, SCORES_BASE_SQL, truncateRationale, type ScoreRow } from './aggregates.js';
+import type { CatalogScoreIndex } from './score-index.js';
 
 /**
  * Round to 6 decimals.
@@ -200,57 +195,38 @@ export interface PeakPercentileMeta {
 /**
  * Per-image peak within-perspective percentile plus per-perspective detail.
  *
- * `percentileLookup` can be passed in when the caller already built one — the
- * Mirror does, and recomputing it would mean a second full pass over every score in
- * the catalog.
+ * Takes the index rather than a database: everything this needs — the live
+ * slugs, the catalog size, the percentile of every cell, the cells grouped by
+ * image — is already in it, and building a second copy meant a second full read
+ * of a 146,983-row query.
+ *
+ * The percentiles are rounded here and nowhere else. The index carries them raw
+ * because the Mirror ranks on full precision, so this is the one place that
+ * decides what six decimals means for the best-photos view.
  */
 export function computeImagePeakPercentileScores(
-  db: Db,
+  index: CatalogScoreIndex,
   opts: {
     minPerspectives?: number | null;
     includeIneligible?: boolean;
-    percentileLookup?: Map<string, number> | null;
   } = {},
 ): { items: PeakPercentileItem[]; meta: PeakPercentileMeta } {
   const includeIneligible = opts.includeIneligible ?? true;
-  const activeSlugs = activePerspectiveSlugs(db);
+  const { activeSlugs, totalCatalog } = index;
   const activeCount = activeSlugs.length;
-  const slugSet = new Set(activeSlugs);
   const minUsed =
     opts.minPerspectives !== null && opts.minPerspectives !== undefined
       ? Math.trunc(opts.minPerspectives)
       : defaultMinPerspectives(activeCount);
 
-  const totalCatalog = Math.trunc(
-    (db.prepare('SELECT COUNT(*) AS c FROM images').get() as { c: number }).c,
-  );
-
-  const percentileLookup =
-    opts.percentileLookup ?? computeWithinPerspectivePercentileLookup(db);
-  const rows = db.prepare(SCORES_BASE_SQL).all() as ScoreRow[];
-
   // Insertion order matters: it becomes the pre-sort order of `items`, and the
   // callers' sorts are stable, so it is the final tiebreaker.
   const byKey = new Map<string, PerspectiveCell[]>();
-  for (const r of rows) {
-    const slug = String(r.perspective_slug);
-    if (!slugSet.has(slug)) continue;
-    const imageKey = String(r.image_key);
-    const score = Math.trunc(r.score);
-    const percentile = percentileLookup.get(cellKey(imageKey, slug))!;
-    const cell: PerspectiveCell = {
-      perspective_slug: slug,
-      display_name: r.perspective_display_name || slug,
-      score,
-      percentile: round6(percentile),
-      rationale: r.rationale ?? '',
-      model_used: r.model_used ?? '',
-      prompt_version: r.prompt_version ?? '',
-      scored_at: r.scored_at ?? '',
-    };
-    const list = byKey.get(imageKey);
-    if (list) list.push(cell);
-    else byKey.set(imageKey, [cell]);
+  for (const [imageKey, cells] of index.byImage) {
+    byKey.set(
+      imageKey,
+      cells.map((c) => ({ ...c, percentile: round6(c.percentile) })),
+    );
   }
 
   const items: PeakPercentileItem[] = [];

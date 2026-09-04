@@ -7,14 +7,9 @@
  * suppress votes — and only rounds on the way out.
  */
 import type { Db } from '../db/connection.js';
-import {
-  activePerspectiveSlugs,
-  SCORES_BASE_SQL,
-  tokenizeRationale,
-  truncateRationale,
-  type ScoreRow,
-} from './aggregates.js';
-import { cellKey, computeWithinPerspectivePercentileLookup, round6 } from './percentiles.js';
+import { tokenizeRationale, truncateRationale } from './aggregates.js';
+import { round6 } from './percentiles.js';
+import { buildCatalogScoreIndex, type CatalogScoreCell, type CatalogScoreIndex } from './score-index.js';
 import { imageMetaMap, stackFieldsForImageKeys, stackNonRepresentativeKeys } from './ranking.js';
 import {
   computeSignatureStats,
@@ -23,8 +18,6 @@ import {
   MIN_VOTING_LENSES,
   round1,
   round4,
-  type MirrorCell,
-  type MirrorScan,
   type SignatureStat,
 } from './signature.js';
 
@@ -127,77 +120,18 @@ export function purity(lensPercentile: number, otherPercentiles: readonly number
   return round1((lensPercentile - Math.max(...otherPercentiles)) * 100);
 }
 
-/** Load everything the Mirror needs in one pass over the score table. */
-export function buildMirrorScan(db: Db): MirrorScan {
-  const activeSlugs = activePerspectiveSlugs(db);
-  const slugSet = new Set(activeSlugs);
-  const rows = db.prepare(SCORES_BASE_SQL).all() as ScoreRow[];
-
-  const displayBySlug = new Map<string, string>();
-  for (const r of rows) {
-    const slug = String(r.perspective_slug);
-    if (!slugSet.has(slug)) continue;
-    if (!displayBySlug.has(slug)) {
-      displayBySlug.set(slug, String(r.perspective_display_name || slug));
-    }
-  }
-
-  // `rows` is handed over so the score table is read once, not twice.
-  const percentileLookup = computeWithinPerspectivePercentileLookup(db, rows);
-  const totalCatalog = Math.trunc(
-    (db.prepare('SELECT COUNT(*) AS c FROM images').get() as { c: number }).c,
-  );
-
-  const byImage = new Map<string, MirrorCell[]>();
-  const rationalesBySlug = new Map<string, string[]>(activeSlugs.map((s) => [s, []]));
-  const corpusRationales: string[] = [];
-
-  for (const r of rows) {
-    const slug = String(r.perspective_slug);
-    if (!slugSet.has(slug)) continue;
-    const imageKey = String(r.image_key);
-    const percentile = percentileLookup.get(cellKey(imageKey, slug))!;
-    const rationale = r.rationale ?? '';
-    if (rationale.trim()) {
-      rationalesBySlug.get(slug)?.push(rationale);
-      corpusRationales.push(rationale);
-    }
-    const cell: MirrorCell = {
-      perspective_slug: slug,
-      display_name: displayBySlug.get(slug) ?? slug,
-      score: Math.trunc(r.score),
-      percentile,
-      rationale,
-    };
-    const list = byImage.get(imageKey);
-    if (list) list.push(cell);
-    else byImage.set(imageKey, [cell]);
-  }
-
-  return {
-    activeSlugs,
-    slugSet,
-    displayBySlug,
-    byImage,
-    rationalesBySlug,
-    corpusRationales,
-    percentileLookup,
-    totalCatalog,
-  };
-}
-
 interface ExemplarCandidate {
   image_key: string;
   score: number;
   percentile: number;
   purity: number;
   rationale: string;
-  per_perspective: MirrorCell[];
+  per_perspective: CatalogScoreCell[];
 }
 
 function lensExemplarCandidates(
   slug: string,
-  byImage: Map<string, MirrorCell[]>,
+  byImage: Map<string, CatalogScoreCell[]>,
 ): ExemplarCandidate[] {
   const candidates: ExemplarCandidate[] = [];
   for (const [imageKey, perspectives] of byImage) {
@@ -289,11 +223,11 @@ export function buildLensExemplars(
   opts: {
     offset?: number;
     limit?: number;
-    scan?: MirrorScan;
+    scan?: CatalogScoreIndex;
     dropKeys?: Set<string>;
   } = {},
 ): { items: MirrorExemplar[]; total: number } {
-  const scan = opts.scan ?? buildMirrorScan(db);
+  const scan = opts.scan ?? buildCatalogScoreIndex(db);
   const offset = opts.offset ?? 0;
   const limit = opts.limit ?? EXEMPLAR_INITIAL_LIMIT;
 
@@ -360,7 +294,7 @@ export interface MirrorPayload {
 
 /** Catalog Mirror: crowned signature lenses, descriptors and exemplar rails. */
 export function buildMirror(db: Db): MirrorPayload {
-  const scan = buildMirrorScan(db);
+  const scan = buildCatalogScoreIndex(db);
   const { stats: signatureStats, votingPopulation } = computeSignatureStats(scan);
 
   // Counted once and shared by every section; see `distinctiveDescriptors`.

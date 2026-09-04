@@ -3,6 +3,8 @@
  */
 import type { Db } from '../db/connection.js';
 import { computeImagePeakPercentileScores, type PeakPercentileItem, type PeakPercentileMeta } from './percentiles.js';
+import { buildCatalogScoreIndex } from './score-index.js';
+import { sortByRanking } from './sort.js';
 
 /**
  * Maximum keys per `IN (...)` list.
@@ -129,11 +131,6 @@ export function stackFieldsForImageKeys(
 
 export type RankedItem = PeakPercentileItem & Partial<ImageMeta> & Partial<StackFields>;
 
-/** Lexicographic string compare for ASCII image keys. */
-function cmpStr(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
-}
-
 /**
  * Eligible images only, ordered by `ranking_percentile` descending.
  *
@@ -160,7 +157,7 @@ export function rankBestPhotos(
     throw new RangeError("sort_by_date must be 'newest' or 'oldest'");
   }
 
-  const { items, meta } = computeImagePeakPercentileScores(db, {
+  const { items, meta } = computeImagePeakPercentileScores(buildCatalogScoreIndex(db), {
     minPerspectives: opts.minPerspectives ?? null,
     includeIneligible: false,
   });
@@ -188,13 +185,7 @@ export function rankBestPhotos(
     }
   }
 
-  const dateDescending = sortByDate !== 'oldest';
-  enriched.sort((a, b) => cmpStr(String(a.image_key), String(b.image_key)));
-  enriched.sort((a, b) => {
-    const c = cmpStr(a.date_taken ?? '', b.date_taken ?? '');
-    return dateDescending ? -c : c;
-  });
-  enriched.sort((a, b) => b.ranking_percentile - a.ranking_percentile);
+  sortByRanking(enriched, sortByDate);
 
   if (opts.posted === true) enriched = enriched.filter((r) => r.instagram_posted === true);
   else if (opts.posted === false) enriched = enriched.filter((r) => !r.instagram_posted);
