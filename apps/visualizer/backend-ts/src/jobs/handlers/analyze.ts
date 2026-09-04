@@ -25,20 +25,25 @@ import {
   type PassStage,
 } from './common.js';
 import { runDescribePass, selectDescribeCandidates } from './describe.js';
+import {
+  runFrameSubstanceDetection,
+  type FrameSubstanceRunResult,
+} from './frame-substance.js';
 import { mergeSkipReasonCounts } from './path-diagnostics.js';
 import { runScorePass } from './score.js';
 
 /**
  * Describe gets the first half of the bar and scoring the second, with the four
- * points between them reserved for frame-substance detection — the stage Python
- * runs there, which lands with the detector port. Leaving the gap rather than
- * closing it keeps the two bands where a resumed Flask-era job expects them.
+ * points between them going to frame-substance detection — cheap next to a vision
+ * call per image, which is why it is worth so little of the bar.
  */
 const DESCRIBE_STAGE: PassStage = {
   progressRange: [0, 48],
   logPrefix: '[describe] ',
   checkpointKey: 'describe',
 };
+
+const FRAME_SUBSTANCE_RANGE: readonly [number, number] = [48, 52];
 
 const SCORE_STAGE: PassStage = {
   progressRange: [52, 100],
@@ -99,6 +104,9 @@ export async function handleBatchAnalyze(
       const describe = await runDescribeStage(runner, jobId, describeMetadata, db, selection);
       if (describe === null) return;
 
+      runner.setCurrentStep(jobId, 'Frame substance');
+      if (!(await runFrameSubstanceStage(runner, jobId, db, selection))) return;
+
       // Condemned frames were still worth describing — a lens cap has a filename
       // and a date — but scoring one produces a rating of nothing.
       const scoreSelection = filterVoidSubstanceFromScoringSelection(db, selection);
@@ -132,6 +140,58 @@ export async function handleBatchAnalyze(
   } catch (e) {
     runner.failJob(jobId, e instanceof Error ? e.message : String(e), failureSeverityFromError(e));
   }
+}
+
+/**
+ * Judge the frames this job just described, so scoring can skip the lens caps.
+ *
+ * Chained rather than a full rescan: scoped to the selection and `staleOnly`, so
+ * it re-judges only images whose preview is newer than their verdict. Unlike the
+ * other two stages a failure here is not fatal — the detector is an optimization
+ * for the stage after it, and a job that has already paid for the descriptions
+ * should go on and score rather than throw them away. Returns `false` only when
+ * the job was cancelled.
+ */
+async function runFrameSubstanceStage(
+  runner: JobRunner,
+  jobId: string,
+  db: Db,
+  selection: readonly (readonly [string, string])[],
+): Promise<boolean> {
+  const imageKeys = [...new Set(selection.map(([key]) => key))];
+  if (imageKeys.length === 0) return true;
+
+  const [lo, hi] = FRAME_SUBSTANCE_RANGE;
+  let result: FrameSubstanceRunResult | null;
+  try {
+    result = await runFrameSubstanceDetection(db, {
+      imageKeys,
+      staleOnly: true,
+      progress: (pct, message) =>
+        runner.updateProgress(jobId, Math.trunc(lo + ((hi - lo) * pct) / 100), message),
+      isCancelled: () => runner.isCancelled(jobId),
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    runner.log(jobId, 'warning', `[frame_substance] status=failed ${message}`);
+    return true;
+  }
+
+  if (result === null) {
+    runner.finalizeCancelled(jobId);
+    return false;
+  }
+  if (result.total === 0) {
+    runner.log(jobId, 'info', '[frame_substance] status=skipped reason=no_stale_images');
+    return true;
+  }
+  runner.log(
+    jobId,
+    'info',
+    `[frame_substance] status=complete void=${result.count_void} ` +
+      `illegible=${result.count_illegible} ok=${result.count_ok} unknown=${result.count_unknown}`,
+  );
+  return true;
 }
 
 /**

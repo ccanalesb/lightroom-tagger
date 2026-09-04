@@ -138,6 +138,19 @@ async function seedPhotos(...keys: string[]): Promise<void> {
   for (const key of keys) fx.addImage({ key, filepath });
 }
 
+/**
+ * A catalog row whose photo the frame substance stage will condemn: flat black,
+ * and large enough for the detector's 32x32 tile grid, which `writePhoto`'s 8x8
+ * thumbnail is not.
+ */
+async function seedVoidPhoto(key: string): Promise<void> {
+  const filepath = join(dir, `${key}-void.jpg`);
+  await sharp({ create: { width: 64, height: 64, channels: 3, background: '#000' } })
+    .jpeg()
+    .toFile(filepath);
+  fx.addImage({ key, filepath });
+}
+
 const addRubric = (slug = 'street'): void => {
   fx.addPerspectives({ slug, prompt_markdown: `# ${slug}\n${RUBRIC}` });
 };
@@ -279,9 +292,9 @@ describe('the batch_analyze handler', () => {
    * filter sits between the stages, not in the shared selection.
    */
   it('describes a condemned frame but leaves it out of the scoring selection', async () => {
-    await seedPhotos('good', 'void');
+    await seedPhotos('good');
+    await seedVoidPhoto('void');
     addRubric();
-    fx.addFrameSubstance('void', 'void');
 
     const job = await runAnalyze({ max_workers: 1 });
 
@@ -291,11 +304,65 @@ describe('the batch_analyze handler', () => {
   });
 
   it('scores a condemned frame the user reinstated', async () => {
-    await seedPhotos('void');
+    await seedVoidPhoto('void');
     addRubric();
-    fx.addFrameSubstance('void', 'void').addFrameSubstanceOverride('void');
+    fx.addFrameSubstanceOverride('void');
 
     expect(analyzeResult(await runAnalyze({ max_workers: 1 })).score_total).toBe(1);
+  });
+
+  /**
+   * The verdict comes from the middle stage, not from a fixture: this is the
+   * chaining the composite exists for, since a lens cap shot yesterday has no
+   * verdict until something judges it, and the scoring stage is what pays for the
+   * omission.
+   */
+  it('judges the frames between the two passes', async () => {
+    await seedVoidPhoto('void');
+    addRubric();
+
+    const job = await runAnalyze({ max_workers: 1 });
+
+    expect(
+      fx.query<{ verdict: string }>('SELECT verdict FROM image_frame_substance')[0],
+    ).toMatchObject({ verdict: 'void' });
+    expect(logMessages(job)).toContain(
+      '[frame_substance] status=complete void=1 illegible=0 ok=0 unknown=0',
+    );
+    expect(analyzeResult(job).score_total).toBe(0);
+  });
+
+  it('keeps the frame substance stage inside the gap between the two halves', async () => {
+    await seedVoidPhoto('void');
+    addRubric();
+
+    await runAnalyze({ max_workers: 1 });
+
+    const band = progressEvents
+      .filter((e) => e.step.startsWith('Judged '))
+      .map((e) => e.progress);
+    expect(band.length).toBeGreaterThan(0);
+    expect(Math.min(...band)).toBeGreaterThanOrEqual(48);
+    expect(Math.max(...band)).toBeLessThanOrEqual(52);
+  });
+
+  /**
+   * The detector is an optimization for the stage after it. A job that has already
+   * paid for the descriptions should go on and score rather than throw them away,
+   * so this stage alone logs its failure and continues.
+   */
+  it('scores anyway when the frame substance stage fails', async () => {
+    await seedPhotos('a');
+    addRubric();
+    fx.exec('DROP TABLE frame_substance_runs');
+
+    const job = await runAnalyze({ max_workers: 1 });
+
+    expect(job.status).toBe('completed');
+    expect(analyzeResult(job).score_succeeded).toBe(1);
+    expect(logMessages(job).some((m) => m.startsWith('[frame_substance] status=failed'))).toBe(
+      true,
+    );
   });
 
   /**

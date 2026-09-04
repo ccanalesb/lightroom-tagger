@@ -18,6 +18,7 @@ import {
   handleSingleDescribe,
 } from './handlers/describe.js';
 import { BATCH_EMBED_IMAGE_CHECKPOINT_MISMATCH, handleBatchEmbedImage } from './handlers/embed.js';
+import { handleBatchFrameSubstance } from './handlers/frame-substance.js';
 import {
   BATCH_SCORE_CHECKPOINT_MISMATCH,
   handleBatchScore,
@@ -107,7 +108,7 @@ export const JOB_TYPES: readonly JobType[] = [
   },
   {
     name: 'batch_frame_substance',
-    handler: null,
+    handler: handleBatchFrameSubstance,
     // The only type that does not need the catalog: it reads the vision cache.
     requiresCatalog: false,
     checkpointMismatchMessage: null,

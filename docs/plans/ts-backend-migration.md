@@ -278,7 +278,7 @@ repo's slicing convention), not build-then-wire.
    | frame substance | done, including the `.lrcat` keyword writer |
    | jobs | routes, runner and processor done; handlers landing one family at a time (step 4) |
 
-   The route surface being complete does not mean the backend is: three of the
+   The route surface being complete does not mean the backend is: two of the
    eleven `JOB_TYPES` still carry `handler: null`, so those jobs fail on enqueue.
    That is step 4.
 3. **Job engine — done.** worker_threads runner, `JOB_TYPES` registry, transitions
@@ -303,8 +303,8 @@ repo's slicing convention), not build-then-wire.
    | stacks | `batch_stack_detect`, `batch_catalog_similarity` | done |
    | stacks | `catalog_cache_build` | blocked — its first stage is `catalog_sync` |
    | score | `single_score`, `batch_score` | done, with the scoring library core underneath them |
-   | analyze | `batch_analyze` | done, minus the frame-substance stage between its two passes |
-   | frame substance | `batch_frame_substance` | not started — needs the detector (step 5) |
+   | analyze | `batch_analyze` | done, all three stages |
+   | frame substance | `batch_frame_substance` | done, with the detector and batch driver underneath it |
    | catalog | `catalog_sync` | not started — needs `catalog_sync` (step 5) |
 
    Two structural departures from the Python, both worth repeating in the
@@ -397,17 +397,17 @@ repo's slicing convention), not build-then-wire.
    free, but "nearly" is a preflight and a pre-filter over the whole selection to
    arrive at no work, so the fingerprint match skips it outright.
 
-   One stage is missing. Python runs frame-substance detection between describe
-   and score, over the images this run just cached, so that a frame condemned
-   during the run is dropped from its own scoring pass. That needs
-   `frame_substance_detector` and `frame_substance_batch`, which are step 5, so
-   the handler currently runs describe (0–48) and score (52–100) with the 48–52
-   band left empty rather than closed — the bands stay where a resumed Flask-era
-   job expects them, and wiring the stage in later is one call. Scoring still
-   drops condemned frames, on the verdicts that were already in the table:
-   `filterVoidSubstanceFromScoringSelection` runs between the passes, where
-   standalone `batch_score` does it in the selection SQL. Until the detector
-   lands, an analyze run will not *discover* a lens cap, only remember one.
+   The middle stage is frame-substance detection, over the images this run just
+   cached, so a frame condemned during the run is dropped from its own scoring
+   pass — the 48–52 band, worth four points of the bar because it is pixel
+   arithmetic next to two vision calls per image. It is scoped to the selection
+   and `staleOnly`, so it re-judges only images whose preview is newer than their
+   verdict. Alone among the three stages its failure is not fatal: the detector
+   is an optimization for the stage after it, and a job that has already paid for
+   the descriptions should go on and score rather than throw them away, so it
+   logs a warning and continues. Scoring then drops condemned frames with
+   `filterVoidSubstanceFromScoringSelection` between the passes, where standalone
+   `batch_score` does it in the selection SQL.
 
    Two smaller departures. `batch_analyze` was the only caller that counted
    `silent_compression_skips`, for no reason the code gives; here every describe
@@ -436,15 +436,43 @@ repo's slicing convention), not build-then-wire.
 5. **Library core — partly done.** The `library.db` read/write seam, providers,
    vision op, identity, imaging, the Lightroom writer and the scoring stack
    (`scoring_service`, `score_perspective`, `structured_output`) are ported.
-   Still Python only: `catalog_sync`, `frame_substance_detector` and
-   `frame_substance_batch`, `lightroom/reader` + `enricher` + `schema`, and the
-   small shared utilities (`managed_connections`, `path_utils`, `cancel_scope`,
-   `text_constants`). The detector pair now unblocks two things rather than one:
-   the `batch_frame_substance` handler and the middle stage of `batch_analyze`.
-   It is the least mechanical port left — five statistics over an 8-bit greyscale
-   array that numpy does in five lines, plus thresholds that have to reproduce
-   Python's verdicts on the same previews, so it wants golden-value parity tests
-   the way the resampler did.
+   The **frame substance detector pair** is done, and it was the least mechanical
+   port left: five statistics over an 8-bit greyscale array that numpy writes in
+   five lines, thresholds that have to reproduce Python's verdicts on the same
+   previews, and 43,000 verdict rows already in `library.db` that a re-judging
+   run must agree with. So it is pinned the way the resampler was —
+   `tests/fixtures/frame-substance/` holds ten synthetic PNGs, one per branch of
+   the rules plus the tiling edges, with the numbers numpy produced for each.
+   The two pixel fractions are exact rationals and compared exactly; entropy,
+   Laplacian variance and tile maximum are compared to a relative tolerance,
+   because numpy accumulates them in float32 and this port accumulates in
+   float64. Decoding is sharp, greyscaling is `pilGreyscale` — the two disagree
+   on a quarter of the pixels, which moves all five numbers.
+
+   Two things about the detector are worth knowing before touching it. Its
+   version string is a SHA-256 over `str(threshold)` for each of the seven
+   thresholds, and Python's `str(20.0)` is `"20.0"` where JavaScript's is `"20"`;
+   getting that wrong would rename the detector and restamp every verdict row, so
+   there is a `pythonFloatStr` and a test that the hash still comes out
+   `v1-847ab31c`. And the 32×32 tile grid needs a preview at least 32 pixels a
+   side. numpy raises there, and the arithmetic here raises too rather than
+   inventing a fallback nobody measured thresholds against — but
+   `computeStatisticsFromPath` catches it, so one undersized preview is one
+   `unknown` verdict instead of an aborted 43,000-image scan, which is what
+   Python does with it.
+
+   The driver lives in `jobs/handlers/frame-substance.ts` beside its handler, for
+   the same reason `runDescribePass` lives in `describe.ts`: `batch_analyze`
+   chains it as a stage. That keeps `imaging/frame-substance-detector.ts` free of
+   any database import. The guard is unchanged and still advisory — a run that
+   flags more than 250 frames, or more than three times what the previous run
+   flagged over the images both runs judged, records a breach and writes its
+   verdicts anyway, because a detector that suddenly condemns a tenth of the
+   catalog is something the user has to see.
+
+   Still Python only: `catalog_sync`, `lightroom/reader` + `enricher` + `schema`,
+   and the small shared utilities (`managed_connections`, `path_utils`,
+   `cancel_scope`, `text_constants`).
 6. **CLI** — replaces the `lightroom-tagger` console script. Not started.
 7. **Cutover** — back up `library.db`, point the Vite proxy at the TS backend, and
    delete the Flask tree. No CLIP reindex: embeddings are already drop-in compatible.
@@ -490,6 +518,13 @@ repo's slicing convention), not build-then-wire.
    per-image retry, `encode_failed` was incremented twice, once by `record_skip`
    and once by the `vec is None` branch. The TS port has no fallback loop, so it
    cannot reproduce it.
+
+   The frame substance detector carried a third. `compute_statistics_from_path`
+   catches decode failures but not the reshape, so a cached preview under 32
+   pixels a side raises a `ValueError` out of the loop and fails the whole
+   catalog scan. Nothing in the current cache is that small, which is why nobody
+   has hit it; the TS port catches it into the `unknown` verdict that every other
+   unreadable preview already gets.
 
    Two working rules for the remaining slices. Build fixtures from the *production*
    schema, not from what `init_database` happens to create — the two have already
