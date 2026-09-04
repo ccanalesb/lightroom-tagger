@@ -110,6 +110,27 @@ const CATALOG_NOT_VIDEO_SQL = [
   .map((ext) => `LOWER(i.filepath) NOT LIKE '%${ext}'`)
   .join(' AND ');
 
+/**
+ * Keep condemned frames out of a scoring selection (#298).
+ *
+ * `void` only, not the `illegible` half of the flagged pair: an illegible frame
+ * still has a subject to judge, while a void one is a lens cap. An override row is
+ * the user saying the detector was wrong, which puts the frame back in.
+ */
+const VOID_SUBSTANCE_SCORING_EXCLUDE_SQL = `
+    NOT EXISTS (
+        SELECT 1
+        FROM image_frame_substance fs
+        WHERE fs.image_key = i.key
+          AND fs.verdict = 'void'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM frame_substance_overrides o
+              WHERE o.image_key = fs.image_key
+          )
+    )
+`;
+
 /** Legacy `date_filter` tokens, still sent by older clients and checkpoints. */
 const LEGACY_DATE_FILTER_MONTHS: Record<string, number> = {
   '3months': 3,
@@ -161,6 +182,8 @@ export interface CatalogSelectionOptions {
   minRating: number | null;
   /** Skip images that already carry a catalog description. */
   undescribedOnly: boolean;
+  /** Skip frames the detector called void, unless the user overrode it. */
+  excludeVoidSubstance?: boolean;
 }
 
 /** Newest first, undated last — the order the UI lists the catalog in. */
@@ -181,6 +204,7 @@ export function selectCatalogKeys(
       'WHERE d.image_key IS NULL'
     : 'SELECT i.key AS key FROM images i WHERE 1=1';
 
+  if (opts.excludeVoidSubstance) conditions.push(VOID_SUBSTANCE_SCORING_EXCLUDE_SQL);
   if (opts.months) {
     conditions.push("i.date_taken >= date('now', ?)");
     params.push(`-${opts.months} months`);

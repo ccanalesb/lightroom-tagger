@@ -11,6 +11,9 @@
  * `batch_describe` — `job_type`, `fingerprint`, `processed_pairs` (`"key|itype"`),
  * `total_at_start`.
  *
+ * `batch_score` — the same shape under `processed_triplets`, whose units carry a
+ * perspective slug as well: `"key|itype|slug"`.
+ *
  * `batch_embed_image` — the same shape, except `processed_pairs` holds bare
  * catalog keys. The key name is not a mistake to tidy up: it is what the Flask
  * backend already wrote, and renaming it here would strand every checkpoint the
@@ -98,6 +101,33 @@ export function fingerprintBatchDescribe(
 }
 
 /**
+ * Identity of a `batch_score` run: its knobs plus the sorted work triples.
+ *
+ * The unit is `key|itype|slug`, not `key|itype`, because one image is scored once
+ * per perspective and each of those is separately resumable. Activating a
+ * perspective mid-run therefore changes the fingerprint, which is the point: the
+ * checkpoint's "done" set says nothing about the rubric that just appeared.
+ */
+export function fingerprintBatchScore(
+  metadata: Record<string, unknown>,
+  workTriples: readonly (readonly [string, string, string])[],
+): Promise<string> {
+  return sha256Hex(
+    canonicalJson({
+      date_filter: metadata['date_filter'] ?? 'all',
+      force: Boolean(metadata['force']),
+      image_type: metadata['image_type'] ?? 'catalog',
+      max_workers: asIntOrNull(metadata['max_workers'] ?? 4) ?? 4,
+      min_rating: asIntOrNull(metadata['min_rating']),
+      perspective_slugs: perspectiveSlugsFingerprint(metadata),
+      provider_id: metadata['provider_id'] ?? null,
+      provider_model: metadata['provider_model'] ?? null,
+      triples: workTriples.map(([key, itype, slug]) => `${key}|${itype}|${slug}`).sort(),
+    }),
+  );
+}
+
+/**
  * Identity of a `batch_embed_image` run.
  *
  * The date window arrives already resolved rather than being re-read from the
@@ -159,6 +189,19 @@ export function buildBatchDescribeCheckpointBody(args: {
     job_type: 'batch_describe',
     fingerprint: args.fingerprint,
     processed_pairs: [...args.processed].sort(),
+    total_at_start: args.totalAtStart,
+  };
+}
+
+export function buildBatchScoreCheckpointBody(args: {
+  fingerprint: string;
+  processed: ReadonlySet<string>;
+  totalAtStart: number;
+}): Record<string, unknown> {
+  return {
+    job_type: 'batch_score',
+    fingerprint: args.fingerprint,
+    processed_triplets: [...args.processed].sort(),
     total_at_start: args.totalAtStart,
   };
 }

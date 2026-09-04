@@ -278,7 +278,7 @@ repo's slicing convention), not build-then-wire.
    | frame substance | done, including the `.lrcat` keyword writer |
    | jobs | routes, runner and processor done; handlers landing one family at a time (step 4) |
 
-   The route surface being complete does not mean the backend is: five of the
+   The route surface being complete does not mean the backend is: four of the
    eleven `JOB_TYPES` still carry `handler: null`, so those jobs fail on enqueue.
    That is step 4.
 3. **Job engine — done.** worker_threads runner, `JOB_TYPES` registry, transitions
@@ -302,8 +302,7 @@ repo's slicing convention), not build-then-wire.
    | embed | `batch_embed_image` | done |
    | stacks | `batch_stack_detect`, `batch_catalog_similarity` | done |
    | stacks | `catalog_cache_build` | blocked — its first stage is `catalog_sync` |
-   | score | `single_score` | done, with the scoring library core underneath it |
-   | score | `batch_score` | not started — the pass, checkpoint and pool around `scoreImageForPerspective` |
+   | score | `single_score`, `batch_score` | done, with the scoring library core underneath them |
    | analyze | `batch_analyze` | not started — composes the describe and score passes |
    | frame substance | `batch_frame_substance` | not started — needs the detector (step 5) |
    | catalog | `catalog_sync` | not started — needs `catalog_sync` (step 5) |
@@ -359,9 +358,26 @@ repo's slicing convention), not build-then-wire.
    `nowIsoUtcSeconds` exists for that one column, and `utils/datetime.ts` said
    the opposite until now.
 
+   `batch_score` then followed the describe pass almost line for line, with one
+   real difference in shape: its unit is an image × perspective **triple**, so
+   the checkpoint resumes on `key|itype|slug` and activating a rubric mid-run
+   changes the fingerprint — correctly, because the stored "done" set says
+   nothing about a slug that was not in it. The pre-filter is the same idea as
+   describe's and a harder query: "already scored" is per rubric version, so it
+   matches on each slug's live `prompt_version`, and an edited perspective falls
+   out of it by itself. Python computes that slug → version map twice, once in
+   the pre-filter and once in the `redo_unless_model` filter; here it is built
+   once. The one new piece of SQL is `excludeVoidSubstance` in
+   `selectCatalogKeys` — the scoring selection drops condemned frames in the
+   query, so a lens cap is not even counted as a skip. Worth noting for
+   `batch_analyze`: `redo_unless_model` implies a per-item `force` and the
+   result payload reports that widened flag, not the one the user sent.
+
    Three things deliberately left out, all for callers that do not exist yet.
-   `batch_analyze` will need `runDescribePass` generalized with the
-   `progress_range` / `log_prefix` / nested-checkpoint options Python carries.
+   `batch_analyze` will need both `runDescribePass` and `runScorePass`
+   generalized with the `progress_range` / `log_prefix` / `finalize` /
+   nested-checkpoint options Python carries — every one of those four parameters
+   exists solely for the composite.
    Neither `batch_embed_image` nor the two stacks handlers have a
    `_catalog_cache_chain` branch: only `catalog_cache_build` sets that flag, and
    it cannot run until `catalog_sync` is ported, so the suppression of logging

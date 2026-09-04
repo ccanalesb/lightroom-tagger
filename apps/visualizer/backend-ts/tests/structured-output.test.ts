@@ -162,9 +162,12 @@ describe('StructuredOutputError.describe', () => {
   });
 
   it('carries the failing field so the log names it', async () => {
-    const err = await parseScoreResponseWithRetry(
-      '{"perspective_slug":"street","score":42,"rationale":"ok"}',
-    ).catch((e: unknown) => e as StructuredOutputError);
-    expect(err.validationErrors.join(' ')).toContain('score:');
+    let err: StructuredOutputError | undefined;
+    try {
+      await parseScoreResponseWithRetry('{"perspective_slug":"street","score":42,"rationale":"ok"}');
+    } catch (e) {
+      err = e as StructuredOutputError;
+    }
+    expect(err?.validationErrors.join(' ')).toContain('score:');
   });
 });

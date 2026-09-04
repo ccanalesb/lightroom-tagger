@@ -23,6 +23,7 @@ import type { Db } from '../src/db/connection.js';
 import { JobRunner } from '../src/jobs/runner.js';
 import { tick } from '../src/jobs/processor.js';
 import { computePromptVersion } from '../src/vision/scoring-service.js';
+import { fingerprintBatchScore } from '../src/jobs/checkpoint.js';
 
 let fx: LibraryFixture;
 let dir: string;
@@ -33,6 +34,9 @@ let port: number;
 /** Replies are consumed in order; the last one repeats once the queue drains. */
 let replies: { status: number; body: unknown }[] = [];
 let requestBodies: string[] = [];
+
+/** Fires as each provider call arrives, so a test can cancel mid-run. */
+let onRequest: (() => void) | null = null;
 
 const completion = (content: string) => ({
   status: 200,
@@ -52,6 +56,7 @@ function startServer(): Promise<void> {
       req.on('data', (c) => (raw += c));
       req.on('end', () => {
         requestBodies.push(raw);
+        onRequest?.();
         const reply = replies.length > 1 ? replies.shift()! : (replies[0] ?? completion('{}'));
         res.writeHead(reply.status, { 'content-type': 'application/json' });
         res.end(JSON.stringify(reply.body));
@@ -104,12 +109,22 @@ async function withJobsDb<T>(fn: (db: Db) => Promise<T>): Promise<T> {
   }
 }
 
-async function runJob(metadata: Record<string, unknown>) {
+/** Enqueue, run one processor pass, and hand back the settled job. */
+async function runJobOfType(type: string, metadata: Record<string, unknown>) {
   return withJobsDb(async (db) => {
-    const jobId = createJob(db, 'single_score', metadata);
+    const jobId = createJob(db, type, metadata);
     await tick(db, new JobRunner(db));
     return getJob(db, jobId)!;
   });
+}
+
+const runJob = (metadata: Record<string, unknown>) => runJobOfType('single_score', metadata);
+const runBatch = (metadata: Record<string, unknown> = {}) => runJobOfType('batch_score', metadata);
+
+/** Seed catalog rows all pointing at one real JPEG, so every one is scorable. */
+async function seedPhotos(...keys: string[]): Promise<void> {
+  const filepath = await writePhoto();
+  for (const key of keys) fx.addImage({ key, filepath });
 }
 
 const logMessages = (job: { logs: { message: string }[] }): string[] =>
@@ -146,6 +161,7 @@ beforeEach(async () => {
   fx = new LibraryFixture().activate();
   replies = [completion(scoreJson('street', 7))];
   requestBodies = [];
+  onRequest = null;
   process.env.DATABASE_PATH = jobsDbPath;
   await startServer();
   writeProviders();
@@ -500,5 +516,315 @@ describe('malformed model output', () => {
     await runJob({ image_key: 'a' });
 
     expect(storedScores('a')[0]).toMatchObject({ not_attempted: 1, score: 2 });
+  });
+});
+
+interface BatchResult {
+  scored: number;
+  skipped: number;
+  failed: number;
+  total: number;
+  image_type: string;
+  date_filter: string;
+  force: boolean;
+}
+
+const batchResult = (job: { result: unknown }) => job.result as unknown as BatchResult;
+
+/** Every current score in the catalog, as `key|slug`. */
+const currentScores = (): string[] =>
+  fx
+    .query<{ image_key: string; perspective_slug: string }>(
+      'SELECT image_key, perspective_slug FROM image_scores WHERE is_current = 1 ' +
+        'ORDER BY image_key, perspective_slug',
+    )
+    .map((r) => `${r.image_key}|${r.perspective_slug}`);
+
+describe('the batch_score handler', () => {
+  it('scores every image against every active perspective', async () => {
+    await seedPhotos('a', 'b');
+    fx.addPerspectives({ slug: 'light' }, { slug: 'street' }, { slug: 'retired', active: false });
+
+    const job = await runBatch();
+
+    expect(job.status).toBe('completed');
+    expect(batchResult(job)).toMatchObject({ scored: 4, skipped: 0, failed: 0, total: 4 });
+    expect(currentScores()).toEqual(['a|light', 'a|street', 'b|light', 'b|street']);
+  });
+
+  it('scores only the perspectives named in the metadata', async () => {
+    await seedPhotos('a');
+    fx.addPerspectives({ slug: 'light' }, { slug: 'street' });
+
+    const job = await runBatch({ perspective_slugs: ['street'] });
+
+    expect(batchResult(job).total).toBe(1);
+    expect(currentScores()).toEqual(['a|street']);
+  });
+
+  /**
+   * The pre-filter is one SQL query standing in for a provider round-trip per
+   * triple. On a catalog that is already scored it is the difference between a
+   * no-op and tens of thousands of paid calls.
+   */
+  it('excludes already-scored triples in SQL rather than one at a time', async () => {
+    await seedPhotos('a', 'b');
+    fx.addPerspectives({ slug: 'street' });
+    expect((await runBatch()).status).toBe('completed');
+    requestBodies = [];
+
+    const job = await runBatch();
+
+    expect(batchResult(job)).toMatchObject({ scored: 0, total: 2 });
+    expect(requestBodies).toHaveLength(0);
+    expect(logMessages(job)).toContain('Skipped 2 already-scored triplets (DB pre-filter)');
+  });
+
+  /** An edited rubric is a different question, so the answers stop counting. */
+  it('re-scores when the perspective markdown changed', async () => {
+    await seedPhotos('a');
+    fx.addPerspectives({ slug: 'street', prompt_markdown: '# v1' });
+    await runBatch();
+
+    fx.exec("UPDATE perspectives SET prompt_markdown = '# v2' WHERE slug = 'street'");
+    replies = [completion(scoreJson('street', 9))];
+    const job = await runBatch();
+
+    expect(batchResult(job).scored).toBe(1);
+    expect(storedScores('a').map((r) => r.is_current)).toEqual([0, 1]);
+  });
+
+  it('re-scores everything when force is set', async () => {
+    await seedPhotos('a');
+    fx.addPerspectives({ slug: 'street' });
+    await runBatch();
+    replies = [completion(scoreJson('street', 3))];
+
+    const job = await runBatch({ force: true });
+
+    expect(batchResult(job).scored).toBe(1);
+    expect(storedScores('a')).toHaveLength(1);
+    expect(storedScores('a')[0]).toMatchObject({ score: 3, is_current: 1 });
+  });
+
+  /**
+   * A void frame is a lens cap: scoring it would put a number on an empty frame
+   * and let it compete in the ranking. The gate is in the selection SQL, so such a
+   * frame is not even counted as a skip.
+   */
+  it('leaves condemned frames out of the selection entirely', async () => {
+    await seedPhotos('good', 'void');
+    fx.addPerspectives({ slug: 'street' }).addFrameSubstance('void', 'void');
+
+    const job = await runBatch();
+
+    expect(batchResult(job).total).toBe(1);
+    expect(currentScores()).toEqual(['good|street']);
+  });
+
+  it('scores a void frame the user reinstated', async () => {
+    await seedPhotos('void');
+    fx.addPerspectives({ slug: 'street' })
+      .addFrameSubstance('void', 'void')
+      .addFrameSubstanceOverride('void');
+
+    expect(batchResult(await runBatch()).total).toBe(1);
+  });
+
+  /** Only `void`; an illegible frame still has a subject worth judging. */
+  it('still scores an illegible frame', async () => {
+    await seedPhotos('blurry');
+    fx.addPerspectives({ slug: 'street' }).addFrameSubstance('blurry', 'illegible');
+
+    expect(batchResult(await runBatch()).total).toBe(1);
+  });
+
+  it('honours the rating window when selecting work', async () => {
+    const filepath = await writePhoto();
+    fx.addImage({ key: 'low', filepath, rating: 1 });
+    fx.addImage({ key: 'high', filepath, rating: 4 });
+    fx.addPerspectives({ slug: 'street' });
+
+    const job = await runBatch({ min_rating: 3 });
+
+    expect(batchResult(job).total).toBe(1);
+    expect(currentScores()).toEqual(['high|street']);
+  });
+
+  it('completes immediately when there is nothing to score', async () => {
+    const job = await runBatch();
+
+    expect(job.status).toBe('completed');
+    expect(job.result).toEqual({
+      scored: 0,
+      skipped: 0,
+      failed: 0,
+      total: 0,
+      skip_reason_counts: emptySkipCounts,
+    });
+  });
+
+  /** No perspectives means no work units, not a failure — unlike `single_score`. */
+  it('completes with nothing to do when no perspective is active', async () => {
+    await seedPhotos('a');
+
+    expect(batchResult(await runBatch()).total).toBe(0);
+  });
+
+  it('refuses an image_type other than catalog', async () => {
+    const job = await runBatch({ image_type: 'instagram' });
+
+    expect(job.status).toBe('failed');
+    expect(job.error).toBe('image_type must be catalog');
+  });
+
+  it('counts a failing triple and carries on with the rest', async () => {
+    await seedPhotos('a');
+    fx.addPerspectives({ slug: 'light' }, { slug: 'street' });
+    replies = [{ status: 500, body: { error: 'boom' } }, completion(scoreJson('street', 7))];
+
+    const job = await runBatch({ max_workers: 1 });
+
+    expect(job.status).toBe('completed');
+    expect(batchResult(job)).toMatchObject({ scored: 1, failed: 1 });
+  });
+});
+
+describe('batch_score checkpoints', () => {
+  it('clears the checkpoint once the run completes', async () => {
+    await seedPhotos('a');
+    fx.addPerspectives({ slug: 'street' });
+
+    expect((await runBatch()).metadata.checkpoint).toBeNull();
+  });
+
+  /**
+   * The whole point of the checkpoint: a resumed run must not pay for work a
+   * previous run already paid for.
+   */
+  it('resumes from a checkpoint and skips the triples already processed', async () => {
+    await seedPhotos('a', 'b');
+    fx.addPerspectives({ slug: 'street' });
+
+    // Selection order is key DESC when no image carries a date.
+    const metadata = { force: true };
+    const fingerprint = await fingerprintBatchScore(metadata, [
+      ['b', 'catalog', 'street'],
+      ['a', 'catalog', 'street'],
+    ]);
+    const job = await runBatch({
+      ...metadata,
+      checkpoint: {
+        checkpoint_version: 1,
+        job_type: 'batch_score',
+        fingerprint,
+        processed_triplets: ['b|catalog|street'],
+        total_at_start: 2,
+      },
+    });
+
+    expect(batchResult(job).scored).toBe(1);
+    expect(currentScores()).toEqual(['a|street']);
+  });
+
+  it('discards a checkpoint built from different inputs, and says so', async () => {
+    await seedPhotos('a', 'b');
+    fx.addPerspectives({ slug: 'street' });
+
+    const job = await runBatch({
+      force: true,
+      checkpoint: {
+        checkpoint_version: 1,
+        job_type: 'batch_score',
+        fingerprint: 'stale',
+        processed_triplets: ['b|catalog|street'],
+        total_at_start: 2,
+      },
+    });
+
+    expect(batchResult(job).scored).toBe(2);
+    expect(logMessages(job)).toContain(
+      'checkpoint mismatch: batch_score fingerprint changed, starting fresh',
+    );
+  });
+
+  /**
+   * Cancel is cooperative: the work already in flight finishes, the rest is
+   * abandoned, and the checkpoint keeps what was paid for.
+   */
+  it('stops at the next triple when a cancel arrives mid-run', async () => {
+    await seedPhotos('a', 'b', 'c');
+    fx.addPerspectives({ slug: 'street' });
+
+    await withJobsDb(async (db) => {
+      const jobId = createJob(db, 'batch_score', { max_workers: 1 });
+      const runner = new JobRunner(db);
+      onRequest = () => runner.signalCancel(jobId);
+
+      await tick(db, runner);
+
+      const job = getJob(db, jobId)!;
+      expect(job.status).toBe('cancelled');
+      expect(logMessages(job)).toContain(
+        'Batch score cancel noted; finishing already-running tasks',
+      );
+      // Selection is key DESC, so the one triple that ran was the last key.
+      expect(currentScores()).toEqual(['c|street']);
+    });
+  });
+
+  /**
+   * A dead provider must not burn through the whole catalog before anyone
+   * notices, so the run aborts once ten scores fail back to back.
+   */
+  it('aborts after ten consecutive failures with nothing scored', async () => {
+    await seedPhotos(...Array.from({ length: 15 }, (_, i) => `k${String(i).padStart(2, '0')}`));
+    fx.addPerspectives({ slug: 'street' });
+    replies = [{ status: 500, body: { error: 'upstream exploded' } }];
+
+    const job = await runBatch({ max_workers: 1 });
+
+    expect(job.status).toBe('failed');
+    expect(job.error).toBe(
+      'Aborted after 10 consecutive failures with 0 successful scores — ' +
+        'check file paths and provider connectivity',
+    );
+    expect(currentScores()).toEqual([]);
+  });
+});
+
+/**
+ * The model-scoped re-do exists to migrate a catalog onto a better model without
+ * paying twice for the images that model already judged.
+ */
+describe('batch_score with redo_unless_model', () => {
+  it('skips the triples the target model already scored', async () => {
+    await seedPhotos('a', 'b');
+    fx.addPerspectives({ slug: 'street' });
+    await runBatch();
+    requestBodies = [];
+
+    const job = await runBatch({ redo_unless_model: 'local:vision-1' });
+
+    expect(batchResult(job)).toMatchObject({ scored: 0, total: 2 });
+    expect(requestBodies).toHaveLength(0);
+    expect(logMessages(job)).toContain(
+      'model-scoped re-do (redo_unless_model=local:vision-1): skipped 2 triples ' +
+        'already scored by this model; force-rescoring the rest',
+    );
+  });
+
+  /** The survivors are forced, so an old model's row is replaced rather than stacked. */
+  it('force-rescores what a different model produced', async () => {
+    await seedPhotos('a');
+    fx.addPerspectives({ slug: 'street' });
+    await runBatch();
+    replies = [completion(scoreJson('street', 5))];
+
+    const job = await runBatch({ redo_unless_model: 'other:model-9' });
+
+    expect(batchResult(job)).toMatchObject({ scored: 1, force: true });
+    expect(storedScores('a')).toHaveLength(1);
+    expect(storedScores('a')[0]).toMatchObject({ score: 5, is_current: 1 });
   });
 });

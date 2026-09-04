@@ -17,7 +17,11 @@ import {
   handleSingleDescribe,
 } from './handlers/describe.js';
 import { BATCH_EMBED_IMAGE_CHECKPOINT_MISMATCH, handleBatchEmbedImage } from './handlers/embed.js';
-import { handleSingleScore } from './handlers/score.js';
+import {
+  BATCH_SCORE_CHECKPOINT_MISMATCH,
+  handleBatchScore,
+  handleSingleScore,
+} from './handlers/score.js';
 import {
   BATCH_STACK_DETECT_CHECKPOINT_MISMATCH,
   handleBatchCatalogSimilarity,
@@ -70,10 +74,9 @@ export const JOB_TYPES: readonly JobType[] = [
   },
   {
     name: 'batch_score',
-    handler: null,
+    handler: handleBatchScore,
     requiresCatalog: true,
-    checkpointMismatchMessage:
-      'checkpoint mismatch: batch_score fingerprint changed, starting fresh',
+    checkpointMismatchMessage: BATCH_SCORE_CHECKPOINT_MISMATCH,
   },
   { name: 'batch_analyze', handler: null, requiresCatalog: true, checkpointMismatchMessage: null },
   {

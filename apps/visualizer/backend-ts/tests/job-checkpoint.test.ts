@@ -14,10 +14,12 @@ import {
   CHECKPOINT_VERSION,
   buildBatchDescribeCheckpointBody,
   buildBatchEmbedImageCheckpointBody,
+  buildBatchScoreCheckpointBody,
   buildBatchStackDetectCheckpointBody,
   canonicalJson,
   fingerprintBatchDescribe,
   fingerprintBatchEmbedImage,
+  fingerprintBatchScore,
   fingerprintBatchStackDetect,
   loadResumeState,
 } from '../src/jobs/checkpoint.js';
@@ -91,6 +93,66 @@ describe('fingerprintBatchDescribe', () => {
     const empty = await fingerprintBatchDescribe({ perspective_slugs: [] }, []);
     const absent = await fingerprintBatchDescribe({}, []);
     expect(empty).toBe(absent);
+  });
+});
+
+describe('fingerprintBatchScore', () => {
+  it('matches the digests Python produces for the same inputs', async () => {
+    await expect(fingerprintBatchScore({}, [])).resolves.toBe(
+      '698ef5bf0a43ef8cae2994b9c90fc124a05386f5a50d261becbb6a9ab0a3ddbd',
+    );
+    await expect(
+      fingerprintBatchScore(
+        { force: true, min_rating: '3', date_filter: '6months', max_workers: 8 },
+        [
+          ['2020-03-08__CC14833', 'catalog', 'street'],
+          ['a', 'catalog', 'light'],
+        ],
+      ),
+    ).resolves.toBe('e0766db72557cd90de18a3b25c4277a8c0495e0513c68a8462f6eb1ffcfff19b');
+    await expect(
+      fingerprintBatchScore(
+        {
+          perspective_slugs: ['street', 'abstract'],
+          provider_id: 'local',
+          provider_model: 'vision-1',
+        },
+        [['k1', 'catalog', 'street']],
+      ),
+    ).resolves.toBe('257d751ac6ba9059e42b0c9132ec9cddc3226a864cd96ea41ac15e36bec31804');
+    await expect(
+      fingerprintBatchScore({ min_rating: 'not-a-number', perspective_slugs: [] }, [
+        ['Café__ñ', 'catalog', '日本'],
+        ['日本', 'catalog', 'street'],
+      ]),
+    ).resolves.toBe('269d91af4c95a96f5554f99831886abaccca5528628c3e8755b90238c2157c61');
+  });
+
+  /**
+   * The perspective is part of the unit, so activating a rubric mid-run is a
+   * different run: the previous "done" set says nothing about the new slug.
+   */
+  it('changes when a perspective joins the work list', async () => {
+    const one = await fingerprintBatchScore({}, [['k1', 'catalog', 'street']]);
+    const two = await fingerprintBatchScore({}, [
+      ['k1', 'catalog', 'street'],
+      ['k1', 'catalog', 'light'],
+    ]);
+    expect(one).not.toBe(two);
+  });
+
+  it('does not depend on the order the triples arrive in', async () => {
+    await expect(
+      fingerprintBatchScore({}, [
+        ['b', 'catalog', 'street'],
+        ['a', 'catalog', 'light'],
+      ]),
+    ).resolves.toBe(
+      await fingerprintBatchScore({}, [
+        ['a', 'catalog', 'light'],
+        ['b', 'catalog', 'street'],
+      ]),
+    );
   });
 });
 
@@ -215,6 +277,23 @@ describe('buildBatchDescribeCheckpointBody', () => {
       fingerprint: 'fp',
       processed_pairs: ['a|catalog', 'b|catalog'],
       total_at_start: 5,
+    });
+  });
+});
+
+describe('buildBatchScoreCheckpointBody', () => {
+  it('sorts the processed triplets so the stored body is stable', () => {
+    expect(
+      buildBatchScoreCheckpointBody({
+        fingerprint: 'fp',
+        processed: new Set(['b|catalog|street', 'a|catalog|light']),
+        totalAtStart: 4,
+      }),
+    ).toEqual({
+      job_type: 'batch_score',
+      fingerprint: 'fp',
+      processed_triplets: ['a|catalog|light', 'b|catalog|street'],
+      total_at_start: 4,
     });
   });
 });

@@ -1,26 +1,36 @@
 /**
  * Score job handlers. Port of the score half of `jobs/handlers/analyze.py`.
  *
- * One image, one perspective at a time. The loop is sequential and the first hard
- * failure stops the job, because a perspective failing means the provider or the
- * rubric is wrong, and the remaining perspectives would fail the same way — a
- * partially-scored image is worse than an unscored one, since the identity
- * aggregate would then average a subset of the rubric without saying so.
+ * The unit of work is an image × perspective pair, and the two handlers disagree
+ * on what a failure means. `single_score` stops at the first one, because a
+ * partially-scored image is worse than an unscored one: the identity aggregate
+ * would then average a subset of the rubric without saying so. `batch_score`
+ * counts it and moves on, and only gives up after ten in a row — over a catalog,
+ * one unreadable file is not evidence that the provider is down.
  */
-import { listPerspectives } from '../../db/library/scores.js';
+import { getPerspectiveBySlug, listPerspectives } from '../../db/library/scores.js';
 import type { CancelCheck } from '../../providers/retry.js';
-import { scoreImageForPerspective } from '../../vision/scoring-service.js';
+import { computePromptVersion, scoreImageForPerspective } from '../../vision/scoring-service.js';
 import { VisionOpOutcome } from '../../vision/vision-op.js';
 import type { Db } from '../../db/connection.js';
+import {
+  CHECKPOINT_MAX_ENTRIES,
+  buildBatchScoreCheckpointBody,
+  fingerprintBatchScore,
+  loadResumeState,
+} from '../checkpoint.js';
 import type { JobRunner } from '../runner.js';
 import {
   asMetadata,
   failureSeverityFromError,
   jobLogLevel,
+  readIntOrNull,
+  resolveDateWindow,
   resolveLibraryDbOrFail,
+  selectCatalogKeys,
   withLibraryDb,
 } from './common.js';
-import { PathSkipDiagnostics } from './path-diagnostics.js';
+import { PathSkipDiagnostics, emptySkipReasonCounts } from './path-diagnostics.js';
 
 /** Score one image for one perspective, turning a thrown error into an outcome. */
 export async function scoreSingleImage(
@@ -138,4 +148,311 @@ export async function handleSingleScore(
   } catch (e) {
     runner.failJob(jobId, e instanceof Error ? e.message : String(e), failureSeverityFromError(e));
   }
+}
+
+/** Logged when a resumed `batch_score` checkpoint no longer fits the inputs. */
+export const BATCH_SCORE_CHECKPOINT_MISMATCH =
+  'checkpoint mismatch: batch_score fingerprint changed, starting fresh';
+
+/** Give up once this many scores fail back to back; the provider is down. */
+const CONSECUTIVE_FAILURE_LIMIT = 10;
+
+export interface BatchScoreResult {
+  scored: number;
+  skipped: number;
+  failed: number;
+  total: number;
+  image_type: string;
+  date_filter: string;
+  force: boolean;
+  skip_reason_counts: Record<string, number>;
+}
+
+/** Score catalog images in bulk: one vision call per image × perspective. */
+export async function handleBatchScore(
+  runner: JobRunner,
+  jobId: string,
+  rawMetadata: unknown,
+): Promise<void> {
+  const metadata = asMetadata(rawMetadata);
+  try {
+    const dbPath = resolveLibraryDbOrFail(runner, jobId);
+    if (dbPath === null) return;
+
+    await withLibraryDb(dbPath, async (db) => {
+      const imageType = String(metadata['image_type'] ?? 'catalog');
+      if (imageType !== 'catalog') {
+        runner.failJob(jobId, 'image_type must be catalog');
+        return;
+      }
+
+      const { months, year } = resolveDateWindow(metadata);
+      const minRating = readIntOrNull(metadata['min_rating']);
+
+      // Every image in the window, `force` or not — where describe narrows to the
+      // undescribed ones. A score is per rubric version, so whether an image is
+      // already done depends on perspectives this query knows nothing about; the
+      // pre-filter in `runScorePass` decides it once the triples exist.
+      const selection = selectCatalogKeys(db, {
+        months,
+        year,
+        minRating,
+        undescribedOnly: false,
+        excludeVoidSubstance: true,
+      });
+
+      await runScorePass(runner, jobId, metadata, db, selection);
+    });
+  } catch (e) {
+    runner.failJob(jobId, e instanceof Error ? e.message : String(e), failureSeverityFromError(e));
+  }
+}
+
+/**
+ * `key|itype|slug` for every current score standing at its slug's live rubric.
+ *
+ * Matching on `prompt_version` is what makes an edited perspective re-score: the
+ * old rows stay current under the old hash and simply stop matching.
+ */
+function currentScoreLabels(
+  db: Db,
+  promptVersions: ReadonlyMap<string, string>,
+  modelUsed: string | null,
+): Set<string> {
+  const stmt = db.prepare(
+    'SELECT image_key, image_type FROM image_scores ' +
+      'WHERE perspective_slug = ? AND prompt_version = ? AND is_current = 1' +
+      (modelUsed === null ? '' : ' AND model_used = ?'),
+  );
+  const labels = new Set<string>();
+  for (const [slug, version] of promptVersions) {
+    const params = modelUsed === null ? [slug, version] : [slug, version, modelUsed];
+    const rows = stmt.all(...(params as never[])) as { image_key: string; image_type: string }[];
+    for (const r of rows) labels.add(`${r.image_key}|${r.image_type}|${slug}`);
+  }
+  return labels;
+}
+
+/**
+ * Score every image × perspective in `selection`, checkpointing as it goes.
+ *
+ * Concurrency is a bounded async pool over one connection, for the reason given
+ * in `runDescribePass`: the time goes to the provider's HTTP response, so Python's
+ * thread-per-connection pool bought nothing, and dropping it removes the separate
+ * sequential branch that had drifted to different log messages.
+ */
+async function runScorePass(
+  runner: JobRunner,
+  jobId: string,
+  metadata: Record<string, unknown>,
+  db: Db,
+  selection: readonly (readonly [string, string])[],
+): Promise<void> {
+  const imageType = String(metadata['image_type'] ?? 'catalog');
+  const dateFilter = String(metadata['date_filter'] ?? 'all');
+  const redoUnlessModel = String(metadata['redo_unless_model'] ?? '').trim() || null;
+  // A model-scoped re-do means "replace what the other model wrote", so it implies
+  // a per-item force: every triple that survives its filter is one whose current
+  // row has to go. That is also why it overrides a blanket `force` of false.
+  const force = Boolean(metadata['force']) || redoUnlessModel !== null;
+  const providerId = (metadata['provider_id'] as string | null | undefined) ?? null;
+  const providerModel = (metadata['provider_model'] as string | null | undefined) ?? null;
+  const maxWorkers = Math.max(1, readIntOrNull(metadata['max_workers']) ?? 4);
+
+  const slugs = resolveScoreSlugs(db, metadata);
+  const workTriples: [string, string, string][] = selection.flatMap(([key, itype]) =>
+    slugs.map((slug): [string, string, string] => [key, itype, slug]),
+  );
+
+  const totalAtStart = workTriples.length;
+  const fingerprint = await fingerprintBatchScore(metadata, workTriples);
+  const processedTriplets = loadResumeState({
+    metadata: runner.readMetadata(jobId),
+    jobType: 'batch_score',
+    resumeKey: 'processed_triplets',
+    fingerprint,
+    mismatchMessage: BATCH_SCORE_CHECKPOINT_MISMATCH,
+    log: (message) => runner.log(jobId, 'info', message),
+  });
+
+  const tripletLabel = (key: string, itype: string, slug: string): string =>
+    `${key}|${itype}|${slug}`;
+  let pending = workTriples.filter(([k, t, s]) => !processedTriplets.has(tripletLabel(k, t, s)));
+
+  const promptVersions = new Map<string, string>();
+  for (const slug of slugs) {
+    const row = getPerspectiveBySlug(db, slug);
+    if (row) promptVersions.set(slug, computePromptVersion(row));
+  }
+
+  // A pre-filter in SQL rather than a skip per triple: on a catalog that is mostly
+  // scored this turns tens of thousands of provider round-trips into none.
+  if (!force && pending.length > 0 && promptVersions.size > 0) {
+    const done = currentScoreLabels(db, promptVersions, null);
+    const before = pending.length;
+    pending = pending.filter(([k, t, s]) => !done.has(tripletLabel(k, t, s)));
+    const skippedByDb = before - pending.length;
+    if (skippedByDb) {
+      runner.log(jobId, 'info', `Skipped ${skippedByDb} already-scored triplets (DB pre-filter)`);
+    }
+  }
+
+  if (redoUnlessModel !== null && pending.length > 0 && promptVersions.size > 0) {
+    const done = currentScoreLabels(db, promptVersions, redoUnlessModel);
+    const before = pending.length;
+    pending = pending.filter(([k, t, s]) => !done.has(tripletLabel(k, t, s)));
+    runner.log(
+      jobId,
+      'info',
+      `model-scoped re-do (redo_unless_model=${redoUnlessModel}): skipped ` +
+        `${before - pending.length} triples already scored by this model; ` +
+        'force-rescoring the rest',
+    );
+  }
+
+  const total = pending.length;
+  const alreadyDone = totalAtStart - total;
+  const progressFor = (done: number): number =>
+    Math.trunc(5 + (done / Math.max(totalAtStart, 1)) * 90);
+
+  runner.updateProgress(
+    jobId,
+    progressFor(alreadyDone),
+    `Found ${totalAtStart} scoring units (${total} remaining)`,
+  );
+
+  if (totalAtStart === 0) {
+    runner.clearCheckpoint(jobId);
+    runner.completeJob(jobId, {
+      scored: 0,
+      skipped: 0,
+      failed: 0,
+      total: 0,
+      skip_reason_counts: emptySkipReasonCounts(),
+    });
+    return;
+  }
+
+  const diag = new PathSkipDiagnostics(runner, jobId, db, {
+    jobLabel: 'batch_score',
+    logAction: 'score',
+  });
+  await diag.runPreflight([...new Set(pending.map(([k]) => k))]);
+
+  let scored = 0;
+  let skipped = 0;
+  let failed = 0;
+  let consecutiveFailures = 0;
+  let completed = 0;
+  let stop = false;
+
+  /**
+   * Record a finished unit. Returns false when the checkpoint has outgrown what
+   * belongs in one metadata column, which stops the run rather than letting the
+   * jobs row grow without bound.
+   */
+  const recordDone = (key: string, itype: string, slug: string): boolean => {
+    processedTriplets.add(tripletLabel(key, itype, slug));
+    if (processedTriplets.size > CHECKPOINT_MAX_ENTRIES) {
+      runner.failJob(jobId, 'checkpoint too large: exceeds 100000 entries');
+      return false;
+    }
+    runner.persistCheckpoint(
+      jobId,
+      buildBatchScoreCheckpointBody({ fingerprint, processed: processedTriplets, totalAtStart }),
+    );
+    return true;
+  };
+
+  const cancelCheck: CancelCheck = () => runner.isCancelled(jobId);
+
+  const next = (): [string, string, string] | undefined => (stop ? undefined : pending.shift());
+
+  const worker = async (): Promise<void> => {
+    for (let unit = next(); unit !== undefined; unit = next()) {
+      const [key, itype, slug] = unit;
+      if (runner.isCancelled(jobId)) {
+        // Once, not once per worker: every worker in the pool sees the same flag.
+        if (!stop) {
+          runner.log(jobId, 'info', 'Batch score cancel noted; finishing already-running tasks');
+        }
+        stop = true;
+        return;
+      }
+
+      const outcome = await scoreSingleImage(db, key, slug, {
+        force,
+        providerId,
+        model: providerModel,
+        logCallback: (level, message) => runner.log(jobId, jobLogLevel(level), message),
+        cancelCheck,
+      });
+
+      completed += 1;
+      runner.updateProgress(
+        jobId,
+        progressFor(alreadyDone + completed),
+        `Scoring ${alreadyDone + completed}/${totalAtStart}: ${key}|${slug}`,
+      );
+
+      if (outcome.wrote) {
+        scored += 1;
+        consecutiveFailures = 0;
+        if (!recordDone(key, itype, slug)) {
+          stop = true;
+          return;
+        }
+      } else if (outcome.status === 'skipped') {
+        skipped += 1;
+        const { reason, detail } = await diag.classify(key);
+        if (reason) diag.recordSkip(reason, key, { detail });
+        runner.log(jobId, 'warning', `${key}|${slug}: ${outcome.reason}`);
+        if (!recordDone(key, itype, slug)) {
+          stop = true;
+          return;
+        }
+      } else {
+        failed += 1;
+        consecutiveFailures += 1;
+        runner.log(jobId, 'warning', `${key}|${slug}: ${outcome.reason}`);
+      }
+
+      if (consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
+        stop = true;
+        runner.log(jobId, 'error', `Stopping: ${consecutiveFailures} consecutive failures`);
+        return;
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(maxWorkers, total) }, () => worker()));
+
+  if (runner.isCancelled(jobId)) {
+    runner.finalizeCancelled(jobId);
+    return;
+  }
+  // `recordDone` may already have failed the job; do not overwrite that outcome.
+  if (runner.hasFailed(jobId)) return;
+
+  if (scored === 0 && consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
+    runner.failJob(
+      jobId,
+      `Aborted after ${consecutiveFailures} consecutive failures with 0 successful ` +
+        'scores — check file paths and provider connectivity',
+    );
+    return;
+  }
+
+  const summary: BatchScoreResult = {
+    scored,
+    skipped,
+    failed,
+    total: totalAtStart,
+    image_type: imageType,
+    date_filter: dateFilter,
+    force,
+    skip_reason_counts: diag.skipReasonCounts,
+  };
+  runner.clearCheckpoint(jobId);
+  runner.completeJob(jobId, summary);
 }
