@@ -564,11 +564,37 @@ repo's slicing convention), not build-then-wire.
    one, matches exactly — so the divergence is asserted in a test rather than
    emulated.
 
-   Remaining commands, in order: `init` (needs the bootstrap schema above),
-   `scan` and `sync` (the reader and sync driver are ported; `scan`'s
-   `workers` parallelism is the open question), then `enrich-catalog`. Each is
-   declared in the registry with `handler: null` already, so an unported command
-   says so instead of reading as a typo.
+   **Slice 2 is done: `scan` and `sync`.** Both sit on drivers the `catalog_sync`
+   job already uses, so the new code is two reader helpers — `getImageCount` and
+   `getImageRecords` — and the two command bodies.
+
+   `--workers` turned out to be nothing to port. Both branches of Python's
+   `if len(image_ids) > 10000 and workers > 1` run the same sequential loop,
+   under a comment saying SQLite connections are not thread-safe and it processes
+   sequentially "for now". The flag is still accepted so an existing invocation is
+   not rejected, and the help says it has no effect. `scan` does diverge in one
+   way that matters: Python's `store_image` commits per record, so a first scan is
+   43,000 fsyncs and an interrupted run leaves a half-synced library. TS wraps the
+   batch in one `libraryWrite`, which is what `storeImagesBatch` was written for.
+
+   Parity was checked against the real 3 GB catalog rather than a fixture:
+   `scan --limit 200` into two freshly initialized databases writes 200
+   byte-identical rows, `id` column included. For `sync` — which has no `--limit`
+   — a 300-file subset of the real catalog, copied out through
+   `immutable=1` so the live file could not be touched, syncs to 300 identical
+   rows, reports the same counts, and is idempotent on a second run on both
+   sides. Both `Catalog not found` paths match too.
+
+   The open problem is the fresh-database case. Python's `managed_library_db`
+   runs `init_database`, so its `must_exist=False` means "create the schema";
+   `openLibraryDb` only opens, and a new path yields an empty file. Rather than
+   fail on `no such table: images` from inside a driver, both commands check for
+   the `images` table and say what is wrong, naming the Python `init` as the way
+   out. That guard is temporary and goes away with the bootstrap port.
+
+   Remaining commands: `init` (needs the bootstrap schema above) and
+   `enrich-catalog`. Both are declared in the registry with `handler: null`, so an
+   unported command says so instead of reading as a typo.
 
    **One deliberate divergence in the shell.** Every global flag is also declared
    by at least one subcommand, and argparse reparses a subcommand into a fresh
@@ -579,7 +605,9 @@ repo's slicing convention), not build-then-wire.
    documented invocation puts its flags after the subcommand, which is why this
    has never been hit. TS reads the subcommand's value first and the global
    second, so both positions work. Reproducing the argparse behaviour would have
-   been more code than fixing it.
+   been more code than fixing it. Filed against the Python CLI, which is the one
+   shipping until cutover, as
+   [#305](https://github.com/ccanalesb/lightroom-tagger/issues/305).
 7. **Cutover** — back up `library.db`, point the Vite proxy at the TS backend, and
    delete the Flask tree. No CLIP reindex: embeddings are already drop-in compatible.
 

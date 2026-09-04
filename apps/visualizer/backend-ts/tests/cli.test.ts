@@ -6,13 +6,14 @@
  * at a line instead of at a captured stream. `run()` is the whole program below
  * `bin.ts`, so nothing about dispatch or exit codes is stubbed out.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadLibraryConfig, type LibraryConfig } from '../src/config.js';
 import { parseArgv, UsageError } from '../src/cli/parse.js';
 import { COMMANDS } from '../src/cli/registry.js';
 import { run } from '../src/cli/main.js';
+import { makeFakeCatalog } from './helpers/fake-catalog.js';
 import { LibraryFixture } from './helpers/library-fixture.js';
 
 /** Config with nothing in it: every path has to come from a flag. */
@@ -87,9 +88,9 @@ describe('run', () => {
   });
 
   it('reports an unported command as such, not as an unknown one', () => {
-    const r = cli(['scan']);
+    const r = cli(['init']);
     expect(r.code).toBe(1);
-    expect(r.text).toBe('Error: scan is not ported to the TypeScript CLI yet');
+    expect(r.text).toBe('Error: init is not ported to the TypeScript CLI yet');
   });
 
   it('refuses a command with no database path anywhere', () => {
@@ -283,3 +284,129 @@ describe('read-only commands', () => {
     expect(() => readFileSync(out, 'utf8')).toThrow();
   });
 });
+
+describe('scan and sync', () => {
+  let fixture: LibraryFixture;
+  let catalogPath: string;
+
+  beforeEach(() => {
+    fixture = new LibraryFixture();
+    catalogPath = join(fixture.dir, 'Catalog.lrcat');
+    makeFakeCatalog(catalogPath, [
+      { id: 101, baseName: 'DSC_0001', captureTime: '2024-06-01T12:00:00', rating: 4 },
+      { id: 102, baseName: 'DSC_0002', captureTime: '2024-06-02T12:00:00', rating: 2 },
+      { id: 103, baseName: 'DSC_0003', captureTime: '2024-06-03T12:00:00' },
+    ]);
+  });
+
+  afterEach(() => fixture.cleanup());
+
+  const scan = (...flags: string[]): Outcome =>
+    cli(['scan', '--catalog', catalogPath, '--db', fixture.dbPath, ...flags]);
+  const sync = (...flags: string[]): Outcome =>
+    cli(['sync', '--catalog', catalogPath, '--db', fixture.dbPath, ...flags]);
+
+  it('indexes every catalog image', () => {
+    const r = scan();
+    expect(r.code).toBe(0);
+    expect(r.lines).toEqual([
+      `Scanning catalog: ${catalogPath}`,
+      'Retrieved 3 image records',
+      `Indexed 3 images to ${fixture.dbPath}`,
+    ]);
+    expect(fixture.query('SELECT key, rating FROM images ORDER BY key')).toEqual([
+      // The key is built from `AgLibraryFile.baseName`, so no extension.
+      { key: '2024-06-01_DSC_0001', rating: 4 },
+      { key: '2024-06-02_DSC_0002', rating: 2 },
+      { key: '2024-06-03_DSC_0003', rating: 0 },
+    ]);
+  });
+
+  it('stores the catalog id as an integer, not a float', () => {
+    // A JS number binds as REAL, which would write '101.0' into the TEXT `id`
+    // column and make every later sync re-fetch the whole catalog.
+    scan();
+    expect(fixture.query<{ id: string }>('SELECT id FROM images ORDER BY key')[0]!.id).toBe('101');
+  });
+
+  it('honours --limit and prints the catalog total under --verbose', () => {
+    const r = scan('--limit', '2');
+    expect(r.lines[1]).toBe('Retrieved 2 image records');
+    expect(fixture.query('SELECT key FROM images')).toHaveLength(2);
+
+    // `--verbose` is a global flag no subcommand redeclares, so it goes first.
+    const v = cli(['--verbose', 'scan', '--catalog', catalogPath, '--db', fixture.dbPath]);
+    expect(v.lines[1]).toBe('Total images in catalog: 3');
+  });
+
+  it('accepts --workers and ignores it, as Python does', () => {
+    const r = scan('--workers', '8');
+    expect(r.code).toBe(0);
+    expect(r.lines[1]).toBe('Retrieved 3 image records');
+  });
+
+  it('re-scanning upserts rather than duplicating', () => {
+    scan();
+    const r = scan();
+    expect(r.code).toBe(0);
+    expect(fixture.query('SELECT key FROM images')).toHaveLength(3);
+  });
+
+  it('adds every image on a first sync and nothing on a second', () => {
+    const first = sync();
+    expect(first.code).toBe(0);
+    expect(first.lines[0]).toBe(`Syncing catalog: ${catalogPath}`);
+    expect(first.lines[1]).toMatch(/^Added 3 images; 0 stale in library \(locking_mode=\w+\)$/);
+
+    expect(sync().lines[1]).toMatch(/^Added 0 images; 0 stale in library/);
+  });
+
+  it('counts a library row the catalog no longer has as stale', () => {
+    sync();
+    fixture.exec("INSERT INTO images (key, id, filename) VALUES ('orphan', '999', 'x.jpg')");
+    expect(sync().lines[1]).toMatch(/^Added 0 images; 1 stale in library/);
+  });
+
+  it.each(['scan', 'sync'])('%s refuses a catalog that is not there', (name) => {
+    const r = cli([name, '--catalog', '/nonexistent/Catalog.lrcat', '--db', fixture.dbPath]);
+    expect(r.code).toBe(1);
+    expect(r.text).toBe('Error: Catalog not found: /nonexistent/Catalog.lrcat');
+  });
+
+  it.each(['scan', 'sync'])('%s refuses when no catalog path is configured', (name) => {
+    const r = cli([name, '--db', fixture.dbPath]);
+    expect(r.code).toBe(1);
+    expect(r.text).toBe('Error: No catalog path provided. Use --catalog or config.yaml');
+  });
+
+  /**
+   * Python's `managed_library_db` runs `init_database`, so `must_exist=False`
+   * means "create the schema". TS has no bootstrap yet, so both commands say so
+   * instead of failing on `no such table: images` from inside a driver.
+   */
+  it.each(['scan', 'sync'])('%s refuses a database with no schema', (name) => {
+    const empty = join(fixture.dir, 'empty.db');
+    writeFileSync(empty, '');
+    const r = cli([name, '--catalog', catalogPath, '--db', empty]);
+    expect(r.code).toBe(1);
+    expect(r.text).toContain(`Error: Database has no schema: ${empty}`);
+    expect(r.text).toContain('lightroom-tagger init');
+  });
+
+  it('reports an unreadable catalog without a stack trace', () => {
+    const notACatalog = join(fixture.dir, 'junk.lrcat');
+    writeFileSync(notACatalog, 'this is not a database');
+    const r = cli(['sync', '--catalog', notACatalog, '--db', fixture.dbPath]);
+    expect(r.code).toBe(1);
+    expect(r.lines.at(-1)).toMatch(/^Error: /);
+  });
+
+  it('leaves the library untouched when a scan cannot finish', () => {
+    // A directory in place of the catalog fails at open, after the first line is
+    // printed and before anything is written.
+    const r = cli(['scan', '--catalog', fixture.dir, '--db', fixture.dbPath]);
+    expect(r.code).toBe(1);
+    expect(fixture.query('SELECT key FROM images')).toHaveLength(0);
+  });
+});
+

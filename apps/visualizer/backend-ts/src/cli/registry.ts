@@ -13,6 +13,7 @@
  */
 import type { LibraryConfig } from '../config.js';
 import type { FlagSpec, ParsedArgs } from './parse.js';
+import { cmdScan, cmdSync } from './commands/catalog.js';
 import { cmdExport, cmdSearch, cmdStats } from './commands/query.js';
 
 export interface CommandContext {
@@ -54,16 +55,19 @@ export const COMMANDS: readonly CliCommand[] = [
     flags: [
       CATALOG_FLAG,
       DB_FLAG,
-      { name: 'workers', kind: 'int', help: 'Parallel workers' },
+      // Accepted and ignored, as in Python: both branches of `get_image_records`
+      // run the same sequential loop, so the catalog has never been read in
+      // parallel. Kept so an existing invocation is not rejected.
+      { name: 'workers', kind: 'int', help: 'Parallel workers (no effect)' },
       { name: 'limit', kind: 'int', help: 'Limit number of images to process' },
     ],
-    handler: null,
+    handler: cmdScan,
   },
   {
     name: 'sync',
     help: 'Incremental catalog sync — add missing images to library.db',
     flags: [CATALOG_FLAG, DB_FLAG],
-    handler: null,
+    handler: cmdSync,
   },
   {
     name: 'search',

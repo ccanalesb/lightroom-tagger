@@ -170,7 +170,16 @@ const IMAGE_DEFAULTS: Partial<Record<(typeof IMAGE_COLUMNS)[number], unknown>> =
   catalog_path: '',
 };
 
-function imageParams(record: Record<string, unknown>): Record<string, unknown> {
+/**
+ * Bind one image's columns by name.
+ *
+ * Takes `object` rather than `Record<string, unknown>` because the callers pass
+ * `CatalogRecord`, a declared interface with no index signature, which does not
+ * satisfy that type. The one assertion belongs here, in the module that owns the
+ * column mapping, rather than at each call site.
+ */
+function imageParams(source: object): Record<string, unknown> {
+  const record = source as Record<string, unknown>;
   const params: Record<string, unknown> = { key: generateKey(record) };
   for (const col of IMAGE_COLUMNS) {
     if (col === 'key') continue;
@@ -186,7 +195,7 @@ function imageParams(record: Record<string, unknown>): Record<string, unknown> {
  * Upsert one catalog image and return its key. Does NOT commit — call inside
  * `libraryWrite`.
  */
-export function storeImage(db: Db, record: Record<string, unknown>): string {
+export function storeImage(db: Db, record: object): string {
   const params = imageParams(record);
   db.prepare(IMAGE_UPSERT_SQL).run(params);
   return String(params['key']);
@@ -199,7 +208,7 @@ export function storeImage(db: Db, record: Record<string, unknown>): string {
  * sync, and a run interrupted halfway leaves a partially synced catalog. Here the
  * caller wraps the whole batch in one `libraryWrite`.
  */
-export function storeImagesBatch(db: Db, records: readonly Record<string, unknown>[]): number {
+export function storeImagesBatch(db: Db, records: readonly object[]): number {
   const stmt = db.prepare(IMAGE_UPSERT_SQL);
   for (const record of records) stmt.run(imageParams(record));
   return records.length;

@@ -273,6 +273,40 @@ export function getImageById(conn: Db, imageId: number): CatalogRecord | null {
   return record;
 }
 
+/** How many files the catalog holds, for `scan`'s pre-count. */
+export function getImageCount(conn: Db): number {
+  const row = conn.prepare('SELECT COUNT(*) AS n FROM AgLibraryFile').get() as { n: number };
+  return Number(row.n);
+}
+
+/**
+ * Every image with full metadata, oldest id first, for a full `scan`.
+ *
+ * Sequential, which is what Python does too despite taking a `workers` argument:
+ * both branches of its `if len(image_ids) > 10000 and workers > 1` run the same
+ * loop, under a comment explaining that SQLite connections are not thread-safe
+ * and that it processes sequentially "for now". There is no parallelism to port.
+ *
+ * A row that has vanished between the id listing and its fetch contributes
+ * nothing, rather than failing the scan.
+ */
+export function getImageRecords(conn: Db, limit?: number | null): CatalogRecord[] {
+  const rows = (
+    limit
+      ? conn
+          .prepare('SELECT f.id_local AS id FROM AgLibraryFile f ORDER BY f.id_local LIMIT ?')
+          .all(limit)
+      : conn.prepare('SELECT f.id_local AS id FROM AgLibraryFile f ORDER BY f.id_local').all()
+  ) as { id: number }[];
+
+  const records: CatalogRecord[] = [];
+  for (const row of rows) {
+    const record = getImageById(conn, Number(row.id));
+    if (record) records.push(record);
+  }
+  return records;
+}
+
 /** Every `AgLibraryFile.id_local` in the catalog — the set-difference input. */
 export function listCatalogFileIds(conn: Db): number[] {
   const rows = conn.prepare('SELECT f.id_local AS id FROM AgLibraryFile f').all() as {

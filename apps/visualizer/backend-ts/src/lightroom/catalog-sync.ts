@@ -17,6 +17,7 @@ import {
   getImageById,
   listCatalogFileIds,
   resolveCatalogLockingMode,
+  type CatalogRecord,
 } from './reader.js';
 
 export const CATALOG_LOCKED_MSG =
@@ -145,7 +146,7 @@ export function syncCatalog(
         `missing=${missingIds.length} stale=${staleCount}`,
     );
 
-    const records: Record<string, unknown>[] = [];
+    const records: CatalogRecord[] = [];
     const totalMissing = missingIds.length;
     let cancelled = false;
     for (const [index, imageId] of missingIds.entries()) {
@@ -157,7 +158,7 @@ export function syncCatalog(
         break;
       }
       const record = getImageById(catalogConn, imageId);
-      if (record) records.push(record as unknown as Record<string, unknown>);
+      if (record) records.push(record);
       if (totalMissing) {
         const pct = 5 + Math.trunc((90 * (index + 1)) / totalMissing);
         opts.progress?.(pct, `Fetching catalog metadata ${index + 1}/${totalMissing}`);
