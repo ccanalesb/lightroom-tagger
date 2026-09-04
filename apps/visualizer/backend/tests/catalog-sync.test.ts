@@ -1,11 +1,6 @@
 /**
- * The Lightroom reader, the incremental sync driver and the `catalog_sync` job.
- *
- * Python mocks `connect_catalog` and `get_image_by_id` out; here the `.lrcat` is a
- * real SQLite file with the tables the metadata join actually reads. That costs a
- * fixture and buys the half of the port most likely to be wrong — the join, the
- * `or`-coalescing of every column, and the key the record ends up under, which has
- * to match the 43,451 keys Python already wrote.
+ * Lightroom reader, incremental sync driver, and `catalog_sync` job — against a
+ * real `.lrcat` SQLite fixture.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -121,7 +116,7 @@ describe('lightroom reader', () => {
     expect(withCatalog((conn) => getImageById(conn, 100))!.keywords).toEqual([]);
   });
 
-  it('coalesces on falsiness the way Python does', () => {
+  it('coalesces on falsiness for pick, rating, focal length, and GPS', () => {
     makeFakeCatalog(lrcatPath, [
       { id: 100, baseName: 'zeroes', rating: 0, pick: -1, focalLength: 0, gpsLatitude: 0 },
     ]);
@@ -131,7 +126,7 @@ describe('lightroom reader', () => {
     // A rejected pick is -1 in the catalog, and `bool(-1)` is true.
     expect(record.pick).toBe(true);
     expect(record.rating).toBe(0);
-    // Not 0: Python's `row[...] or ''` turns a zero focal length into empty text.
+    // Zero focal length is falsy and becomes empty text.
     expect(record.focal_length).toBe('');
     // Not 0 either: Null Island reads as "no coordinate".
     expect(record.gps_latitude).toBeNull();
@@ -164,7 +159,7 @@ describe('lightroom reader', () => {
     expect(resolveCatalogLockingMode(true)).toBe('EXCLUSIVE');
   });
 
-  it('zero-pads a capture time so the key matches what Python wrote', () => {
+  it('zero-pads a capture time in record keys', () => {
     expect(parseCatalogDate('2024-1-5T9:07:00')).toBe('2024-01-05T09:07:00');
     expect(parseCatalogDate('2024-06-01T12:00:00')).toBe('2024-06-01T12:00:00');
     // Anything the format cannot read comes back untouched, as strptime's caller does.
@@ -393,9 +388,7 @@ describe('catalog_sync handler', () => {
     const job = await runJob();
 
     expect(job.status).toBe('failed');
-    // Not the friendly "Cannot read Lightroom catalog: …" text, because a
-    // read-only open succeeds and the header check fires on the first query —
-    // and only the *open* is wrapped. Faithful to Python, quirk included.
+    // Read-only open succeeds; SQLite's own error on first query, not the wrapped catalog message.
     expect(job.error).toBe('file is not a database');
     expect(job.error_severity).toBe('error');
   });

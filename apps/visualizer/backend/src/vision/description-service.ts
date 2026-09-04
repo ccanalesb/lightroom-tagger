@@ -17,14 +17,7 @@ import { resolveFilepath } from '../utils/path-resolve.js';
 import { resolveVisionImage } from './vision-cache.js';
 import { runVisionOpPersist, VisionOpOutcome } from './vision-op.js';
 
-/**
- * Counters for a batch describe pass.
- *
- * Python needs a `threading.Lock` in this bag because its describe workers are
- * real threads sharing one interpreter. Here the batch handler drives concurrency
- * with promises on a single isolate, so `silentCompressionSkips += 1` cannot
- * interleave and no lock is needed — the field is the whole struct.
- */
+/** Counters for a batch describe pass. */
 export interface DescribeTelemetry {
   silentCompressionSkips: number;
 }
@@ -59,9 +52,9 @@ export function descriptionStructuredIsValid(structured: DescriptionStructured):
 /**
  * Normalize the model's loose output into the columns `image_descriptions` holds.
  *
- * Every fallback here exists because models answer the prompt's root-level
- * `dominant_colors` / `mood_tags` / `has_repetition` fields inconsistently, and
- * the same values are also asked for inside `technical`. The order is Python's:
+ * Models answer the prompt's root-level `dominant_colors` / `mood_tags` /
+ * `has_repetition` fields inconsistently, and the same values are also asked for
+ * inside `technical`:
  *
  *   - `dominant_colors`: root list if non-empty, else `technical.dominant_colors`.
  *     An empty root list falls through, because "the model returned []" and "the

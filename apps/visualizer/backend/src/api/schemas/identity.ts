@@ -1,17 +1,9 @@
 /**
  * Identity API response models.
  *
- * One deliberate difference from the Python models, and it is a bug fix rather than
- * a port: `IdentityBestPhotoItem` gains `ranking_percentile`,
- * `corroboration_revoked` and `corroboration_revoked_by`.
- *
- * The corroboration veto (#292, commit f8b6662) started returning those three
- * fields from `rank_best_photos`, but the pydantic model sets `extra='forbid'` and
- * was never updated — so spectree's response validation rejects the payload and
- * `GET /api/identity/best-photos` answers **500** on the real catalog. Verified
- * against the running Flask app. Reproducing that would mean porting a broken page,
- * so the fields are declared here and the endpoint works. Nothing in the frontend
- * references them yet, so the addition is purely additive.
+ * `IdentityBestPhotoItem` includes `ranking_percentile`, `corroboration_revoked`
+ * and `corroboration_revoked_by` (#292) — fields the ranking function returns that
+ * must be declared or response validation rejects the payload.
  */
 import { z } from '@hono/zod-openapi';
 import { IdentityPerPerspectiveScore } from './catalog.js';

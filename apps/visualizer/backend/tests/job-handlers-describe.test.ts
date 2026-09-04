@@ -1,19 +1,6 @@
 /**
- * The `single_describe` job handler, driven through the processor.
- *
- * There is no Python counterpart to mirror: `handle_single_describe` is reached
- * only by `tests/test_handlers_path_diagnostics.py`, which patches the describe
- * call out to assert the skip bucketing. Its outcomes are covered here for real.
- *
- * Deliberately entered via `tick()` and a real `jobs` row rather than by calling
- * the handler directly: the thing worth pinning is that a registry entry, the
- * runner's lifecycle writes and the handler's own `completeJob`/`failJob` calls
- * agree. A direct call would test the handler while leaving the wiring — the part
- * this slice added — unexercised.
- *
- * The provider is a real HTTP server for the same reason `description-generate`
- * uses one, and the three env overrides keep the user's providers, vision cache
- * and catalog out of reach.
+ * single_describe and batch_describe handlers via tick() and real job rows.
+ * Provider is a real HTTP server; env overrides isolate config paths.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3';

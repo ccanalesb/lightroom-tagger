@@ -217,7 +217,7 @@ describe(`Pillow parity (golden files from Pillow ${manifest.pillow})`, () => {
 });
 
 describe('helpers', () => {
-  it('resizeShortestEdgeSize truncates like Python int()', () => {
+  it('resizeShortestEdgeSize truncates toward zero like int()', () => {
     // 1024x683 landscape: short edge is the height.
     expect(resizeShortestEdgeSize(1024, 683)).toEqual({
       width: Math.trunc((224 * 1024) / 683),

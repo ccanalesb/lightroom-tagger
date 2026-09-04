@@ -4,17 +4,8 @@
  * Thumbnails are not inlined: responses carry `image_key` and `filename` so the
  * frontend reuses the catalog thumbnail route.
  *
- * These are the only routes in the Flask backend where spectree was given a `query=`
- * model, so they are the only ones whose query parameters appear in the contract —
- * and the models are NOT `extra='forbid'`, so unknown parameters are ignored.
- *
- * The integer parameters use `z.coerce` because that is what pydantic's lax mode
- * did: a query value arrives as a string, and `int | None` accepted `"4"` while
- * rejecting `"abc"` and `"4.5"`. The one input where the two differ is `?limit=`
- * (empty): pydantic rejected it, Zod coerces it to 0, which the pagination clamp
- * then lifts to 1. Flask's rejection surfaced as `500 {"error": "??? Unknown Error:
- * None"}` anyway, because `with_db` swallowed spectree's abort — so nothing was
- * relying on it.
+ * Query parameters on these routes appear in the OpenAPI contract. Integer params
+ * use `z.coerce` so string query values like `"4"` parse as integers.
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { libraryDb, type LibraryEnv } from '../db/library/with-db.js';
@@ -164,7 +155,7 @@ identityRoutes.openapi(lensExemplarsRoute, (c) => {
       200,
     );
   } catch (e) {
-    // An unknown or deactivated slug is a 400, matching the ValueError branch.
+    // An unknown or deactivated slug is a 400.
     if (e instanceof RangeError) return c.json({ error: e.message }, 400);
     throw e;
   }

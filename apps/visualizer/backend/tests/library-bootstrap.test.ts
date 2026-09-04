@@ -1,11 +1,8 @@
 /**
- * `initLibraryDb` — the schema a fresh `library.db` is born with.
+ * `initLibraryDb` — schema shape for a fresh `library.db`.
  *
- * The shape assertions are deliberately against the *production* schema rather
- * than against what Python's `init_database` builds today, because the two have
- * diverged and production is the one everything else is tested against. The
- * fixture in `helpers/library-fixture.ts` declares that same shape by hand, so
- * the first test here is what keeps the two from drifting apart.
+ * The fixture in `helpers/library-fixture.ts` declares the same shape by hand;
+ * these tests keep the two from drifting apart.
  */
 import Database from 'better-sqlite3';
 import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -69,12 +66,7 @@ describe('initLibraryDb', () => {
     db.close();
   });
 
-  /**
-   * The one place the new schema deliberately differs from a Python-initialized
-   * database. `_migrate_image_descriptions_fts` builds a standalone table but is
-   * gated at `user_version` 3, so the real database kept the external-content
-   * form it was created with — and the two need opposite delete statements.
-   */
+  /** Production keeps `image_descriptions_fts` as external-content, not standalone. */
   it('creates image_descriptions_fts as external content, as production has it', () => {
     const { db } = init();
     const row = db
@@ -113,12 +105,6 @@ describe('initLibraryDb', () => {
     db.close();
   });
 
-  /**
-   * The six data migrations Python runs between versions 0 and 8 are not ported:
-   * every one of them transforms data only a pre-8 database can hold. Meeting one
-   * anyway has to say so rather than run the current DDL over it and leave a
-   * database that claims to be current.
-   */
   it('refuses a populated database from before the current version', () => {
     const path = join(dir, 'legacy.db');
     const legacy = new Database(path);
@@ -132,14 +118,10 @@ describe('initLibraryDb', () => {
 });
 
 /**
- * The claim this whole module rests on: a database `init` creates is the same
- * shape as the 638 MB one everything else runs against. Skips cleanly when the
- * production database is not present, and opens it read-only — it reads nothing
- * but `sqlite_master` and `PRAGMA table_info`.
+ * Skips when the production library.db is not present. Opens production read-only
+ * and compares table/column/index shape to a fresh init.
  *
- * A Python-initialized database would *not* pass this: its
- * `image_descriptions_fts` is standalone rather than external-content, which is
- * the one place this port deliberately follows production over Python.
+ * `image_descriptions_fts` is external-content here, matching production.
  */
 describe.skipIf(!existsSync(config.LIBRARY_DB))('schema parity with the real library.db', () => {
   it('matches every table, column and index', () => {
@@ -190,7 +172,6 @@ describe('perspective seeding', () => {
     ).toEqual([
       {
         slug: 'color_theory',
-        // Python's `str.title()` over the slug with underscores as spaces.
         display_name: 'Color Theory',
         description: 'Hue and value.',
         source_filename: 'color_theory.md',
@@ -204,7 +185,7 @@ describe('perspective seeding', () => {
     ]);
   });
 
-  it('title-cases every hyphenated word, as Python does', () => {
+  it('title-cases every hyphenated word in the slug', () => {
     writePrompt('environmental-context-legibility.md', '# Heading\n\nBody.\n');
     seedPerspectivesFromPromptsDir(db, promptsDir);
     expect(
@@ -270,11 +251,7 @@ describe('perspectiveSeedDescription', () => {
     expect(perspectiveSeedDescription('\n  \n')).toBe('');
   });
 
-  /**
-   * Faithful to Python, and a wart: on the rubrics that carry the marker right
-   * under the heading, the marker is the first body line and becomes the
-   * description the UI shows until an owner edits it.
-   */
+  /** When the optional marker is the first body line, it becomes the seeded description. */
   it('returns the optional marker when that is the first body line', () => {
     expect(perspectiveSeedDescription('# Framing\n\n<!-- optional: true -->\n\nReal text.\n')).toBe(
       '<!-- optional: true -->',

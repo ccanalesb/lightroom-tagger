@@ -1,14 +1,8 @@
 /**
  * Builds a real `library.db` for route tests.
  *
- * Deliberately a real SQLite file rather than a mocked DB layer: the queries are
- * the part most likely to break in the port, so they have to actually execute.
- *
- * The schema comes from `createLibrarySchema`, the same DDL `lightroom-tagger
- * init` writes, rather than a copy maintained here. It used to be a copy, and it
- * had drifted: no named indexes at all, and `image_scores` was missing the
- * `uq_image_scores_versioned` unique constraint every score upsert conflicts on.
- * Seeding is left out — most tests assert on perspectives they insert themselves.
+ * Uses a real SQLite file and `createLibrarySchema` (same DDL as production) so
+ * queries actually execute against the real schema.
  */
 import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync } from 'node:fs';

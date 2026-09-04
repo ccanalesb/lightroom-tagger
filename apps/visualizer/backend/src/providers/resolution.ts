@@ -1,9 +1,8 @@
 /**
  * The single provider/model resolution seam — one precedence ladder per kind.
  *
- * Having exactly one ladder is the point. Before this existed the describe path,
- * the scoring path and the UI each resolved a model slightly differently, so the
- * model the user picked in the dropdown was not always the model that ran.
+ * Describe, scoring, and the UI must share one ladder so the model the user picks
+ * is the model that runs.
  */
 import { getDescriptionModel } from '../config.js';
 import { ModelUnavailableError } from './errors.js';
@@ -21,10 +20,8 @@ export interface ResolvedModel {
 /**
  * `DESCRIPTION_VISION_MODEL` beats `VISION_MODEL`.
  *
- * Both are process-level configuration only. Flask's describe route also used
- * `DESCRIPTION_VISION_MODEL` as a smuggling channel for a per-request `model`,
- * setting it and restoring it in a `finally`; the TS route passes the model as an
- * argument instead. See the note in `api/descriptions.ts`.
+ * Both are process-level configuration only. The describe route passes an explicit
+ * `model` argument instead of mutating env vars per request.
  */
 function modelFromEnv(): string | null {
   if (process.env.DESCRIPTION_VISION_MODEL !== undefined) {

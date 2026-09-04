@@ -1,34 +1,11 @@
 /**
  * `erf` and `erfc` to double precision.
  *
- * Node has no `Math.erfc`, and the Mirror's crowning test needs one: for a voting
- * population of 30 or more it computes the binomial upper tail through the
- * continuity-corrected normal approximation, i.e. `0.5 * erfc(z / sqrt(2))`. A
- * coarse approximation would move p-values across the `p < 0.05` threshold and
- * change which lenses get crowned.
+ * Node has no `Math.erfc`; the Mirror crowning test needs it for the binomial upper
+ * tail via `0.5 * erfc(z / sqrt(2))`.
  *
- * Built from the FDLIBM `s_erf.c` rational approximations (Sun Microsystems, 1993),
- * the same family the C libraries behind Python's `math.erfc` use.
- *
- * **Measured accuracy: worst relative error 5.4e-9 against Python's `math.erfc`**
- * over the range the crowning test exercises, pinned by `tests/erf.test.ts` against
- * a table of Python-generated values. That is not the sub-ulp agreement a bit-exact
- * port would give — the two tail branches here plateau around 1e-9 rather than
- * 1e-16, so this reproduces the algorithm rather than the platform's exact result.
- *
- * It is comfortably enough for what depends on it. `p_value` is published rounded
- * to six decimals, so 5e-9 is 100x below the last digit that reaches the client,
- * and flipping the `p < 0.05` crowning decision would need a lens to sit within
- * 5e-9 of the threshold. The end-to-end check is the real-catalog parity test,
- * which compares the actual crowned set and every p-value against Flask's.
- *
- * A curve fit of the kind usually pasted into JavaScript projects gives 1e-7 or
- * worse, which is within range of the published rounding — hence the full
- * piecewise approximation rather than a one-liner.
- *
- * The magic constants are the published coefficients and are not derivable from
- * anything here; they are grouped exactly as the original file groups them so the
- * two can be diffed.
+ * FDLIBM `s_erf.c` rational approximations (Sun Microsystems, 1993). Worst relative
+ * error ~5.4e-9 over the crowning range, pinned by `tests/erf.test.ts`.
  */
 
 const TINY = 1e-300;
@@ -36,10 +13,7 @@ const TINY = 1e-300;
 /**
  * Crossover between the two tail approximations.
  *
- * FDLIBM splits at 1/0.35 (~2.857). Measured against Python across 1.25..27, the
- * first branch stays near 5e-9 relative throughout while the second only becomes
- * the better of the two past about 4.5 — so the split is placed where the error
- * actually crosses rather than where the original file puts it.
+ * FDLIBM splits at ~2.857; here at 4.5 where measured error actually crosses.
  */
 const TAIL_SPLIT = 4.5;
 const ERX = 8.45062911510467529297e-1;
@@ -111,9 +85,8 @@ const SB7 = -2.24409524465858183362e1;
 /**
  * Truncate a double to its high 32 bits of mantissa.
  *
- * FDLIBM does this by masking the low word of the representation; it matters
- * because `exp(-z*z - 0.5625)` is evaluated at a deliberately truncated `z` so the
- * two exponential factors multiply without cancellation.
+ * `exp(-z*z - 0.5625)` is evaluated at a truncated `z` so the two exponential
+ * factors multiply without cancellation.
  */
 function truncateLow(x: number): number {
   const buf = new DataView(new ArrayBuffer(8));

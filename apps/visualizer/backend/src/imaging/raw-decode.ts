@@ -1,25 +1,12 @@
 /**
  * RAW decode via libraw-wasm.
  *
- * This was the single hardest dependency in the migration and it needed three
- * shims, because libraw-wasm ships an Emscripten build written for a browser:
+ * libraw-wasm is an Emscripten browser build. Node needs shims for `Worker`, `self`
+ * inside workers, and `fetch` for `file://` WASM loads.
  *
- *   1. `globalThis.Worker` — the module spawns a Web Worker. Node has
- *      `worker_threads`, whose API is close but not identical, so a small
- *      adapter presents the browser surface over it.
- *   2. `self` inside the worker — the Emscripten glue expects it.
- *   3. `fetch` for `file://` — the glue fetches its own `.wasm` next to the
- *      script, and Node's `fetch` refuses the `file:` scheme.
- *
- * `half_size: true` matches rawpy's call exactly: half-resolution is plenty for a
- * 1024px vision preview and it is roughly four times faster.
- *
- * Measured on this catalog, 40 consecutive Leica DNGs: 40 of 40 decoded to
- * 2992×1996×3 (portrait frames come back 1996×2992, correctly un-rotated) at
- * roughly 900 ms each. RSS rises to a ~924 MB high-water mark and falls back to
- * 600 MB, so it is GC-bounded rather than leaking — but only with the `dispose()`
- * in `decodeRaw`. The "~14 decodes then hard failure" reported in the background
- * research did not reproduce through this adapter.
+ * `half_size: true` matches half-resolution decode: enough for a 1024px vision
+ * preview and roughly four times faster. Each decode must call `dispose()` or the
+ * process retains ~200 MB per instance.
  */
 import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -27,7 +14,7 @@ import { extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
 
-/** Extensions `rawpy` handled, and therefore the ones the sidecar check covers. */
+/** RAW extensions the sidecar check covers. */
 export const RAW_EXTENSIONS = new Set([
   '.dng',
   '.raw',
@@ -60,21 +47,8 @@ export const VIDEO_EXTENSIONS = new Set([
  * Worker prelude: bridge the browser Worker surface onto `worker_threads`, then
  * import the real worker script.
  *
- * Three bridges, each needed because a Node worker is not a Web Worker:
- *
- *   - `self` — the Emscripten glue and libraw's own `worker.js` both use it.
- *   - `postMessage` / `self.postMessage` — in Node these live on `parentPort`,
- *     not on the global, so the worker's replies would go nowhere.
- *   - inbound messages — the worker assigns `self.onmessage`, but Node delivers
- *     via `parentPort.on('message')`, and it hands over the value directly where
- *     the browser wraps it in a `MessageEvent`. Without the `{ data }` wrapper
- *     every call silently hangs, which is exactly how this first failed.
- *
- * Plus the `file://` fetch patch, because Emscripten resolves `libraw.wasm`
- * relative to the script and fetches it *from the worker* — patching the main
- * thread's `fetch` does nothing for a separate isolate.
- *
- * Kept as a string constant so there is nothing to resolve at runtime.
+ * Bridges `self`, `postMessage`, inbound `MessageEvent` wrapping, and `file://`
+ * fetch for WASM. Kept as a string constant so there is nothing to resolve at runtime.
  */
 const WORKER_BOOTSTRAP = `
 import { parentPort } from 'node:worker_threads';
@@ -109,11 +83,10 @@ await import(__URL__);
 let shimsInstalled = false;
 
 /**
- * Install the three browser shims libraw-wasm's Emscripten glue expects.
+ * Install browser shims libraw-wasm's Emscripten glue expects.
  *
- * Idempotent, and deliberately non-destructive: an existing `globalThis.Worker`
- * or `fetch` is left alone, so this cannot break a runtime that already provides
- * them.
+ * Idempotent and non-destructive: an existing `globalThis.Worker` or `fetch` is
+ * left alone.
  */
 async function installBrowserShims(): Promise<void> {
   if (shimsInstalled) return;
@@ -125,10 +98,7 @@ async function installBrowserShims(): Promise<void> {
     /**
      * A `Worker` adapter over `worker_threads`.
      *
-     * The differences that matter: the browser delivers messages as a
-     * `MessageEvent` with a `.data` property while Node passes the value
-     * directly, and the browser's worker script needs `self` defined. Both are
-     * bridged here.
+     * Node passes message values directly; the browser wraps them in `MessageEvent`.
      */
     class WorkerShim {
       private readonly worker: InstanceType<typeof NodeWorker>;
@@ -137,12 +107,8 @@ async function installBrowserShims(): Promise<void> {
 
       constructor(scriptUrl: string | URL) {
         const url = typeof scriptUrl === 'string' ? scriptUrl : scriptUrl.href;
-        // Both shims have to be installed *inside* the worker, before the real
-        // script is imported. A worker is a separate isolate, so patching
-        // `globalThis` on the main thread does nothing for it — which is exactly
-        // how this first failed: "both async and sync fetching of the wasm
-        // failed", because Emscripten resolves `libraw.wasm` to a file:// URL
-        // and fetches it from the worker.
+        // Both shims must run inside the worker before the real script loads.
+        // Emscripten fetches `libraw.wasm` via `file://` from the worker isolate.
         this.worker = new NodeWorker(WORKER_BOOTSTRAP.replace('__URL__', JSON.stringify(url)), {
           eval: true,
         });
@@ -242,18 +208,12 @@ async function decodeWith(
   rawPath: string,
   buf: Buffer,
 ): Promise<DecodedRaw> {
-  // `new Uint8Array(buf)` copies, and the copy is the point: libraw-wasm's
-  // `runFn` puts the argument's `.buffer` in `postMessage`'s transfer list, and a
-  // Node `Buffer` under 8 KB is a view into a shared pool — transferring it would
-  // detach every other Buffer sharing that pool. A fresh Uint8Array owns its
-  // ArrayBuffer outright, so there is nothing else to detach.
+  // `new Uint8Array(buf)` copies on purpose: libraw-wasm transfers the argument's
+  // `.buffer` in `postMessage`, and a Node `Buffer` under 8 KB may share a pool.
   //
-  // These three settings mirror rawpy's `postprocess(use_camera_wb=True,
-  // half_size=True)` call. `useCameraWb` is load-bearing rather than cosmetic:
-  // without the camera's recorded white balance a daylight frame renders
-  // strongly blue and the model describes the wrong photograph. `outputBps: 8`
-  // is stated explicitly rather than relied on, because `imageData()` reports
-  // `bits` and a 16-bit buffer would need different handling below.
+  // `useCameraWb` is load-bearing: without the camera's recorded white balance a
+  // daylight frame renders strongly blue. `outputBps: 8` is explicit because
+  // `imageData()` reports `bits` and 16-bit samples need different handling.
   await libraw.open(new Uint8Array(buf), {
     halfSize: true,
     useCameraWb: true,
@@ -282,9 +242,7 @@ async function decodeWith(
 /**
  * Convert a RAW file to a temporary JPEG. Returns `null` when it cannot.
  *
- * The three-attempt retry is for NAS flakiness, not for decode bugs: an
- * intermittent read over SMB was the original reason it exists, and a genuine
- * decode failure fails the same way three times. Quality 95 matches Python.
+ * Three attempts cover intermittent NAS read failures. Quality 95.
  */
 export async function convertRawToJpg(
   rawPath: string,

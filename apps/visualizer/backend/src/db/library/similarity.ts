@@ -93,11 +93,10 @@ export function insertCatalogSimilarityGroup(
 }
 
 /**
- * `datetime.now().isoformat()` — local time, no offset suffix.
+ * Local ISO timestamp without timezone offset.
  *
- * Naive local time is what every `created_at` already in this table holds, and the
- * groups list sorts on the column as text, so a UTC or offset-bearing string here
- * would order new groups against old ones by timezone rather than by time.
+ * Existing `created_at` values use naive local time; the groups list sorts the
+ * column as text, so UTC or offset-bearing strings would order incorrectly.
  */
 function localIsoNow(): string {
   const d = new Date();

@@ -24,13 +24,9 @@ export interface ClipEmbedWindow {
 }
 
 /**
- * Newest first, undated last — the order the embed job works through the catalog,
- * so an interrupted run has covered the photos the user is most likely looking at.
+ * Newest first, undated last — the order the embed job works through the catalog.
  *
- * Python sorted the rows in memory on `(date_taken, key)` descending after a
- * `key ASC` query; `COALESCE(date_taken, '')` reproduces it in SQL, because
- * SQLite's default BINARY collation compares UTF-8 bytes in the same order
- * Python compares code points.
+ * `COALESCE(date_taken, '')` orders undated rows last under SQLite's default collation.
  */
 function windowedCatalogKeys(db: Db, window: ClipEmbedWindow): string[] {
   const conditions = ["i.filepath IS NOT NULL AND TRIM(COALESCE(i.filepath, '')) != ''"];

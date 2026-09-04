@@ -1,13 +1,9 @@
 /**
  * Image preparation — viewable paths and vision compression.
  *
- * `compressImage` uses sharp rather than the Pillow-exact resampler in
- * `pil-resample.ts`, and that is a deliberate split. The Pillow port exists
- * because CLIP embeddings and phashes are *compared numerically* against 43,451
- * rows the Python backend wrote, so a one-level difference in a pixel changes a
- * stored value. This path feeds a JPEG to a language model, which will describe
- * the same photograph either way — so sharp's faster resize is the right tool,
- * and using the slow exact one here would buy nothing.
+ * `compressImage` uses sharp rather than `pil-resample.ts`. CLIP and phash paths
+ * need fixture-exact pixels; this path feeds a JPEG to a language model, so sharp's
+ * faster resize is sufficient.
  */
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { existsSync, statSync } from 'node:fs';
@@ -43,8 +39,7 @@ export async function makeTempJpgPath(): Promise<string> {
  * Compress an image for a vision call. Returns the new path, or the input path
  * unchanged on failure.
  *
- * Returning the input rather than throwing is faithful and load-bearing in one
- * direction and a hazard in the other: it keeps a batch running past one odd
+ * Returning the input rather than throwing keeps a batch running past one odd
  * file, but it also means a `.mov` sails through to the provider, which is why
  * `description-service.ts` short-circuits video *before* getting here.
  */
@@ -60,15 +55,11 @@ export async function compressImage(
     const meta = await image.metadata();
 
     const pipeline = image
-      // 16-bit and floating-point samples cannot be written as JPEG. Pillow
-      // rescaled the sample range by hand; sharp's `toColourspace('srgb')` plus
-      // the JPEG encoder does the equivalent, and `removeAlpha` covers the
-      // RGBA/LA/P modes Pillow converted explicitly.
+      // 16-bit and floating-point samples cannot be written as JPEG.
       .removeAlpha()
       .toColourspace('srgb');
 
-    // Only shrink. `withoutEnlargement` reproduces Pillow's `thumbnail`, which
-    // is a no-op when the image already fits.
+    // Only shrink. `withoutEnlargement` is a no-op when the image already fits.
     if ((meta.width ?? 0) > maxSize || (meta.height ?? 0) > maxSize) {
       pipeline.resize({
         width: maxSize,

@@ -1,9 +1,5 @@
 /**
  * Structured catalog filtering and listing queries.
- *
- * The SQL is transcribed rather than rewritten. It is the part of the port most
- * likely to change behaviour invisibly — clause order determines positional binding
- * order, and the `ORDER BY` expressions decide what the grid shows first.
  */
 import type { Db } from '../connection.js';
 import {
@@ -58,13 +54,7 @@ function buildJoin(scorePerspective: string): { sql: string; joinBindings: Bindi
   return { sql, joinBindings };
 }
 
-/**
- * Re-throw a filter-builder range error as a `CatalogQueryError`.
- *
- * `appendQueryCatalogImageFilters` signals the FTS short-query rule and the
- * `min_score_on_active` range with `RangeError`; both are 400s to the caller, and
- * both carry the exact message the Flask API returned.
- */
+/** Re-throw a filter-builder `RangeError` as a `CatalogQueryError` (HTTP 400). */
 function appendFilters(clauses: string[], bindings: Binding[], f: CatalogImageFilters): void {
   try {
     appendQueryCatalogImageFilters(clauses, bindings, f);

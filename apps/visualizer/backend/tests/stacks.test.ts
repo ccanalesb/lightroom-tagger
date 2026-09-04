@@ -231,7 +231,7 @@ describe('POST /api/images/stacks/suggestions/reject', () => {
     expect(empty.status).toBe(400);
     expect(await json(empty)).toEqual({ error: 'image_key_a and image_key_b required' });
 
-    // A missing field fails the declared schema first, as spectree did.
+    // A missing field fails the declared schema first (422).
     expect((await post('/api/images/stacks/suggestions/reject', { image_key_a: 'a' })).status).toBe(
       422,
     );
@@ -305,9 +305,7 @@ describe('POST /api/images/stacks/suggestions/accept', () => {
   });
 
   it('500s when neither key names a real image', async () => {
-    // Representative selection queries `images`, so with no rows it cannot pick
-    // one. Verified against the running Flask app, which answers
-    // `500 {"error": "stack representative selection failed"}`.
+    // Representative selection queries images; with no rows it returns 500.
     const res = await post('/api/images/stacks/suggestions/accept', {
       image_key_a: 'nope-a',
       image_key_b: 'nope-b',
@@ -346,7 +344,7 @@ describe('GET /api/images/stacks/{stack_id}/members', () => {
     expect(res.status).toBe(200);
     const body = await json<{ items: { key: string; thumbnail_url: string }[] }>(res);
 
-    // `primary_grid_only=False` is the point of this endpoint.
+    // Lists every member, not just the rows the catalog grid collapses to.
     expect(body.items.map((i) => i.key)).toEqual(['member', 'rep']);
     expect(body.items[0]!.thumbnail_url).toBe('/api/images/catalog/member/thumbnail');
   });
@@ -498,9 +496,7 @@ describe('POST /api/images/stacks/{target_stack_id}/merge', () => {
   it('422s a non-integer source id', async () => {
     fx.addImages('a', 'b');
     const stackId = fx.addStack(['a', 'b'], 'a');
-    // Flask accepted `"7"` here because pydantic's lax mode coerced it, then 404ed
-    // on the missing stack. Zod requires the integer the contract declares, so the
-    // rejection happens one layer earlier. Both refuse the request.
+    // Non-integer source_stack_id is rejected at schema validation (422), not deferred to a 404.
     expect((await post(`/api/images/stacks/${stackId}/merge`, { source_stack_id: 'abc' })).status).toBe(
       422,
     );

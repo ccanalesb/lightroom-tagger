@@ -66,9 +66,8 @@ export function readCullKeywordPresent(imageKey: string): boolean | null {
 /**
  * Add `lrt-cull` to the image in the live catalog.
  *
- * The lock check runs twice — once inside `describeLrCatalogWriteStatus` and again
- * here — because that is the window that matters: the status call and the write are
- * separate moments, and Lightroom can start in between.
+ * Lock is checked again after availability, because Lightroom can open between the
+ * two calls.
  */
 export function writeCullKeyword(imageKey: string): KeywordAddResult {
   const status = describeLrCatalogWriteStatus();

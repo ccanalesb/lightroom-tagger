@@ -64,8 +64,6 @@ systemRoutes.openapi(statsRoute, (c) => {
   try {
     return c.json(
       {
-        // The Flask version did `len(get_all_images(db))`, materializing every row
-        // to count them. COUNT(*) is the same number without loading the catalog.
         catalog_images: getImageCount(db),
         posted_to_instagram: getPostedImagesCount(db),
         db_path: dbPath,
@@ -91,7 +89,7 @@ const catalogStatusRoute = createRoute({
 
 systemRoutes.openapi(catalogStatusRoute, (c) => {
   const dbPath = config.LIBRARY_DB;
-  // A missing library DB is "not cached", not an error — matches api/system.py.
+  // A missing library DB is "not cached", not an error.
   if (!existsSync(dbPath)) return c.json({ cached: false }, 200);
 
   let db;
@@ -161,8 +159,7 @@ systemRoutes.openapi(cacheStatusRoute, (c) => {
     return c.json(
       {
         ...stats,
-        // Rounded to two places for display, as Flask did. The raw byte sum stays
-        // in `getCacheStats` so a caller that wants precision can have it.
+        // Rounded to two places for display; the raw byte sum stays in `getCacheStats`.
         cache_size_mb: Math.round(stats.cache_size_mb * 100) / 100,
       },
       200,
@@ -185,14 +182,10 @@ const cachePipelineStatusRoute = createRoute({
 });
 
 systemRoutes.openapi(cachePipelineStatusRoute, (c) => {
-  // The jobs table lives in `visualizer.db`. Flask reached it through
-  // `current_app.db`, a connection opened once at startup and shared across
-  // threads; opened per request here instead, which is what makes the route safe
-  // to serve while the job processor is writing.
+  // The jobs table lives in `visualizer.db`, opened per request so this route stays
+  // safe while the job processor is writing.
   const dbPath = config.VISUALIZER_DB;
   if (!existsSync(dbPath)) {
-    // Flask would have raised on a missing app DB and answered 500; the message is
-    // the one the caller can act on.
     return c.json({ error: `Jobs database not found: ${dbPath}` }, 500);
   }
   const db = openDb(dbPath, { readonly: true, vec: false });
@@ -219,11 +212,8 @@ const visionModelsRoute = createRoute({
 /**
  * Vision-capable models from every available provider, plus user-added rows.
  *
- * Never fails: any error — an unreadable `providers.json`, a provider that throws
- * while listing — falls back to `gemma3:27b` with `fallback: true`, so the
- * description UI always has something selectable. That is deliberate in the
- * original and kept here; a 500 would leave the page with an empty dropdown and no
- * explanation.
+ * Never fails: any error falls back to `gemma3:27b` with `fallback: true`, so the
+ * description UI always has something selectable. A 500 would leave an empty dropdown.
  */
 systemRoutes.openapi(visionModelsRoute, async (c) => {
   // Not `as const`: the response type needs a mutable array of the schema's shape.

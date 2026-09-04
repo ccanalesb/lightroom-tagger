@@ -1,16 +1,9 @@
 /**
  * Coordinate the job lifecycle between the processor loop and the handlers.
  *
- * The Python runner handed out thread-local SQLite connections, because sharing
- * one `sqlite3.Connection` across the processor, four worker threads and the HTTP
- * handlers serialized every operation on the connection's internal mutex — the
- * proximate cause of a three-hour stall on job `50710bf6`.
- *
- * That specific hazard does not exist here: the runner lives on one thread with
- * one connection, and handlers that need real parallelism will run in
- * `worker_threads` with their own. So `thread_db` has no analogue and there is
- * nothing to route around; SQLite's WAL plus `busy_timeout` is the only
- * coordination point, which is what the Python fix was reaching for.
+ * One thread, one SQLite connection; handlers that need real parallelism use
+ * `worker_threads` with their own connection. WAL plus `busy_timeout` is the
+ * coordination point across processes.
  */
 import type { Db } from '../db/connection.js';
 import {

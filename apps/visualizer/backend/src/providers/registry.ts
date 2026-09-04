@@ -8,12 +8,8 @@
  * warning rather than failing (#245) — the same courtesy `load_config` extends to
  * `config.yaml`.
  *
- * The Python version drove HTTP through the `openai` SDK. Here the three calls it
- * needed (list models, discover Ollama tags, probe tool calling) are plain `fetch`
- * requests against the same OpenAI-compatible endpoints, so the backend gains no
- * dependency for them. One behavioural consequence, and it is an improvement: the
- * SDK retried a failing `models.list` twice by default, so probing a dead provider
- * took three round trips before reporting unreachable. These do not retry.
+ * Model listing, Ollama discovery, and tool-calling probes use plain `fetch`
+ * against OpenAI-compatible endpoints. Probe requests do not retry.
  */
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -39,8 +35,7 @@ const DEFAULTS_KEYS = new Set(['description']);
 /**
  * Tool-calling probe cache, shared for the process lifetime.
  *
- * Module-level on purpose, matching Python: the probe is a live API call, and a
- * fresh `ProviderRegistry` is constructed per request, so a per-instance cache
+ * A fresh `ProviderRegistry` is constructed per request, so a per-instance cache
  * would probe on every page load.
  */
 const toolCallingProbeCache = new Map<string, boolean>();
@@ -112,7 +107,6 @@ export class ProviderRegistry {
 
   constructor(configPath: string = config.LT_PROVIDERS_JSON) {
     this.configPath = configPath;
-    // First run bootstraps from the shipped example, as Python does.
     if (!existsSync(this.configPath) && existsSync(EXAMPLE_PATH)) {
       copyFileSync(EXAMPLE_PATH, this.configPath);
     }
@@ -159,12 +153,7 @@ export class ProviderRegistry {
     return Object.hasOwn(this.providers, providerId);
   }
 
-  /**
-   * The provider's custom model order, or `[]`.
-   *
-   * Exposed because the models route re-applies the order after folding in
-   * user-added models; Python reached into `registry._providers` for it.
-   */
+  /** The provider's custom model order, or `[]`. */
   modelOrderFor(providerId: string): string[] {
     return this.providers[providerId]?.model_order ?? [];
   }
@@ -230,13 +219,7 @@ export class ProviderRegistry {
     return (body.data ?? []).map((m) => String(m.id)).filter(Boolean);
   }
 
-  /**
-   * A resolved endpoint for the vision client.
-   *
-   * Python returned a configured `openai.OpenAI` and stamped `_provider_id` on
-   * it so downstream code could tell an Ollama client apart. The id is a plain
-   * field here rather than a monkey-patched attribute.
-   */
+  /** A resolved endpoint for the vision client. */
   getClient(providerId: string): ProviderClient {
     const cfg = this.providers[providerId];
     if (!cfg) throw new UnknownProviderError(providerId);
@@ -264,7 +247,6 @@ export class ProviderRegistry {
     const ids = order.map(String);
     const unknown = ids.filter((id) => !this.hasProvider(id));
     if (unknown.length > 0) {
-      // The Python repr of a list of strings, which the frontend surfaces verbatim.
       throw new RangeError(`Unknown provider id(s): [${unknown.map((u) => `'${u}'`).join(', ')}]`);
     }
     this.config.fallback_order = [...new Set(ids)];

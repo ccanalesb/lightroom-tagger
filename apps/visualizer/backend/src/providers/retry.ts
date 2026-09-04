@@ -1,18 +1,5 @@
 /**
  * Configurable retry with exponential backoff for provider calls.
- *
- * The Python version needed `_interruptible_sleep` and a thread-local
- * `cancel_scope`, because `time.sleep(32)` inside a backoff held the worker for
- * the full duration regardless of `runner.is_cancelled` — the exact failure that
- * left job `b141dbcc` CPU-pegged for nine minutes after a cancel. And threading a
- * cancel check through runner → handler → description_service → analyzer →
- * dispatcher → retry was five layers of signature plumbing, hence the
- * thread-local.
- *
- * Neither is needed here. `await sleep()` does not hold anything, so the check
- * before each slice is only about *promptness*, and an explicit optional
- * `cancelCheck` threads through async calls without ceremony. The thread-local
- * scope has no analogue and is not reproduced.
  */
 import { isNotRetryableError, isRetryableError, ProviderError } from './errors.js';
 

@@ -1,9 +1,8 @@
 /**
  * Runtime configuration.
  *
- * Values are exposed as **getters**, read on each access. The Python module captured
- * `os.getenv` at import time, which meant tests had to reload the module to change a
- * path; reading lazily removes that whole class of test scaffolding.
+ * Values are exposed as getters, read on each access, so tests can override env vars
+ * without reloading the module.
  *
  * Load `.env` with `node --env-file=.env` rather than a dotenv dependency.
  */
@@ -26,8 +25,6 @@ function resolvePath(p: string): string {
   const expanded = expandUser(p);
   return isAbsolute(expanded) ? expanded : resolve(REPO_ROOT, expanded);
 }
-
-// --- server -----------------------------------------------------------------
 
 export const HOST_DEFAULT = 'localhost';
 /**
@@ -67,9 +64,7 @@ export const config = {
   /**
    * The repo-level `config.yaml` that `/api/config/*` reads and WRITES.
    *
-   * Overridable via `LT_CONFIG_YAML` specifically so tests never rewrite the
-   * user's real config. The Python route hard-coded the repo path, which meant a
-   * test of the PUT handler would have clobbered it.
+   * Overridable via `LT_CONFIG_YAML` so tests never rewrite the user's real config.
    */
   get LT_CONFIG_YAML(): string {
     return resolvePath(process.env.LT_CONFIG_YAML ?? 'config.yaml');
@@ -89,8 +84,6 @@ export const config = {
     );
   },
 } as const;
-
-// --- library config.yaml ----------------------------------------------------
 
 export interface LibraryConfig {
   catalogPath: string | null;
@@ -112,8 +105,7 @@ export interface LibraryConfig {
 
 const CONFIG_DEFAULTS = {
   workers: 4,
-  // The Python `Config` dataclass default. Not null: something has to be
-  // selectable when neither the env nor config.yaml names a model.
+  // Default when neither env nor config.yaml names a model.
   visionModel: 'gemma3:27b',
   stackBurstDeltaMs: 2000,
   visionCacheDir: join(homedir(), '.cache', 'lightroom_tagger', 'vision'),
@@ -168,10 +160,8 @@ export function loadLibraryConfig(configPath = join(REPO_ROOT, 'config.yaml')): 
 /**
  * Read `config.yaml` as a plain map, merge one key, and write it back.
  *
- * Preserves every other key and their order, matching
- * `yaml.safe_dump(..., sort_keys=False)` in `lightroom_tagger/core/config.py`. This
- * file is user-owned, so a rewrite must not reorder or drop anything it does not
- * understand.
+ * Preserves every other key and their order. This file is user-owned, so a rewrite
+ * must not reorder or drop anything it does not understand.
  */
 function updateConfigYaml(configFile: string, key: string, value: unknown): void {
   let data: Record<string, unknown> = {};

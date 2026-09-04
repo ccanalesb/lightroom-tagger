@@ -64,22 +64,18 @@ export function activePerspectiveSlugs(db: Db): string[] {
 /**
  * Minimum perspectives required for eligibility.
  *
- * Currently a constant 1 regardless of how many perspectives are active. Kept as a
- * function of the active count because that is the shape the Python signature has
- * and the threshold is the knob most likely to change.
+ * Currently 1 regardless of active count. Kept as a function because the
+ * threshold is the knob most likely to change.
  */
 export function defaultMinPerspectives(_activeCount: number): number {
   return 1;
 }
 
 /**
- * Round to 4 decimals, matching `round(value, 4)`.
+ * Round to 4 decimals.
  *
- * Python rounds halves to even and JavaScript rounds them up, but the difference
- * cannot surface here: this only ever rounds a mean of integer scores over the
- * number of active perspectives, and for every count that yields a terminating
- * decimal the result already has at most three places, while the repeating cases
- * never land exactly on a half at the fourth.
+ * Only ever rounds a mean of integer scores; repeating decimals never land exactly
+ * on a half at the fourth decimal.
  */
 export function round4(value: number): number {
   return Math.round(value * 1e4) / 1e4;
@@ -88,9 +84,7 @@ export function round4(value: number): number {
 /**
  * Trim a rationale to a preview length, appending an ellipsis when cut.
  *
- * Slices by code point rather than UTF-16 code unit, as Python does, so a rationale
- * containing an emoji cannot be cut through the middle of a surrogate pair and
- * produce a replacement character in the UI.
+ * Slices by code point so an emoji cannot be cut through a surrogate pair.
  */
 export function truncateRationale(
   text: string | null | undefined,
@@ -118,10 +112,8 @@ export interface ScoreRow {
 /**
  * Lowercase word tokens of length >= 3, minimal English stopwords dropped (D-43).
  *
- * Python's `[\w']+` under `re.UNICODE` matches letters, digits, underscore and
- * combining marks; JavaScript's `\w` is ASCII-only, so the class is spelled out
- * with Unicode property escapes instead. Leading and trailing apostrophes are
- * stripped, so `'the'` and `the` collapse to the same token.
+ * Uses Unicode property escapes because JavaScript's `\w` is ASCII-only. Leading
+ * and trailing apostrophes are stripped.
  */
 export function tokenizeRationale(text: string | null | undefined): string[] {
   if (!text) return [];

@@ -1,10 +1,7 @@
 /**
  * `init` — create an empty `library.db`.
  *
- * The command itself is a print, in both languages: opening a library DB with
- * `mustExist: false` is what applies the schema, so `init` is the name for doing
- * only that. What it buys is a database to point `scan` at before there is
- * anything to scan.
+ * Opening with `mustExist: false` applies the schema; this command does only that.
  */
 import { withLibraryDb } from '../library-db.js';
 import type { CommandContext } from '../registry.js';

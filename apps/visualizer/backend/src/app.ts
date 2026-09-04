@@ -1,10 +1,8 @@
 /**
  * Application factory.
  *
- * Deliberately side-effect free: constructing the app must not start the job
- * processor or write to stdout. The Python `create_app()` printed the auto-detected
- * NAS prefix to stdout, which corrupted `export_openapi.py`'s JSON output and broke
- * `npm run verify:contract`. Diagnostics here go to stderr.
+ * Side-effect free: constructing the app must not start the job processor or
+ * write to stdout. Diagnostics go to stderr so OpenAPI export output stays JSON.
  */
 import { cors } from 'hono/cors';
 import { config } from './config.js';
@@ -32,8 +30,7 @@ export function createApp() {
     }),
   );
 
-  // One route group per domain area, mirroring the Flask blueprint layout and its
-  // url_prefix values exactly — the frontend and the OpenAPI contract depend on them.
+  // One route group per domain area; url_prefix values match the frontend contract.
   //
   // Order matters within the images tree: `/images/catalog/months` and
   // `/images/catalog-similarity-groups` must be registered before the
@@ -53,13 +50,10 @@ export function createApp() {
   /**
    * `/api/images/<bad_type>/<key>` for a family that is not mounted.
    *
-   * Registered after the images groups so real paths resolve to them first. It also
-   * catches a non-numeric stack id: Flask's `<int:stack_id>` simply did not match
-   * `/api/images/stacks/abc/members`, so the request fell through to here and got
-   * this 400 rather than a 404. Verified against the running Flask app.
+   * Registered after the images groups so real paths resolve first. Also catches a
+   * non-numeric stack id (`/api/images/stacks/abc/members`) with 400 rather than 404.
    *
-   * The message embeds a Python tuple repr because that is what the frontend has
-   * been receiving — `_DETAIL_IMAGE_TYPES` was interpolated directly.
+   * The error message uses a tuple repr; the frontend depends on this exact string.
    */
   app.all('/api/images/:bad_type/*', (c) => {
     if (c.req.method !== 'GET') return c.notFound();
@@ -72,11 +66,8 @@ export function createApp() {
   /**
    * Uncaught errors become a 500 carrying the message.
    *
-   * Every Flask route wrapped its body in `try/except Exception` and returned
-   * `error_server_error(str(e))`, and `with_db` did the same again one layer out.
-   * Centralizing it here keeps the same response without declaring an undocumented
-   * 500 on each route — spectree only listed 500 for `/api/stats` and
-   * `/api/catalog/status`, so declaring it everywhere would drift the contract.
+   * Centralized here instead of declaring 500 on every route — only some routes list
+   * 500 in the OpenAPI contract.
    */
   app.onError((err, c) => {
     if (err instanceof HttpError) return c.json({ error: err.message }, err.status);

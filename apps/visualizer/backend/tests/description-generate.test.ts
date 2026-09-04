@@ -321,7 +321,7 @@ describe('POST /api/descriptions/{image_key}/generate', () => {
     expect(await json(res)).toEqual({ error: 'Invalid image_type: instagram' });
   });
 
-  it('accepts an empty image_type, as Flask does', async () => {
+  it('accepts an empty image_type', async () => {
     const filepath = await writePhoto();
     fx.addImage({ key: 'a', filepath });
     reply = completion(JSON.stringify({ summary: 'ok' }));
@@ -329,19 +329,9 @@ describe('POST /api/descriptions/{image_key}/generate', () => {
   });
 
   /**
-   * Reaching this 400 takes some staging, and the reason is worth recording.
-   *
-   * An unknown `provider_id` is not rejected up front — neither here nor in Flask.
-   * `buildAttempts` skips a primary that is not in the available set and cascades
-   * to `fallback_order`, so the describe simply succeeds on another provider. The
-   * only route to `UnknownProviderError` is the model ladder bottoming out on
-   * `listModels(providerId)`, which needs *every* higher rung to come up empty:
-   * no `provider_model`, no `defaults.description.model`, and no config model.
-   * That last one is why `VISION_MODEL` is set to the empty string — a bare
-   * `config.yaml` still yields `CONFIG_DEFAULTS.visionModel`.
-   *
-   * Flask's own test mocks `describe_matched_image` to raise instead. This file
-   * does not mock, so it stages the config that makes the error real.
+   * Unknown provider_id is only rejected after the model ladder bottoms out: no
+   * provider_model, no defaults.description.model, and VISION_MODEL cleared so the
+   * config fallback is empty too.
    */
   it('returns 400 when an explicitly requested provider is unknown', async () => {
     writeFileSync(
@@ -415,12 +405,11 @@ describe('POST /api/descriptions/{image_key}/generate', () => {
 
     await generate('a', { model: 'vision-7' });
     expect(requests[0]!.body.model).toBe('vision-7');
-    // Flask smuggled this through DESCRIPTION_VISION_MODEL and restored it in a
-    // `finally`; the TS route passes it as an argument, so the env is untouched.
+    // Bare model is passed as an argument; DESCRIPTION_VISION_MODEL env is untouched.
     expect(process.env.DESCRIPTION_VISION_MODEL).toBeUndefined();
   });
 
-  it('ignores a bare model when provider_id is given, as Flask does', async () => {
+  it('ignores a bare model when provider_id is given', async () => {
     const filepath = await writePhoto();
     fx.addImage({ key: 'a', filepath });
     reply = completion(JSON.stringify({ summary: 'ok' }));

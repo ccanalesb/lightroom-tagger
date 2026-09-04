@@ -1,14 +1,8 @@
 /**
  * The `lightroom-tagger` program; `bin.ts` is the executable that calls it.
  *
- * It lives under the visualizer backend rather than in a package of its own
- * because it is the same program: config loader, `library.db` seam, Lightroom
- * reader and catalog sync are all here already, and a second package would
- * either duplicate them or depend on this one.
- *
- * Every failure leaves as `Error: …` on stdout and exit 1 — not stderr, which is
- * where Python does not put it either, and scripts have been reading stdout for
- * as long as the command has existed.
+ * Every failure leaves as `Error: …` on stdout and exit 1 (not stderr) — scripts
+ * read stdout for errors.
  */
 import { config as runtimeConfig, loadLibraryConfig, type LibraryConfig } from '../config.js';
 import { CliError } from './library-db.js';
@@ -22,12 +16,7 @@ export interface RunOptions {
   config?: LibraryConfig;
 }
 
-/**
- * Run one command line and return its exit code.
- *
- * Exported separately from `main` so tests drive the whole program — parsing,
- * dispatch, error mapping — without a subprocess or a captured stdout.
- */
+/** Run one command line and return its exit code. */
 export async function run(argv: readonly string[], opts: RunOptions = {}): Promise<number> {
   const out = opts.out ?? ((line: string) => process.stdout.write(`${line}\n`));
 
@@ -55,9 +44,6 @@ export async function run(argv: readonly string[], opts: RunOptions = {}): Promi
   try {
     return await command.handler(ctx);
   } catch (e) {
-    // Every throw, not just `CliError`: Python's `map_cli_errors` catches bare
-    // `Exception`, so a command that fails on a corrupt database reports it the
-    // same way as one that fails on a missing flag.
     out(`Error: ${e instanceof CliError || e instanceof Error ? e.message : String(e)}`);
     return 1;
   }

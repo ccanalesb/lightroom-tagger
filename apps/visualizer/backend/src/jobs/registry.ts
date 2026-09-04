@@ -5,10 +5,6 @@
  * checkpoint co-location. Mirrors ADR-0006's explicit CLI `COMMANDS` list —
  * greppable, no decorators, no auto-discovery, so adding a job type is a visible
  * edit rather than a side effect of importing a module.
- *
- * Every type here now has a handler. Through the migration the field was
- * nullable, because a declaration had to exist before its handler did —
- * `requiresCatalog` gates job creation and `/api/jobs/health` publishes the list.
  */
 import type { JobRunner } from './runner.js';
 import { handleBatchAnalyze } from './handlers/analyze.js';

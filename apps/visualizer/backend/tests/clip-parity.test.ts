@@ -1,13 +1,8 @@
 /**
- * The acceptance test for the whole imaging port: do embeddings computed in Node
- * match the ones Python already wrote to `library.db`?
+ * Do Node CLIP embeddings match the vectors already stored in `library.db`?
  *
- * This is what decides whether the migration needs a full 43,451-image reindex.
- * Naive preprocessing scores ~0.93 cosine here; the Pillow-exact path must score
- * essentially 1.0, because anything less silently corrupts near-duplicate ranking.
- *
- * Requires the real library.db, the vision cache on disk, and a model download, so
- * it skips unless LT_CLIP_PARITY=1. Run it deliberately:
+ * Requires the real library.db, the vision cache on disk, and a model download.
+ * Skips unless LT_CLIP_PARITY=1:
  *
  *   LT_CLIP_PARITY=1 LIBRARY_DB=/path/to/library.db npx vitest run tests/clip-parity.test.ts
  */

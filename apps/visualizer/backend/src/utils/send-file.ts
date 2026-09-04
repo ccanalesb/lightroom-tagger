@@ -1,20 +1,11 @@
 /**
- * Serve a file from disk. Stands in for Flask's `send_file`.
+ * Serve a file from disk with conditional GET support.
  *
- * Flask's `send_file` defaults to `conditional=True`, so it answers
- * `If-Modified-Since` / `If-None-Match` with a 304 and supports byte ranges. The
- * thumbnail grid loads hundreds of images per page view, so dropping conditional
- * responses would turn every scroll back into a full re-download.
+ * Answers `If-Modified-Since` / `If-None-Match` with 304. The thumbnail grid loads
+ * hundreds of images per page view.
  *
- * Two deliberate differences from Werkzeug:
- *
- *   - the ETag value is `"<mtime-ms>-<size>"` rather than Werkzeug's
- *     `mtime-size-adler32(filename)`. It is still stable per file version, which is
- *     what the header is for; matching Werkzeug's exact bytes would only serve to
- *     keep caches warm *across* the backend switch, and invalidating them once at
- *     cutover is the safer outcome.
- *   - `Range` is not implemented. These are whole JPEGs rendered by `<img>`, which
- *     never asks for a range. A route that serves video would need it.
+ * ETag is `"<mtime-ms>-<size>"`. Range requests are not implemented — these are
+ * whole JPEGs rendered by `<img>`.
  */
 import type { Context } from 'hono';
 import { createReadStream, statSync } from 'node:fs';

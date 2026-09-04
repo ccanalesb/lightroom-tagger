@@ -48,8 +48,7 @@ export async function withLibraryDb<T>(path: string, fn: (db: Db) => Promise<T>)
  */
 export function failureSeverityFromError(e: unknown): ErrorSeverity {
   if (e instanceof AuthenticationError || e instanceof InvalidRequestError) return 'warning';
-  // Node reports filesystem and permission failures as an Error carrying both an
-  // `errno` and a `code`, which is the closest analogue to Python's `OSError`.
+  // Node reports filesystem and permission failures with both `errno` and `code`.
   if (
     typeof e === 'object' &&
     e !== null &&
@@ -179,10 +178,6 @@ export interface StageBand {
 /**
  * A `StageBand` for the two passes `batch_analyze` composes, which do resume:
  * their processed-unit set lives in a sub-object of the composite's checkpoint.
- *
- * Python spells this as four independent parameters — `progress_range`,
- * `log_prefix`, `finalize`, `nested_analyze_checkpoint` — but only these two
- * combinations of them exist, so one optional argument says the same thing.
  */
 export interface PassStage extends StageBand {
   /** Which sub-object of the `batch_analyze` checkpoint holds the resume state. */

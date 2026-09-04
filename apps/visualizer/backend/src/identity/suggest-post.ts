@@ -8,13 +8,10 @@ import { imageMetaMap } from './ranking.js';
 import { computeSignatureStats } from './signature.js';
 
 /**
- * Python's bare `round()` — half to **even**, not half away from zero.
+ * Round halves to even, not away from zero.
  *
- * This one is load-bearing rather than theoretical. The p90 index is
- * `round(0.9 * (n - 1))`, and `0.9 * 5` is exactly 4.5, so with six unposted
- * candidates Python picks index 4 while `Math.round` would pick 5 — a different
- * threshold, and therefore different `high_score_unposted` reason codes. The same
- * happens at 16, 26, 36 candidates and so on.
+ * Load-bearing for the p90 index: `round(0.9 * (n - 1))` at exactly 4.5 picks
+ * index 4 under half-to-even but 5 under `Math.round`.
  */
 export function roundHalfEven(value: number): number {
   const floor = Math.floor(value);

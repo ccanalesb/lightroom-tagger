@@ -1,16 +1,9 @@
 /**
- * CLIP image preprocessing, matching `CLIPImageProcessor` for
- * `openai/clip-vit-base-patch32` as sentence-transformers configures it.
+ * CLIP image preprocessing for `openai/clip-vit-base-patch32`.
  *
- * Config read off the live model (transformers, Pillow 12.2.0):
- *   do_convert_rgb, do_resize {shortest_edge: 224}, resample = 3 (BICUBIC),
- *   do_center_crop {224, 224}, do_rescale 1/255,
- *   image_mean [0.48145466, 0.4578275, 0.40821073],
- *   image_std  [0.26862954, 0.26130258, 0.27577711]
- *
- * Must NOT be replaced by transformers.js's own processor: its `RawImage.resize`
- * goes through sharp, which drifts the embedding to ~0.93 cosine against the stored
- * corpus. See src/imaging/pil-resample.ts for the measurements.
+ * Shortest-edge resize (bicubic), centre crop 224×224, rescale 1/255, then
+ * standardize with the model's mean and std. Must not use transformers.js's
+ * processor — its resize goes through sharp. See `pil-resample.ts`.
  */
 import { centerCrop, pilResize, type Plane } from './pil-resample.js';
 
@@ -20,9 +13,7 @@ export const CLIP_IMAGE_MEAN = [0.48145466, 0.4578275, 0.40821073] as const;
 export const CLIP_IMAGE_STD = [0.26862954, 0.26130258, 0.27577711] as const;
 
 /**
- * Port of `get_resize_output_image_size(..., default_to_square=False)`: scale the
- * shortest edge to `shortestEdge` and let the long edge follow, truncating (not
- * rounding) as Python's `int()` does.
+ * Scale the shortest edge to `shortestEdge`; truncate (not round) the long edge.
  */
 export function resizeShortestEdgeSize(
   width: number,

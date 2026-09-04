@@ -15,8 +15,7 @@ export function canonicalPath(path: string | null | undefined): string | null {
   try {
     return realpathSync(expandUserPath(String(path).trim()));
   } catch {
-    // realpath throws for a nonexistent path, which is the same "cannot use this"
-    // answer Python's OSError branch gives.
+    // realpath throws for a nonexistent path — same as an unusable path.
     return null;
   }
 }
@@ -63,7 +62,7 @@ export function isPathUnderAllowedRoots(filePath: string, roots: readonly string
  * Directories a catalog thumbnail is allowed to be served from: the vision cache,
  * the configured NAS mount point, and the folders holding the `.lrcat` files.
  *
- * Order is preserved and duplicates dropped, matching the Python helper.
+ * Order is preserved and duplicates dropped.
  */
 export function catalogThumbnailRoots(): string[] {
   const cfg = loadLibraryConfig(config.LT_CONFIG_YAML);

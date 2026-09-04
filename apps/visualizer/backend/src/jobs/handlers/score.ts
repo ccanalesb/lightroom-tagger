@@ -145,7 +145,7 @@ export async function handleSingleScore(
         scored,
         skipped,
         // Always zero on this path: a failure returns above. The key stays in the
-        // payload because the UI reads it, and Python emits it for the same reason.
+        // payload because the UI reads it.
         failed: 0,
         skip_reason_counts: diag.skipReasonCounts,
       });
@@ -248,10 +248,8 @@ export const ANALYZE_SCORE_CHECKPOINT_MISMATCH =
  * Returns the summary when running as a stage of `batch_analyze`, and `null`
  * whenever the job has already been settled, exactly as `runDescribePass` does.
  *
- * Concurrency is a bounded async pool over one connection, for the reason given
- * in `runDescribePass`: the time goes to the provider's HTTP response, so Python's
- * thread-per-connection pool bought nothing, and dropping it removes the separate
- * sequential branch that had drifted to different log messages.
+ * Concurrency is a bounded async pool over one connection: time is spent waiting on
+ * the provider's HTTP response, not on CPU or SQLite.
  */
 export async function runScorePass(
   runner: JobRunner,
@@ -350,7 +348,6 @@ export async function runScorePass(
     };
     if (stage !== undefined) return empty;
     runner.clearCheckpoint(jobId);
-    // The zero-work payload Python completes with omits the echoed knobs.
     runner.completeJob(jobId, {
       scored: 0,
       skipped: 0,

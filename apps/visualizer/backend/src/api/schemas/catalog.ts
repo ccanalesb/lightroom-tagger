@@ -1,10 +1,8 @@
 /**
  * Catalog browse, similarity, and image-detail API models.
  *
- * Every model here is `.strict()`, matching pydantic's `extra='forbid'`. That is
- * load-bearing rather than stylistic: the catalog row is built by spreading a
- * `SELECT i.*` result, so a column added to `images` would otherwise leak into the
- * API and into `api.gen.ts` without anyone deciding to expose it.
+ * Every model here is `.strict()`. The catalog row is built from `SELECT i.*`, so
+ * `.strict()` prevents new DB columns from leaking into the API unnoticed.
  */
 import { z } from '@hono/zod-openapi';
 
@@ -22,11 +20,7 @@ export const IdentityPerPerspectiveScore = z
   .strict()
   .openapi('IdentityPerPerspectiveScore');
 
-/**
- * Catalog list / search row shape (`queryCatalogImages` plus the API transforms).
- *
- * The field order follows the Python model so the generated schema diffs cleanly.
- */
+/** Catalog list / search row shape (`queryCatalogImages` plus API transforms). */
 export const CatalogImage = z
   .object({
     key: z.string(),

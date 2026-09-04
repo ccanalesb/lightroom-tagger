@@ -62,8 +62,7 @@ export function appendQueryCatalogImageFilters(
   if (f.posted === true) clauses.push('i.instagram_posted = 1');
   else if (f.posted === false) clauses.push('i.instagram_posted = 0');
 
-  // A malformed `month` is ignored rather than rejected, matching Python's
-  // `len(month) == 6 and month.isdigit()` guard.
+  // Malformed `month` values are ignored rather than rejected.
   if (f.month && f.month.length === 6 && /^[0-9]+$/.test(f.month)) {
     clauses.push("strftime('%Y%m', i.date_taken) = ?");
     bindings.push(f.month);
@@ -185,7 +184,6 @@ export function appendQueryCatalogImageFilters(
     bindings.push(...mtTokens);
   }
 
-  // The primary-grid stack collapse: a non-representative stack member never appears
-  // as its own row. Appended unconditionally and last, exactly as in Python.
+  // Primary-grid stack collapse: non-representative members are hidden. Appended last.
   clauses.push('(m_st.image_key IS NULL OR i.key = st.representative_key)');
 }

@@ -1,24 +1,15 @@
 /**
- * Perceptual hash, matching `imagehash.phash(img, hash_size=8, highfreq_factor=4)`.
+ * Perceptual hash (hash_size=8, highfreq_factor=4).
  *
- * The Python algorithm, from imagehash:
- *   image.convert("L").resize((32, 32), LANCZOS)
- *   dct = scipy.fftpack.dct(scipy.fftpack.dct(pixels, axis=0), axis=1)
- *   dctlowfreq = dct[:8, :8]
- *   diff = dctlowfreq > median(dctlowfreq)
- *
- * Notes that matter for exactness:
- *   - the greyscale conversion happens BEFORE the resize
- *   - `scipy.fftpack.dct` defaults to `norm=None`, i.e. unnormalized DCT-II
- *   - the median includes the DC term
- *   - both resize and greyscale must be Pillow-exact (see pil-resample.ts)
+ * Greyscale before resize, unnormalized DCT-II, median includes the DC term.
+ * Resize and greyscale must use `pil-resample.ts`.
  */
 import { pilGreyscale, pilResize, type Plane } from './pil-resample.js';
 
 const HASH_SIZE = 8;
 const HIGHFREQ_FACTOR = 4;
 
-/** Unnormalized DCT-II — `scipy.fftpack.dct(x)` with default `norm=None`. */
+/** Unnormalized DCT-II. */
 function dct1d(input: Float64Array, out: Float64Array): void {
   const N = input.length;
   for (let k = 0; k < N; k++) {
@@ -30,7 +21,7 @@ function dct1d(input: Float64Array, out: Float64Array): void {
   }
 }
 
-/** Median the way numpy computes it for an even-length sample: mean of the middle two. */
+/** Median for an even-length sample: mean of the middle two. */
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const n = sorted.length;
@@ -41,19 +32,15 @@ function median(values: number[]): number {
 /**
  * The low-frequency 8×8 DCT block phash thresholds, in row-major order.
  *
- * Exported so tests can compare the numeric stage against Pillow/scipy directly.
- * That matters because the final `> median` step is not always numerically
- * decidable: for strongly periodic input (a 1px checkerboard, say) most of the
- * block cancels to zero and the comparison turns on floating-point noise rather
- * than image content. Comparing the block catches real errors that a hash
- * comparison on such an image would mask, and vice versa.
+ * Exported so tests can compare the numeric stage directly. Comparing the block
+ * catches real errors that a hash comparison on periodic input would mask.
  */
 export function phashDctBlock(rgbOrGrey: Plane): Float64Array {
   const size = HASH_SIZE * HIGHFREQ_FACTOR; // 32
   const grey = pilGreyscale(rgbOrGrey);
   const small = pilResize(grey, size, size, 'lanczos');
 
-  // scipy does dct(dct(pixels, axis=0), axis=1): columns first, then rows.
+  // Column DCT first, then row DCT.
   const matrix: Float64Array[] = [];
   for (let y = 0; y < size; y++) {
     const row = new Float64Array(size);
@@ -88,8 +75,8 @@ export function phashDctBlock(rgbOrGrey: Plane): Float64Array {
 /**
  * Compute the phash of already-decoded pixels.
  *
- * Returns the 16-character hex string `imagehash.ImageHash.__str__` produces: the
- * flattened bit array packed big-endian, 4 bits per hex digit.
+ * Returns a 16-character hex string: the flattened bit array packed big-endian,
+ * 4 bits per hex digit.
  */
 export function phash(rgbOrGrey: Plane): string {
   const block = Array.from(phashDctBlock(rgbOrGrey));

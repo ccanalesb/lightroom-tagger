@@ -1,16 +1,8 @@
 /**
  * Frame substance per-image read and mutation routes.
  *
- * Registered ONTO the catalog group rather than as a group of its own, matching
- * `@catalog_bp.route` in Python. That is not cosmetic: these paths live under
- * `/api/images/catalog/{image_key}/…`, and a second route group would need its own
- * `use('/images/catalog/*', …)`. Hono's `app.route()` flattens a child's middleware
- * into the parent, so both registrations would then match every catalog request and
- * open two `library.db` connections for it.
- *
- * Kept in its own module for the reason it was one in Python: the cull-keyword
- * routes write to a live Lightroom `.lrcat`, and that is the one blast radius in
- * this backend worth keeping visible.
+ * Registered onto the catalog group so both share one `library.db` middleware.
+ * A second route group would open two connections per catalog request.
  */
 import { createRoute, z, type OpenAPIHono } from '@hono/zod-openapi';
 import { ERROR_IMAGE_NOT_FOUND } from '../../constants/errors.js';
@@ -69,7 +61,7 @@ function buildFrameSubstanceResponse(
 
   if (verdictRow !== null) {
     verdictValue = verdictRow.verdict;
-    // Empty strings become null, matching Python's `str(...) or None`.
+    // Empty strings become null.
     unknownReason = String(verdictRow.unknown_reason || '') || null;
     detectorVersion = String(verdictRow.detector_version || '') || null;
     judgedAt = String(verdictRow.judged_at || '') || null;

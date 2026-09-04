@@ -1,10 +1,6 @@
 /**
- * The frame substance batch driver and the `batch_frame_substance` job.
- *
- * Real greyscale JPEGs on disk and a real `library.db`: the detector is the point
- * of the job, so stubbing it would leave only the loop under test. The images are
- * the same shapes the Python tests use — a flat black frame and fixed-seed noise —
- * so the verdicts they produce are comparable line for line.
+ * Frame substance batch driver and batch_frame_substance job — real greyscale JPEGs
+ * and library.db; flat black and fixed-seed noise fixtures produce stable verdicts.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -212,12 +208,7 @@ describe('runFrameSubstanceDetection', () => {
     ).toHaveLength(1);
   });
 
-  /**
-   * `compressed_at` is set explicitly rather than nudged by an interval: staleness
-   * is a *text* comparison against `judged_at`, and the two columns are written in
-   * different Python timestamp formats, so only an unambiguous value tests the
-   * scoping rather than the collation.
-   */
+  /** staleOnly compares compressed_at to judged_at as text; use an unambiguous future date. */
   it('judges only the scoped stale images in chain mode', async () => {
     seedImage('in_run', await writeOkJpeg('in_run.jpg'));
     seedImage('outside', await writeOkJpeg('outside.jpg'));

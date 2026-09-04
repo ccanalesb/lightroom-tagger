@@ -37,8 +37,6 @@ export function cmdScan(ctx: CommandContext): number {
   const catalog = connectCatalogReadOnly(catalogPath);
   let records;
   try {
-    // `--verbose` prints the catalog total; Python reads it unconditionally, so
-    // the query runs either way and the flag only decides whether it is shown.
     const total = getImageCount(catalog);
     if (boolFlag(ctx.args, 'verbose')) ctx.out(`Total images in catalog: ${total}`);
     records = getImageRecords(catalog, intFlag(ctx.args, 'limit'));
@@ -49,10 +47,7 @@ export function cmdScan(ctx: CommandContext): number {
   ctx.out(`Retrieved ${records.length} image records`);
 
   return withLibraryDb(ctx, { mustExist: false }, (db, dbPath) => {
-    // One transaction for the batch, where Python commits once per record — the
-    // difference `storeImagesBatch` was written for. On a 43,000-image catalog
-    // that is one fsync instead of 43,000, and an interrupted run leaves the
-    // library untouched rather than half-synced.
+    // One transaction for the whole batch — an interrupted run leaves the library untouched.
     const count = libraryWrite(db, () => storeImagesBatch(db, records));
     ctx.out(`Indexed ${count} images to ${dbPath}`);
     return 0;

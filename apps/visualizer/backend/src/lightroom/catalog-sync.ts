@@ -83,8 +83,8 @@ export function listLibraryCatalogIds(db: Db): Set<number> {
   for (const row of rows) {
     if (row.id === null || row.id === undefined) continue;
     const text = String(row.id).trim();
-    // `Number('')` is 0 and `Number('12abc')` is NaN, where Python's `int()` raises
-    // for both; the regex keeps a legacy row from inventing an id of zero.
+    // Skip empty and non-numeric ids. Numeric comparison matters: as text,
+    // `'38887'` sorts after `'99999'`.
     if (!/^[+-]?\d+$/.test(text)) continue;
     ids.add(Number(text));
   }
@@ -150,9 +150,6 @@ export function syncCatalog(
     const totalMissing = missingIds.length;
     let cancelled = false;
     for (const [index, imageId] of missingIds.entries()) {
-      // Python has no check here at all: `cancel_scope` is installed by the handler
-      // but nothing on this path consults it, so cancelling a 43,000-image sync did
-      // nothing until it finished. What it has already fetched is still written.
       if (opts.isCancelled?.()) {
         cancelled = true;
         break;

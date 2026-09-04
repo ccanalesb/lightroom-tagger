@@ -1,10 +1,6 @@
 /**
- * The `batch_stack_detect` and `batch_catalog_similarity` handlers, driven through
- * the processor.
- *
- * Nothing is stubbed here. Both jobs are pure SQLite, so the real `vec0` KNN runs
- * against real vectors — which is the point, since the parts most likely to break
- * in the port are the similarity ranking and the burst arithmetic.
+ * batch_stack_detect and batch_catalog_similarity handlers via the processor.
+ * Pure SQLite end to end, including vec0 KNN.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -83,12 +79,8 @@ afterEach(() => {
 });
 
 describe('parseDateTakenUtc', () => {
-  /**
-   * The naive case is the one that matters: `new Date('2024-01-15T10:00:00')`
-   * reads local time, so on any machine away from Greenwich it would place the
-   * same photo hours from where Python does.
-   */
-  it('reads a naive timestamp as UTC, like fromisoformat plus a UTC stamp', () => {
+  /** Naive timestamps without an offset are interpreted as UTC, not local time. */
+  it('reads a naive timestamp as UTC', () => {
     expect(parseDateTakenUtc('2024-01-15T10:00:00')).toBe(Date.UTC(2024, 0, 15, 10, 0, 0));
     expect(parseDateTakenUtc('2024-01-15 10:00:00')).toBe(Date.UTC(2024, 0, 15, 10, 0, 0));
     expect(parseDateTakenUtc('2024-01-15')).toBe(Date.UTC(2024, 0, 15));

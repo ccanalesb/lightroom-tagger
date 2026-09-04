@@ -108,7 +108,7 @@ describe('GET /api/descriptions/', () => {
   });
 
   it('reports 0 total_pages for an empty catalog, not 1', async () => {
-    // Python guards this with `if total`; a naive ceil would say 1 page of nothing.
+    // An empty catalog should report 0 total_pages, not 1 from a naive ceil.
     const body = await json<{ total: number; pagination: { total_pages: number } }>(
       await app.request('/api/descriptions/'),
     );

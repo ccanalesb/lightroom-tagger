@@ -107,7 +107,7 @@ const listRoute = createRoute({
 
 jobsRoutes.openapi(listRoute, (c) => {
   const status = c.req.query('status');
-  // `type=int` semantics: an unparseable value falls back to the default.
+  // Unparseable query values fall back to the default.
   const toInt = (raw: string | undefined, fallback: number): number =>
     raw !== undefined && /^\s*[+-]?\d+\s*$/.test(raw) ? Number.parseInt(raw.trim(), 10) : fallback;
   const limit = Math.max(1, Math.min(toInt(c.req.query('limit'), 50), 500));
@@ -136,10 +136,8 @@ const createRouteDef = createRoute({
 });
 
 jobsRoutes.openapi(createRouteDef, (c) => {
-  // `type` is required by the declared body, so the handler's own
-  // 'type is required' 400 is unreachable — a body without it is a 422 before
-  // this runs, exactly as spectree made it in Flask. The 400 stays declared
-  // because the contract lists it.
+  // The handler's own 'type is required' 400 is unreachable — a missing `type` is 422
+  // before this runs. The 400 stays declared because the contract lists it.
   const { type: jobType, metadata } = c.req.valid('json');
 
   // Refused at enqueue time rather than accepted and failed later: a queued job
@@ -239,16 +237,8 @@ const processorHealthRoute = createRoute({
 /**
  * Diagnose the background processor — was it started, is it ticking?
  *
- * Added after an incident where a `pending` job sat untouched for minutes with no
- * way to tell from outside whether the processor was alive, stuck, or never
- * started. `stale` is the flag clients should read, so they need not reimplement
- * the threshold.
- *
- * The Python version had to guess which module held the processor thread, because
- * running `python app.py` directly registered the server under `__main__` while the
- * blueprint imported a second copy as `app`, and snapshotting the wrong one
- * reported a live processor as dead. There is one module instance here, so that
- * whole dance is gone.
+ * Added after an incident where a `pending` job sat untouched with no way to tell
+ * whether the processor was alive. `stale` encodes the threshold clients should read.
  */
 jobsRoutes.openapi(processorHealthRoute, (c) => {
   const snapshot = getProcessorHealthSnapshot();
@@ -278,10 +268,8 @@ jobsRoutes.openapi(processorHealthRoute, (c) => {
 
 // --- one job ----------------------------------------------------------------
 //
-// Registered AFTER the static paths above. Werkzeug sorted routes by specificity,
-// so `/api/jobs/active` beat `/api/jobs/<job_id>` regardless of declaration order;
-// Hono matches in registration order, so `{job_id}` would otherwise swallow
-// `active`, `health` and `_processor_health` and answer 404 "Job not found".
+// Registered AFTER the static paths above. Hono matches in registration order, so
+// `{job_id}` would otherwise swallow `active`, `health` and `_processor_health`.
 
 const detailRoute = createRoute({
   method: 'get',

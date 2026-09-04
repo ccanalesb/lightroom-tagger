@@ -18,11 +18,7 @@ export type ErrorBody = z.infer<typeof ErrorBody>;
 /**
  * Request-validation failure element.
  *
- * spectree attached a 422 to every decorated route automatically, under a
- * content-hashed schema name (`ValidationError.6a07bef`). We emit the same
- * structure under a stable name: the hash was an artefact of spectree internals,
- * nothing on the frontend consumes the type, and a name that changes with an
- * upstream implementation detail is a poor thing to gate CI on.
+ * Stable schema name for CI; a content-hashed name would churn with upstream internals.
  */
 export const ValidationErrorElement = z
   .object({

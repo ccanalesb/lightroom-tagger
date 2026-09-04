@@ -7,12 +7,9 @@
  * ordering enforceable: four separately queued jobs can be started out of order,
  * and stack detection over a half-filled embedding table quietly produces less.
  *
- * The stages are the same passes the standalone jobs run, told they are a stage:
- * each reports into a quarter of the bar and hands its summary back instead of
- * completing the job. Python does this with a proxy object wrapped around the
- * runner, intercepting `complete_job` and remapping `update_progress`; here the
- * passes already take a `StageBand` for `batch_analyze`, so there is nothing to
- * intercept.
+ * The stages are the same passes the standalone jobs run with a `StageBand`: each
+ * reports into a quarter of the bar and hands its summary back instead of completing
+ * the job.
  *
  * Stage 0 is the exception to "each stage reads what the one before wrote": the
  * three after it read `library.db`, which is there whether or not today's

@@ -78,10 +78,7 @@ export function countTokens(texts: readonly string[]): TokenCounts {
  * the model says most often everywhere. Unseen corpus tokens are floored at half a
  * count so the ratio stays finite.
  *
- * The corpus may be passed pre-counted, and `buildMirror` does exactly that. The
- * Python version re-tokenized the whole corpus inside every call; on this catalog
- * that is 147,000 rationales per section, measured at 3.7s a time, so the Mirror
- * spent 11 of its 12 seconds counting the same words three times over.
+ * The corpus may be passed pre-counted; `buildMirror` shares one count across sections.
  */
 export function distinctiveDescriptors(
   lensRationales: readonly string[],

@@ -180,12 +180,7 @@ afterEach(async () => {
 });
 
 describe('computePromptVersion', () => {
-  /**
-   * The rubric id is what decides whether a score is stale, so it is pinned to
-   * the digest Python computes rather than to whatever this implementation
-   * produces — a drift here would silently rescore the whole catalog, or
-   * silently refuse to.
-   */
+  /** prompt_version is pinned to slug:sha256-prefix so rubric edits invalidate scores. */
   it('is the slug and the first 16 hex of the markdown sha256', () => {
     const markdown = '# Street\nIs the moment decisive?';
     const expected = createHash('sha256').update(markdown, 'utf8').digest('hex').slice(0, 16);
@@ -232,12 +227,8 @@ describe('the single_score handler', () => {
     });
   });
 
-  /**
-   * `scored_at` is written to whole seconds, not milliseconds. The column is
-   * sorted and compared as text against rows Python already wrote, so a stray
-   * `.123` would order a new score before an older one written in the same second.
-   */
-  it('writes scored_at in the second-precision UTC shape Python uses', async () => {
+  /** scored_at uses whole-second UTC; text sort breaks if milliseconds appear. */
+  it('writes scored_at in second-precision UTC', async () => {
     const filepath = await writePhoto();
     fx.addImage({ key: 'a', filepath }).addPerspectives({ slug: 'street' });
 

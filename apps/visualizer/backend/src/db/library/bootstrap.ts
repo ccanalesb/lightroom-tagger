@@ -1,26 +1,12 @@
 /**
  * Create a `library.db`.
  *
- * Python spells the schema as a base DDL script followed by fifteen migration
- * functions, replayed on **every** open. Here it is one script that produces the
- * current shape directly, because the six migrations that do real work only
- * transform data a database below `user_version` 8 can hold, and the one live
- * database has been at 8 for a long time. What is left of the ladder — the tables
- * and indexes the later migrations create — is inlined below, so a fresh database
- * arrives at the same place in one step. See the plan for the case for each.
+ * Fresh databases are created at schema version 8 in one script. Legacy upgrade
+ * migrations (below version 8) are not carried here.
  *
- * Two deliberate divergences from what Python's `init_database` builds today:
- *
- *   - `image_descriptions_fts` is created as an **external-content** table
- *     (`content='image_descriptions'`), which is what the production database
- *     has. Python's `_migrate_image_descriptions_fts` was rewritten to build a
- *     standalone table but is gated at `user_version` 3, so it never re-ran and
- *     the two shapes have diverged: a Python-initialized database and the real
- *     one need opposite delete statements (see `removeDescriptionFtsRow`). New
- *     databases should match the one everything is actually tested against.
- *   - Nothing is written beside the database. Python's ladder leaves a
- *     `library.db.pre-key-migration.bak` and an `instagram-matching-export.json`
- *     next to a brand-new file, both of them backups of nothing.
+ * `image_descriptions_fts` is external-content (`content='image_descriptions'`),
+ * matching production; standalone and external-content forms need opposite delete
+ * statements (see `removeDescriptionFtsRow`).
  */
 import { mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, extname, join, resolve } from 'node:path';
@@ -29,12 +15,7 @@ import { REPO_ROOT } from '../../config.js';
 import { nowIsoUtc } from '../../utils/datetime.js';
 import { markdownMarksOptional } from './scores.js';
 
-/**
- * The `PRAGMA user_version` a current database carries.
- *
- * Python reaches 8 by stepping 0 → 1 → 3 → 5 → 6 → 7 → 8; a database this module
- * creates is born there.
- */
+/** `PRAGMA user_version` for a database created by this module. */
 export const LIBRARY_SCHEMA_VERSION = 8;
 
 const SCHEMA_SQL = `
@@ -274,13 +255,9 @@ function userVersion(db: Db): number {
 /**
  * Refuse a database that predates the current schema.
  *
- * A path that is not there yet, or an empty file `openLibraryDb` just created,
- * has no `images` table and is simply new. Anything with one and a
- * `user_version` below the current is a legacy database that needs the six data
- * migrations this module does not carry — remapping composite keys, backfilling
- * blob scores, exporting the retired Instagram tables. Saying so is honest;
- * running the current DDL over it would leave a database that claims to be
- * current and is not.
+ * A missing or empty path is treated as new. An existing `images` table with
+ * `user_version` below the current needs legacy upgrade migrations this module
+ * does not carry.
  */
 function assertNotLegacy(db: Db, path: string): void {
   const version = userVersion(db);
@@ -293,14 +270,7 @@ function assertNotLegacy(db: Db, path: string): void {
   );
 }
 
-/**
- * Create every table and index at the current version on an open connection.
- * Idempotent, and seeds nothing.
- *
- * Exported for the test fixture, which needs the production schema without the
- * factory rubrics — most of its tests assert on perspectives they seeded
- * themselves. Everything else should go through `initLibraryDb`.
- */
+/** Create every table and index at the current version. Idempotent; seeds nothing. */
 export function createLibrarySchema(db: Db): void {
   db.exec(SCHEMA_SQL);
   db.exec(VIRTUAL_TABLE_SQL);
@@ -312,8 +282,7 @@ export function createLibrarySchema(db: Db): void {
  * factory perspectives. Idempotent; the caller owns closing the connection.
  */
 export function initLibraryDb(path: string): Db {
-  // Python's `init_database` does the same `makedirs` first, so `init --db` into
-  // a directory that does not exist yet works rather than failing at open.
+  // Ensure the parent directory exists so `init --db` into a new path works.
   mkdirSync(dirname(resolve(path)), { recursive: true });
   const db = openLibraryDb(path);
   try {
@@ -331,24 +300,19 @@ export function initLibraryDb(path: string): Db {
 export const PERSPECTIVE_PROMPTS_DIR = join(REPO_ROOT, 'prompts', 'perspectives');
 
 /**
- * Python's `str.title()`: the first letter of every run of letters is uppercased
- * and the rest lowercased, so `environmental-context-legibility` becomes
- * `Environmental-Context-Legibility` rather than the single-capital result
- * JavaScript's usual word-boundary regex would give.
+ * Title-case each run of letters (not word-boundary regex), so
+ * `environmental-context-legibility` becomes `Environmental-Context-Legibility`.
  */
 function pythonTitle(s: string): string {
   return s.replace(/\p{L}+/gu, (w) => w[0]!.toUpperCase() + w.slice(1).toLowerCase());
 }
 
 /**
- * The value `perspectives.description` is seeded with: the first non-blank body
- * line, skipping a leading `# Heading`.
+ * Seed value for `perspectives.description`: first non-blank body line, skipping
+ * a leading `# Heading`.
  *
- * On the rubrics that carry `<!-- optional: true -->` immediately under their
- * heading, that marker *is* the first body line, so it becomes the description.
- * Reproduced rather than fixed: it is what the factory seed has always produced,
- * it is the first thing an owner edits in the UI, and the seed only ever runs
- * once against an empty table.
+ * On rubrics with `<!-- optional: true -->` immediately under the heading, that
+ * marker becomes the description — what the factory seed has always produced.
  */
 export function perspectiveSeedDescription(markdown: string): string {
   const lines = markdown.split(/\r\n|\r|\n/);

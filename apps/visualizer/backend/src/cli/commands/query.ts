@@ -1,9 +1,5 @@
 /**
  * The three commands that only read `library.db`: `search`, `export`, `stats`.
- *
- * All three take the same shape — resolve one filter, run one whole-table query,
- * print a count — because that is what the CLI has always been next to the
- * visualizer: the coarse view, without paging or ordering.
  */
 import { writeFileSync } from 'node:fs';
 import type { Db } from '../../db/connection.js';
@@ -21,12 +17,9 @@ import { intFlag, stringFlag } from '../parse.js';
 import type { CommandContext } from '../registry.js';
 
 /**
- * The first filter the user gave, in the order the flags are checked.
+ * The first filter given wins; multiple filters are not combined.
  *
- * First rather than combined, matching Python's `if/elif` chain: two filters
- * together are not an intersection, the earlier one simply wins. `--rating 0` is
- * a filter, not an absent one, which is why it is tested for `null` rather than
- * for truthiness.
+ * `--rating 0` is a filter, tested for `null` not truthiness.
  */
 function selectRows(db: Db, ctx: CommandContext): Row[] {
   const keyword = stringFlag(ctx.args, 'keyword');
@@ -47,8 +40,7 @@ function selectRows(db: Db, ctx: CommandContext): Row[] {
 /** Apply `--limit`, which truncates the result rather than bounding the query. */
 function limited(rows: Row[], ctx: CommandContext): Row[] {
   const limit = intFlag(ctx.args, 'limit');
-  // Falsy rather than null: Python's `if args.limit` treats `--limit 0` as unset,
-  // so it returns everything rather than nothing.
+  // `--limit 0` is treated as unset and returns everything.
   return limit ? rows.slice(0, limit) : rows;
 }
 
@@ -65,8 +57,6 @@ export function cmdSearch(ctx: CommandContext): number {
 
 export function cmdExport(ctx: CommandContext): number {
   return withLibraryDb(ctx, { mustExist: true }, (db) => {
-    // `export` reads only `--keyword` and `--rating`; a `--date-start` is not one
-    // of its flags, so this is the same chain with two links.
     const keyword = stringFlag(ctx.args, 'keyword');
     const rating = intFlag(ctx.args, 'rating');
     const selected =
@@ -84,27 +74,14 @@ export function cmdExport(ctx: CommandContext): number {
     } else if (results.length > 0) {
       writeFileSync(outputPath, toCsv(results));
     }
-    // Python writes no file at all for an empty CSV export, and still reports
-    // success. Kept, because the alternative — a header-only file — would need
-    // column names that an empty result set does not have.
+    // Empty CSV export writes no file and still reports success (no column names to infer).
 
     ctx.out(`Exported ${results.length} images to ${outputPath}`);
     return 0;
   });
 }
 
-/**
- * `csv.DictWriter` over the first row's keys, with its `\r\n` line ending.
- *
- * Two cells do not match Python byte-for-byte, both because `DictWriter` falls
- * back to `str()` on a non-string: a decoded `keywords` writes as
- * `['sunset', 'beach']` there and `["sunset","beach"]` here, and a decoded
- * `instagram_posted` writes as `False` there and `false` here. Those are Python
- * reprs leaking into a data format rather than a contract anything reads back —
- * the JSON export, which is the one with a parser on the other end, is
- * identical. Emitting Python reprs from TypeScript to preserve them was the
- * worse trade.
- */
+/** CSV with `\r\n` line endings. Arrays JSON-encoded; booleans lowercase. */
 function toCsv(rows: readonly Row[]): string {
   const fieldnames = Object.keys(rows[0]!);
   const cell = (value: unknown): string => {
@@ -126,10 +103,7 @@ export function cmdStats(ctx: CommandContext): number {
   return withLibraryDb(ctx, { mustExist: true }, (db, dbPath) => {
     const count = getImageCount(db);
 
-    // One row per distinct rating, where Python reads the whole table into memory
-    // and tallies it. The column is `INTEGER DEFAULT 0` but nullable, and a null
-    // sorts first here — Python raises `TypeError` comparing it to an int, which
-    // its own error mapper then reports as a failed command.
+    // `rating` is nullable despite DEFAULT 0; null sorts first here.
     const rows = db
       .prepare('SELECT rating, COUNT(*) AS c FROM images GROUP BY rating ORDER BY rating')
       .all() as { rating: number | null; c: number }[];

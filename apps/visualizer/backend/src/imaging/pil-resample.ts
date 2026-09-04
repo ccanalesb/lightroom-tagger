@@ -1,25 +1,14 @@
 /**
- * Pillow-exact image resampling.
+ * Fixture-exact image resampling.
  *
- * WHY THIS EXISTS: every image-derived value in `library.db` — the 43,451 CLIP
- * embeddings and every stored phash — was produced by Pillow. `sharp`/libvips
- * resizing is *not* Pillow resizing, and the difference is not cosmetic:
+ * Stored CLIP embeddings and phashes depend on exact resize and greyscale output.
+ * sharp/libvips resize drifts CLIP cosine to ~0.93–0.97 and phash by ~2 bits.
  *
- *   - CLIP embeddings drift to cosine 0.93–0.97 against the stored corpus, which is
- *     inside the near-duplicate band that stack detection and catalog similarity
- *     rank on. Feeding Pillow's own tensor through the same ONNX graph gives
- *     cosine 1.000000, so the model is exact and the resize is the entire error.
- *   - phash lands ~2 bits of 64 off, exact on only 7 of 12 sample images.
- *
- * So the resize is ported rather than delegated. This is a direct transcription of
- * `src/libImaging/Resample.c` from Pillow (tested against Pillow 12.2.0), keeping
- * its fixed-point arithmetic and rounding rules — those, not the filter maths, are
- * what make the output bit-identical.
- *
- * Only the 8-bit-per-channel path is implemented, which is all this project needs.
+ * Fixed-point resampling with Resample.c-style arithmetic and rounding rules.
+ * Only the 8-bit-per-channel path is implemented.
  */
 
-/** `32 - 8 - 2` in Resample.c. Coefficients are fixed-point with this many bits. */
+/** Fixed-point coefficient precision (`32 - 8 - 2` in Resample.c). */
 const PRECISION_BITS = 22;
 const HALF = 1 << (PRECISION_BITS - 1);
 const SCALE = 1 << PRECISION_BITS;
@@ -36,7 +25,7 @@ function bilinearFilter(x: number): number {
   return x < 1.0 ? 1.0 - x : 0.0;
 }
 
-/** Catmull-Rom-style cubic with a = -0.5, matching Pillow's `bicubic_filter`. */
+/** Catmull-Rom-style cubic with a = -0.5. */
 function bicubicFilter(x: number): number {
   const a = -0.5;
   if (x < 0) x = -x;
@@ -51,7 +40,7 @@ function sinc(x: number): number {
   return Math.sin(px) / px;
 }
 
-/** Sinc truncated at 3 lobes, matching Pillow's `lanczos_filter`. */
+/** Sinc truncated at 3 lobes. */
 function lanczosFilter(x: number): number {
   if (x >= -3.0 && x < 3.0) return sinc(x) * sinc(x / 3.0);
   return 0.0;
@@ -72,11 +61,10 @@ interface Coeffs {
 }
 
 /**
- * Port of `precompute_coeffs` + `normalize_coeffs_8bpc`.
+ * Precompute resampling coefficients and normalize for 8-bit output.
  *
- * C's `(int)` truncates toward zero, so `Math.trunc` is used deliberately in place
- * of `Math.floor` — they differ for the negative intermediates that arise near the
- * left/top edge, and the truncating form is what Pillow does.
+ * C's `(int)` truncates toward zero, so `Math.trunc` is used in place of
+ * `Math.floor` for negative edge intermediates.
  */
 function precomputeCoeffs(
   inSize: number,
@@ -135,10 +123,7 @@ function clip8(v: number): number {
   return s < 0 ? 0 : s > 255 ? 255 : s;
 }
 
-/**
- * An 8-bit image as interleaved channel data, the layout both `sharp().raw()` and
- * `numpy.asarray(pil_image)` produce.
- */
+/** An 8-bit image as interleaved channel data. */
 export interface Plane {
   data: Uint8Array;
   width: number;
@@ -200,13 +185,11 @@ function resampleVertical(src: Plane, outHeight: number, c: Coeffs): Plane {
 }
 
 /**
- * Resize `src` to `outWidth`×`outHeight`, bit-identically to
- * `PIL.Image.resize((outWidth, outHeight), resample=<filter>)`.
+ * Resize `src` to `outWidth`×`outHeight` with the given filter.
  *
- * Two-pass like Pillow: horizontal into a temp restricted to the rows the vertical
- * pass will actually read, then vertical. Passes are skipped when the corresponding
- * dimension is unchanged, which is also what Pillow does — and it matters, because
- * a skipped pass is not the same as a no-op pass through fixed-point rounding.
+ * Two-pass horizontal then vertical. Passes are skipped when the corresponding
+ * dimension is unchanged — a skipped pass is not the same as a no-op pass through
+ * fixed-point rounding.
  */
 export function pilResize(
   src: Plane,
@@ -242,10 +225,10 @@ export function pilResize(
 }
 
 /**
- * PIL `Image.convert("L")` — ITU-R 601-2 luma in Pillow's fixed point.
+ * ITU-R 601-2 luma in fixed point.
  *
- * `sharp().greyscale()` is NOT equivalent: measured against Pillow on a real cache
- * JPEG it differs on 23.7% of pixels (max 11 levels). Use this.
+ * `sharp().greyscale()` is not equivalent: it differs on ~24% of pixels on a real
+ * cache JPEG. Use this for fixture-exact greyscale.
  */
 export function pilGreyscale(src: Plane): Plane {
   if (src.channels === 1) return { ...src, data: Uint8Array.prototype.slice.call(src.data) };
@@ -261,8 +244,9 @@ export function pilGreyscale(src: Plane): Plane {
 }
 
 /**
- * Crop a centred region, matching `transformers.image_transforms.center_crop`
- * (floor division for the offsets). Assumes the crop fits; callers resize first.
+ * Crop a centred region with floor division for the offsets.
+ *
+ * Assumes the crop fits; callers resize first.
  */
 export function centerCrop(src: Plane, cropWidth: number, cropHeight: number): Plane {
   const left = Math.floor((src.width - cropWidth) / 2);

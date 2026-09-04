@@ -1,17 +1,9 @@
 /**
  * Job rows and their logs, in `visualizer.db`.
  *
- * The log storage design is load-bearing and its history is worth keeping. Logs
- * used to be a growing JSON array on the `jobs` row, so every `addJobLog` did
- * SELECT → parse → append → serialize → UPDATE. For a scoring job with 15,000+
- * entries that approached O(n²), and because a single connection was shared by the
- * request handlers, the coordinator and four worker callbacks, they all serialized
- * on those writes — which wedged a job for three hours in production.
- *
- * `job_logs` is append-only with a `(job_id, id)` index: appending is one INSERT
- * and a tail read is a bounded `ORDER BY id DESC LIMIT n`. The legacy `jobs.logs`
- * column still exists and is still decoded on read, because rows written before
- * the migration carry it.
+ * Logs live in append-only `job_logs` (indexed on `(job_id, id)`). The legacy
+ * `jobs.logs` JSON column still exists and is decoded on read for rows written
+ * before that table existed.
  */
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
@@ -197,7 +189,7 @@ function deserializeJob(row: RawJobRow, logs: JobLog[] | null): JobRow {
     try {
       return JSON.parse(value);
     } catch {
-      // Not JSON: hand back the raw string, as Python's `except` branch does.
+      // Not JSON: return the raw string.
       return value;
     }
   };
@@ -420,16 +412,9 @@ export function clearJobFailureDetails(db: Db, jobId: string): void {
 /**
  * Update one JSON-serializable field. The column name is whitelisted.
  *
- * A string is stored verbatim and anything else is JSON-encoded, matching Python —
- * with one deliberate exception. Python encoded `None` as `json.dumps(None)`, i.e.
- * the four-character string `"null"`, so `transition_retry` clearing `error` wrote
- * the *text* "null" into the column. `error` is not a JSON-decoded column, so the
- * API returned `{"error": "null"}` and a retried job displayed "null" where its
- * failure message had been. Verified against the running Flask app.
- *
- * Clearing the previous failure is the entire purpose of that code path, so `null`
- * is written as SQL NULL here. The published schema types the field `str | None`,
- * so `null` is what it always meant.
+ * A string is stored verbatim; anything else is JSON-encoded. `null`/`undefined`
+ * are written as SQL NULL (not the four-character string `"null"`), because
+ * `error` is not a JSON-decoded column and the API types it as `str | None`.
  */
 export function updateJobField(db: Db, jobId: string, field: string, value: unknown): void {
   if (!ALLOWED_JOB_UPDATE_FIELDS.has(field)) {

@@ -2,9 +2,8 @@
  * CLIP-only visual similarity (KNN over `image_clip_embeddings`), SIM-02 / D-05.
  *
  * Runs against the sqlite-vec `vec0` table already in `library.db` — 43,451 rows of
- * 512-d float32 written by the Python backend, read here with no migration. The
- * npm `sqlite-vec` build is pinned to the same 0.1.9 the Python side pins, so the
- * on-disk format is the same one that wrote it.
+ * 512-d float32, read with no migration. `sqlite-vec` stays pinned to 0.1.9, the
+ * version those rows were written with, so the on-disk format still matches.
  */
 import type { Db } from '../db/connection.js';
 import { catalogKeyIsPrimaryGridRow, filterOrderKeysInCatalog } from '../db/library/catalog-query.js';
@@ -136,8 +135,8 @@ export function runClipSimilarForSeed(
     ordered.push([imageKey, dist]);
   }
 
-  // Note the asymmetry, carried over deliberately: the empty case omits
-  // `knn_k_used` from the metadata while the non-empty case includes it.
+  // Deliberate asymmetry: the empty case omits `knn_k_used` from the metadata
+  // while the non-empty case includes it.
   if (ordered.length === 0) return { pairs: [], meta: clipMeta(raw.length) };
 
   const allowed = new Set(

@@ -113,10 +113,7 @@ export function isCatalogSimilarityPairRejected(db: Db, keyA: string, keyB: stri
 /**
  * Persist a user rejection for a normalized image-key pair.
  *
- * Python committed inside this function even when the caller had already opened a
- * `library_write` transaction, which silently ended that transaction early. Here
- * the commit is left to the caller's `libraryWrite`, so the rejection and anything
- * the caller writes alongside it succeed or fail together.
+ * Does not commit — caller's `libraryWrite` owns the transaction.
  */
 export function rejectCatalogSimilarityPair(db: Db, keyA: string, keyB: string): void {
   const [a, b] = normalizeImagePair(keyA, keyB);

@@ -36,7 +36,7 @@ export const PerspectiveScore = z
   .strict()
   .openapi('PerspectiveScore');
 
-/** `GET /api/perspectives/` response body — a bare array, as spectree emitted. */
+/** `GET /api/perspectives/` response body — a bare array. */
 export const PerspectiveListResponse = z
   .array(PerspectiveSummary)
   .openapi('PerspectiveListResponse');

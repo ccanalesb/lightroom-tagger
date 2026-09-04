@@ -372,8 +372,7 @@ describe('DELETE /api/providers/{id}/models/{model_id}', () => {
   });
 
   it('deletes a model id containing a slash', async () => {
-    // Real ids look like `meta/llama-4-maverick-17b-128e-instruct`. Flask routed
-    // this with the `path:` converter; a single-segment parameter would 404.
+    // Model ids can contain slashes; the route must accept the full path segment.
     const res = await send('DELETE', '/api/providers/local/models/vendor/big');
     expect(res.status).toBe(200);
     expect(await json(res)).toEqual({ deleted: true });

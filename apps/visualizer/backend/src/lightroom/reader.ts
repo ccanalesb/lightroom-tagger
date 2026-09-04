@@ -5,23 +5,13 @@
  * this one opens the catalog **read-only** so a browse or a sync cannot mutate a
  * file Lightroom owns. `writer.connectCatalog` opens it read-write and is guarded
  * by `raiseIfCatalogLocked` plus a backup; nothing here should ever reach for it.
- *
- * Only the functions `catalog_sync` needs are ported. `get_image_records`,
- * `get_image_count` and the `main()` CLI in the Python module are for the CLI
- * (step 6) and the schema explorer, neither of which runs in the backend.
  */
 import Database from 'better-sqlite3';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Db } from '../db/connection.js';
 
-/**
- * The legacy `LIGHTRoom_*` spelling, still documented in the README and used by
- * `core/config.py`'s env overrides. The TS config loader dropped that whole family,
- * but these two are different in kind: they are the documented workaround for a
- * catalog on SMB/NAS that will not open at all, so a user who has one exported has
- * no other way in.
- */
+/** Legacy `LIGHTRoom_*` env spellings still documented in the README for SMB/NAS catalogs. */
 const LEGACY_ENV_ALIASES: Record<string, string> = {
   LIGHTROOM_CATALOG_READONLY_URI: 'LIGHTRoom_CATALOG_READONLY_URI',
   LIGHTROOM_CATALOG_LOCKING_MODE: 'LIGHTRoom_CATALOG_LOCKING_MODE',
@@ -69,10 +59,9 @@ function applyLockingMode(conn: Db, lockingMode: string, readOnly: boolean): str
 /**
  * Open a Lightroom catalog for reading.
  *
- * `readonly: true` is better-sqlite3's `SQLITE_OPEN_READONLY`, which is what
- * Python's `file:...?mode=ro` URI asks for. Set `LIGHTROOM_CATALOG_READONLY_URI=0`
- * for the legacy read-write open, and `LIGHTROOM_CATALOG_LOCKING_MODE=EXCLUSIVE` to
- * request exclusive locking on a read-only open (with the NORMAL fallback above).
+ * Set `LIGHTROOM_CATALOG_READONLY_URI=0` for a read-write open, and
+ * `LIGHTROOM_CATALOG_LOCKING_MODE=EXCLUSIVE` to request exclusive locking on a
+ * read-only open (with the NORMAL fallback above).
  *
  * The 30-second busy timeout matters: Lightroom holds the catalog while it is open,
  * and a scan that starts a second before Lightroom releases it should wait rather
@@ -89,14 +78,11 @@ export function connectCatalogReadOnly(catalogPath: string): Db {
 }
 
 /**
- * Normalize a Lightroom `captureTime` the way Python's `strptime`/`isoformat`
- * round-trip does.
+ * Zero-pad a Lightroom `captureTime`, leaving anything unparseable unchanged.
  *
- * That round-trip is the identity for a well-formed `YYYY-MM-DDTHH:MM:SS`, and
- * anything it cannot parse comes back unchanged — so the only thing it really does
- * is zero-pad. That is load-bearing rather than cosmetic: the first ten characters
- * become the image key, so a catalog row reading `2024-1-5T…` has to produce
- * `2024-01-05_…` or the sync writes a second row for a photo Python already stored.
+ * Load-bearing rather than cosmetic: the first ten characters become the image key,
+ * so a row reading `2024-1-5T…` has to produce `2024-01-05_…` or the sync stores a
+ * duplicate of a photo that is already in the library.
  */
 export function parseCatalogDate(dateStr: string | null | undefined): string | null {
   if (!dateStr) return null;
@@ -110,9 +96,8 @@ export function parseCatalogDate(dateStr: string | null | undefined): string | n
 /**
  * A GPS coordinate as a number, or `null`.
  *
- * Note that an exact `0` also becomes `null`, because Python tests the raw value
- * for truthiness before parsing. Null Island is not in this catalog and matching
- * the existing rows is worth more than fixing that.
+ * An exact `0` also becomes `null`. Null Island is not in this catalog, and the
+ * stored rows were written under this rule.
  */
 export function parseGps(value: unknown): number | null {
   if (!value) return null;
@@ -196,19 +181,11 @@ const IMAGE_METADATA_SQL = `
 `;
 
 /**
- * Keywords linked to an image — and a faithful port of a bug.
+ * Keywords linked to an image.
  *
- * `AgLibraryKeywordImage.image` references `Adobe_images.id_local`, but every
- * caller passes the `AgLibraryFile.id_local` the metadata join is keyed on. Those
- * are different id spaces, which is the exact mistake `writer.ts` warns about, so
- * this returns nothing: all 43,794 rows in the real `library.db` have `keywords`
- * of `[]`.
- *
- * Left as-is rather than repaired, because the sync is additions-only. A fix would
- * populate keywords for newly imported photos and leave the other 43,794 empty,
- * which makes `search_by_keyword` inconsistent instead of uniformly silent — a
- * worse failure than the one it replaces. Repairing it means a backfill, not a
- * one-line join change; tracked as #304.
+ * `AgLibraryKeywordImage.image` references `Adobe_images.id_local`, but this passes
+ * `AgLibraryFile.id_local`, so it returns nothing. Fixing it requires a backfill,
+ * not a one-line join change; tracked as #304.
  */
 function keywordsForImage(conn: Db, imageId: number): string[] {
   const rows = conn
@@ -225,10 +202,8 @@ function keywordsForImage(conn: Db, imageId: number): string[] {
 /**
  * Fetch one image by `AgLibraryFile.id_local`, or `null` when the file is gone.
  *
- * `?? fallback` is wrong throughout this function and `|| fallback` is right:
- * Python coalesces on *falsiness*, so a zero focal length reads as `''` and a
- * missing caption as `''`. Half the rows in a real catalog already went through
- * those rules, so changing them would rewrite values on the next sync.
+ * Use `|| fallback`, not `?? fallback`: a zero focal length must read as `''`, and
+ * existing catalog rows were written under that rule.
  */
 export function getImageById(conn: Db, imageId: number): CatalogRecord | null {
   const row = conn.prepare(IMAGE_METADATA_SQL).get(imageId) as Record<string, unknown> | undefined;
@@ -280,11 +255,6 @@ export function getImageCount(conn: Db): number {
 
 /**
  * Every image with full metadata, oldest id first, for a full `scan`.
- *
- * Sequential, which is what Python does too despite taking a `workers` argument:
- * both branches of its `if len(image_ids) > 10000 and workers > 1` run the same
- * loop, under a comment explaining that SQLite connections are not thread-safe
- * and that it processes sequentially "for now". There is no parallelism to port.
  *
  * A row that has vanished between the id listing and its fetch contributes
  * nothing, rather than failing the scan.

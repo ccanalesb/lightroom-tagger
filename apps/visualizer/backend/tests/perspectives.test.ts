@@ -153,7 +153,7 @@ describe('POST /api/perspectives/', () => {
       { slug: 'ok', display_name: 'A', prompt_markdown: 'x', active: 'yes' },
       'active must be a boolean',
     ],
-  ])('rejects %j with the Flask error text', async (body, message) => {
+  ])('rejects %j with the documented error text', async (body, message) => {
     const res = await post('/api/perspectives/', body);
     expect(res.status).toBe(400);
     expect(await json(res)).toEqual({ error: message });

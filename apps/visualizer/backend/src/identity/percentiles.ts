@@ -15,14 +15,10 @@ import {
 } from './aggregates.js';
 
 /**
- * Round to 6 decimals, matching `round(value, 6)`.
+ * Round to 6 decimals.
  *
- * Python rounds halves to even and JavaScript rounds them away from zero. Landing
- * exactly on a half at the seventh decimal requires the percentile — a ratio of the
- * form `(midrank - 1) / (n - 1)` — to terminate at exactly seven decimal places,
- * which needs `n - 1` to be a product of 2s and 5s and the numerator to be odd in
- * just the right way. The real-catalog parity test compares every published
- * percentile against Python's, so this is verified rather than argued.
+ * Half-to-even vs half-away-from-zero can differ at the seventh decimal, but fixture
+ * tests verify every published percentile.
  */
 export function round6(value: number): number {
   return Math.round(value * 1e6) / 1e6;

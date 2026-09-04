@@ -13,7 +13,7 @@ export const JobLogLevel = z.enum(['debug', 'info', 'warning', 'error']);
 export const ErrorSeverity = z.enum(['warning', 'error', 'critical']);
 export const LibraryDbSource = z.enum(['env', 'config', 'default', 'none']);
 
-/** Not `.strict()`, matching the Python model, which sets no `extra` policy. */
+/** Not `.strict()` — unknown keys on a log entry are allowed. */
 export const JobLog = z
   .object({
     timestamp: z.string(),
@@ -105,12 +105,10 @@ export const JobsRecoveredPayload = z
   .openapi('JobsRecoveredPayload');
 
 /**
- * `ErrorBody` subclasses, spelled out rather than built with `.extend()`.
+ * `ErrorBody` subclasses spelled out rather than built with `.extend()`.
  *
- * pydantic inlines an inherited field into the subclass schema, so Flask emits a
- * flat object. Extending the *registered* `ErrorBody` here would emit
- * `allOf: [$ref ErrorBody, { code }]` instead, and the contract diff would see a
- * different shape. The `error` field is repeated for that reason, not by oversight.
+ * Inheritance would emit `allOf: [$ref ErrorBody, { code }]` instead of a flat
+ * object. The `error` field is repeated for that reason.
  */
 export const CatalogUnavailableError = z
   .object({

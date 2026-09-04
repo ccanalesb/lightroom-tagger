@@ -1,26 +1,17 @@
 /**
- * Timestamp formatting that matches what Python wrote into `library.db`.
+ * Timestamp formatting matching persisted `library.db` columns.
  *
- * Three distinct formats are already persisted, and they are not interchangeable:
+ * Three distinct formats are already stored and are not interchangeable:
  *
- *   - `datetime.now(timezone.utc).isoformat()` → `2026-04-12T21:40:51.334442+00:00`
- *     used for `perspectives.created_at/updated_at` and the frame-substance tables
- *   - the same truncated to whole seconds → `2026-04-12T21:40:51+00:00`
- *     used for `image_scores.scored_at`, which is the only column Python writes
- *     through `.replace(microsecond=0)`
- *   - `datetime.now().isoformat()` → `2026-09-02T13:50:07.083774` (naive, local)
- *     used for `catalog_similarity_rejections.rejected_at` and
- *     `catalog_similarity_groups.created_at`
+ *   - UTC with `+00:00` and microseconds → perspectives, frame-substance tables
+ *   - UTC truncated to whole seconds → `image_scores.scored_at`
+ *   - Naive local wall-clock, no offset → similarity rejections/groups
  *
- * `Date.prototype.toISOString()` produces neither: it renders UTC with a `Z`
- * suffix and millisecond precision. That matters because these columns are sorted
- * as text (`idx_catalog_similarity_rejections_rejected_at` is a plain string index)
- * and rendered directly in the UI, so a row written by this backend must be
- * indistinguishable in shape from one written by the Python backend.
+ * `Date.prototype.toISOString()` is wrong for all three (UTC `Z`, millisecond precision).
+ * These columns are sorted as text and rendered in the UI.
  *
- * JavaScript clocks only resolve to milliseconds, so the microsecond field is
- * zero-padded rather than invented. Fixed six-digit width keeps text ordering
- * correct against the existing rows.
+ * JavaScript clocks resolve to milliseconds; the microsecond field is zero-padded
+ * to six digits so text ordering matches existing rows.
  */
 
 function pad(n: number, width: number): string {
@@ -43,7 +34,7 @@ function format(
   );
 }
 
-/** UTC instant with an explicit `+00:00` offset, as `datetime.now(timezone.utc)` writes. */
+/** UTC instant with explicit `+00:00` offset and microsecond padding. */
 export function nowIsoUtc(date: Date = new Date()): string {
   return (
     format(
@@ -63,13 +54,7 @@ export function nowIsoUtcSeconds(date: Date = new Date()): string {
   return nowIsoUtc(date).replace(/\.\d+(?=\+)/, '');
 }
 
-/**
- * Local wall-clock instant with no offset, as bare `datetime.now()` writes.
- *
- * Naive local time is a poor choice for a stored timestamp — it is ambiguous across
- * a DST transition — but it is what these columns already hold, and mixing offsets
- * into a text-sorted column would order rows wrongly.
- */
+/** Local wall-clock with no offset. Rows in similarity tables use this shape. */
 export function nowIsoLocal(date: Date = new Date()): string {
   return format(
     date.getFullYear(),

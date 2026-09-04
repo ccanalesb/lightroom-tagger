@@ -1,19 +1,12 @@
 /**
  * Vision calls against OpenAI-compatible providers.
  *
- * The Python module wrapped the `openai` SDK and mapped its exception classes
- * onto the `ProviderError` hierarchy. Here the requests are plain `fetch` and the
- * mapping is from HTTP status, which is what the SDK's classes encode anyway —
- * `RateLimitError` is 429, `AuthenticationError` is 401/403, and so on. Same
- * reasoning as the registry: three endpoints do not justify the dependency.
- *
- * Ollama gets special treatment, and it is not cosmetic. It serves an
- * OpenAI-compatible surface at `/v1`, but only its native `/api/chat` honours the
- * `think` toggle. Through the compat endpoint `think` is silently ignored, so a
- * thinking model (kimi-k2.6) burns its entire output-token budget on the
- * reasoning channel and returns empty content. Routing Ollama natively with
- * `think: false` yields the actual answer, and is a harmless no-op for
- * non-thinking models.
+ * Ollama serves an OpenAI-compatible surface at `/v1`, but only its native
+ * `/api/chat` honours the `think` toggle. Through the compat endpoint `think` is
+ * silently ignored, so a thinking model (kimi-k2.6) burns its entire output-token
+ * budget on the reasoning channel and returns empty content. Routing Ollama
+ * natively with `think: false` yields the actual answer, and is a harmless no-op
+ * for non-thinking models.
  */
 import { readFile } from 'node:fs/promises';
 import { basename } from 'node:path';

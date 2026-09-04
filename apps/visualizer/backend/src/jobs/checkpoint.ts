@@ -13,13 +13,11 @@
  * `batch_score` — the same shape under `processed_triplets`, whose units carry a
  * perspective slug as well: `"key|itype|slug"`.
  *
- * `batch_embed_image` — the same shape, except `processed_pairs` holds bare
- * catalog keys. The key name is not a mistake to tidy up: it is what the Flask
- * backend already wrote, and renaming it here would strand every checkpoint the
- * cutover is meant to resume.
+ * `batch_embed_image` — the same shape, with `processed_pairs` holding bare
+ * catalog keys. Field name is legacy; renaming would strand existing checkpoints.
  *
- * `batch_stack_detect` — bare catalog keys again, but under
- * `processed_image_keys`. Same reason: the name is the Flask backend's.
+ * `batch_stack_detect` — bare catalog keys under `processed_image_keys`. Same
+ * legacy field name.
  *
  * `batch_analyze` — the composite, and the one that is not flat: `stage` names the
  * pass that is running, and `describe` / `score` each hold a body of the shape
@@ -34,12 +32,8 @@ export const CHECKPOINT_VERSION = 1;
 export const CHECKPOINT_MAX_ENTRIES = 100_000;
 
 /**
- * `json.dumps(payload, sort_keys=True, separators=(",", ":"))`, byte for byte.
- *
- * The fingerprint has to survive the cutover: a job checkpointed by the Flask
- * backend must resume under this one rather than restarting from zero, and that
- * only holds if both sides hash the same bytes. Python sorts object keys and
- * escapes non-ASCII, neither of which `JSON.stringify` does.
+ * Canonical JSON for checkpoint fingerprints: sorted object keys, escaped non-ASCII.
+ * Must match the byte sequence already stored in resumed checkpoints.
  */
 export function canonicalJson(value: unknown): string {
   return escapeNonAscii(JSON.stringify(sortKeys(value)));
@@ -57,8 +51,7 @@ function sortKeys(value: unknown): unknown {
 
 function escapeNonAscii(json: string): string {
   // Only string contents can hold non-ASCII, and `JSON.stringify` has already
-  // escaped everything else, so a blind pass over the output is safe. Lone
-  // surrogates escape individually, which is what Python emits too.
+  // escaped everything else, so a blind pass over the output is safe.
   return json.replace(/[\u0080-\uffff]/g, (c) =>
     `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`,
   );

@@ -1,9 +1,7 @@
 /**
  * Flag parsing and help for the `lightroom-tagger` CLI.
  *
- * Hand-rolled over `node:util`'s `parseArgs` rather than an argument library:
- * the surface is seven subcommands with three flag kinds between them, and the
- * one thing that needs care is not expressible in `parseArgs` anyway — see
+ * Hand-rolled: subcommand-local flags override globals with the same name — see
  * `resolveFlag`.
  */
 
@@ -16,7 +14,7 @@ export interface FlagSpec {
   help: string;
   /** Single-letter alias, e.g. `-d` for `--db`. Global flags only. */
   short?: string;
-  /** Rejects a value outside this set, the way argparse's `choices` does. */
+  /** Rejects a value outside this set. */
   choices?: readonly string[];
   required?: boolean;
 }
@@ -24,16 +22,8 @@ export interface FlagSpec {
 /**
  * Flags accepted before the subcommand.
  *
- * Every one of these is also declared by at least one subcommand, which in
- * Python makes it dead: argparse parses a subcommand into a fresh namespace and
- * copies **all** of it back, so a subparser's absent `--db` overwrites the root's
- * with `None`. `lightroom-tagger --db library.db search` therefore ignores the
- * path and falls through to `config.yaml`, silently. Every documented invocation
- * puts its flags after the subcommand, which is why nobody has hit it.
- *
- * `resolveFlag` reads the subcommand's value first and the global second, so
- * both forms work here. Reproducing the argparse behaviour would have taken more
- * code than fixing it.
+ * `resolveFlag` reads the subcommand's value first, then the global, so flags after
+ * the subcommand win.
  */
 export const GLOBAL_FLAGS: readonly FlagSpec[] = [
   { name: 'catalog', short: 'c', kind: 'string', help: 'Path to .lrcat file' },
@@ -58,13 +48,7 @@ export interface ParsedArgs {
 /** Raised for a malformed command line; the caller prints help and exits 1. */
 export class UsageError extends Error {}
 
-/**
- * A flag's value: what the subcommand was given, else what preceded it.
- *
- * The precedence is the whole reason this exists. A `--db` written after the
- * subcommand is the more specific of the two and wins; one written before still
- * counts, which is where this parts company with Python.
- */
+/** A flag's value: subcommand-local wins over global. */
 export function resolveFlag(args: ParsedArgs, name: string): string | number | boolean | undefined {
   return args.local[name] ?? args.global[name];
 }
@@ -104,11 +88,8 @@ function lookup(specs: readonly FlagSpec[]): FlagLookup {
 }
 
 /**
- * Split `argv` at the first bare word, which is the subcommand.
- *
- * Anything before it is parsed against the global flags, anything after against
- * the subcommand's own — the same two-level shape argparse builds, without the
- * namespace merge that loses the first half.
+ * Split `argv` at the first bare word (the subcommand). Tokens before it are global
+ * flags; tokens after are subcommand flags.
  */
 export function parseArgv(
   argv: readonly string[],
@@ -193,7 +174,7 @@ function consumeFlag(
   return inline === null ? index + 1 : index;
 }
 
-/** The `--help` text, in argparse's shape so the README's output still reads true. */
+/** The `--help` text. */
 export function helpText(commands: readonly { name: string; help: string }[]): string {
   const flagLine = (s: FlagSpec): string => {
     const names = s.short === undefined ? `--${s.name}` : `--${s.name}, -${s.short}`;

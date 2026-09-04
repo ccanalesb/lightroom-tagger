@@ -1,21 +1,7 @@
 /**
  * Burst stack members and mutations.
  *
- * Reuses catalog's row shaping so a stack member looks exactly like the same image
- * in the grid — that is the whole point of the endpoint, and a divergence would show
- * as a card that renders differently inside a stack than outside it.
- *
- * Request bodies are declared, so `@hono/zod-openapi` rejects a malformed one with
- * the documented 422 before the handler runs. That makes several of the Python
- * handlers' manual checks unreachable here, exactly as they were unreachable in
- * Flask (spectree validated first). Two divergences are worth naming:
- *
- *   - Flask answered a malformed body with `500 {"error": "??? Unknown Error:
- *     None"}` rather than 422, because `with_db`'s `except Exception` swallowed
- *     spectree's abort. See `api/openapi.ts`.
- *   - pydantic's lax mode coerced a numeric string, so `{"source_stack_id": "7"}`
- *     was accepted; Zod requires an integer and answers 422. The published contract
- *     says integer, and the generated frontend client sends one.
+ * Reuses catalog row shaping so stack members match the same image in the grid.
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { ERROR_IMAGE_NOT_FOUND } from '../../constants/errors.js';
@@ -59,16 +45,14 @@ export const stacksRoutes = createOpenApiApp<LibraryEnv>();
 stacksRoutes.use('/images/stacks/*', libraryDb({ writeForMethods: ['POST'] }));
 
 /**
- * `_clamp_pagination` in `api/images/stacks.py` is a *different* function from the
- * shared one in `utils/pagination.py`: it caps the limit at 100 rather than 500 and
- * defaults to 20 rather than 50. Ported as its own helper so the two do not get
- * merged by a future tidy-up.
+ * Stack pagination: limit capped at 100, default 20 — not the shared catalog helper
+ * (500 / 50). Keep separate so a tidy-up does not merge the two.
  */
 function clampStackPagination(
   limitRaw: string | undefined,
   offsetRaw: string | undefined,
 ): { limit: number; offset: number } {
-  // Flask read these with `type=int`, which yields the default when unparseable.
+  // Unparseable query values fall back to the default.
   const toInt = (raw: string | undefined, fallback: number): number =>
     raw !== undefined && /^\s*[+-]?\d+\s*$/.test(raw) ? Number.parseInt(raw.trim(), 10) : fallback;
   return {
@@ -77,12 +61,7 @@ function clampStackPagination(
   };
 }
 
-/**
- * A non-empty string, matching Python's `not key or not isinstance(key, str)`.
- *
- * Still reachable with a schema-validated body: `""` is a valid string to Zod and
- * to pydantic, and both backends then reject it here.
- */
+/** A non-empty string; `""` is rejected even though it is schema-valid. */
 function nonEmpty(value: string): string | null {
   return value.length > 0 ? value : null;
 }
@@ -90,19 +69,10 @@ function nonEmpty(value: string): string | null {
 const stackIdParams = z.object({ stack_id: z.string() });
 
 /**
- * Resolve a `stack_id` path segment, reproducing two *different* Flask outcomes.
+ * Parse a `stack_id` path segment.
  *
- * Flask declared these with `<int:stack_id>`, so a non-numeric segment did not
- * match the route at all: the request fell through to the
- * `/api/images/<bad_type>/<key>` catch-all and got its legacy 400. Verified against
- * the running app — `GET /api/images/stacks/abc/members` really answers
- * `400 {"error": "invalid image_type; expected one of ('catalog', 'instagram')"}`.
- * A numeric id below 1 *did* match, and the handler turned it into a 404.
- *
- * Hono has no integer path converter that `@hono/zod-openapi` would honour (the
- * Hono path is derived from the OpenAPI path, which must stay `{stack_id}`), so the
- * distinction is made here instead: a non-integer throws the catch-all's 400 and an
- * out-of-range integer returns null for the caller's 404.
+ * A non-numeric id throws the legacy catch-all 400; an integer below 1 returns null
+ * for the caller's 404. OpenAPI requires `{stack_id}` as a string, not an int converter.
  */
 function parseStackId(raw: string): number | null {
   if (!/^\d+$/.test(raw)) {
@@ -250,13 +220,8 @@ stacksRoutes.openapi(membersRoute, (c) => {
 // --- mutations --------------------------------------------------------------
 
 /**
- * The three stack mutations map `StackMutationError` identically, but the mapping is
- * repeated inline rather than factored out: a helper that returns a bare `Response`
- * erases the typed-response information `@hono/zod-openapi` uses to check a handler
- * against its declared statuses, which is the one guarantee worth keeping here.
- *
- * A `>= 500` error ("merge produced an empty stack") and anything unexpected both
- * fall through to the app-level 500 handler with the message intact.
+ * Stack mutation error mapping is repeated inline: a helper returning `Response`
+ * erases the typed-response information `@hono/zod-openapi` checks against.
  */
 
 const splitMemberRoute = createRoute({

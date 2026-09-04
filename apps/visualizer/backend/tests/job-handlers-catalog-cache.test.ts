@@ -1,16 +1,6 @@
 /**
- * The `catalog_cache_build` chain, driven through the processor.
- *
- * Python patches all four stage functions out and asserts on the order they were
- * called in, which tests the chain's bookkeeping and nothing else. Here the
- * stages really run — a real `.lrcat`, real JPEGs, a real `vec0` KNN — because
- * the claim worth testing is that each stage can consume what the one before it
- * wrote. An order assertion cannot fail when stage 2 reads a column stage 1 never
- * filled; a synced image arriving as a stack of embedded near-duplicates can.
- *
- * The CLIP encoder is the one thing stubbed, for the reason
- * `job-handlers-embed.test.ts` gives: the real vision tower would download a few
- * hundred megabytes of weights and say nothing about the chain.
+ * The `catalog_cache_build` chain via the processor — real stages end to end,
+ * CLIP stubbed.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';

@@ -1,10 +1,8 @@
 /**
  * Identity route tests.
  *
- * The percentile maths is the part worth testing at unit scale, because on the real
- * catalog every value is plausible and only the parity test can tell right from
- * nearly-right. Here the population is small enough to compute the expected
- * percentile by hand.
+ * Percentile maths is worth testing at unit scale: on a real catalog every value
+ * looks plausible, but here the population is small enough to compute by hand.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app.js';
@@ -71,7 +69,7 @@ describe('midrank percentile ranks', () => {
   });
 });
 
-describe("Python's round(), half to even", () => {
+describe('round half to even', () => {
   it.each([
     [4.5, 4],
     [5.5, 6],

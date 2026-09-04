@@ -1,15 +1,8 @@
 /**
  * Frame substance detector — preview statistics and verdict rules (#295).
  *
- * Five numbers per image and three thresholds over them decide whether a frame is
- * a lens cap (`void`), a blown or crushed frame with nothing legible in it
- * (`illegible`), or a photograph (`ok`). numpy does the five in as many lines; the
- * arithmetic is written out here, which is why `tests/frame-substance-detector.test.ts`
- * pins every statistic against values Pillow and numpy produced on the same images.
- *
- * Decoding is sharp, greyscaling is not: `sharp().greyscale()` disagrees with
- * `Image.convert("L")` on a quarter of the pixels, which moves every one of the
- * five. See `pil-resample.ts`.
+ * Decoding uses sharp; greyscale uses `pilGreyscale` because `sharp().greyscale()`
+ * disagrees with ITU-R 601-2 luma on a quarter of pixels. See `pil-resample.ts`.
  */
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
@@ -56,9 +49,9 @@ const THRESHOLD_TUPLE = [
 ] as const;
 
 /**
- * `str(float)` in Python, which always keeps a decimal point. `String(20.0)` is
- * `"20"`, and the version hash is over exactly this text, so the difference would
- * silently rename the detector and restamp every verdict row in the catalog.
+ * Format a float for the detector version hash — always includes a decimal point.
+ *
+ * `String(20.0)` is `"20"`; the version hash is over exactly this text.
  */
 function pythonFloatStr(value: number): string {
   const s = String(value);
@@ -105,10 +98,7 @@ export function computeStatisticsFromGreyscale(grey: Plane): FrameStatistics {
 /**
  * Variance of the 4-neighbour Laplacian over the interior pixels.
  *
- * numpy accumulates this in float32 and this does it in float64. The Laplacian
- * values themselves are integers either way, so only the variance's last bits
- * differ, which is why the parity test compares these to a relative tolerance
- * while comparing the two pixel fractions exactly.
+ * Accumulated in float64; fixture tests compare with a relative tolerance.
  */
 function laplacianVariance(grey: Plane): number {
   const { width, height, data } = grey;
@@ -147,10 +137,8 @@ function laplacianVariance(grey: Plane): number {
  * frame with a small bright subject from one that is uniformly dark.
  *
  * Cell size is `floor(dimension / 32)`, and the remainder is cropped away, so a
- * frame under 32 pixels on a side has no grid at all. numpy raises there rather
- * than inventing one, and so does this: a silent fallback would be a second
- * detector nobody measured thresholds against. `computeStatisticsFromPath` turns
- * the throw into an `unknown` verdict for that one image.
+ * frame under 32 pixels on a side has no grid and throws. `computeStatisticsFromPath`
+ * turns the throw into an `unknown` verdict for that one image.
  */
 function tileMax(grey: Plane): number {
   const { width, height, data } = grey;
@@ -178,12 +166,8 @@ function tileMax(grey: Plane): number {
 
 /**
  * Decode a cached preview and return its statistics, or `null` when it cannot be
- * measured — a corrupt file in a 43,000-image cache is one `unknown` verdict, not
- * an aborted run.
- *
- * The tiling failure is inside the same `null`, which Python's version is not:
- * there the ValueError escapes `compute_statistics_from_path` and takes the whole
- * scan down with it. One preview under 32 pixels a side is worth one `unknown`.
+ * measured — a corrupt file in a large cache is one `unknown` verdict, not an
+ * aborted run.
  */
 export async function computeStatisticsFromPath(path: string): Promise<FrameStatistics | null> {
   try {

@@ -86,8 +86,8 @@ export function insertPerspective(
  * `optional` is not a parameter: whenever `prompt_markdown` is written it is
  * re-derived from the marker, so a removed marker un-sets optional. See ADR-0012.
  *
- * Mirrors the Python fallback exactly: a zero `changes` count still reports true
- * when the row exists, because writing identical values is not a failure.
+ * A zero `changes` count still returns true when the row exists (writing identical
+ * values is not a failure).
  */
 export function updatePerspective(
   db: Db,

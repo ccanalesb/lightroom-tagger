@@ -88,7 +88,7 @@ export function backupCatalogIfNeeded(
     }
   }
 
-  // Local wall-clock, colons replaced, matching Python's `%Y-%m-%dT%H-%M-%S`.
+  // Local wall-clock timestamp with colons replaced: `YYYY-MM-DDTHH-MM-SS`.
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   const ts =

@@ -1,14 +1,8 @@
 /**
  * Perceptual hash of a file on disk.
  *
- * Split from `phash.ts` so that module stays pure pixel arithmetic and testable
- * from a fixture array; this one is the I/O boundary.
- *
- * Decoding is delegated to sharp, which is safe here and was *verified*: sharp
- * and Pillow produce byte-identical output for JPEG and PNG decode — 0 differing
- * bytes of 2,098,176 on a real cache JPEG. The two disagree on *resize* and
- * *greyscale*, which is why both of those are done by the Pillow-exact code in
- * `pil-resample.ts` rather than by sharp.
+ * Split from `phash.ts` so that module stays pure pixel arithmetic. Decoding uses
+ * sharp; resize and greyscale use `pil-resample.ts` for fixture-exact output.
  */
 import sharp from 'sharp';
 import { phash } from './phash.js';
@@ -39,8 +33,8 @@ async function decodePlane(path: string): Promise<Plane> {
 /**
  * The phash of an image file, or `null` when it cannot be read.
  *
- * `null` rather than throwing, matching Python: a corrupt file in a 43,000-image
- * cache build should skip that image, not abort the run.
+ * Returns `null` rather than throwing so a corrupt file in a large cache build
+ * skips that image instead of aborting the run.
  */
 export async function phashFromFile(path: string): Promise<string | null> {
   try {

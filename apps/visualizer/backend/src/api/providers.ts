@@ -1,12 +1,10 @@
 /**
  * Providers API — list providers, manage models, fallback order and defaults.
  *
- * A fresh `ProviderRegistry` per request, matching `_get_registry()`. That is not
- * an oversight: `providers.json` is user-editable on disk, and a long-lived
- * registry would keep serving a stale copy after the user edited it.
+ * A fresh `ProviderRegistry` per request: `providers.json` is user-editable on disk,
+ * and a long-lived registry would serve a stale copy after edits.
  *
- * These routes read `providers.json` and `visualizer.db`, never `library.db`, so
- * they do not use the library middleware.
+ * These routes read `providers.json` and `visualizer.db`, never `library.db`.
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { existsSync } from 'node:fs';
@@ -56,7 +54,7 @@ function withJobsDb<T>(write: boolean, fn: (db: Db) => T): T {
   }
 }
 
-/** `request.json` is `None` for an absent or unparseable body. */
+/** Returns `null` for an absent or unparseable JSON body. */
 async function readJson(c: { req: { json: () => Promise<unknown> } }): Promise<unknown> {
   try {
     return await c.req.json();
@@ -314,9 +312,7 @@ providersRoutes.openapi(modelsListRoute, async (c) => {
     });
   }
 
-  // The custom order is applied a second time here, after the user models were
-  // appended — `listModels` already ordered the config and discovered ones, and
-  // this pass folds the user additions into the same sequence.
+  // The custom order is applied again after user models are appended.
   return c.json(
     applyModelOrder(modelsList, registry.modelOrderFor(providerId)) as z.infer<
       typeof ProviderModelsListResponse
@@ -417,17 +413,9 @@ const modelDeleteRoute = createRoute({
 });
 
 /**
- * Registered twice, and this one is load-bearing rather than defensive.
- *
- * Model ids contain slashes — `meta/llama-4-maverick-17b-128e-instruct`,
- * `google/gemini-2.5-flash-lite` — which is why Flask declared the segment with the
- * `path:` converter. `@hono/zod-openapi` derives the Hono pattern from the OpenAPI
- * path template, and `{model_id}` becomes a single-segment `:model_id`, so a slashed
- * id would 404.
- *
- * The greedy plain route below handles every request; the `openapi()` registration
- * is what puts the path in the document. Both call the same function, so there is
- * one implementation and no way for them to disagree.
+ * Registered twice: OpenAPI derives `{model_id}` as a single segment, but model ids
+ * contain slashes (`meta/llama-4-maverick-…`). The greedy plain route below handles
+ * requests; the `openapi()` registration puts the path in the document.
  */
 providersRoutes.openapi(modelDeleteRoute, async (c) => {
   const result = await deleteModel(c.req.param('provider_id'), c.req.param('model_id'));

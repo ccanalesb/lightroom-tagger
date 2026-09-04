@@ -6,9 +6,7 @@ import { nowIsoLocal } from '../../utils/datetime.js';
 
 /**
  * Columns stored as JSON text. They are decoded on read; a value that fails to
- * parse is left as the raw string rather than raising, matching the Python
- * `except (JSONDecodeError, TypeError): pass`. Older rows predate the current
- * shape, and a malformed one should not take down the whole page.
+ * parse is left as the raw string rather than raising.
  */
 const JSON_COLUMNS = [
   'composition',
@@ -29,7 +27,7 @@ function decodeJsonColumns(row: DescriptionRow): DescriptionRow {
       try {
         out[col] = JSON.parse(val);
       } catch {
-        // Leave the raw string in place, as Python does.
+        // Leave the raw string in place.
       }
     }
   }
@@ -61,9 +59,8 @@ export interface DescriptionListItem {
 /**
  * Images joined with their descriptions for the descriptions page.
  *
- * Ordering matches Python exactly: described rows first (NULL `described_at`
- * sorts last), then newest description, then newest capture date. The UI depends
- * on undescribed images sinking to the bottom.
+ * Undescribed images sort last (NULL `described_at`), then newest description,
+ * then newest capture date.
  */
 export function getAllImagesWithDescriptions(
   db: Db,
@@ -103,7 +100,8 @@ export function getAllImagesWithDescriptions(
  *
  * Returns `{ match, error }` where `match` is suitable as the sole bound parameter
  * to `... MATCH ?`, or `null` when no FTS filter should apply. `error` is non-null
- * only for the short-query rule (D-12), which the caller turns into a 400.
+ * only for inputs shorter than two characters (D-12), which the caller turns into
+ * a 400.
  *
  * Tokenization: maximal ASCII alphanumeric runs on the trimmed input, so punctuation
  * and FTS/SQL metacharacters can never reach the match string. Tokens shorter than
@@ -138,8 +136,7 @@ export const DESCRIPTION_FTS_KEY_SUBQUERY =
 /**
  * Normalized full-text for summary plus subjects (D-06).
  *
- * Whitespace is collapsed so an FTS token cannot be split by a line break in the
- * model's output.
+ * Whitespace is collapsed so an FTS token cannot be split by a line break.
  */
 export function buildDescriptionSearchDocument(
   summary: string | null | undefined,
@@ -171,8 +168,7 @@ function coerceHasRepetition(value: unknown): number | null {
   if (value === true || value === 1 || value === '1' || value === 'true' || value === 'yes') {
     return 1;
   }
-  // Anything unrecognized becomes 0 rather than null, matching Python: an
-  // unparseable answer means "no repetition observed", not "not asked".
+  // Unrecognized values become 0, meaning "no repetition observed".
   return 0;
 }
 
@@ -200,11 +196,8 @@ export interface DescriptionRecord {
 /**
  * Whether `image_descriptions_fts` is an external-content FTS5 table.
  *
- * The two forms are both in the wild and need opposite removal statements. The
- * production `library.db` carries `content='image_descriptions'`, while
- * `_migrate_image_descriptions_fts` builds a standalone table for fresh databases
- * and only re-runs below `user_version` 3, so an existing catalog keeps whichever
- * form it was created with.
+ * External-content and standalone forms need opposite removal statements; existing
+ * catalogs keep whichever form they were created with.
  */
 function ftsIsExternalContent(db: Db): boolean {
   const row = db

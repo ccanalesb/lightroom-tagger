@@ -1,9 +1,6 @@
 /**
- * Guards the two facts the whole migration rests on, against the real database:
- * that Node's sqlite-vec matches the version Python writes with, and that the
- * `vec0` embeddings Python stored are readable and searchable from here.
- *
- * Skips cleanly when the production library.db is not present (CI, fresh clone).
+ * On-disk compatibility with the real library.db: sqlite-vec version and readable
+ * vec0 embeddings. Skips when the production database is not present.
  */
 import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
@@ -14,7 +11,7 @@ const hasLibrary = existsSync(config.LIBRARY_DB);
 const describeIfLibrary = hasLibrary ? describe : describe.skip;
 
 describe('sqlite-vec', () => {
-  it('is the same version the Python side pins (sqlite-vec==0.1.9)', () => {
+  it('pins sqlite-vec 0.1.9, the version the stored embeddings were written with', () => {
     const db = openLibraryDb(':memory:');
     try {
       const { v } = db.prepare('select vec_version() as v').get() as { v: string };
@@ -33,7 +30,7 @@ describe('sqlite-vec', () => {
 });
 
 describeIfLibrary('live library.db', () => {
-  it('reads CLIP embeddings Python wrote, as 512-d unit vectors', () => {
+  it('reads stored CLIP embeddings as 512-d unit vectors', () => {
     const db = openLibraryDb(config.LIBRARY_DB, { readonly: true });
     try {
       const row = db

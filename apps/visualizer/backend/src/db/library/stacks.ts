@@ -28,10 +28,7 @@ export interface StackMetadata {
 /**
  * Lexicographically largest key, the last-resort representative.
  *
- * Python used `sorted(keys)[-1]`, which orders by Unicode code point; JavaScript's
- * default sort orders by UTF-16 code unit. The two differ only above the BMP, and
- * every key in this catalog is drawn from alphanumerics, `-`, `_`, space and
- * parentheses, so they agree here.
+ * Default string sort matches Unicode code-point order for this catalog's key charset.
  */
 function largestKey(keys: readonly string[]): string {
   return [...keys].sort()[keys.length - 1]!;

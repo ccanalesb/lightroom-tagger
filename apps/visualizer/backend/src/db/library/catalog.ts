@@ -9,12 +9,9 @@ export type Row = Record<string, unknown>;
 /**
  * Columns stored as JSON text and decoded on read.
  *
- * A value that fails to parse is left as the raw string rather than raising,
- * matching Python's `except (JSONDecodeError, TypeError): pass`. `exif` is on this
- * list even though the API contract types it as a string — that is the Python
- * behaviour, and in this catalog the column is empty on every one of the 43,451
- * rows, so the two never actually disagree. Ported as-is rather than "fixed",
- * because a divergence here would be invisible until some future row had JSON in it.
+ * A value that fails to parse is left as the raw string rather than raising.
+ * `exif` is JSON-eligible even though the API types it as a string; in practice
+ * the column is empty on every row.
  */
 const JSON_COLUMNS = ['keywords', 'exif', 'exif_data', 'logs', 'metadata', 'result'] as const;
 
@@ -30,14 +27,13 @@ export function deserializeRow<T extends Row>(row: T): T {
       try {
         (out as Row)[col] = JSON.parse(val);
       } catch {
-        // Leave the raw string in place, as Python does.
+        // Leave the raw string in place.
       }
     }
   }
   for (const col of BOOL_COLUMNS) {
-    // Python coerces `instagram_posted` / `processed` whenever the key is present,
-    // but `is_stack_representative` only when it is also non-null — a null there
-    // means "not part of a stack" and must stay null, not become false.
+    // `is_stack_representative` stays null when absent from a stack; the other bool
+    // columns coerce whenever the key is present.
     if (!(col in out)) continue;
     if (col === 'is_stack_representative' && out[col] === null) continue;
     (out as Row)[col] = Boolean(out[col]);
@@ -69,7 +65,7 @@ export function generateKey(record: { date_taken?: unknown; filename?: unknown }
   return `${datePart}_${record.filename ?? 'unknown'}`;
 }
 
-/** JSON text for a value already stored as text, or `null` — Python's `_serialize_json`. */
+/** JSON text for a value already stored as text, or `null`. */
 function serializeJson(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   return typeof value === 'string' ? value : JSON.stringify(value);
@@ -83,16 +79,10 @@ function bindable(value: unknown): unknown {
 /**
  * `images.id` — the catalog's `AgLibraryFile.id_local` — as an integer bind.
  *
- * Every JavaScript number binds as SQLite REAL, and `id` is a TEXT column, so a
- * plain `100` lands as `'100.0'` where Python's int bind gives `'100'`. That is not
- * cosmetic: `catalog_sync` diffs on this column and parses it back as an integer,
- * so `'100.0'` reads as no id at all and every sync re-fetches the whole catalog.
- * A BigInt is the only way to ask better-sqlite3 for `sqlite3_bind_int64`.
- *
- * The other numeric columns are left alone deliberately. Lightroom types
- * `isoSpeedRating`, `focalLength` and `aperture` as REAL, and the 43,794 rows
- * already in `library.db` read `'800.0'` and `'50.0'` — which is exactly what a
- * double bind produces.
+ * JavaScript numbers bind as SQLite REAL; a plain `100` becomes `'100.0'` in a
+ * TEXT column, and `catalog_sync` diffs parse that as no id. BigInt triggers
+ * `sqlite3_bind_int64`. Other numeric columns stay as doubles — existing rows
+ * already store `'800.0'` and `'50.0'`.
  */
 function bindableCatalogId(value: unknown): unknown {
   if (typeof value === 'number' && Number.isInteger(value)) return BigInt(value);
@@ -173,10 +163,7 @@ const IMAGE_DEFAULTS: Partial<Record<(typeof IMAGE_COLUMNS)[number], unknown>> =
 /**
  * Bind one image's columns by name.
  *
- * Takes `object` rather than `Record<string, unknown>` because the callers pass
- * `CatalogRecord`, a declared interface with no index signature, which does not
- * satisfy that type. The one assertion belongs here, in the module that owns the
- * column mapping, rather than at each call site.
+ * Accepts `object` because callers pass `CatalogRecord`, which has no index signature.
  */
 function imageParams(source: object): Record<string, unknown> {
   const record = source as Record<string, unknown>;
@@ -204,9 +191,7 @@ export function storeImage(db: Db, record: object): string {
 /**
  * Upsert many catalog images through one prepared statement. Returns the count.
  *
- * Python commits inside `store_image`, once per record: 43,000 fsyncs on a first
- * sync, and a run interrupted halfway leaves a partially synced catalog. Here the
- * caller wraps the whole batch in one `libraryWrite`.
+ * Caller wraps the batch in one `libraryWrite` transaction.
  */
 export function storeImagesBatch(db: Db, records: readonly object[]): number {
   const stmt = db.prepare(IMAGE_UPSERT_SQL);
@@ -217,14 +202,9 @@ export function storeImagesBatch(db: Db, records: readonly object[]): number {
 /**
  * Catalog images with no usable vision-cache entry, for `enrich-catalog` to warm.
  *
- * Two passes, as in Python. The first is a plain anti-join. The second reads
- * every row that *claims* a cached file and keeps the ones whose file is gone,
- * which is the case that matters in practice: the cache directory is local and
- * disposable while `vision_cache` is not, so deleting it leaves 43,000 rows
- * pointing at nothing.
- *
- * The second pass therefore stats one file per cached row. That is the cost of
- * the query and there is no cheaper way to ask the question.
+ * Two passes: anti-join for uncached rows, then filesystem check for rows whose
+ * compressed file is gone (the cache directory is disposable while `vision_cache`
+ * is not).
  */
 export function getCatalogImagesMissingCache(db: Db): Row[] {
   const uncached = db
@@ -250,10 +230,7 @@ export function getCatalogImagesMissingCache(db: Db): Row[] {
 
   for (const row of cached) {
     const compressedPath = row['compressed_path'];
-    // The oversized sentinel is not a path, so it never exists and every
-    // oversized image is re-offered on every run. Python does the same, and the
-    // retry is cheap next to being unable to notice a sidecar that has appeared
-    // since — see `isVisionCacheValid`.
+    // The oversized sentinel is not a path; missing files re-offer the image each run.
     if (typeof compressedPath === 'string' && compressedPath && !existsSync(compressedPath)) {
       images.push(deserializeRow(row));
     }

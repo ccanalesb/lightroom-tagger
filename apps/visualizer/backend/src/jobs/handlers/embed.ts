@@ -6,14 +6,8 @@
  * over. That is worth saying in the log, because a run that ends "embedded 40,000"
  * with no visible change otherwise reads like it did nothing.
  *
- * Python buffered eight paths and called `encode_images(paths, batch_size=8)`,
- * with a per-image retry loop for when the batch threw. Neither survives here:
- * `encodeImages` is a sequential loop over `encodePixels` — the ONNX session is
- * already internally threaded, so batching bought only peak memory — which makes
- * the buffer an indirection around a one-element list and the fallback a retry of
- * work that never shared a fate. Encoding one image at a time also drops a
- * double-count in the original, where a file that failed *both* the batch and the
- * retry was tallied under `encode_failed` twice.
+ * Encodes one image at a time; the ONNX session is already internally threaded,
+ * so batching bought only peak memory.
  */
 import type { Db } from '../../db/connection.js';
 import {

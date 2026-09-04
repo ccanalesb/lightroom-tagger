@@ -1,16 +1,8 @@
 /**
- * `enrich-catalog`, reduced to its cache-warming half.
+ * `enrich-catalog` — warm the vision cache.
  *
- * Python's command has two modes. `--cache-only` warms the vision cache, which is
- * what this does. The default mode calls `lightroom/enricher.py`, and that half
- * is deliberately not ported — see `docs/plans/ts-backend-migration.md`. The
- * short version is that it has never run: it stamps `images.analyzed_at` on every
- * image it stores, and that column is NULL on all 43,794 rows.
- *
- * So the flag is accepted and the command always warms the cache, the way `scan`
- * still accepts `--workers`. An existing `enrich-catalog --cache-only` is
- * unchanged; a bare `enrich-catalog` now does the useful half instead of opening
- * an LLM call per image in the catalog.
+ * `--cache-only` and bare `enrich-catalog` both run cache warming; `--catalog` is
+ * accepted but ignored. See `docs/plans/ts-backend-migration.md`.
  */
 import { warmVisionCache } from '../../vision/vision-cache.js';
 import { withLibraryDbAsync } from '../library-db.js';

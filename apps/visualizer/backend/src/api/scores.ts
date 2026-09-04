@@ -44,16 +44,8 @@ function readImageType(raw: string | undefined): { ok: true; value: 'catalog' } 
 }
 
 /**
- * Deliberate narrowing: Flask routed these with the `path:` converter, which also
- * matches slashes. A plain Hono parameter does not.
- *
- * Verified against the catalog: 0 of 43,794 image keys contain a slash, and none in
- * `image_scores` either — keys use only alphanumerics, `-`, `_`, space and
- * parentheses. A plain parameter therefore covers every real key, and avoids the
- * routing hazard a greedy `{.+}` introduces, where `/history` would be swallowed
- * into the key unless route registration order is exactly right.
- *
- * If slashed keys ever become possible, this needs `{.+}` plus an ordering test.
+ * Plain `{image_key}` routing — no greedy `{.+}` — because no catalog keys contain
+ * slashes. A greedy pattern would swallow `/history` unless registration order is exact.
  */
 const historyRoute = createRoute({
   method: 'get',

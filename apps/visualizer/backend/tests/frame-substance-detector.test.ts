@@ -1,18 +1,7 @@
 /**
- * Frame substance detector parity — pins the five statistics against the numpy
- * values in `fixtures/frame-substance/manifest.json`.
- *
- * Every verdict row in `library.db` was written by the numpy detector, so a rerun
- * of this one has to agree with it or the catalog silently re-judges itself. The
- * two pixel fractions are exact rationals and compared exactly; the other three
- * are compared to a relative tolerance because numpy accumulates them in float32
- * and this port accumulates in float64.
- *
- * The manifest is frozen. The numpy detector that produced it was deleted with the
- * Python package, so there is nothing left to regenerate it from — which is the
- * point: it is the independent second opinion this port is measured against. A
- * deliberate threshold change means recovering the detector from git history, not
- * rewriting these numbers from the TypeScript side.
+ * Frame substance detector parity against golden statistics in
+ * fixtures/frame-substance/manifest.json. Verdict rows in library.db depend on these
+ * numbers; pixel fractions are exact, entropy/lap_var/tile_max use relative tolerance.
  */
 import { describe, expect, it } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -77,7 +66,7 @@ describe(`frame substance statistics against numpy ${manifest.numpy}`, () => {
 });
 
 describe('verdict rules over the golden statistics', () => {
-  // Independent of the pixel arithmetic: feed Python's own numbers to the rules.
+  // Verdict rules alone, using golden statistics from the manifest.
   for (const entry of manifest.images) {
     it(`${entry.name} is ${entry.verdict}`, () => {
       expect(classifyVerdict(entry.stats)).toBe(entry.verdict);
@@ -97,7 +86,7 @@ describe('verdict rules over the golden statistics', () => {
 });
 
 describe('detectorVersion', () => {
-  it('reproduces the hash the numpy detector stamps on every verdict row', () => {
+  it('matches the detector_version hash in the manifest', () => {
     expect(detectorVersion()).toBe(manifest.detector_version);
   });
 });
@@ -119,7 +108,7 @@ describe('computeStatisticsFromGreyscale edges', () => {
     });
   });
 
-  it('refuses a frame too small to hold a 32x32 tile grid, as numpy does', () => {
+  it('refuses a frame too small to hold a 32x32 tile grid', () => {
     expect(() => computeStatisticsFromGreyscale(greyPlane(40, 20, () => 7))).toThrow(
       /too small to tile/,
     );

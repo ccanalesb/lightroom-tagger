@@ -256,10 +256,8 @@ export function normalizeStackDetectForce(metadata: Record<string, unknown>): St
 /**
  * `date_taken` as epoch milliseconds, or `null` when it is missing or unparseable.
  *
- * Hand-parsed rather than handed to `new Date()`, which reads a naive
- * `2024-01-10T09:15:00` as *local* time. Python's `fromisoformat` produces a naive
- * datetime that this job then stamps as UTC, so on any machine east or west of
- * Greenwich the two would disagree about where a burst begins.
+ * Hand-parsed rather than `new Date()`, which reads a naive timestamp as local time.
+ * Naive timestamps are treated as UTC so burst boundaries stay consistent across zones.
  */
 export function parseDateTakenUtc(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -420,14 +418,9 @@ export async function runStackDetectPass(
   }
 
   /*
-   * One query where Python ran two — a key list, then the same rows re-fetched in
-   * 500-key `IN (...)` chunks with a fallback row for any key the second query did
-   * not return. Both queries read `images`, so that fallback covers a case the
-   * first query cannot produce.
-   *
-   * Incremental mode only looks at unstacked images, which means a gap is measured
-   * against the unstacked neighbours alone; images still stacked from a previous
-   * run are invisible to it. `force: true` is the global re-scan.
+   * Incremental mode only looks at unstacked images, so gaps are measured against
+   * unstacked neighbours alone; images still stacked from a previous run are invisible.
+   * `force: true` is the global re-scan.
    */
   const rows = db
     .prepare(

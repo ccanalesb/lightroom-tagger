@@ -1,16 +1,9 @@
 /**
  * The background job processor.
  *
- * Structural difference from Python, and it removes a whole class of bug: the
- * Python loop ran on a `threading.Thread` restarted by a watchdog, and
- * `/_processor_health` had to guess which *module instance* held the heartbeat —
- * running `python app.py` registered the server under `__main__` while the
- * blueprint imported a second copy as `app`, so snapshotting the wrong one
- * reported a live processor as dead. Here the loop is an async interval in the one
- * process, and the heartbeat is a module-level object with a single instance.
- *
- * The watchdog survives in spirit: `tick` never throws, and a thrown error is
- * recorded on the heartbeat as `last_error` rather than killing the loop.
+ * The loop is an async interval in one process with a module-level heartbeat.
+ * `tick` never throws; a thrown error is recorded on the heartbeat as `last_error`
+ * rather than killing the loop.
  */
 import { config } from '../config.js';
 import type { Db } from '../db/connection.js';

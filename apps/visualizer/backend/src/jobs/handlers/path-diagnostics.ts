@@ -274,7 +274,7 @@ export class PathSkipDiagnostics {
   }
 }
 
-/** Python renders these counters with `repr(dict)`; the logs are compared by eye. */
+/** Matches the existing log format for skip-reason roll-ups. */
 function formatCounts(counts: SkipReasonCounts): string {
   const body = SKIP_REASON_BUCKETS.map((k) => `'${k}': ${counts[k]}`).join(', ');
   return `{${body}}`;

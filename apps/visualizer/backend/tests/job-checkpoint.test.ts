@@ -1,13 +1,8 @@
 /**
- * Resume checkpoints.
+ * Resume checkpoint fingerprints and canonical JSON.
  *
- * The fingerprint digests below were produced by running Python's
- * `jobs.checkpoint.fingerprint_batch_describe` over the same inputs, and they are
- * golden values on purpose: a job checkpointed by the Flask backend has to resume
- * under this one at cutover rather than re-describing everything, and that holds
- * only while both sides hash identical bytes. `JSON.stringify` differs from
- * `json.dumps` in two ways that matter — key order and non-ASCII escaping — so the
- * last case deliberately carries accented and CJK keys.
+ * Golden digests must stay stable so jobs checkpointed before cutover can resume
+ * without redoing work. Non-ASCII keys test legacy JSON escaping rules.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -45,16 +40,16 @@ const loadPairs = (
   });
 
 describe('canonicalJson', () => {
-  it('sorts keys and escapes non-ASCII the way json.dumps does', () => {
+  it('sorts keys and escapes non-ASCII for stable digests', () => {
     expect(canonicalJson({ b: 1, a: { d: 2, c: 3 } })).toBe('{"a":{"c":3,"d":2},"b":1}');
     expect(canonicalJson({ k: 'Café' })).toBe('{"k":"Caf\\u00e9"}');
-    // Astral characters escape as the surrogate pair, matching Python.
+    // Astral characters escape as a UTF-16 surrogate pair.
     expect(canonicalJson({ k: '\u{1F600}' })).toBe('{"k":"\\ud83d\\ude00"}');
   });
 });
 
 describe('fingerprintBatchDescribe', () => {
-  it('matches the digests Python produces for the same inputs', async () => {
+  it('matches golden digests for the same inputs', async () => {
     await expect(fingerprintBatchDescribe({}, [])).resolves.toBe(
       'a98980d082036758489667bce9bd2543b182f830b86d2c346ede5c837aabd241',
     );
@@ -101,7 +96,7 @@ describe('fingerprintBatchDescribe', () => {
 });
 
 describe('fingerprintBatchScore', () => {
-  it('matches the digests Python produces for the same inputs', async () => {
+  it('matches golden digests for the same inputs', async () => {
     await expect(fingerprintBatchScore({}, [])).resolves.toBe(
       '698ef5bf0a43ef8cae2994b9c90fc124a05386f5a50d261becbb6a9ab0a3ddbd',
     );
@@ -163,7 +158,7 @@ describe('fingerprintBatchScore', () => {
 describe('fingerprintBatchEmbedImage', () => {
   const noWindow = { resolvedMonths: null, resolvedYear: null };
 
-  it('matches the digests Python produces for the same inputs', async () => {
+  it('matches golden digests for the same inputs', async () => {
     await expect(fingerprintBatchEmbedImage({}, [], noWindow)).resolves.toBe(
       'fe6a73865c32858e8090ded4f6fee96197abf1331225b5c850b6d6dfded8d9c6',
     );
@@ -203,7 +198,7 @@ describe('fingerprintBatchEmbedImage', () => {
 });
 
 describe('fingerprintBatchStackDetect', () => {
-  it('matches the digests Python produces for the same inputs', async () => {
+  it('matches golden digests for the same inputs', async () => {
     await expect(
       fingerprintBatchStackDetect([], { resolvedDeltaMs: 2000, forceMode: 'incremental' }),
     ).resolves.toBe('bb8c918ab959d1d0075e25ec09614709de73c034155294043e94ccc13e15e944');
@@ -236,7 +231,7 @@ describe('fingerprintBatchStackDetect', () => {
 });
 
 describe('fingerprintCatalogCacheBuild', () => {
-  it('matches the digests Python produces for the same inputs', async () => {
+  it('matches golden digests for the same inputs', async () => {
     await expect(
       fingerprintCatalogCacheBuild({}, { resolvedMonths: null, resolvedYear: null }),
     ).resolves.toBe('d1437c4a9a2c7fa10220ee5189c20882b49cfcc145fd3ca3801af8f919f4247b');
@@ -254,12 +249,8 @@ describe('fingerprintCatalogCacheBuild', () => {
     ).resolves.toBe('a44e5fec6a2f59207f1d75bcb9ea94c45946d8b1d4cdf98646b0a18457664d15');
   });
 
-  /**
-   * `preserve_edited` is a third stack mode, not a second boolean, but the
-   * fingerprint only records that forcing was asked for — same as Python. Two
-   * runs differing only in which kind of full rebuild they do hash alike.
-   */
-  it('flattens the force flags to booleans, as Python does', async () => {
+  /** force_stack modes collapse to a boolean "forcing was requested" in the fingerprint. */
+  it('flattens the force flags to booleans', async () => {
     const window = { resolvedMonths: null, resolvedYear: null };
     await expect(fingerprintCatalogCacheBuild({ force_stack: true }, window)).resolves.toBe(
       await fingerprintCatalogCacheBuild({ force_stack: 'preserve_edited' }, window),
@@ -436,7 +427,7 @@ describe('buildBatchScoreCheckpointBody', () => {
 });
 
 describe('buildBatchEmbedImageCheckpointBody', () => {
-  /** `processed_pairs` holding bare keys is the shape Flask already wrote. */
+  /** Embed checkpoints store bare keys under the legacy processed_pairs field name. */
   it('stores bare catalog keys under the processed_pairs name', () => {
     expect(
       buildBatchEmbedImageCheckpointBody({
@@ -454,7 +445,7 @@ describe('buildBatchEmbedImageCheckpointBody', () => {
 });
 
 describe('buildBatchStackDetectCheckpointBody', () => {
-  /** A third name for the same list, again because Flask wrote it that way. */
+  /** Stack checkpoints use processed_image_keys for the same list. */
   it('stores catalog keys under processed_image_keys', () => {
     expect(
       buildBatchStackDetectCheckpointBody({

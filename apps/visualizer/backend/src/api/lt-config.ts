@@ -39,7 +39,7 @@ async function readJsonBody(c: { req: { json: () => Promise<unknown> } }): Promi
   try {
     return await c.req.json();
   } catch {
-    // Matches `request.get_json(silent=True)` returning None on unparseable input.
+    // Unparseable JSON body returns null, matching silent-failure semantics elsewhere.
     return null;
   }
 }
@@ -95,7 +95,6 @@ ltConfigRoutes.openapi(putCatalogRoute, async (c) => {
   }
 
   updateConfigYamlCatalogPath(config.LT_CONFIG_YAML, value);
-  // Python writes the stripped value and echoes the stripped value.
   return c.json({ catalog_path: value.trim(), ok: true }, 200);
 });
 
@@ -136,9 +135,7 @@ ltConfigRoutes.openapi(putStackDetectionRoute, async (c) => {
   }
   const value = (data as { stack_burst_delta_ms: unknown }).stack_burst_delta_ms;
 
-  // Python used `type(value) is not int`, which rejects bools (a bool IS an int
-  // subclass, and `type()` is exact) and rejects floats like 2000.0. JSON gives us
-  // numbers, so require an integer-valued number and reject booleans explicitly.
+  // Reject booleans and non-integers; JSON numbers arrive as `number`, not `int`.
   if (typeof value !== 'number' || !Number.isInteger(value)) {
     return c.json({ error: 'stack_burst_delta_ms must be an integer' }, 400);
   }

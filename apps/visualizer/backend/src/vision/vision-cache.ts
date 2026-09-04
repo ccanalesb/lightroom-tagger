@@ -260,9 +260,9 @@ export interface WarmCacheResult {
 /**
  * Build cache entries for catalog images that have none. Backs `enrich-catalog`.
  *
- * Sequential, as Python is: the work is RAW decoding and JPEG compression, which
- * `sharp` and `libraw-wasm` already thread internally, and the originals are on a
- * NAS where concurrent readers make it slower rather than faster.
+ * Sequential: the work is RAW decoding and JPEG compression, which `sharp` and
+ * `libraw-wasm` already thread internally, and the originals are on a NAS where
+ * concurrent readers make it slower rather than faster.
  *
  * An unreachable original is `skipped`, not an error — with the NAS unmounted
  * every image is unreachable, and that is a mount problem the counts should say
@@ -272,7 +272,7 @@ export interface WarmCacheResult {
  */
 export async function warmVisionCache(db: Db, limit?: number | null): Promise<WarmCacheResult> {
   let images = getCatalogImagesMissingCache(db);
-  // Python's `if limit:` — a limit of 0 is falsy there and means "no limit".
+  // A limit of 0 means "no limit".
   if (limit) images = images.slice(0, limit);
 
   let processed = 0;

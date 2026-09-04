@@ -49,14 +49,7 @@ export class StructuredOutputError extends Error {
     this.validationErrors = [...(opts.validationErrors ?? [])];
   }
 
-  /**
-   * The one-line form the job log and the failure reason both show.
-   *
-   * Python folds this into `__str__`, so every `str(exc)` carries the preview.
-   * Here it is a separate method: `error.message` is read directly in far more
-   * places in JS than `str(exc)` is in Python, and widening it would change every
-   * one of them.
-   */
+  /** The one-line form the job log and the failure reason both show. */
   describe(): string {
     const parts = [this.message];
     if (this.validationErrors.length > 0) {
@@ -69,14 +62,7 @@ export class StructuredOutputError extends Error {
   }
 }
 
-/**
- * A payload that did not validate — the signal that repair is worth attempting.
- *
- * Python leans on pydantic's `ValidationError` to mean this and reserves
- * `StructuredOutputError` for terminal failures. The two must stay distinct: the
- * retry path catches one and re-raises the other, so collapsing them would send
- * 512 KB of garbage to the provider for an LLM repair attempt.
- */
+/** A payload that did not validate — the signal that repair is worth attempting. */
 export class ScoreValidationError extends Error {
   readonly issues: string[];
 
@@ -107,10 +93,8 @@ function issueMessages(error: z.ZodError): string[] {
  * Normalize the two ways models break JSON that need no model to fix.
  *
  * The trailing-comma sweep runs to a fixed point because a single pass leaves
- * `,,]` half-cleaned. Its limitation is inherited deliberately: a comma
- * immediately before `}` or `]` *inside a string value* is removed too. That is
- * accepted at this tier — the alternative is a JSON tokenizer, and what this sees
- * are one-line rationales.
+ * `,,]` half-cleaned. A comma immediately before `}` or `]` inside a string value
+ * is removed too; score rationales are one-line strings, so that tradeoff is fine.
  */
 export function repairJsonText(raw: string): string {
   rejectIfTooLarge(raw);
@@ -135,8 +119,6 @@ export function parseScoreResponse(raw: string): ScoreResponse {
   try {
     json = JSON.parse(text);
   } catch (e) {
-    // Pydantic reports a JSON syntax failure as a validation error with an empty
-    // location, so the repair path sees it exactly as it sees a schema violation.
     const detail = `Invalid JSON: ${e instanceof Error ? e.message : String(e)}`;
     throw new ScoreValidationError(detail, [`: ${detail}`]);
   }
@@ -158,9 +140,6 @@ export type LlmFixer = (raw: string, errorSummary: string) => Promise<string> | 
  * which is what `image_scores.repaired_from_malformed` records — that column
  * exists so "how often is this model returning junk?" can be answered from the
  * catalog rather than from logs that have already rotated away.
- *
- * Python accepts a second, non-LLM `fixer` hook here as well. Nothing has ever
- * passed one except its own unit test, so it is not ported.
  */
 export async function parseScoreResponseWithRetry(
   raw: string,

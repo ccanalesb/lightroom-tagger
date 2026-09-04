@@ -1,10 +1,8 @@
 /**
  * SQLite connection helpers.
  *
- * `better-sqlite3` is synchronous, which matches the Python backend's `sqlite3`
- * usage directly — but it means anything long-running must execute on a worker
- * thread, never the HTTP event loop. Job handlers get their own connection per
- * thread, mirroring `JobRunner.thread_db()` in the Python runner.
+ * `better-sqlite3` is synchronous — long-running work must run on a worker thread,
+ * not the HTTP event loop. Job handlers open their own connection per thread.
  */
 import Database from 'better-sqlite3';
 import * as sqliteVec from 'sqlite-vec';
@@ -41,8 +39,8 @@ export function openDb(path: string, opts: OpenOptions = {}): Db {
 /**
  * Open `library.db` with sqlite-vec loaded.
  *
- * The npm `sqlite-vec` package is version-matched to the Python `sqlite-vec==0.1.9`
- * pin, so the `vec0` virtual tables written by either side are mutually readable.
+ * The sqlite-vec pin matches the extension version used to write existing `vec0`
+ * tables, so embeddings remain readable across backends.
  */
 export function openLibraryDb(path: string, opts: OpenOptions = {}): Db {
   return openDb(path, { ...opts, vec: true });

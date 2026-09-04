@@ -1,10 +1,5 @@
 /**
  * Library-DB path resolution and connection lifecycle for the CLI.
- *
- * Python spells this as two decorators, `@map_cli_errors` and
- * `@with_library_db(must_exist=…)`. Here it is one function a command body sits
- * inside, which is the same two jobs — resolve the path, open and always close,
- * turn anything thrown into `Error: …` and exit 1 — without the wrapper layer.
  */
 import { existsSync } from 'node:fs';
 import { openLibraryDb, type Db } from '../db/connection.js';
@@ -30,15 +25,9 @@ export function resolveLibraryDbPath(ctx: CommandContext, opts: { mustExist: boo
 /**
  * Run `body` against an open library DB, closing it whatever happens.
  *
- * `mustExist: false` is `init`, `scan` and `sync`, which are allowed to create
- * the file — so the schema is applied on the way in, the way Python's
- * `managed_library_db` runs `init_database` on every open. Every other command
- * refuses a path that is not there rather than opening an empty database and
- * reporting zero of everything.
- *
- * Only that branch bootstraps. Python applies the schema for `must_exist=True`
- * too, which quietly makes `search` and `stats` writers — they take the WAL
- * writer seat and can seed rows into a database the user only asked to read.
+ * `mustExist: false` bootstraps the schema (`init`, `scan`, `sync`). Other commands
+ * refuse a missing path instead of opening an empty database — applying the schema
+ * on open would make read-only commands writers.
  */
 export function withLibraryDb<T>(
   ctx: CommandContext,
@@ -57,10 +46,8 @@ export function withLibraryDb<T>(
 /**
  * `withLibraryDb` for a body that awaits.
  *
- * A separate function rather than a union return, because the synchronous
- * version's `finally` would close the connection the moment an async body
- * returned its promise — leaving every statement after the first `await` running
- * against a closed database.
+ * A separate function rather than a union return, because the synchronous version's
+ * `finally` would close the connection the moment an async body returned its promise.
  */
 export async function withLibraryDbAsync<T>(
   ctx: CommandContext,

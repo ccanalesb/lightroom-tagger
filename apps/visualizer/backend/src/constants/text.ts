@@ -1,10 +1,8 @@
 /**
  * Shared text-processing constants.
  *
- * A deliberately minimal stopword list, not a full NLTK set: it exists so the
- * Mirror's distinctive-descriptor log-odds are not dominated by articles and
- * pronouns. Extending it would change which descriptors surface, so it stays a
- * verbatim copy.
+ * Minimal stopword list for Mirror distinctive-descriptor log-odds. Extending it
+ * would change which descriptors surface.
  */
 export const EN_STOPWORDS: ReadonlySet<string> = new Set([
   'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of',

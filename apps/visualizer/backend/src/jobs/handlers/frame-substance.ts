@@ -2,10 +2,8 @@
  * Frame substance detection: the batch driver and the `batch_frame_substance`
  * job.
  *
- * The driver lives beside the handler rather than under `imaging/` for the same
- * reason `runDescribePass` lives in `describe.ts`: `batch_analyze` chains it as a
- * stage, and the detector itself — `imaging/frame-substance-detector.ts` — stays
- * free of any database import.
+ * The driver lives beside the handler so composite jobs can chain it as a stage;
+ * the detector itself stays free of database imports.
  *
  * A run rewrites every verdict it judges and records a `frame_substance_runs`
  * row. The guard is advisory by design: a run that trips it still writes its

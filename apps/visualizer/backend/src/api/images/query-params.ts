@@ -11,9 +11,7 @@
  *     distance, so honouring a sort would silently discard the ranking) and instead
  *     supports `dominant_colors`, `mood_tags` and `has_repetition`
  *
- * Flask's parsing conventions are reproduced exactly, including where they are
- * inconsistent: `min_rating` is read with `type=int` and silently becomes `None`
- * when unparseable, while `min_score` returns a 400 for the same input.
+ * `min_rating` silently becomes null when unparseable; `min_score` returns 400.
  */
 import type { CatalogImageFilters } from '../../db/library/catalog-query.js';
 import type { SortByDate, SortByScore } from '../../db/library/catalog-query.js';
@@ -26,8 +24,7 @@ export interface ParamError {
 export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
 /**
- * `"true"` / `"false"` and nothing else. Any other value — including `"1"` and
- * `"yes"` — reads as "filter not applied", matching Flask.
+ * Any value other than `"true"` / `"false"` reads as "filter not applied".
  */
 export function boolTriState(raw: string | undefined): boolean | null {
   if (raw === 'true') return true;
@@ -35,12 +32,7 @@ export function boolTriState(raw: string | undefined): boolean | null {
   return null;
 }
 
-/**
- * `request.args.get(name, type=int)`: an integer or `null`.
- *
- * Mirrors Python's `int()`, which tolerates surrounding whitespace and a sign but
- * rejects anything fractional, so `"5.0"` is not an integer here.
- */
+/** An integer query param, or null when absent or unparseable. */
 export function intOrNull(raw: string | undefined): number | null {
   if (raw === undefined) return null;
   if (!/^\s*[+-]?\d+\s*$/.test(raw)) return null;

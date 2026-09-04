@@ -34,19 +34,13 @@ export const perspectivesRoutes = createOpenApiApp<LibraryEnv>();
 // This group writes (create/update/delete/reset), so the connection is writable.
 perspectivesRoutes.use('/perspectives/*', libraryDb({ write: true }));
 
-// Flask answered the bare form with a 308; keep that rather than 404ing.
+// Bare form redirects with 308 rather than 404ing.
 redirectToTrailingSlash(perspectivesRoutes, '/perspectives');
 
 /**
- * Route paths carry the `/perspectives` prefix and the group mounts at `/api`,
- * rather than mounting at `/api/perspectives` with bare paths.
- *
- * Reason: Flask registered this blueprint with `url_prefix='/api/perspectives'` and
- * a route of `"/"`, so its canonical URL — and the OpenAPI path, and the key in the
- * frontend's generated `api.gen.ts` — is `/api/perspectives/` WITH the trailing
- * slash. Hono's `app.route('/api/perspectives', ...)` collapses a `'/'` child path
- * to `/api/perspectives` without it, which silently breaks the contract. Spelling
- * the full path here makes the emitted path visible in the source.
+ * Route paths include the `/perspectives` prefix because the canonical URL is
+ * `/api/perspectives/` with a trailing slash — mounting at `/api/perspectives` with
+ * a bare `'/'` child would collapse to `/api/perspectives` without it.
  */
 
 const SOURCE_FILENAME_RE = /^[a-zA-Z0-9_-]+\.md$/;
@@ -126,9 +120,8 @@ const createPerspectiveRoute = createRoute({
 });
 
 /**
- * Body validation is hand-rolled rather than declared as a Zod request schema, to
- * preserve the exact error strings the Flask route returned — the frontend and the
- * contract tests assert on them.
+ * Body validation is hand-rolled to preserve the exact error strings the frontend
+ * and contract tests assert on.
  */
 perspectivesRoutes.openapi(createPerspectiveRoute, async (c) => {
   let data: unknown;
@@ -182,10 +175,8 @@ perspectivesRoutes.openapi(createPerspectiveRoute, async (c) => {
   }
 
   const created = getPerspectiveBySlug(db, slug);
-  // Thrown, not returned: spectree documented no 500 for the perspectives routes,
-  // so declaring one here would widen the contract. `app.onError` renders it as the
-  // same 500 body Flask produced. This is a can't-happen read-after-write on the
-  // connection that just wrote the row.
+  // Thrown, not returned: the OpenAPI contract documents no 500 for this route.
+  // Read-after-write on the connection that just wrote the row.
   if (!created) throw new Error('perspective vanished after insert');
   return c.json(rowDetail(created), 201);
 });
@@ -220,7 +211,7 @@ perspectivesRoutes.openapi(updateRoute, async (c) => {
   }
   const body = data as Record<string, unknown>;
 
-  // Absent means "leave alone"; the Flask route keyed off `in data`, not falsiness.
+  // Absent field means "leave alone", not falsy.
   const displayName = 'display_name' in body ? body.display_name : null;
   const description = 'description' in body ? body.description : null;
   const promptMarkdown = 'prompt_markdown' in body ? body.prompt_markdown : null;

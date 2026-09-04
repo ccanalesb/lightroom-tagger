@@ -2,10 +2,8 @@
  * A real `.lrcat` on disk, holding the slice of the Lightroom schema the metadata
  * join touches.
  *
- * Python's tests mock `connect_catalog` and `get_image_by_id` out; a real file
- * costs this fixture and buys the half of the port most likely to be wrong — the
- * join, the `or`-coalescing of every column, and the key each record ends up
- * under, which has to match the 43,451 keys Python already wrote.
+ * Exercises the join, column coalescing, and catalog key format. Synced keys must
+ * match the library's real key count (43,451 in the production corpus).
  */
 import Database from 'better-sqlite3';
 

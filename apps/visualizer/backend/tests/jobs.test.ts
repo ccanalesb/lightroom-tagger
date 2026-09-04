@@ -372,7 +372,7 @@ describe('POST /api/jobs/', () => {
   });
 
   it('422s a body with no type', async () => {
-    // The declared schema rejects it before the handler runs, as spectree did.
+    // Missing type is rejected by schema validation (422).
     expect((await send('POST', '/api/jobs/', {})).status).toBe(422);
   });
 

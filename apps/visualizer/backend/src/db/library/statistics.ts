@@ -36,7 +36,7 @@ export interface CacheStats {
  * Vision cache statistics.
  *
  * `cache_size_mb` sums the on-disk size of each cached JPEG; rows whose file has
- * gone missing contribute nothing rather than throwing, matching the Python version.
+ * gone missing contribute nothing rather than throwing.
  */
 export function getCacheStats(db: Db, cacheDir: string): CacheStats {
   const total = getImageCount(db);

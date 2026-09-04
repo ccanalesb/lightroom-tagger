@@ -1,22 +1,11 @@
 /**
- * phash parity against the values Python stored in `vision_cache`.
+ * phash parity against values stored in `vision_cache`.
  *
- * Subtlety that makes or breaks this test: `vision_cache.get_or_create_cached_image`
- * hashes the *viewable* image, not the compressed cache file —
+ * phash is computed from the viewable image path, not the compressed cache file.
+ * For RAW originals the viewable temp file is gone, so only JPEG originals with
+ * reachable files on disk are comparable here.
  *
- *     viewable_path = get_viewable_path(original_path)
- *     temp_path = compress_image(viewable_path)
- *     phash = compute_phash(viewable_path)
- *
- * For a RAW original the viewable is a temp file that no longer exists, so those
- * rows are unusable here. Only originals that are already JPEG have a reproducible
- * input: `get_viewable_path` returns the original path unchanged for them.
- *
- * Comparing against the cache JPEG instead would be comparing a different image at
- * a different resolution, which looks *almost* right and would quietly certify a
- * broken resampler.
- *
- * Skips unless the real library.db and the referenced originals are reachable.
+ * Skips unless the real library.db and referenced originals are reachable.
  */
 import { describe, expect, it } from 'vitest';
 import { existsSync } from 'node:fs';
@@ -48,7 +37,7 @@ function loadJpegSamples(limit: number): Row[] {
 
     const out: Row[] = [];
     for (const r of rows) {
-      // Only originals PIL itself would have opened directly.
+      // Only JPEG originals have a stable on-disk input for phash.
       const ext = extname(r.filepath).toLowerCase();
       if (ext !== '.jpg' && ext !== '.jpeg') continue;
       if (!existsSync(r.filepath)) continue;
@@ -61,7 +50,7 @@ function loadJpegSamples(limit: number): Row[] {
   }
 }
 
-describeMaybe('phash reproduces the values Python stored', () => {
+describeMaybe('phash reproduces stored vision_cache values', () => {
   it('matches exactly on JPEG originals', async () => {
     const samples = loadJpegSamples(12);
     if (samples.length === 0) {

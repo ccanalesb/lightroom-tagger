@@ -1,11 +1,9 @@
 /**
  * Descriptions API response models.
  *
- * Note the differing strictness, which is deliberate and mirrors pydantic:
- *   - list/envelope models forbid extra properties (`extra='forbid'`)
- *   - the nested description sub-objects IGNORE extras (`extra='ignore'`)
- *   - `ImageDescription` ALLOWS extras (`extra='allow'`) — description rows carry
- *     columns beyond the documented ones and they are passed through
+ * Strictness varies by model: list envelopes forbid extras; nested description
+ * sub-objects ignore them; `ImageDescription` uses `.passthrough()` so undeclared
+ * DB columns pass through.
  */
 import { z } from '@hono/zod-openapi';
 import { PaginationMeta } from './pagination.js';
@@ -63,9 +61,8 @@ export const DescriptionTechnical = z
   .openapi('DescriptionTechnical');
 
 /**
- * `extra='allow'` in pydantic — `.passthrough()` here. Description rows include
- * columns the model does not name (`dominant_colors`, `mood_tags`, …) and the
- * route returns the row as-is, so narrowing this would silently drop data.
+ * Uses `.passthrough()` — description rows include columns beyond those named here,
+ * and narrowing would silently drop data.
  */
 export const ImageDescription = z
   .object({
@@ -91,12 +88,9 @@ export const DescriptionGetResponse = z
   .openapi('DescriptionGetResponse');
 
 /**
- * Not `.strict()`: the pydantic model has no `extra='forbid'`, so an unknown key
- * in the body is ignored rather than rejected. Tightening it would 422 requests
- * Flask accepts.
+ * Not `.strict()` — unknown body keys are ignored, not rejected.
  *
- * `image_type` is validated in the handler, not here — Flask answers 400 with
- * `Invalid image_type: …` for a bad value, and a Zod enum would make it a 422.
+ * `image_type` is validated in the handler (400), not here (422).
  */
 export const DescriptionGenerateRequest = z
   .object({
@@ -105,10 +99,8 @@ export const DescriptionGenerateRequest = z
     model: z.string().nullish().default(null),
     provider_id: z.string().nullish().default(null),
     /**
-     * The model name passed *through* to the provider, distinct from `model`:
-     * `model` sets `DESCRIPTION_VISION_MODEL` for the call and is only honoured
-     * when no `provider_id` is given, while `provider_model` names the model
-     * within an explicitly chosen provider.
+     * Model name passed through to the provider, distinct from `model`:
+     * `model` is only honoured when no `provider_id` is given.
      */
     provider_model: z.string().nullish().default(null),
   })

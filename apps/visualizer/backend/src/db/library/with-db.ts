@@ -4,12 +4,9 @@
  * Implemented as Hono middleware rather than a handler wrapper. A wrapper that
  * returns responses on the handler's behalf erases the typed-response information
  * `@hono/zod-openapi` needs, so the route's declared shapes stop being checked
- * against what it actually returns — which is the one guarantee worth keeping.
- * Middleware owns the 404/500 paths and hands the handler an open connection.
- *
- * Keeps the Flask contract: a missing database is a 404 with the canonical
- * message, any other failure is a 500 carrying the error text, and the connection
- * is always closed.
+ * against what it actually returns. Middleware owns the 404/500 paths and hands
+ * the handler an open connection. A missing database is a 404 with the canonical
+ * message; any other failure is a 500 carrying the error text.
  */
 import type { Env, MiddlewareHandler } from 'hono';
 import { existsSync } from 'node:fs';
@@ -23,7 +20,7 @@ export interface LibraryEnv extends Env {
 }
 
 export interface LibraryDbOptions {
-  /** 404 when `library.db` is absent. Matches `with_db(require_exists=True)`. */
+  /** 404 when `library.db` is absent. */
   requireExists?: boolean;
   /**
    * Open writable. Only for groups that actually mutate.

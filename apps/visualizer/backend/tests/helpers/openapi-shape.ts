@@ -1,22 +1,19 @@
 /**
  * Reduce an OpenAPI schema to a comparable shape.
  *
- * The TypeScript and Flask documents cannot be compared field-for-field, because
- * two differences are unavoidable and neither is a contract change:
+ * Compared against the checked-in document the previous backend exported. Two
+ * emitter differences are normalized away because they do not change the contract:
  *
- *   - **schema names.** spectree hashed every model name by content and duplicated
- *     nested models per parent, so the same `CatalogImage` appears three times as
- *     `CatalogListResponse.573ec44.CatalogImage`,
- *     `CatalogSimilarResponse.573ec44.CatalogImage` and
- *     `StackMembersResponse.b12c71e.CatalogImage`. Zod emits one shared
- *     `CatalogImage` and `$ref`s it. Names are therefore resolved away entirely and
- *     only the resolved structure is compared.
- *   - **spelling of the same constraint.** `int | None` is `anyOf: [integer, null]`
- *     from pydantic and may be `type: [integer, null]` from Zod; both mean the same
- *     thing, so both normalize to the same union.
+ *   - **schema names.** The legacy document duplicated nested models per parent
+ *     (hashed suffixes on each use). The current emitter shares one component
+ *     schema and `$ref`s it. Names are resolved away; only the resolved structure
+ *     is compared.
+ *   - **nullable spelling.** `type: ['integer', 'null']`, `anyOf: [{type:integer},
+ *     {type:null}]`, and `allOf: [{$ref}, {type:null}]` all mean the same nullable
+ *     integer and fold to the same union.
  *
  * Annotations that carry no type information (`title`, `description`, `default`,
- * `examples`) and numeric bounds Zod adds to `z.int()` are dropped: they do not
+ * `examples`) and numeric bounds added to integer fields are dropped: they do not
  * change what `openapi-typescript` generates.
  */
 
@@ -75,11 +72,10 @@ export function shapeOf(schema: unknown, doc: OpenApiDoc, seen: Set<string> = ne
     return shapeOf(target, doc, new Set([...seen, name]));
   }
 
-  // `allOf` here is never a real intersection: it is how a `$ref` gets extra
-  // annotations attached. Zod renders a nullable registered object as
-  // `allOf: [{$ref}, {type: ['object','null']}]`, and pydantic renders the same
-  // thing as `anyOf: [{$ref}, {type: null}]`. Take the substantive member and
-  // carry the nullability across.
+  // `allOf` here is usually annotations on a `$ref`, not a real intersection.
+  // Nullable registered objects often appear as `allOf: [{$ref}, {type: ['object','null']}]`
+  // or `anyOf: [{$ref}, {type: null}]`. Take the substantive member and carry
+  // nullability across.
   if (Array.isArray(s.allOf)) {
     const members = s.allOf.map((m) => shapeOf(m, doc, seen));
     const nullable = members.some(
@@ -120,11 +116,10 @@ export function shapeOf(schema: unknown, doc: OpenApiDoc, seen: Set<string> = ne
   }
 
   if (Array.isArray(s.type)) {
-    // `type: ['array', 'null']` is Zod's spelling of what pydantic writes as
-    // `anyOf: [{type: array, items: ...}, {type: null}]`. Re-normalize each member
-    // against the *whole* schema so `properties` / `items` are not lost — but the
-    // `null` member must not inherit them, or `['array','null']` collapses to a
-    // plain array and the nullability disappears from the comparison.
+    // `type: ['array', 'null']` and `anyOf: [{type: array, items: ...}, {type: null}]`
+    // are the same nullable array. Re-normalize each member against the *whole*
+    // schema so `properties` / `items` are not lost — but the `null` member must
+    // not inherit them, or nullability disappears from the comparison.
     return union(
       (s.type as string[]).map((t) =>
         t === 'null' ? ({ t: 'scalar', type: 'null' } as Shape) : shapeOf({ ...s, type: t }, doc, seen),
@@ -153,8 +148,7 @@ export function shapeOf(schema: unknown, doc: OpenApiDoc, seen: Set<string> = ne
 
   if (typeof s.type === 'string') {
     const out: Shape = { t: 'scalar', type: s.type };
-    // `Literal[...]` renders as `const` in pydantic and as `const` (Zod 4) or a
-    // single-item `enum` (older emitters); fold both into `const`.
+    // Literal values may appear as `const` or as a single-item `enum`; fold both.
     const constValue =
       'const' in s
         ? s.const
@@ -170,8 +164,8 @@ export function shapeOf(schema: unknown, doc: OpenApiDoc, seen: Set<string> = ne
 }
 
 function union(options: Shape[]): Shape {
-  // `Any | None` is just `Any`: pydantic spells it `anyOf: [{}, {type: null}]` and
-  // Zod spells it `{}`, and both accept null. Collapsing keeps the two comparable.
+  // `Any | None` is just `Any`: `{}` and `anyOf: [{}, {type: null}]` both accept
+  // null. Collapsing keeps nullable-any shapes comparable.
   if (options.some((o) => o.t === 'any')) return { t: 'any' };
   const byCanonical = new Map(options.map((o) => [canonical(o), o]));
   const deduped = [...byCanonical.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));

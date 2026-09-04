@@ -45,8 +45,7 @@ describe('GET /api/images/catalog', () => {
     fx.addImages('a');
     const bare = await json<ListBody>(await app.request('/api/images/catalog'));
     const slashed = await json<ListBody>(await app.request('/api/images/catalog/'));
-    // Flask registered both and spectree documented both, so they are two contract
-    // entries rather than one plus a redirect.
+    // Both paths are separate contract entries, not a redirect.
     expect(bare).toEqual(slashed);
     expect(bare.total).toBe(1);
   });
@@ -86,12 +85,10 @@ describe('GET /api/images/catalog', () => {
   });
 
   describe('row shaping', () => {
-    it('exposes pick as the raw integer, matching the Flask wire format', async () => {
+    it('exposes pick as the raw integer wire format', async () => {
       fx.addImage({ key: 'a', pick: 1 });
       const body = await json<ListBody>(await app.request('/api/images/catalog'));
-      // The published schema says boolean, but spectree validated the response
-      // without re-serializing it, so `0`/`1` went out over the wire. Verified
-      // against the running Flask app on the real catalog.
+      // OpenAPI says boolean, but the wire format sends raw 0/1 integers.
       expect(body.images[0]!.pick).toBe(1);
     });
 
@@ -136,8 +133,7 @@ describe('GET /api/images/catalog', () => {
     it('does not add thumbnail_url to list rows', async () => {
       fx.addImages('a');
       const body = await json<ListBody>(await app.request('/api/images/catalog'));
-      // Only similarity, groups and stack members attach it. Verified against the
-      // running Flask app, whose list rows omit the key entirely.
+      // Only similarity, groups, and stack member routes attach thumbnail_url.
       expect('thumbnail_url' in body.images[0]!).toBe(false);
     });
   });
@@ -359,7 +355,7 @@ describe('GET /api/images/catalog', () => {
     });
 
     it('reports the unknown perspective before the missing-perspective rule', async () => {
-      // Both conditions hold; Flask validated the slug first, so that message wins.
+      // When both fail, the unknown perspective error wins over the missing-perspective rule.
       const res = await app.request(
         '/api/images/catalog?score_perspective=nope-xyz&min_score=5',
       );
@@ -547,8 +543,7 @@ describe('PATCH /api/images/catalog/{image_key}/instagram-posted', () => {
 
   it('422s a non-boolean or missing value', async () => {
     fx.addImages('a');
-    // The declared body schema rejects these before the handler runs, as spectree
-    // did in Flask.
+    // The declared body schema rejects these before the handler runs.
     expect((await patch('a', { posted: 'yes' })).status).toBe(422);
     expect((await patch('a', {})).status).toBe(422);
   });
@@ -583,8 +578,7 @@ describe('GET /api/images/catalog/{image_key}/thumbnail', () => {
   });
 
   it('is absent from the OpenAPI document', async () => {
-    // spectree never decorated it — it returns a file, not JSON — so it must not
-    // appear in the contract.
+    // Returns a file, not JSON, so it must not appear in the OpenAPI contract.
     const doc = await json<{ paths: Record<string, unknown> }>(
       await app.request('/apidoc/openapi.json'),
     );
@@ -682,15 +676,14 @@ describe('/api/images/{bad_type}/...', () => {
   it('400s with the legacy message for an unmounted family', async () => {
     const res = await app.request('/api/images/bogus/whatever');
     expect(res.status).toBe(400);
-    // The Python tuple repr is part of what the frontend has been receiving.
+    // The error string uses a tuple repr; the frontend depends on this exact shape.
     expect(await json(res)).toEqual({
       error: "invalid image_type; expected one of ('catalog', 'instagram')",
     });
   });
 
-  it('catches a non-numeric stack id, as Flask did by failing to match', async () => {
-    // `<int:stack_id>` simply did not match, so the request fell through to the
-    // catch-all and got its 400 rather than a 404. Verified against Flask.
+  it('catches a non-numeric stack id with the legacy 400', async () => {
+    // A non-numeric stack id hits the image_type catch-all (400), not stack-not-found (404).
     const res = await app.request('/api/images/stacks/abc/members');
     expect(res.status).toBe(400);
     expect(await json(res)).toEqual({

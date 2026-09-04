@@ -4,9 +4,8 @@
  *
  * These strings are the product, not incidental configuration: they are what
  * decides whether a model returns parseable JSON and whether its critique is
- * useful. They are transcribed verbatim, including the "no flattery, no
- * performative negativity" framing, because changing the wording changes every
- * description and score the catalog holds.
+ * useful. Wording is frozen because changing it changes every description and
+ * score the catalog holds.
  */
 
 const COMPOSITION_BLOCK = `## Composition Analysis

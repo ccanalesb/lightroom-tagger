@@ -1,8 +1,8 @@
 /**
  * System route tests.
  *
- * Fixtures build a real SQLite file rather than mocking the DB layer: the queries
- * are the thing most likely to break in the port, so they must actually run.
+ * Fixtures build a real SQLite file rather than mocking the DB layer so the
+ * queries actually run.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -41,10 +41,7 @@ function seedLibrary(path: string, opts: { images?: number; posted?: number; cac
   db.close();
 }
 
-/**
- * Build the app. Config reads env lazily, so a single import is enough — no
- * module-cache busting required.
- */
+/** Build the app. Config reads env lazily, so a single import is enough. */
 async function freshApp() {
   return createApp();
 }

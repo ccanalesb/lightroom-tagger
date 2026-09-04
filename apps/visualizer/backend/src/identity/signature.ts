@@ -180,7 +180,7 @@ export function computeSignatureStats(scan: MirrorScan): SignatureStats {
       chance_rate: round6(chance),
       z_score: round2(z),
       p_value: round6(pValue),
-      // Compared on the unrounded p-value, as Python does.
+      // Compared on the unrounded p-value.
       crowned: pValue < CROWN_ALPHA && z > 0,
       coverage: round4(coverage),
       low_coverage: coverage < LOW_COVERAGE_THRESHOLD,

@@ -1,14 +1,10 @@
 /**
  * Socket.IO wiring.
  *
- * The server instance is held in a module-level slot rather than threaded through
- * every caller. Emits happen from three places — the jobs routes, the orphan
- * recovery pass and the processor's progress callback — and the alternative was
- * Python's `from app import socketio` late import in each of them.
+ * Module-level server slot so emits from routes, recovery, and the processor do not
+ * need the instance threaded through every caller.
  *
- * `emitJobEvent` is a no-op before the server is attached, which is what makes the
- * routes testable without a live socket: the Python code guarded every emit with
- * `if socketio:` for the same reason.
+ * `emitJobEvent` is a no-op before attach, so routes are testable without a socket.
  */
 import type { Server } from 'socket.io';
 import type { Job } from '../api/schemas/jobs.js';
@@ -41,9 +37,8 @@ export function registerSocketEvents(server: Server): void {
     /**
      * Acknowledge only — cancellation goes through `DELETE /api/jobs/{id}`.
      *
-     * This event re-broadcasts the request to the asking client so the UI can show
-     * "cancelling…" immediately; it deliberately does not touch the database,
-     * because the REST route owns the state transition.
+     * Re-broadcasts to the asking client so the UI can show "cancelling…" immediately;
+     * does not touch the database — the REST route owns the state transition.
      */
     socket.on('cancel_job', (data: { job_id?: string } | undefined) => {
       socket.emit('job_cancel_requested', { job_id: data?.job_id });

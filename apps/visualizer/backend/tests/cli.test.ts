@@ -59,12 +59,7 @@ describe('argv parsing', () => {
     expect(args.local['cache-only']).toBe(true);
   });
 
-  /**
-   * The divergence from Python. argparse reparses a subcommand into a fresh
-   * namespace and copies all of it back, so an absent subcommand `--db`
-   * overwrites the global one with `None` and `--db X search` silently reads
-   * `config.yaml` instead. Both positions work here.
-   */
+  /** Subcommand `--db` overrides the global flag instead of clearing it. */
   it('lets a subcommand flag override a global one, and honours the global alone', () => {
     const overridden = parseArgv(['--db', 'global.db', 'search', '--db', 'local.db'], COMMANDS);
     const globalOnly = parseArgv(['--db', 'global.db', 'search'], COMMANDS);
@@ -95,11 +90,6 @@ describe('run', () => {
     expect(r.text).toContain('enrich-catalog');
   });
 
-  /**
-   * `handler` was nullable while the port was in progress. Every command now
-   * dispatches, so the "not ported yet" branch is gone; this is what stops it
-   * coming back by accident.
-   */
   it('has a handler for every declared command', () => {
     expect(COMMANDS.map((c) => c.name).sort()).toEqual([
       'enrich-catalog',
@@ -131,8 +121,7 @@ describe('run', () => {
   );
 
   it('maps an unexpected throw to Error: … and exit 1', async () => {
-    // A directory is a path that exists, so it clears the must-exist guard and
-    // fails inside the command — the case Python's bare `except Exception` covers.
+    // A directory exists but fails inside the command.
     const fixture = new LibraryFixture();
     try {
       const r = await cli(['stats', '--db', fixture.dir]);
@@ -274,13 +263,8 @@ describe('read-only commands', () => {
     expect(rows[1]).toContain('2026-01-01_a.jpg');
   });
 
-  /**
-   * The one place the CLI does not match Python byte-for-byte. `csv.DictWriter`
-   * `str()`s a decoded column, so Python writes `['sunset', 'beach']` and
-   * `False` where these write JSON and `false`. Asserted so the divergence stays
-   * a decision rather than becoming a surprise.
-   */
-  it('writes JSON and lowercase booleans in CSV where Python writes reprs', async () => {
+  /** CSV export writes JSON-encoded columns and lowercase booleans, not repr-style values. */
+  it('writes JSON and lowercase booleans in CSV export', async () => {
     const out = join(fixture.dir, 'repr.csv');
     await cli(['export', '--db', fixture.dbPath, '--output', out, '--format', 'csv']);
     const body = readFileSync(out, 'utf8');
@@ -289,7 +273,7 @@ describe('read-only commands', () => {
     expect(body).toContain(',false,');
   });
 
-  it('writes no file for an empty CSV export, as Python does', async () => {
+  it('writes no file for an empty CSV export', async () => {
     const out = join(fixture.dir, 'empty.csv');
     const r = await cli([
       'export',
@@ -362,7 +346,7 @@ describe('scan and sync', () => {
     expect(v.lines[1]).toBe('Total images in catalog: 3');
   });
 
-  it('accepts --workers and ignores it, as Python does', async () => {
+  it('accepts --workers and ignores it', async () => {
     const r = await scan('--workers', '8');
     expect(r.code).toBe(0);
     expect(r.lines[1]).toBe('Retrieved 3 image records');
@@ -402,11 +386,7 @@ describe('scan and sync', () => {
     expect(r.text).toBe('Error: No catalog path provided. Use --catalog or config.yaml');
   });
 
-  /**
-   * `must_exist=False` means "create the schema" in Python, because
-   * `managed_library_db` runs `init_database` on the way in. Both commands
-   * therefore have to work against a path that is not there yet.
-   */
+  /** scan and sync create the library schema when pointed at a path that does not exist yet. */
   it.each(['scan', 'sync'])('%s creates the library it is pointed at', async (name) => {
     const fresh = join(fixture.dir, 'fresh.db');
     const r = await cli([name, '--catalog', catalogPath, '--db', fresh]);
@@ -451,9 +431,6 @@ describe('init', () => {
     const r = await cli(['init', '--db', dbPath]);
     expect(r.code).toBe(0);
     expect(r.lines).toEqual([`Initialized database at ${dbPath}`]);
-    // Python's ladder drops a `.pre-key-migration.bak` and an
-    // `instagram-matching-export.json` beside a brand-new file, both backups of
-    // nothing. Nothing here writes anything but the database.
     expect(readdirSync(dir)).toEqual(['library.db']);
   });
 
@@ -486,12 +463,7 @@ describe('init', () => {
   });
 });
 
-/**
- * `enrich-catalog` is the cache-warming half of Python's command. The full
- * enrichment half is not ported — it has never run, and both halves of the proof
- * are asserted here: the flags that selected it are accepted and inert, and
- * nothing the command does touches `images.phash` or `images.analyzed_at`.
- */
+/** `enrich-catalog` warms the vision cache only; it must not touch phash or analyzed_at. */
 describe('enrich-catalog', () => {
   let fixture: LibraryFixture;
   let dir: string;
@@ -596,11 +568,7 @@ describe('enrich-catalog', () => {
     expect(fixture.query('SELECT key FROM vision_cache')).toHaveLength(2);
   });
 
-  /**
-   * `--cache-only` is what the command always does now, and `--catalog` was
-   * already inert in Python — `enrich_catalog_images` takes the path and never
-   * reads it. Both stay accepted so an existing invocation is not rejected.
-   */
+  /** --cache-only and --catalog are accepted for compatibility but do not change behavior. */
   it('accepts --cache-only and --catalog without changing what it does', async () => {
     const path = await writeJpeg('a.jpg');
     fixture.addImage({ key: '2026-01-01_a.jpg', filename: 'a.jpg', filepath: path });
@@ -610,7 +578,6 @@ describe('enrich-catalog', () => {
     expect(r.lines).toEqual(['Processed: 1', 'Skipped: 0', 'Errors: 0']);
   });
 
-  /** The columns the unported half wrote. Nothing here should touch them. */
   it('writes no phash, exif or analyzed_at onto the image row', async () => {
     const path = await writeJpeg('a.jpg');
     fixture.addImage({ key: '2026-01-01_a.jpg', filename: 'a.jpg', filepath: path });

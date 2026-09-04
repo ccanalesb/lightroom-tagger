@@ -101,11 +101,7 @@ describe('PUT /api/config/catalog', () => {
   });
 
   it('rejects a padded path, because validation runs before the trim', async () => {
-    // Faithful to Flask: it checks `value.lower().endswith(".lrcat")` on the RAW
-    // value, so trailing whitespace fails the extension check, and a leading-space
-    // path fails the existence check. The `.strip()` applied when writing is
-    // therefore unreachable for any input that gets that far — vestigial, but kept
-    // so the port stays behaviour-identical rather than quietly more permissive.
+    // Validation runs on the raw path before trim, so padded paths fail the extension check.
     const lrcat = join(dir, 'spaced.lrcat');
     writeFileSync(lrcat, 'x');
 
@@ -132,11 +128,7 @@ describe('PUT /api/config/catalog', () => {
     [{ catalog_path: 5 }, 'a non-string'],
     [{ catalog_path: '/nope/missing.lrcat', extra: 1 }, 'an unexpected field'],
   ])('answers 422 for %o (%s)', async (body, _why) => {
-    // Schema violations are 422, not 400. Verified against the running Flask app:
-    // spectree validated `json=ConfigCatalogPutRequest` before the handler ran, so
-    // the handler's own 'catalog_path is required' / 'must be a string' branches
-    // were already unreachable there. `extra: 1` is 422 because the model sets
-    // `extra='forbid'`.
+    // Schema violations return 422, not 400.
     const res = await put('/api/config/catalog', body);
     expect(res.status).toBe(422);
   });
@@ -194,17 +186,8 @@ describe('PUT /api/config/stack-detection', () => {
     [{ stack_burst_delta_ms: '900' }, 'a numeric string'],
     [{ stack_burst_delta_ms: true }, 'a boolean'],
   ])('answers 422 for %o (%s)', async (body, _why) => {
-    // The first two match Flask exactly (verified: 422 from spectree, since the
-    // model requires an int and pydantic rejects a non-integral float).
-    //
-    // The last two are a deliberate divergence, and the reason is pydantic's lax
-    // mode: it coerced `"900"` to 900 and `true` to 1, so validation *passed* and
-    // the handler then rejected the raw value with its own 400 "must be an
-    // integer". Zod does not coerce, so the rejection happens one layer earlier
-    // and reports 422. Both backends refuse the value; only the status and message
-    // differ. Reproducing pydantic's coercion table in Zod would mean making the
-    // validator disagree with the published schema (which says integer) for every
-    // numeric field in the API, so the schema is taken at its word instead.
+    // Numeric strings and booleans are rejected at schema validation (422); Zod does not
+    // coerce them to integers the way the old backend did before its handler-level 400s.
     const res = await put('/api/config/stack-detection', body);
     expect(res.status).toBe(422);
     // Nothing reached the writer: the file is not even created.

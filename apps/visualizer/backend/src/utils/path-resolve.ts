@@ -13,9 +13,8 @@ import { join } from 'node:path';
 /**
  * Whether `path` is a mount point.
  *
- * Node has no `os.path.ismount`, so this reproduces CPython's `posixpath.ismount`:
- * a non-symlink whose device differs from its parent's, or whose inode equals its
- * parent's (which is how `/` identifies itself).
+ * A non-symlink whose device differs from its parent, or whose inode equals its
+ * parent's (root).
  */
 function isMount(path: string): boolean {
   let s1;
@@ -72,8 +71,7 @@ export function resolveFilepath(path: string): string {
   if (configured && existsSync(configured)) return configured;
 
   try {
-    // Reverse sort so `ccanales-1` (the newer duplicate mount) is preferred over
-    // `ccanales`, matching the Python behaviour.
+    // Reverse sort so `ccanales-1` (newer duplicate mount) is preferred over `ccanales`.
     for (const name of readdirSync('/Volumes').sort().reverse()) {
       if (!name.startsWith(shareName)) continue;
       const candidate = join('/Volumes', name);

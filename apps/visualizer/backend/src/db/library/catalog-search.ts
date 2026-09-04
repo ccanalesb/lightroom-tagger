@@ -1,10 +1,8 @@
 /**
- * Whole-table `images` queries.
+ * Whole-table `images` queries for the CLI.
  *
- * These predate the grid's filter builder and are coarser than it: no paging, no
- * ordering, no joins, `SELECT *` over the whole table. The CLI is the only caller
- * — the HTTP API uses `queryCatalogImages`, which composes its filters — so they
- * are kept apart from `catalog-query.ts` rather than folded into it.
+ * Coarser than the grid filter builder: no paging, ordering, or joins. Kept
+ * separate from `catalog-query.ts`, which serves the HTTP API.
  */
 import type { Db } from '../connection.js';
 import { deserializeRow, type Row } from './catalog.js';
@@ -44,9 +42,7 @@ export function searchByKeyword(db: Db, keyword: string): Row[] {
     params.push(match);
   }
 
-  // `DISTINCT` over `SELECT *`, as Python has it. It cannot deduplicate anything
-  // — `key` is the primary key and the FTS subquery is an `IN`, not a join — but
-  // it is what the stored query plan has always been.
+  // `DISTINCT` is redundant (`key` is PK) but kept for the existing query shape.
   return all(db, `SELECT DISTINCT * FROM images WHERE ${where}`, params);
 }
 

@@ -1,17 +1,6 @@
 /**
- * The `batch_embed_image` job handler, driven through the processor.
- *
- * The CLIP encoder is the one thing stubbed, for the same reason Python
- * monkeypatches `encode_images`: running the real vision tower would download a
- * few hundred megabytes of weights and say nothing about the handler. Everything
- * else is real — a `vec0` table on disk, real JPEGs, the real vision cache — so
- * the parts the port could get wrong actually execute.
- *
- * Two of Python's cases are absent on purpose. Its `no_row` and `empty_path`
- * buckets are reachable only by patching the selection query out: the SQL selects
- * `FROM images` and requires a non-empty `filepath`, so neither can occur through
- * this handler's own work list. The buckets stay in the counters because
- * `PathSkipDiagnostics` is shared, not because embed can produce them.
+ * The `batch_embed_image` handler via the processor. CLIP is stubbed; vec0, JPEGs,
+ * and vision cache are real.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';

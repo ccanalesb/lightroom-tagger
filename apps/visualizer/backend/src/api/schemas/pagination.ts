@@ -3,7 +3,7 @@
  *
  * Lives in its own module rather than under `jobs`: several groups import it, and
  * the module-boundary policy forbids one `api` area importing a sibling.
- * `PaginationMeta` does not forbid extra properties, matching the Python model.
+ * `PaginationMeta` does not forbid extra properties.
  */
 import { z } from '@hono/zod-openapi';
 

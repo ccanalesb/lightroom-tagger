@@ -7,11 +7,8 @@ import { computeImagePeakPercentileScores, type PeakPercentileItem, type PeakPer
 /**
  * Maximum keys per `IN (...)` list.
  *
- * These helpers are called with *every* scored image in the catalog — the Mirror
- * passes all ~29,000 at once — and one bound parameter per key blows SQLite's
- * variable limit. Python got away with it because CPython's bundled SQLite is built
- * with a high `SQLITE_MAX_VARIABLE_NUMBER`; better-sqlite3's answers "too many SQL
- * variables". 900 is under the 999 floor that any SQLite build guarantees.
+ * better-sqlite3 hits SQLite's variable limit with one bound parameter per key.
+ * 900 is under the 999 floor any SQLite build guarantees.
  */
 const KEY_CHUNK = 900;
 
@@ -94,8 +91,7 @@ export function stackNonRepresentativeKeys(db: Db, keys: readonly string[]): Set
  * Stack columns for the given keys.
  *
  * `stack_member_count` comes from the denormalized `image_stacks.stack_size` here,
- * unlike `stackMetadataForApi`, which counts live membership. Kept as-is so the
- * identity payload matches what Flask sent.
+ * unlike `stackMetadataForApi`, which counts live membership.
  */
 export function stackFieldsForImageKeys(
   db: Db,
@@ -133,7 +129,7 @@ export function stackFieldsForImageKeys(
 
 export type RankedItem = PeakPercentileItem & Partial<ImageMeta> & Partial<StackFields>;
 
-/** Compare two strings the way Python's `<` does for ASCII keys. */
+/** Lexicographic string compare for ASCII image keys. */
 function cmpStr(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
@@ -145,9 +141,9 @@ function cmpStr(a: string, b: string): number {
  * percentile stays the primary key, so asking for "oldest" reorders equally-ranked
  * photos rather than turning this into a date listing.
  *
- * The three successive stable sorts reproduce Python's exactly — key ascending,
- * then date, then ranking — which is not the same as one comparator with three
- * clauses when equal ranking values arise from different rounding paths.
+ * Three successive stable sorts — key ascending, then date, then ranking — not
+ * equivalent to one comparator with three clauses when equal ranking values arise
+ * from different rounding paths.
  */
 export function rankBestPhotos(
   db: Db,

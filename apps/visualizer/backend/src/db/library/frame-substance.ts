@@ -167,9 +167,8 @@ export function isFrameSubstanceFlagged(db: Db, imageKey: string): boolean {
 /**
  * Whether the preview the detector judged has since been rebuilt.
  *
- * Compared as *strings*, not dates, because that is what Python did and both
- * columns hold ISO-8601 timestamps, which sort correctly as text. A date parse here
- * would change the answer for rows with differing fractional-second widths.
+ * Compared as strings, not parsed dates — both columns hold ISO-8601 timestamps
+ * that sort correctly as text, including varying fractional-second widths.
  */
 export function isFrameSubstanceVerdictStale(
   db: Db,

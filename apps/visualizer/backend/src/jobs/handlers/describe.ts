@@ -269,9 +269,7 @@ export function selectDescribeCandidates(
     runner.log(jobId, 'warning', BACKFILL_FORCE_CONFLICT_MSG);
   }
 
-  // Two branches where Python has three: its third called
-  // `get_undescribed_catalog_images`, which is `selectCatalogKeys` with
-  // `undescribedOnly` and no year — the same SQL, reached by a different route.
+  // Backfill uses missing visual tags; otherwise undescribed-only unless force/redo.
   const selection = backfillVisualTags
     ? selectCatalogKeysMissingVisualTags(db, { months, year, minRating })
     : selectCatalogKeys(db, { months, year, minRating, undescribedOnly: !selectAll });
@@ -299,11 +297,8 @@ export const ANALYZE_DESCRIBE_CHECKPOINT_MISMATCH =
  * whenever the job has already been settled — completed, cancelled or failed —
  * which is every path a standalone run takes.
  *
- * Concurrency is a bounded async pool over one connection, where Python ran a
- * `ThreadPoolExecutor` with a connection per worker. It can be: the time is spent
- * waiting on the provider's HTTP response, not on CPU or SQLite, so threads bought
- * nothing here — and the pool removes the duplicated sequential branch Python
- * needed for `max_workers == 1`, which had drifted to different log messages.
+ * Concurrency is a bounded async pool over one connection: time is spent waiting on
+ * the provider's HTTP response, not on CPU or SQLite.
  */
 export async function runDescribePass(
   runner: JobRunner,
@@ -398,7 +393,6 @@ export async function runDescribePass(
     };
     if (stage !== undefined) return empty;
     runner.clearCheckpoint(jobId);
-    // The zero-work payload Python completes with omits the echoed knobs.
     runner.completeJob(jobId, {
       described: 0,
       skipped: 0,
@@ -422,9 +416,7 @@ export async function runDescribePass(
   let completed = 0;
   let stop = false;
 
-  // Counted for every run, where Python counts only inside `batch_analyze`. The
-  // number says how much of the catalog was described off an already-compressed
-  // preview instead of the original, which is as worth knowing on its own.
+  // Tracks how many images used an already-compressed preview instead of the original.
   const telemetry: DescribeTelemetry = { silentCompressionSkips: 0 };
 
   /**

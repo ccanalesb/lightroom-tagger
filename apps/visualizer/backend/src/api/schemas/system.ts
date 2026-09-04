@@ -1,11 +1,8 @@
 /**
  * System and cache health API response models.
  *
- * Every model there sets `ConfigDict(extra='forbid')`, which spectree emits as
- * `additionalProperties: false`. `.strict()` is the Zod equivalent — keep it, or the
- * generated frontend types silently widen.
- *
- * Field names stay snake_case: they are the wire contract, not internal naming.
+ * Every model uses `.strict()` (`additionalProperties: false`). Field names stay
+ * snake_case — they are the wire contract.
  */
 import { z } from '@hono/zod-openapi';
 

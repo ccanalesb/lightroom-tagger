@@ -35,10 +35,9 @@ descriptionsRoutes.use('/descriptions/*', libraryDb({ writeForMethods: ['POST'] 
 redirectToTrailingSlash(descriptionsRoutes, '/descriptions');
 
 /**
- * `limit`/`offset` use Flask's `type=int` semantics: an unparseable value falls
- * back to the default rather than erroring. Note this is NOT the clamped
- * `_clamp_pagination` helper — `api/descriptions.py` deliberately does not clamp,
- * so no bounds are imposed here either.
+ * `limit`/`offset` use loose int parsing: an unparseable value falls back to the
+ * default rather than erroring. Unlike the shared pagination helper, no bounds are
+ * imposed here.
  */
 function intArg(raw: string | undefined, fallback: number): number {
   if (raw === undefined || raw === '') return fallback;
@@ -58,10 +57,8 @@ const listRoute = createRoute({
 descriptionsRoutes.openapi(listRoute, (c) => {
   const imageType = c.req.query('image_type');
   // Catalog-only since #218; anything else is a client error, not empty results.
-  //
-  // Thrown rather than returned: spectree documented only 200 and 422 for this
-  // route, so declaring the 400 would change the published contract even though
-  // Flask really does answer 400 here. See `HttpError`.
+  // Thrown rather than returned: the OpenAPI contract documents only 200 and 422.
+  // See `HttpError`.
   if (imageType !== undefined && imageType !== '' && imageType !== 'catalog') {
     throw new HttpError(400, `Invalid image_type: ${imageType}`);
   }
@@ -84,7 +81,7 @@ descriptionsRoutes.openapi(listRoute, (c) => {
         offset,
         limit,
         current_page: Math.floor(offset / limit) + 1,
-        // Python emits 0 pages for an empty result, not 1 — the `if total` guard.
+        // Empty result yields 0 pages, not 1.
         total_pages: total ? Math.floor((total + limit - 1) / limit) : 0,
         has_more: offset + limit < total,
       },
@@ -136,19 +133,15 @@ descriptionsRoutes.openapi(generateRoute, async (c) => {
   const body = c.req.valid('json');
   const providerId = body.provider_id ?? null;
 
-  // Catalog-only since #218. Validated here rather than as a Zod enum because
-  // Flask answers 400 with this message; a schema-level enum would make it a 422.
+  // Catalog-only since #218. Validated here rather than as a Zod enum so bad values
+  // return 400, not 422.
   if (body.image_type !== '' && body.image_type !== 'catalog') {
     return c.json({ error: `Invalid image_type: ${body.image_type}` }, 400);
   }
 
-  // Flask smuggled a bare `model` down to `resolve_model` by setting
-  // `DESCRIPTION_VISION_MODEL` and restoring it in a `finally`. That is a race
-  // between concurrent requests — two describes in flight would read each
-  // other's model — so the model is passed as an argument instead. The result is
-  // identical, because `resolveModel` already ranks an explicit model above the
-  // env var. `provider_model` still wins over `model`, and a bare `model` is
-  // ignored when an explicit `provider_id` is given, both as in Flask.
+  // The model is passed as an argument instead of via env var to avoid races between
+  // concurrent requests. `provider_model` wins over `model`; bare `model` is ignored
+  // when an explicit `provider_id` is given.
   const model = body.provider_model ?? (providerId ? null : body.model ?? null);
 
   const respond = (generated: boolean, desc: unknown) =>
@@ -166,10 +159,7 @@ descriptionsRoutes.openapi(generateRoute, async (c) => {
     if (!outcome.wrote) return respond(false, getImageDescription(db, imageKey));
     return respond(true, getImageDescription(db, imageKey));
   } catch (e) {
-    // Only an explicitly requested provider turns into a 400. Without
-    // `provider_id` the unknown provider came from config, which is a server
-    // fault, so it rethrows to the 500 handler exactly as Flask's bare `raise`
-    // does.
+    // Without `provider_id`, an unknown provider from config is a server fault (500).
     if (e instanceof UnknownProviderError) {
       if (!providerId) throw e;
       return c.json(
@@ -198,8 +188,7 @@ descriptionsRoutes.openapi(generateRoute, async (c) => {
         503,
       );
     }
-    // Everything else — including ProviderTimeoutError and InvalidRequestError,
-    // which Flask also leaves uncaught here — becomes a 500 via `app.onError`.
+    // Unhandled provider errors become 500 via `app.onError`.
     throw e;
   }
 });

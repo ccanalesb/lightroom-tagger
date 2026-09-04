@@ -1,30 +1,14 @@
 /**
  * Single-writer discipline for `library.db`.
  *
- * The Python version needed two things: a process-wide `RLock` (because parallel
- * describe/score threads shared one process and raced the SQLite writer seat) and
- * `BEGIN IMMEDIATE` (because Python's driver auto-opens a *deferred* transaction on
- * the first SELECT, and the later read→write lock upgrade fails instantly with
- * SQLITE_BUSY, ignoring `busy_timeout`).
- *
- * Only the second reason survives the port, and the first one could not be ported
- * even if it mattered:
- *
- *   - better-sqlite3 does not auto-begin a transaction, so there is no deferred read
- *     lock to upgrade. `BEGIN IMMEDIATE` is still used, because it takes the writer
- *     seat up front and *does* honour `busy_timeout` — which is what makes concurrent
- *     writers queue instead of failing.
- *   - a JavaScript mutex would be worthless here: the job engine runs on
- *     `worker_threads`, each with its own connection, and a module-level lock is
- *     per-isolate, not per-process. Cross-thread serialization is SQLite's job, via
- *     the writer seat plus `busy_timeout`.
- *
- * Retries cover the remaining case Python retried: an *external* process holding the
- * writer seat for longer than `busy_timeout`.
+ * Uses `BEGIN IMMEDIATE` to take the writer seat up front; better-sqlite3 does not
+ * auto-begin deferred transactions, but immediate mode still honours `busy_timeout`
+ * when multiple connections contend. Retries cover an external process holding the
+ * lock longer than the timeout. Nested calls reuse the open transaction.
  */
 import type { Db } from '../connection.js';
 
-/** Matches the Python default of 5 attempts. */
+/** Default retry count for lock contention. */
 const DEFAULT_RETRIES = 5;
 
 export interface LibraryWriteOptions {
@@ -54,10 +38,8 @@ function sleepSync(ms: number): void {
 /**
  * Run `fn` inside one `BEGIN IMMEDIATE` transaction on `library.db`.
  *
- * Commits on success, rolls back and rethrows on failure. A nested call reuses the
- * open transaction, matching the Python `in_transaction` check — the outer block
- * still owns commit and rollback, so a nested failure aborts the whole unit rather
- * than half-committing.
+ * Commits on success, rolls back and rethrows on failure. Nested calls reuse the
+ * open transaction — the outer block owns commit/rollback.
  */
 export function libraryWrite<T>(db: Db, fn: () => T, opts: LibraryWriteOptions = {}): T {
   const retries = opts.retries ?? DEFAULT_RETRIES;
@@ -77,10 +59,7 @@ export function libraryWrite<T>(db: Db, fn: () => T, opts: LibraryWriteOptions =
       lastError = err;
       if (isBusy(err) && attempt < retries - 1) {
         opts.log?.('warning', `[library-write] lock busy, retry ${attempt + 1}/${retries}`);
-        // Exponential backoff, as in Python. The jitter term there was
-        // `time.time() % 0.05`, which is a clock-derived pseudo-random spread;
-        // the point is to desynchronize competing writers, so any small spread
-        // does the job.
+        // Exponential backoff with small jitter to desynchronize competing writers.
         sleepSync(100 * 2 ** attempt + attempt * 7);
         continue;
       }

@@ -1,10 +1,8 @@
 /**
  * The per-perspective scoring vision operation.
  *
- * Structurally the twin of `buildDescriptionOpSpec`: same image preparation, same
- * cleanup discipline, same one-call-per-op factory. Only the parser differs, and
- * it differs in a way that matters — a score is validated, and a payload that
- * fails validation gets one repair attempt against the model that produced it.
+ * Same image preparation and cleanup as `buildDescriptionOpSpec`. The parser
+ * validates score output and allows one LLM JSON repair attempt.
  */
 import { unlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';

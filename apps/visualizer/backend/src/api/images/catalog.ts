@@ -1,15 +1,9 @@
 /**
  * Catalog list, thumbnails, CLIP similar, similarity groups, and image detail.
  *
- * Two contract details worth stating up front, because both are easy to break:
- *
- *   - Flask registered the list at BOTH `/api/images/catalog` and
- *     `/api/images/catalog/`, and spectree documented both. They are two entries in
- *     the OpenAPI document and therefore two keys in `api.gen.ts`, so both are
- *     declared here rather than one plus a redirect.
- *   - the thumbnail route is deliberately NOT an `openapi()` route. spectree never
- *     decorated it (it returns a file, not JSON), so it is absent from the document
- *     and must stay absent.
+ * Both `/api/images/catalog` and `/api/images/catalog/` are declared — they are two
+ * contract entries, not a redirect pair. The thumbnail route is not an `openapi()`
+ * route (file response, not JSON).
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { existsSync } from 'node:fs';
@@ -82,14 +76,8 @@ catalogRoutes.use(
 catalogRoutes.use('/images/catalog-similarity-groups', libraryDb());
 
 /**
- * Flask routed these with the `path:` converter, which also matches slashes; a plain
- * Hono parameter does not.
- *
- * Verified against the catalog: 0 of 43,794 image keys contain a slash — they use
- * only alphanumerics, `-`, `_`, space and parentheses. A plain parameter therefore
- * covers every real key and avoids the routing hazard a greedy `{.+}` introduces,
- * where `/similar` would be swallowed into the key unless registration order is
- * exactly right. Slashed keys would need `{.+}` plus an ordering test.
+ * Plain `{image_key}` routing — no catalog keys contain slashes. A greedy `{.+}`
+ * would swallow `/similar` unless registration order is exact.
  */
 const imageKeyParams = z.object({ image_key: z.string() });
 
@@ -104,10 +92,7 @@ const imageKeyParams = z.object({ image_key: z.string() });
  * neither is trustworthy, and without containment this would serve any file the
  * process can read.
  *
- * Cache *generation* is not wired up yet — that needs the RAW decode and
- * compression pipeline. Flask already treated generation as best-effort (it caught
- * every exception and fell through), so the behaviour here is the same one a cache
- * miss produced there: serve the original file.
+ * Cache generation is not wired up yet. On cache miss, serve the original file.
  */
 catalogRoutes.get('/images/catalog/:image_key/thumbnail', (c) => {
   const imageKey = c.req.param('image_key');
@@ -130,9 +115,7 @@ catalogRoutes.get('/images/catalog/:image_key/thumbnail', (c) => {
     if (!filepath || !existsSync(filepath)) return errorNotFound(c, 'file');
     if (!isPathUnderAllowedRoots(filepath, allowed)) return errorNotFound(c, 'file');
 
-    // The declared mimetype is a lie for a RAW original, and it was a lie in Flask
-    // too — `send_file(filepath, mimetype="image/jpeg")`. Left as-is: the browser
-    // sniffs the content, and changing it would alter cached responses.
+    // Declared mimetype is `image/jpeg` even for RAW originals; the browser sniffs content.
     return sendFile(c, filepath, { mimetype: 'image/jpeg' });
   }
 });
@@ -202,7 +185,7 @@ const listResponses = withValidationError({
   400: { description: 'Bad Request', content: jsonBody(ErrorBody) },
 });
 
-// Both forms are in the Flask contract; neither is a redirect to the other.
+// Both forms are in the contract; neither is a redirect to the other.
 const listSlashRoute = createRoute({
   method: 'get',
   path: '/images/catalog/',
@@ -299,8 +282,7 @@ catalogRoutes.openapi(similarRoute, (c) => {
 
 /**
  * Registered at `/api/images/catalog-similarity-groups`, a sibling of the catalog
- * blueprint rather than a child. Flask attached it with `add_url_rule` for exactly
- * that reason, and the path is part of the contract.
+ * routes rather than a child — the path is part of the contract.
  */
 const similarityGroupsRoute = createRoute({
   method: 'get',
@@ -385,12 +367,8 @@ catalogRoutes.openapi(instagramPostedRoute, (c) => {
   const imageKey = c.req.param('image_key');
   const db = c.get('libraryDb');
 
-  // The schema makes `posted` a required boolean, so the Python handler's
-  // 'JSON body required' and 'posted must be a boolean' branches are unreachable
-  // here — a non-boolean is a 422 before the handler runs. Flask reached its 400
-  // for `{"posted": "yes"}` only because spectree had already coerced nothing and
-  // the model was validated separately; verified against the running app, which
-  // answers 400 there. The 400 remains declared because the contract lists it.
+  // The schema requires `posted` as boolean; non-boolean input is 422 before here.
+  // The 400 remains declared because the contract lists it.
   const posted = c.req.valid('json').posted;
 
   if (!getImage(db, imageKey)) return c.json({ error: ERROR_IMAGE_NOT_FOUND }, 404);
@@ -425,8 +403,7 @@ catalogRoutes.openapi(detailRoute, (c) => {
   const imageKey = c.req.param('image_key');
   const db = c.get('libraryDb');
 
-  // Validated before the try block, matching Flask: a bad perspective is a 400 even
-  // though the parameter goes unused below.
+  // Validated before the try block: a bad perspective is 400 even though unused below.
   const sp = validateScorePerspectiveExists(db, c.req.query('score_perspective') ?? null);
   if (sp.error) return c.json({ error: sp.error }, 400);
 
@@ -478,7 +455,6 @@ catalogRoutes.openapi(detailRoute, (c) => {
 
 // --- frame substance --------------------------------------------------------
 
-// Registered last, after the `/{image_key}` catch-all above, so route order in the
-// emitted document matches Flask's. The paths are all deeper than one segment, so
-// the catch-all cannot shadow them either way.
+// Registered last, after the `/{image_key}` catch-all, so route order in the
+// emitted document is stable. The paths are all deeper than one segment anyway.
 registerFrameSubstanceRoutes(catalogRoutes);

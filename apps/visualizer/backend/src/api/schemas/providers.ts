@@ -74,11 +74,8 @@ export const ProviderReorderSuccessResponse = z
   .openapi('ProviderReorderSuccessResponse');
 
 /**
- * These two are bare arrays, not objects.
- *
- * `pydantic.RootModel[list[...]]` in Python; `GET /api/providers/` and
- * `GET /api/providers/{id}/models` really do return a top-level JSON array, so the
- * schema has to be an array rather than something wrapping one.
+ * Top-level JSON arrays, not wrapped objects — matching the wire format of
+ * `GET /api/providers/` and `GET /api/providers/{id}/models`.
  */
 export const ProviderListResponse = z.array(Provider).openapi('ProviderListResponse');
 export const ProviderModelsListResponse = z

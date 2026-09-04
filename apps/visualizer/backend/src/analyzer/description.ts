@@ -10,13 +10,7 @@ import { generateDescription } from '../providers/vision-client.js';
 import type { VisionOpSpec } from '../vision/vision-op.js';
 import { buildDescriptionUserPrompt } from './prompt-builder.js';
 
-/**
- * The legacy monolithic prompt.
- *
- * Superseded by `buildDescriptionUserPrompt`, and kept only as the fallback the
- * vision client uses when no user prompt is supplied — so a caller that forgets
- * to pass one still gets a prompt that asks for the right JSON.
- */
+/** Fallback prompt when no user prompt is supplied. */
 export function buildDescriptionPrompt(): string {
   return buildDescriptionUserPrompt();
 }

@@ -1,8 +1,7 @@
 /**
  * Standardized response helpers.
  *
- * Architectural constraint carried over from the Flask backend: routes must always
- * shape JSON through these helpers, never by hand-rolling a body and status code.
+ * Routes must shape JSON through these helpers, not hand-rolled bodies.
  */
 import type { Context } from 'hono';
 import {
@@ -13,14 +12,9 @@ import {
 } from '../constants/errors.js';
 
 /**
- * An error response whose status the route deliberately does not *declare*.
+ * An error response whose status the route deliberately does not declare in OpenAPI.
  *
- * Some Flask routes returned a status spectree never listed: `GET
- * /api/descriptions/` answers 400 for an unknown `image_type`, but its documented
- * responses are only 200 and 422. Declaring the 400 in `createRoute` would widen
- * the published contract and change `api.gen.ts`; returning it inline would fail
- * the typed-response check against the declared statuses. Throwing it keeps both
- * the behaviour and the document honest — `app.onError` renders it.
+ * Throwing keeps the published contract unchanged while `app.onError` renders it.
  */
 export class HttpError extends Error {
   readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 503;
@@ -102,8 +96,7 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
 
 /**
- * Clamp `limit`/`offset` the same way `utils/pagination._clamp_pagination` does:
- * unparseable values fall back to the defaults rather than erroring.
+ * Clamp `limit`/`offset`: unparseable values fall back to defaults rather than erroring.
  */
 export function clampPagination(
   limit: unknown,
