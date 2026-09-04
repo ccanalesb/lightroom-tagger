@@ -7,7 +7,6 @@
  * drivers the visualizer's `catalog_sync` job already uses.
  */
 import { existsSync } from 'node:fs';
-import type { Db } from '../../db/connection.js';
 import { storeImagesBatch } from '../../db/library/catalog.js';
 import { libraryWrite } from '../../db/library/write.js';
 import { syncCatalog } from '../../lightroom/catalog-sync.js';
@@ -28,27 +27,6 @@ function resolveCatalogPath(ctx: CommandContext): string {
   }
   if (!existsSync(catalogPath)) throw new CliError(`Catalog not found: ${catalogPath}`);
   return catalogPath;
-}
-
-/**
- * Refuse a `library.db` that has no schema in it.
- *
- * Python does not need this: its `managed_library_db` runs `init_database`, so
- * opening a path that is not there builds the whole schema on the way in. TS has
- * no bootstrap yet — `openLibraryDb` opens, and a fresh path yields an empty
- * file — so without this guard `scan` and `sync` would fail on `no such table:
- * images` from somewhere deep in a driver. The guard goes away when `init` lands.
- */
-function requireSchema(db: Db, dbPath: string): void {
-  const table = db
-    .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'images'")
-    .get();
-  if (table === undefined) {
-    throw new CliError(
-      `Database has no schema: ${dbPath}. The TypeScript CLI cannot create one yet; ` +
-        'initialize it with the Python CLI (`lightroom-tagger init`) first.',
-    );
-  }
 }
 
 export function cmdScan(ctx: CommandContext): number {
@@ -72,7 +50,6 @@ export function cmdScan(ctx: CommandContext): number {
   ctx.out(`Retrieved ${records.length} image records`);
 
   return withLibraryDb(ctx, { mustExist: false }, (db, dbPath) => {
-    requireSchema(db, dbPath);
     // One transaction for the batch, where Python commits once per record — the
     // difference `storeImagesBatch` was written for. On a 43,000-image catalog
     // that is one fsync instead of 43,000, and an interrupted run leaves the
@@ -86,8 +63,7 @@ export function cmdScan(ctx: CommandContext): number {
 export function cmdSync(ctx: CommandContext): number {
   const catalogPath = resolveCatalogPath(ctx);
 
-  return withLibraryDb(ctx, { mustExist: false }, (db, dbPath) => {
-    requireSchema(db, dbPath);
+  return withLibraryDb(ctx, { mustExist: false }, (db) => {
     ctx.out(`Syncing catalog: ${catalogPath}`);
     // No progress or cancellation callbacks: this is a foreground command, and
     // the driver only reports through them when a job runner is listening.

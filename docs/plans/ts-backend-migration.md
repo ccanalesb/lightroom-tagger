@@ -524,15 +524,9 @@ repo's slicing convention), not build-then-wire.
    `aperture` as REAL and the 43,794 rows already stored read `'800.0'` and
    `'50.0'` — which is exactly what a double bind produces.
 
-   Still Python only, after checking each one rather than trusting this list —
-   four of the six named here previously were already done or never needed:
-   `enricher` (only `enrich-catalog` calls it), and `init_database` — the
-   `library.db` bootstrap schema and its migration ladder, ~850 lines across
-   `db_init`, `library_bootstrap_schema`, `db_init_migrations` and
-   `db_init_instagram_drop`. Nothing in TS creates a `library.db`; it has only
-   ever opened one Python made. That is fine until `lightroom-tagger init` needs
-   to exist, and it is worth knowing before the cutover, which assumes the file
-   on disk is already at the current schema version.
+   Still Python only, after checking each one rather than trusting this list:
+   `enricher`, which only `enrich-catalog` calls. `init_database` is **done** —
+   see slice 3 below.
 
    `managed_connections` is `db/library/with-db.ts` and the handlers' managed-DB
    helper. `path_utils` is `utils/path-resolve.ts`. `text_constants` is
@@ -585,16 +579,56 @@ repo's slicing convention), not build-then-wire.
    rows, reports the same counts, and is idempotent on a second run on both
    sides. Both `Catalog not found` paths match too.
 
-   The open problem is the fresh-database case. Python's `managed_library_db`
-   runs `init_database`, so its `must_exist=False` means "create the schema";
-   `openLibraryDb` only opens, and a new path yields an empty file. Rather than
-   fail on `no such table: images` from inside a driver, both commands check for
-   the `images` table and say what is wrong, naming the Python `init` as the way
-   out. That guard is temporary and goes away with the bootstrap port.
+   **Slice 3 is done: the bootstrap schema and `init`.** `init` itself is a
+   print in both languages — opening a library DB with `must_exist=False` is what
+   creates the schema — so the slice is `db/library/bootstrap.ts`, and it also
+   retires the temporary no-schema guard slice 2 left in `scan` and `sync`.
 
-   Remaining commands: `init` (needs the bootstrap schema above) and
-   `enrich-catalog`. Both are declared in the registry with `handler: null`, so an
-   unported command says so instead of reading as a typo.
+   Python spells the schema as a base DDL script plus fifteen migration functions
+   replayed on every open. Here it is **one script at `user_version` 8**, because
+   the six migrations that do real work only transform data a database below 8
+   can hold: remapping legacy composite keys (0 → 1), backfilling the FTS index
+   from existing description rows (2 → 3), backfilling blob perspective scores
+   (5 → 6), and exporting then dropping the retired Instagram tables (6 → 7, 7 →
+   8). The one live database has been at 8 for a long time and nothing in TS has
+   ever met another. Meeting one anyway is refused by name — `initLibraryDb`
+   reads `user_version`, and a database that has an `images` table and claims to
+   be older is reported rather than silently stamped current. An *empty* file is
+   not that case, which matters because it is exactly what `openLibraryDb` leaves
+   behind on a path that was not there.
+
+   The schema it writes is the **production** one, not the one Python's
+   `init_database` builds today, and the two differ in one place:
+   `image_descriptions_fts`. `_migrate_image_descriptions_fts` was rewritten to
+   create a standalone FTS5 table but is gated at `user_version` 3, so the real
+   database kept the external-content form it was created with — and the two need
+   opposite delete statements, which is the whole subject of
+   [#303](https://github.com/ccanalesb/lightroom-tagger/pull/303). A new database
+   should be the shape everything is actually tested against. Also unlike Python,
+   nothing is written *beside* the database: its ladder leaves a
+   `library.db.pre-key-migration.bak` and an `instagram-matching-export.json` next
+   to a brand-new file, both backups of nothing, and prints three lines about
+   migrating data that does not exist.
+
+   That claim is not asserted by eye. `tests/library-bootstrap.test.ts` compares
+   every table, column, declared type, null-ness, default and index against the
+   real 638 MB `library.db`, skipping when it is not present. It earned its keep
+   immediately: `perspectives.optional` is **last** in production, because it
+   arrived by `ALTER TABLE`, and column order is the key order of a `SELECT *`
+   row — so the tidier position this port first gave it would have reordered JSON
+   keys the API already emits. End to end, `scan --limit 150` from the real
+   catalog into a path neither CLI had seen writes 150 byte-identical rows on both
+   sides, each into a database at version 8 with the same eight seeded
+   perspectives.
+
+   Seeding is ported as-is, warts included. `perspectives.description` is seeded
+   with the first body line under the heading, which on the three rubrics that
+   carry `<!-- optional: true -->` right after their `#` heading is the marker
+   itself. It is the factory default, the first thing an owner edits, and it only
+   ever runs against an empty table, so there is no parity target for "fixed".
+
+   Remaining command: `enrich-catalog`, declared in the registry with
+   `handler: null` so it says so instead of reading as a typo.
 
    **One deliberate divergence in the shell.** Every global flag is also declared
    by at least one subcommand, and argparse reparses a subcommand into a fresh
@@ -687,6 +721,20 @@ repo's slicing convention), not build-then-wire.
    converges. And when a ported test fails, establish whether Python actually
    passes the same case before assuming the port is wrong; here it was the original
    that was broken.
+
+   The first of those rules now has teeth. `tests/helpers/library-fixture.ts` used
+   to declare the schema by hand and had drifted from what it claimed to mirror:
+   **no named indexes at all**, `image_scores.rationale` and `model_used`
+   nullable where production has them `NOT NULL DEFAULT ''`, and no
+   `uq_image_scores_versioned` — the unique constraint every score upsert
+   conflicts on. It now calls `createLibrarySchema`, the same DDL `init` writes,
+   which made the drift impossible and immediately failed 47 tests that had been
+   seeding rows the real database rejects: `score: 0` alongside `not_attempted`
+   (all 24,881 real not-attempted rows carry a score of 1–5), and pairs of rows
+   differing only by `is_current` (all 1,507 real superseded rows differ by
+   `prompt_version`, which is what the unique constraint is on). Every one was the
+   fixture permitting a row that cannot exist, so the tests were fixed rather than
+   the schema loosened.
 
 ---
 Created using Anthropic Claude. This line should stay on internal versions until a

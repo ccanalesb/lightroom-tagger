@@ -181,13 +181,13 @@ describe('GET /api/images/catalog/{image_key}/frame-substance', () => {
       {
         image_key: 'excused',
         perspective_slug: 'optional-lens',
-        score: 0,
+        score: 4,
         not_attempted: true,
       },
       {
         image_key: 'condemned',
         perspective_slug: 'optional-lens',
-        score: 0,
+        score: 4,
         not_attempted: true,
       },
     );
@@ -221,7 +221,7 @@ describe('GET /api/images/catalog/{image_key}/frame-substance', () => {
     fx.addScores({
       image_key: 'a',
       perspective_slug: 'opt-one',
-      score: 0,
+      score: 4,
       not_attempted: true,
     });
 

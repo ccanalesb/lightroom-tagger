@@ -14,6 +14,7 @@
 import type { LibraryConfig } from '../config.js';
 import type { FlagSpec, ParsedArgs } from './parse.js';
 import { cmdScan, cmdSync } from './commands/catalog.js';
+import { cmdInit } from './commands/init.js';
 import { cmdExport, cmdSearch, cmdStats } from './commands/query.js';
 
 export interface CommandContext {
@@ -105,7 +106,7 @@ export const COMMANDS: readonly CliCommand[] = [
     name: 'init',
     help: 'Initialize database',
     flags: [DB_FLAG],
-    handler: null,
+    handler: cmdInit,
   },
   {
     name: 'stats',

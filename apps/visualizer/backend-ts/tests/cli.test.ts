@@ -6,10 +6,13 @@
  * at a line instead of at a captured stream. `run()` is the whole program below
  * `bin.ts`, so nothing about dispatch or exit codes is stubbed out.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadLibraryConfig, type LibraryConfig } from '../src/config.js';
+import { openLibraryDb } from '../src/db/connection.js';
+import { LIBRARY_SCHEMA_VERSION } from '../src/db/library/bootstrap.js';
 import { parseArgv, UsageError } from '../src/cli/parse.js';
 import { COMMANDS } from '../src/cli/registry.js';
 import { run } from '../src/cli/main.js';
@@ -88,9 +91,9 @@ describe('run', () => {
   });
 
   it('reports an unported command as such, not as an unknown one', () => {
-    const r = cli(['init']);
+    const r = cli(['enrich-catalog', '--db', '/tmp/x.db']);
     expect(r.code).toBe(1);
-    expect(r.text).toBe('Error: init is not ported to the TypeScript CLI yet');
+    expect(r.text).toBe('Error: enrich-catalog is not ported to the TypeScript CLI yet');
   });
 
   it('refuses a command with no database path anywhere', () => {
@@ -380,17 +383,23 @@ describe('scan and sync', () => {
   });
 
   /**
-   * Python's `managed_library_db` runs `init_database`, so `must_exist=False`
-   * means "create the schema". TS has no bootstrap yet, so both commands say so
-   * instead of failing on `no such table: images` from inside a driver.
+   * `must_exist=False` means "create the schema" in Python, because
+   * `managed_library_db` runs `init_database` on the way in. Both commands
+   * therefore have to work against a path that is not there yet.
    */
-  it.each(['scan', 'sync'])('%s refuses a database with no schema', (name) => {
-    const empty = join(fixture.dir, 'empty.db');
-    writeFileSync(empty, '');
-    const r = cli([name, '--catalog', catalogPath, '--db', empty]);
-    expect(r.code).toBe(1);
-    expect(r.text).toContain(`Error: Database has no schema: ${empty}`);
-    expect(r.text).toContain('lightroom-tagger init');
+  it.each(['scan', 'sync'])('%s creates the library it is pointed at', (name) => {
+    const fresh = join(fixture.dir, 'fresh.db');
+    const r = cli([name, '--catalog', catalogPath, '--db', fresh]);
+    expect(r.code).toBe(0);
+    const db = openLibraryDb(fresh);
+    try {
+      expect(db.pragma('user_version', { simple: true })).toBe(LIBRARY_SCHEMA_VERSION);
+      expect(
+        db.prepare('SELECT COUNT(*) AS cnt FROM images').get(),
+      ).toEqual({ cnt: 3 });
+    } finally {
+      db.close();
+    }
   });
 
   it('reports an unreadable catalog without a stack trace', () => {
@@ -407,6 +416,55 @@ describe('scan and sync', () => {
     const r = cli(['scan', '--catalog', fixture.dir, '--db', fixture.dbPath]);
     expect(r.code).toBe(1);
     expect(fixture.query('SELECT key FROM images')).toHaveLength(0);
+  });
+});
+
+describe('init', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'lt-init-'));
+  });
+
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('creates a database and says where, and only that', () => {
+    const dbPath = join(dir, 'library.db');
+    const r = cli(['init', '--db', dbPath]);
+    expect(r.code).toBe(0);
+    expect(r.lines).toEqual([`Initialized database at ${dbPath}`]);
+    // Python's ladder drops a `.pre-key-migration.bak` and an
+    // `instagram-matching-export.json` beside a brand-new file, both backups of
+    // nothing. Nothing here writes anything but the database.
+    expect(readdirSync(dir)).toEqual(['library.db']);
+  });
+
+  it('creates the parent directory when it is not there', () => {
+    const dbPath = join(dir, 'nested', 'deeper', 'library.db');
+    expect(cli(['init', '--db', dbPath]).code).toBe(0);
+    expect(existsSync(dbPath)).toBe(true);
+  });
+
+  it('is idempotent, and does not re-seed perspectives an owner deleted', () => {
+    const dbPath = join(dir, 'library.db');
+    cli(['init', '--db', dbPath]);
+
+    const db = openLibraryDb(dbPath);
+    const seeded = (db.prepare('SELECT COUNT(*) AS cnt FROM perspectives').get() as { cnt: number })
+      .cnt;
+    db.prepare("DELETE FROM perspectives WHERE slug = 'street'").run();
+    db.close();
+    expect(seeded).toBeGreaterThan(0);
+
+    const again = cli(['init', '--db', dbPath]);
+    expect(again.code).toBe(0);
+    expect(again.lines).toEqual([`Initialized database at ${dbPath}`]);
+
+    const reopened = openLibraryDb(dbPath);
+    expect(
+      (reopened.prepare('SELECT COUNT(*) AS cnt FROM perspectives').get() as { cnt: number }).cnt,
+    ).toBe(seeded - 1);
+    reopened.close();
   });
 });
 

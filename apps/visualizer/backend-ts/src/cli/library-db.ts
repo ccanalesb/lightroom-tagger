@@ -9,6 +9,7 @@
  */
 import { existsSync } from 'node:fs';
 import { openLibraryDb, type Db } from '../db/connection.js';
+import { initLibraryDb } from '../db/library/bootstrap.js';
 import type { CommandContext } from './registry.js';
 import { stringFlag } from './parse.js';
 
@@ -30,9 +31,15 @@ export function resolveLibraryDbPath(ctx: CommandContext, opts: { mustExist: boo
 /**
  * Run `body` against an open library DB, closing it whatever happens.
  *
- * `mustExist: false` is `init` and `sync`, which are allowed to create the file;
- * every other command refuses a path that is not there rather than opening an
- * empty database and reporting zero of everything.
+ * `mustExist: false` is `init`, `scan` and `sync`, which are allowed to create
+ * the file — so the schema is applied on the way in, the way Python's
+ * `managed_library_db` runs `init_database` on every open. Every other command
+ * refuses a path that is not there rather than opening an empty database and
+ * reporting zero of everything.
+ *
+ * Only that branch bootstraps. Python applies the schema for `must_exist=True`
+ * too, which quietly makes `search` and `stats` writers — they take the WAL
+ * writer seat and can seed rows into a database the user only asked to read.
  */
 export function withLibraryDb<T>(
   ctx: CommandContext,
@@ -40,7 +47,7 @@ export function withLibraryDb<T>(
   body: (db: Db, dbPath: string) => T,
 ): T {
   const dbPath = resolveLibraryDbPath(ctx, opts);
-  const db = openLibraryDb(dbPath);
+  const db = opts.mustExist ? openLibraryDb(dbPath) : initLibraryDb(dbPath);
   try {
     return body(db, dbPath);
   } finally {

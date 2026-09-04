@@ -170,7 +170,9 @@ describe('GET /api/images/catalog', () => {
       fx.addImages('a');
       fx.addPerspectives({ slug: 'street' });
       fx.addScores(
-        { image_key: 'a', perspective_slug: 'street', score: 10, is_current: false },
+        // The superseded row carries the older `prompt_version`, which is what
+        // makes it a second row at all under `uq_image_scores_versioned`.
+        { image_key: 'a', perspective_slug: 'street', score: 10, prompt_version: 'v0', is_current: false },
         { image_key: 'a', perspective_slug: 'street', score: 3 },
       );
       const body = await json<ListBody>(await app.request('/api/images/catalog'));
@@ -462,7 +464,7 @@ describe('GET /api/images/catalog/{image_key}', () => {
     fx.addPerspectives({ slug: 'street' }, { slug: 'optional-lens', optional: true });
     fx.addScores(
       { image_key: 'a', perspective_slug: 'street', score: 4 },
-      { image_key: 'a', perspective_slug: 'optional-lens', score: 0, not_attempted: true },
+      { image_key: 'a', perspective_slug: 'optional-lens', score: 4, not_attempted: true },
     );
     const body = await json<Record<string, unknown>>(await app.request('/api/images/catalog/a'));
     // A placeholder for an excusable dimension must not drag the mean to 2.

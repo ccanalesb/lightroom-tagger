@@ -20,7 +20,9 @@ describe('GET /api/scores/{image_key}', () => {
     fx.addScores(
       { image_key: 'img1', perspective_slug: 'zebra', score: 7 },
       { image_key: 'img1', perspective_slug: 'alpha', score: 9 },
-      { image_key: 'img1', perspective_slug: 'alpha', score: 3, is_current: false },
+      // A superseded row differs from the current one by `prompt_version`; the
+      // unique constraint is on that tuple, so there is no other way to hold two.
+      { image_key: 'img1', perspective_slug: 'alpha', score: 3, prompt_version: 'v0', is_current: false },
       { image_key: 'other', perspective_slug: 'alpha', score: 1 },
     );
 
@@ -98,6 +100,7 @@ describe('GET /api/scores/{image_key}/history', () => {
         perspective_slug: 'alpha',
         score: 3,
         scored_at: '2026-01-01T00:00:00+00:00',
+        prompt_version: 'v0',
         is_current: false,
       },
       {
