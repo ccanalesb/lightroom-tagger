@@ -28,9 +28,8 @@ export interface LibraryDbStatus {
 
 /**
  * The repo-level `config.yaml`, resolved from the repo root rather than the working
- * directory. The backend's cwd is usually `apps/visualizer/backend`, where no
- * `config.yaml` exists — which is exactly how the old relative-path default broke
- * job handlers.
+ * directory. The backend's cwd is its own package directory, where no `config.yaml`
+ * exists — which is exactly how the old relative-path default broke job handlers.
  */
 const REPO_CONFIG_YAML = join(REPO_ROOT, 'config.yaml');
 

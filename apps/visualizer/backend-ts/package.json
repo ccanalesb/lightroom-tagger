@@ -17,8 +17,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "//test:parity": "Needs the real library.db, passed via LIBRARY_DB. Every request the parity tests make is a GET, so it cannot modify the catalog.",
-    "test:parity": "LT_CATALOG_PARITY=1 LT_CLIP_PARITY=1 vitest run",
+    "//test:parity": "Needs the real library.db, passed via LIBRARY_DB. Reads only, so it cannot modify the catalog.",
+    "test:parity": "LT_CLIP_PARITY=1 vitest run",
     "export:openapi": "tsx scripts/export-openapi.ts"
   },
   "dependencies": {

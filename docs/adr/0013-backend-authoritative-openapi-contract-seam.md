@@ -38,6 +38,30 @@ Coverage is **incremental**: V1 protects the Jobs group only (`api/jobs.py`, eig
 - **Negative:** `api.ts` remains a mix of generated (Jobs) and hand-written (everything else) until V7 — do not claim the contract is complete until then.
 - **Operational:** Agents and sandcastle runners must not commit under `.github/workflows/`; the drift gate ships as `.sandcastle/ci-drift-gate.yml` for human installation.
 
+## Addendum — TypeScript cutover (2026-09)
+
+The invariant is unchanged; the tooling under it moved when the Flask backend was
+replaced. Response shapes are now **zod schemas** registered on their route with
+`@hono/zod-openapi` rather than pydantic models registered with spectree, and the
+backend half of the drift gate is `vitest` rather than pytest with spectree
+response validation.
+
+| Piece | Was | Now |
+|---|---|---|
+| Schema registry | `backend/api/openapi.py` | `backend-ts/src/api/openapi.ts` |
+| Schemas | `backend/api/schemas/` (pydantic) | `backend-ts/src/api/schemas/` (zod) |
+| OpenAPI export | `backend/scripts/export_openapi.py` | `backend-ts/scripts/export-openapi.ts` |
+
+Two things about the emitted document changed with the toolchain, and both reached
+the committed `api.gen.ts`. spectree namespaced every component per blueprint
+(`Stats.36cf89b`); the new document names each schema once. And pydantic wrote
+`"default": null` for `x: T | None = None`, which `openapi-typescript` promotes to a
+required property — so a handful of optional fields had been typed as always
+present. Neither was a wire change.
+
+Coverage is no longer incremental: all 52 paths are generated, and
+`frontend/src/services/api.ts` has no hand-written response interfaces left.
+
 ## References
 
 - Parent PRD: GitHub issue #57 (frontend↔backend contract seam)

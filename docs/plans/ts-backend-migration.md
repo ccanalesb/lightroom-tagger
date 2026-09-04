@@ -695,8 +695,74 @@ repo's slicing convention), not build-then-wire.
    been more code than fixing it. Filed against the Python CLI, which is the one
    shipping until cutover, as
    [#305](https://github.com/ccanalesb/lightroom-tagger/issues/305).
-7. **Cutover** — back up `library.db`, point the Vite proxy at the TS backend, and
-   delete the Flask tree. No CLIP reindex: embeddings are already drop-in compatible.
+7. **Cutover — done.** `library.db.pre-ts-cutover.bak` is the backup. No CLIP
+   reindex was needed: embeddings were drop-in compatible, as predicted.
+
+   The Vite proxy needed no change at all — it already targeted 5001, and
+   `config.ts` kept the `FLASK_PORT` name so an existing `.env` keeps working.
+   What did need pointing were the three things that still reached into the
+   Flask tree: `make dev` and `restart-backend.sh` (now `node
+   --env-file-if-exists=.env --import tsx src/server.ts`, with Node port probes
+   instead of Python ones, so the dev loop needs no virtualenv),
+   `generate-api-types.mjs` (now `backend-ts/scripts/export-openapi.ts`), and CI.
+
+   **Switching the OpenAPI source found two contract differences that had been
+   hiding behind spectree.** Neither is a wire change; both reached the
+   committed `api.gen.ts`. spectree namespaced every component per blueprint —
+   `Stats.36cf89b`, `IdentityBestPhotosResponse.00d7522.IdentityBestPhotoItem` —
+   and the frontend's alias layer in `src/types/` was keyed on those hashes; the
+   TS document names each schema once, and nested ones flatten to their leaf.
+   And pydantic wrote `"default": null` for `model: str | None = None`, which
+   `openapi-typescript` promotes to a **required** property, so the frontend
+   believed `ProviderDefaultsEntry.model` was always present. The route returns
+   `jsonify(registry.defaults)` — the raw config dict — so it never was unless
+   `providers.json` set it, and two `setModelId((m) => m ?? d.model)` call sites
+   were reading `undefined` through a type that said they could not.
+
+   Cutover was verified against a copy of the real 638 MB `library.db` before
+   anything was deleted: 25 collection routes and 8 per-image routes all answer
+   200, the thumbnail route serves a 107 KB JPEG out of the RAW cache, and the
+   catalog parity suite ran 936/937 — the single failure being `/api/stats`
+   echoing back the temp `db_path` the fixture was not captured with.
+
+   **CI drops Python entirely.** With it goes `contract-tests.txt`, the
+   hand-maintained pytest subset: it existed because CI could not afford all 438
+   backend tests, and vitest runs all 891 in four seconds. The two Flask
+   baselines went too — `flask-openapi.json` and `flask-catalog-parity.json`,
+   both of which said "delete at cutover" — and with them
+   `openapi-contract.test.ts` and `catalog-parity.test.ts`. There is no longer an
+   external contract to hold to; TS is the contract, and `git diff --exit-code
+   src/types/api.gen.ts` is the gate.
+
+   Four Python guardrail tests died with the Flask tree they parsed. Two are now
+   structural — `JOB_TYPES` is the only thing typed to hold a handler,
+   `withLibraryDb` the only export handing out a connection — and two, the
+   transitions seam and the "no hand-written response interfaces in `api.ts`"
+   rule, are conventions with nothing behind them. Filed as
+   [#306](https://github.com/ccanalesb/lightroom-tagger/issues/306).
+
+   **`lightroom_tagger/` is still on disk, and deliberately so.** Of its 79
+   modules, ten are unported, and seven of those are safe to lose: `schema.py`
+   and `schema_explorer.py` are byte-identical copies of a `.lrcat` explorer
+   nothing imports, `cleanup_wrong_links.py` is a spent one-off repair,
+   `extract_exif` was only ever called by the enricher, `cancel_scope.py` was
+   Flask-only, and `enricher.py` is the `enrich-catalog` half slice 4 already
+   argued against. The other three are the `library.db` **migration ladder**.
+   `bootstrap.ts` creates the schema at version 8 and refuses anything below it,
+   pointing the user at Python `init` — and while the live catalog is at 8, two
+   of the owner's own backups are not (`pre-drop-228.bak` is v6,
+   `pre-key-migration.bak` is v0). Deleting the package makes those unopenable.
+   `core/providers.json` and `core/providers.example.json` are also still read at
+   runtime by `config.ts` and `providers/registry.ts`.
+
+   Left broken rather than fixed blind: `scripts/verify_readme.py`, whose CLI
+   oracle is the Python command registry and whose clean-clone smoke boots
+   `backend/app.py`. Nothing calls it any more — the README reference is gone and
+   the guardrail test that ran it was deleted with the Flask tree. The three
+   perspective scripts (`sync_perspectives.py`, `seed_yt_perspectives.py`,
+   `merge_perspectives_6_to_4.py`) still import `lightroom_tagger.core.database`
+   and still work. `check_core_file_sizes.sh` caps a tree nothing builds from.
+   `ollama_autopilot.py` is a pure HTTP client and is unaffected.
 
 ## Risks
 

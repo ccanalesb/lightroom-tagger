@@ -66,8 +66,6 @@ Thumbs.db
 logs
 *.log
 *.db
-# Committed E2E library seed (exception to *.db)
-!apps/visualizer/backend/tests/e2e/fixtures/library_seed.db
 instructions.md
 skills-lock.json
 .agents/
@@ -95,8 +93,8 @@ lightroom_tagger/core/providers.json
 .agent-browser-shots/*
 config.yaml
 .env
-apps/visualizer/backend/*.crt
-apps/visualizer/backend/*.key
+apps/visualizer/backend-ts/*.crt
+apps/visualizer/backend-ts/*.key
 .codebuddy/*
 .claude/*
 .augment/*
