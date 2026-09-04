@@ -278,7 +278,7 @@ repo's slicing convention), not build-then-wire.
    | frame substance | done, including the `.lrcat` keyword writer |
    | jobs | routes, runner and processor done; handlers landing one family at a time (step 4) |
 
-   The route surface being complete does not mean the backend is: six of the
+   The route surface being complete does not mean the backend is: five of the
    eleven `JOB_TYPES` still carry `handler: null`, so those jobs fail on enqueue.
    That is step 4.
 3. **Job engine — done.** worker_threads runner, `JOB_TYPES` registry, transitions
@@ -302,7 +302,8 @@ repo's slicing convention), not build-then-wire.
    | embed | `batch_embed_image` | done |
    | stacks | `batch_stack_detect`, `batch_catalog_similarity` | done |
    | stacks | `catalog_cache_build` | blocked — its first stage is `catalog_sync` |
-   | score | `single_score`, `batch_score` | not started — needs `scoring_service` (step 5) |
+   | score | `single_score` | done, with the scoring library core underneath it |
+   | score | `batch_score` | not started — the pass, checkpoint and pool around `scoreImageForPerspective` |
    | analyze | `batch_analyze` | not started — composes the describe and score passes |
    | frame substance | `batch_frame_substance` | not started — needs the detector (step 5) |
    | catalog | `catalog_sync` | not started — needs `catalog_sync` (step 5) |
@@ -337,6 +338,27 @@ repo's slicing convention), not build-then-wire.
    sub-millisecond precision, because the gap is compared against `delta_ms` as a
    float.
 
+   Scoring brought its own library core with it — `structured-output.ts`,
+   `analyzer/scoring.ts`, the four `image_scores` write helpers and
+   `vision/scoring-service.ts` — because `single_score` is the only thing that
+   has ever called it. Two departures. Python's
+   `parse_score_response_with_retry` takes *two* repair hooks, a plain `fixer`
+   and an `llm_fixer`; nothing has ever passed the first except its own unit
+   test, so only the LLM one is ported. And Python's single `ValidationError`
+   role is split in two: `ScoreValidationError` means "worth repairing" and
+   `StructuredOutputError` means "give up", which pydantic gets for free and
+   here has to be explicit. Collapsing them would send half a megabyte of
+   garbage to the provider for a repair attempt, since the size gate raises the
+   terminal one.
+
+   One thing the port found, worth knowing before writing any more timestamps:
+   `image_scores.scored_at` is the **only** column Python writes through
+   `.replace(microsecond=0)`. Every other UTC column keeps its fractional part.
+   These columns are compared and sorted as text, so a millisecond field on a
+   new score would order it against existing rows wrongly —
+   `nowIsoUtcSeconds` exists for that one column, and `utils/datetime.ts` said
+   the opposite until now.
+
    Three things deliberately left out, all for callers that do not exist yet.
    `batch_analyze` will need `runDescribePass` generalized with the
    `progress_range` / `log_prefix` / nested-checkpoint options Python carries.
@@ -357,11 +379,12 @@ repo's slicing convention), not build-then-wire.
    re-describing 40,000 images, and `JSON.stringify` differs from Python on both
    key order and non-ASCII escaping.
 5. **Library core — partly done.** The `library.db` read/write seam, providers,
-   vision op, identity, imaging and the Lightroom writer are ported. Still Python
-   only: `scoring_service` / `score_perspective` / `structured_output`,
-   `catalog_sync`, `frame_substance_detector` and `frame_substance_batch`,
-   `lightroom/reader` + `enricher` + `schema`, and the small shared utilities
-   (`managed_connections`, `path_utils`, `cancel_scope`, `text_constants`).
+   vision op, identity, imaging, the Lightroom writer and the scoring stack
+   (`scoring_service`, `score_perspective`, `structured_output`) are ported.
+   Still Python only: `catalog_sync`, `frame_substance_detector` and
+   `frame_substance_batch`, `lightroom/reader` + `enricher` + `schema`, and the
+   small shared utilities (`managed_connections`, `path_utils`, `cancel_scope`,
+   `text_constants`).
 6. **CLI** — replaces the `lightroom-tagger` console script. Not started.
 7. **Cutover** — back up `library.db`, point the Vite proxy at the TS backend, and
    delete the Flask tree. No CLIP reindex: embeddings are already drop-in compatible.
