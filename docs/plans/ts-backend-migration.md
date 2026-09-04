@@ -278,7 +278,7 @@ repo's slicing convention), not build-then-wire.
    | frame substance | done, including the `.lrcat` keyword writer |
    | jobs | routes, runner and processor done; handlers landing one family at a time (step 4) |
 
-   The route surface being complete does not mean the backend is: four of the
+   The route surface being complete does not mean the backend is: three of the
    eleven `JOB_TYPES` still carry `handler: null`, so those jobs fail on enqueue.
    That is step 4.
 3. **Job engine — done.** worker_threads runner, `JOB_TYPES` registry, transitions
@@ -303,7 +303,7 @@ repo's slicing convention), not build-then-wire.
    | stacks | `batch_stack_detect`, `batch_catalog_similarity` | done |
    | stacks | `catalog_cache_build` | blocked — its first stage is `catalog_sync` |
    | score | `single_score`, `batch_score` | done, with the scoring library core underneath them |
-   | analyze | `batch_analyze` | not started — composes the describe and score passes |
+   | analyze | `batch_analyze` | done, minus the frame-substance stage between its two passes |
    | frame substance | `batch_frame_substance` | not started — needs the detector (step 5) |
    | catalog | `catalog_sync` | not started — needs `catalog_sync` (step 5) |
 
@@ -373,11 +373,50 @@ repo's slicing convention), not build-then-wire.
    `batch_analyze`: `redo_unless_model` implies a per-item `force` and the
    result payload reports that widened flag, not the one the user sent.
 
-   Three things deliberately left out, all for callers that do not exist yet.
-   `batch_analyze` will need both `runDescribePass` and `runScorePass`
-   generalized with the `progress_range` / `log_prefix` / `finalize` /
-   nested-checkpoint options Python carries — every one of those four parameters
-   exists solely for the composite.
+   `batch_analyze` then composed those two passes, and the generalization it
+   needed came out smaller than Python's. Python gives each pass four independent
+   parameters — `progress_range`, `log_prefix`, `finalize`,
+   `nested_analyze_checkpoint` — but only two combinations of them are ever
+   passed, so here there is one optional `PassStage` argument: absent, the pass
+   owns the job; present, it owns a band of the progress bar, prefixes its logs,
+   writes into a sub-object of the composite's checkpoint, and returns its summary
+   instead of completing the job. Both passes are otherwise unchanged, which is
+   the point — the body reads the same because `log` and `progress` are two local
+   closures that apply the prefix and the band.
+
+   The composite's own content is the shared selection and the nested checkpoint.
+   Selecting once is the reason the job exists: run `batch_describe` and
+   `batch_score` back to back and the second selection has moved, because every
+   image the first job described is now described and drops out of an
+   undescribed-only window. The consequence, worth knowing before reading a
+   support ticket about it, is that an already-described image is out of scope for
+   *both* stages unless `force_describe` widens the selection — sharing the list
+   means sharing its filter. The checkpoint holds two fingerprints and two
+   processed sets under one `stage` marker, so a run interrupted while scoring
+   resumes into scoring; re-entering a finished describe stage would be nearly
+   free, but "nearly" is a preflight and a pre-filter over the whole selection to
+   arrive at no work, so the fingerprint match skips it outright.
+
+   One stage is missing. Python runs frame-substance detection between describe
+   and score, over the images this run just cached, so that a frame condemned
+   during the run is dropped from its own scoring pass. That needs
+   `frame_substance_detector` and `frame_substance_batch`, which are step 5, so
+   the handler currently runs describe (0–48) and score (52–100) with the 48–52
+   band left empty rather than closed — the bands stay where a resumed Flask-era
+   job expects them, and wiring the stage in later is one call. Scoring still
+   drops condemned frames, on the verdicts that were already in the table:
+   `filterVoidSubstanceFromScoringSelection` runs between the passes, where
+   standalone `batch_score` does it in the selection SQL. Until the detector
+   lands, an analyze run will not *discover* a lens cap, only remember one.
+
+   Two smaller departures. `batch_analyze` was the only caller that counted
+   `silent_compression_skips`, for no reason the code gives; here every describe
+   pass counts it, which drops a branch and tells a standalone `batch_describe`
+   the same useful thing. And the selection block that `handle_batch_describe`
+   and `handle_batch_analyze` duplicate in Python is one exported
+   `selectDescribeCandidates`, parameterized on the force flag they read from
+   different metadata keys.
+
    Neither `batch_embed_image` nor the two stacks handlers have a
    `_catalog_cache_chain` branch: only `catalog_cache_build` sets that flag, and
    it cannot run until `catalog_sync` is ported, so the suppression of logging
@@ -400,7 +439,12 @@ repo's slicing convention), not build-then-wire.
    Still Python only: `catalog_sync`, `frame_substance_detector` and
    `frame_substance_batch`, `lightroom/reader` + `enricher` + `schema`, and the
    small shared utilities (`managed_connections`, `path_utils`, `cancel_scope`,
-   `text_constants`).
+   `text_constants`). The detector pair now unblocks two things rather than one:
+   the `batch_frame_substance` handler and the middle stage of `batch_analyze`.
+   It is the least mechanical port left — five statistics over an 8-bit greyscale
+   array that numpy does in five lines, plus thresholds that have to reproduce
+   Python's verdicts on the same previews, so it wants golden-value parity tests
+   the way the resampler did.
 6. **CLI** — replaces the `lightroom-tagger` console script. Not started.
 7. **Cutover** — back up `library.db`, point the Vite proxy at the TS backend, and
    delete the Flask tree. No CLIP reindex: embeddings are already drop-in compatible.

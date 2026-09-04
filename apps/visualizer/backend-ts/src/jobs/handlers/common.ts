@@ -5,6 +5,7 @@
 import { openLibraryDb, type Db } from '../../db/connection.js';
 import type { JobLogLevel } from '../../db/jobs/jobs.js';
 import { AuthenticationError, InvalidRequestError } from '../../providers/errors.js';
+import type { AnalyzeStage } from '../checkpoint.js';
 import { requireLibraryDb } from '../library-db.js';
 import type { ErrorSeverity, JobRunner } from '../runner.js';
 
@@ -130,6 +131,61 @@ const VOID_SUBSTANCE_SCORING_EXCLUDE_SQL = `
           )
     )
 `;
+
+/**
+ * Drop condemned frames from a selection that already exists.
+ *
+ * `selectCatalogKeys`'s `excludeVoidSubstance` does the same thing in SQL, and is
+ * what a standalone `batch_score` uses. `batch_analyze` cannot: its one selection
+ * feeds describe first, which has no reason to skip a lens cap, and the verdicts
+ * scoring filters on are written by the stage in between.
+ */
+export function filterVoidSubstanceFromScoringSelection(
+  db: Db,
+  selection: readonly (readonly [string, string])[],
+): (readonly [string, string])[] {
+  if (selection.length === 0) return [...selection];
+  const keys = selection.map(([k]) => k);
+  const rows = db
+    .prepare(
+      'SELECT fs.image_key AS image_key FROM image_frame_substance fs ' +
+        `WHERE fs.image_key IN (${keys.map(() => '?').join(',')}) ` +
+        "AND fs.verdict = 'void' " +
+        'AND NOT EXISTS (SELECT 1 FROM frame_substance_overrides o WHERE o.image_key = fs.image_key)',
+    )
+    .all(...(keys as never[])) as { image_key: string }[];
+  if (rows.length === 0) return [...selection];
+  const condemned = new Set(rows.map((r) => r.image_key));
+  return selection.filter(([k]) => !condemned.has(k));
+}
+
+/**
+ * How a describe or score pass reports when it is one stage of a composite job.
+ *
+ * Absent, the pass owns the job: the whole progress bar, unprefixed logs, its own
+ * flat checkpoint, and it completes the job itself. Present, it owns a slice:
+ * progress maps into `progressRange`, logs carry `logPrefix`, the resume state
+ * lives in a sub-object of the composite's checkpoint, and the summary comes back
+ * for the caller to combine rather than being written as the job's result.
+ *
+ * Python spells this as four independent parameters — `progress_range`,
+ * `log_prefix`, `finalize`, `nested_analyze_checkpoint` — but only these two
+ * combinations of them exist, so one optional argument says the same thing.
+ */
+export interface PassStage {
+  /** The slice of the job's 0–100 bar this pass reports into. */
+  progressRange: readonly [number, number];
+  logPrefix: string;
+  /** Which sub-object of the `batch_analyze` checkpoint holds the resume state. */
+  checkpointKey: AnalyzeStage;
+}
+
+/** Map a pass's own 0–100 onto the slice of the bar it was given. */
+export function mapStageProgress(stage: PassStage | undefined, pct: number): number {
+  if (stage === undefined) return pct;
+  const [lo, hi] = stage.progressRange;
+  return Math.trunc(lo + ((hi - lo) * pct) / 100);
+}
 
 /** Legacy `date_filter` tokens, still sent by older clients and checkpoints. */
 const LEGACY_DATE_FILTER_MONTHS: Record<string, number> = {

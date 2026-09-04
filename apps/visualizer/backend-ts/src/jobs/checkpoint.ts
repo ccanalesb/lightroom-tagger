@@ -21,6 +21,11 @@
  *
  * `batch_stack_detect` — bare catalog keys again, but under
  * `processed_image_keys`. Same reason: the name is the Flask backend's.
+ *
+ * `batch_analyze` — the composite, and the one that is not flat: `stage` names the
+ * pass that is running, and `describe` / `score` each hold a body of the shape
+ * above. Two fingerprints rather than one because the stages are resumable
+ * independently — a run interrupted during scoring must not re-describe.
  */
 import { CLIP_EMBED_DIM, CLIP_EMBED_MODEL_ID } from '../imaging/clip-embed.js';
 
@@ -232,15 +237,92 @@ export function buildBatchStackDetectCheckpointBody(args: {
   };
 }
 
+/** The two passes `batch_analyze` composes, and the two checkpoint sub-objects. */
+export type AnalyzeStage = 'describe' | 'score';
+
+export interface AnalyzeCheckpoint {
+  /** The pass that was running when the checkpoint was written, if any. */
+  stage: AnalyzeStage | null;
+  describe: Record<string, unknown>;
+  score: Record<string, unknown>;
+}
+
+const EMPTY_ANALYZE_CHECKPOINT: AnalyzeCheckpoint = { stage: null, describe: {}, score: {} };
+
+/** The `batch_analyze` checkpoint, or empty sub-objects when there is none. */
+export function readAnalyzeCheckpoint(metadata: Record<string, unknown>): AnalyzeCheckpoint {
+  const body = checkpointBody(metadata, 'batch_analyze');
+  if (body === null) return EMPTY_ANALYZE_CHECKPOINT;
+  const stage = body['stage'];
+  return {
+    stage: stage === 'describe' || stage === 'score' ? stage : null,
+    describe: asBody(body['describe']),
+    score: asBody(body['score']),
+  };
+}
+
+/**
+ * Minimal runner surface `persistAnalyzeStageCheckpoint` needs, so this module
+ * stays free of a dependency on the runner it is imported by.
+ */
+interface CheckpointWriter {
+  readMetadata(jobId: string): Record<string, unknown>;
+  persistCheckpoint(jobId: string, body: Record<string, unknown>): void;
+}
+
+/**
+ * Write one stage's resume state into the composite checkpoint, preserving the
+ * other stage's.
+ *
+ * Read-modify-write rather than a merge inside `persistCheckpoint`, which knows
+ * nothing about stages. It is safe here because the passes are sequential: by the
+ * time score is writing, describe's sub-object has stopped changing.
+ */
+export function persistAnalyzeStageCheckpoint(
+  runner: CheckpointWriter,
+  jobId: string,
+  stage: AnalyzeStage,
+  payload: Record<string, unknown>,
+): void {
+  const existing = readAnalyzeCheckpoint(runner.readMetadata(jobId));
+  runner.persistCheckpoint(jobId, {
+    job_type: 'batch_analyze',
+    stage,
+    describe: stage === 'describe' ? payload : existing.describe,
+    score: stage === 'score' ? payload : existing.score,
+  });
+}
+
+/** One stage's own body, the same shape its standalone job would checkpoint. */
+export function buildAnalyzeStagePayload(args: {
+  fingerprint: string;
+  processed: ReadonlySet<string>;
+  totalAtStart: number;
+  resumeKey: ResumeKey;
+}): Record<string, unknown> {
+  return {
+    fingerprint: args.fingerprint,
+    [args.resumeKey]: [...args.processed].sort(),
+    total_at_start: args.totalAtStart,
+  };
+}
+
+/** Which array in a checkpoint body holds the processed units. */
+export type ResumeKey = 'processed_pairs' | 'processed_triplets' | 'processed_image_keys';
+
 export interface LoadResumeStateArgs {
   metadata: Record<string, unknown>;
   jobType: string;
-  /** Which array in the checkpoint body holds the processed units. */
-  resumeKey: 'processed_pairs' | 'processed_triplets' | 'processed_image_keys';
+  resumeKey: ResumeKey;
   fingerprint: string;
   /** Logged when a checkpoint exists but was built from different inputs. */
   mismatchMessage: string | null;
   log: (message: string) => void;
+  /**
+   * Read from this sub-object of a `batch_analyze` checkpoint instead of the
+   * root, for a pass running as a stage rather than as its own job.
+   */
+  analyzeStage?: AnalyzeStage;
 }
 
 /**
@@ -251,11 +333,11 @@ export interface LoadResumeStateArgs {
  * to be skipped is about to be redone.
  */
 export function loadResumeState(args: LoadResumeStateArgs): Set<string> {
-  const chk = args.metadata['checkpoint'];
-  if (!chk || typeof chk !== 'object' || Array.isArray(chk)) return new Set();
-  const body = chk as Record<string, unknown>;
-  if (body['checkpoint_version'] !== CHECKPOINT_VERSION) return new Set();
-  if (body['job_type'] !== args.jobType) return new Set();
+  const body =
+    args.analyzeStage === undefined
+      ? checkpointBody(args.metadata, args.jobType)
+      : readAnalyzeCheckpoint(args.metadata)[args.analyzeStage];
+  if (body === null) return new Set();
 
   if (body['fingerprint'] === args.fingerprint) {
     const units = body[args.resumeKey];
@@ -263,4 +345,23 @@ export function loadResumeState(args: LoadResumeStateArgs): Set<string> {
   }
   if (body['fingerprint'] && args.mismatchMessage) args.log(args.mismatchMessage);
   return new Set();
+}
+
+/** A current-version checkpoint of `jobType`, or `null`. */
+function checkpointBody(
+  metadata: Record<string, unknown>,
+  jobType: string,
+): Record<string, unknown> | null {
+  const chk = metadata['checkpoint'];
+  if (!chk || typeof chk !== 'object' || Array.isArray(chk)) return null;
+  const body = chk as Record<string, unknown>;
+  if (body['checkpoint_version'] !== CHECKPOINT_VERSION) return null;
+  if (body['job_type'] !== jobType) return null;
+  return body;
+}
+
+function asBody(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }

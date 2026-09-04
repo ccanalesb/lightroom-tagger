@@ -104,6 +104,17 @@ export class JobRunner {
   }
 
   /**
+   * Name the stage a composite job is in, without touching its progress.
+   *
+   * `updateProgress` also writes `current_step`, but it is called once per unit of
+   * work; this is called once per stage, so the label survives being overwritten
+   * by the per-item messages only in the sense that the UI reads both.
+   */
+  setCurrentStep(jobId: string, currentStep: string): void {
+    updateJobField(this.db, jobId, 'current_step', currentStep);
+  }
+
+  /**
    * Mark a job completed and store its result.
    *
    * A job cancelled while the handler was finishing stays cancelled: the user's

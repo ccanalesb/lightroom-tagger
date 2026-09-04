@@ -12,6 +12,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CHECKPOINT_VERSION,
+  buildAnalyzeStagePayload,
   buildBatchDescribeCheckpointBody,
   buildBatchEmbedImageCheckpointBody,
   buildBatchScoreCheckpointBody,
@@ -22,6 +23,8 @@ import {
   fingerprintBatchScore,
   fingerprintBatchStackDetect,
   loadResumeState,
+  persistAnalyzeStageCheckpoint,
+  readAnalyzeCheckpoint,
 } from '../src/jobs/checkpoint.js';
 
 const MISMATCH = 'checkpoint mismatch: batch_describe fingerprint changed, starting fresh';
@@ -261,6 +264,104 @@ describe('loadResumeState', () => {
     expect(loadPairs(body({ checkpoint_version: 99 }), 'fp', push).size).toBe(0);
     expect(loadPairs(body({ job_type: 'batch_score' }), 'fp', push).size).toBe(0);
     expect(logs).toEqual([]);
+  });
+});
+
+describe('the nested batch_analyze checkpoint', () => {
+  const nested = (over: Record<string, unknown> = {}) => ({
+    checkpoint: {
+      checkpoint_version: CHECKPOINT_VERSION,
+      job_type: 'batch_analyze',
+      stage: 'score',
+      describe: { fingerprint: 'dfp', processed_pairs: ['a|catalog'], total_at_start: 1 },
+      score: { fingerprint: 'sfp', processed_triplets: ['a|catalog|street'], total_at_start: 1 },
+      ...over,
+    },
+  });
+
+  it('reads both stages out of one checkpoint', () => {
+    expect(readAnalyzeCheckpoint(nested())).toEqual({
+      stage: 'score',
+      describe: { fingerprint: 'dfp', processed_pairs: ['a|catalog'], total_at_start: 1 },
+      score: { fingerprint: 'sfp', processed_triplets: ['a|catalog|street'], total_at_start: 1 },
+    });
+  });
+
+  /** A flat checkpoint from either standalone job is not a composite one. */
+  it('reads nothing out of a checkpoint belonging to another job type', () => {
+    const flat = {
+      checkpoint: {
+        checkpoint_version: CHECKPOINT_VERSION,
+        job_type: 'batch_describe',
+        fingerprint: 'dfp',
+        processed_pairs: ['a|catalog'],
+      },
+    };
+    expect(readAnalyzeCheckpoint(flat)).toEqual({ stage: null, describe: {}, score: {} });
+    expect(readAnalyzeCheckpoint({})).toEqual({ stage: null, describe: {}, score: {} });
+  });
+
+  it('resumes a stage from its own sub-object', () => {
+    expect(
+      loadResumeState({
+        metadata: nested(),
+        jobType: 'batch_score',
+        resumeKey: 'processed_triplets',
+        fingerprint: 'sfp',
+        mismatchMessage: null,
+        log: () => {},
+        analyzeStage: 'score',
+      }),
+    ).toEqual(new Set(['a|catalog|street']));
+  });
+
+  /** Each stage's fingerprint is checked alone; describe's moving is score's business. */
+  it('discards one stage without disturbing the other', () => {
+    const logs: string[] = [];
+    const resumed = loadResumeState({
+      metadata: nested(),
+      jobType: 'batch_describe',
+      resumeKey: 'processed_pairs',
+      fingerprint: 'moved',
+      mismatchMessage: 'describe moved',
+      log: (m) => logs.push(m),
+      analyzeStage: 'describe',
+    });
+
+    expect(resumed.size).toBe(0);
+    expect(logs).toEqual(['describe moved']);
+  });
+
+  it('writes one stage without dropping what the other stored', () => {
+    let metadata: Record<string, unknown> = nested();
+    const runner = {
+      readMetadata: () => metadata,
+      persistCheckpoint: (_id: string, checkpointBody: Record<string, unknown>) => {
+        metadata = { checkpoint: { checkpoint_version: CHECKPOINT_VERSION, ...checkpointBody } };
+      },
+    };
+
+    persistAnalyzeStageCheckpoint(
+      runner,
+      'job-1',
+      'score',
+      buildAnalyzeStagePayload({
+        fingerprint: 'sfp',
+        processed: new Set(['b|catalog|street', 'a|catalog|street']),
+        totalAtStart: 2,
+        resumeKey: 'processed_triplets',
+      }),
+    );
+
+    expect(readAnalyzeCheckpoint(metadata)).toEqual({
+      stage: 'score',
+      describe: { fingerprint: 'dfp', processed_pairs: ['a|catalog'], total_at_start: 1 },
+      score: {
+        fingerprint: 'sfp',
+        processed_triplets: ['a|catalog|street', 'b|catalog|street'],
+        total_at_start: 2,
+      },
+    });
   });
 });
 

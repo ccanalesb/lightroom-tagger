@@ -16,23 +16,30 @@ import { getImageDescription } from '../../db/library/descriptions.js';
 import { VIDEO_EXTENSIONS } from '../../imaging/raw-decode.js';
 import type { CancelCheck } from '../../providers/retry.js';
 import { resolveFilepath } from '../../utils/path-resolve.js';
-import { describeMatchedImage } from '../../vision/description-service.js';
+import {
+  describeMatchedImage,
+  type DescribeTelemetry,
+} from '../../vision/description-service.js';
 import {
   CHECKPOINT_MAX_ENTRIES,
+  buildAnalyzeStagePayload,
   buildBatchDescribeCheckpointBody,
   fingerprintBatchDescribe,
   loadResumeState,
+  persistAnalyzeStageCheckpoint,
 } from '../checkpoint.js';
 import type { JobRunner } from '../runner.js';
 import {
   asMetadata,
   failureSeverityFromError,
+  mapStageProgress,
   readIntOrNull,
   resolveDateWindow,
   resolveLibraryDbOrFail,
   selectCatalogKeys,
   selectCatalogKeysMissingVisualTags,
   withLibraryDb,
+  type PassStage,
 } from './common.js';
 import { PathSkipDiagnostics, emptySkipReasonCounts } from './path-diagnostics.js';
 
@@ -76,6 +83,7 @@ export async function describeSingleImage(
     providerId?: string | null;
     model?: string | null;
     cancelCheck?: CancelCheck;
+    telemetry?: DescribeTelemetry | null;
   },
 ): Promise<DescribeAttempt> {
   try {
@@ -84,6 +92,7 @@ export async function describeSingleImage(
       providerId: opts.providerId ?? null,
       model: opts.model ?? null,
       cancelCheck: opts.cancelCheck ?? null,
+      telemetry: opts.telemetry ?? null,
     });
 
     if (result.status === 'written') return { status: 'described', success: true, error: null };
@@ -212,37 +221,13 @@ export async function handleBatchDescribe(
         return;
       }
 
-      const force = Boolean(metadata['force']);
-      // A model-scoped re-do has to widen the candidate set to every image, the
-      // same way `force` does: rows written by an *older* model are described
-      // already, so an undescribed-only selection would never surface them.
-      const redoUnlessModel = String(metadata['redo_unless_model'] ?? '').trim() || null;
-      const selectAll = force || redoUnlessModel !== null;
-      const backfillVisualTags = Boolean(metadata['backfill_visual_tags']);
-
-      const { months, year } = resolveDateWindow(metadata);
-      const minRating = readIntOrNull(metadata['min_rating']);
-
-      if (backfillVisualTags && (force || metadata['force_describe'] || metadata['force_score'])) {
-        runner.log(jobId, 'warning', BACKFILL_FORCE_CONFLICT_MSG);
-      }
-
-      // Two branches where Python has three: its third called
-      // `get_undescribed_catalog_images`, which is `selectCatalogKeys` with
-      // `undescribedOnly` and no year — the same SQL, reached by a different route.
-      const selection = backfillVisualTags
-        ? selectCatalogKeysMissingVisualTags(db, { months, year, minRating })
-        : selectCatalogKeys(db, { months, year, minRating, undescribedOnly: !selectAll });
-
-      if (backfillVisualTags && selection.length === 0) {
-        runner.log(
-          jobId,
-          'info',
-          'Backfill visual tags: no images matched the current scope (no catalog rows ' +
-            'with missing color/mood data in the date/rating window, or no work selected).',
-        );
-      }
-
+      const selection = selectDescribeCandidates(
+        runner,
+        jobId,
+        db,
+        metadata,
+        Boolean(metadata['force']),
+      );
       await runDescribePass(runner, jobId, metadata, db, selection);
     });
   } catch (e) {
@@ -255,7 +240,64 @@ export async function handleBatchDescribe(
 }
 
 /**
+ * The images a describe run should consider, given how hard it was told to look.
+ *
+ * Shared with `batch_analyze`, which selects once for both of its passes and
+ * derives `force` from `force_describe` rather than `force`.
+ */
+export function selectDescribeCandidates(
+  runner: JobRunner,
+  jobId: string,
+  db: Db,
+  metadata: Record<string, unknown>,
+  force: boolean,
+): [string, string][] {
+  // A model-scoped re-do has to widen the candidate set to every image, the same
+  // way `force` does: rows written by an *older* model are described already, so
+  // an undescribed-only selection would never surface them.
+  const redoUnlessModel = String(metadata['redo_unless_model'] ?? '').trim() || null;
+  const selectAll = force || redoUnlessModel !== null;
+  const backfillVisualTags = Boolean(metadata['backfill_visual_tags']);
+
+  const { months, year } = resolveDateWindow(metadata);
+  const minRating = readIntOrNull(metadata['min_rating']);
+
+  if (
+    backfillVisualTags &&
+    (metadata['force'] || metadata['force_describe'] || metadata['force_score'])
+  ) {
+    runner.log(jobId, 'warning', BACKFILL_FORCE_CONFLICT_MSG);
+  }
+
+  // Two branches where Python has three: its third called
+  // `get_undescribed_catalog_images`, which is `selectCatalogKeys` with
+  // `undescribedOnly` and no year — the same SQL, reached by a different route.
+  const selection = backfillVisualTags
+    ? selectCatalogKeysMissingVisualTags(db, { months, year, minRating })
+    : selectCatalogKeys(db, { months, year, minRating, undescribedOnly: !selectAll });
+
+  if (backfillVisualTags && selection.length === 0) {
+    runner.log(
+      jobId,
+      'info',
+      'Backfill visual tags: no images matched the current scope (no catalog rows ' +
+        'with missing color/mood data in the date/rating window, or no work selected).',
+    );
+  }
+
+  return selection;
+}
+
+/** Logged when a `batch_analyze` resumes onto a describe selection that moved. */
+export const ANALYZE_DESCRIBE_CHECKPOINT_MISMATCH =
+  'checkpoint mismatch: batch_analyze describe fingerprint changed, starting describe fresh';
+
+/**
  * Describe every pair in `selection`, checkpointing as it goes.
+ *
+ * Returns the summary when running as a stage of `batch_analyze`, and `null`
+ * whenever the job has already been settled — completed, cancelled or failed —
+ * which is every path a standalone run takes.
  *
  * Concurrency is a bounded async pool over one connection, where Python ran a
  * `ThreadPoolExecutor` with a connection per worker. It can be: the time is spent
@@ -263,13 +305,20 @@ export async function handleBatchDescribe(
  * nothing here — and the pool removes the duplicated sequential branch Python
  * needed for `max_workers == 1`, which had drifted to different log messages.
  */
-async function runDescribePass(
+export async function runDescribePass(
   runner: JobRunner,
   jobId: string,
   metadata: Record<string, unknown>,
   db: Db,
   selection: readonly (readonly [string, string])[],
-): Promise<void> {
+  stage?: PassStage,
+): Promise<BatchDescribeResult | null> {
+  const prefix = stage?.logPrefix ?? '';
+  const log = (level: 'info' | 'warning' | 'error', message: string): void =>
+    runner.log(jobId, level, `${prefix}${message}`);
+  const progress = (pct: number, message: string): void =>
+    runner.updateProgress(jobId, mapStageProgress(stage, pct), `${prefix}${message}`);
+
   const imageType = String(metadata['image_type'] ?? 'catalog');
   const dateFilter = String(metadata['date_filter'] ?? 'all');
   const force = Boolean(metadata['force']);
@@ -289,8 +338,10 @@ async function runDescribePass(
     jobType: 'batch_describe',
     resumeKey: 'processed_pairs',
     fingerprint,
-    mismatchMessage: BATCH_DESCRIBE_CHECKPOINT_MISMATCH,
-    log: (message) => runner.log(jobId, 'info', message),
+    mismatchMessage:
+      stage === undefined ? BATCH_DESCRIBE_CHECKPOINT_MISMATCH : ANALYZE_DESCRIBE_CHECKPOINT_MISMATCH,
+    log: (message) => log('info', message),
+    analyzeStage: stage?.checkpointKey,
   });
 
   const pairLabel = (key: string, itype: string): string => `${key}|${itype}`;
@@ -308,7 +359,7 @@ async function runDescribePass(
     pending = pending.filter(([k]) => !described.has(k));
     const skippedByDb = before - pending.length;
     if (skippedByDb) {
-      runner.log(jobId, 'info', `Skipped ${skippedByDb} already-described images (DB pre-filter)`);
+      log('info', `Skipped ${skippedByDb} already-described images (DB pre-filter)`);
     }
   }
 
@@ -319,8 +370,7 @@ async function runDescribePass(
     const doneByTarget = new Set(rows.map((r) => pairLabel(r.image_key, r.image_type)));
     const before = pending.length;
     pending = pending.filter(([k, t]) => !doneByTarget.has(pairLabel(k, t)));
-    runner.log(
-      jobId,
+    log(
       'info',
       `model-scoped re-do (redo_unless_model=${redoUnlessModel}): skipped ` +
         `${before - pending.length} images already described by this model; ` +
@@ -333,14 +383,22 @@ async function runDescribePass(
   const progressFor = (done: number): number =>
     Math.trunc(5 + (done / Math.max(totalAtStart, 1)) * 90);
 
-  runner.updateProgress(
-    jobId,
-    progressFor(alreadyDone),
-    `Found ${totalAtStart} images to describe (${total} remaining)`,
-  );
+  progress(progressFor(alreadyDone), `Found ${totalAtStart} images to describe (${total} remaining)`);
 
   if (totalAtStart === 0) {
+    const empty: BatchDescribeResult = {
+      described: 0,
+      skipped: 0,
+      failed: 0,
+      total: 0,
+      image_type: imageType,
+      date_filter: dateFilter,
+      force,
+      skip_reason_counts: emptySkipReasonCounts(),
+    };
+    if (stage !== undefined) return empty;
     runner.clearCheckpoint(jobId);
+    // The zero-work payload Python completes with omits the echoed knobs.
     runner.completeJob(jobId, {
       described: 0,
       skipped: 0,
@@ -348,7 +406,7 @@ async function runDescribePass(
       total: 0,
       skip_reason_counts: emptySkipReasonCounts(),
     });
-    return;
+    return null;
   }
 
   const diag = new PathSkipDiagnostics(runner, jobId, db, {
@@ -364,6 +422,11 @@ async function runDescribePass(
   let completed = 0;
   let stop = false;
 
+  // Counted for every run, where Python counts only inside `batch_analyze`. The
+  // number says how much of the catalog was described off an already-compressed
+  // preview instead of the original, which is as worth knowing on its own.
+  const telemetry: DescribeTelemetry = { silentCompressionSkips: 0 };
+
   /**
    * Record a finished unit. Returns false when the checkpoint has outgrown what
    * belongs in one metadata column, which stops the run rather than letting the
@@ -375,10 +438,24 @@ async function runDescribePass(
       runner.failJob(jobId, 'checkpoint too large: exceeds 100000 entries');
       return false;
     }
-    runner.persistCheckpoint(
-      jobId,
-      buildBatchDescribeCheckpointBody({ fingerprint, processed: processedPairs, totalAtStart }),
-    );
+    if (stage === undefined) {
+      runner.persistCheckpoint(
+        jobId,
+        buildBatchDescribeCheckpointBody({ fingerprint, processed: processedPairs, totalAtStart }),
+      );
+    } else {
+      persistAnalyzeStageCheckpoint(
+        runner,
+        jobId,
+        stage.checkpointKey,
+        buildAnalyzeStagePayload({
+          fingerprint,
+          processed: processedPairs,
+          totalAtStart,
+          resumeKey: 'processed_pairs',
+        }),
+      );
+    }
     return true;
   };
 
@@ -391,9 +468,7 @@ async function runDescribePass(
       const [key, itype] = unit;
       if (runner.isCancelled(jobId)) {
         // Once, not once per worker: every worker in the pool sees the same flag.
-        if (!stop) {
-          runner.log(jobId, 'info', 'Batch describe cancel noted; finishing already-running tasks');
-        }
+        if (!stop) log('info', 'Batch describe cancel noted; finishing already-running tasks');
         stop = true;
         return;
       }
@@ -403,11 +478,11 @@ async function runDescribePass(
         providerId,
         model: providerModel,
         cancelCheck,
+        telemetry,
       });
 
       completed += 1;
-      runner.updateProgress(
-        jobId,
+      progress(
         progressFor(alreadyDone + completed),
         `Describing ${alreadyDone + completed}/${totalAtStart}: ${key}`,
       );
@@ -421,8 +496,8 @@ async function runDescribePass(
         }
       } else if (attempt.status === 'skipped') {
         skipped += 1;
-        await recordPathSkipFromStatus(diag, key, attempt.status);
-        runner.log(jobId, 'warning', `${key}: ${attempt.error}`);
+        await recordPathSkipFromStatus(diag, key, attempt.status, prefix);
+        log('warning', `${key}: ${attempt.error}`);
         if (!recordDone(key, itype)) {
           stop = true;
           return;
@@ -430,12 +505,12 @@ async function runDescribePass(
       } else {
         failed += 1;
         consecutiveFailures += 1;
-        runner.log(jobId, 'warning', `${key}: ${attempt.error}`);
+        log('warning', `${key}: ${attempt.error}`);
       }
 
       if (consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
         stop = true;
-        runner.log(jobId, 'error', `Stopping: ${consecutiveFailures} consecutive failures`);
+        log('error', `Stopping: ${consecutiveFailures} consecutive failures`);
         return;
       }
     }
@@ -445,10 +520,14 @@ async function runDescribePass(
 
   if (runner.isCancelled(jobId)) {
     runner.finalizeCancelled(jobId);
-    return;
+    return null;
   }
   // `recordDone` may already have failed the job; do not overwrite that outcome.
-  if (runner.hasFailed(jobId)) return;
+  if (runner.hasFailed(jobId)) return null;
+
+  if (telemetry.silentCompressionSkips > 0) {
+    log('info', `${telemetry.silentCompressionSkips} images already compressed, skipped.`);
+  }
 
   if (described === 0 && consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
     runner.failJob(
@@ -456,7 +535,7 @@ async function runDescribePass(
       `Aborted after ${consecutiveFailures} consecutive failures with 0 successful ` +
         'descriptions — check file paths and provider connectivity',
     );
-    return;
+    return null;
   }
 
   const summary: BatchDescribeResult = {
@@ -469,6 +548,8 @@ async function runDescribePass(
     force,
     skip_reason_counts: diag.skipReasonCounts,
   };
+  if (stage !== undefined) return summary;
   runner.clearCheckpoint(jobId);
   runner.completeJob(jobId, summary);
+  return null;
 }

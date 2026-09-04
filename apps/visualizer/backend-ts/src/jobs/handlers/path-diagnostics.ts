@@ -48,6 +48,26 @@ export function emptySkipReasonCounts(): SkipReasonCounts {
   return { no_row: 0, empty_path: 0, unresolved_or_missing: 0, encode_failed: 0 };
 }
 
+/**
+ * Add up the counters of several passes into one set for a composite job.
+ *
+ * Tolerant of a missing or malformed part because one caller has one: a
+ * `batch_analyze` that resumed past its describe stage synthesizes that stage's
+ * summary from the checkpoint, which never held these counts.
+ */
+export function mergeSkipReasonCounts(...parts: unknown[]): SkipReasonCounts {
+  const merged = emptySkipReasonCounts();
+  for (const part of parts) {
+    if (!part || typeof part !== 'object') continue;
+    for (const bucket of SKIP_REASON_BUCKETS) {
+      const raw = (part as Record<string, unknown>)[bucket];
+      const n = typeof raw === 'number' ? raw : Number(raw);
+      if (Number.isFinite(n)) merged[bucket] += Math.trunc(n);
+    }
+  }
+  return merged;
+}
+
 export interface PathClassification {
   /** The usable image path, or `null` when `reason` is set. */
   path: string | null;

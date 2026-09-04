@@ -11,6 +11,7 @@
  * `requiresCatalog` gates job creation and `/api/jobs/health` publishes the list.
  */
 import type { JobRunner } from './runner.js';
+import { handleBatchAnalyze } from './handlers/analyze.js';
 import {
   BATCH_DESCRIBE_CHECKPOINT_MISMATCH,
   handleBatchDescribe,
@@ -78,7 +79,14 @@ export const JOB_TYPES: readonly JobType[] = [
     requiresCatalog: true,
     checkpointMismatchMessage: BATCH_SCORE_CHECKPOINT_MISMATCH,
   },
-  { name: 'batch_analyze', handler: null, requiresCatalog: true, checkpointMismatchMessage: null },
+  {
+    name: 'batch_analyze',
+    handler: handleBatchAnalyze,
+    requiresCatalog: true,
+    // Null because the composite has two checkpoints, not one: each stage logs its
+    // own mismatch message, which this single field cannot hold.
+    checkpointMismatchMessage: null,
+  },
   {
     name: 'batch_stack_detect',
     handler: handleBatchStackDetect,
