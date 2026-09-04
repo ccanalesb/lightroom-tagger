@@ -209,7 +209,7 @@ const IMAGE_METADATA_SQL = `
  * populate keywords for newly imported photos and leave the other 43,794 empty,
  * which makes `search_by_keyword` inconsistent instead of uniformly silent — a
  * worse failure than the one it replaces. Repairing it means a backfill, not a
- * one-line join change.
+ * one-line join change; tracked as #304.
  */
 function keywordsForImage(conn: Db, imageId: number): string[] {
   const rows = conn

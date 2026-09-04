@@ -206,7 +206,7 @@ describe('lightroom reader', () => {
     ]);
     // `AgLibraryKeywordImage.image` is an `Adobe_images.id_local`, and the reader
     // passes an `AgLibraryFile.id_local`. Pinned so a "fix" is a deliberate change
-    // with a backfill behind it, not an accident.
+    // with a backfill behind it, not an accident. See #304.
     expect(withCatalog((conn) => getImageById(conn, 100))!.keywords).toEqual([]);
   });
 

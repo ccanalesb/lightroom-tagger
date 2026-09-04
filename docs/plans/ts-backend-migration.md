@@ -578,7 +578,8 @@ repo's slicing convention), not build-then-wire.
    the join populates keywords for newly imported photos and leaves the existing
    43,794 empty — keyword search that works for last week's import and silently
    fails for the whole catalog is a worse bug than one that is uniformly silent.
-   Repairing it properly means a backfill pass, which is its own slice.
+   Repairing it properly means a backfill pass, which is its own slice and is
+   filed as [#304](https://github.com/ccanalesb/lightroom-tagger/issues/304).
 
    Two working rules for the remaining slices. Build fixtures from the *production*
    schema, not from what `init_database` happens to create — the two have already
