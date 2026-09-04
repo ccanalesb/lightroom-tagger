@@ -2,6 +2,7 @@
  * Catalog image rows. Port of the read/write helpers the images API uses from
  * `core/database/catalog.py` and `core/database/catalog_statistics.py`.
  */
+import { existsSync } from 'node:fs';
 import type { Db } from '../connection.js';
 
 export type Row = Record<string, unknown>;
@@ -212,6 +213,54 @@ export function storeImagesBatch(db: Db, records: readonly object[]): number {
   const stmt = db.prepare(IMAGE_UPSERT_SQL);
   for (const record of records) stmt.run(imageParams(record));
   return records.length;
+}
+
+/**
+ * Catalog images with no usable vision-cache entry, for `enrich-catalog` to warm.
+ *
+ * Two passes, as in Python. The first is a plain anti-join. The second reads
+ * every row that *claims* a cached file and keeps the ones whose file is gone,
+ * which is the case that matters in practice: the cache directory is local and
+ * disposable while `vision_cache` is not, so deleting it leaves 43,000 rows
+ * pointing at nothing.
+ *
+ * The second pass therefore stats one file per cached row. That is the cost of
+ * the query and there is no cheaper way to ask the question.
+ */
+export function getCatalogImagesMissingCache(db: Db): Row[] {
+  const uncached = db
+    .prepare(
+      `
+        SELECT i.* FROM images i
+        LEFT JOIN vision_cache vc ON i.key = vc.key
+        WHERE vc.key IS NULL OR vc.compressed_path IS NULL
+        `,
+    )
+    .all() as Row[];
+  const images = uncached.map((r) => deserializeRow(r));
+
+  const cached = db
+    .prepare(
+      `
+        SELECT i.*, vc.compressed_path FROM images i
+        INNER JOIN vision_cache vc ON i.key = vc.key
+        WHERE vc.compressed_path IS NOT NULL
+        `,
+    )
+    .all() as Row[];
+
+  for (const row of cached) {
+    const compressedPath = row['compressed_path'];
+    // The oversized sentinel is not a path, so it never exists and every
+    // oversized image is re-offered on every run. Python does the same, and the
+    // retry is cheap next to being unable to notice a sidecar that has appeared
+    // since — see `isVisionCacheValid`.
+    if (typeof compressedPath === 'string' && compressedPath && !existsSync(compressedPath)) {
+      images.push(deserializeRow(row));
+    }
+  }
+
+  return images;
 }
 
 /** Distinct `YYYYMM` months from catalog `date_taken`, newest first. */

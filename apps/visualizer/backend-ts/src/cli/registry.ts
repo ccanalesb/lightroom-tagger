@@ -7,13 +7,14 @@
  * live beside the command instead of in an `add_arguments` callback, because a
  * declarative list is all seven of them ever needed.
  *
- * `handler: null` marks a command whose port is still to come. The declaration
- * has to exist first: it is what makes `lightroom-tagger scan` say the command
- * is not ported yet rather than "unknown command", which would read as a typo.
+ * `handler` was nullable while the port was in progress, so a declared but
+ * unwritten command could say so instead of reading as a typo. All seven now
+ * dispatch, so it is not.
  */
 import type { LibraryConfig } from '../config.js';
 import type { FlagSpec, ParsedArgs } from './parse.js';
 import { cmdScan, cmdSync } from './commands/catalog.js';
+import { cmdEnrichCatalog } from './commands/enrich.js';
 import { cmdInit } from './commands/init.js';
 import { cmdExport, cmdSearch, cmdStats } from './commands/query.js';
 
@@ -24,14 +25,20 @@ export interface CommandContext {
   out: (line: string) => void;
 }
 
-/** A command returns its process exit code: 0 for success, 1 for failure. */
-export type CommandHandler = (ctx: CommandContext) => number;
+/**
+ * A command returns its process exit code: 0 for success, 1 for failure.
+ *
+ * Six of the seven are synchronous and stay that way; `enrich-catalog` warms the
+ * vision cache, which is filesystem and image work, so the return may be a
+ * promise. `run` awaits either.
+ */
+export type CommandHandler = (ctx: CommandContext) => number | Promise<number>;
 
 export interface CliCommand {
   name: string;
   help: string;
   flags: readonly FlagSpec[];
-  handler: CommandHandler | null;
+  handler: CommandHandler;
 }
 
 /** `--db`, which every command that touches the library declares. */
@@ -116,13 +123,17 @@ export const COMMANDS: readonly CliCommand[] = [
   },
   {
     name: 'enrich-catalog',
-    help: 'Analyze catalog images or warm the vision cache',
+    help: 'Warm the vision cache for catalog images',
     flags: [
       DB_FLAG,
-      { ...CATALOG_FLAG, help: 'Path to .lrcat file (overrides global; full enrichment only)' },
+      // Both accepted and ignored. `--catalog` was already dead in Python:
+      // `enrich_catalog_images` takes the path and never reads it. `--cache-only`
+      // is now what the command always does, so the invocation people actually
+      // run keeps working unchanged.
+      { ...CATALOG_FLAG, help: 'Path to .lrcat file (no effect)' },
       { name: 'limit', kind: 'int', help: 'Limit number of images to process' },
-      { name: 'cache-only', kind: 'boolean', help: 'Warm vision cache only (skip full enrichment)' },
+      { name: 'cache-only', kind: 'boolean', help: 'Warm vision cache only (always on)' },
     ],
-    handler: null,
+    handler: cmdEnrichCatalog,
   },
 ];

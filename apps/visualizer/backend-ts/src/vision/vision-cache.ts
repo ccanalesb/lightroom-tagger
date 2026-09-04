@@ -12,12 +12,14 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve, sep } from 'node:path';
 import { config, loadLibraryConfig } from '../config.js';
 import type { Db } from '../db/connection.js';
+import { getCatalogImagesMissingCache } from '../db/library/catalog.js';
 import {
   getVisionCachedImage,
   VISION_CACHE_OVERSIZED_SENTINEL,
 } from '../db/library/vision-cache.js';
 import { libraryWrite } from '../db/library/write.js';
 import { nowIsoLocal } from '../utils/datetime.js';
+import { resolveCatalogPath } from '../utils/path-resolve.js';
 import { compressImage, getViewablePathManaged, isRawPath, isVideoPath } from '../imaging/image-prep.js';
 import { phashFromFile } from '../imaging/phash-file.js';
 
@@ -247,6 +249,60 @@ export async function resolveVisionImage(
 export function getCachedPhash(db: Db, catalogKey: string): string | null {
   const cached = getVisionCachedImage(db, catalogKey);
   return cached?.phash || null;
+}
+
+export interface WarmCacheResult {
+  processed: number;
+  skipped: number;
+  errors: number;
+}
+
+/**
+ * Build cache entries for catalog images that have none. Backs `enrich-catalog`.
+ *
+ * Sequential, as Python is: the work is RAW decoding and JPEG compression, which
+ * `sharp` and `libraw-wasm` already thread internally, and the originals are on a
+ * NAS where concurrent readers make it slower rather than faster.
+ *
+ * An unreachable original is `skipped`, not an error — with the NAS unmounted
+ * every image is unreachable, and that is a mount problem the counts should say
+ * plainly rather than 43,000 failures. An image that is reachable but yields no
+ * cache entry is an `error`, which includes the oversized ones: they return the
+ * sentinel every run, so a steady handful of errors here is expected.
+ */
+export async function warmVisionCache(db: Db, limit?: number | null): Promise<WarmCacheResult> {
+  let images = getCatalogImagesMissingCache(db);
+  // Python's `if limit:` — a limit of 0 is falsy there and means "no limit".
+  if (limit) images = images.slice(0, limit);
+
+  let processed = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  for (const record of images) {
+    const key = record['key'];
+    if (!key || typeof key !== 'string') {
+      skipped += 1;
+      continue;
+    }
+
+    const raw = record['filepath'];
+    const filepath = resolveCatalogPath(typeof raw === 'string' ? raw : '');
+    if (!filepath) {
+      skipped += 1;
+      continue;
+    }
+
+    try {
+      const cachedPath = await getOrCreateCachedImage(db, key, filepath);
+      if (cachedPath) processed += 1;
+      else errors += 1;
+    } catch {
+      errors += 1;
+    }
+  }
+
+  return { processed, skipped, errors };
 }
 
 /** Write bytes into the cache directory directly. Used by the cache-build job. */

@@ -54,3 +54,25 @@ export function withLibraryDb<T>(
     db.close();
   }
 }
+
+/**
+ * `withLibraryDb` for a body that awaits.
+ *
+ * A separate function rather than a union return, because the synchronous
+ * version's `finally` would close the connection the moment an async body
+ * returned its promise — leaving every statement after the first `await` running
+ * against a closed database.
+ */
+export async function withLibraryDbAsync<T>(
+  ctx: CommandContext,
+  opts: { mustExist: boolean },
+  body: (db: Db, dbPath: string) => Promise<T>,
+): Promise<T> {
+  const dbPath = resolveLibraryDbPath(ctx, opts);
+  const db = opts.mustExist ? openLibraryDb(dbPath) : initLibraryDb(dbPath);
+  try {
+    return await body(db, dbPath);
+  } finally {
+    db.close();
+  }
+}

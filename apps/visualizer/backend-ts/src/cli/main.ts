@@ -29,7 +29,7 @@ export interface RunOptions {
  * Exported separately from `main` so tests drive the whole program — parsing,
  * dispatch, error mapping — without a subprocess or a captured stdout.
  */
-export function run(argv: readonly string[], opts: RunOptions = {}): number {
+export async function run(argv: readonly string[], opts: RunOptions = {}): Promise<number> {
   const out = opts.out ?? ((line: string) => process.stdout.write(`${line}\n`));
 
   let config: LibraryConfig;
@@ -52,14 +52,9 @@ export function run(argv: readonly string[], opts: RunOptions = {}): number {
   }
 
   const command = COMMANDS.find((c) => c.name === args.command)!;
-  if (command.handler === null) {
-    out(`Error: ${args.command} is not ported to the TypeScript CLI yet`);
-    return 1;
-  }
-
   const ctx: CommandContext = { args, config, out };
   try {
-    return command.handler(ctx);
+    return await command.handler(ctx);
   } catch (e) {
     // Every throw, not just `CliError`: Python's `map_cli_errors` catches bare
     // `Exception`, so a command that fails on a corrupt database reports it the

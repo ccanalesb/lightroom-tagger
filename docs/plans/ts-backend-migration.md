@@ -524,9 +524,9 @@ repo's slicing convention), not build-then-wire.
    `aperture` as REAL and the 43,794 rows already stored read `'800.0'` and
    `'50.0'` — which is exactly what a double bind produces.
 
-   Still Python only, after checking each one rather than trusting this list:
-   `enricher`, which only `enrich-catalog` calls. `init_database` is **done** —
-   see slice 3 below.
+   Nothing in the library is Python-only any more. `init_database` is done (slice
+   3), and `enricher` — the last name that was on this list, called only by
+   `enrich-catalog` — is deliberately not ported; slice 4 below has the evidence.
 
    `managed_connections` is `db/library/with-db.ts` and the handlers' managed-DB
    helper. `path_utils` is `utils/path-resolve.ts`. `text_constants` is
@@ -535,9 +535,10 @@ repo's slicing convention), not build-then-wire.
    as `runner.isCancelled`, so there is nothing left to port. `schema` is a
    standalone catalog explorer that `[project.scripts]` never exposed; it is a
    dev tool, not part of the console script.
-6. **CLI** — replaces the `lightroom-tagger` console script: 562 lines across
-   `core/cli.py`, `cli_commands.py`, `cli_cmds_extra.py` and `cli_library_db.py`,
-   seven commands, argparse and `print()`.
+6. **CLI — done.** Replaces the `lightroom-tagger` console script: 562 lines
+   across `core/cli.py`, `cli_commands.py`, `cli_cmds_extra.py` and
+   `cli_library_db.py`, seven commands, argparse and `print()`. All seven
+   dispatch, over four slices.
 
    **Slice 1 is done: the shell, plus `search`, `export` and `stats`.** The three
    read-only commands first because they need nothing that is not already
@@ -627,8 +628,60 @@ repo's slicing convention), not build-then-wire.
    itself. It is the factory default, the first thing an owner edits, and it only
    ever runs against an empty table, so there is no parity target for "fixed".
 
-   Remaining command: `enrich-catalog`, declared in the registry with
-   `handler: null` so it says so instead of reading as a typo.
+   **Slice 4 is done: `enrich-catalog`, as its cache-warming half.** Python's
+   command has two modes. `--cache-only` calls `warm_vision_cache`, which is a
+   real and still-useful operation: 746 catalog images have no cache row today,
+   and another 51 carry the oversized sentinel, which is not a path and so never
+   exists on disk — those are re-offered on every run, by both languages. The
+   default mode calls `lightroom/enricher.py`, and that half is not ported. This
+   is the reasoning, not an omission.
+
+   `enrich_catalog_images` selects `images WHERE phash IS NULL`, and on the live
+   database that is **all 43,794 rows** — `phash`, `exif`, `analyzed_at` and
+   `description` are NULL or empty on every one of them. `store_catalog_image`
+   stamps `analyzed_at` on every image it writes, so NULL across the whole column
+   is proof the path has never processed a single image. What it would do on a
+   first run is one LLM description call per image, written into
+   `images.description`: a column only the `keyword LIKE` half of `search` reads,
+   while the descriptions everything else uses live in `image_descriptions` —
+   42,997 of them, written by `batch_describe` with a perspective, provider
+   metadata, checkpointing and cancellation that this loop has none of.
+
+   It also cannot converge. `hasher.compute_phash` is plain Pillow, and Pillow has
+   no plugin for `.dng`, `.arw`, `.raf`, `.sr2`, `.cr2`, `.heic`, `.mp4` or
+   `.mov` — 41,669 of the 43,794 files. Those yield `None`, `store_catalog_image`
+   writes `phash=COALESCE(excluded.phash, images.phash)`, the row stays NULL, and
+   the next run describes them again. Forever.
+
+   So `enrich-catalog` now always warms the cache. `--cache-only` is still
+   accepted and is exactly what the command does, so the invocation anyone has
+   actually run is unchanged. `--catalog` is still accepted and documented as
+   having no effect, which it already did: `enrich_catalog_images(db,
+   catalog_path, limit)` takes the path and never reads it. This is the
+   `--workers` treatment from slice 2.
+
+   Not porting it also avoids taking an EXIF dependency for nothing.
+   `extract_exif` reads eight Pillow tags into `images.exif`, and all eight —
+   make, model, capture time, lens, ISO, aperture, exposure and GPS — are already
+   columns the catalog sync fills from Lightroom.
+
+   Parity is against the real catalog rather than a fixture. Run against its own
+   copy of the 638 MB `library.db`, each CLI reports `Processed: 0, Skipped: 794,
+   Errors: 3` — the three are `.MOV` files, which compress to nothing and land on
+   the oversized sentinel — and the two leave all 43,502 `vision_cache` rows
+   identical, `original_mtime` floats included, with the `images` table untouched
+   on both sides.
+
+   One structural change came with the slice. Warming the cache decodes and
+   compresses, so `CommandHandler` may now return a promise and `run` awaits it.
+   `withLibraryDbAsync` is the lifecycle helper for a body that awaits, and it is
+   a second function rather than a wider return type because the synchronous
+   version's `finally` would close the connection the moment an async body handed
+   back its promise, leaving every statement after the first `await` running
+   against a closed database. The other six commands are untouched and still
+   synchronous. And with all seven dispatching, `CliCommand.handler` is no longer
+   nullable and the "not ported to the TypeScript CLI yet" branch is gone — the
+   same cleanup `JobType.handler` got in step 4.
 
    **One deliberate divergence in the shell.** Every global flag is also declared
    by at least one subcommand, and argparse reparses a subcommand into a fresh
