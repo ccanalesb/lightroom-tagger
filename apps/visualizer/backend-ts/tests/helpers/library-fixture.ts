@@ -447,6 +447,16 @@ export class LibraryFixture {
     }
   }
 
+  /** Direct SQL that writes, for tests that mutate a seed mid-run. */
+  exec(sql: string, ...params: unknown[]): void {
+    const db = this.open();
+    try {
+      db.prepare(sql).run(...(params as never[]));
+    } finally {
+      db.close();
+    }
+  }
+
   /** Point the app at this database for the duration of a test. */
   activate(): this {
     process.env.LIBRARY_DB = this.dbPath;

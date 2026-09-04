@@ -17,6 +17,7 @@ import {
   handleSingleDescribe,
 } from './handlers/describe.js';
 import { BATCH_EMBED_IMAGE_CHECKPOINT_MISMATCH, handleBatchEmbedImage } from './handlers/embed.js';
+import { handleSingleScore } from './handlers/score.js';
 import {
   BATCH_STACK_DETECT_CHECKPOINT_MISMATCH,
   handleBatchCatalogSimilarity,
@@ -61,7 +62,12 @@ export const JOB_TYPES: readonly JobType[] = [
     requiresCatalog: true,
     checkpointMismatchMessage: null,
   },
-  { name: 'single_score', handler: null, requiresCatalog: true, checkpointMismatchMessage: null },
+  {
+    name: 'single_score',
+    handler: handleSingleScore,
+    requiresCatalog: true,
+    checkpointMismatchMessage: null,
+  },
   {
     name: 'batch_score',
     handler: null,

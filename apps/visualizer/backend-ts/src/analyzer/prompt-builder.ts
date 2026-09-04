@@ -75,7 +75,7 @@ export interface PerspectiveRowLike {
   slug: string;
   display_name: string;
   prompt_markdown?: string;
-  optional?: boolean | number;
+  optional?: boolean | number | null;
 }
 
 /**

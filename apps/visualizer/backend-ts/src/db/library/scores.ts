@@ -189,3 +189,104 @@ export function listScoreHistoryForPerspective(
     )
     .all(imageKey, imageType, perspectiveSlug) as ImageScoreRow[];
 }
+
+export interface ImageScoreInsert {
+  image_key: string;
+  image_type?: string;
+  perspective_slug: string;
+  score: number;
+  rationale?: string;
+  model_used?: string;
+  prompt_version?: string;
+  scored_at: string;
+  is_current?: number | boolean;
+  repaired_from_malformed?: number | boolean;
+  not_attempted?: number | boolean;
+}
+
+/**
+ * Insert one `image_scores` row and return its rowid.
+ *
+ * Caller owns the transaction and the `is_current` bookkeeping — writing a new
+ * current row means superseding the old one, and doing both in one transaction is
+ * the only thing that keeps a single row current per image and perspective.
+ */
+export function insertImageScore(db: Db, row: ImageScoreInsert): number {
+  const info = db
+    .prepare(
+      `INSERT INTO image_scores (
+         image_key, image_type, perspective_slug, score, rationale,
+         model_used, prompt_version, scored_at, is_current,
+         repaired_from_malformed, not_attempted
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      row.image_key,
+      row.image_type ?? 'catalog',
+      row.perspective_slug,
+      row.score,
+      row.rationale ?? '',
+      row.model_used ?? '',
+      row.prompt_version ?? '',
+      row.scored_at,
+      Number(row.is_current ?? 1),
+      Number(row.repaired_from_malformed ?? 0),
+      Number(row.not_attempted ?? 0),
+    );
+  return Number(info.lastInsertRowid);
+}
+
+/**
+ * Demote every current row for this image and perspective written under a
+ * *different* rubric version.
+ *
+ * Scoped by `prompt_version` rather than blanket, because a rescore under the
+ * same rubric replaces its own row and must not demote it before the insert.
+ */
+export function supersedePreviousCurrentScores(
+  db: Db,
+  imageKey: string,
+  imageType: string,
+  perspectiveSlug: string,
+  newPromptVersion: string,
+): void {
+  db.prepare(
+    `UPDATE image_scores SET is_current = 0
+     WHERE image_key = ? AND image_type = ? AND perspective_slug = ?
+       AND prompt_version != ?`,
+  ).run(imageKey, imageType, perspectiveSlug, newPromptVersion);
+}
+
+/** Whether a current score already exists for this image, perspective and rubric. */
+export function perspectiveScoreAlreadyCurrent(
+  db: Db,
+  imageKey: string,
+  imageType: string,
+  perspectiveSlug: string,
+  promptVersion: string,
+): boolean {
+  const row = db
+    .prepare(
+      `SELECT 1 FROM image_scores
+       WHERE image_key = ? AND image_type = ? AND perspective_slug = ?
+         AND prompt_version = ? AND is_current = 1
+       LIMIT 1`,
+    )
+    .get(imageKey, imageType, perspectiveSlug, promptVersion);
+  return row !== undefined;
+}
+
+/** Drop every row for one image, perspective and rubric version — the force path. */
+export function deleteScoresForVersion(
+  db: Db,
+  imageKey: string,
+  imageType: string,
+  perspectiveSlug: string,
+  promptVersion: string,
+): void {
+  db.prepare(
+    `DELETE FROM image_scores
+     WHERE image_key = ? AND image_type = ? AND perspective_slug = ?
+       AND prompt_version = ?`,
+  ).run(imageKey, imageType, perspectiveSlug, promptVersion);
+}

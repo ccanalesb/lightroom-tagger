@@ -3,6 +3,7 @@
  * and the `managed_library_db` lifecycle in `jobs/handlers/db_lifecycle.py`.
  */
 import { openLibraryDb, type Db } from '../../db/connection.js';
+import type { JobLogLevel } from '../../db/jobs/jobs.js';
 import { AuthenticationError, InvalidRequestError } from '../../providers/errors.js';
 import { requireLibraryDb } from '../library-db.js';
 import type { ErrorSeverity, JobRunner } from '../runner.js';
@@ -61,6 +62,19 @@ export function failureSeverityFromError(e: unknown): ErrorSeverity {
     return 'critical';
   }
   return 'error';
+}
+
+/**
+ * Narrow a provider `LogCallback` level onto the four the job log stores.
+ *
+ * The provider layer types its level as a bare string — it is shared with the
+ * routes, which log to stdout — so anything it emits outside the enum lands as
+ * `info` rather than writing a level the log filters cannot select.
+ */
+export function jobLogLevel(level: string): JobLogLevel {
+  return level === 'debug' || level === 'info' || level === 'warning' || level === 'error'
+    ? level
+    : 'info';
 }
 
 /** Job metadata as a plain object, whatever the column happened to hold. */

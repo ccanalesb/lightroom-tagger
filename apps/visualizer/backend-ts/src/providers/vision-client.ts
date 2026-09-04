@@ -300,3 +300,38 @@ export async function completeChatText(
   )) as ChatCompletion;
   return body.choices?.[0]?.message?.content ?? '';
 }
+
+const SCORE_JSON_REPAIR_SYSTEM =
+  'You are a JSON repair tool. Output analysis is forbidden; emit data only.\n' +
+  'Return a single JSON object with exactly these keys:\n' +
+  '- "perspective_slug" (string)\n' +
+  '- "score" (integer from 1 through 10 inclusive)\n' +
+  '- "rationale" (string)\n' +
+  'Do not wrap the JSON in markdown fences. Do not add any text before or after the object.';
+
+/**
+ * Build the `llmFixer` that `parseScoreResponseWithRetry` calls at most once.
+ *
+ * The raw output is truncated to 4096 characters: a model that has gone off the
+ * rails can emit the whole context back, and paying to send that to a second
+ * model buys nothing the first few kilobytes do not already show.
+ *
+ * There is no default repair client here on purpose — the fixer runs against the
+ * same provider and model that produced the bad answer, which the caller knows
+ * and this module does not.
+ */
+export function makeScoreJsonLlmFixer(
+  client: ProviderClient,
+  model: string,
+): (raw: string, errorSummary: string) => Promise<string> {
+  return async (raw, errorSummary) =>
+    completeChatText(client, model, {
+      system: SCORE_JSON_REPAIR_SYSTEM,
+      user:
+        'The previous output is not valid JSON for the required score schema.\n\n' +
+        `Raw model output (first 4096 characters):\n${raw.slice(0, 4096)}\n\n` +
+        `Validation error summary:\n${errorSummary}\n\n` +
+        'Respond with ONLY the corrected JSON object. Keys must be exactly ' +
+        'perspective_slug, score, and rationale.',
+    });
+}

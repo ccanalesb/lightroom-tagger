@@ -1,10 +1,13 @@
 /**
  * Timestamp formatting that matches what Python wrote into `library.db`.
  *
- * Two distinct formats are already persisted, and they are not interchangeable:
+ * Three distinct formats are already persisted, and they are not interchangeable:
  *
  *   - `datetime.now(timezone.utc).isoformat()` → `2026-04-12T21:40:51.334442+00:00`
- *     used for `image_scores.scored_at` and `perspectives.created_at/updated_at`
+ *     used for `perspectives.created_at/updated_at` and the frame-substance tables
+ *   - the same truncated to whole seconds → `2026-04-12T21:40:51+00:00`
+ *     used for `image_scores.scored_at`, which is the only column Python writes
+ *     through `.replace(microsecond=0)`
  *   - `datetime.now().isoformat()` → `2026-09-02T13:50:07.083774` (naive, local)
  *     used for `catalog_similarity_rejections.rejected_at` and
  *     `catalog_similarity_groups.created_at`
@@ -53,6 +56,11 @@ export function nowIsoUtc(date: Date = new Date()): string {
       date.getUTCMilliseconds(),
     ) + '+00:00'
   );
+}
+
+/** UTC instant truncated to whole seconds, as `image_scores.scored_at` holds it. */
+export function nowIsoUtcSeconds(date: Date = new Date()): string {
+  return nowIsoUtc(date).replace(/\.\d+(?=\+)/, '');
 }
 
 /**
