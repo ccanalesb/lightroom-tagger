@@ -3,14 +3,16 @@
 # dependency manifests, so exclude everything else (keeps the context tiny and
 # avoids shipping library.db / artifacts / node_modules into the build).
 *
-!pyproject.toml
-!uv.lock
-# Frontend manifests for the pre-baked `npm ci` layer (.sandcastle/Dockerfile, added in #152).
-# `*` also excludes the parent dirs, so walk down re-including each level, then the two files.
+# Backend and frontend manifests for the pre-baked `npm ci` layers.
+# `*` also excludes the parent dirs, so walk down re-including each level, then the files.
 !apps
 apps/*
 !apps/visualizer
 apps/visualizer/*
+!apps/visualizer/backend
+apps/visualizer/backend/*
+!apps/visualizer/backend/package.json
+!apps/visualizer/backend/package-lock.json
 !apps/visualizer/frontend
 apps/visualizer/frontend/*
 !apps/visualizer/frontend/package.json

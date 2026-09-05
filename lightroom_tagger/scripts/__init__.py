@@ -1,1 +1,0 @@
-"""Lightroom Tagger scripts package."""

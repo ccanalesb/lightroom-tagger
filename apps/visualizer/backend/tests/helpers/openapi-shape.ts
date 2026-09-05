@@ -1,0 +1,220 @@
+/**
+ * Reduce an OpenAPI schema to a comparable shape.
+ *
+ * Compared against the checked-in document the previous backend exported. Two
+ * emitter differences are normalized away because they do not change the contract:
+ *
+ *   - **schema names.** The legacy document duplicated nested models per parent
+ *     (hashed suffixes on each use). The current emitter shares one component
+ *     schema and `$ref`s it. Names are resolved away; only the resolved structure
+ *     is compared.
+ *   - **nullable spelling.** `type: ['integer', 'null']`, `anyOf: [{type:integer},
+ *     {type:null}]`, and `allOf: [{$ref}, {type:null}]` all mean the same nullable
+ *     integer and fold to the same union.
+ *
+ * Annotations that carry no type information (`title`, `description`, `default`,
+ * `examples`) and numeric bounds added to integer fields are dropped: they do not
+ * change what `openapi-typescript` generates.
+ */
+
+export type Shape =
+  | { t: 'object'; props: Record<string, Shape>; required: string[]; open: boolean }
+  | { t: 'array'; items: Shape }
+  | { t: 'union'; of: Shape[] }
+  | { t: 'scalar'; type: string; const?: string }
+  | { t: 'any' }
+  | { t: 'cycle' };
+
+export interface OpenApiDoc {
+  paths?: Record<string, Record<string, unknown>>;
+  components?: { schemas?: Record<string, unknown> };
+}
+
+type RawSchema = Record<string, unknown>;
+
+/** Stable string form, used for equality and for sorting union members. */
+export function canonical(shape: Shape): string {
+  const sortKeys = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(sortKeys);
+    if (v && typeof v === 'object') {
+      return Object.fromEntries(
+        Object.entries(v as Record<string, unknown>)
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+          .map(([k, val]) => [k, sortKeys(val)]),
+      );
+    }
+    return v;
+  };
+  return JSON.stringify(sortKeys(shape));
+}
+
+function refName(ref: string): string {
+  return ref.replace('#/components/schemas/', '');
+}
+
+/**
+ * Normalize `schema` against the document it came from.
+ *
+ * `seen` tracks `$ref` names on the current path so a self-referential model
+ * terminates instead of recursing forever.
+ */
+export function shapeOf(schema: unknown, doc: OpenApiDoc, seen: Set<string> = new Set()): Shape {
+  if (schema === true || schema === undefined || schema === null) return { t: 'any' };
+  if (typeof schema !== 'object') return { t: 'any' };
+
+  const s = schema as RawSchema;
+
+  if (typeof s.$ref === 'string') {
+    const name = refName(s.$ref);
+    if (seen.has(name)) return { t: 'cycle' };
+    const target = doc.components?.schemas?.[name];
+    if (target === undefined) return { t: 'any' };
+    return shapeOf(target, doc, new Set([...seen, name]));
+  }
+
+  // `allOf` here is usually annotations on a `$ref`, not a real intersection.
+  // Nullable registered objects often appear as `allOf: [{$ref}, {type: ['object','null']}]`
+  // or `anyOf: [{$ref}, {type: null}]`. Take the substantive member and carry
+  // nullability across.
+  if (Array.isArray(s.allOf)) {
+    const members = s.allOf.map((m) => shapeOf(m, doc, seen));
+    const nullable = members.some(
+      (m) =>
+        (m.t === 'scalar' && m.type === 'null') ||
+        (m.t === 'union' && m.of.some((o) => o.t === 'scalar' && o.type === 'null')),
+    );
+
+    // An intersection of objects is the union of their properties, so members are
+    // merged rather than one being chosen. A later member overriding an earlier
+    // property is how `.extend()` replaces a field.
+    const objects = members.filter((m) => m.t === 'object') as Extract<Shape, { t: 'object' }>[];
+    let merged: Shape;
+    if (objects.length > 0) {
+      const props: Record<string, Shape> = {};
+      const required = new Set<string>();
+      let open = true;
+      for (const obj of objects) {
+        Object.assign(props, obj.props);
+        for (const r of obj.required) required.add(r);
+        // Closed wins: an intersection is only open if every member is.
+        if (!obj.open) open = false;
+      }
+      merged = { t: 'object', props, required: [...required].sort(), open };
+    } else {
+      merged =
+        members.find((m) => m.t === 'array' || m.t === 'cycle') ??
+        members.find((m) => m.t === 'scalar' && m.type !== 'null' && m.type !== 'object') ??
+        members[0] ??
+        ({ t: 'any' } as Shape);
+    }
+    return nullable ? union([merged, { t: 'scalar', type: 'null' }]) : merged;
+  }
+
+  const variants = (s.anyOf ?? s.oneOf) as unknown[] | undefined;
+  if (Array.isArray(variants)) {
+    return union(variants.map((v) => shapeOf(v, doc, seen)));
+  }
+
+  if (Array.isArray(s.type)) {
+    // `type: ['array', 'null']` and `anyOf: [{type: array, items: ...}, {type: null}]`
+    // are the same nullable array. Re-normalize each member against the *whole*
+    // schema so `properties` / `items` are not lost — but the `null` member must
+    // not inherit them, or nullability disappears from the comparison.
+    return union(
+      (s.type as string[]).map((t) =>
+        t === 'null' ? ({ t: 'scalar', type: 'null' } as Shape) : shapeOf({ ...s, type: t }, doc, seen),
+      ),
+    );
+  }
+
+  // `'items' in s` / `'properties' in s` are fallbacks for a schema with no
+  // explicit `type`; they must not override an explicit one.
+  if (s.type === 'array' || (s.type === undefined && 'items' in s)) {
+    return { t: 'array', items: shapeOf(s.items, doc, seen) };
+  }
+
+  if (s.type === 'object' || (s.type === undefined && 'properties' in s)) {
+    const properties = (s.properties ?? {}) as Record<string, unknown>;
+    const props: Record<string, Shape> = {};
+    for (const [k, v] of Object.entries(properties)) props[k] = shapeOf(v, doc, seen);
+    return {
+      t: 'object',
+      props,
+      required: [...((s.required as string[] | undefined) ?? [])].sort(),
+      // `extra='forbid'` / `.strict()` both render as `additionalProperties: false`.
+      open: s.additionalProperties !== false,
+    };
+  }
+
+  if (typeof s.type === 'string') {
+    const out: Shape = { t: 'scalar', type: s.type };
+    // Literal values may appear as `const` or as a single-item `enum`; fold both.
+    const constValue =
+      'const' in s
+        ? s.const
+        : Array.isArray(s.enum) && s.enum.length === 1
+          ? s.enum[0]
+          : undefined;
+    if (constValue !== undefined) out.const = JSON.stringify(constValue);
+    return out;
+  }
+
+  // No `type` and no structure: `Any`.
+  return { t: 'any' };
+}
+
+function union(options: Shape[]): Shape {
+  // `Any | None` is just `Any`: `{}` and `anyOf: [{}, {type: null}]` both accept
+  // null. Collapsing keeps nullable-any shapes comparable.
+  if (options.some((o) => o.t === 'any')) return { t: 'any' };
+  const byCanonical = new Map(options.map((o) => [canonical(o), o]));
+  const deduped = [...byCanonical.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  if (deduped.length === 1) return deduped[0]![1];
+  return { t: 'union', of: deduped.map(([, o]) => o) };
+}
+
+export interface NormalizedParam {
+  name: string;
+  in: string;
+  required: boolean;
+}
+
+export function paramsOf(operation: Record<string, unknown>): NormalizedParam[] {
+  const raw = (operation.parameters as Record<string, unknown>[] | undefined) ?? [];
+  return raw
+    .map((p) => ({
+      name: String(p.name),
+      in: String(p.in),
+      required: Boolean(p.required),
+    }))
+    .sort((a, b) => (`${a.in}:${a.name}` < `${b.in}:${b.name}` ? -1 : 1));
+}
+
+/** `{ '200': Shape, '400': Shape, ... }` for a single operation's JSON responses. */
+export function responseShapes(
+  operation: Record<string, unknown>,
+  doc: OpenApiDoc,
+): Record<string, Shape> {
+  const responses = (operation.responses as Record<string, unknown> | undefined) ?? {};
+  const out: Record<string, Shape> = {};
+  for (const [status, resp] of Object.entries(responses)) {
+    const content = (resp as { content?: Record<string, { schema?: unknown }> }).content;
+    const json = content?.['application/json'];
+    if (!json) continue;
+    out[status] = shapeOf(json.schema, doc, new Set());
+  }
+  return out;
+}
+
+/** The request body shape, or `null` when the operation takes no JSON body. */
+export function requestBodyShape(
+  operation: Record<string, unknown>,
+  doc: OpenApiDoc,
+): Shape | null {
+  const body = operation.requestBody as
+    | { content?: Record<string, { schema?: unknown }> }
+    | undefined;
+  const json = body?.content?.['application/json'];
+  if (!json) return null;
+  return shapeOf(json.schema, doc, new Set());
+}

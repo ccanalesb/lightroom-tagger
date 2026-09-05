@@ -1,0 +1,128 @@
+/**
+ * Read and write the repo-level `config.yaml`.
+ *
+ * These routes do not touch `library.db` — they edit the user's own config file,
+ * so no library-DB middleware here.
+ */
+import { createRoute } from '@hono/zod-openapi';
+import { statSync } from 'node:fs';
+import {
+  config,
+  expandUserPath,
+  loadLibraryConfig,
+  updateConfigYamlCatalogPath,
+  updateConfigYamlStackBurstDeltaMs,
+} from '../config.js';
+import { createOpenApiApp } from './openapi.js';
+import { jsonBody, withValidationError } from './route-helpers.js';
+import {
+  ConfigCatalogGetResponse,
+  ConfigCatalogPutRequest,
+  ConfigCatalogPutResponse,
+  ConfigStackDetectionGetResponse,
+  ConfigStackDetectionPutRequest,
+  ConfigStackDetectionPutResponse,
+} from './schemas/config.js';
+import { ErrorBody } from './schemas/errors.js';
+
+export const ltConfigRoutes = createOpenApiApp();
+
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
+
+// --- catalog ----------------------------------------------------------------
+
+const getCatalogRoute = createRoute({
+  method: 'get',
+  path: '/config/catalog',
+  tags: ['config'],
+  responses: withValidationError({
+    200: { description: 'Catalog path config', content: jsonBody(ConfigCatalogGetResponse) },
+  }),
+});
+
+ltConfigRoutes.openapi(getCatalogRoute, (c) => {
+  const cfg = loadLibraryConfig(config.LT_CONFIG_YAML);
+  // The RAW value is echoed back, not the resolved one: the UI edits what the user
+  // typed (which may contain `~`), and `resolved_path` is shown alongside it.
+  const raw = cfg.catalogPathRaw || '';
+  const resolved = raw ? expandUserPath(raw) : '';
+  return c.json(
+    { catalog_path: raw, resolved_path: resolved, exists: Boolean(resolved && isFile(resolved)) },
+    200,
+  );
+});
+
+const putCatalogRoute = createRoute({
+  method: 'put',
+  path: '/config/catalog',
+  tags: ['config'],
+  request: { body: { content: jsonBody(ConfigCatalogPutRequest) } },
+  responses: withValidationError({
+    200: { description: 'Saved', content: jsonBody(ConfigCatalogPutResponse) },
+    400: { description: 'Invalid request', content: jsonBody(ErrorBody) },
+  }),
+});
+
+// Presence and type are the schema's job and answer 422 before this runs. What is
+// left is the two checks Zod cannot make: the extension, and whether the file is
+// really there.
+ltConfigRoutes.openapi(putCatalogRoute, (c) => {
+  const { catalog_path: value } = c.req.valid('json');
+  if (!value.toLowerCase().endsWith('.lrcat')) {
+    return c.json({ error: 'catalog_path must be a .lrcat file' }, 400);
+  }
+  if (!isFile(expandUserPath(value))) {
+    return c.json({ error: 'catalog_path must be an existing file' }, 400);
+  }
+
+  updateConfigYamlCatalogPath(config.LT_CONFIG_YAML, value);
+  return c.json({ catalog_path: value.trim(), ok: true }, 200);
+});
+
+// --- stack detection --------------------------------------------------------
+
+const getStackDetectionRoute = createRoute({
+  method: 'get',
+  path: '/config/stack-detection',
+  tags: ['config'],
+  responses: withValidationError({
+    200: {
+      description: 'Stack detection config',
+      content: jsonBody(ConfigStackDetectionGetResponse),
+    },
+  }),
+});
+
+ltConfigRoutes.openapi(getStackDetectionRoute, (c) => {
+  const cfg = loadLibraryConfig(config.LT_CONFIG_YAML);
+  return c.json({ stack_burst_delta_ms: Math.trunc(cfg.stackBurstDeltaMs) }, 200);
+});
+
+const putStackDetectionRoute = createRoute({
+  method: 'put',
+  path: '/config/stack-detection',
+  tags: ['config'],
+  request: { body: { content: jsonBody(ConfigStackDetectionPutRequest) } },
+  responses: withValidationError({
+    200: { description: 'Saved', content: jsonBody(ConfigStackDetectionPutResponse) },
+    400: { description: 'Invalid request', content: jsonBody(ErrorBody) },
+  }),
+});
+
+// `z.int()` already rejects a missing field, a fractional number, a numeric string
+// and a boolean with 422. The floor is the one rule left to enforce.
+ltConfigRoutes.openapi(putStackDetectionRoute, (c) => {
+  const { stack_burst_delta_ms: value } = c.req.valid('json');
+  if (value < 1) {
+    return c.json({ error: 'stack_burst_delta_ms must be at least 1' }, 400);
+  }
+
+  updateConfigYamlStackBurstDeltaMs(config.LT_CONFIG_YAML, value);
+  return c.json({ stack_burst_delta_ms: value, ok: true }, 200);
+});

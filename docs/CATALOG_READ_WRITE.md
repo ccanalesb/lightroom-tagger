@@ -4,14 +4,13 @@
 
 By default, `sqlite3` URI parameter `mode=ro` is used when opening the catalog for reads.
 
-- Catalog reads and scans use `lightroom_tagger/lightroom/reader.py` (`connect_catalog`).
-- `lightroom_tagger/schema_explorer.py` opens the catalog only through the reader.
-- `lightroom_tagger/lightroom/schema.py` opens the catalog only through the reader.
-- `lightroom_tagger/core/cli.py` imports `connect_catalog` from the reader for scan workflows.
+- Catalog reads and scans use `apps/visualizer/backend/src/lightroom/reader.ts` (`connectCatalogReadOnly`).
+- `src/lightroom/catalog-sync.ts` opens the catalog only through the reader.
+- The `catalog` CLI commands (`src/cli/commands/catalog.ts`) go through the same reader for scan workflows.
 
-Keyword writeback and repair scripts use a **separate** SQLite connection from the read-only reader.
+Keyword writeback uses a **separate** SQLite connection from the read-only reader.
 
 ## Write paths
 
-- `lightroom_tagger/lightroom/writer.py` — keyword writeback to the catalog.
-- `lightroom_tagger/lightroom/cleanup_wrong_links.py` — one-time repair script that mutates the catalog.
+- `apps/visualizer/backend/src/lightroom/writer.ts` (`connectCatalog`) — keyword writeback to the catalog.
+- `src/utils/lr-catalog-write.ts` — the single wrapper every write route goes through; it takes the catalog lock check and the once-a-day backup with it.

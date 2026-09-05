@@ -55,7 +55,7 @@ function AIPerspectiveSectionLoaded({
   useEffect(() => {
     const d = defaults.description
     if (d?.provider) setProviderId((p) => p ?? d.provider)
-    if (d?.model) setModelId((m) => m ?? d.model)
+    if (d?.model) setModelId((m) => m ?? d.model ?? null)
   }, [defaults])
 
   const refreshScores = useCallback(() => {

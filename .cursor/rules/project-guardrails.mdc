@@ -15,7 +15,7 @@ Default five-role vocabulary (needs-triage, needs-info, ready-for-agent, ready-f
 
 ## Domain docs
 
-Multi-context: `lightroom_tagger/CONTEXT.md` (library/CLI) and `apps/visualizer/CONTEXT.md` (Flask + React product). See `docs/agents/domain.md`.
+Single context: `apps/visualizer/CONTEXT.md` (Hono API + CLI + React product). See `docs/agents/domain.md`.
 
 # NEVER revert or discard the user's work without an explicit instruction
 

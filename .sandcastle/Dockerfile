@@ -1,13 +1,10 @@
-FROM node:22-bookworm
+FROM node:24-bookworm
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
   git \
   curl \
   jq \
-  python3 \
-  python3-venv \
-  python3-pip \
   && rm -rf /var/lib/apt/lists/*
 
 # Build-args for UID/GID alignment: sandcastle docker build-image
@@ -26,27 +23,18 @@ USER ${AGENT_UID}:${AGENT_GID}
 # Install Cursor Agent CLI
 RUN curl https://cursor.com/install -fsS | bash
 
-# Install uv (fast Python package manager) into ~/.local/bin
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/home/agent/.local/bin:$PATH"
 
-# Shared venv outside the bind-mounted repo so it never clobbers the host's.
-ENV UV_PROJECT_ENVIRONMENT=/home/agent/venv
-ENV VIRTUAL_ENV=/home/agent/venv
-# venv first so `python`/`pip` resolve to it; then uv + cursor in ~/.local/bin
-ENV PATH="/home/agent/venv/bin:/home/agent/.local/bin:$PATH"
+# Pre-bake the backend's (heavy: sharp, better-sqlite3, transformers) dependencies
+# into the image so every run is fast and offline. Only the manifests are copied
+# here, so this layer caches across code changes. A runtime hook symlinks
+# node_modules into the bind-mounted worktree.
+WORKDIR /home/agent/.be-deps
+COPY apps/visualizer/backend/package.json apps/visualizer/backend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
-# Pre-bake the project's (heavy) dependencies into the image so every run is
-# fast and offline. Only the dependency manifests are copied here, so this
-# layer is cached across code changes. The editable project itself is installed
-# at runtime via the onSandboxReady hook (deps already satisfied -> fast).
-WORKDIR /home/agent/.deps
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-install-project --extra dev
-
-# Pre-bake the frontend deps too (same rationale: fast, offline; layer caches on
-# the manifests). Baked outside the bind-mounted workspace; a runtime hook
-# symlinks node_modules into the worktree so the contract check (generate:api +
-# tsc) can run. Skip Playwright's browser download — the check needs none.
+# Pre-bake the frontend deps too (same rationale). Skip Playwright's browser
+# download — the contract check needs none.
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 WORKDIR /home/agent/.fe-deps
 COPY apps/visualizer/frontend/package.json apps/visualizer/frontend/package-lock.json ./

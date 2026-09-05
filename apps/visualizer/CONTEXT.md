@@ -1,27 +1,27 @@
-# Context: Visualizer (Flask API + React UI)
+# Context: Visualizer (TypeScript API + React UI)
 
 ## Purpose
 
-The visualizer is the web product that surfaces library data to the user. It consists of a Flask backend (`apps/visualizer/backend/`) and a React SPA (`apps/visualizer/frontend/`). They are developed and deployed together — backend and frontend share the same domain model and API contracts. The visualizer consumes the `lightroom_tagger` library as a dependency.
+The visualizer is the web product that surfaces library data to the user. It consists of a Hono backend (`apps/visualizer/backend/`) and a React SPA (`apps/visualizer/frontend/`). They are developed and deployed together — backend and frontend share the same domain model and API contracts. The backend also carries the library itself (catalog reader, vision pipeline, CLIP, scoring) and the `lightroom-tagger` CLI; there is no separate library package.
 
 ## Domain language
 
 | Term | Meaning |
 |---|---|
 | **job** | A background task (e.g. score images, generate descriptions, build catalog cache). Stored in `visualizer.db`. Has a lifecycle: `pending → running → completed / failed / cancelled`. |
-| **job runner** | `JobRunner` in `jobs/runner.py` — coordinates job lifecycle, progress hooks, cancellation events, and thread-local DB connections for worker threads. |
-| **job processor** | Daemon thread started at app startup that drains the job queue and dispatches to handlers. |
-| **handler** | A function in `jobs/handlers/` (one module per job family) that implements a specific job type (e.g. `handle_batch_describe`, `handle_batch_stack_detect`). |
-| **job-type registry** | `jobs/registry.py` — explicit `JOB_TYPES` list (`JobType` dataclass) co-locating handler, catalog requirement, and checkpoint helpers per type. Single registration surface; mirrors ADR-0006. See ADR-0010. |
-| **job transitions seam** | `jobs/transitions.py` — pure cancel/retry status legality and `update_job_status` targets. Routes delegate via `transition_cancel` / `transition_retry`; no status-rule literals in `api/jobs.py`. See ADR-0010. |
+| **job runner** | `JobRunner` in `jobs/runner.ts` — coordinates job lifecycle, progress hooks and cancellation. Handlers poll `runner.isCancelled(jobId)`; there is no thread-local DB, because handlers run on the event loop over one connection. |
+| **job processor** | `jobs/processor.ts` — started at app startup, drains the job queue and dispatches to handlers. |
+| **handler** | A function in `jobs/handlers/` (one module per job family) that implements a specific job type (e.g. `handleBatchDescribe`, `handleBatchStackDetect`). |
+| **job-type registry** | `jobs/registry.ts` — explicit `JOB_TYPES` list co-locating handler, catalog requirement, and checkpoint helpers per type. Single registration surface; mirrors ADR-0006. See ADR-0010. |
+| **job transitions seam** | `jobs/transitions.ts` — pure cancel/retry status legality and `updateJobStatus` targets. Routes delegate via `transitionCancel` / `transitionRetry`; no status-rule literals in `api/jobs.ts`. See ADR-0010. |
 | **checkpoint** | Persisted job progress snapshot merged into job metadata so interrupted jobs can resume. |
 | **emit_progress** | SocketIO callback passed into job runner and handlers to push real-time progress to the frontend. |
 | **visualizer DB** | `visualizer.db` — SQLite database holding jobs, logs, and visualizer-specific state. Separate from `library.db`. |
-| **library DB** | `library.db` — the shared library database (images, scores, descriptions). The visualizer reads/writes this via the `lightroom_tagger` library. Legacy Instagram-matching data lives in `instagram-matching-export.json` beside the DB ([#228](https://github.com/ccanalesb/lightroom-tagger/issues/228)). |
-| **library-DB lifecycle seam** | Job handlers open `library.db` via `make_managed_library_db` in `jobs/handlers/db_lifecycle.py` (backed by `init_database`); never hand-roll `init_database(...)` + manual `close()` in handler bodies. See ADR-0011. |
-| **blueprint** | A Flask blueprint under `apps/visualizer/backend/api/`. One per domain area (jobs, images, descriptions, providers, scores, identity, system). |
-| **response helpers** | `utils/responses.py` — `error_not_found`, `error_bad_request`, `success_paginated`, etc. Always use these for consistent JSON shapes. |
-| **WebSocket / SocketIO** | Real-time job progress pushed from backend to frontend via Flask-SocketIO + socket.io-client. |
+| **library DB** | `library.db` — the shared library database (images, scores, descriptions), read and written through `db/library/`. Legacy Instagram-matching data lives in `instagram-matching-export.json` beside the DB ([#228](https://github.com/ccanalesb/lightroom-tagger/issues/228)). |
+| **library-DB lifecycle seam** | Job handlers open `library.db` via `withLibraryDb` in `jobs/handlers/common.ts`; never hand-roll `initLibraryDb(...)` + manual `close()` in handler bodies. See ADR-0011. |
+| **route group** | An `OpenAPIHono` router under `apps/visualizer/backend/src/api/`, mounted in `app.ts`. One per domain area (jobs, images, descriptions, providers, scores, identity, system). Successor to the Flask blueprint, and the mount prefixes are unchanged. |
+| **response helpers** | `utils/responses.ts` — `errorNotFound`, `errorBadRequest`, `successPaginated`, etc. Always use these for consistent JSON shapes. |
+| **WebSocket / SocketIO** | Real-time job progress pushed from backend to frontend via socket.io + socket.io-client. |
 | **perspective** | Named scoring lens shown in the UI (matches the library concept). |
 | **model-scoped re-do** (`redo_unless_model`) | A batch describe/score mode that regenerates every eligible image *except* those whose current row was produced by the named target model, which it preserves. Lets a model-swap backlog run over many throttled cycles without redoing the target model's own finished work. Overrides blanket `force`. |
 | **identity** | Photographer style fingerprint and suggestions page (`IdentityPage.tsx`). Catalog-only candidate pool ([#218](https://github.com/ccanalesb/lightroom-tagger/issues/218)); Advisor `high_score_unposted` / `eligible_unposted` key off manually set `instagram_posted` (see [#205](https://github.com/ccanalesb/lightroom-tagger/issues/205)). |
@@ -36,24 +36,33 @@ The Images page is catalog-only in the UI ([#225](https://github.com/ccanalesb/l
 
 | File | Role |
 |---|---|
-| `app.py` | `create_app()` factory — registers blueprints, CORS, SocketIO, DB init, starts job processor daemon |
-| `config.py` | `load_dotenv()` + `os.getenv` for `LIBRARY_DB`, `FLASK_PORT`, `OLLAMA_HOST`, etc. |
-| `database.py` | Visualizer DB schema and helpers (jobs, logs, checkpoints) |
-| `library_db.py` | Thin wrapper for opening `library.db` connections from the backend |
-| `jobs/runner.py` | `JobRunner` — lifecycle, cancellation, thread-local DB, progress hooks |
-| `jobs/registry.py` | Explicit `JOB_TYPES` registry — dispatch, catalog requirement, checkpoint co-location |
+Paths are relative to `apps/visualizer/backend/src/`.
+
+| File | Role |
+|---|---|
+| `app.ts` | `createApp()` factory — mounts the route groups, CORS and the OpenAPI document |
+| `server.ts` | Process entry point — binds the port, attaches SocketIO, starts the job processor |
+| `config.ts` | Env-var getters (`LIBRARY_DB`, `FLASK_PORT`, `OLLAMA_HOST`, …) plus the `config.yaml` loader |
+| `db/jobs/` | Visualizer DB schema and helpers (jobs, logs, checkpoints) |
+| `db/library/` | Every `library.db` read and write, one module per table family; `bootstrap.ts` owns the schema |
+| `jobs/runner.ts` | `JobRunner` — lifecycle, cancellation, progress hooks |
+| `jobs/registry.ts` | Explicit `JOB_TYPES` registry — dispatch, catalog requirement, checkpoint co-location |
 | `jobs/handlers/` | Per-job-family handler modules (`analyze`, `embed`, `stacks`, …) |
-| `jobs/transitions.py` | Pure cancel/retry state machine (`transition_cancel`, `transition_retry`) |
-| `jobs/checkpoint.py` | Checkpoint merge logic |
-| `api/jobs.py` | REST endpoints for job CRUD and cancellation (spectree + pydantic — ADR-0013) |
-| `api/images/` | Catalog and stack image blueprints (`catalog`, `stacks`) |
-| `api/descriptions.py` | Description fetch/trigger endpoints |
-| `api/scores.py` | Score endpoints per image/perspective |
-| `api/identity.py` | Identity/suggestions endpoints |
-| `api/providers.py` | Provider availability endpoints |
-| `api/system.py` | Health, config, system info |
+| `jobs/transitions.ts` | Pure cancel/retry state machine (`transitionCancel`, `transitionRetry`) |
+| `jobs/checkpoint.ts` | Checkpoint merge logic |
+| `api/jobs.ts` | REST endpoints for job CRUD and cancellation (zod + OpenAPI — ADR-0013) |
+| `api/images/` | Catalog and stack image route groups (`catalog`, `stacks`, `frame-substance`) |
+| `api/descriptions.ts` | Description fetch/trigger endpoints |
+| `api/scores.ts` | Score endpoints per image/perspective |
+| `api/identity.ts` | Identity/suggestions endpoints |
+| `api/providers.ts` | Provider availability endpoints |
+| `api/system.ts` | Health, config, system info |
+| `api/schemas/` | zod request/response models, one module per group |
 | `websocket/` | SocketIO event handlers |
-| `utils/responses.py` | Shared JSON response helpers |
+| `utils/responses.ts` | Shared JSON response helpers |
+| `cli/` | The `lightroom-tagger` CLI — `scan`, `sync`, `search`, `export`, `init`, `stats`, `enrich-catalog` |
+| `lightroom/` | `.lrcat` reader, keyword writer and the catalog sync driver |
+| `imaging/`, `vision/`, `providers/`, `analyzer/`, `identity/`, `clip/` | The library layer: RAW decode, CLIP, phash, vision calls, scoring, identity |
 
 ### Frontend
 
@@ -72,14 +81,20 @@ The server emits `job_created` on job creation (`POST /jobs`); `useJobSocket` ow
 
 ## Architectural constraints
 
-- **Frontend and backend are one unit**: changes to API shape must be reflected in both the Flask blueprint and the TypeScript service layer.
+- **Frontend and backend are one unit**: changes to API shape must be reflected in both the backend route group and the frontend service layer.
 - **SocketIO for job progress**: never poll for job status — use the WebSocket channel.
-- **Always use `utils/responses.py` helpers**: never return raw `jsonify(...)` with ad-hoc status codes from blueprints.
-- **Thread-local DB connections in job workers**: workers must call `runner.thread_db()` rather than using the runner's `self.db` directly.
-- **`sys.path` includes repo root**: `app.py` inserts the monorepo root so `lightroom_tagger.*` imports resolve from the backend.
+- **Always use `utils/responses.ts` helpers**: never return a raw `c.json(...)` with an ad-hoc status code from a route.
+- **Cancellation is polled, not thrown**: handlers check `runner.isCancelled(jobId)` between units of work and pass a `cancelCheck` down; there is no thread-local cancel scope.
 - **Dev proxy**: Vite proxies `/api` and `/socket.io` to `localhost:5001`; don't hardcode backend URLs in frontend code.
 - **Design system**: all UI work must follow `apps/visualizer/frontend/DESIGN.md` (Tailwind semantic classes, 8px grid, Inter font, single blue accent).
-- **Job-type knowledge through `JOB_TYPES` only** (ADR-0010): dispatch (`get_job_handler`), catalog gating (`catalog_requiring_job_types` / `JOB_TYPES_REQUIRING_CATALOG`), and checkpoint helpers are registry projections — no second handler map or catalog frozenset (enforced by `test_job_registry_guardrail.py`).
-- **Job status transitions through `jobs/transitions.py` only** (ADR-0010): `api/jobs.py` delegates cancel/retry to `transition_cancel` / `transition_retry`; no cancellable/retryable status sets or `update_job_status` targets in routes (enforced by `test_job_transitions_guardrail.py`).
-- **Library-DB lifecycle through `make_managed_library_db` only** (ADR-0011): handler modules bind one module-level CM via `jobs/handlers/db_lifecycle.py`; no hand-rolled `init_database(...)` + manual `close()` in handler orchestration (enforced by `test_db_lifecycle_guardrail.py`).
-- **API contract seam — backend-authoritative OpenAPI** (ADR-0013): All API response shapes are pydantic models exposed via spectree; frontend types are generated from OpenAPI (`npm run generate:api` → `src/types/api.gen.ts`); drift is gated in CI (see `.sandcastle/ci-drift-gate.yml`). `frontend/src/services/api.ts` must not declare hand-written response interfaces (enforced by `test_api_ts_contract_guardrail.py`). All API groups are migrated.
+- **Job-type knowledge through `JOB_TYPES` only** (ADR-0010): dispatch (`getJobHandler`), catalog gating (`jobTypesRequiringCatalog`) and checkpoint helpers are registry projections — no second handler map or catalog set.
+- **Job status transitions through `jobs/transitions.ts` only** (ADR-0010): `api/jobs.ts` delegates cancel/retry to `transitionCancel` / `transitionRetry`; no cancellable/retryable status sets or `updateJobStatus` targets in routes.
+- **Library-DB lifecycle through `withLibraryDb` only** (ADR-0011): handler orchestration goes through the helper in `jobs/handlers/common.ts`; no hand-rolled `initLibraryDb(...)` + manual `close()`.
+- **API contract seam — backend-authoritative OpenAPI** (ADR-0013): All API response shapes are zod schemas registered on their route; frontend types are generated from OpenAPI (`npm run generate:api` → `src/types/api.gen.ts`); drift is gated in CI (see `.sandcastle/ci-drift-gate.yml`). `frontend/src/services/api.ts` must not declare hand-written response interfaces.
+
+The last four were each enforced by a Python guardrail test that read the Flask
+tree with `ast`, and those went with it. Two are now structural instead: the
+registry is the only thing typed to hold a handler, and `withLibraryDb` is the
+only export that hands out a connection. The other two are conventions until
+something replaces the guardrails
+([#306](https://github.com/ccanalesb/lightroom-tagger/issues/306)).

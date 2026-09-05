@@ -3,19 +3,23 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-REPO_ROOT="$(cd "$ROOT/../.." && pwd)"
-PYTHON="${PYTHON:-$REPO_ROOT/.venv/bin/python}"
 
-echo "==> 1/3 Regenerate frontend types and check for drift"
+echo "==> 1/5 Regenerate frontend types and check for drift"
 cd "$ROOT/frontend"
 npm run generate:api
 git diff --exit-code src/types/api.gen.ts
 
-echo "==> 2/3 Typecheck frontend"
+echo "==> 2/5 Typecheck frontend"
 npx tsc --noEmit
 
-echo "==> 3/3 Backend pytest (spectree validates Jobs responses)"
+echo "==> 3/5 Frontend tests"
+npx vitest run
+
+echo "==> 4/5 Typecheck backend"
 cd "$ROOT/backend"
-"$PYTHON" -m pytest tests/ --ignore=tests/e2e -q
+npm run typecheck
+
+echo "==> 5/5 Backend tests"
+npm test
 
 echo "Contract gate: OK"

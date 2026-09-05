@@ -1,13 +1,13 @@
 # Domain Docs
 
-This repo uses a **multi-context** layout with two independent context files.
+This repo has a **single** context file. The two-context layout ended with the
+TypeScript cutover, which folded the Python library into the backend.
 
 ## Contexts
 
 | Context | File | Covers |
 |---|---|---|
-| Library / CLI | `lightroom_tagger/CONTEXT.md` | Matching, vision, providers, ProviderRegistry, Lightroom catalog, Instagram parsing, CLI |
-| Visualizer product | `apps/visualizer/CONTEXT.md` | Flask API, job queue, WebSocket, React UI, blueprints |
+| Visualizer product | `apps/visualizer/CONTEXT.md` | HTTP API, CLI, job queue, WebSocket, React UI, vision, providers, ProviderRegistry, Lightroom catalog, matching |
 
 ## Cross-cutting decisions
 
@@ -35,6 +35,6 @@ Architectural decision records live in `docs/adr/`:
 
 ## Usage by skills
 
-- `diagnose`, `tdd`, `improve-codebase-architecture` — read the context file closest to the files being worked on
-- If work spans both contexts, read both
-- Both `CONTEXT.md` files exist (`lightroom_tagger/CONTEXT.md`, `apps/visualizer/CONTEXT.md`); keep them current as the domain language evolves
+- `diagnose`, `tdd`, `improve-codebase-architecture` — read `apps/visualizer/CONTEXT.md` before changing anything under `apps/`
+- Pair it with `docs/architecture.md` for the backend's layer boundaries and import rules
+- Keep `apps/visualizer/CONTEXT.md` current as the domain language evolves

@@ -1,6 +1,6 @@
 # Module boundaries and layering
 
-This document is the authoritative boundary policy for Python packages in this repository. Ruff configuration references it from `pyproject.toml`.
+This document is the authoritative boundary policy for `apps/visualizer/backend/src/`.
 
 ## Layers
 
@@ -10,20 +10,40 @@ flowchart TB
     services --> database
 ```
 
-HTTP/Flask handlers and job adapters live above the library: they translate HTTP and job metadata into calls into `lightroom_tagger.core`. **Pipelines** (`lightroom_tagger/core/pipelines.py`, per [ADR-0003](adr/0003-pipeline-layer.md)) are the intended orchestration layer between handlers and services; that module is the target design even if parts of the tree still call services directly during refactors.
-
-## File size budget
-
-Non-test Python files under `lightroom_tagger/core/` must be **≤ 400** physical lines as reported by `wc -l` (inclusive of blanks and comments).
+Route groups and job handlers live above the library: they translate HTTP and job
+metadata into calls into the service modules. Nothing below the handler layer knows
+about `Context`, request parsing or response shaping.
 
 ## What belongs in each layer
 
-- **HTTP / Flask handlers** (`apps/visualizer/backend/jobs/`, `apps/visualizer/backend/api/`) — routing, request parsing, response shaping, progress callbacks into the job runner, and thin delegation to the library.
-- **Services** (`lightroom_tagger/core/` except the `database/` package internals) — domain logic: matching, analysis, scoring, identity, NL search, embeddings, and similar.
-- **Database package** (`lightroom_tagger/core/database/`) — persistence: SQL, migrations, stores, and catalog/library write paths (see [ADR-0002](adr/0002-split-database.md)).
-- **Exceptions package** (`lightroom_tagger/core/exceptions/`) — typed errors shared across layers (provider errors, DB mutation errors, etc.).
+- **HTTP routes and job handlers** (`api/`, `jobs/`) — routing, request parsing, response shaping, progress callbacks into the job runner, and thin delegation to the services.
+- **Services** (`analyzer/`, `clip/`, `identity/`, `imaging/`, `lightroom/`, `providers/`, `vision/`) — domain logic: analysis, scoring, identity, embeddings, RAW decode, catalog reading and the provider stack.
+- **Database layer** (`db/library/`, `db/jobs/`) — persistence: SQL, schema, and the catalog/library write paths (see [ADR-0002](adr/0002-split-database.md)). `db/library/bootstrap.ts` owns the `library.db` schema.
+- **Shared utilities** (`utils/`, `constants/`) — errors, datetime, path resolution and response helpers used across layers.
 
 ## Import rules
 
-1. Modules under `lightroom_tagger/core/` **must not** import application packages such as `apps.visualizer` (stdlib, third-party libs, and other `lightroom_tagger` library code are allowed as appropriate).
-2. API layer modules (`apps/visualizer/backend/api/**/*.py`) **may** import from `lightroom_tagger.core.*` but must not import sibling api modules — for example `api/identity.py` must not import `api.images` or `from api.images import ...`, and `api/scores.py` must not import `api.perspectives`. Coupling between API areas should go through shared non-`api` helpers or upward into the service layer. The shared infrastructure modules `api.openapi` (the OpenAPI spec singleton) and `api.schemas` (request/response models) are exempt — every route area is expected to import them.
+1. Service and database modules **must not** import from `api/` or `jobs/`.
+2. Route modules under `api/` may import services and `db/`, but **must not** import sibling route modules — for example `api/identity.ts` must not import `api/images/catalog.ts`, and `api/scores.ts` must not import `api/perspectives.ts`. Coupling between API areas goes through `api/route-helpers.ts`, `api/schemas/` or downward into the service layer. `api/openapi.ts` and `api/schemas/` are exempt — every route group is expected to import them.
+3. `cli/` sits alongside `api/` as a second entry point over the same services; it must not import from `api/` or `jobs/`.
+
+## History
+
+Until the TypeScript cutover this policy governed a Python package at
+`lightroom_tagger/` and a Flask backend at this same `apps/visualizer/backend/`
+path, with the layer split enforced by `test_architecture.py` and a 400-line cap
+on `lightroom_tagger/core/` (`make check-core-sizes`). Both trees are gone; the
+replacement was built alongside them as `backend-ts/` and took over the name once
+the Flask tree was deleted. The rules above are the same boundaries restated for
+it.
+
+Neither enforcement mechanism survived the port. The import rules above are a
+convention today; ten files under `src/` are already over the old 400-line cap,
+so reinstating it needs refactoring first. Tracked in
+[#306](https://github.com/ccanalesb/lightroom-tagger/issues/306).
+
+The Python package took the `library.db` migration ladder with it, so
+`db/library/bootstrap.ts` is now the only schema authority: it creates version 8
+and refuses anything below. Backups predating version 8 are no longer openable by
+anything in this repo — recover the ladder from git history if one ever needs
+upgrading. See [docs/plans/ts-backend-migration.md](plans/ts-backend-migration.md).

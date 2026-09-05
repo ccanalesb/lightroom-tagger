@@ -1,7 +1,7 @@
 {
   "name": "lightroom-tagger",
   "version": "1.0.0",
-  "description": "A Python tool to read Lightroom catalog (`.lrcat` SQLite database), index metadata to a local SQLite database, and export/search your photo library. Includes Instagram matching with vision model support.",
+  "description": "A TypeScript tool to read a Lightroom catalog (`.lrcat` SQLite database), index metadata to a local SQLite database, and export/search your photo library. Includes vision-model descriptions and scoring.",
   "main": "index.js",
   "directories": {
     "doc": "docs"

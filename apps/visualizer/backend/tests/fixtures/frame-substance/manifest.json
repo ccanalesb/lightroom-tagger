@@ -1,0 +1,158 @@
+{
+ "pillow": "12.2.0",
+ "numpy": "2.4.4",
+ "detector_version": "v1-847ab31c",
+ "note": "Golden values for the frame substance detector. See regenerate-fixtures.py.",
+ "images": [
+  {
+   "name": "flat_black",
+   "file": "flat_black.png",
+   "mode": "L",
+   "width": 128,
+   "height": 128,
+   "stats": {
+    "black_frac_25": 1.0,
+    "blown_frac_235": 0.0,
+    "entropy": -0.0,
+    "lap_var": 0.0,
+    "tile_max": 0.0
+   },
+   "verdict": "void"
+  },
+  {
+   "name": "flat_white",
+   "file": "flat_white.png",
+   "mode": "L",
+   "width": 128,
+   "height": 128,
+   "stats": {
+    "black_frac_25": 0.0,
+    "blown_frac_235": 1.0,
+    "entropy": -0.0,
+    "lap_var": 0.0,
+    "tile_max": 255.0
+   },
+   "verdict": "void"
+  },
+  {
+   "name": "black_bright_cluster",
+   "file": "black_bright_cluster.png",
+   "mode": "L",
+   "width": 512,
+   "height": 512,
+   "stats": {
+    "black_frac_25": 0.99993896484375,
+    "blown_frac_235": 6.103515625e-05,
+    "entropy": 0.0009425446174581648,
+    "lap_var": 10.0,
+    "tile_max": 3.984375
+   },
+   "verdict": "illegible"
+  },
+  {
+   "name": "black_bright_patch",
+   "file": "black_bright_patch.png",
+   "mode": "L",
+   "width": 512,
+   "height": 512,
+   "stats": {
+    "black_frac_25": 0.993896484375,
+    "blown_frac_235": 0.006103515625,
+    "entropy": 0.05367692328116453,
+    "lap_var": 82.0,
+    "tile_max": 255.0
+   },
+   "verdict": "ok"
+  },
+  {
+   "name": "blown_near_uniform",
+   "file": "blown_near_uniform.png",
+   "mode": "L",
+   "width": 128,
+   "height": 128,
+   "stats": {
+    "black_frac_25": 0.0,
+    "blown_frac_235": 1.0,
+    "entropy": 0.9886994082884974,
+    "lap_var": 1.2219703197479248,
+    "tile_max": 250.0
+   },
+   "verdict": "illegible"
+  },
+  {
+   "name": "noisy_mid_grey",
+   "file": "noisy_mid_grey.png",
+   "mode": "L",
+   "width": 128,
+   "height": 128,
+   "stats": {
+    "black_frac_25": 0.0,
+    "blown_frac_235": 0.0,
+    "entropy": 6.5813565780678145,
+    "lap_var": 15753.50390625,
+    "tile_max": 147.375
+   },
+   "verdict": "ok"
+  },
+  {
+   "name": "below_trigger_grey",
+   "file": "below_trigger_grey.png",
+   "mode": "L",
+   "width": 128,
+   "height": 128,
+   "stats": {
+    "black_frac_25": 0.97955322265625,
+    "blown_frac_235": 0.0,
+    "entropy": 0.14394177435212188,
+    "lap_var": 266.2554931640625,
+    "tile_max": 96.0
+   },
+   "verdict": "ok"
+  },
+  {
+   "name": "gradient_rgb_251x137",
+   "file": "gradient_rgb_251x137.png",
+   "mode": "RGB",
+   "width": 251,
+   "height": 137,
+   "stats": {
+    "black_frac_25": 0.023206444295809463,
+    "blown_frac_235": 0.014075086515252857,
+    "entropy": 7.758922850429331,
+    "lap_var": 2.4445648193359375,
+    "tile_max": 230.92857360839844
+   },
+   "verdict": "ok"
+  },
+  {
+   "name": "exact_32x32",
+   "file": "exact_32x32.png",
+   "mode": "L",
+   "width": 32,
+   "height": 32,
+   "stats": {
+    "black_frac_25": 0.0947265625,
+    "blown_frac_235": 0.080078125,
+    "entropy": 7.817632521654422,
+    "lap_var": 102254.4375,
+    "tile_max": 255.0
+   },
+   "verdict": "ok"
+  },
+  {
+   "name": "odd_37x53",
+   "file": "odd_37x53.png",
+   "mode": "L",
+   "width": 37,
+   "height": 53,
+   "stats": {
+    "black_frac_25": 0.09943906170321265,
+    "blown_frac_235": 0.0887302396736359,
+    "entropy": 7.90725917176775,
+    "lap_var": 107155.4296875,
+    "tile_max": 255.0
+   },
+   "verdict": "ok"
+  }
+ ]
+}

@@ -66,8 +66,6 @@ Thumbs.db
 logs
 *.log
 *.db
-# Committed E2E library seed (exception to *.db)
-!apps/visualizer/backend/tests/e2e/fixtures/library_seed.db
 instructions.md
 skills-lock.json
 .agents/
@@ -88,7 +86,7 @@ library.db*.bak-wal
 node_modules/
 .env.local
 thumbnails/
-lightroom_tagger/core/providers.json
+apps/visualizer/backend/providers.json
 *.db-journal
 *.db-wal
 *.db-shm
