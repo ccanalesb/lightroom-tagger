@@ -1,5 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom';
+import { BackendConnectivityBanner } from './BackendConnectivityBanner';
 import { ThemeToggle } from './ui/ThemeToggle';
+import { useBackendSocket } from '../hooks/useBackendSocket';
 import {
   APP_TITLE,
   NAV_INSIGHTS,
@@ -9,6 +11,7 @@ import {
 } from '../constants/strings';
 
 export function Layout() {
+  useBackendSocket();
   const navItems = [
     { to: '/', label: NAV_INSIGHTS, exact: true },
     { to: '/images', label: NAV_IMAGES },
@@ -18,6 +21,7 @@ export function Layout() {
 
   return (
     <div className="min-h-screen bg-bg transition-colors duration-200">
+      <BackendConnectivityBanner />
       <header className="sticky top-0 z-50 bg-bg border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">

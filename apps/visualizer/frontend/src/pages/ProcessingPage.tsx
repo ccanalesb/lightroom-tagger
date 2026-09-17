@@ -13,6 +13,7 @@ import { useJobSocket } from '../hooks/useJobSocket';
 import { usePageTab } from '../hooks/usePageTab';
 import { JobsAPI } from '../services/api';
 import { ErrorBoundary, ErrorState, invalidateAll, useQuery } from '../data';
+import { AnalyzeOptionsProvider } from '../stores/analyzeOptionsContext';
 import { PROCESSING_TAB_IDS, usePageUiStore } from '../stores/pageUiStore';
 import {
   TAB_ANALYZE,
@@ -106,7 +107,9 @@ export function ProcessingPage() {
           )}
         >
           <Suspense fallback={tabSuspenseFallback}>
-            <AnalyzeTab />
+            <AnalyzeOptionsProvider>
+              <AnalyzeTab />
+            </AnalyzeOptionsProvider>
           </Suspense>
         </ErrorBoundary>
       ),
