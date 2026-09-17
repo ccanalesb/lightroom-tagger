@@ -190,6 +190,22 @@ export function storeImagesBatch(db: Db, records: readonly object[]): number {
 }
 
 /**
+ * Rewrite `images.keywords` for catalog ids already in the library. Does NOT
+ * commit — call inside `libraryWrite`.
+ */
+export function updateImageKeywordsBatch(
+  db: Db,
+  updates: ReadonlyArray<{ catalogId: number; keywords: string[] }>,
+): number {
+  const stmt = db.prepare('UPDATE images SET keywords = ? WHERE id = ?');
+  let count = 0;
+  for (const { catalogId, keywords } of updates) {
+    count += stmt.run(JSON.stringify(keywords), String(catalogId)).changes;
+  }
+  return count;
+}
+
+/**
  * Catalog images with no usable vision-cache entry, for `enrich-catalog` to warm.
  *
  * Two passes: anti-join for uncached rows, then filesystem check for rows whose

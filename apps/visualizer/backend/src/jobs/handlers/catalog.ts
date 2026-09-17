@@ -45,6 +45,7 @@ export interface CatalogSyncStageResult {
   catalog_total?: number;
   library_total?: number;
   missing_ids_count?: number;
+  keywords_backfilled?: number;
   /** Set when no catalog is configured, or the configured one is not there. */
   skipped?: true;
   /** Set when the catalog exists but could not be read. */
@@ -115,6 +116,7 @@ export async function runCatalogSyncPass(
       log: (level, message) => runner.log(jobId, jobLogLevel(level), `${prefix}${message}`),
       progress,
       isCancelled: () => runner.isCancelled(jobId),
+      backfillKeywords: metadata['backfill_keywords'] === true,
     });
   } catch (e) {
     const raw = e instanceof Error ? e.message : String(e);

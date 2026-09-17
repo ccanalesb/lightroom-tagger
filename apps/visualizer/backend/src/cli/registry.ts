@@ -61,7 +61,15 @@ export const COMMANDS: readonly CliCommand[] = [
   {
     name: 'sync',
     help: 'Incremental catalog sync — add missing images to library.db',
-    flags: [CATALOG_FLAG, DB_FLAG],
+    flags: [
+      CATALOG_FLAG,
+      DB_FLAG,
+      {
+        name: 'backfill-keywords',
+        kind: 'boolean',
+        help: 'Re-read keywords for rows already in library.db',
+      },
+    ],
     handler: cmdSync,
   },
   {

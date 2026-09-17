@@ -12,10 +12,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { config } from '../src/config.js';
 import { openLibraryDb, type Db } from '../src/db/connection.js';
 import {
+  getLibraryMeta,
   initLibraryDb,
   LIBRARY_SCHEMA_VERSION,
   perspectiveSeedDescription,
   seedPerspectivesFromPromptsDir,
+  setLibraryMeta,
+  upgradeLibrarySchema,
 } from '../src/db/library/bootstrap.js';
 import { LibraryFixture } from './helpers/library-fixture.js';
 
@@ -112,8 +115,29 @@ describe('initLibraryDb', () => {
     legacy.pragma('user_version = 5');
     legacy.close();
 
-    expect(() => initLibraryDb(path)).toThrow(/schema version 5, below the current 8/);
+    expect(() => initLibraryDb(path)).toThrow(/schema version 5, below the current 9/);
     expect(() => initLibraryDb(path)).toThrow(/lightroom-tagger init/);
+  });
+
+  it('upgrades a version 8 database to 9 by adding library_meta', () => {
+    const path = join(dir, 'v8.db');
+    const v8 = new Database(path);
+    v8.exec('CREATE TABLE images (key TEXT PRIMARY KEY)');
+    v8.pragma('user_version = 8');
+    v8.close();
+
+    const db = openLibraryDb(path);
+    try {
+      upgradeLibrarySchema(db);
+      expect(db.pragma('user_version', { simple: true })).toBe(LIBRARY_SCHEMA_VERSION);
+      setLibraryMeta(db, 'k', 'v');
+      expect(getLibraryMeta(db, 'k')).toBe('v');
+      // Idempotent: a second pass over the already-current db is a no-op.
+      upgradeLibrarySchema(db);
+      expect(getLibraryMeta(db, 'k')).toBe('v');
+    } finally {
+      db.close();
+    }
   });
 });
 

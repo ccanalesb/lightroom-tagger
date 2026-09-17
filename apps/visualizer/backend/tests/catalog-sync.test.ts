@@ -115,14 +115,14 @@ describe('lightroom reader', () => {
     });
   });
 
-  it('finds no keywords, because the join uses the file id (see reader.ts)', () => {
+  it('reads keywords through Adobe_images.rootFile, not the file id directly', () => {
     makeFakeCatalog(lrcatPath, [
       { id: 100, baseName: 'L1007168', keywords: ['sunset', 'maine'] },
     ]);
-    // `AgLibraryKeywordImage.image` is an `Adobe_images.id_local`, and the reader
-    // passes an `AgLibraryFile.id_local`. Pinned so a "fix" is a deliberate change
-    // with a backfill behind it, not an accident. See #304.
-    expect(withCatalog((conn) => getImageById(conn, 100))!.keywords).toEqual([]);
+    expect(withCatalog((conn) => getImageById(conn, 100))!.keywords).toEqual([
+      'sunset',
+      'maine',
+    ]);
   });
 
   it('coalesces on falsiness for pick, rating, focal length, and GPS', () => {
@@ -261,8 +261,53 @@ describe('syncCatalog', () => {
     // Same id, so the second run sees nothing missing and writes nothing.
     const { result } = await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
 
-    expect(result).toMatchObject({ added: 0, missing_ids_count: 0, library_total: 1 });
+    expect(result).toMatchObject({
+      added: 0,
+      missing_ids_count: 0,
+      library_total: 1,
+      keywords_backfilled: 0,
+    });
     expect(syncedImages()).toHaveLength(1);
+  });
+
+  it('backfills keywords for rows already in the library on the first sync', async () => {
+    makeFakeCatalog(lrcatPath, [
+      { id: 1, baseName: 'old', keywords: ['legacy'] },
+      { id: 2, baseName: 'new', keywords: ['fresh'] },
+    ]);
+    seedLibraryImage('old', '1');
+
+    const { result } = await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
+
+    expect(result).toMatchObject({ added: 1, keywords_backfilled: 2 });
+    expect(syncedImages()).toEqual([
+      {
+        key: '2024-06-01_new',
+        id: '2',
+        filepath: '/Volumes/photos/2024/new.jpg',
+        keywords: '["fresh"]',
+      },
+      {
+        key: 'old',
+        id: '1',
+        filepath: expect.any(String),
+        keywords: '["legacy"]',
+      },
+    ]);
+  });
+
+  it('can force keyword backfill after the one-time auto pass', async () => {
+    makeFakeCatalog(lrcatPath, [{ id: 1, baseName: 'once', keywords: ['first'] }]);
+    await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
+
+    rmSync(lrcatPath);
+    makeFakeCatalog(lrcatPath, [{ id: 1, baseName: 'once', keywords: ['renamed'] }]);
+    const { result } = await withLibraryAsync((db) =>
+      syncCatalog(lrcatPath, db, { backfillKeywords: true }),
+    );
+
+    expect(result).toMatchObject({ added: 0, keywords_backfilled: 1 });
+    expect(syncedImages()[0]!.keywords).toBe('["renamed"]');
   });
 
   it('raises an actionable error when the catalog cannot be opened', async () => {
@@ -299,10 +344,13 @@ describe('syncCatalog', () => {
     expect(progress).toEqual([
       [50, 'Fetching catalog metadata 1/2'],
       [95, 'Fetching catalog metadata 2/2'],
+      [97, 'Backfilling keywords 1/2'],
+      [99, 'Backfilling keywords 2/2'],
       [100, 'Catalog sync complete'],
     ]);
     expect(logs[0]).toContain('catalog_total=2 library_total=0 missing=2 stale=0');
-    expect(logs[1]).toContain('complete added=2 stale=0');
+    expect(logs[1]).toContain('keyword_backfill mode=auto rows=2');
+    expect(logs[2]).toContain('complete added=2 stale=0 keywords_backfilled=2');
   });
 
   it('stops on cancellation and keeps what it already fetched', async () => {

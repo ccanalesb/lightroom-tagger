@@ -181,21 +181,21 @@ const IMAGE_METADATA_SQL = `
 `;
 
 /**
- * Keywords linked to an image.
+ * Keywords linked to a catalog file.
  *
- * `AgLibraryKeywordImage.image` references `Adobe_images.id_local`, but this passes
- * `AgLibraryFile.id_local`, so it returns nothing. Fixing it requires a backfill,
- * not a one-line join change; tracked as #304.
+ * `AgLibraryKeywordImage.image` references `Adobe_images.id_local`, not
+ * `AgLibraryFile.id_local`. Join through `Adobe_images.rootFile`, as `writer.ts` does.
  */
-function keywordsForImage(conn: Db, imageId: number): string[] {
+export function getKeywordsForFileId(conn: Db, fileId: number): string[] {
   const rows = conn
     .prepare(
       `SELECT k.name AS name
        FROM AgLibraryKeywordImage ki
        JOIN AgLibraryKeyword k ON ki.tag = k.id_local
-       WHERE ki.image = ?`,
+       JOIN Adobe_images ai ON ai.id_local = ki.image
+       WHERE ai.rootFile = ?`,
     )
-    .all(imageId) as { name: string }[];
+    .all(fileId) as { name: string }[];
   return rows.map((r) => r.name);
 }
 
@@ -226,7 +226,7 @@ export function getImageById(conn: Db, imageId: number): CatalogRecord | null {
     rating: (row['rating'] as number) || 0,
     pick: pickFlag === null || pickFlag === undefined ? false : Boolean(pickFlag),
     color_label: (row['color_label'] as string) || '',
-    keywords: keywordsForImage(conn, imageId),
+    keywords: getKeywordsForFileId(conn, imageId),
     title: '',
     caption: (row['caption'] as string) || '',
     copyright: (row['copyright'] as string) || '',
