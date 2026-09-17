@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { IdentityAPI, type MirrorExemplar } from '../../services/api'
 import { thumbnailUrl } from '../../utils/imageUrl'
 import { Badge } from '../ui/badges'
+import { ScrollContainerLazyImage } from '../ui/ScrollContainerLazyImage'
 import { formatStackCountBadge } from '../../constants/strings'
 
 // Fallbacks only; the live values come from the mirror payload's
@@ -179,10 +180,10 @@ export function ExemplarRail({
                   <Badge variant="default">{formatStackCountBadge(stackCount)}</Badge>
                 </span>
               ) : null}
-              <img
+              <ScrollContainerLazyImage
+                scrollContainerRef={railRef}
                 src={thumbnailUrl('catalog', exemplar.image_key)}
                 alt={`Exemplar ${index + 1}`}
-                loading="lazy"
                 className="h-full w-full object-cover"
               />
             </button>
