@@ -9,7 +9,7 @@ The visualizer is the web product that surfaces library data to the user. It con
 | Term | Meaning |
 |---|---|
 | **job** | A background task (e.g. score images, generate descriptions, build catalog cache). Stored in `visualizer.db`. Has a lifecycle: `pending → running → completed / failed / cancelled`. |
-| **job runner** | `JobRunner` in `jobs/runner.ts` — coordinates job lifecycle, progress hooks and cancellation. Handlers poll `runner.isCancelled(jobId)`; there is no thread-local DB, because handlers run on the event loop over one connection. |
+| **job runner** | `JobRunner` in `jobs/runner.ts` — coordinates job lifecycle, progress hooks and cancellation. Handlers run on the main event loop, one job at a time, and poll `runner.isCancelled(jobId)` between units of work. Long synchronous loops must yield cooperatively so the API stays responsive. See ADR-0018. |
 | **job processor** | `jobs/processor.ts` — started at app startup, drains the job queue and dispatches to handlers. |
 | **handler** | A function in `jobs/handlers/` (one module per job family) that implements a specific job type (e.g. `handleBatchDescribe`, `handleBatchStackDetect`). |
 | **job-type registry** | `jobs/registry.ts` — explicit `JOB_TYPES` list co-locating handler, catalog requirement, and checkpoint helpers per type. Single registration surface; mirrors ADR-0006. See ADR-0010. |
