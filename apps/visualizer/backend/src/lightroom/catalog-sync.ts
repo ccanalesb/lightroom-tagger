@@ -9,6 +9,7 @@
  * moved it to a different catalog and every score and description hangs off its key.
  */
 import type { Db } from '../db/connection.js';
+import { createEventLoopYieldState, pollCancelAndYield } from '../utils/yield.js';
 import { storeImagesBatch } from '../db/library/catalog.js';
 import { libraryWrite } from '../db/library/write.js';
 import {
@@ -95,7 +96,7 @@ export interface SyncCatalogOptions {
   log?: (level: string, message: string) => void;
   progress?: (pct: number, message: string) => void;
   /** Checked between metadata fetches; the run stops and reports what it added. */
-  isCancelled?: () => boolean;
+  isCancelled?: () => boolean | Promise<boolean>;
 }
 
 /** True when the run stopped early because the caller cancelled it. */
@@ -111,11 +112,11 @@ export interface SyncCatalogOutcome {
  * id list is in hand nothing else is fatal: a per-image fetch that returns nothing
  * just contributes no record.
  */
-export function syncCatalog(
+export async function syncCatalog(
   catalogPath: string,
   libDb: Db,
   opts: SyncCatalogOptions = {},
-): SyncCatalogOutcome {
+): Promise<SyncCatalogOutcome> {
   const log = (level: string, message: string): void => opts.log?.(level, message);
 
   let catalogConn: Db;
@@ -149,8 +150,10 @@ export function syncCatalog(
     const records: CatalogRecord[] = [];
     const totalMissing = missingIds.length;
     let cancelled = false;
+    const yieldState = createEventLoopYieldState();
+    const isCancelled = (): boolean | Promise<boolean> => opts.isCancelled?.() ?? false;
     for (const [index, imageId] of missingIds.entries()) {
-      if (opts.isCancelled?.()) {
+      if (await pollCancelAndYield(libDb, isCancelled, yieldState)) {
         cancelled = true;
         break;
       }

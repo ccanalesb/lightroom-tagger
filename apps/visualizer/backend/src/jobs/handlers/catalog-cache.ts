@@ -106,7 +106,7 @@ async function runChain(
 
   runner.setCurrentStep(jobId, 'Catalog sync');
   banner('stage=sync status=start');
-  const sync = runCatalogSyncPass(runner, jobId, metadata, db, SYNC_STAGE);
+  const sync = await runCatalogSyncPass(runner, jobId, metadata, db, SYNC_STAGE);
   if (sync === null) return;
   const syncFell = Boolean(sync.failed ?? sync.skipped);
   banner(
@@ -157,7 +157,7 @@ async function runChain(
 
   runner.setCurrentStep(jobId, 'Catalog similarity');
   banner('stage=similarity status=start');
-  const similarity = runSimilarityPass(runner, jobId, metadata, db, SIMILARITY_STAGE);
+  const similarity = await runSimilarityPass(runner, jobId, metadata, db, SIMILARITY_STAGE);
   if (similarity === null) return;
   banner(
     `stage=similarity status=complete groups_created=${similarity.groups_created} ` +

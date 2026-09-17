@@ -32,6 +32,7 @@ import {
   loadResumeState,
 } from '../checkpoint.js';
 import type { JobRunner } from '../runner.js';
+import { createEventLoopYieldState, pollCancelAndYield } from '../../utils/yield.js';
 import {
   asMetadata,
   failureSeverityFromError,
@@ -76,7 +77,7 @@ export async function handleBatchCatalogSimilarity(
     const dbPath = resolveLibraryDbOrFail(runner, jobId);
     if (dbPath === null) return;
     await withLibraryDb(dbPath, async (db) => {
-      runSimilarityPass(runner, jobId, metadata, db, OWN_JOB);
+      await runSimilarityPass(runner, jobId, metadata, db, OWN_JOB);
     });
   } catch (e) {
     runner.failJob(jobId, e instanceof Error ? e.message : String(e), failureSeverityFromError(e));
@@ -96,13 +97,13 @@ function clampedNumber(raw: unknown, fallback: number, lo: number, hi: number): 
  * `null` whenever the job has already been settled — the contract every pass in
  * this backend follows.
  */
-export function runSimilarityPass(
+export async function runSimilarityPass(
   runner: JobRunner,
   jobId: string,
   metadata: Record<string, unknown>,
   db: Db,
   ctx: PassContext,
-): BatchCatalogSimilarityResult | null {
+): Promise<BatchCatalogSimilarityResult | null> {
   const prefix = ctx.logPrefix;
   const log = (message: string): void => runner.log(jobId, 'info', `${prefix}${message}`);
   const progress = (pct: number, message: string): void =>
@@ -136,9 +137,10 @@ export function runSimilarityPass(
   // A pair is a group under whichever of its two images comes up first as a seed;
   // without this the same near-duplicate appears twice, once from each side.
   const seenPairs = new Set<string>();
+  const yieldState = createEventLoopYieldState();
 
   for (const [index, seedKey] of allKeys.entries()) {
-    if (runner.isCancelled(jobId)) {
+    if (await pollCancelAndYield(db, () => runner.isCancelled(jobId), yieldState)) {
       runner.finalizeCancelled(jobId);
       return null;
     }
@@ -344,7 +346,9 @@ export async function handleBatchStackDetect(
   try {
     const dbPath = resolveLibraryDbOrFail(runner, jobId);
     if (dbPath === null) return;
-    await withLibraryDb(dbPath, (db) => runStackDetectPass(runner, jobId, metadata, db, OWN_JOB));
+    await withLibraryDb(dbPath, async (db) => {
+      await runStackDetectPass(runner, jobId, metadata, db, OWN_JOB);
+    });
   } catch (e) {
     runner.failJob(jobId, e instanceof Error ? e.message : String(e), failureSeverityFromError(e));
   }
@@ -495,6 +499,7 @@ export async function runStackDetectPass(
   let stacksCreated = 0;
   let imagesStacked = 0;
   let lastSummaryAt = 0;
+  const yieldState = createEventLoopYieldState();
 
   const emitSummary = (force = false): void => {
     const done = processed.size;
@@ -529,7 +534,7 @@ export async function runStackDetectPass(
   };
 
   for (const segment of segments) {
-    if (runner.isCancelled(jobId)) {
+    if (await pollCancelAndYield(db, () => runner.isCancelled(jobId), yieldState)) {
       runner.finalizeCancelled(jobId);
       return null;
     }

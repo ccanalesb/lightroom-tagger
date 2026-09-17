@@ -90,6 +90,9 @@ export const MSG_DISCONNECTED = 'Disconnected'
 export const BACKEND_DISCONNECTED_BANNER_TITLE = 'Backend unreachable'
 export const BACKEND_DISCONNECTED_BANNER_BODY =
   'Lost connection to the server. New data may not load until the backend responds again. The app will keep retrying in the background.'
+export const BACKEND_BUSY_BANNER_TITLE = 'Backend busy'
+export const BACKEND_BUSY_BANNER_BODY =
+  'A background job is keeping the server busy. Pages may load slowly — cancel the job from Processing if you need the API back sooner. The app will keep retrying.'
 export const MSG_ERROR_PREFIX = 'Error:'
 
 // Generic Labels

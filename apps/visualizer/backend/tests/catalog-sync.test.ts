@@ -54,6 +54,15 @@ function withLibrary<T>(fn: (db: Db) => T): T {
   }
 }
 
+async function withLibraryAsync<T>(fn: (db: Db) => Promise<T>): Promise<T> {
+  const db = openLibraryDb(fx.dbPath);
+  try {
+    return await fn(db);
+  } finally {
+    db.close();
+  }
+}
+
 /** A library row carrying an explicit `images.id`, the column the diff reads. */
 const seedLibraryImage = (key: string, catalogId: string | null) =>
   fx.addImage({ key, id: catalogId });
@@ -186,7 +195,7 @@ describe('listLibraryCatalogIds', () => {
 });
 
 describe('syncCatalog', () => {
-  it('fetches only the ids the library is missing', () => {
+  it('fetches only the ids the library is missing', async () => {
     makeFakeCatalog(
       lrcatPath,
       [1, 2, 3, 5, 99999].map((id) => ({ id, baseName: `img${id}` })),
@@ -194,7 +203,7 @@ describe('syncCatalog', () => {
     seedLibraryImage('existing', '1');
     seedLibraryImage('gap', '5');
 
-    const { result } = withLibrary((db) => syncCatalog(lrcatPath, db));
+    const { result } = await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
 
     expect(result).toMatchObject({
       added: 3,
@@ -212,54 +221,54 @@ describe('syncCatalog', () => {
     ]);
   });
 
-  it('reports stale library rows without deleting them', () => {
+  it('reports stale library rows without deleting them', async () => {
     makeFakeCatalog(lrcatPath, []);
     seedLibraryImage('gone', '42');
 
-    const { result } = withLibrary((db) => syncCatalog(lrcatPath, db));
+    const { result } = await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
 
     expect(result).toMatchObject({ added: 0, stale: 1 });
     expect(syncedImages()).toHaveLength(1);
   });
 
-  it('diffs ids numerically, not lexicographically', () => {
+  it('diffs ids numerically, not lexicographically', async () => {
     makeFakeCatalog(lrcatPath, [
       { id: 38887, baseName: 'have' },
       { id: 99999, baseName: 'new' },
     ]);
     seedLibraryImage('high', '38887');
 
-    const { result } = withLibrary((db) => syncCatalog(lrcatPath, db));
+    const { result } = await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
 
     expect(result).toMatchObject({ added: 1, missing_ids_count: 1 });
     expect(syncedImages().map((r) => r.key)).toContain('2024-06-01_new');
   });
 
-  it('stores the catalog id as an integer, not as a REAL bind', () => {
+  it('stores the catalog id as an integer, not as a REAL bind', async () => {
     makeFakeCatalog(lrcatPath, [{ id: 100, baseName: 'a' }]);
 
-    withLibrary((db) => syncCatalog(lrcatPath, db));
+    await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
 
     // `'100.0'` here would parse back as no id at all, so the next sync would
     // re-fetch the whole catalog, forever.
     expect(syncedImages()[0]!.id).toBe('100');
   });
 
-  it('does not re-fetch an image it already has', () => {
+  it('does not re-fetch an image it already has', async () => {
     makeFakeCatalog(lrcatPath, [{ id: 1, baseName: 'once' }]);
-    withLibrary((db) => syncCatalog(lrcatPath, db));
+    await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
 
     // Same id, so the second run sees nothing missing and writes nothing.
-    const { result } = withLibrary((db) => syncCatalog(lrcatPath, db));
+    const { result } = await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
 
     expect(result).toMatchObject({ added: 0, missing_ids_count: 0, library_total: 1 });
     expect(syncedImages()).toHaveLength(1);
   });
 
-  it('raises an actionable error when the catalog cannot be opened', () => {
-    expect(() => withLibrary((db) => syncCatalog(join(dir, 'absent.lrcat'), db))).toThrow(
-      CatalogSyncError,
-    );
+  it('raises an actionable error when the catalog cannot be opened', async () => {
+    await expect(
+      withLibraryAsync((db) => syncCatalog(join(dir, 'absent.lrcat'), db)),
+    ).rejects.toThrow(CatalogSyncError);
   });
 
   it('translates the three failures the user can act on', () => {
@@ -272,7 +281,7 @@ describe('syncCatalog', () => {
     );
   });
 
-  it('reports progress and logs the set-difference summary', () => {
+  it('reports progress and logs the set-difference summary', async () => {
     makeFakeCatalog(lrcatPath, [
       { id: 1, baseName: 'a' },
       { id: 2, baseName: 'b' },
@@ -280,7 +289,7 @@ describe('syncCatalog', () => {
     const progress: [number, string][] = [];
     const logs: string[] = [];
 
-    withLibrary((db) =>
+    await withLibraryAsync((db) =>
       syncCatalog(lrcatPath, db, {
         progress: (pct, msg) => progress.push([pct, msg]),
         log: (_level, msg) => logs.push(msg),
@@ -296,14 +305,14 @@ describe('syncCatalog', () => {
     expect(logs[1]).toContain('complete added=2 stale=0');
   });
 
-  it('stops on cancellation and keeps what it already fetched', () => {
+  it('stops on cancellation and keeps what it already fetched', async () => {
     makeFakeCatalog(
       lrcatPath,
       [1, 2, 3, 4].map((id) => ({ id, baseName: `img${id}` })),
     );
     let seen = 0;
 
-    const { result, cancelled } = withLibrary((db) =>
+    const { result, cancelled } = await withLibraryAsync((db) =>
       syncCatalog(lrcatPath, db, {
         isCancelled: () => {
           seen += 1;
