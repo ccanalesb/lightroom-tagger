@@ -2,6 +2,7 @@
  * Structured catalog filtering and listing queries.
  */
 import type { Db } from '../connection.js';
+import { prepareCached } from '../prepare-cached.js';
 import {
   CATALOG_BEST_SCORE_JOIN_SQL,
   CATALOG_BEST_SCORE_SELECT_COLS,
@@ -235,16 +236,15 @@ export function queryCatalogImagesByKeys(
  * False for a **non-representative** stack member, which the default grid hides.
  */
 export function catalogKeyIsPrimaryGridRow(db: Db, imageKey: string): boolean {
-  const row = db
-    .prepare(
-      `
+  const row = prepareCached(
+    db,
+    `
         SELECT NOT EXISTS(
             SELECT 1 FROM image_stack_members m
             INNER JOIN image_stacks s ON s.stack_id = m.stack_id
             WHERE m.image_key = ? AND m.image_key <> s.representative_key
         ) AS ok
         `,
-    )
-    .get(imageKey) as { ok: number } | undefined;
+  ).get(imageKey) as { ok: number } | undefined;
   return Boolean(row && Math.trunc(row.ok));
 }

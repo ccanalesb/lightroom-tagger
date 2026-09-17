@@ -2,6 +2,7 @@
  * Catalog similarity pairs reframed as stack suggestions (#226 / #231).
  */
 import type { Db } from '../connection.js';
+import { prepareCached } from '../prepare-cached.js';
 import { flaggedExistsSql } from './frame-substance-sql.js';
 import {
   selectStackRepresentativeKeyForKeys,
@@ -98,15 +99,14 @@ export function normalizeImagePair(keyA: string, keyB: string): [string, string]
 
 export function isCatalogSimilarityPairRejected(db: Db, keyA: string, keyB: string): boolean {
   const [a, b] = normalizeImagePair(keyA, keyB);
-  const row = db
-    .prepare(
-      `
+  const row = prepareCached(
+    db,
+    `
         SELECT 1 AS o FROM catalog_similarity_rejections
         WHERE key_a = ? AND key_b = ?
         LIMIT 1
         `,
-    )
-    .get(a, b);
+  ).get(a, b);
   return row !== undefined;
 }
 
