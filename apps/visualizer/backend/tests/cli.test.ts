@@ -370,6 +370,13 @@ describe('scan and sync', () => {
     expect((await sync()).lines[1]).toMatch(/^Added 0 images; 0 stale in library; 0 keywords backfilled/);
   });
 
+  it('accepts --backfill-keywords and forces a re-read after the auto pass', async () => {
+    await sync();
+    const r = await sync('--backfill-keywords');
+    expect(r.code).toBe(0);
+    expect(r.lines[1]).toMatch(/^Added 0 images; 0 stale in library; 3 keywords backfilled/);
+  });
+
   it('counts a library row the catalog no longer has as stale', async () => {
     await sync();
     fixture.exec("INSERT INTO images (key, id, filename) VALUES ('orphan', '999', 'x.jpg')");
