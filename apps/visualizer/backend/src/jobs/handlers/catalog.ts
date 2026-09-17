@@ -70,7 +70,7 @@ export async function handleCatalogSync(
   if (dbPath === null) return;
 
   await withLibraryDb(dbPath, async (libDb) => {
-    runCatalogSyncPass(runner, jobId, metadata, libDb, OWN_JOB);
+    await runCatalogSyncPass(runner, jobId, metadata, libDb, OWN_JOB);
   });
 }
 
@@ -82,13 +82,13 @@ export async function handleCatalogSync(
  * and score passes follow. Unlike those two, a stage failure here is a returned
  * result rather than a settled job, because the chain goes on without it.
  */
-export function runCatalogSyncPass(
+export async function runCatalogSyncPass(
   runner: JobRunner,
   jobId: string,
   metadata: Record<string, unknown>,
   libDb: Db,
   ctx: PassContext,
-): CatalogSyncStageResult | null {
+): Promise<CatalogSyncStageResult | null> {
   const prefix = ctx.logPrefix;
   const unrunnable = (message: string): CatalogSyncStageResult | null => {
     if (ctx.settle === 'job') {
@@ -111,7 +111,7 @@ export function runCatalogSyncPass(
 
   let outcome: SyncCatalogOutcome;
   try {
-    outcome = syncCatalog(catalogPath, libDb, {
+    outcome = await syncCatalog(catalogPath, libDb, {
       log: (level, message) => runner.log(jobId, jobLogLevel(level), `${prefix}${message}`),
       progress,
       isCancelled: () => runner.isCancelled(jobId),

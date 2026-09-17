@@ -1,3 +1,5 @@
+import { useBackendHealthStore } from '../stores/backendHealthStore'
+
 /** Default HTTP timeout for API requests (ms). */
 export const API_REQUEST_TIMEOUT_MS = 15_000
 
@@ -31,9 +33,12 @@ export async function fetchWithTimeout(
   }
 
   try {
-    return await fetch(url, { ...options, signal: controller.signal })
+    const response = await fetch(url, { ...options, signal: controller.signal })
+    useBackendHealthStore.getState().reportHttpSuccess()
+    return response
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
+      useBackendHealthStore.getState().reportHttpTimeout()
       throw new RequestTimeoutError(timeoutMs)
     }
     throw error

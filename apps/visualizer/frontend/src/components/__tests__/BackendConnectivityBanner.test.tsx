@@ -1,17 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import { BackendConnectivityBanner } from '../BackendConnectivityBanner'
+import { useBackendHealthStore } from '../../stores/backendHealthStore'
 import { useSocketStore } from '../../stores/socketStore'
 
 describe('BackendConnectivityBanner', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     useSocketStore.setState({ socket: null, connected: false })
+    useBackendHealthStore.setState({ httpBusy: false })
   })
 
   afterEach(() => {
     vi.useRealTimers()
     useSocketStore.setState({ socket: null, connected: false })
+    useBackendHealthStore.setState({ httpBusy: false })
   })
 
   it('renders nothing while connected', () => {
@@ -45,5 +48,15 @@ describe('BackendConnectivityBanner', () => {
 
     expect(screen.getByTestId('backend-connectivity-banner')).toBeTruthy()
     expect(screen.getByText('Backend unreachable')).toBeTruthy()
+  })
+
+  it('renders the busy banner when HTTP requests time out', () => {
+    useSocketStore.setState({ socket: {} as never, connected: true })
+    useBackendHealthStore.setState({ httpBusy: true })
+
+    render(<BackendConnectivityBanner />)
+
+    expect(screen.getByTestId('backend-busy-banner')).toBeTruthy()
+    expect(screen.getByText('Backend busy')).toBeTruthy()
   })
 })

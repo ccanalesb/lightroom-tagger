@@ -14,7 +14,7 @@ import {
   getImageCount,
   getImageRecords,
 } from '../../lightroom/reader.js';
-import { CliError, withLibraryDb } from '../library-db.js';
+import { CliError, withLibraryDb, withLibraryDbAsync } from '../library-db.js';
 import { boolFlag, intFlag, stringFlag } from '../parse.js';
 import type { CommandContext } from '../registry.js';
 
@@ -54,14 +54,14 @@ export function cmdScan(ctx: CommandContext): number {
   });
 }
 
-export function cmdSync(ctx: CommandContext): number {
+export async function cmdSync(ctx: CommandContext): Promise<number> {
   const catalogPath = resolveCatalogPath(ctx);
 
-  return withLibraryDb(ctx, { mustExist: false }, (db) => {
+  return withLibraryDbAsync(ctx, { mustExist: false }, async (db) => {
     ctx.out(`Syncing catalog: ${catalogPath}`);
     // No progress or cancellation callbacks: this is a foreground command, and
     // the driver only reports through them when a job runner is listening.
-    const { result } = syncCatalog(catalogPath, db);
+    const { result } = await syncCatalog(catalogPath, db);
     ctx.out(
       `Added ${result.added} images; ${result.stale} stale in library ` +
         `(locking_mode=${result.locking_mode})`,
