@@ -1,6 +1,7 @@
 # ADR-0018: Job handlers stay on the event loop and yield cooperatively
 
-**Status:** Accepted
+**Status:** Accepted (2026-09-17). Context's claim about the remaining handlers
+corrected (2026-09-17) — see *Amendment*.
 **Date:** 2026-09-17
 
 ## Context
@@ -18,7 +19,8 @@ Three job types are responsible. `batch_catalog_similarity` is the worst — a
 synchronous loop over ~43k CLIP seeds, each running a sqlite-vec KNN.
 `batch_stack_detect` is a synchronous loop of similar length, and `catalog_sync`
 becomes one when catalog drift is large. The remaining handlers await a provider
-HTTP call per item and already yield naturally.
+HTTP call per item and already yield naturally. (That last sentence is wrong for
+two handlers — see *Amendment*.)
 
 Two facts shaped the decision and are easy to get wrong from a reading of the
 code:
@@ -107,3 +109,35 @@ while any job runs.
   degradation is worth having on its own, but it does not make a job cancellable.
 - **Chunk the synchronous setup phases too** — rejected for now; fiddly work for
   a stall users are unlikely to distinguish from normal startup.
+
+## Amendment (2026-09-17, #317): why the remaining handlers are fine
+
+Context says the handlers this ADR does not fix "await a provider HTTP call per
+item and already yield naturally." That is true of describe and score, and false
+of `batch_embed_image` and `batch_frame_substance`: both do local, CPU-bound work
+on the main thread and make no HTTP call. The conclusion — that they need no
+yield — still holds, but for a different reason, and the wrong reason is worth
+correcting because it invites a worker-thread rewrite that the numbers do not
+justify.
+
+They are fine because their per-image work is bounded and small. Measured on
+Apple Silicon against the real ~43k catalog ([#317](https://github.com/ccanalesb/lightroom-tagger/issues/317)):
+
+| Handler | Main-thread block per image |
+|---|---|
+| `batch_embed_image` | ~90ms (18ms JS preprocessing, 18ms ONNX inference, rest handler overhead) |
+| `batch_frame_substance` | ~5ms |
+
+Both sit an order of magnitude or more inside the one-second bar. Verified in the
+running app: during an embed pass, in-page `/api/status` latency was 20ms median
+and 115ms worst, the UI dropped no frame over 250ms, and cancelling a
+43,794-image job from the Job Queue took 0.10s.
+
+Two consequences for anyone revisiting this:
+
+- **`sharp` is not a main-thread cost.** It is awaited and runs on libuv's
+  threadpool. Decode is ~2.5ms of wall time and none of it blocks.
+- **A `worker_threads` move for CLIP encode is not a latency fix.** The fp32
+  model is ~335 MiB, so the per-call worker pattern used by RAW decode cannot
+  apply; it would need a persistent worker, which buys nothing at 90ms per image.
+  This remains a throughput question, still deferred.
