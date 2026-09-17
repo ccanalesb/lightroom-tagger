@@ -9,13 +9,20 @@
  * moved it to a different catalog and every score and description hangs off its key.
  */
 import type { Db } from '../db/connection.js';
-import { createEventLoopYieldState, pollCancelAndYield } from '../utils/yield.js';
-import { storeImagesBatch } from '../db/library/catalog.js';
+import {
+  getLibraryMeta,
+  KEYWORDS_BACKFILL_META_KEY,
+  setLibraryMeta,
+  upgradeLibrarySchema,
+} from '../db/library/bootstrap.js';
+import { storeImagesBatch, updateImageKeywordsBatch } from '../db/library/catalog.js';
 import { libraryWrite } from '../db/library/write.js';
+import { createEventLoopYieldState, pollCancelAndYield } from '../utils/yield.js';
 import {
   catalogReadonlyUriEnabled,
   connectCatalogReadOnly,
   getImageById,
+  getKeywordsForFileId,
   listCatalogFileIds,
   resolveCatalogLockingMode,
   type CatalogRecord,
@@ -40,6 +47,8 @@ export interface CatalogSyncResult {
   catalog_total: number;
   library_total: number;
   missing_ids_count: number;
+  /** Rows whose `images.keywords` were rewritten from the catalog. */
+  keywords_backfilled: number;
 }
 
 function isCatalogLockedError(e: unknown): boolean {
@@ -97,6 +106,11 @@ export interface SyncCatalogOptions {
   progress?: (pct: number, message: string) => void;
   /** Checked between metadata fetches; the run stops and reports what it added. */
   isCancelled?: () => boolean | Promise<boolean>;
+  /**
+   * Re-read keywords for every indexed catalog id. When omitted, a one-time
+   * backfill runs automatically until `library_meta.keywords_backfilled_v1` is set.
+   */
+  backfillKeywords?: boolean;
 }
 
 /** True when the run stopped early because the caller cancelled it. */
@@ -112,12 +126,39 @@ export interface SyncCatalogOutcome {
  * id list is in hand nothing else is fatal: a per-image fetch that returns nothing
  * just contributes no record.
  */
+async function backfillCatalogKeywords(
+  catalogConn: Db,
+  libDb: Db,
+  fileIds: readonly number[],
+  opts: SyncCatalogOptions,
+  yieldState: ReturnType<typeof createEventLoopYieldState>,
+  isCancelled: () => boolean | Promise<boolean>,
+): Promise<{ updated: number; cancelled: boolean }> {
+  const total = fileIds.length;
+  const updates: { catalogId: number; keywords: string[] }[] = [];
+  for (const [index, fileId] of fileIds.entries()) {
+    if (await pollCancelAndYield(libDb, isCancelled, yieldState)) {
+      return { updated: 0, cancelled: true };
+    }
+    updates.push({ catalogId: fileId, keywords: getKeywordsForFileId(catalogConn, fileId) });
+    if (total) {
+      const pct = 95 + Math.trunc((4 * (index + 1)) / total);
+      opts.progress?.(pct, `Backfilling keywords ${index + 1}/${total}`);
+    }
+  }
+  const updated = updates.length
+    ? libraryWrite(libDb, () => updateImageKeywordsBatch(libDb, updates))
+    : 0;
+  return { updated, cancelled: false };
+}
+
 export async function syncCatalog(
   catalogPath: string,
   libDb: Db,
   opts: SyncCatalogOptions = {},
 ): Promise<SyncCatalogOutcome> {
   const log = (level: string, message: string): void => opts.log?.(level, message);
+  upgradeLibrarySchema(libDb);
 
   let catalogConn: Db;
   try {
@@ -167,11 +208,42 @@ export async function syncCatalog(
 
     const added = records.length ? libraryWrite(libDb, () => storeImagesBatch(libDb, records)) : 0;
 
+    let keywordsBackfilled = 0;
+    const forceKeywordBackfill = opts.backfillKeywords === true;
+    const autoKeywordBackfill =
+      !forceKeywordBackfill && getLibraryMeta(libDb, KEYWORDS_BACKFILL_META_KEY) !== '1';
+    if (!cancelled && (forceKeywordBackfill || autoKeywordBackfill)) {
+      const indexedIds = [...listLibraryCatalogIds(libDb)]
+        .filter((id) => catalogIds.has(id))
+        .sort((a, b) => a - b);
+      log(
+        'info',
+        `[catalog-sync] keyword_backfill mode=${forceKeywordBackfill ? 'forced' : 'auto'} ` +
+          `rows=${indexedIds.length}`,
+      );
+      const backfill = await backfillCatalogKeywords(
+        catalogConn,
+        libDb,
+        indexedIds,
+        opts,
+        yieldState,
+        isCancelled,
+      );
+      if (backfill.cancelled) {
+        cancelled = true;
+      } else {
+        keywordsBackfilled = backfill.updated;
+        libraryWrite(libDb, () =>
+          setLibraryMeta(libDb, KEYWORDS_BACKFILL_META_KEY, '1'),
+        );
+      }
+    }
+
     opts.progress?.(100, 'Catalog sync complete');
     log(
       'info',
       `[catalog-sync] complete added=${added} stale=${staleCount} ` +
-        `locking_mode=${lockingMode}`,
+        `keywords_backfilled=${keywordsBackfilled} locking_mode=${lockingMode}`,
     );
 
     return {
@@ -182,6 +254,7 @@ export async function syncCatalog(
         catalog_total: catalogIds.size,
         library_total: libraryIds.size,
         missing_ids_count: totalMissing,
+        keywords_backfilled: keywordsBackfilled,
       },
       cancelled,
     };

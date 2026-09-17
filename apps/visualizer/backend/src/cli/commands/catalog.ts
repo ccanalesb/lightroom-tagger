@@ -61,9 +61,12 @@ export async function cmdSync(ctx: CommandContext): Promise<number> {
     ctx.out(`Syncing catalog: ${catalogPath}`);
     // No progress or cancellation callbacks: this is a foreground command, and
     // the driver only reports through them when a job runner is listening.
-    const { result } = await syncCatalog(catalogPath, db);
+    const { result } = await syncCatalog(catalogPath, db, {
+      backfillKeywords: boolFlag(ctx.args, 'backfill-keywords'),
+    });
     ctx.out(
-      `Added ${result.added} images; ${result.stale} stale in library ` +
+      `Added ${result.added} images; ${result.stale} stale in library; ` +
+        `${result.keywords_backfilled} keywords backfilled ` +
         `(locking_mode=${result.locking_mode})`,
     );
     return 0;

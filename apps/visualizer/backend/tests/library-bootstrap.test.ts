@@ -112,7 +112,7 @@ describe('initLibraryDb', () => {
     legacy.pragma('user_version = 5');
     legacy.close();
 
-    expect(() => initLibraryDb(path)).toThrow(/schema version 5, below the current 8/);
+    expect(() => initLibraryDb(path)).toThrow(/schema version 5, below the current 9/);
     expect(() => initLibraryDb(path)).toThrow(/lightroom-tagger init/);
   });
 });

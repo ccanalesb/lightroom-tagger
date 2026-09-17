@@ -16,7 +16,10 @@ import { nowIsoUtc } from '../../utils/datetime.js';
 import { markdownMarksOptional } from './scores.js';
 
 /** `PRAGMA user_version` for a database created by this module. */
-export const LIBRARY_SCHEMA_VERSION = 8;
+export const LIBRARY_SCHEMA_VERSION = 9;
+
+/** Set after the one-time Lightroom keyword backfill in `catalog_sync`. */
+export const KEYWORDS_BACKFILL_META_KEY = 'keywords_backfilled_v1';
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS images (
@@ -218,6 +221,11 @@ CREATE TABLE IF NOT EXISTS frame_substance_runs (
     breached INTEGER NOT NULL DEFAULT 0,
     breach_reason TEXT NOT NULL DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS library_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 `;
 
 /**
@@ -268,6 +276,39 @@ function assertNotLegacy(db: Db, path: string): void {
       'The TypeScript CLI does not carry the upgrade migrations; run the Python ' +
       '`lightroom-tagger init` against it once first.',
   );
+}
+
+/** Read one `library_meta` row, or `null` when the table or key is absent. */
+export function getLibraryMeta(db: Db, key: string): string | null {
+  if (!tableExists(db, 'library_meta')) return null;
+  const row = db.prepare('SELECT value FROM library_meta WHERE key = ?').get(key) as
+    | { value: string }
+    | undefined;
+  return row?.value ?? null;
+}
+
+/** Upsert one `library_meta` row. Does NOT commit — call inside `libraryWrite`. */
+export function setLibraryMeta(db: Db, key: string, value: string): void {
+  db.prepare(
+    'INSERT INTO library_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+  ).run(key, value);
+}
+
+/** Upgrade an existing `library.db` to the current schema version. Idempotent. */
+export function upgradeLibrarySchema(db: Db): void {
+  const version = userVersion(db);
+  if (version >= LIBRARY_SCHEMA_VERSION) return;
+  if (version === 8) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS library_meta (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+      );
+    `);
+    db.pragma(`user_version = ${LIBRARY_SCHEMA_VERSION}`);
+    return;
+  }
+  assertNotLegacy(db, 'library.db');
 }
 
 /** Create every table and index at the current version. Idempotent; seeds nothing. */

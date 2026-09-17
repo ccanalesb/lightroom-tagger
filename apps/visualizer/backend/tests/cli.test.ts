@@ -363,9 +363,11 @@ describe('scan and sync', () => {
     const first = await sync();
     expect(first.code).toBe(0);
     expect(first.lines[0]).toBe(`Syncing catalog: ${catalogPath}`);
-    expect(first.lines[1]).toMatch(/^Added 3 images; 0 stale in library \(locking_mode=\w+\)$/);
+    expect(first.lines[1]).toMatch(
+      /^Added 3 images; 0 stale in library; 3 keywords backfilled \(locking_mode=\w+\)$/,
+    );
 
-    expect((await sync()).lines[1]).toMatch(/^Added 0 images; 0 stale in library/);
+    expect((await sync()).lines[1]).toMatch(/^Added 0 images; 0 stale in library; 0 keywords backfilled/);
   });
 
   it('counts a library row the catalog no longer has as stale', async () => {
