@@ -36,11 +36,10 @@ describe('fetchWithTimeout', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const pending = fetchWithTimeout('/api/slow', undefined, 1_000)
-    const timeoutAssertion = expect(pending).rejects.toMatchObject({
-      name: 'RequestTimeoutError',
-      message: 'Request timed out after 1s',
-    })
+    const timeoutAssertion = expect(pending).rejects.toThrow(RequestTimeoutError)
+    const messageAssertion = expect(pending).rejects.toThrow('Request timed out after 1s')
     await vi.advanceTimersByTimeAsync(1_000)
     await timeoutAssertion
+    await messageAssertion
   })
 })
