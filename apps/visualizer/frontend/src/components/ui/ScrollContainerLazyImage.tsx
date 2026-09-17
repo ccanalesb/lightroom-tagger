@@ -5,6 +5,8 @@ interface ScrollContainerLazyImageProps {
   src: string
   alt: string
   className?: string
+  onLoad?: () => void
+  onError?: () => void
 }
 
 /**
@@ -17,6 +19,8 @@ export function ScrollContainerLazyImage({
   src,
   alt,
   className,
+  onLoad,
+  onError,
 }: ScrollContainerLazyImageProps) {
   const imgRef = useRef<HTMLImageElement>(null)
   const [shouldLoad, setShouldLoad] = useState(false)
@@ -56,6 +60,8 @@ export function ScrollContainerLazyImage({
       alt={alt}
       decoding="async"
       className={className}
+      onLoad={onLoad}
+      onError={onError}
     />
   )
 }

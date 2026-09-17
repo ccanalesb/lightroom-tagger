@@ -95,6 +95,7 @@ function CatalogDetailStackEditing({
   stackId: number
   onDataChanged: () => void
 }) {
+  const filmstripRef = useRef<HTMLDivElement>(null)
   const [members, setMembers] = useState<CatalogImage[] | null>(null)
   const [mutating, setMutating] = useState(false)
   const [mergeSourceId, setMergeSourceId] = useState('')
@@ -190,13 +191,14 @@ function CatalogDetailStackEditing({
   return (
     <div className="space-y-3 rounded-base border border-border bg-surface p-4">
       <h3 className="text-sm font-semibold text-text">Burst stack</h3>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div ref={filmstripRef} className="flex gap-2 overflow-x-auto pb-1">
         {members.map((member) => (
           <div key={member.key} className="w-[7.5rem] shrink-0 min-w-0 space-y-1">
             <ImageTile
               image={fromCatalogListRow(member)}
               variant="strip"
               primaryScoreSource="catalog"
+              scrollContainerRef={filmstripRef}
               onClick={() => {}}
               className="!w-full max-w-full"
             />
