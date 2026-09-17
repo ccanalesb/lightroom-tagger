@@ -1,8 +1,46 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, act } from '@testing-library/react'
+import { useRef } from 'react'
 import type { ImageView } from '../../../services/api'
 import { ImageTile } from '../ImageTile'
 import { Badge } from '../../ui/badges'
+
+type IoCallback = IntersectionObserverCallback
+
+class MockIntersectionObserver {
+  static instances: MockIntersectionObserver[] = []
+  callback: IoCallback
+  observe = vi.fn()
+  disconnect = vi.fn()
+  unobserve = vi.fn()
+
+  constructor(callback: IoCallback) {
+    this.callback = callback
+    MockIntersectionObserver.instances.push(this)
+  }
+
+  trigger(isIntersecting: boolean, target: Element) {
+    this.callback(
+      [{ isIntersecting, target } as IntersectionObserverEntry],
+      this as unknown as IntersectionObserver,
+    )
+  }
+}
+
+function StripInScroller() {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  return (
+    <div ref={scrollRef} data-testid="scroll-root" className="overflow-x-auto">
+      <ImageTile
+        image={baseImage()}
+        variant="strip"
+        primaryScoreSource="identity"
+        scrollContainerRef={scrollRef}
+        onClick={() => {}}
+      />
+    </div>
+  )
+}
 
 function baseImage(overrides: Partial<ImageView> = {}): ImageView {
   return {
@@ -15,6 +53,29 @@ function baseImage(overrides: Partial<ImageView> = {}): ImageView {
 }
 
 describe('ImageTile', () => {
+  beforeEach(() => {
+    MockIntersectionObserver.instances = []
+    vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('defers strip thumbnail src until intersection when scrollContainerRef is set', () => {
+    render(<StripInScroller />)
+
+    const img = screen.getByRole('img', { name: 'img.jpg' })
+    expect(img).not.toHaveAttribute('src')
+    expect(img).not.toHaveAttribute('loading')
+
+    const observer = MockIntersectionObserver.instances[0]
+    act(() => {
+      observer.trigger(true, img)
+    })
+    expect(img).toHaveAttribute('src', '/api/images/catalog/abc/thumbnail')
+  })
+
   it('renders filename, falling back to key', () => {
     render(
       <ImageTile

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { IdentityBestPhotoItem } from '../../services/api'
 import { ImageDetailModal, ImageTile, fromBestPhotoRow } from '../image-view'
 import { PerspectiveBadge } from '../ui/badges'
@@ -13,6 +13,7 @@ export type TopPhotosStripProps = {
 }
 
 export function TopPhotosStrip({ items, loading, error, emptyMessage }: TopPhotosStripProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
   const [selected, setSelected] = useState<IdentityBestPhotoItem | null>(null)
 
   if (loading) {
@@ -45,7 +46,7 @@ export function TopPhotosStrip({ items, loading, error, emptyMessage }: TopPhoto
 
   return (
     <>
-      <div className="-mx-1 flex gap-3 overflow-x-auto pb-2 pt-1">
+      <div ref={scrollRef} className="-mx-1 flex gap-3 overflow-x-auto pb-2 pt-1">
         {items.map((row) => {
           const dom = pickDominantPerspective(row.per_perspective)
           return (
@@ -54,6 +55,7 @@ export function TopPhotosStrip({ items, loading, error, emptyMessage }: TopPhoto
               image={fromBestPhotoRow(row)}
               variant="strip"
               primaryScoreSource="identity"
+              scrollContainerRef={scrollRef}
               onClick={() => setSelected(row)}
               footer={
                 dom ? (

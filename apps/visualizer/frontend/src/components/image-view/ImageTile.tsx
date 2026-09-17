@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
+import { ScrollContainerLazyImage } from '../ui/ScrollContainerLazyImage'
 import type { ImageView } from '../../services/api'
 import { Badge } from '../ui/badges'
 import { formatStackCountBadge } from '../../constants/strings'
@@ -24,6 +25,9 @@ interface ImageTileProps {
   footer?: ReactNode
   /** When true, hides the metadata-row "Posted" chip (e.g. when using overlayBadges). */
   hidePostedMetadataBadge?: boolean
+  /** Pass the horizontal scroll container ref for strip tiles so thumbnails
+   *  load via IntersectionObserver instead of native lazy loading. */
+  scrollContainerRef?: RefObject<HTMLElement | null>
   className?: string
 }
 
@@ -52,6 +56,7 @@ export function ImageTile({
   overlayBadges,
   footer,
   hidePostedMetadataBadge = false,
+  scrollContainerRef,
   className = '',
 }: ImageTileProps) {
   const classes = imageTileVariantClasses(variant)
@@ -61,6 +66,9 @@ export function ImageTile({
     : image.created_at
       ? new Date(image.created_at).toLocaleDateString()
       : '—'
+
+  const thumbnailSrc = `/api/images/${imageType}/${encodeURIComponent(image.key)}/thumbnail`
+  const thumbnailAlt = image.filename ?? image.key
 
   const stackOverlay = deriveStackOverlay(image)
   const composedOverlays =
@@ -85,12 +93,21 @@ export function ImageTile({
         className={`block w-full text-left focus:outline-none focus:ring-2 focus:ring-accent focus:ring-inset ${classes.button}`}
       >
         <div className={`relative bg-surface ${classes.thumb}`}>
-          <img
-            src={`/api/images/${imageType}/${encodeURIComponent(image.key)}/thumbnail`}
-            alt={image.filename ?? image.key}
-            className="absolute inset-0 h-full w-full object-cover"
-            loading="lazy"
-          />
+          {scrollContainerRef ? (
+            <ScrollContainerLazyImage
+              scrollContainerRef={scrollContainerRef}
+              src={thumbnailSrc}
+              alt={thumbnailAlt}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : (
+            <img
+              src={thumbnailSrc}
+              alt={thumbnailAlt}
+              className="absolute inset-0 h-full w-full object-cover"
+              loading="lazy"
+            />
+          )}
           {composedOverlays ? (
             <div className="absolute right-2 top-2 flex flex-col gap-1">
               {composedOverlays}
