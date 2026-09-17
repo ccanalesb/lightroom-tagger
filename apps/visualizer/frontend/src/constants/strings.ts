@@ -87,6 +87,9 @@ export const MSG_UNKNOWN_ERROR = 'Unknown error'
 export const MSG_NO_JOBS = 'No jobs found. Start a job to see it here.'
 export const MSG_CONNECTED = 'Connected'
 export const MSG_DISCONNECTED = 'Disconnected'
+export const BACKEND_DISCONNECTED_BANNER_TITLE = 'Backend unreachable'
+export const BACKEND_DISCONNECTED_BANNER_BODY =
+  'Lost connection to the server. New data may not load until the backend responds again. The app will keep retrying in the background.'
 export const MSG_ERROR_PREFIX = 'Error:'
 
 // Generic Labels

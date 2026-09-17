@@ -1,7 +1,13 @@
-import { createContext, useContext, useLayoutEffect, useState, useCallback, useMemo, Suspense } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+} from 'react';
 import type { ReactNode } from 'react';
 import { ProvidersAPI } from '../services/api';
-import { useQuery } from '../data';
 
 interface AnalyzeOptions {
   providerId: string | null;
@@ -25,20 +31,32 @@ interface AnalyzeOptionsContextValue {
 
 const AnalyzeOptionsContext = createContext<AnalyzeOptionsContextValue | null>(null);
 
-function AnalyzeOptionsProviderImpl({ children }: { children: ReactNode }) {
-  const defaultsPayload = useQuery(['providers.defaults'] as const, () => ProvidersAPI.getDefaults());
+export function AnalyzeOptionsProvider({ children }: { children: ReactNode }) {
   const [options, setOptions] = useState<AnalyzeOptions>({ ...DEFAULT_OPTIONS });
 
-  useLayoutEffect(() => {
-    const descriptionDefaults = defaultsPayload.description;
-    if (descriptionDefaults?.provider) {
-      setOptions((prev) => ({
-        ...prev,
-        providerId: descriptionDefaults.provider,
-        providerModel: descriptionDefaults.model ?? null,
-      }));
-    }
-  }, [defaultsPayload]);
+  useEffect(() => {
+    let cancelled = false;
+
+    void ProvidersAPI.getDefaults()
+      .then((defaultsPayload) => {
+        if (cancelled) return;
+        const descriptionDefaults = defaultsPayload.description;
+        if (descriptionDefaults?.provider) {
+          setOptions((prev) => ({
+            ...prev,
+            providerId: descriptionDefaults.provider,
+            providerModel: descriptionDefaults.model ?? null,
+          }));
+        }
+      })
+      .catch(() => {
+        /* keep local defaults — Analyze tab can still render */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const updateOption = useCallback(<K extends keyof AnalyzeOptions>(key: K, value: AnalyzeOptions[K]) => {
     setOptions((prev) => ({ ...prev, [key]: value }));
@@ -64,14 +82,6 @@ function AnalyzeOptionsProviderImpl({ children }: { children: ReactNode }) {
     <AnalyzeOptionsContext.Provider value={value}>
       {children}
     </AnalyzeOptionsContext.Provider>
-  );
-}
-
-export function AnalyzeOptionsProvider({ children }: { children: ReactNode }) {
-  return (
-    <Suspense fallback={null}>
-      <AnalyzeOptionsProviderImpl>{children}</AnalyzeOptionsProviderImpl>
-    </Suspense>
   );
 }
 

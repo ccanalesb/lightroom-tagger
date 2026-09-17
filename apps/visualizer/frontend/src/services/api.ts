@@ -87,6 +87,7 @@ import type {
   VisionModelsResponse,
 } from '../types/system'
 import { API_DEFAULT_URL } from '../constants/strings'
+import { fetchWithTimeout } from './fetchWithTimeout'
 
 export type {
   IdentityBestPhotoItem,
@@ -158,7 +159,7 @@ export type {
 const API_URL = import.meta.env.VITE_API_URL || API_DEFAULT_URL
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetchWithTimeout(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -183,7 +184,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 async function requestVoid(path: string, options?: RequestInit): Promise<void> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetchWithTimeout(`${API_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',

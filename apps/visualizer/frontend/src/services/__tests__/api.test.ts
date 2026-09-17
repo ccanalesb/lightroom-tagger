@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { deleteMatching } from '../../data/cache'
 import { query } from '../../data/query'
 import { JobsAPI, ImagesAPI, DescriptionsAPI } from '../api'
+import { API_REQUEST_TIMEOUT_MS } from '../fetchWithTimeout'
 
 const fetchMock = vi.fn()
 globalThis.fetch = fetchMock
@@ -132,6 +133,26 @@ describe('JobsAPI', () => {
     })
 
     await expect(JobsAPI.get('nonexistent')).rejects.toThrow('404 Not Found')
+  })
+
+  it('passes an AbortSignal and times out when fetch never resolves', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockImplementation((_url: string, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted.', 'AbortError'))
+        })
+      }),
+    )
+
+    const pending = JobsAPI.get('hung')
+    const assertion = expect(pending).rejects.toThrow('Request timed out after 15s')
+    await vi.advanceTimersByTimeAsync(API_REQUEST_TIMEOUT_MS)
+    await assertion
+    expect(fetchMock.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    )
+    vi.useRealTimers()
   })
 })
 
