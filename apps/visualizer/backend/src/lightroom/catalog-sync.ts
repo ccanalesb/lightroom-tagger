@@ -9,7 +9,7 @@
  * moved it to a different catalog and every score and description hangs off its key.
  */
 import type { Db } from '../db/connection.js';
-import { createEventLoopYieldState, pollCancelAndYield } from '../jobs/yield.js';
+import { createEventLoopYieldState, pollCancelAndYield } from '../utils/yield.js';
 import { storeImagesBatch } from '../db/library/catalog.js';
 import { libraryWrite } from '../db/library/write.js';
 import {

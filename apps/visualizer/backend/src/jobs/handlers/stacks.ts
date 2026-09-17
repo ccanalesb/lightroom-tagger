@@ -32,7 +32,7 @@ import {
   loadResumeState,
 } from '../checkpoint.js';
 import type { JobRunner } from '../runner.js';
-import { createEventLoopYieldState, pollCancelAndYield } from '../yield.js';
+import { createEventLoopYieldState, pollCancelAndYield } from '../../utils/yield.js';
 import {
   asMetadata,
   failureSeverityFromError,

@@ -2,11 +2,11 @@
  * Event-loop yield helper — ADR-0018.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { openDb, type Db } from '../src/db/connection.js';
+import { openDb } from '../src/db/connection.js';
 import {
   createEventLoopYieldState,
   pollCancelAndYield,
-} from '../src/jobs/yield.js';
+} from '../src/utils/yield.js';
 
 describe('pollCancelAndYield', () => {
   it('returns true immediately when already cancelled', async () => {
@@ -66,10 +66,8 @@ describe('pollCancelAndYield', () => {
     try {
       const state = createEventLoopYieldState();
       state.lastYieldAt = 0;
-      libraryWrite(db, () => {
-        /* transaction is open; pollCancelAndYield must not be awaited here */
-      });
-      // Nested libraryWrite above committed; open one explicitly instead.
+      // libraryWrite runs BEGIN IMMEDIATE/COMMIT; open one explicitly to leave
+      // a transaction hanging while the guard is exercised.
       db.exec('BEGIN IMMEDIATE');
       await expect(pollCancelAndYield(db, () => false, state)).rejects.toThrow(
         /cannot yield while library.db transaction is open/,
