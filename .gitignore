@@ -1,4 +1,7 @@
-node_modules/
+# No trailing slash: Sandcastle symlinks the pre-baked dependency trees into the
+# worktree, and `node_modules/` matches directories only, so the symlink read as
+# a tracked file and got committed once already.
+node_modules
 dist/
 coverage/
 *.tsbuildinfo
