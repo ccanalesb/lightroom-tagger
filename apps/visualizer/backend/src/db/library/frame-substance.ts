@@ -7,6 +7,7 @@
  * and the catalog listing; the single-key form lives here.
  */
 import type { Db } from '../connection.js';
+import { prepareCached } from '../prepare-cached.js';
 import { FLAGGED_VERDICTS } from './frame-substance-sql.js';
 import { getVisionCachedImage } from './vision-cache.js';
 import { nowIsoUtc } from '../../utils/datetime.js';
@@ -42,9 +43,10 @@ export interface FrameSubstanceRunRow {
 
 /** One verdict row, or `null` when the image has never been judged. */
 export function getFrameSubstanceVerdict(db: Db, imageKey: string): FrameSubstanceRow | null {
-  const row = db
-    .prepare('SELECT * FROM image_frame_substance WHERE image_key = ?')
-    .get(imageKey) as FrameSubstanceRow | undefined;
+  const row = prepareCached(
+    db,
+    'SELECT * FROM image_frame_substance WHERE image_key = ?',
+  ).get(imageKey) as FrameSubstanceRow | undefined;
   return row ?? null;
 }
 
@@ -148,9 +150,10 @@ export function deleteFrameSubstanceOverride(db: Db, imageKey: string): boolean 
 }
 
 export function hasFrameSubstanceOverride(db: Db, imageKey: string): boolean {
-  const row = db
-    .prepare('SELECT 1 AS o FROM frame_substance_overrides WHERE image_key = ?')
-    .get(imageKey);
+  const row = prepareCached(
+    db,
+    'SELECT 1 AS o FROM frame_substance_overrides WHERE image_key = ?',
+  ).get(imageKey);
   return row !== undefined;
 }
 

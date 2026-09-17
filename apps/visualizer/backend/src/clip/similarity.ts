@@ -6,6 +6,7 @@
  * version those rows were written with, so the on-disk format still matches.
  */
 import type { Db } from '../db/connection.js';
+import { prepareCached } from '../db/prepare-cached.js';
 import { catalogKeyIsPrimaryGridRow, filterOrderKeysInCatalog } from '../db/library/catalog-query.js';
 import type { CatalogImageFilters } from '../db/library/catalog-query.js';
 import { CLIP_EMBED_DIM, CLIP_EMBED_MODEL_ID } from '../imaging/clip-embed.js';
@@ -38,24 +39,24 @@ export function knnClipCatalogKeys(
   k: number,
 ): [string, number][] {
   const bounded = Math.min(KNN_K_MAX, Math.max(1, Math.trunc(k)));
-  const rows = db
-    .prepare(
-      `
+  const rows = prepareCached(
+    db,
+    `
         SELECT image_key, distance
         FROM image_clip_embeddings
         WHERE embedding MATCH ?
           AND k = ?
         `,
-    )
-    .all(queryVecBlob, bounded) as { image_key: string; distance: number }[];
+  ).all(queryVecBlob, bounded) as { image_key: string; distance: number }[];
   return rows.map((r) => [String(r.image_key), Number(r.distance)]);
 }
 
 /** The 512-d float32 blob for `imageKey`, or `null` when it has no embedding. */
 export function getClipEmbeddingBlobForKey(db: Db, imageKey: string): Buffer | null {
-  const row = db
-    .prepare('SELECT embedding FROM image_clip_embeddings WHERE image_key = ?')
-    .get(imageKey) as { embedding: Buffer | null } | undefined;
+  const row = prepareCached(
+    db,
+    'SELECT embedding FROM image_clip_embeddings WHERE image_key = ?',
+  ).get(imageKey) as { embedding: Buffer | null } | undefined;
   if (!row || row.embedding === null || row.embedding === undefined) return null;
   // Copy out: better-sqlite3 hands back a Buffer that views SQLite-owned memory,
   // which is invalidated by the next step on the same statement.
