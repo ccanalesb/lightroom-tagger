@@ -13,6 +13,7 @@ import {
   getLibraryMeta,
   KEYWORDS_BACKFILL_META_KEY,
   setLibraryMeta,
+  SYNCED_CATALOG_META_KEY,
   upgradeLibrarySchema,
 } from '../db/library/bootstrap.js';
 import { storeImagesBatch, updateImageKeywordsBatch } from '../db/library/catalog.js';
@@ -237,6 +238,12 @@ export async function syncCatalog(
           setLibraryMeta(libDb, KEYWORDS_BACKFILL_META_KEY, '1'),
         );
       }
+    }
+
+    // Only a run that reached the end can claim the library mirrors this catalog.
+    // A cancelled one leaves the previous claim standing, which is the truth.
+    if (!cancelled) {
+      libraryWrite(libDb, () => setLibraryMeta(libDb, SYNCED_CATALOG_META_KEY, catalogPath));
     }
 
     opts.progress?.(100, 'Catalog sync complete');
