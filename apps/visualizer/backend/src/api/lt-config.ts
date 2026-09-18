@@ -17,6 +17,7 @@ import { createOpenApiApp } from './openapi.js';
 import { jsonBody, withValidationError } from './route-helpers.js';
 import {
   ConfigCatalogGetResponse,
+  ConfigCatalogPickResponse,
   ConfigCatalogPutRequest,
   ConfigCatalogPutResponse,
   ConfigStackDetectionGetResponse,
@@ -24,6 +25,12 @@ import {
   ConfigStackDetectionPutResponse,
 } from './schemas/config.js';
 import { ErrorBody } from './schemas/errors.js';
+import {
+  chooseFile,
+  FileDialogBusyError,
+  FileDialogUnavailableError,
+  nativeFileDialogAvailable,
+} from '../utils/native-file-dialog.js';
 
 export const ltConfigRoutes = createOpenApiApp();
 
@@ -53,9 +60,39 @@ ltConfigRoutes.openapi(getCatalogRoute, (c) => {
   const raw = cfg.catalogPathRaw || '';
   const resolved = raw ? expandUserPath(raw) : '';
   return c.json(
-    { catalog_path: raw, resolved_path: resolved, exists: Boolean(resolved && isFile(resolved)) },
+    {
+      catalog_path: raw,
+      resolved_path: resolved,
+      exists: Boolean(resolved && isFile(resolved)),
+      picker_available: nativeFileDialogAvailable(),
+    },
     200,
   );
+});
+
+const pickCatalogRoute = createRoute({
+  method: 'post',
+  path: '/config/catalog/pick',
+  tags: ['config'],
+  responses: withValidationError({
+    200: { description: 'Chosen path, or null', content: jsonBody(ConfigCatalogPickResponse) },
+    409: { description: 'A dialog is already open', content: jsonBody(ErrorBody) },
+    500: { description: 'The dialog failed to open', content: jsonBody(ErrorBody) },
+    501: { description: 'This host has no native dialog', content: jsonBody(ErrorBody) },
+  }),
+});
+
+// Blocks until the user answers the dialog, which is the point: the response is
+// their answer. It does not save — the path still goes through PUT's validation.
+ltConfigRoutes.openapi(pickCatalogRoute, async (c) => {
+  try {
+    const result = await chooseFile('Select your Lightroom catalog', 'lrcat');
+    return c.json({ catalog_path: 'path' in result ? result.path : null }, 200);
+  } catch (error) {
+    if (error instanceof FileDialogUnavailableError) return c.json({ error: error.message }, 501);
+    if (error instanceof FileDialogBusyError) return c.json({ error: error.message }, 409);
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
 });
 
 const putCatalogRoute = createRoute({

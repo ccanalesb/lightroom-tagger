@@ -57,8 +57,10 @@ object, branded type or selector union is introduced.
   shipped feature requires auth first. Accepted as-is while this stays a
   single-user tool on a trusted network.
 - **Catalog selection can use machine-local mechanisms.** Since the backend is
-  co-located with the user for every local-only operation, a native dialog is
-  legitimate once there is a shell that can open one.
+  co-located with the user for every local-only operation, it may open a native
+  dialog on its own screen. `POST /api/config/catalog/pick` does exactly that,
+  via `osascript`, and is macOS-only; typing a path stays as the fallback for
+  every other host and for a UI reached from another device.
 - **Any future "access from anywhere" work starts from pushing derived
   artifacts** — `library.db` plus the vision cache, roughly 4.6 GB — from a
   local agent to a read-mostly service. Not from moving the backend.
@@ -78,11 +80,11 @@ Each was killed by a specific fact, recorded here so they are not re-proposed.
   `startsWith` prefix-check bypasses; `isPathUnderAllowedRoots` already does
   containment correctly with `realpath` plus `root + sep`, and would be the
   thing to extend if this is ever revisited.
-- **A native dialog spawned by the backend via `osascript`** — rejected. It
-  works, and was demonstrated returning a real path from a backgrounded process,
-  but it assumes the backend shares a GUI session with the user. That assumption
-  is exactly what this ADR declines to bake in at the HTTP layer, and the code
-  would be deleted the day an Electron shell lands.
+- **A native dialog spawned by the backend via `osascript`** — adopted, after
+  first being rejected for assuming the backend shares a GUI session with the
+  user. It does assume that, but the assumption is the one this ADR already
+  makes everywhere else, and a text field people have to feed by hand is not a
+  picker. The endpoint is a thin wrapper that an Electron shell deletes.
 - **Discovering catalogs heuristically**, by scanning known Lightroom locations
   or reading `recentLibraries20` out of Lightroom's preference plist — rejected.
   A `~/Pictures` scan finds only the empty default `Lightroom Catalog.lrcat` and
@@ -94,4 +96,4 @@ Each was killed by a specific fact, recorded here so they are not re-proposed.
   the File System Access API deliberately exposes only opaque handles, and all
   three engines blank `text/uri-list` for `file:` scheme drags. Finder's
   "Copy as Pathname" is the exception, because it puts plain text rather than a
-  file on the pasteboard, and is what the interim UI leans on.
+  file on the pasteboard, and is what the fallback field leans on.

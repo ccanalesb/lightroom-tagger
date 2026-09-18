@@ -11,6 +11,7 @@ import type {
 } from '../types/catalog'
 import type {
   ConfigCatalogGetResponse,
+  ConfigCatalogPickResponse,
   ConfigCatalogPutResponse,
   ConfigStackDetectionGetResponse,
   ConfigStackDetectionPutResponse,
@@ -158,14 +159,21 @@ export type {
 
 const API_URL = import.meta.env.VITE_API_URL || API_DEFAULT_URL
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetchWithTimeout(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
+/** Outlasts the backend's own dialog timeout, so the server's error is what surfaces. */
+const CATALOG_PICK_TIMEOUT_MS = 6 * 60 * 1000
+
+async function request<T>(path: string, options?: RequestInit, timeoutMs?: number): Promise<T> {
+  const response = await fetchWithTimeout(
+    `${API_URL}${path}`,
+    {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
     },
-  })
+    timeoutMs,
+  )
 
   if (!response.ok) {
     let detail = `${response.status} ${response.statusText}`
@@ -311,6 +319,17 @@ export const JobsAPI = {
 export const ConfigAPI = {
   getCatalog: () =>
     request<ConfigCatalogGetResponse>('/config/catalog'),
+
+  /**
+   * Opens a file dialog on the machine running the backend and resolves once the
+   * user answers it, so the deadline is a human's, not a server's.
+   */
+  pickCatalog: () =>
+    request<ConfigCatalogPickResponse>(
+      '/config/catalog/pick',
+      { method: 'POST' },
+      CATALOG_PICK_TIMEOUT_MS,
+    ),
 
   putCatalog: async (catalogPath: string) => {
     const result = await request<ConfigCatalogPutResponse>('/config/catalog', {

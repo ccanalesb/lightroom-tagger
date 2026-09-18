@@ -4,10 +4,12 @@ import { ConfigAPI } from '../services/api'
 /**
  * Every way the catalog path is acquired and saved, in one place.
  *
- * A browser cannot hand JavaScript a filesystem path, so today acquisition is
- * typing or pasting one. Under an Electron shell it becomes a native dialog
- * ([#328](https://github.com/ccanalesb/lightroom-tagger/issues/328)); keeping
- * it behind this hook is what makes that a change to one file.
+ * A browser cannot hand JavaScript a filesystem path, so the picker is the
+ * backend's: it opens a macOS dialog on its own machine and answers with what
+ * was chosen. Typing a path stays as the fallback for the machines and browsers
+ * that leaves out. An Electron shell would replace the transport
+ * ([#328](https://github.com/ccanalesb/lightroom-tagger/issues/328)) without
+ * touching anything above this hook.
  */
 
 export interface CatalogStatus {
@@ -16,6 +18,8 @@ export interface CatalogStatus {
   /** What the backend resolves that to. */
   resolvedPath: string
   exists: boolean
+  /** Whether the backend's machine can open a native dialog. */
+  pickerAvailable: boolean
 }
 
 /**
@@ -37,6 +41,7 @@ export function useCatalogPicker() {
   const [status, setStatus] = useState<CatalogStatus | null>(null)
   const [draftPath, setDraft] = useState('')
   const [loading, setLoading] = useState(true)
+  const [picking, setPicking] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -48,6 +53,7 @@ export function useCatalogPicker() {
         path: data.catalog_path,
         resolvedPath: data.resolved_path,
         exists: data.exists,
+        pickerAvailable: data.picker_available,
       })
       setDraft(data.catalog_path)
     } catch (e) {
@@ -63,6 +69,20 @@ export function useCatalogPicker() {
 
   const setDraftPath = useCallback((value: string) => {
     setDraft(normalizeCatalogPath(value))
+  }, [])
+
+  const pick = useCallback(async () => {
+    setPicking(true)
+    setError(null)
+    try {
+      const { catalog_path: chosen } = await ConfigAPI.pickCatalog()
+      // `null` is a dismissed dialog: the user changed their mind, not an error.
+      if (chosen) setDraft(chosen)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setPicking(false)
+    }
   }, [])
 
   const save = useCallback(async () => {
@@ -85,8 +105,10 @@ export function useCatalogPicker() {
     /** Saving would point the library DB at a different catalog than it mirrors. */
     changesCatalog: status !== null && draftPath !== status.path,
     loading,
+    picking,
     saving,
     error,
+    pick,
     save,
   }
 }

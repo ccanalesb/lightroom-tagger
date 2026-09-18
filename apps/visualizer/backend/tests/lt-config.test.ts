@@ -26,6 +26,8 @@ const put = (path: string, body: unknown) =>
 const readCfg = (): Record<string, unknown> =>
   parseYaml(readFileSync(cfgPath, 'utf8')) as Record<string, unknown>;
 
+const onMac = process.platform === 'darwin';
+
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'lt-cfg-'));
   cfgPath = join(dir, 'config.yaml');
@@ -49,6 +51,7 @@ describe('GET /api/config/catalog', () => {
       catalog_path: lrcat,
       resolved_path: lrcat,
       exists: true,
+      picker_available: onMac,
     });
   });
 
@@ -67,6 +70,7 @@ describe('GET /api/config/catalog', () => {
       catalog_path: '',
       resolved_path: '',
       exists: false,
+      picker_available: onMac,
     });
   });
 
@@ -143,6 +147,24 @@ describe('PUT /api/config/catalog', () => {
     writeFileSync(cfgPath, 'catalog_path: /original.lrcat\n');
     await put('/api/config/catalog', { catalog_path: '/nope/missing.lrcat' });
     expect(readCfg().catalog_path).toBe('/original.lrcat');
+  });
+});
+
+// Opening the dialog for real would block the suite on a human, so the only
+// branch testable here is the one where there is no dialog to open.
+describe('POST /api/config/catalog/pick', () => {
+  it('answers 501 on a platform without a native dialog', async () => {
+    const real = process.platform;
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+    try {
+      const res = await app.request('/api/config/catalog/pick', { method: 'POST' });
+      expect(res.status).toBe(501);
+      expect(await json(res)).toEqual({
+        error: 'Native file dialog is only available on macOS',
+      });
+    } finally {
+      Object.defineProperty(process, 'platform', { value: real, configurable: true });
+    }
   });
 });
 

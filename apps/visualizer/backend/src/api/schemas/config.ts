@@ -6,9 +6,19 @@ export const ConfigCatalogGetResponse = z
     catalog_path: z.string(),
     resolved_path: z.string(),
     exists: z.boolean(),
+    /** Whether this host can open a native file dialog; macOS only for now. */
+    picker_available: z.boolean(),
   })
   .strict()
   .openapi('ConfigCatalogGetResponse');
+
+export const ConfigCatalogPickResponse = z
+  .object({
+    /** `null` when the dialog was dismissed without choosing anything. */
+    catalog_path: z.string().nullable(),
+  })
+  .strict()
+  .openapi('ConfigCatalogPickResponse');
 
 export const ConfigCatalogPutRequest = z
   .object({ catalog_path: z.string() })

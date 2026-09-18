@@ -3,8 +3,18 @@ import { Button } from '../ui/Button/Button';
 import { Input } from '../ui/Input/Input';
 
 export function CatalogSettingsPanel() {
-  const { status, draftPath, setDraftPath, changesCatalog, loading, saving, error, save } =
-    useCatalogPicker();
+  const {
+    status,
+    draftPath,
+    setDraftPath,
+    changesCatalog,
+    loading,
+    picking,
+    saving,
+    error,
+    pick,
+    save,
+  } = useCatalogPicker();
 
   return (
     <div className="rounded-base border border-border bg-bg p-4 space-y-4">
@@ -13,32 +23,42 @@ export function CatalogSettingsPanel() {
         <p className="text-sm text-text-secondary">Loading catalog settings…</p>
       ) : (
         <>
-          <Input
-            label="Active catalog path"
-            readOnly
-            value={status.path}
-            fullWidth
-            className="text-text-secondary"
-          />
           {status.exists ? (
-            <p className="text-sm text-success">Found at {status.resolvedPath}</p>
+            <p className="text-sm text-success">Using {status.resolvedPath}</p>
           ) : (
             <p className="text-sm text-error">
-              No file at {status.resolvedPath}. Catalog sync will fail until this is fixed.
+              No catalog at {status.resolvedPath || 'the configured path'}. Catalog sync will fail
+              until this is fixed.
             </p>
           )}
-          <Input
-            label="Catalog path (.lrcat)"
-            value={draftPath}
-            onChange={(e) => setDraftPath(e.target.value)}
-            fullWidth
-          />
-          <p className="text-sm text-text-secondary">
-            To get the path: find the .lrcat in Finder, hold Option and right-click it, then
-            choose “Copy as Pathname” — or press ⌥⌘C — and paste it above.
-          </p>
-          <Button type="button" onClick={save} disabled={saving}>
-            Save catalog path
+
+          <div className="flex items-end gap-2">
+            <Input
+              label="Catalog path (.lrcat)"
+              value={draftPath}
+              onChange={(e) => setDraftPath(e.target.value)}
+              fullWidth
+            />
+            {status.pickerAvailable && (
+              <Button type="button" onClick={pick} disabled={picking || saving}>
+                {picking ? 'Choosing…' : 'Choose…'}
+              </Button>
+            )}
+          </div>
+
+          {status.pickerAvailable ? (
+            <p className="text-sm text-text-secondary">
+              The dialog opens on the machine running the backend. From another device, paste the
+              path instead.
+            </p>
+          ) : (
+            <p className="text-sm text-text-secondary">
+              This backend cannot open a file dialog, so type or paste the path.
+            </p>
+          )}
+
+          <Button type="button" onClick={save} disabled={saving || picking || !changesCatalog}>
+            {saving ? 'Saving…' : 'Save catalog path'}
           </Button>
           {error && <p className="text-sm text-error">{error}</p>}
           {changesCatalog && (
