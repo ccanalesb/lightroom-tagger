@@ -16,9 +16,13 @@ The visualizer is the web product that surfaces library data to the user. It con
 | **job transitions seam** | `jobs/transitions.ts` — pure cancel/retry status legality and `updateJobStatus` targets. Routes delegate via `transitionCancel` / `transitionRetry`; no status-rule literals in `api/jobs.ts`. See ADR-0010. |
 | **checkpoint** | Persisted job progress snapshot merged into job metadata so interrupted jobs can resume. |
 | **emit_progress** | SocketIO callback passed into job runner and handlers to push real-time progress to the frontend. |
+| **catalog** | The Lightroom Classic `.lrcat` file, named by `catalog_path` in `config.yaml`. Exactly one per installation. Read (and keyword-written) through `lightroom/`. Never a synonym for the **library DB**, which mirrors it, nor for an **image filepath**. Beware: several existing identifiers say "catalog" when they mean one of the other two — `catalogRequiringJobTypes()` gates on the library DB, and `utils/path-resolve.ts`'s `resolveCatalogPath` resolves image filepaths. |
 | **visualizer DB** | `visualizer.db` — SQLite database holding jobs, logs, and visualizer-specific state. Separate from `library.db`. |
 | **library DB** | `library.db` — the shared library database (images, scores, descriptions), read and written through `db/library/`. Legacy Instagram-matching data lives in `instagram-matching-export.json` beside the DB ([#228](https://github.com/ccanalesb/lightroom-tagger/issues/228)). |
+| **catalog drift** | `config.yaml` names one catalog while `library.db` still mirrors another. Opens the moment `catalog_path` changes and closes only when a catalog sync finishes, which is why the sync records what it read in `library_meta.synced_catalog_path` rather than the UI inferring it from an unsaved edit. `GET /api/config/catalog` reports it as `needs_catalog_sync`; unknown (a library synced before that key existed) reports `false`, because a guess here is a false alarm. |
 | **library-DB lifecycle seam** | Job handlers open `library.db` via `withLibraryDb` in `jobs/handlers/common.ts`; never hand-roll `initLibraryDb(...)` + manual `close()` in handler bodies. See ADR-0011. |
+| **vision cache** | One compressed JPEG derivative (50–135 KB) plus a phash per image, under `vision_cache_dir` (default `~/.cache/lightroom_tagger/vision`), indexed by the `vision_cache` table. Built by decoding the original from wherever `filepath` points. It is the thumbnail route's preferred source, ahead of the original — so the cache, not the originals, is what the UI actually reads. |
+| **local-only operation** | Work that must run on the machine holding the catalog and the photos: catalog sync, cache builds, and catalog selection. Distinct from browsing, which any client can do. See ADR-0019. |
 | **route group** | An `OpenAPIHono` router under `apps/visualizer/backend/src/api/`, mounted in `app.ts`. One per domain area (jobs, images, descriptions, providers, scores, identity, system). Successor to the Flask blueprint, and the mount prefixes are unchanged. |
 | **response helpers** | `utils/responses.ts` — `errorNotFound`, `errorBadRequest`, `successPaginated`, etc. Always use these for consistent JSON shapes. |
 | **WebSocket / SocketIO** | Real-time job progress pushed from backend to frontend via socket.io + socket.io-client. |
@@ -82,6 +86,7 @@ The server emits `job_created` on job creation (`POST /jobs`); `useJobSocket` ow
 ## Architectural constraints
 
 - **Frontend and backend are one unit**: changes to API shape must be reflected in both the backend route group and the frontend service layer.
+- **The backend is always local; only the UI travels** (ADR-0019): the backend and CLI run on the machine that holds the catalog and can reach the photos, because catalog reads, RAW decode, CLIP and vision work all need them. The SPA may be served to other devices, but any **local-only operation** is unavailable to a remote client.
 - **SocketIO for job progress**: never poll for job status — use the WebSocket channel.
 - **Always use `utils/responses.ts` helpers**: never return a raw `c.json(...)` with an ad-hoc status code from a route.
 - **Cancellation is polled, not thrown**: handlers check `runner.isCancelled(jobId)` between units of work and pass a `cancelCheck` down; there is no thread-local cancel scope.

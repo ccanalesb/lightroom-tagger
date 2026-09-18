@@ -21,6 +21,16 @@ export const LIBRARY_SCHEMA_VERSION = 9;
 /** Set after the one-time Lightroom keyword backfill in `catalog_sync`. */
 export const KEYWORDS_BACKFILL_META_KEY = 'keywords_backfilled_v1';
 
+/**
+ * The catalog `catalog_sync` last read, resolved and absolute.
+ *
+ * What `library.db` actually mirrors, as opposed to what `config.yaml` points at
+ * now. The two diverge the moment the catalog path is changed and stay diverged
+ * until a sync runs, which is the window the settings UI has to warn about.
+ * Absent on a library synced before this key existed.
+ */
+export const SYNCED_CATALOG_META_KEY = 'synced_catalog_path';
+
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS images (
     key TEXT PRIMARY KEY,

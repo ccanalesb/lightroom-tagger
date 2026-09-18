@@ -1,11 +1,15 @@
 /**
  * Read and write the repo-level `config.yaml`.
  *
- * These routes do not touch `library.db` — they edit the user's own config file,
- * so no library-DB middleware here.
+ * These routes edit the user's own config file, so there is no library-DB
+ * middleware here. The one exception is `GET /config/catalog`, which reads a
+ * single `library_meta` key to answer whether `library.db` still mirrors the
+ * configured catalog — opened by hand, read-only, and closed before returning,
+ * because a missing or unreadable library is a normal answer here rather than
+ * the 404 the middleware would raise.
  */
 import { createRoute } from '@hono/zod-openapi';
-import { statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import {
   config,
   expandUserPath,
@@ -13,10 +17,13 @@ import {
   updateConfigYamlCatalogPath,
   updateConfigYamlStackBurstDeltaMs,
 } from '../config.js';
+import { openLibraryDb, type Db } from '../db/connection.js';
+import { getLibraryMeta, SYNCED_CATALOG_META_KEY } from '../db/library/bootstrap.js';
 import { createOpenApiApp } from './openapi.js';
 import { jsonBody, withValidationError } from './route-helpers.js';
 import {
   ConfigCatalogGetResponse,
+  ConfigCatalogPickResponse,
   ConfigCatalogPutRequest,
   ConfigCatalogPutResponse,
   ConfigStackDetectionGetResponse,
@@ -24,6 +31,12 @@ import {
   ConfigStackDetectionPutResponse,
 } from './schemas/config.js';
 import { ErrorBody } from './schemas/errors.js';
+import {
+  chooseFile,
+  FileDialogBusyError,
+  FileDialogUnavailableError,
+  nativeFileDialogAvailable,
+} from '../utils/native-file-dialog.js';
 
 export const ltConfigRoutes = createOpenApiApp();
 
@@ -32,6 +45,24 @@ function isFile(path: string): boolean {
     return statSync(path).isFile();
   } catch {
     return false;
+  }
+}
+
+/**
+ * The catalog `library.db` was last synced from, or `null` when that is unknown —
+ * no library yet, or one built before the key existed. `null` means "cannot say",
+ * not "out of sync", so the UI stays quiet rather than warning on a guess.
+ */
+function syncedCatalogPath(): string | null {
+  if (!existsSync(config.LIBRARY_DB)) return null;
+  let db: Db | undefined;
+  try {
+    db = openLibraryDb(config.LIBRARY_DB, { readonly: true });
+    return getLibraryMeta(db, SYNCED_CATALOG_META_KEY);
+  } catch {
+    return null;
+  } finally {
+    db?.close();
   }
 }
 
@@ -52,10 +83,45 @@ ltConfigRoutes.openapi(getCatalogRoute, (c) => {
   // typed (which may contain `~`), and `resolved_path` is shown alongside it.
   const raw = cfg.catalogPathRaw || '';
   const resolved = raw ? expandUserPath(raw) : '';
+  // `cfg.catalogPath`, not `resolved`: the sync records the path the config loader
+  // produced, so comparing anything else would read a relative path as a mismatch.
+  const synced = syncedCatalogPath();
   return c.json(
-    { catalog_path: raw, resolved_path: resolved, exists: Boolean(resolved && isFile(resolved)) },
+    {
+      catalog_path: raw,
+      resolved_path: resolved,
+      exists: Boolean(resolved && isFile(resolved)),
+      picker_available: nativeFileDialogAvailable(),
+      synced_catalog_path: synced,
+      needs_catalog_sync: synced !== null && synced !== cfg.catalogPath,
+    },
     200,
   );
+});
+
+const pickCatalogRoute = createRoute({
+  method: 'post',
+  path: '/config/catalog/pick',
+  tags: ['config'],
+  responses: withValidationError({
+    200: { description: 'Chosen path, or null', content: jsonBody(ConfigCatalogPickResponse) },
+    409: { description: 'A dialog is already open', content: jsonBody(ErrorBody) },
+    500: { description: 'The dialog failed to open', content: jsonBody(ErrorBody) },
+    501: { description: 'This host has no native dialog', content: jsonBody(ErrorBody) },
+  }),
+});
+
+// Blocks until the user answers the dialog, which is the point: the response is
+// their answer. It does not save — the path still goes through PUT's validation.
+ltConfigRoutes.openapi(pickCatalogRoute, async (c) => {
+  try {
+    const result = await chooseFile('Select your Lightroom catalog', 'lrcat');
+    return c.json({ catalog_path: 'path' in result ? result.path : null }, 200);
+  } catch (error) {
+    if (error instanceof FileDialogUnavailableError) return c.json({ error: error.message }, 501);
+    if (error instanceof FileDialogBusyError) return c.json({ error: error.message }, 409);
+    return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  }
 });
 
 const putCatalogRoute = createRoute({
