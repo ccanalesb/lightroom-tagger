@@ -1,5 +1,25 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeCatalogPath } from '../useCatalogPicker'
+import { browserIsOnBackendHost, normalizeCatalogPath } from '../useCatalogPicker'
+
+describe('browserIsOnBackendHost', () => {
+  it('accepts the loopback names a browser can report', () => {
+    for (const host of ['localhost', '127.0.0.1', '[::1]', '::1']) {
+      expect(browserIsOnBackendHost(host)).toBe(true)
+    }
+  })
+
+  it('rejects a LAN address, even though it may be the same machine', () => {
+    // The dialog would open on the backend's screen; being wrong the other way
+    // costs a button, being wrong this way costs a hung request.
+    expect(browserIsOnBackendHost('192.168.1.42')).toBe(false)
+    expect(browserIsOnBackendHost('macbook.local')).toBe(false)
+  })
+
+  it('rejects a hostname that merely contains a loopback name', () => {
+    expect(browserIsOnBackendHost('localhost.evil.com')).toBe(false)
+    expect(browserIsOnBackendHost('notlocalhost')).toBe(false)
+  })
+})
 
 describe('normalizeCatalogPath', () => {
   it('leaves a plain path alone', () => {

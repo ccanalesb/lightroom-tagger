@@ -61,6 +61,13 @@ object, branded type or selector union is introduced.
   dialog on its own screen. `POST /api/config/catalog/pick` does exactly that,
   via `osascript`, and is macOS-only; typing a path stays as the fallback for
   every other host and for a UI reached from another device.
+- **The client has to judge co-location itself, and only loopback proves it.**
+  `picker_available` answers whether the backend's OS has a dialog, not whether
+  anyone is in front of it, so a phone talking to a Mac would still be offered
+  the button and would hold the request open until it timed out. The frontend
+  therefore shows the control only when it was served over loopback. Reaching
+  the UI by LAN address while sitting at that machine reads as remote and gives
+  up the dialog — the cheaper of the two errors, and one Electron removes.
 - **Any future "access from anywhere" work starts from pushing derived
   artifacts** — `library.db` plus the vision cache, roughly 4.6 GB — from a
   local agent to a read-mostly service. Not from moving the backend.

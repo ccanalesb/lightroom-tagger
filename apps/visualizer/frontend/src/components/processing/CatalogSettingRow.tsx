@@ -17,7 +17,9 @@ export function CatalogSettingRow() {
     pick,
     save,
   } = useCatalogPicker();
-  const [typing, setTyping] = useState(false);
+  // `null` means the user has not touched the disclosure, so it follows whether
+  // there is a dialog to prefer over it.
+  const [typing, setTyping] = useState<boolean | null>(null);
 
   if (loading) {
     return <SettingRow name="Lightroom catalog" description="Loading…" control={null} />;
@@ -35,20 +37,20 @@ export function CatalogSettingRow() {
     );
   }
 
-  // Typing is the fallback, so the field only appears when asked for — or when
-  // there is no catalog and no dialog to get one from.
-  const manual = typing || (!status.pickerAvailable && !status.path);
+  // Typing is the fallback where a dialog is on offer and the only way in where
+  // it is not, so with no usable dialog the field starts open.
+  const manual = typing ?? !status.pickerUsable;
   const busy = picking || saving;
 
   // Only a saved path closes the field: on failure the value stays where the
   // user can correct it.
   const commit = async () => {
-    if (await save()) setTyping(false);
+    if (await save()) setTyping(null);
   };
 
   const cancel = () => {
     setDraftPath(status.path);
-    setTyping(false);
+    setTyping(null);
   };
 
   const saveButton = (
@@ -88,7 +90,7 @@ export function CatalogSettingRow() {
       }
       control={
         <>
-          {status.pickerAvailable && (
+          {status.pickerUsable && (
             // One way in at a time: with the field open, the dialog would
             // overwrite what is being typed.
             <Button
@@ -152,10 +154,6 @@ export function CatalogSettingRow() {
                 onChange={(e) => setDraftPath(e.target.value)}
                 fullWidth
               />
-              <p className="text-sm text-text-secondary">
-                The file dialog opens on the machine hosting the backend, so paste a path here when
-                you are working from another device.
-              </p>
               <div className="flex flex-wrap gap-2">
                 {saveButton}
                 {cancelButton}

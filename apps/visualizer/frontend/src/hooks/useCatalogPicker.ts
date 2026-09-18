@@ -18,8 +18,13 @@ export interface CatalogStatus {
   /** What the backend resolves that to. */
   resolvedPath: string
   exists: boolean
-  /** Whether the backend's machine can open a native dialog. */
-  pickerAvailable: boolean
+  /**
+   * Whether the dialog is worth offering: the backend's machine can open one
+   * AND this browser is on that machine. Both halves are needed — the dialog
+   * opens where the backend is, so from another device it would appear in front
+   * of nobody and hold the request until it times out.
+   */
+  pickerUsable: boolean
   /**
    * `library.db` mirrors a catalog other than the configured one, so what the app
    * shows is from the old catalog until a sync runs. Stays true across the save —
@@ -43,6 +48,21 @@ export function normalizeCatalogPath(raw: string): string {
   return trimmed
 }
 
+/** IPv6 literals arrive bracketed in `location.hostname`; bare form for safety. */
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
+
+/**
+ * Whether this page is being served from the machine it is talking to.
+ *
+ * Reaching the backend over loopback is the only evidence a browser has that the
+ * two are the same machine. It is a floor, not a ceiling: opening the UI by LAN
+ * address while sitting at that very machine reads as remote and gives up the
+ * dialog. Offering a dialog that opens somewhere else is the worse mistake.
+ */
+export function browserIsOnBackendHost(hostname: string): boolean {
+  return LOOPBACK_HOSTNAMES.has(hostname)
+}
+
 export function useCatalogPicker() {
   const [status, setStatus] = useState<CatalogStatus | null>(null)
   const [draftPath, setDraft] = useState('')
@@ -59,7 +79,8 @@ export function useCatalogPicker() {
         path: data.catalog_path,
         resolvedPath: data.resolved_path,
         exists: data.exists,
-        pickerAvailable: data.picker_available,
+        pickerUsable:
+          data.picker_available && browserIsOnBackendHost(window.location.hostname),
         needsSync: data.needs_catalog_sync,
       })
       setDraft(data.catalog_path)
