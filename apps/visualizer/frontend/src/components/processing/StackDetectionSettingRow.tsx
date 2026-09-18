@@ -84,7 +84,7 @@ export function StackDetectionSettingRow() {
           </Button>
         </>
       }
-      panel={error && <p className="text-sm text-error">{error}</p>}
+      under={error && <p className="text-sm text-error">{error}</p>}
     />
   );
 }

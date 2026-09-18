@@ -7,7 +7,7 @@ interface SettingRowProps {
   /** The controls that sit at the end of the row. */
   control: ReactNode;
   /** Shown under the row when the setting needs more than its control fits. */
-  panel?: ReactNode;
+  under?: ReactNode;
 }
 
 /**
@@ -18,7 +18,7 @@ interface SettingRowProps {
  * share a phone-width line. Everything that can be long sits in a `min-w-0`
  * column so it truncates instead of pushing the controls off-screen.
  */
-export function SettingRow({ name, description, control, panel }: SettingRowProps) {
+export function SettingRow({ name, description, control, under }: SettingRowProps) {
   return (
     <div className="p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -28,7 +28,7 @@ export function SettingRow({ name, description, control, panel }: SettingRowProp
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:flex-shrink-0">{control}</div>
       </div>
-      {panel && <div className="mt-4 space-y-3 border-t border-border pt-4">{panel}</div>}
+      {under && <div className="mt-3">{under}</div>}
     </div>
   );
 }
