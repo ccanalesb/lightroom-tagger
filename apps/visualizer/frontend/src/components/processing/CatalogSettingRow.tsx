@@ -19,17 +19,31 @@ export function CatalogSettingRow() {
   } = useCatalogPicker();
   const [typing, setTyping] = useState(false);
 
-  if (loading || !status) {
+  if (loading) {
     return <SettingRow name="Lightroom catalog" description="Loading…" control={null} />;
+  }
+
+  // No status and not loading means the read failed. Without this the row would
+  // sit on "Loading…" forever and the error would have nowhere to go.
+  if (!status) {
+    return (
+      <SettingRow
+        name="Lightroom catalog"
+        description={<span className="text-error">{error ?? 'Could not read the setting'}</span>}
+        control={null}
+      />
+    );
   }
 
   // Typing is the fallback, so the field only appears when asked for — or when
   // there is no catalog and no dialog to get one from.
   const manual = typing || (!status.pickerAvailable && !status.path);
+  const busy = picking || saving;
 
+  // Only a saved path closes the field: on failure the value stays where the
+  // user can correct it.
   const commit = async () => {
-    await save();
-    setTyping(false);
+    if (await save()) setTyping(false);
   };
 
   const cancel = () => {
@@ -43,7 +57,7 @@ export function CatalogSettingRow() {
       size="sm"
       variant="primary"
       onClick={commit}
-      disabled={saving || picking || !changesCatalog}
+      disabled={busy || !changesCatalog}
     >
       {saving ? 'Saving…' : 'Save'}
     </Button>
@@ -82,7 +96,7 @@ export function CatalogSettingRow() {
               size="sm"
               variant={status.exists || changesCatalog ? 'secondary' : 'primary'}
               onClick={pick}
-              disabled={manual || picking || saving}
+              disabled={manual || busy}
             >
               {picking ? 'Choosing…' : 'Choose…'}
             </Button>
@@ -106,11 +120,18 @@ export function CatalogSettingRow() {
           {error && <p className="mb-3 text-sm text-error">{error}</p>}
           <details open={manual} className="group">
             <summary
+              // Locked while the dialog is open or a save is in flight: opening
+              // the field then would let the dialog's answer land on top of
+              // whatever was being typed.
+              aria-disabled={busy}
               onClick={(e) => {
                 e.preventDefault();
+                if (busy) return;
                 setTyping(!manual);
               }}
-              className="inline-flex cursor-pointer list-none items-center gap-1 text-sm text-accent [&::-webkit-details-marker]:hidden"
+              className={`inline-flex list-none items-center gap-1 text-sm [&::-webkit-details-marker]:hidden ${
+                busy ? 'cursor-default text-text-tertiary' : 'cursor-pointer text-accent'
+              }`}
             >
               <span className="inline-block transition-transform group-open:rotate-90">›</span>
               Enter a path manually

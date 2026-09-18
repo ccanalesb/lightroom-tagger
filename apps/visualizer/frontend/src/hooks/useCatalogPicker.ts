@@ -85,14 +85,17 @@ export function useCatalogPicker() {
     }
   }, [])
 
+  /** Whether the path was written. A caller closing an editor needs to know. */
   const save = useCallback(async () => {
     setSaving(true)
     setError(null)
     try {
       await ConfigAPI.putCatalog(draftPath)
       await refresh()
+      return true
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+      return false
     } finally {
       setSaving(false)
     }
