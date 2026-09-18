@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ConfigAPI } from '../../services/api';
 import { Button } from '../ui/Button/Button';
-import { Input } from '../ui/Input/Input';
+import { SettingRow } from './SettingRow';
 
-export function StackDetectionSettingsPanel() {
+export function StackDetectionSettingRow() {
   const [savedMs, setSavedMs] = useState(2000);
   const [draftMs, setDraftMs] = useState('2000');
   const [loading, setLoading] = useState(true);
@@ -46,39 +46,45 @@ export function StackDetectionSettingsPanel() {
     }
   };
 
+  if (loading) {
+    return <SettingRow name="Stack detection" description="Loading…" control={null} />;
+  }
+
+  const changed = draftMs !== String(savedMs);
+
   return (
-    <div className="rounded-base border border-border bg-bg p-4 space-y-4">
-      <h3 className="text-sm font-medium text-text">Stack detection</h3>
-      {loading ? (
-        <p className="text-sm text-text-secondary">Loading stack detection settings…</p>
-      ) : (
+    <SettingRow
+      name="Stack detection"
+      description={
         <>
-          <Input
-            label="Saved burst window (ms, on server)"
-            readOnly
-            value={String(savedMs)}
-            fullWidth
-            className="text-text-secondary"
-          />
-          <Input
-            label="Burst time window (milliseconds)"
+          Shots within {savedMs} ms are treated as one burst by{' '}
+          <code className="text-text">batch_stack_detect</code>
+        </>
+      }
+      control={
+        <>
+          <input
             type="number"
             min={1}
             step={1}
             value={draftMs}
             onChange={(e) => setDraftMs(e.target.value)}
-            fullWidth
+            aria-label="Burst time window (milliseconds)"
+            className="w-24 rounded-base border border-border bg-bg px-3 py-1.5 text-sm text-text transition-all duration-150 hover:border-border-strong focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent"
           />
-          <p className="text-sm text-text-secondary">
-            Default time between shots treated as the same burst for <code className="text-text">batch_stack_detect</code>
-            . Increase for slower sequences; decrease for fast bursts.
-          </p>
-          <Button type="button" onClick={handleSave} disabled={saving}>
-            Save burst window
+          <span className="text-sm text-text-secondary">ms</span>
+          <Button
+            type="button"
+            size="sm"
+            variant="primary"
+            onClick={handleSave}
+            disabled={saving || !changed}
+          >
+            {saving ? 'Saving…' : 'Save'}
           </Button>
-          {error && <p className="text-sm text-error">{error}</p>}
         </>
-      )}
-    </div>
+      }
+      panel={error && <p className="text-sm text-error">{error}</p>}
+    />
   );
 }

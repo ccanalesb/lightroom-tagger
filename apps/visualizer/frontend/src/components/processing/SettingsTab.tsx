@@ -1,5 +1,5 @@
-import { CatalogSettingsPanel } from '../images/CatalogSettingsPanel';
-import { StackDetectionSettingsPanel } from './StackDetectionSettingsPanel';
+import { CatalogSettingRow } from './CatalogSettingRow';
+import { StackDetectionSettingRow } from './StackDetectionSettingRow';
 
 export function SettingsTab() {
   return (
@@ -11,8 +11,10 @@ export function SettingsTab() {
         </p>
       </div>
 
-      <CatalogSettingsPanel />
-      <StackDetectionSettingsPanel />
+      <div className="divide-y divide-border rounded-base border border-border bg-bg">
+        <CatalogSettingRow />
+        <StackDetectionSettingRow />
+      </div>
     </div>
   );
 }
