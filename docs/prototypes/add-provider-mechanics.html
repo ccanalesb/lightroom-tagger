@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Five ways to add a provider — pick a mechanic</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Tokens copied verbatim from apps/visualizer/frontend/src/index.css — do not invent values here. */
+  :root {
+    --color-background:#ffffff; --color-surface:#f6f5f4; --color-surface-hover:#f1f0ed;
+    --color-text-primary:rgba(0,0,0,0.95); --color-text-secondary:#4a4642; --color-text-tertiary:#847f7a;
+    --color-border:rgba(0,0,0,0.12); --color-border-strong:rgba(0,0,0,0.2);
+    --color-accent:#0075de; --color-accent-hover:#005bab; --color-accent-light:#f2f9ff;
+    --color-success:#1aae39; --color-warning:#dd5b00; --color-error:#e03e3e;
+  }
+  .dark {
+    --color-background:#191919; --color-surface:#31302e; --color-surface-hover:#3d3b38;
+    --color-text-primary:#f7f6f5; --color-text-secondary:#b8b7b4; --color-text-tertiary:#8a8985;
+    --color-border:rgba(255,255,255,0.12); --color-border-strong:rgba(255,255,255,0.25);
+    --color-accent:#4A9EFF; --color-accent-hover:#7AB8FF; --color-accent-light:rgba(74,158,255,0.15);
+    --color-success:#3db39a; --color-warning:#ff8c42; --color-error:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Inter',-apple-system,system-ui,'Segoe UI',sans-serif;
+       background:var(--color-background);color:var(--color-text-primary);
+       -webkit-font-smoothing:antialiased;font-size:14px;line-height:1.5}
+  .wrap{max-width:900px;margin:0 auto;padding:28px 20px 90px}
+
+  h1{font-size:26px;line-height:1.23;letter-spacing:-.625px;font-weight:700;margin:0 0 6px}
+  h2{font-size:22px;line-height:1.27;letter-spacing:-.25px;font-weight:700;margin:0}
+  .lede{color:var(--color-text-secondary);margin:0 0 10px;max-width:72ch}
+  .sect{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--color-text-tertiary);
+        margin:32px 0 10px;font-weight:600}
+  code{background:var(--color-surface);padding:1px 5px;border-radius:4px;
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em}
+  p{margin:0 0 10px}
+  .muted{color:var(--color-text-secondary)}
+  .tiny{font-size:12px;color:var(--color-text-tertiary)}
+
+  .card{background:var(--color-background);border:1px solid var(--color-border);border-radius:12px;
+        box-shadow:rgba(0,0,0,.04) 0 4px 18px,rgba(0,0,0,.027) 0 2.025px 7.84688px,rgba(0,0,0,.02) 0 .8px 2.925px,rgba(0,0,0,.01) 0 .175px 1.04062px;
+        padding:20px}
+  .card + .card{margin-top:16px}
+
+  .opt-head{display:flex;align-items:baseline;gap:10px;margin-bottom:2px}
+  .opt-n{flex:0 0 26px;height:26px;border-radius:9999px;background:var(--color-accent);color:#fff;
+       font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .feel{color:var(--color-text-secondary);margin:6px 0 0}
+  .knows{display:flex;gap:16px;flex-wrap:wrap;margin:12px 0 0;padding:10px 0 0;border-top:1px solid var(--color-border)}
+  .knows div{font-size:12px}
+  .knows b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+       color:var(--color-text-tertiary);font-weight:600}
+  .stage{background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;
+       padding:14px;margin:14px 0 0}
+
+  .badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:9999px;
+         font-size:12px;font-weight:600;border:1px solid var(--color-border);
+         background:var(--color-surface);color:var(--color-text-secondary);white-space:nowrap}
+  .badge.success{background:rgba(26,174,57,.08);color:var(--color-success);border-color:rgba(26,174,57,.25)}
+  .badge.accent{background:var(--color-accent-light);color:var(--color-accent);border-color:rgba(0,117,222,.25)}
+  .badge.warning{background:rgba(221,91,0,.08);color:var(--color-warning);border-color:rgba(221,91,0,.25)}
+  .badge.error{background:rgba(224,62,62,.08);color:var(--color-error);border-color:rgba(224,62,62,.25)}
+
+  button{font:500 14px Inter,sans-serif;border-radius:8px;padding:7px 13px;cursor:pointer;
+         background:var(--color-background);color:var(--color-text-primary);
+         border:1px solid var(--color-border);transition:all .15s}
+  button:hover:not(:disabled){background:var(--color-surface-hover);border-color:var(--color-border-strong)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.primary{background:var(--color-accent);color:#fff;border-color:var(--color-accent);font-weight:600}
+  button.primary:hover:not(:disabled){background:var(--color-accent-hover);border-color:var(--color-accent-hover)}
+  button.danger{color:var(--color-error);border-color:rgba(224,62,62,.3)}
+  button.tiny{font-size:12px;padding:3px 9px}
+
+  input,select,textarea{font:400 14px Inter,sans-serif;border:1px solid var(--color-border);border-radius:8px;
+        padding:8px 11px;background:var(--color-background);color:var(--color-text-primary);width:100%}
+  textarea{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.6;resize:vertical}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--color-accent);outline-offset:-1px;border-color:transparent}
+  input::placeholder,textarea::placeholder{color:var(--color-text-tertiary)}
+  label.f{display:block;margin-bottom:10px}
+  label.f > span{display:block;font-size:13px;font-weight:500;color:var(--color-text-secondary);margin-bottom:5px}
+  .err{color:var(--color-error);font-size:12.5px;margin-top:4px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+  @media(max-width:700px){.grid2{grid-template-columns:1fr}}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .hr{height:1px;background:var(--color-border);margin:14px 0}
+
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  @media(max-width:700px){.tiles{grid-template-columns:repeat(2,1fr)}}
+  .tile{text-align:left;padding:10px 12px;border-radius:8px;background:var(--color-background)}
+  .tile b{display:block;font-size:13px;font-weight:600}
+  .tile span{display:block;font-size:11px;color:var(--color-text-tertiary);margin-top:2px}
+  .tile.custom{border-style:dashed}
+
+  .read{display:grid;grid-template-columns:150px 1fr;gap:4px 12px;font-size:13px;margin:0}
+  .read dt{color:var(--color-text-tertiary);font-size:12px}
+  .read dd{margin:0;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;word-break:break-all}
+  .read dd.na{font-family:inherit;color:var(--color-text-tertiary)}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+     color:var(--color-text-tertiary);font-weight:600;padding:0 10px 6px 0}
+  td{padding:7px 10px 7px 0;border-top:1px solid var(--color-border);vertical-align:middle}
+  td.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+  label.ck{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--color-border);
+     cursor:pointer}
+  label.ck input{width:auto;margin-top:3px}
+  label.ck b{font-size:13px;font-weight:600}
+
+  .toast{margin:14px 0 0;padding:11px 13px;border-radius:8px;font-size:13px;border:1px solid var(--color-border)}
+  .toast.ok{background:rgba(26,174,57,.06);border-color:rgba(26,174,57,.25)}
+  .toast.no{background:rgba(224,62,62,.06);border-color:rgba(224,62,62,.25)}
+  .toast b{display:block;margin-bottom:2px}
+  .toggle{position:fixed;top:14px;right:14px;z-index:9}
+  .catch{margin:12px 0 0;padding:2px 0 2px 13px;border-left:3px solid var(--color-border-strong);
+     color:var(--color-text-secondary);font-size:13px}
+  .catch b{color:var(--color-text-primary)}
+  details summary{cursor:pointer;font-weight:600;color:var(--color-text-secondary)}
+  details[open] summary{margin-bottom:10px}
+  pre{background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;padding:12px;
+      overflow:auto;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.55;margin:0}
+</style>
+</head>
+<body>
+<button class="toggle" onclick="document.documentElement.classList.toggle('dark')">Toggle theme</button>
+<div class="wrap">
+
+  <h1>Five ways to add a provider</h1>
+  <p class="lede"><b>This page asks one question: which of these should the Providers tab actually do?</b>
+  Every option below adds the same kind of provider and stores the same fields — they differ only in
+  how you say <em>which</em> provider you want. Try each one. They all work.</p>
+  <p class="lede">The stepper from the previous prototype is deliberately not here; it turned adding a
+  provider into an onboarding flow. Behind all five, adding a provider is a single operation: check the
+  address, ask what models it has, send each one a test image, report back.</p>
+
+  <div class="sect">Providers you have added</div>
+  <div id="added"></div>
+
+  <div class="sect">The options</div>
+  <div id="options"></div>
+
+  <div class="sect">Reference</div>
+  <div class="card">
+    <details>
+      <summary>Which servers exist in this simulation</summary>
+      <p class="tiny">Nothing here touches the real network. These are the only addresses that answer,
+      and the only keys that work. Use them when trying the options above.</p>
+      <div id="servers"></div>
+    </details>
+    <div class="hr"></div>
+    <details>
+      <summary>What gets stored, whichever option wins</summary>
+      <p class="tiny">Unchanged from the data-model prototype. The mechanic is the open question, not this.</p>
+      <pre id="shape"></pre>
+    </details>
+  </div>
+
+</div>
+
+<script>
+/* ==========================================================================
+   Shared model. Identical for all five options — only the way a user expresses
+   "this provider" changes. Lifted from the data-model prototype.
+   ========================================================================== */
+function normalizeBaseUrl(raw) {
+  let text = String(raw == null ? '' : raw).trim().replace(/^["']|["']$/g, '');
+  if (!text) return { ok: false, error: 'Required.' };
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(text)) text = 'http://' + text;
+  let u;
+  try { u = new URL(text); } catch (_) { return { ok: false, error: 'That is not an address.' }; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+    return { ok: false, error: u.protocol + ' cannot be reached over HTTP.' };
+  }
+  return { ok: true, url: (u.origin + u.pathname).replace(/\/+$/, '') };
+}
+
+/** Users paste what their model server prints, which rarely includes /v1. */
+function probeCandidates(url) { return url.endsWith('/v1') ? [url] : [url + '/v1', url]; }
+
+/**
+ * Drop the operation off the end of a copied URL.
+ *
+ * Every provider's documentation shows a full call, so anything pasted out of
+ * docs or a curl command arrives with `/chat/completions` still attached.
+ */
+const ENDPOINT_TAIL = /\/(chat\/completions|completions|messages|embeddings|responses|models|api\/tags|generate)\/?$/;
+function trimEndpoint(url) {
+  const trimmed = String(url).replace(ENDPOINT_TAIL, '');
+  return { url: trimmed, trimmed: trimmed !== String(url).replace(/\/+$/, '') };
+}
+
+function slugify(s) {
+  return String(s || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '').slice(0, 40);
+}
+
+function uniqueId(base, taken) {
+  let id = base || 'provider', n = 2;
+  while (taken.indexOf(id) !== -1) { id = base + '_' + n; n++; }
+  return id;
+}
+
+/* ---------- the simulated world ---------- */
+const SERVERS = {
+  'http://localhost:11434/v1': { label: 'Ollama', up: true, auth: false, chat: true,
+    models: ['llama3.2-vision:11b', 'qwen2.5vl:7b', 'llama3.1:8b', 'nomic-embed-text'],
+    seeing: ['llama3.2-vision:11b', 'qwen2.5vl:7b'] },
+  'http://localhost:1234/v1': { label: 'LM Studio', up: true, auth: false, chat: true,
+    models: ['qwen2.5-vl-7b-instruct', 'gemma-3-12b-it'],
+    seeing: ['qwen2.5-vl-7b-instruct', 'gemma-3-12b-it'] },
+  'http://localhost:8000/v1': { label: 'vLLM', up: true, auth: false, chat: true,
+    models: ['Qwen/Qwen2.5-VL-7B-Instruct'], seeing: ['Qwen/Qwen2.5-VL-7B-Instruct'] },
+  'http://localhost:8080/v1': { label: 'llama.cpp server', up: false, auth: false, chat: true,
+    models: ['gemma-3-4b-it'], seeing: ['gemma-3-4b-it'] },
+  'https://openrouter.ai/api/v1': { label: 'OpenRouter', up: true, auth: 'bearer', keys: ['sk-or-demo'],
+    chat: true, models: ['google/gemini-2.5-flash-lite', 'openai/gpt-4.1-nano',
+      'qwen/qwen3-vl-32b-instruct', 'deepseek/deepseek-r1'],
+    seeing: ['google/gemini-2.5-flash-lite', 'openai/gpt-4.1-nano', 'qwen/qwen3-vl-32b-instruct'] },
+  'https://api.groq.com/openai/v1': { label: 'Groq', up: true, auth: 'bearer', keys: ['gsk-demo'],
+    chat: true, models: ['meta-llama/llama-4-scout-17b-16e-instruct', 'llama-3.3-70b-versatile'],
+    seeing: ['meta-llama/llama-4-scout-17b-16e-instruct'] },
+  'https://models.acme-corp.internal/v1': { label: 'a company proxy', up: true, auth: 'bearer',
+    keys: ['acme-token'], chat: true, models: ['gpt-4o-mini-2024-07-18'],
+    seeing: ['gpt-4o-mini-2024-07-18'] },
+  'https://api.anthropic.com/v1': { label: 'Anthropic', up: true, auth: 'header:x-api-key',
+    keys: ['sk-ant-demo'], chat: false, models: ['claude-sonnet-4-5'], seeing: [] }
+};
+
+/** Variables already set in this simulated shell. Option 3 reads these. */
+const ENV = { OPENROUTER_API_KEY: 'sk-or-demo', GROQ_API_KEY: 'gsk-demo' };
+
+function lookup(candidate) {
+  if (SERVERS[candidate]) return { server: SERVERS[candidate], exact: true };
+  const origin = candidate.split('/').slice(0, 3).join('/');
+  const sibling = Object.keys(SERVERS).find(k => k.indexOf(origin + '/') === 0 || k === origin);
+  return sibling ? { server: SERVERS[sibling], exact: false } : { server: null, exact: false };
+}
+
+function authOk(server, auth) {
+  if (!server.auth) return true;
+  const known = (server.keys || []).indexOf(auth.secret) !== -1;
+  if (server.auth === 'bearer') return auth.mode === 'bearer' && known;
+  const wanted = server.auth.split(':')[1];
+  return auth.mode === 'header' && String(auth.headerName || '').toLowerCase() === wanted && known;
+}
+
+function callModels(candidate, auth) {
+  const f = lookup(candidate);
+  if (!f.server) return { kind: 'network' };
+  if (!f.server.up) return { kind: 'down' };
+  if (!f.exact) return { kind: 'wrong-path' };
+  if (!authOk(f.server, auth)) return { kind: 'unauthorized' };
+  return { kind: 'ok', models: f.server.models.slice() };
+}
+
+function callVision(candidate, auth, modelId) {
+  const f = lookup(candidate);
+  if (!f.server || !f.server.up || !f.exact || !authOk(f.server, auth)) return false;
+  if (!f.server.chat) return false;
+  return f.server.seeing.indexOf(modelId) !== -1;
+}
+
+/* ---------- the one operation all five options share ---------- */
+const state = { providers: [], reports: {} };
+
+/**
+ * Check the address, list the models, send each a test image.
+ *
+ * The test image is the only thing that answers "can this actually describe a
+ * photo" — an OpenAI-compatible models list reports ids and nothing else.
+ */
+function addProvider(spec, via) {
+  const n = normalizeBaseUrl(spec.baseUrl);
+  if (!n.ok) return fail(via, n.error, null);
+
+  const auth = spec.auth || { mode: 'none' };
+  let reached = null, raw = null;
+  for (const candidate of probeCandidates(n.url)) {
+    raw = callModels(candidate, auth);
+    if (raw.kind === 'ok') { reached = candidate; break; }
+  }
+  if (!reached) {
+    const why = {
+      network: ['Nothing answered at that address.', 'Check the address, or start the server if it is a local one.'],
+      down: ['Nothing answered at that address.', 'A local model server only listens while it is running.'],
+      'wrong-path': ['The host is up, but there is no API there.', 'Most servers mount theirs at /v1.'],
+      unauthorized: ['The key was rejected.', auth.mode === 'none'
+        ? 'This one needs a key.'
+        : 'Some providers want the key in their own header rather than Authorization: Bearer.']
+    }[raw.kind];
+    return fail(via, why[0], why[1]);
+  }
+
+  const models = raw.models.map(id => ({ id: id, vision: callVision(reached, auth, id) }));
+  const seeing = models.filter(m => m.vision);
+  const id = uniqueId(spec.id || slugify(spec.name), state.providers.map(p => p.id));
+  const p = { id: id, name: spec.name || SERVERS[reached].label, baseUrl: reached, auth: auth,
+              extraHeaders: spec.extraHeaders || {}, models: models, via: via };
+  state.providers.push(p);
+  state.reports[via] = { ok: true,
+    head: p.name + ' added — ' + seeing.length + ' of ' + models.length +
+      (models.length === 1 ? ' model' : ' models') + ' can read a photo.',
+    body: seeing.length
+      ? 'Describe jobs will use ' + seeing[0].id + '.' + (reached === n.url ? '' : ' Its API turned out to be at ' + reached + '.')
+      : 'Nothing here can accept an image, so it cannot describe photos — only text.' };
+  render();
+  return true;
+}
+
+function fail(via, head, body) {
+  state.reports[via] = { ok: false, head: head, body: body };
+  render();
+  return false;
+}
+function tryAdd(spec, via) { return addProvider(spec, via); }
+
+function removeProvider(id) {
+  state.providers = state.providers.filter(p => p.id !== id);
+  render();
+}
+
+function resetAll() {
+  state.providers = []; state.reports = {};
+  Object.keys(FORMS).forEach(k => FORMS[k] = FRESH[k]());
+  render();
+}
+
+/* ==========================================================================
+   The five options. Each owns a tiny bit of local form state and nothing else.
+   ========================================================================== */
+const PRESETS = [
+  { key: 'ollama', name: 'Ollama', hint: 'localhost:11434', baseUrl: 'http://localhost:11434', auth: null },
+  { key: 'lmstudio', name: 'LM Studio', hint: 'localhost:1234', baseUrl: 'http://localhost:1234', auth: null },
+  { key: 'vllm', name: 'vLLM', hint: 'localhost:8000', baseUrl: 'http://localhost:8000', auth: null },
+  { key: 'llamacpp', name: 'llama.cpp', hint: 'localhost:8080', baseUrl: 'http://localhost:8080', auth: null },
+  { key: 'openrouter', name: 'OpenRouter', hint: 'needs a key', baseUrl: 'https://openrouter.ai/api/v1', auth: 'bearer' },
+  { key: 'groq', name: 'Groq', hint: 'needs a key', baseUrl: 'https://api.groq.com/openai/v1', auth: 'bearer' },
+  { key: 'anthropic', name: 'Anthropic', hint: 'needs a key', baseUrl: 'https://api.anthropic.com/v1', auth: 'header:x-api-key' }
+];
+
+const SCAN_PORTS = ['http://localhost:11434', 'http://localhost:1234', 'http://localhost:8000',
+                    'http://localhost:8080', 'http://localhost:5000'];
+
+const FRESH = {
+  preset: () => ({ chosen: null, key: '' }),
+  paste: () => ({ text: '' }),
+  scan: () => ({ ran: false, found: [], picked: {} }),
+  form: () => ({ name: '', baseUrl: '', authMode: 'none', headerName: '', secret: '', headers: '' }),
+  file: () => ({ text: '{\n  "name": "LM Studio",\n  "base_url": "http://localhost:1234/v1",\n  "auth": { "mode": "none" }\n}' })
+};
+const FORMS = { preset: FRESH.preset(), paste: FRESH.paste(), scan: FRESH.scan(),
+                form: FRESH.form(), file: FRESH.file() };
+
+/* ---------- option 2: read whatever was pasted ---------- */
+/**
+ * Pull an address and a credential out of free text.
+ *
+ * Deliberately reports what it understood rather than acting on it, because a
+ * wrong guess that silently succeeds is worse than a form.
+ */
+function interpretPaste(text) {
+  const t = String(text || '').trim();
+  if (!t) return { empty: true, notes: [] };
+  const out = { notes: [] };
+
+  const bearer = t.match(/Authorization\s*:\s*Bearer\s+([^\s"'\\]+)/i);
+  const custom = t.match(/-H\s+["']?([A-Za-z0-9-]+)\s*:\s*([^\s"'\\]+)/g);
+  const urls = t.match(/https?:\/\/[^\s"'<>,\\]+/g) || [];
+  const kv = {};
+  t.replace(/^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)\s*=\s*["']?([^\s"']+)/gm, (m, k, v) => { kv[k] = v; return m; });
+  let json = null;
+  try { json = JSON.parse(t); } catch (_) {}
+
+  if (json && typeof json === 'object') {
+    out.baseUrl = json.base_url || json.baseUrl || json.url || null;
+    out.name = json.name || null;
+    const k = json.api_key || json.apiKey || json.key || null;
+    if (k) out.auth = { mode: 'bearer', secret: k };
+    out.source = 'a JSON block';
+  }
+
+  if (!out.baseUrl) {
+    const envUrl = Object.keys(kv).find(k => /(_BASE_URL|_HOST|_URL|_ENDPOINT)$/.test(k));
+    if (envUrl) { out.baseUrl = kv[envUrl]; out.source = 'environment variables'; out.fromVar = envUrl; }
+  }
+  if (!out.baseUrl && urls.length) {
+    out.baseUrl = urls[urls.length - 1];
+    out.source = out.source || (/\bcurl\b/i.test(t) ? 'a curl command' : 'an address');
+  }
+  if (!out.baseUrl) {
+    const bare = t.match(/(?:^|\s)((?:localhost|\d+\.\d+\.\d+\.\d+|[a-z0-9-]+\.[a-z]{2,})(?::\d+)?(?:\/\S*)?)/i);
+    if (bare) { out.baseUrl = bare[1]; out.source = 'an address with no scheme'; out.notes.push('Assumed http://'); }
+  }
+
+  if (!out.auth && bearer) { out.auth = { mode: 'bearer', secret: bearer[1] }; out.source = out.source || 'a curl command'; }
+  if (!out.auth && custom) {
+    for (const h of custom) {
+      const m = h.match(/-H\s+["']?([A-Za-z0-9-]+)\s*:\s*([^\s"'\\]+)/);
+      // Version pins and content negotiation are not credentials.
+      if (/^(authorization|content-type|accept|accept-encoding|user-agent)$/i.test(m[1])) continue;
+      if (/-version$/i.test(m[1])) continue;
+      out.auth = { mode: 'header', headerName: m[1], secret: m[2] };
+      break;
+    }
+  }
+  if (!out.auth) {
+    const envKey = Object.keys(kv).find(k => /(_API_KEY|_KEY|_TOKEN)$/.test(k));
+    if (envKey) { out.auth = { mode: 'bearer', secret: kv[envKey] }; out.fromKeyVar = envKey; }
+  }
+
+  if (out.baseUrl) {
+    const t = trimEndpoint(out.baseUrl);
+    if (t.trimmed) {
+      out.notes.push('Dropped the endpoint off the end — documentation always shows a whole call.');
+    }
+    out.baseUrl = t.url;
+  }
+  if (!out.baseUrl) out.notes.push('No address found in that.');
+  if (out.baseUrl && !out.auth) out.notes.push('No key found — assuming this one needs none.');
+  if (!out.name && out.baseUrl) {
+    const n = normalizeBaseUrl(out.baseUrl);
+    if (n.ok) { const f = lookup(n.url.endsWith('/v1') ? n.url : n.url + '/v1');
+      out.name = f.server ? f.server.label : new URL(n.url).hostname; }
+  }
+  out.ok = !!out.baseUrl;
+  return out;
+}
+
+/* ---------- option 3: probe the obvious places ---------- */
+function runScan() {
+  const found = [];
+  for (const base of SCAN_PORTS) {
+    for (const candidate of probeCandidates(base)) {
+      const r = callModels(candidate, { mode: 'none' });
+      if (r.kind === 'ok') {
+        found.push({ baseUrl: candidate, name: lookup(candidate).server.label,
+          note: r.models.length + ' models, no key needed', kind: 'local' });
+        break;
+      }
+    }
+  }
+  for (const name of Object.keys(ENV)) {
+    if (!/(_API_KEY|_TOKEN)$/.test(name)) continue;
+    const guess = { OPENROUTER_API_KEY: 'https://openrouter.ai/api/v1',
+                    GROQ_API_KEY: 'https://api.groq.com/openai/v1' }[name];
+    if (!guess) continue;
+    const r = callModels(guess, { mode: 'bearer', secret: ENV[name] });
+    if (r.kind === 'ok') {
+      found.push({ baseUrl: guess, name: lookup(guess).server.label,
+        auth: { mode: 'bearer', secret: ENV[name] },
+        note: 'key already in your environment as $' + name, kind: 'env' });
+    }
+  }
+  FORMS.scan = { ran: true, found: found, picked: {} };
+  render();
+}
+
+/* ==========================================================================
+   Render
+   ========================================================================== */
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function toast(via) {
+  const r = state.reports[via];
+  if (!r) return '';
+  return '<div class="toast ' + (r.ok ? 'ok' : 'no') + '"><b>' + esc(r.head) + '</b>' +
+    (r.body ? '<span class="muted">' + esc(r.body) + '</span>' : '') + '</div>';
+}
+
+function knows(a, b, c) {
+  return '<div class="knows">' +
+    '<div><b>User must already know</b>' + a + '</div>' +
+    '<div><b>Clicks to a working provider</b>' + b + '</div>' +
+    '<div><b>Reaches</b>' + c + '</div></div>';
+}
+
+const OPTIONS = [
+  {
+    key: 'preset',
+    title: 'A shelf of known providers, plus Anything else',
+    feel: 'You recognise your provider by name and click it. Local ones need nothing else and add ' +
+      'immediately. Cloud ones ask for the key and nothing more. Anything not on the shelf falls ' +
+      'through to the plain form.',
+    catch: '<b>The catch:</b> the shelf is a list somebody has to maintain, which is the thing you said ' +
+      'you wanted to get away from. It only helps if your provider is on it — everyone else silently ' +
+      'takes the slow path and feels like a second-class citizen.',
+    knows: knows('Its name.', 'One, for a local server.', 'Whatever is on the shelf, quickly. Everything else, slowly.'),
+    body() {
+      const f = FORMS.preset;
+      const tiles = PRESETS.map(p => '<button class="tile" data-a="preset-pick" data-k="' + p.key + '">' +
+        '<b>' + esc(p.name) + '</b><span>' + esc(p.hint) + '</span></button>').join('') +
+        '<button class="tile custom" data-a="preset-pick" data-k="__custom"><b>Anything else</b>' +
+        '<span>fill it in yourself</span></button>';
+      let tail = '';
+      if (f.chosen === '__custom') {
+        tail = '<div class="stage"><p class="tiny" style="margin:0">Falls through to option 4, the plain ' +
+          'form. Nothing is prefilled and nothing is guessed.</p></div>';
+      } else if (f.chosen) {
+        const p = PRESETS.find(x => x.key === f.chosen);
+        tail = '<div class="stage"><div style="margin-bottom:10px"><b>' + esc(p.name) + '</b> ' +
+          '<span class="tiny">' + esc(p.baseUrl) + '</span></div>' +
+          (p.auth
+            ? '<label class="f"><span>API key</span><input data-form="preset" data-field="key" value="' +
+              esc(f.key) + '" placeholder="' + (p.auth === 'bearer' ? 'sk-or-demo' : 'sk-ant-demo') + '"></label>'
+            : '<p class="tiny" style="margin:0 0 10px">No key needed — it is on your own machine.</p>') +
+          '<button class="primary" data-a="preset-add">Add ' + esc(p.name) + '</button></div>';
+      }
+      return '<div class="tiles">' + tiles + '</div>' + tail;
+    }
+  },
+  {
+    key: 'paste',
+    title: 'Paste anything and let it read it',
+    feel: 'One box. Paste an address, the curl command from a provider\'s docs, the two lines you ' +
+      'already have in your .env, or a JSON snippet. It shows you what it understood before adding ' +
+      'anything, so a wrong guess is visible rather than silent.',
+    catch: '<b>The catch:</b> detection is a bottomless pit — every new paste shape is another branch, ' +
+      'and a confident wrong reading is worse than an empty form. It lives or dies on the ' +
+      '"here is what I read" panel being trustworthy.',
+    knows: knows('Nothing, if they can copy and paste.', 'Two: paste, then Add.',
+      'Anything reachable, including a company proxy.'),
+    body() {
+      const f = FORMS.paste, r = interpretPaste(f.text);
+      let panel = '';
+      if (!r.empty) {
+        panel = '<div class="stage"><div class="tiny" style="margin-bottom:8px">Read as ' +
+          esc(r.source || 'something unrecognised') + ':</div><dl class="read">' +
+          '<dt>Address</dt><dd' + (r.baseUrl ? '' : ' class="na"') + '>' +
+            esc(r.baseUrl || 'not found') + '</dd>' +
+          '<dt>Name</dt><dd' + (r.name ? '' : ' class="na"') + '>' + esc(r.name || 'you can rename later') + '</dd>' +
+          '<dt>Authentication</dt><dd' + (r.auth ? '' : ' class="na"') + '>' +
+            (r.auth ? esc(r.auth.mode === 'bearer' ? 'Authorization: Bearer' : r.auth.headerName + ' header') : 'none') +
+            '</dd>' +
+          '<dt>Key</dt><dd' + (r.auth ? '' : ' class="na"') + '>' +
+            (r.auth ? esc(r.auth.secret) : '—') + '</dd>' +
+          '</dl>' +
+          (r.notes.length ? '<p class="tiny" style="margin:10px 0 0">' +
+            r.notes.map(esc).join(' ') + '</p>' : '') +
+          '<div class="btns" style="margin-top:12px">' +
+            '<button class="primary" data-a="paste-add"' + (r.ok ? '' : ' disabled') + '>Add this</button>' +
+            '<button data-a="paste-clear">Clear</button></div></div>';
+      }
+      return '<textarea rows="4" data-form="paste" data-field="text" placeholder="Paste an address, a curl ' +
+        'command, or a couple of env lines…">' + esc(f.text) + '</textarea>' +
+        '<div class="btns" style="margin-top:8px"><span class="tiny">Try:</span>' +
+        this.samples.map((s, i) => '<button class="tiny" data-a="paste-sample" data-i="' + i + '">' +
+          esc(s[0]) + '</button>').join('') + '</div>' + panel;
+    },
+    samples: [
+      ['An address', 'localhost:1234'],
+      ['A curl command', 'curl https://api.groq.com/openai/v1/chat/completions \\\n  -H "Authorization: Bearer gsk-demo" \\\n  -H "Content-Type: application/json"'],
+      ['Two .env lines', 'OPENAI_BASE_URL=https://models.acme-corp.internal/v1\nOPENAI_API_KEY=acme-token'],
+      ['Anthropic docs', 'curl https://api.anthropic.com/v1/messages \\\n  -H "x-api-key: sk-ant-demo" \\\n  -H "anthropic-version: 2023-06-01"']
+    ]
+  },
+  {
+    key: 'scan',
+    title: 'Find them for me',
+    feel: 'One button. It knocks on the handful of ports local model servers actually use, and reads ' +
+      'the API keys already sitting in your environment. Whatever answers comes back as a list you ' +
+      'tick. You never type an address.',
+    catch: '<b>The catch:</b> it can only find things it already knows to look for — the ports list and ' +
+      'the env-variable list are both maintained lists, same problem as the shelf. It cannot find a ' +
+      'server on a port nobody expected, or a machine on your network. It needs a manual option beside it.',
+    knows: knows('Nothing at all.', 'Two: scan, then tick.', 'Local servers on usual ports, and keys already in your shell.'),
+    body() {
+      const f = FORMS.scan;
+      if (!f.ran) {
+        return '<div class="btns"><button class="primary" data-a="scan">Look for providers</button>' +
+          '<span class="tiny">Checks ' + SCAN_PORTS.length + ' local ports and ' +
+          Object.keys(ENV).length + ' environment variables.</span></div>';
+      }
+      if (!f.found.length) {
+        return '<div class="stage"><b>Nothing answered.</b><p class="tiny" style="margin:4px 0 0">' +
+          'No local server is running and no usable key is in your environment.</p></div>' +
+          '<div class="btns" style="margin-top:12px"><button data-a="scan">Look again</button></div>';
+      }
+      const picked = Object.keys(f.picked).filter(k => f.picked[k]);
+      return '<div class="stage"><div class="tiny" style="margin-bottom:4px">Found ' + f.found.length +
+        ':</div>' + f.found.map((x, i) =>
+        '<label class="ck"><input type="checkbox" data-a="scan-tick" data-i="' + i + '"' +
+        (f.picked[i] ? ' checked' : '') + '><span><b>' + esc(x.name) + '</b> ' +
+        '<span class="badge ' + (x.kind === 'env' ? 'accent' : '') + '">' + esc(x.note) + '</span>' +
+        '<div class="tiny" style="font-family:ui-monospace,Menlo,monospace">' + esc(x.baseUrl) +
+        '</div></span></label>').join('') +
+        '<div class="btns" style="margin-top:12px">' +
+        '<button class="primary" data-a="scan-add"' + (picked.length ? '' : ' disabled') + '>Add ' +
+        (picked.length ? picked.length + ' selected' : 'selected') + '</button>' +
+        '<button data-a="scan-again">Look again</button></div></div>';
+    }
+  },
+  {
+    key: 'form',
+    title: 'One plain form',
+    feel: 'Every field visible at once, one Add button, no sequence and no guessing. The fastest option ' +
+      'by far if you already know your address and how the provider wants its key — and the only one ' +
+      'that can express something nothing else anticipated.',
+    catch: '<b>The catch:</b> it asks a photographer to know what a base URL is, whether their provider ' +
+      'wants Bearer or its own header, and which port their model server chose. Most of them do not, ' +
+      'and there is no way for the form to teach them.',
+    knows: knows('Base URL, and how the key is sent.', 'One, after filling four fields.', 'Absolutely anything reachable.'),
+    body() {
+      const f = FORMS.form;
+      const fld = (label, name, ph, val) => '<label class="f"><span>' + label + '</span>' +
+        '<input data-form="form" data-field="' + name + '" value="' + esc(val) + '" placeholder="' +
+        esc(ph) + '"></label>';
+      return '<div class="grid2">' +
+          fld('Name', 'name', 'The studio Mac', f.name) +
+          fld('Base URL', 'baseUrl', 'http://localhost:1234/v1', f.baseUrl) +
+        '</div><div class="grid2">' +
+          '<label class="f"><span>Authentication</span><select data-form="form" data-field="authMode">' +
+            [['none', 'None — a local server'], ['bearer', 'Authorization: Bearer'],
+             ['header', 'Its own header']].map(o => '<option value="' + o[0] + '"' +
+              (o[0] === f.authMode ? ' selected' : '') + '>' + o[1] + '</option>').join('') +
+          '</select></label>' +
+          (f.authMode === 'header' ? fld('Header name', 'headerName', 'x-api-key', f.headerName) : '<div></div>') +
+        '</div>' +
+        (f.authMode === 'none' ? '' : fld('API key', 'secret', 'sk-…', f.secret)) +
+        fld('Extra headers, one per line', 'headers', 'HTTP-Referer: lightroom-tagger', f.headers) +
+        '<div class="btns"><button class="primary" data-a="form-add"' +
+          (f.baseUrl.trim() ? '' : ' disabled') + '>Add provider</button></div>';
+    }
+  },
+  {
+    key: 'file',
+    title: 'Edit the config, in the app',
+    feel: 'The Providers tab shows you the actual JSON, validates as you type, and has one button that ' +
+      'tries it. No invented vocabulary sitting between you and the file — what you see is what gets ' +
+      'written.',
+    catch: '<b>The catch:</b> this is not a feature for a photographer, it is a feature for you. Worth ' +
+      'having as an escape hatch behind one of the others; unusable as the only way in.',
+    knows: knows('The file format.', 'One, after writing valid JSON.', 'Anything, including fields no form has.'),
+    body() {
+      const f = FORMS.file;
+      let err = null, parsed = null;
+      try { parsed = JSON.parse(f.text); } catch (e) { err = e.message; }
+      if (!err && (!parsed || !(parsed.base_url || parsed.baseUrl))) err = 'Needs a "base_url".';
+      return '<textarea rows="7" data-form="file" data-field="text">' + esc(f.text) + '</textarea>' +
+        (err ? '<div class="err">' + esc(err) + '</div>' : '') +
+        '<div class="btns" style="margin-top:10px"><button class="primary" data-a="file-add"' +
+        (err ? ' disabled' : '') + '>Try it and add</button></div>';
+    }
+  }
+];
+
+function renderAdded() {
+  const el = document.getElementById('added');
+  if (!state.providers.length) {
+    el.innerHTML = '<div class="card"><p class="muted" style="margin:0">None yet — use any of the five ' +
+      'options below. Whichever you use, the result lands here.</p></div>';
+    return;
+  }
+  el.innerHTML = '<div class="card"><table>' +
+    '<tr><th>Provider</th><th>Address</th><th>Can describe photos</th><th>Added via</th><th></th></tr>' +
+    state.providers.map(p => {
+      const seeing = p.models.filter(m => m.vision);
+      return '<tr><td><b>' + esc(p.name) + '</b></td><td class="mono">' + esc(p.baseUrl) + '</td>' +
+        '<td>' + (seeing.length
+          ? '<span class="badge success">yes</span> <span class="tiny">' + seeing.length + ' of ' +
+            p.models.length + ' models</span>'
+          : '<span class="badge error">no</span> <span class="tiny">no model takes an image</span>') + '</td>' +
+        '<td class="tiny">' + esc((OPTIONS.find(o => o.key === p.via) || {}).title || p.via) + '</td>' +
+        '<td style="text-align:right"><button class="tiny danger" data-a="remove" data-id="' + p.id +
+        '">Remove</button></td></tr>';
+    }).join('') + '</table><div class="btns" style="margin-top:12px">' +
+    '<button data-a="reset">Clear all and start over</button></div></div>';
+}
+
+function renderOptions() {
+  document.getElementById('options').innerHTML = OPTIONS.map((o, i) =>
+    '<div class="card"><div class="opt-head"><div class="opt-n">' + (i + 1) + '</div>' +
+    '<h2>' + esc(o.title) + '</h2></div>' +
+    '<p class="feel">' + o.feel + '</p>' + o.knows +
+    '<div style="margin-top:14px">' + o.body() + '</div>' + toast(o.key) +
+    '<p class="catch">' + o.catch + '</p></div>').join('');
+}
+
+function renderReference() {
+  document.getElementById('servers').innerHTML = '<table>' +
+    '<tr><th>Address</th><th>What it is</th><th>Key that works</th><th>State</th></tr>' +
+    Object.keys(SERVERS).map(url => {
+      const s = SERVERS[url];
+      return '<tr><td class="mono">' + esc(url) + '</td><td>' + esc(s.label) +
+        (s.chat === false ? ' <span class="badge warning">no /chat/completions</span>' : '') + '</td>' +
+        '<td class="mono">' + (s.auth ? esc((s.auth === 'bearer' ? '' : s.auth + ' ') + s.keys[0]) : '—') + '</td>' +
+        '<td>' + (s.up ? '<span class="badge success">running</span>'
+                       : '<span class="badge">not running</span>') + '</td></tr>';
+    }).join('') + '</table>' +
+    '<p class="tiny" style="margin-top:10px">Environment already contains: ' +
+    Object.keys(ENV).map(k => '<code>' + k + '</code>').join(' ') + '</p>';
+
+  const sample = state.providers[0];
+  document.getElementById('shape').textContent = JSON.stringify(sample ? {
+    name: sample.name,
+    base_url: { from: 'literal', value: sample.baseUrl },
+    auth: sample.auth.mode === 'none' ? { mode: 'none' } : {
+      mode: sample.auth.mode,
+      ...(sample.auth.headerName ? { header_name: sample.auth.headerName } : {}),
+      secret: { from: 'literal', value: sample.auth.secret } },
+    models: sample.models.map(m => ({ id: m.id, vision: m.vision }))
+  } : {
+    name: '<display name>',
+    base_url: { from: 'literal | env', value: '<url or variable name>' },
+    auth: { mode: 'none | bearer | header', header_name: '<only when mode is header>',
+            secret: { from: 'literal | env', value: '<key or variable name>' } },
+    extra_headers: {},
+    models: [{ id: '<model id>', vision: 'true once a test image succeeds' }]
+  }, null, 2);
+}
+
+function render() { renderAdded(); renderOptions(); renderReference(); }
+
+/* ---------- events ---------- */
+let focused = null;
+function remember(e) {
+  const t = e.target;
+  if (!t.getAttribute) return;
+  const f = t.getAttribute('data-form');
+  if (!f) return;
+  focused = { form: f, field: t.getAttribute('data-field'), caret: t.selectionStart };
+}
+function restore() {
+  if (!focused) return;
+  const el = document.querySelector('[data-form="' + focused.form + '"][data-field="' + focused.field + '"]');
+  if (!el) return;
+  el.focus();
+  if (el.setSelectionRange && focused.caret != null) {
+    try { el.setSelectionRange(focused.caret, focused.caret); } catch (_) {}
+  }
+}
+const _render = render;
+render = function () { _render(); restore(); };
+
+document.addEventListener('input', e => {
+  const f = e.target.getAttribute && e.target.getAttribute('data-form');
+  if (!f) return;
+  remember(e);
+  FORMS[f][e.target.getAttribute('data-field')] = e.target.value;
+  render();
+});
+document.addEventListener('change', e => {
+  const f = e.target.getAttribute && e.target.getAttribute('data-form');
+  if (!f || e.target.tagName !== 'SELECT') return;
+  focused = null;
+  FORMS[f][e.target.getAttribute('data-field')] = e.target.value;
+  render();
+});
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-a]');
+  if (!btn) return;
+  const a = btn.getAttribute('data-a');
+  if (a !== 'scan-tick') focused = null;
+
+  if (a === 'preset-pick') {
+    FORMS.preset = { chosen: btn.getAttribute('data-k'), key: '' };
+    delete state.reports.preset; render(); return;
+  }
+  if (a === 'preset-add') {
+    const p = PRESETS.find(x => x.key === FORMS.preset.chosen);
+    const auth = !p.auth ? { mode: 'none' }
+      : p.auth === 'bearer' ? { mode: 'bearer', secret: FORMS.preset.key.trim() }
+      : { mode: 'header', headerName: p.auth.split(':')[1], secret: FORMS.preset.key.trim() };
+    if (tryAdd({ name: p.name, baseUrl: p.baseUrl, auth: auth }, 'preset')) FORMS.preset = FRESH.preset();
+    render(); return;
+  }
+  if (a === 'paste-sample') {
+    FORMS.paste.text = OPTIONS.find(o => o.key === 'paste').samples[Number(btn.getAttribute('data-i'))][1];
+    delete state.reports.paste; render(); return;
+  }
+  if (a === 'paste-clear') { FORMS.paste = FRESH.paste(); delete state.reports.paste; render(); return; }
+  if (a === 'paste-add') {
+    const r = interpretPaste(FORMS.paste.text);
+    if (tryAdd({ name: r.name, baseUrl: r.baseUrl, auth: r.auth || { mode: 'none' } }, 'paste')) {
+      FORMS.paste = FRESH.paste();
+    }
+    render(); return;
+  }
+  if (a === 'scan') { runScan(); return; }
+  if (a === 'scan-again') { FORMS.scan = FRESH.scan(); delete state.reports.scan; runScan(); return; }
+  if (a === 'scan-tick') {
+    const i = btn.getAttribute('data-i');
+    FORMS.scan.picked[i] = !FORMS.scan.picked[i];
+    render(); return;
+  }
+  if (a === 'scan-add') {
+    const chosen = Object.keys(FORMS.scan.picked).filter(k => FORMS.scan.picked[k])
+      .map(k => FORMS.scan.found[k]);
+    let added = 0;
+    chosen.forEach(x => { if (addProvider({ name: x.name, baseUrl: x.baseUrl,
+      auth: x.auth || { mode: 'none' } }, 'scan')) added++; });
+    if (added) {
+      state.reports.scan = { ok: true, head: added + (added === 1 ? ' provider' : ' providers') +
+        ' added. See the list at the top.', body: 'You never typed an address.' };
+      FORMS.scan = FRESH.scan();
+    }
+    render(); return;
+  }
+  if (a === 'form-add') {
+    const f = FORMS.form;
+    const auth = f.authMode === 'none' ? { mode: 'none' }
+      : { mode: f.authMode, headerName: f.headerName.trim(), secret: f.secret.trim() };
+    const headers = {};
+    f.headers.split('\n').map(l => l.trim()).filter(Boolean).forEach(l => {
+      const at = l.indexOf(':'); if (at > 0) headers[l.slice(0, at).trim()] = l.slice(at + 1).trim();
+    });
+    if (tryAdd({ name: f.name.trim(), baseUrl: f.baseUrl, auth: auth, extraHeaders: headers }, 'form')) {
+      FORMS.form = FRESH.form();
+    }
+    render(); return;
+  }
+  if (a === 'file-add') {
+    let j = null;
+    try { j = JSON.parse(FORMS.file.text); } catch (_) { return; }
+    const auth = j.auth && j.auth.mode && j.auth.mode !== 'none'
+      ? { mode: j.auth.mode, headerName: j.auth.header_name,
+          secret: j.auth.secret && (j.auth.secret.value || j.auth.secret) }
+      : { mode: 'none' };
+    tryAdd({ name: j.name, baseUrl: j.base_url || j.baseUrl, auth: auth,
+             extraHeaders: j.extra_headers || {} }, 'file');
+    render(); return;
+  }
+  if (a === 'remove') { removeProvider(btn.getAttribute('data-id')); return; }
+  if (a === 'reset') { resetAll(); return; }
+});
+
+render();
+</script>
+</body>
+</html>

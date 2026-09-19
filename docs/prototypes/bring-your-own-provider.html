@@ -1,0 +1,1253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bring your own provider — logic prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Tokens copied verbatim from apps/visualizer/frontend/src/index.css — do not invent values here. */
+  :root {
+    --color-background:#ffffff; --color-surface:#f6f5f4; --color-surface-hover:#f1f0ed;
+    --color-text-primary:rgba(0,0,0,0.95); --color-text-secondary:#4a4642; --color-text-tertiary:#847f7a;
+    --color-border:rgba(0,0,0,0.12); --color-border-strong:rgba(0,0,0,0.2);
+    --color-accent:#0075de; --color-accent-hover:#005bab; --color-accent-light:#f2f9ff;
+    --color-success:#1aae39; --color-warning:#dd5b00; --color-error:#e03e3e;
+  }
+  .dark {
+    --color-background:#191919; --color-surface:#31302e; --color-surface-hover:#3d3b38;
+    --color-text-primary:#f7f6f5; --color-text-secondary:#b8b7b4; --color-text-tertiary:#8a8985;
+    --color-border:rgba(255,255,255,0.12); --color-border-strong:rgba(255,255,255,0.25);
+    --color-accent:#4A9EFF; --color-accent-hover:#7AB8FF; --color-accent-light:rgba(74,158,255,0.15);
+    --color-success:#3db39a; --color-warning:#ff8c42; --color-error:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Inter',-apple-system,system-ui,'Segoe UI',sans-serif;
+       background:var(--color-background);color:var(--color-text-primary);
+       -webkit-font-smoothing:antialiased;font-size:14px;line-height:1.5}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 80px}
+
+  h1{font-size:26px;line-height:1.23;letter-spacing:-.625px;font-weight:700;margin:0 0 6px}
+  h2{font-size:22px;line-height:1.27;letter-spacing:-.25px;font-weight:700;margin:0 0 4px}
+  .lede{color:var(--color-text-secondary);margin:0 0 6px;max-width:74ch}
+  .sect{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--color-text-tertiary);
+        margin:34px 0 10px;font-weight:600}
+  code{background:var(--color-surface);padding:1px 5px;border-radius:4px;font-size:.92em;
+       font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  p{margin:0 0 10px}
+  .muted{color:var(--color-text-secondary)}
+  .tiny{font-size:12px;color:var(--color-text-tertiary)}
+
+  .card{background:var(--color-background);border:1px solid var(--color-border);border-radius:12px;
+        box-shadow:rgba(0,0,0,.04) 0 4px 18px,rgba(0,0,0,.027) 0 2.025px 7.84688px,rgba(0,0,0,.02) 0 .8px 2.925px,rgba(0,0,0,.01) 0 .175px 1.04062px;
+        padding:16px}
+  .card + .card{margin-top:12px}
+  .card-title{font-size:14px;font-weight:600;margin:0}
+
+  .badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:9999px;
+         font-size:12px;font-weight:600;border:1px solid var(--color-border);
+         background:var(--color-surface);color:var(--color-text-secondary);white-space:nowrap}
+  .badge.success{background:rgba(26,174,57,.08);color:var(--color-success);border-color:rgba(26,174,57,.25)}
+  .badge.accent{background:var(--color-accent-light);color:var(--color-accent);border-color:rgba(0,117,222,.25)}
+  .badge.warning{background:rgba(221,91,0,.08);color:var(--color-warning);border-color:rgba(221,91,0,.25)}
+  .badge.error{background:rgba(224,62,62,.08);color:var(--color-error);border-color:rgba(224,62,62,.25)}
+
+  button{font:500 14px Inter,sans-serif;border-radius:8px;padding:6px 12px;cursor:pointer;
+         background:var(--color-surface);color:var(--color-text-primary);
+         border:1px solid var(--color-border);transition:all .15s}
+  button:hover:not(:disabled){background:var(--color-surface-hover);border-color:var(--color-border-strong)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.primary{background:var(--color-accent);color:#fff;border-color:var(--color-accent);font-weight:600}
+  button.primary:hover:not(:disabled){background:var(--color-accent-hover);border-color:var(--color-accent-hover)}
+  button.danger{color:var(--color-error);border-color:rgba(224,62,62,.3)}
+  button.tiny{font-size:12px;padding:3px 8px}
+
+  input,select{font:400 14px Inter,sans-serif;border:1px solid var(--color-border);border-radius:8px;
+        padding:7px 10px;background:var(--color-background);color:var(--color-text-primary);width:100%}
+  input:focus,select:focus{outline:2px solid var(--color-accent);outline-offset:-1px;border-color:transparent}
+  input::placeholder{color:var(--color-text-tertiary)}
+  label.f{display:block;margin-bottom:12px}
+  label.f > span{display:block;font-size:14px;font-weight:500;color:var(--color-text-secondary);margin-bottom:6px}
+  .err{color:var(--color-error);font-size:13px;margin-top:5px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 16px}
+  @media(max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .btns{display:flex;gap:8px;flex-wrap:wrap}
+  .hr{height:1px;background:var(--color-border);margin:14px 0}
+
+  .verdict{border:1px solid var(--color-border);border-radius:12px;padding:16px;background:var(--color-surface)}
+  .verdict.ok{background:rgba(26,174,57,.06);border-color:rgba(26,174,57,.25)}
+  .verdict.no{background:rgba(224,62,62,.06);border-color:rgba(224,62,62,.25)}
+  .verdict h3{margin:0 0 4px;font-size:16px;font-weight:600}
+  .ladder{margin:12px 0 0;padding:0;list-style:none;font-size:13px}
+  .ladder li{padding:6px 0;border-top:1px solid var(--color-border);display:flex;gap:10px;align-items:baseline}
+  .ladder li:first-child{border-top:0}
+  .ladder .w{flex:1;color:var(--color-text-secondary)}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+     color:var(--color-text-tertiary);font-weight:600;padding:0 8px 6px 0}
+  td{padding:6px 8px 6px 0;border-top:1px solid var(--color-border);vertical-align:middle}
+  td.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+
+  nav.tabs{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1px solid var(--color-border);margin-bottom:16px}
+  nav.tabs button{background:none;border:0;border-bottom:3px solid transparent;border-radius:0;
+       padding:8px 14px;font-weight:500;color:var(--color-text-primary);opacity:.6}
+  nav.tabs button:hover{background:none;opacity:1}
+  nav.tabs button.on{border-bottom-color:var(--color-accent);color:var(--color-accent);font-weight:600;opacity:1}
+
+  ol.steps{list-style:none;margin:14px 0 0;padding:0;counter-reset:s}
+  ol.steps li{counter-increment:s;display:flex;gap:10px;align-items:flex-start;padding:4px 0}
+  ol.steps li::before{content:counter(s);flex:0 0 20px;height:20px;border-radius:9999px;
+       background:var(--color-surface);color:var(--color-text-tertiary);font-size:11px;font-weight:600;
+       display:flex;align-items:center;justify-content:center;margin-top:5px}
+  ol.steps li.done::before{background:rgba(26,174,57,.12);color:var(--color-success)}
+  ol.steps li.now::before{background:var(--color-accent);color:#fff}
+  ol.steps li.done button{opacity:.5}
+  ol.steps li > div{flex:1}
+  ol.steps .watch{font-size:12px;color:var(--color-text-tertiary);margin-top:3px}
+
+  pre{background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;
+      padding:12px;overflow:auto;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.55;margin:0}
+  .log{list-style:none;margin:0;padding:0;font-size:13px}
+  .log li{padding:4px 0;border-top:1px solid var(--color-border);color:var(--color-text-secondary)}
+  .log li:first-child{border-top:0;color:var(--color-text-primary);font-weight:500}
+  .log .t{color:var(--color-text-tertiary);font-size:11px;margin-right:8px;font-variant-numeric:tabular-nums}
+  .toggle{position:fixed;top:14px;right:14px;z-index:9}
+  details summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--color-text-secondary)}
+  details[open] summary{margin-bottom:10px}
+  .findings{border-left:3px solid var(--color-border-strong);padding:2px 0 2px 14px;margin:0;
+       color:var(--color-text-secondary)}
+  .findings b{color:var(--color-text-primary)}
+</style>
+</head>
+<body>
+<button class="toggle" onclick="document.documentElement.classList.toggle('dark')">Toggle theme</button>
+<div class="wrap">
+
+  <h1>Bring your own provider</h1>
+  <p class="lede"><b>The question this demo exists to answer:</b> what is the smallest set of things a
+  photographer has to type in for <em>any</em> HTTP-reachable, OpenAI-compatible model server —
+  Ollama, LM Studio, vLLM, llama.cpp, OpenRouter, Groq, a company proxy — to actually produce a
+  description of a photo? And where does the API key live once they have typed it?</p>
+  <p class="lede">Today <code>providers.json</code> is hand-edited and understands three providers.
+  Below you can add any provider you like, probe it, discover its models, and watch the one thing that
+  matters: whether a describe job would succeed right now. Nothing here talks to the real network —
+  the servers are simulated, including which ones are switched on.</p>
+
+  <div class="sect">Would a describe job work right now?</div>
+  <div id="verdict"></div>
+
+  <div class="sect">Providers you have added</div>
+  <div id="providers"></div>
+
+  <div class="sect">The machine this is running on (simulated)</div>
+  <div id="world"></div>
+
+  <div class="sect">Add or edit a provider</div>
+  <div id="draft"></div>
+
+  <div class="sect">Guided walkthroughs</div>
+  <nav class="tabs" id="tabs"></nav>
+  <div id="scenario"></div>
+
+  <div class="sect">What just happened</div>
+  <div class="card"><ul class="log" id="log"></ul></div>
+
+  <div class="sect">The file this would write</div>
+  <div class="card">
+    <details>
+      <summary>Proposed <code>providers.json</code> shape</summary>
+      <p class="tiny">Two collapses versus today: <code>base_url</code> / <code>base_url_env</code> /
+      <code>base_url_default</code> become one <code>{ from, value }</code> pair, and
+      <code>api_key</code> / <code>api_key_env</code> become one <code>auth</code> block that can also say
+      "this endpoint needs no credential" — which is what the literal <code>"api_key": "ollama"</code>
+      in today's file is faking. <code>native_chat</code> and <code>auto_discover</code> are gone:
+      discovery is a button, not a flag.</p>
+      <pre id="json"></pre>
+    </details>
+  </div>
+
+  <div class="sect">What the demo is built to expose</div>
+  <div class="card">
+    <p class="findings"><b>A models list is not proof it works.</b> The current health check calls
+    <code>GET /models</code> and shows a green tick. Walkthrough 4 adds an endpoint that answers
+    <code>/models</code> perfectly and then cannot chat at all. Reachable and usable are two different
+    questions and need two different probes.</p>
+    <div class="hr"></div>
+    <p class="findings"><b>Nothing tells you which models can see.</b> OpenAI's <code>/models</code>
+    returns bare ids with no capability information, so every discovered model arrives as
+    <code>vision: unknown</code>. Today the code sidesteps this by marking <em>every</em> Ollama model
+    vision-capable, which is wrong for <code>llama3.1:8b</code>. Here a one-pixel image probe settles it
+    per model, and until it runs, a describe job has nothing it can honestly pick.</p>
+    <div class="hr"></div>
+    <p class="findings"><b>Someone has to decide where a typed key goes.</b> An environment variable
+    reference keeps secrets off disk but means the user must also edit their shell — which defeats the
+    point of a UI. Storing it inline puts a plaintext key in <code>providers.json</code>. Walkthrough 3
+    makes both consequences visible; the demo does not pick for you.</p>
+  </div>
+
+</div>
+
+<script>
+/* ==========================================================================
+   PURE MODULE — no DOM, no fetch, no handlers. This is the part meant to be
+   lifted into apps/visualizer/backend/src/providers/ once the shape is agreed.
+   ========================================================================== */
+const ProviderModel = (() => {
+  const UPPER_SNAKE = /^[A-Z][A-Z0-9_]*$/;
+  const SLUG = /^[a-z][a-z0-9_]*$/;
+
+  function slugify(s) {
+    return String(s || '').toLowerCase().trim()
+      .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+  }
+
+  /** Trim, drop the trailing slash, insist on http(s) and a host. */
+  function normalizeBaseUrl(raw) {
+    const text = String(raw == null ? '' : raw).trim();
+    if (!text) return { ok: false, error: 'Required.' };
+    let u;
+    try { u = new URL(text); } catch (_) {
+      return { ok: false, error: 'Not a URL — include http:// or https://' };
+    }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+      return { ok: false, error: u.protocol + ' cannot be reached over HTTP.' };
+    }
+    if (!u.host) return { ok: false, error: 'No host in that URL.' };
+    return { ok: true, url: (u.origin + u.pathname).replace(/\/+$/, '') };
+  }
+
+  /**
+   * Where to look for the OpenAI-compatible API, best guess first.
+   *
+   * Users paste the address they see in their model server's window, which is
+   * usually the bare origin. Trying `/v1` first and reporting which one answered
+   * is cheaper than making them understand the difference.
+   */
+  function probeCandidates(url) {
+    return url.endsWith('/v1') ? [url] : [url + '/v1', url];
+  }
+
+  function emptyDraft() {
+    return {
+      editing: null, name: '', id: '', idTouched: false,
+      baseUrlSource: 'literal', baseUrlValue: '',
+      authMode: 'none', headerName: '', secretSource: 'literal', secretValue: '',
+      extraHeaders: '', timeoutSeconds: 120, probe: null
+    };
+  }
+
+  function draftId(d) { return d.idTouched ? d.id : slugify(d.name); }
+
+  function validateDraft(d, existingIds) {
+    const e = {};
+    const id = draftId(d);
+    if (!d.name.trim()) e.name = 'Give it a name you will recognise in a dropdown.';
+    if (!id) e.id = 'Needs an id.';
+    else if (!SLUG.test(id)) e.id = 'Lowercase letters, digits and underscores, starting with a letter.';
+    else if (existingIds.indexOf(id) !== -1 && id !== d.editing) {
+      e.id = '"' + id + '" is already taken. Pick another id, or edit that provider instead.';
+    }
+
+    if (d.baseUrlSource === 'literal') {
+      const n = normalizeBaseUrl(d.baseUrlValue);
+      if (!n.ok) e.baseUrl = n.error;
+    } else if (!UPPER_SNAKE.test(d.baseUrlValue.trim())) {
+      e.baseUrl = 'An environment variable name, e.g. OLLAMA_HOST.';
+    }
+
+    if (d.authMode === 'header' && !d.headerName.trim()) {
+      e.headerName = 'Which header carries the key? e.g. x-api-key';
+    }
+    if (d.authMode !== 'none') {
+      if (d.secretSource === 'literal') {
+        if (!d.secretValue.trim()) e.secret = 'Paste the key, or switch to an environment variable.';
+      } else if (!UPPER_SNAKE.test(d.secretValue.trim())) {
+        e.secret = 'An environment variable name, e.g. OPENROUTER_API_KEY.';
+      }
+    }
+    if (d.extraHeaders.trim() && !parseHeaders(d.extraHeaders).ok) {
+      e.extraHeaders = 'One per line, as Name: value';
+    }
+    return { errors: e, ok: Object.keys(e).length === 0, id: id };
+  }
+
+  function parseHeaders(text) {
+    const out = {};
+    const lines = String(text || '').split('\n').map(l => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      const at = line.indexOf(':');
+      if (at < 1) return { ok: false };
+      out[line.slice(0, at).trim()] = line.slice(at + 1).trim();
+    }
+    return { ok: true, headers: out };
+  }
+
+  function draftToProvider(d, existing) {
+    const id = draftId(d);
+    return {
+      id: id,
+      name: d.name.trim(),
+      baseUrl: { source: d.baseUrlSource, value: d.baseUrlSource === 'literal'
+        ? normalizeBaseUrl(d.baseUrlValue).url : d.baseUrlValue.trim() },
+      auth: d.authMode === 'none'
+        ? { mode: 'none' }
+        : { mode: d.authMode, headerName: d.authMode === 'header' ? d.headerName.trim() : null,
+            secret: { source: d.secretSource, value: d.secretValue.trim() } },
+      extraHeaders: (parseHeaders(d.extraHeaders).headers) || {},
+      timeoutSeconds: Number(d.timeoutSeconds) || 120,
+      models: existing ? existing.models : [],
+      probe: d.probe || (existing ? existing.probe : null)
+    };
+  }
+
+  function providerToDraft(p) {
+    return {
+      editing: p.id, name: p.name, id: p.id, idTouched: true,
+      baseUrlSource: p.baseUrl.source, baseUrlValue: p.baseUrl.value,
+      authMode: p.auth.mode,
+      headerName: p.auth.headerName || '',
+      secretSource: p.auth.secret ? p.auth.secret.source : 'literal',
+      secretValue: p.auth.secret ? p.auth.secret.value : '',
+      extraHeaders: Object.keys(p.extraHeaders).map(k => k + ': ' + p.extraHeaders[k]).join('\n'),
+      timeoutSeconds: p.timeoutSeconds, probe: p.probe
+    };
+  }
+
+  function resolveBaseUrl(p, env) {
+    if (p.baseUrl.source === 'literal') return { ok: true, url: p.baseUrl.value };
+    const raw = (env[p.baseUrl.value] || '').trim();
+    if (!raw) return { ok: false, reason: '$' + p.baseUrl.value + ' is not set' };
+    const n = normalizeBaseUrl(raw);
+    if (!n.ok) return { ok: false, reason: '$' + p.baseUrl.value + ' is not a URL' };
+    return { ok: true, url: n.url };
+  }
+
+  function resolveSecret(p, env) {
+    if (p.auth.mode === 'none') return { ok: true, value: null };
+    const s = p.auth.secret;
+    if (s.source === 'literal') return { ok: true, value: s.value };
+    const v = (env[s.value] || '').trim();
+    if (!v) return { ok: false, reason: '$' + s.value + ' is not set' };
+    return { ok: true, value: v };
+  }
+
+  /**
+   * Whether a credential and an address can both be resolved.
+   *
+   * `mode: 'none'` is available with no key at all — a local model server needs
+   * no credential, and today's file fakes that with a literal `"api_key": "ollama"`.
+   */
+  function availability(p, env) {
+    const b = resolveBaseUrl(p, env);
+    if (!b.ok) return { available: false, reason: b.reason };
+    const s = resolveSecret(p, env);
+    if (!s.ok) return { available: false, reason: s.reason };
+    if (p.auth.mode === 'none') return { available: true, reason: 'no credential needed' };
+    return { available: true, reason: p.auth.secret.source === 'env'
+      ? 'key read from $' + p.auth.secret.value
+      : 'key stored in providers.json' };
+  }
+
+  /** Turn one raw probe outcome into something worth showing a photographer. */
+  function interpretProbe(raw, authMode) {
+    if (raw.kind === 'ok') {
+      return { state: 'ok', headline: 'Answered with ' + raw.models.length +
+        (raw.models.length === 1 ? ' model.' : ' models.'), hint: null };
+    }
+    if (raw.kind === 'network') {
+      return { state: 'failed', headline: 'Nothing answered at that address.',
+        hint: 'A local model server only listens while it is running — start Ollama or LM Studio first. ' +
+              'Saving it anyway is fine: it gets skipped until it comes back.', detail: raw.message };
+    }
+    if (raw.kind === 'timeout') {
+      return { state: 'failed', headline: 'The address accepted the connection and then went quiet.',
+        hint: 'Usually a proxy or a tunnel in front of the real server.' };
+    }
+    if (raw.kind === 'not-openai') {
+      return { state: 'failed', headline: 'It answered, but not with a list of models.',
+        hint: 'That looks like a web page rather than an OpenAI-compatible API.' };
+    }
+    if (raw.status === 401 || raw.status === 403) {
+      const hint = authMode === 'none'
+        ? 'This endpoint wants a credential — set authentication to something other than None.'
+        : authMode === 'bearer'
+          ? 'Not every provider reads Authorization: Bearer. Anthropic, for one, wants the key in x-api-key.'
+          : 'Check both the header name and the key itself.';
+      return { state: 'failed', headline: 'The credential was rejected.', hint: hint,
+        detail: raw.status + ' ' + raw.statusText };
+    }
+    if (raw.status === 404) {
+      return { state: 'failed', headline: 'The host is up, but there is no model list at that path.',
+        hint: 'Almost every OpenAI-compatible server mounts its API at /v1.',
+        detail: '404 Not Found' };
+    }
+    return { state: 'failed', headline: 'HTTP ' + raw.status + ' ' + raw.statusText + '.', hint: null };
+  }
+
+  function visionModels(p) { return p.models.filter(m => m.vision === true); }
+
+  /** Default provider first, then the rest of the fallback order. */
+  function effectiveOrder(s) {
+    const ids = s.fallbackOrder.filter(id => s.providers[id]);
+    if (s.defaultProviderId && ids.indexOf(s.defaultProviderId) !== -1) {
+      return [s.defaultProviderId].concat(ids.filter(id => id !== s.defaultProviderId));
+    }
+    return ids;
+  }
+
+  /**
+   * What a describe job would actually do, right now, and why.
+   *
+   * This is the only readout that answers "does it work" — availability and a
+   * green health tick both pass for providers that cannot describe a photo.
+   */
+  function describePlan(s) {
+    const steps = [];
+    for (const id of effectiveOrder(s)) {
+      const p = s.providers[id];
+      const avail = availability(p, s.env);
+      if (!avail.available) { steps.push({ p: p, verdict: 'skip', why: avail.reason }); continue; }
+      if (p.probe && p.probe.state === 'failed') {
+        steps.push({ p: p, verdict: 'skip', why: 'last probe failed — ' + p.probe.headline.toLowerCase() });
+        continue;
+      }
+      const seeing = visionModels(p);
+      if (seeing.length === 0) {
+        const unknown = p.models.filter(m => m.vision === 'unknown').length;
+        steps.push({ p: p, verdict: 'skip', why: p.models.length === 0
+          ? 'no models yet — discover them or add one by hand'
+          : unknown > 0
+            ? unknown + (unknown === 1 ? ' model has' : ' models have') + ' never been image-probed, so none is known to accept a photo'
+            : 'none of its models can accept an image' });
+        continue;
+      }
+      steps.push({ p: p, verdict: 'use', model: seeing[0],
+        why: 'first model known to accept an image' });
+    }
+    return { steps: steps, winner: steps.find(st => st.verdict === 'use') || null };
+  }
+
+  function toConfigFile(s) {
+    const providers = {};
+    for (const id of Object.keys(s.providers)) {
+      const p = s.providers[id];
+      const out = { name: p.name, base_url: { from: p.baseUrl.source, value: p.baseUrl.value } };
+      out.auth = p.auth.mode === 'none' ? { mode: 'none' } : {
+        mode: p.auth.mode,
+        ...(p.auth.headerName ? { header_name: p.auth.headerName } : {}),
+        secret: { from: p.auth.secret.source, value: p.auth.secret.value }
+      };
+      if (Object.keys(p.extraHeaders).length) out.extra_headers = p.extraHeaders;
+      out.request_timeout_seconds = p.timeoutSeconds;
+      out.models = p.models.map(m => ({ id: m.id, name: m.name, vision: m.vision, source: m.source }));
+      if (p.probe) out.last_probe = { ok: p.probe.state === 'ok', base_url: p.probe.resolvedBaseUrl || null,
+        note: p.probe.headline };
+      providers[id] = out;
+    }
+    return {
+      providers: providers,
+      fallback_order: s.fallbackOrder,
+      defaults: { description: { provider: s.defaultProviderId, model: null } }
+    };
+  }
+
+  function initialState() {
+    return { providers: {}, fallbackOrder: [], defaultProviderId: null,
+             env: {}, draft: null, log: [] };
+  }
+
+  function note(s, text) {
+    return Object.assign({}, s, { log: [{ text: text, at: Date.now() }].concat(s.log).slice(0, 14) });
+  }
+
+  /** (state, action) => state. The whole model, one function. */
+  function reduce(s, a) {
+    switch (a.type) {
+      case 'state/replace':
+        return a.state;
+
+      case 'draft/open':
+        return note(Object.assign({}, s, { draft: emptyDraft() }), 'Started a new provider.');
+
+      case 'draft/edit': {
+        const p = s.providers[a.id];
+        if (!p) return s;
+        return note(Object.assign({}, s, { draft: providerToDraft(p) }), 'Editing ' + p.name + '.');
+      }
+
+      case 'draft/close':
+        return note(Object.assign({}, s, { draft: null }), 'Closed the form.');
+
+      case 'draft/set': {
+        if (!s.draft) return s;
+        const d = Object.assign({}, s.draft, { [a.field]: a.value });
+        if (a.field === 'id') d.idTouched = true;
+        // Any change to the address or the credential invalidates the last probe:
+        // a green tick against a URL you have since edited is a lie.
+        if (['baseUrlValue', 'baseUrlSource', 'authMode', 'secretValue', 'secretSource', 'headerName']
+            .indexOf(a.field) !== -1) d.probe = null;
+        return Object.assign({}, s, { draft: d });
+      }
+
+      case 'draft/probe/result': {
+        if (!s.draft) return s;
+        return note(Object.assign({}, s, { draft: Object.assign({}, s.draft, { probe: a.probe }) }),
+          'Probed the address: ' + a.probe.headline);
+      }
+
+      case 'draft/save': {
+        const v = validateDraft(s.draft, Object.keys(s.providers));
+        if (!v.ok) return note(s, 'Cannot save yet — ' + Object.keys(v.errors).length + ' field(s) need attention.');
+        const prev = s.draft.editing ? s.providers[s.draft.editing] : null;
+        const p = draftToProvider(s.draft, prev);
+        const providers = Object.assign({}, s.providers);
+        if (s.draft.editing && s.draft.editing !== p.id) delete providers[s.draft.editing];
+        providers[p.id] = p;
+        let order = s.fallbackOrder.slice();
+        if (s.draft.editing && s.draft.editing !== p.id) {
+          order = order.map(id => (id === s.draft.editing ? p.id : id));
+        }
+        if (order.indexOf(p.id) === -1) order.push(p.id);
+        const next = Object.assign({}, s, {
+          providers: providers, fallbackOrder: order, draft: null,
+          defaultProviderId: s.defaultProviderId === s.draft.editing ? p.id : (s.defaultProviderId || p.id)
+        });
+        return note(next, (prev ? 'Saved changes to ' : 'Added ') + p.name + '.');
+      }
+
+      case 'provider/delete': {
+        const p = s.providers[a.id];
+        if (!p) return s;
+        const providers = Object.assign({}, s.providers);
+        delete providers[a.id];
+        const order = s.fallbackOrder.filter(id => id !== a.id);
+        return note(Object.assign({}, s, { providers: providers, fallbackOrder: order,
+          defaultProviderId: s.defaultProviderId === a.id ? (order[0] || null) : s.defaultProviderId }),
+          'Removed ' + p.name + '.');
+      }
+
+      case 'provider/probe/result': {
+        const p = s.providers[a.id];
+        if (!p) return s;
+        const providers = Object.assign({}, s.providers);
+        providers[a.id] = Object.assign({}, p, { probe: a.probe });
+        return note(Object.assign({}, s, { providers: providers }),
+          p.name + ': ' + a.probe.headline);
+      }
+
+      case 'provider/setDefault':
+        return note(Object.assign({}, s, { defaultProviderId: a.id }),
+          s.providers[a.id].name + ' is now tried first.');
+
+      case 'provider/move': {
+        const order = s.fallbackOrder.slice();
+        const i = order.indexOf(a.id);
+        const j = i + a.delta;
+        if (i < 0 || j < 0 || j >= order.length) return s;
+        order[i] = order[j]; order[j] = a.id;
+        return note(Object.assign({}, s, { fallbackOrder: order }),
+          'Moved ' + s.providers[a.id].name + (a.delta < 0 ? ' up' : ' down') + ' the fallback order.');
+      }
+
+      case 'models/discovered': {
+        const p = s.providers[a.id];
+        if (!p) return s;
+        const known = {};
+        p.models.forEach(m => { known[m.id] = m; });
+        // Discovery reports ids only — an OpenAI-compatible /models says nothing
+        // about vision, so a newly seen model is `unknown` until probed.
+        const models = a.ids.map(id => known[id] || { id: id, name: id, vision: 'unknown', source: 'discovered' });
+        p.models.filter(m => m.source === 'manual' && a.ids.indexOf(m.id) === -1).forEach(m => models.push(m));
+        const providers = Object.assign({}, s.providers);
+        providers[a.id] = Object.assign({}, p, { models: models });
+        return note(Object.assign({}, s, { providers: providers }),
+          p.name + ' reported ' + a.ids.length + ' models, none of them saying whether they can see.');
+      }
+
+      case 'models/addManual': {
+        const p = s.providers[a.id];
+        if (!p || !a.modelId.trim()) return s;
+        if (p.models.some(m => m.id === a.modelId.trim())) return note(s, 'That model is already listed.');
+        const providers = Object.assign({}, s.providers);
+        providers[a.id] = Object.assign({}, p, { models: p.models.concat([
+          { id: a.modelId.trim(), name: a.modelId.trim(), vision: 'unknown', source: 'manual' }]) });
+        return note(Object.assign({}, s, { providers: providers }),
+          'Added ' + a.modelId.trim() + ' to ' + p.name + ' by hand.');
+      }
+
+      case 'models/remove': {
+        const p = s.providers[a.id];
+        if (!p) return s;
+        const providers = Object.assign({}, s.providers);
+        providers[a.id] = Object.assign({}, p, { models: p.models.filter(m => m.id !== a.modelId) });
+        return note(Object.assign({}, s, { providers: providers }), 'Dropped ' + a.modelId + '.');
+      }
+
+      case 'models/visionResult': {
+        const p = s.providers[a.id];
+        if (!p) return s;
+        const providers = Object.assign({}, s.providers);
+        providers[a.id] = Object.assign({}, p, { models: p.models.map(m =>
+          m.id === a.modelId ? Object.assign({}, m, { vision: a.vision, visionNote: a.note }) : m) });
+        return note(Object.assign({}, s, { providers: providers }),
+          a.modelId + (a.vision ? ' described the test image.' : ' could not: ' + a.note));
+      }
+
+      case 'env/set':
+        return note(Object.assign({}, s, { env: Object.assign({}, s.env, { [a.name]: a.value }) }),
+          'Set ' + a.name + ' in the environment.');
+
+      case 'env/unset': {
+        const env = Object.assign({}, s.env);
+        delete env[a.name];
+        return note(Object.assign({}, s, { env: env }), 'Unset ' + a.name + '.');
+      }
+
+      default:
+        return s;
+    }
+  }
+
+  return { slugify, normalizeBaseUrl, probeCandidates, emptyDraft, draftId, validateDraft,
+           parseHeaders, draftToProvider, providerToDraft, resolveBaseUrl, resolveSecret,
+           availability, interpretProbe, visionModels, effectiveOrder, describePlan,
+           toConfigFile, initialState, reduce };
+})();
+
+
+/* ==========================================================================
+   THROWAWAY SHELL — a fake network, and a page to click. None of this is
+   meant to survive.
+   ========================================================================== */
+const M = ProviderModel;
+
+/** Model servers that exist in this simulated world. */
+const SERVERS = {
+  'http://localhost:11434/v1': { label: 'Ollama', up: true, auth: false, chat: true,
+    models: ['llama3.2-vision:11b', 'qwen2.5vl:7b', 'llama3.1:8b', 'nomic-embed-text'],
+    seeing: ['llama3.2-vision:11b', 'qwen2.5vl:7b'] },
+  'http://localhost:1234/v1': { label: 'LM Studio', up: false, auth: false, chat: true,
+    models: ['qwen2.5-vl-7b-instruct', 'gemma-3-12b-it'],
+    seeing: ['qwen2.5-vl-7b-instruct', 'gemma-3-12b-it'] },
+  'http://localhost:8000/v1': { label: 'vLLM', up: true, auth: false, chat: true,
+    models: ['Qwen/Qwen2.5-VL-7B-Instruct'], seeing: ['Qwen/Qwen2.5-VL-7B-Instruct'] },
+  'https://openrouter.ai/api/v1': { label: 'OpenRouter', up: true, auth: 'bearer',
+    keys: ['sk-or-demo'], chat: true,
+    models: ['google/gemini-2.5-flash-lite', 'openai/gpt-4.1-nano', 'qwen/qwen3-vl-32b-instruct',
+             'deepseek/deepseek-r1'],
+    seeing: ['google/gemini-2.5-flash-lite', 'openai/gpt-4.1-nano', 'qwen/qwen3-vl-32b-instruct'] },
+  'https://api.groq.com/openai/v1': { label: 'Groq', up: true, auth: 'bearer', keys: ['gsk-demo'],
+    chat: true, models: ['meta-llama/llama-4-scout-17b-16e-instruct', 'llama-3.3-70b-versatile'],
+    seeing: ['meta-llama/llama-4-scout-17b-16e-instruct'] },
+  'https://api.anthropic.com/v1': { label: 'Anthropic', up: true, auth: 'header:x-api-key',
+    keys: ['sk-ant-demo'], chat: false, models: ['claude-sonnet-4-5', 'claude-haiku-4-5'], seeing: [] },
+  'https://models.acme-corp.internal/v1': { label: 'an internal proxy', up: true, auth: 'bearer',
+    keys: ['acme-token'], chat: true, models: ['gpt-4o-mini-2024-07-18'],
+    seeing: ['gpt-4o-mini-2024-07-18'] },
+  'https://example.com/v1': { label: 'a web page', up: true, auth: false, notOpenAi: true }
+};
+
+function lookup(candidate) {
+  if (SERVERS[candidate]) return { server: SERVERS[candidate], exact: true };
+  const origin = candidate.split('/').slice(0, 3).join('/');
+  const sibling = Object.keys(SERVERS).find(k => k.indexOf(origin + '/') === 0 || k === origin);
+  return sibling ? { server: SERVERS[sibling], exact: false } : { server: null, exact: false };
+}
+
+function checkAuth(server, auth) {
+  if (!server.auth) return null;
+  const key = auth.secret;
+  const known = (server.keys || []).indexOf(key) !== -1;
+  if (server.auth === 'bearer') {
+    if (auth.mode !== 'bearer' || !known) return { kind: 'http', status: 401, statusText: 'Unauthorized' };
+    return null;
+  }
+  const wanted = server.auth.split(':')[1];
+  if (auth.mode !== 'header' || String(auth.headerName || '').toLowerCase() !== wanted || !known) {
+    return { kind: 'http', status: 401, statusText: 'Unauthorized' };
+  }
+  return null;
+}
+
+function callModels(candidate, auth) {
+  const found = lookup(candidate);
+  if (!found.server) return { kind: 'network', message: 'getaddrinfo ENOTFOUND' };
+  if (!found.server.up) return { kind: 'network', message: 'connect ECONNREFUSED ' + candidate };
+  if (!found.exact) return { kind: 'http', status: 404, statusText: 'Not Found' };
+  const bad = checkAuth(found.server, auth);
+  if (bad) return bad;
+  if (found.server.notOpenAi) return { kind: 'not-openai' };
+  return { kind: 'ok', models: found.server.models.slice() };
+}
+
+/** The probe that answers "can this model look at a photo": one 1x1 PNG. */
+function callVision(candidate, auth, modelId) {
+  const found = lookup(candidate);
+  if (!found.server || !found.server.up) return { ok: false, note: 'the server is not reachable' };
+  if (!found.exact) return { ok: false, note: 'no chat endpoint at that path' };
+  const bad = checkAuth(found.server, auth);
+  if (bad) return { ok: false, note: 'the credential was rejected' };
+  if (!found.server.chat) {
+    return { ok: false, note: 'this endpoint has no /chat/completions — it speaks its own dialect (404)' };
+  }
+  if (found.server.seeing.indexOf(modelId) === -1) {
+    return { ok: false, note: '400 — the model rejected the image part of the message' };
+  }
+  return { ok: true, note: 'described the test image' };
+}
+
+/* ---------- store ---------- */
+let state = M.initialState();
+let focusField = null, activeTab = 0, stepIndex = [0, 0, 0, 0, 0];
+
+function dispatch(action) { state = M.reduce(state, action); render(); }
+
+function authSpecOf(p, env) {
+  if (p.auth.mode === 'none') return { mode: 'none' };
+  const s = M.resolveSecret(p, env);
+  return { mode: p.auth.mode, headerName: p.auth.headerName, secret: s.ok ? s.value : '' };
+}
+
+function authSpecOfDraft(d) {
+  if (d.authMode === 'none') return { mode: 'none' };
+  const secret = d.secretSource === 'literal' ? d.secretValue.trim() : (state.env[d.secretValue.trim()] || '');
+  return { mode: d.authMode, headerName: d.headerName, secret: secret };
+}
+
+/** Walk the candidate list, keep the first that answers, report the last failure otherwise. */
+function probe(baseUrl, authSpec, authMode) {
+  let last = null;
+  for (const candidate of M.probeCandidates(baseUrl)) {
+    const raw = callModels(candidate, authSpec);
+    const verdict = M.interpretProbe(raw, authMode);
+    if (verdict.state === 'ok') {
+      return Object.assign(verdict, { resolvedBaseUrl: candidate, models: raw.models,
+        headline: verdict.headline + (candidate === baseUrl ? '' : ' Found the API at ' + candidate + '.') });
+    }
+    last = Object.assign(verdict, { resolvedBaseUrl: candidate });
+  }
+  return last;
+}
+
+function probeDraft() {
+  const d = state.draft;
+  const b = d.baseUrlSource === 'literal'
+    ? M.normalizeBaseUrl(d.baseUrlValue)
+    : (function () { const v = state.env[d.baseUrlValue.trim()]; return v ? M.normalizeBaseUrl(v) : { ok: false, error: '$' + d.baseUrlValue + ' is not set' }; })();
+  if (!b.ok) { dispatch({ type: 'draft/probe/result', probe: { state: 'failed', headline: b.error, hint: null } }); return; }
+  dispatch({ type: 'draft/probe/result', probe: probe(b.url, authSpecOfDraft(d), d.authMode) });
+}
+
+function probeProvider(id) {
+  const p = state.providers[id];
+  const b = M.resolveBaseUrl(p, state.env);
+  if (!b.ok) { dispatch({ type: 'provider/probe/result', id: id, probe: { state: 'failed', headline: b.reason, hint: null } }); return; }
+  dispatch({ type: 'provider/probe/result', id: id, probe: probe(b.url, authSpecOf(p, state.env), p.auth.mode) });
+}
+
+function discover(id) {
+  const p = state.providers[id];
+  if (!p) return;
+  const url = (p.probe && p.probe.resolvedBaseUrl) || M.resolveBaseUrl(p, state.env).url;
+  const raw = callModels(url, authSpecOf(p, state.env));
+  if (raw.kind !== 'ok') {
+    dispatch({ type: 'provider/probe/result', id: id, probe: M.interpretProbe(raw, p.auth.mode) });
+    return;
+  }
+  dispatch({ type: 'models/discovered', id: id, ids: raw.models });
+}
+
+function visionProbe(id, modelId) {
+  const p = state.providers[id];
+  if (!p) return;
+  const url = (p.probe && p.probe.resolvedBaseUrl) || M.resolveBaseUrl(p, state.env).url;
+  const r = callVision(url, authSpecOf(p, state.env), modelId);
+  dispatch({ type: 'models/visionResult', id: id, modelId: modelId, vision: r.ok, note: r.note });
+}
+
+function visionProbeAll(id) {
+  const p = state.providers[id];
+  if (!p) return;
+  p.models.slice().forEach(m => visionProbe(id, m.id));
+}
+
+function probeProviderSafe(id) { if (state.providers[id]) probeProvider(id); }
+
+function toggleServer(url) {
+  SERVERS[url].up = !SERVERS[url].up;
+  state = M.reduce(state, { type: 'state/replace', state: state });
+  state.log = [{ text: SERVERS[url].label + ' was just ' + (SERVERS[url].up ? 'started' : 'stopped') +
+    '. Re-probe to see what changes.', at: Date.now() }].concat(state.log).slice(0, 14);
+  render();
+}
+
+/* ---------- scenarios ---------- */
+function seedOllama() {
+  const s = M.initialState();
+  s.providers.ollama = {
+    id: 'ollama', name: 'Ollama (local)',
+    baseUrl: { source: 'literal', value: 'http://localhost:11434/v1' },
+    auth: { mode: 'none' }, extraHeaders: {}, timeoutSeconds: 120,
+    models: [
+      { id: 'llama3.2-vision:11b', name: 'llama3.2-vision:11b', vision: true, source: 'discovered' },
+      { id: 'qwen2.5vl:7b', name: 'qwen2.5vl:7b', vision: true, source: 'discovered' },
+      { id: 'llama3.1:8b', name: 'llama3.1:8b', vision: false, source: 'discovered' }
+    ],
+    probe: { state: 'ok', headline: 'Answered with 4 models.', resolvedBaseUrl: 'http://localhost:11434/v1' }
+  };
+  s.fallbackOrder = ['ollama'];
+  s.defaultProviderId = 'ollama';
+  return s;
+}
+
+const SCENARIOS = [
+  {
+    title: 'A local model server, no key, and the URL typed the way the app shows it',
+    blurb: 'Ollama prints <code>http://localhost:11434</code> in its own window, so that is what gets pasted — ' +
+      'without the <code>/v1</code> the OpenAI-compatible API actually lives at. There is no API key at all here, ' +
+      'which today\'s file has to fake with a literal <code>"api_key": "ollama"</code>.',
+    reset: () => M.initialState(),
+    steps: [
+      { label: 'Start a new provider', watch: 'Authentication starts at None — the common case for local servers.',
+        run: () => dispatch({ type: 'draft/open' }) },
+      { label: 'Name it "Ollama (local)"', watch: 'The id is slugified for you.',
+        run: () => dispatch({ type: 'draft/set', field: 'name', value: 'Ollama (local)' }) },
+      { label: 'Paste http://localhost:11434', watch: 'No /v1. The form does not complain — it is a valid URL.',
+        run: () => dispatch({ type: 'draft/set', field: 'baseUrlValue', value: 'http://localhost:11434' }) },
+      { label: 'Probe the address', watch: 'It tries /v1 first and tells you that is where it found the API, rather than making you work it out from a 404.',
+        run: probeDraft },
+      { label: 'Save it', watch: 'Available with no credential whatsoever. Then look at the verdict panel: still no describe job possible.',
+        run: () => dispatch({ type: 'draft/save' }) },
+      { label: 'Discover its models', watch: 'Four models arrive, every one marked "can it see? unknown". The models list says nothing about vision — this is the gap.',
+        run: () => discover('ollama_local') },
+      { label: 'Send each model a one-pixel test image', watch: 'Two can describe it, two cannot. Only now does the verdict panel go green — and note that llama3.1:8b would have been wrongly marked vision-capable by the code as it stands.',
+        run: () => visionProbeAll('ollama_local') }
+    ]
+  },
+  {
+    title: 'A provider that is switched off right now',
+    blurb: 'LM Studio is installed but not running. The interesting question is not the error message — ' +
+      'it is whether you are allowed to save a provider that cannot be reached, and what that does to ' +
+      'the fallback order afterwards.',
+    reset: seedOllama,
+    steps: [
+      { label: 'Add LM Studio at http://localhost:1234/v1', watch: 'Filled in for you, auth None.',
+        run: () => { dispatch({ type: 'draft/open' });
+          dispatch({ type: 'draft/set', field: 'name', value: 'LM Studio' });
+          dispatch({ type: 'draft/set', field: 'baseUrlValue', value: 'http://localhost:1234/v1' }); } },
+      { label: 'Probe it', watch: 'Connection refused, with a hint that says so in photographer language, not errno language.',
+        run: probeDraft },
+      { label: 'Save it anyway', watch: 'This has to be allowed — you configure a laptop before you start the server on it.',
+        run: () => dispatch({ type: 'draft/save' }) },
+      { label: 'Put LM Studio first in the order', watch: 'The verdict panel skips it with a reason and still lands on Ollama. An unreachable provider must not break the chain.',
+        run: () => dispatch({ type: 'provider/setDefault', id: 'lm_studio' }) },
+      { label: 'Start LM Studio', watch: 'The simulated machine changes; nothing in your config does.',
+        run: () => toggleServer('http://localhost:1234/v1') },
+      { label: 'Re-probe LM Studio', watch: 'Green now — but the verdict panel still will not use it.',
+        run: () => probeProvider('lm_studio') },
+      { label: 'Discover and image-probe its models', watch: 'Only now does it take over as first choice. Reachable was never enough.',
+        run: () => { discover('lm_studio'); visionProbeAll('lm_studio'); } }
+    ]
+  },
+  {
+    title: 'A cloud key, typed into a browser — so where does it go?',
+    blurb: 'This is the decision the demo will not make for you. An environment variable keeps the secret out ' +
+      'of any file the app writes, but the user has to go and set it in their shell, which is most of the ' +
+      'reason they wanted a UI. Storing it inline puts a plaintext key in <code>providers.json</code>. ' +
+      'Watch both, then open the file preview at the bottom.',
+    reset: seedOllama,
+    steps: [
+      { label: 'Add OpenRouter, Bearer auth, key pasted in', watch: 'The key is sk-or-demo in this world.',
+        run: () => { dispatch({ type: 'draft/open' });
+          dispatch({ type: 'draft/set', field: 'name', value: 'OpenRouter' });
+          dispatch({ type: 'draft/set', field: 'baseUrlValue', value: 'https://openrouter.ai/api/v1' });
+          dispatch({ type: 'draft/set', field: 'authMode', value: 'bearer' });
+          dispatch({ type: 'draft/set', field: 'secretValue', value: 'sk-or-demo' }); } },
+      { label: 'Add the two headers OpenRouter asks for', watch: 'Free-text headers are needed by real providers — OpenRouter attributes traffic with them.',
+        run: () => dispatch({ type: 'draft/set', field: 'extraHeaders',
+          value: 'HTTP-Referer: lightroom-tagger\nX-Title: Lightroom Tagger' }) },
+      { label: 'Probe, then save', watch: 'Availability reads "key stored in providers.json" — an honest label for what just happened.',
+        run: () => { probeDraft(); dispatch({ type: 'draft/save' }); } },
+      { label: 'Discover and image-probe', watch: 'Three of four can see. deepseek-r1 cannot, which no models list would have told you.',
+        run: () => { discover('openrouter'); visionProbeAll('openrouter'); } },
+      { label: 'Try OpenRouter first', watch: 'Now the verdict panel depends on it, so the next two steps are visible rather than academic.',
+        run: () => dispatch({ type: 'provider/setDefault', id: 'openrouter' }) },
+      { label: 'Switch it to read $OPENROUTER_API_KEY instead', watch: 'It immediately goes unavailable — the variable is not set — and the verdict panel drops back to Ollama.',
+        run: () => { dispatch({ type: 'draft/edit', id: 'openrouter' });
+          dispatch({ type: 'draft/set', field: 'secretSource', value: 'env' });
+          dispatch({ type: 'draft/set', field: 'secretValue', value: 'OPENROUTER_API_KEY' });
+          dispatch({ type: 'draft/save' }); } },
+      { label: 'Set OPENROUTER_API_KEY in the environment', watch: 'Available again, and the file preview now contains a variable name rather than a secret. This is the trade, in full view.',
+        run: () => dispatch({ type: 'env/set', name: 'OPENROUTER_API_KEY', value: 'sk-or-demo' }) }
+    ]
+  },
+  {
+    title: 'An endpoint that passes the health check and still cannot do the job',
+    blurb: 'Anthropic answers <code>GET /v1/models</code> perfectly well once the key is in the right header. ' +
+      'It has no <code>/chat/completions</code> at all. The health check as it exists today would show this ' +
+      'provider as green, and every describe job against it would fail.',
+    reset: seedOllama,
+    steps: [
+      { label: 'Add Anthropic with Bearer auth', watch: 'The obvious first guess, since almost everything else uses Bearer.',
+        run: () => { dispatch({ type: 'draft/open' });
+          dispatch({ type: 'draft/set', field: 'name', value: 'Anthropic' });
+          dispatch({ type: 'draft/set', field: 'baseUrlValue', value: 'https://api.anthropic.com/v1' });
+          dispatch({ type: 'draft/set', field: 'authMode', value: 'bearer' });
+          dispatch({ type: 'draft/set', field: 'secretValue', value: 'sk-ant-demo' }); } },
+      { label: 'Probe it', watch: '401. The hint names the actual cause: this provider wants the key in x-api-key, not Authorization.',
+        run: probeDraft },
+      { label: 'Move the key into an x-api-key header', watch: 'Auth mode "custom header" exists for exactly this.',
+        run: () => { dispatch({ type: 'draft/set', field: 'authMode', value: 'header' });
+          dispatch({ type: 'draft/set', field: 'headerName', value: 'x-api-key' });
+          dispatch({ type: 'draft/set', field: 'secretValue', value: 'sk-ant-demo' }); } },
+      { label: 'Probe again', watch: 'Green. Two models. Everything looks finished.',
+        run: probeDraft },
+      { label: 'Save and discover', watch: 'A tidy, healthy-looking provider.',
+        run: () => { dispatch({ type: 'draft/save' }); discover('anthropic'); } },
+      { label: 'Image-probe the models', watch: 'Both fail with "no /chat/completions — it speaks its own dialect". This is the boundary of an OpenAI-compatible-only scope, and the image probe is what makes it visible before a job queue does.',
+        run: () => visionProbeAll('anthropic') }
+    ]
+  },
+  {
+    title: 'Editing a provider that jobs already depend on',
+    blurb: 'The last provider you add is not the last thing that happens. Here a working Ollama gets a second ' +
+      'copy, a rename, and a moved address — the cases where stale state does damage.',
+    reset: seedOllama,
+    steps: [
+      { label: 'Try to add a second provider called "Ollama"', watch: 'The id collides and the form says which existing provider to edit instead. Two entries pointing at one server is the quickest way to a confusing fallback chain.',
+        run: () => { dispatch({ type: 'draft/open' });
+          dispatch({ type: 'draft/set', field: 'name', value: 'Ollama' });
+          dispatch({ type: 'draft/set', field: 'id', value: 'ollama' });
+          dispatch({ type: 'draft/set', field: 'baseUrlValue', value: 'http://localhost:11434/v1' }); } },
+      { label: 'Give it a distinct id instead', watch: 'Now it saves. Nothing stops you having two entries for one machine, and that is probably fine.',
+        run: () => dispatch({ type: 'draft/set', field: 'id', value: 'ollama_spare' }) },
+      { label: 'Save it, discover and image-probe it', watch: 'Two providers, one server — and the spare is now genuinely usable, which is what makes the next steps interesting.',
+        run: () => { dispatch({ type: 'draft/save' }); discover('ollama_spare'); visionProbeAll('ollama_spare'); } },
+      { label: 'Edit the original and point it at the wrong port', watch: 'Its green probe result is discarded the moment the address changes. A tick earned against an address you have since edited is worse than no tick.',
+        run: () => { dispatch({ type: 'draft/edit', id: 'ollama' });
+          dispatch({ type: 'draft/set', field: 'baseUrlValue', value: 'http://localhost:9999/v1' }); } },
+      { label: 'Save the broken address', watch: 'The models survive the edit, still marked vision-capable, and the verdict panel happily plans to use one of them. Its probe is unknown, not failed — the open question is whether saving an address change should force a re-probe.',
+        run: () => dispatch({ type: 'draft/save' }) },
+      { label: 'Probe it', watch: 'Now it fails and gets skipped, and the spare picks up the work. The failure arrived one click late.',
+        run: () => probeProvider('ollama') }
+    ]
+  }
+];
+
+/* ---------- render ---------- */
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function renderVerdict() {
+  const plan = M.describePlan(state);
+  const n = Object.keys(state.providers).length;
+  let head, cls;
+  if (!n) { head = 'No providers yet. Add one below.'; cls = ''; }
+  else if (plan.winner) {
+    cls = 'ok';
+    head = 'Yes — ' + esc(plan.winner.p.name) + ' would answer, using ' + esc(plan.winner.model.name) + '.';
+  } else { cls = 'no'; head = 'No. Nothing you have configured can describe a photo right now.'; }
+
+  const rows = plan.steps.map((st, i) => {
+    const badge = st.verdict === 'use'
+      ? '<span class="badge success">used</span>'
+      : '<span class="badge">skipped</span>';
+    return '<li>' + badge + '<span class="w"><b>' + esc(st.p.name) + '</b> — ' + esc(st.why) +
+      (st.verdict === 'use' ? ' (<code>' + esc(st.model.id) + '</code>)' : '') + '</span></li>';
+  }).join('');
+
+  document.getElementById('verdict').innerHTML =
+    '<div class="verdict ' + cls + '"><h3>' + head + '</h3>' +
+    '<p class="tiny" style="margin:0">Tried in order: whichever provider is set first, then the rest of the fallback order.</p>' +
+    (rows ? '<ul class="ladder">' + rows + '</ul>' : '') + '</div>';
+}
+
+function visionBadge(m) {
+  if (m.vision === true) return '<span class="badge success">can see</span>';
+  if (m.vision === false) return '<span class="badge error" title="' + esc(m.visionNote || '') + '">cannot</span>';
+  return '<span class="badge warning">unknown</span>';
+}
+
+function renderProviders() {
+  const ids = M.effectiveOrder(state);
+  if (!ids.length) {
+    document.getElementById('providers').innerHTML =
+      '<div class="card"><p class="muted" style="margin:0">Nothing configured. Use the form below, ' +
+      'or start a walkthrough.</p></div>';
+    return;
+  }
+  document.getElementById('providers').innerHTML = ids.map((id, i) => {
+    const p = state.providers[id];
+    const av = M.availability(p, state.env);
+    const base = M.resolveBaseUrl(p, state.env);
+    const pr = p.probe;
+    const probeBadge = !pr ? '<span class="badge">never probed</span>'
+      : pr.state === 'ok' ? '<span class="badge success">reachable</span>'
+      : '<span class="badge error">unreachable</span>';
+    const authText = p.auth.mode === 'none' ? 'no credential'
+      : p.auth.mode === 'bearer' ? 'Authorization: Bearer' : p.auth.headerName + ' header';
+    const secretText = p.auth.mode === 'none' ? '—'
+      : p.auth.secret.source === 'env' ? '$' + p.auth.secret.value + (state.env[p.auth.secret.value] ? ' (set)' : ' (not set)')
+      : 'stored in providers.json';
+
+    const models = p.models.length ? '<table><tr><th>Model</th><th>Can it see a photo?</th><th>Where from</th><th></th></tr>' +
+      p.models.map(m => '<tr><td class="mono">' + esc(m.id) + '</td><td>' + visionBadge(m) + '</td>' +
+        '<td class="tiny">' + m.source + '</td><td style="text-align:right">' +
+        '<button class="tiny" data-a="vision" data-id="' + id + '" data-m="' + esc(m.id) + '">Image-probe</button> ' +
+        '<button class="tiny danger" data-a="dropModel" data-id="' + id + '" data-m="' + esc(m.id) + '">Drop</button>' +
+        '</td></tr>').join('') + '</table>'
+      : '<p class="tiny" style="margin:8px 0 0">No models listed yet.</p>';
+
+    return '<div class="card">' +
+      '<div class="row"><div><div class="card-title">' + esc(p.name) +
+        (i === 0 ? ' <span class="badge accent">tried first</span>' : '') + '</div>' +
+        '<div class="tiny" style="margin-top:3px"><code>' + esc(id) + '</code> &middot; ' +
+        esc(base.ok ? base.url : base.reason) +
+        (p.baseUrl.source === 'env' ? ' <span class="tiny">(from $' + esc(p.baseUrl.value) + ')</span>' : '') +
+        '</div></div>' +
+      '<div class="btns">' + probeBadge +
+        (av.available ? '<span class="badge success">available</span>' : '<span class="badge error">unavailable</span>') +
+      '</div></div>' +
+      '<div class="hr"></div>' +
+      '<div class="grid3">' +
+        '<div><div class="tiny">Authentication</div><div>' + esc(authText) + '</div></div>' +
+        '<div><div class="tiny">Key</div><div>' + esc(secretText) + '</div></div>' +
+        '<div><div class="tiny">Availability</div><div>' + esc(av.reason) + '</div></div>' +
+      '</div>' +
+      (pr && pr.state === 'failed'
+        ? '<p class="err" style="margin-top:10px"><b>' + esc(pr.headline) + '</b>' +
+          (pr.hint ? '<br><span class="muted">' + esc(pr.hint) + '</span>' : '') + '</p>' : '') +
+      (Object.keys(p.extraHeaders).length
+        ? '<p class="tiny" style="margin-top:10px">Extra headers: ' +
+          esc(Object.keys(p.extraHeaders).map(k => k + ': ' + p.extraHeaders[k]).join(', ')) + '</p>' : '') +
+      models +
+      '<div class="hr"></div>' +
+      '<div class="btns">' +
+        '<button data-a="probe" data-id="' + id + '">Probe address</button>' +
+        '<button data-a="discover" data-id="' + id + '">Discover models</button>' +
+        '<button data-a="visionAll" data-id="' + id + '">Image-probe every model</button>' +
+        '<button data-a="addModel" data-id="' + id + '">Add a model by hand</button>' +
+        '<button data-a="edit" data-id="' + id + '">Edit</button>' +
+        (i === 0 ? '' : '<button data-a="first" data-id="' + id + '">Try this one first</button>') +
+        '<button data-a="up" data-id="' + id + '">Move up</button>' +
+        '<button data-a="down" data-id="' + id + '">Move down</button>' +
+        '<button class="danger" data-a="delete" data-id="' + id + '">Remove</button>' +
+      '</div></div>';
+  }).join('');
+}
+
+function renderWorld() {
+  const envNames = Object.keys(state.env);
+  document.getElementById('world').innerHTML = '<div class="card">' +
+    '<div class="card-title">Model servers on this machine and network</div>' +
+    '<p class="tiny" style="margin:4px 0 10px">Switch one off and re-probe — this is how a photographer\'s ' +
+    'laptop actually behaves. Only these addresses exist in the simulation.</p>' +
+    '<table><tr><th>Address</th><th>What it is</th><th>State</th><th></th></tr>' +
+    Object.keys(SERVERS).map(url => {
+      const s = SERVERS[url];
+      const auth = !s.auth ? 'no key' : s.auth === 'bearer' ? 'Bearer ' + s.keys[0] : s.auth + ' ' + s.keys[0];
+      return '<tr><td class="mono">' + esc(url) + '</td><td class="tiny">' + esc(s.label) + ' &middot; ' +
+        esc(auth) + (s.chat === false ? ' &middot; no /chat/completions' : '') +
+        (s.notOpenAi ? ' &middot; not an API' : '') + '</td>' +
+        '<td>' + (s.up ? '<span class="badge success">up</span>' : '<span class="badge">down</span>') + '</td>' +
+        '<td style="text-align:right"><button class="tiny" data-a="toggleServer" data-url="' + esc(url) + '">' +
+        (s.up ? 'Stop it' : 'Start it') + '</button></td></tr>';
+    }).join('') + '</table>' +
+    '<div class="hr"></div>' +
+    '<div class="card-title">Environment variables</div>' +
+    (envNames.length
+      ? '<table>' + envNames.map(n => '<tr><td class="mono">' + esc(n) + '</td><td class="mono">' +
+          esc(state.env[n]) + '</td><td style="text-align:right"><button class="tiny danger" ' +
+          'data-a="unsetEnv" data-name="' + esc(n) + '">Unset</button></td></tr>').join('') + '</table>'
+      : '<p class="tiny" style="margin:4px 0 0">None set.</p>') +
+    '<div class="btns" style="margin-top:10px">' +
+      '<button data-a="setEnv">Set a variable</button>' +
+      '<button data-a="reset">Reset everything</button>' +
+    '</div></div>';
+}
+
+function field(label, name, value, opts) {
+  opts = opts || {};
+  const err = opts.error ? '<div class="err">' + esc(opts.error) + '</div>' : '';
+  if (opts.options) {
+    return '<label class="f"><span>' + label + '</span><select data-field="' + name + '">' +
+      opts.options.map(o => '<option value="' + o[0] + '"' + (o[0] === value ? ' selected' : '') + '>' +
+        esc(o[1]) + '</option>').join('') + '</select>' + err + '</label>';
+  }
+  return '<label class="f"><span>' + label + '</span><input data-field="' + name + '" value="' +
+    esc(value == null ? '' : value) + '" placeholder="' + esc(opts.placeholder || '') + '"' +
+    (opts.disabled ? ' disabled' : '') + '>' + err + '</label>';
+}
+
+function renderDraft() {
+  const el = document.getElementById('draft');
+  if (!state.draft) {
+    el.innerHTML = '<div class="card"><div class="row"><p class="muted" style="margin:0">' +
+      'Nothing being edited.</p><button class="primary" data-a="new">Add a provider</button></div></div>';
+    return;
+  }
+  const d = state.draft, v = M.validateDraft(d, Object.keys(state.providers));
+  const pr = d.probe;
+
+  el.innerHTML = '<div class="card">' +
+    '<div class="row"><div class="card-title">' + (d.editing ? 'Editing ' + esc(d.editing) : 'New provider') +
+      '</div><button data-a="closeDraft">Close</button></div>' +
+    '<div class="hr"></div>' +
+    '<div class="grid2">' +
+      field('Name', 'name', d.name, { error: v.errors.name, placeholder: 'LM Studio on the studio Mac' }) +
+      field('Id', 'id', d.idTouched ? d.id : M.slugify(d.name), { error: v.errors.id, placeholder: 'auto from the name' }) +
+    '</div>' +
+    '<div class="grid2">' +
+      field('Where the address comes from', 'baseUrlSource', d.baseUrlSource,
+        { options: [['literal', 'Typed here'], ['env', 'An environment variable']] }) +
+      field(d.baseUrlSource === 'literal' ? 'Base URL' : 'Variable holding the base URL',
+        'baseUrlValue', d.baseUrlValue,
+        { error: v.errors.baseUrl,
+          placeholder: d.baseUrlSource === 'literal' ? 'http://localhost:1234/v1' : 'OLLAMA_HOST' }) +
+    '</div>' +
+    '<div class="grid3">' +
+      field('Authentication', 'authMode', d.authMode, { options: [
+        ['none', 'None — local server'], ['bearer', 'Authorization: Bearer'], ['header', 'A custom header']] }) +
+      (d.authMode === 'header'
+        ? field('Header name', 'headerName', d.headerName, { error: v.errors.headerName, placeholder: 'x-api-key' })
+        : '<div></div>') +
+      (d.authMode === 'none' ? '<div></div>'
+        : field('Where the key comes from', 'secretSource', d.secretSource,
+            { options: [['literal', 'Typed here'], ['env', 'An environment variable']] })) +
+    '</div>' +
+    (d.authMode === 'none' ? '' :
+      field(d.secretSource === 'literal' ? 'API key' : 'Variable holding the key', 'secretValue', d.secretValue,
+        { error: v.errors.secret,
+          placeholder: d.secretSource === 'literal' ? 'sk-…' : 'OPENROUTER_API_KEY' })) +
+    (d.authMode === 'none' ? '' : '<p class="tiny" style="margin:-4px 0 12px">' +
+      (d.secretSource === 'literal'
+        ? 'Typed here, the key is written into providers.json in plain text.'
+        : 'Read from the environment, the key never touches a file this app writes — but you have to set it yourself.') +
+      '</p>') +
+    '<div class="grid2">' +
+      field('Extra headers (one per line, Name: value)', 'extraHeaders', d.extraHeaders,
+        { error: v.errors.extraHeaders, placeholder: 'HTTP-Referer: lightroom-tagger' }) +
+      field('Request timeout (seconds)', 'timeoutSeconds', d.timeoutSeconds, {}) +
+    '</div>' +
+    (pr ? '<div class="verdict ' + (pr.state === 'ok' ? 'ok' : 'no') + '" style="margin-bottom:12px">' +
+        '<b>' + esc(pr.headline) + '</b>' + (pr.detail ? ' <span class="tiny">' + esc(pr.detail) + '</span>' : '') +
+        (pr.hint ? '<div class="muted" style="margin-top:4px">' + esc(pr.hint) + '</div>' : '') + '</div>' : '') +
+    '<div class="btns">' +
+      '<button data-a="probeDraft">Probe the address</button>' +
+      '<button class="primary" data-a="save" ' + (v.ok ? '' : 'disabled') + '>' +
+        (d.editing ? 'Save changes' : 'Add this provider') + '</button>' +
+      (v.ok ? '' : '<span class="tiny" style="align-self:center">Fill in what is flagged above.</span>') +
+    '</div></div>';
+}
+
+function renderScenarios() {
+  document.getElementById('tabs').innerHTML = SCENARIOS.map((s, i) =>
+    '<button class="' + (i === activeTab ? 'on' : '') + '" data-a="tab" data-i="' + i + '">' +
+    (i + 1) + '. ' + esc(s.title.split(' ').slice(0, 4).join(' ')) + '…</button>').join('');
+
+  const sc = SCENARIOS[activeTab], at = stepIndex[activeTab];
+  document.getElementById('scenario').innerHTML = '<div class="card">' +
+    '<h2>' + esc(sc.title) + '</h2><p class="muted">' + sc.blurb + '</p>' +
+    '<div class="btns"><button data-a="startScenario">' +
+      (at === 0 ? 'Start from a clean slate' : 'Start over') + '</button>' +
+      '<span class="tiny" style="align-self:center">Step ' + Math.min(at + 1, sc.steps.length) +
+      ' of ' + sc.steps.length + '</span></div>' +
+    '<ol class="steps">' + sc.steps.map((st, i) =>
+      '<li class="' + (i < at ? 'done' : i === at ? 'now' : '') + '"><div>' +
+      '<button data-a="step" data-i="' + i + '"' + (i === at ? ' class="primary"' : '') +
+      (i > at ? ' disabled' : '') + '>' + esc(st.label) + '</button>' +
+      '<div class="watch">' + st.watch + '</div></div></li>').join('') + '</ol></div>';
+}
+
+function renderLog() {
+  document.getElementById('log').innerHTML = state.log.length
+    ? state.log.map(l => '<li><span class="t">' +
+        new Date(l.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) +
+        '</span>' + esc(l.text) + '</li>').join('')
+    : '<li class="muted">Nothing yet.</li>';
+}
+
+function render() {
+  renderVerdict(); renderProviders(); renderWorld(); renderDraft(); renderScenarios(); renderLog();
+  document.getElementById('json').textContent = JSON.stringify(M.toConfigFile(state), null, 2);
+  if (focusField) {
+    const el = document.querySelector('[data-field="' + focusField + '"]');
+    if (el) { el.focus(); if (el.setSelectionRange) { const n = el.value.length; el.setSelectionRange(n, n); } }
+  }
+}
+
+document.addEventListener('input', e => {
+  const f = e.target.getAttribute('data-field');
+  if (!f) return;
+  focusField = f;
+  dispatch({ type: 'draft/set', field: f, value: e.target.value });
+});
+document.addEventListener('change', e => {
+  const f = e.target.getAttribute('data-field');
+  if (!f || e.target.tagName !== 'SELECT') return;
+  focusField = null;
+  dispatch({ type: 'draft/set', field: f, value: e.target.value });
+});
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-a]');
+  if (!btn) return;
+  const a = btn.getAttribute('data-a'), id = btn.getAttribute('data-id');
+  focusField = null;
+  switch (a) {
+    case 'new': dispatch({ type: 'draft/open' }); break;
+    case 'closeDraft': dispatch({ type: 'draft/close' }); break;
+    case 'save': dispatch({ type: 'draft/save' }); break;
+    case 'probeDraft': probeDraft(); break;
+    case 'edit': dispatch({ type: 'draft/edit', id: id }); break;
+    case 'delete': dispatch({ type: 'provider/delete', id: id }); break;
+    case 'probe': probeProvider(id); break;
+    case 'discover': discover(id); break;
+    case 'visionAll': visionProbeAll(id); break;
+    case 'vision': visionProbe(id, btn.getAttribute('data-m')); break;
+    case 'dropModel': dispatch({ type: 'models/remove', id: id, modelId: btn.getAttribute('data-m') }); break;
+    case 'addModel': {
+      const m = prompt('Model id, exactly as the provider spells it:');
+      if (m) dispatch({ type: 'models/addManual', id: id, modelId: m });
+      break;
+    }
+    case 'first': dispatch({ type: 'provider/setDefault', id: id }); break;
+    case 'up': dispatch({ type: 'provider/move', id: id, delta: -1 }); break;
+    case 'down': dispatch({ type: 'provider/move', id: id, delta: 1 }); break;
+    case 'toggleServer': toggleServer(btn.getAttribute('data-url')); break;
+    case 'setEnv': {
+      const n = prompt('Variable name:', 'OPENROUTER_API_KEY');
+      if (!n) break;
+      const val = prompt('Value for ' + n + ':', 'sk-or-demo');
+      if (val != null) dispatch({ type: 'env/set', name: n.trim(), value: val });
+      break;
+    }
+    case 'unsetEnv': dispatch({ type: 'env/unset', name: btn.getAttribute('data-name') }); break;
+    case 'reset':
+      Object.keys(SERVERS).forEach(u => { SERVERS[u].up = u !== 'http://localhost:1234/v1'; });
+      state = M.initialState(); stepIndex = [0, 0, 0, 0, 0]; render();
+      break;
+    case 'tab': activeTab = Number(btn.getAttribute('data-i')); render(); break;
+    case 'startScenario':
+      Object.keys(SERVERS).forEach(u => { SERVERS[u].up = u !== 'http://localhost:1234/v1'; });
+      state = SCENARIOS[activeTab].reset();
+      state.log = [{ text: 'Walkthrough ' + (activeTab + 1) + ' reset to a known starting point.', at: Date.now() }];
+      stepIndex[activeTab] = 0;
+      render();
+      break;
+    case 'step': {
+      const i = Number(btn.getAttribute('data-i'));
+      SCENARIOS[activeTab].steps[i].run();
+      if (i === stepIndex[activeTab]) stepIndex[activeTab] = i + 1;
+      render();
+      break;
+    }
+  }
+});
+
+render();
+</script>
+</body>
+</html>

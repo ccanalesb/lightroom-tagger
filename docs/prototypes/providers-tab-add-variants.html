@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Providers tab — three ways to fuse shelf + scan + form</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Tokens copied verbatim from apps/visualizer/frontend/src/index.css — do not invent values here. */
+  :root {
+    --color-background:#ffffff; --color-surface:#f6f5f4; --color-surface-hover:#f1f0ed;
+    --color-text-primary:rgba(0,0,0,0.95); --color-text-secondary:#4a4642; --color-text-tertiary:#847f7a;
+    --color-border:rgba(0,0,0,0.12); --color-border-strong:rgba(0,0,0,0.2);
+    --color-accent:#0075de; --color-accent-hover:#005bab; --color-accent-light:#f2f9ff;
+    --color-success:#1aae39; --color-warning:#dd5b00; --color-error:#e03e3e;
+  }
+  .dark {
+    --color-background:#191919; --color-surface:#31302e; --color-surface-hover:#3d3b38;
+    --color-text-primary:#f7f6f5; --color-text-secondary:#b8b7b4; --color-text-tertiary:#8a8985;
+    --color-border:rgba(255,255,255,0.12); --color-border-strong:rgba(255,255,255,0.25);
+    --color-accent:#4A9EFF; --color-accent-hover:#7AB8FF; --color-accent-light:rgba(74,158,255,0.15);
+    --color-success:#3db39a; --color-warning:#ff8c42; --color-error:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Inter',-apple-system,system-ui,'Segoe UI',sans-serif;
+    background:var(--color-background);color:var(--color-text-primary);
+    -webkit-font-smoothing:antialiased;font-size:16px;line-height:1.5;
+    transition:background-color .2s ease,color .2s ease}
+
+  /* --- real chrome: Layout.tsx --- */
+  header.app{position:sticky;top:0;z-index:50;background:var(--color-background);
+    border-bottom:1px solid var(--color-border)}
+  .container{max-width:80rem;margin:0 auto;padding:0 2rem}
+  .hdr{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .hdr-left{display:flex;align-items:center;gap:2rem}
+  .brand{font-size:18px;font-weight:600;margin:0}
+  nav.pills{display:flex;align-items:center;gap:4px}
+  nav.pills a{padding:6px 12px;border-radius:8px;font-size:14px;font-weight:500;text-decoration:none;
+    color:var(--color-text-secondary);transition:all .15s}
+  nav.pills a:hover{background:var(--color-surface);color:var(--color-text-primary)}
+  nav.pills a.on{background:var(--color-accent);color:#fff;font-weight:600;
+    box-shadow:0 1px 2px rgba(0,0,0,.05)}
+  main{max-width:80rem;margin:0 auto;padding:2rem}
+
+  /* --- Tabs.tsx --- */
+  .tabstrip{border-bottom:1px solid var(--color-border);margin-bottom:24px}
+  .tabstrip nav{display:flex;gap:4px;overflow-x:auto}
+  .tabstrip button{padding:8px 16px;font-size:14px;font-weight:600;white-space:nowrap;
+    background:none;border:0;border-bottom:3px solid transparent;cursor:pointer;
+    color:var(--color-text-primary);opacity:.6;transition:all .15s}
+  .tabstrip button:hover{opacity:1;border-bottom-color:var(--color-border-strong)}
+  .tabstrip button.on{border-bottom-color:var(--color-accent);color:var(--color-accent);opacity:1}
+
+  /* --- Card / shadow grammar from DESIGN.md --- */
+  .card{background:var(--color-background);border:1px solid var(--color-border);border-radius:12px;
+    box-shadow:rgba(0,0,0,.04) 0 4px 18px,rgba(0,0,0,.027) 0 2.025px 7.84688px,
+      rgba(0,0,0,.02) 0 .8px 2.925px,rgba(0,0,0,.01) 0 .175px 1.04062px}
+  .p16{padding:16px} .p24{padding:24px}
+  .stack6 > * + *{margin-top:24px}
+  .stack3 > * + *{margin-top:12px}
+
+  h3.sec{font-size:22px;font-weight:700;letter-spacing:-.25px;margin:0 0 8px}
+  h4.card-h{font-size:16px;font-weight:600;margin:0 0 4px}
+  .s{font-size:14px} .s2{font-size:14px;color:var(--color-text-secondary)}
+  .t3{font-size:12px;color:var(--color-text-tertiary)}
+  p{margin:0}
+  code{background:var(--color-surface);padding:1px 5px;border-radius:4px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.86em}
+
+  .badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:9999px;
+    font-size:12px;font-weight:600;border:1px solid var(--color-border);
+    background:var(--color-surface);color:var(--color-text-secondary);white-space:nowrap}
+  .badge.success{background:rgba(26,174,57,.08);color:var(--color-success);border-color:rgba(26,174,57,.25)}
+  .badge.error{background:rgba(224,62,62,.08);color:var(--color-error);border-color:rgba(224,62,62,.25)}
+  .badge.accent{background:var(--color-accent-light);color:var(--color-accent);border-color:rgba(0,117,222,.25)}
+  .badge.warning{background:rgba(221,91,0,.08);color:var(--color-warning);border-color:rgba(221,91,0,.25)}
+
+  /* --- Button.tsx --- */
+  button.btn{font:500 14px Inter,sans-serif;border-radius:8px;padding:6px 12px;cursor:pointer;
+    background:var(--color-surface);color:var(--color-text-primary);
+    border:1px solid var(--color-border);transition:all .15s}
+  button.btn:hover:not(:disabled){background:var(--color-surface-hover);border-color:var(--color-border-strong)}
+  button.btn:disabled{opacity:.5;cursor:not-allowed}
+  button.btn.primary{background:var(--color-accent);color:#fff;border:2px solid var(--color-background);
+    font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+  button.btn.primary:hover:not(:disabled){background:var(--color-accent-hover)}
+  button.btn.ghost{background:transparent;border-color:transparent}
+  button.btn.ghost:hover:not(:disabled){background:var(--color-surface)}
+  button.btn.xs{font-size:12px;padding:2px 6px;min-width:0}
+
+  /* --- Input from DESIGN.md --- */
+  input.in,select.in{font:400 14px Inter,sans-serif;border:1px solid var(--color-border);border-radius:8px;
+    padding:8px 12px;background:var(--color-background);color:var(--color-text-primary);width:100%}
+  input.in:hover{border-color:var(--color-border-strong)}
+  input.in:focus,select.in:focus{outline:2px solid var(--color-accent);outline-offset:-1px;border-color:transparent}
+  input.in::placeholder{color:var(--color-text-tertiary)}
+  label.fld{display:block}
+  label.fld > span{display:block;font-size:14px;font-weight:500;color:var(--color-text-secondary);margin-bottom:6px}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:760px){.g2{grid-template-columns:1fr}.container,main{padding-left:1rem;padding-right:1rem}}
+
+  .row{display:flex;align-items:center;gap:12px}
+  .between{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .hr{height:1px;background:var(--color-border)}
+
+  /* provider card, matching ProviderCard.tsx */
+  .pcard{border:1px solid var(--color-border);border-radius:12px;background:var(--color-background);
+    box-shadow:rgba(0,0,0,.04) 0 4px 18px,rgba(0,0,0,.027) 0 2.025px 7.84688px,
+      rgba(0,0,0,.02) 0 .8px 2.925px,rgba(0,0,0,.01) 0 .175px 1.04062px}
+  .pcard > .head{width:100%;display:flex;align-items:center;justify-content:space-between;
+    padding:12px 16px;background:none;border:0;cursor:pointer;text-align:left;border-radius:12px 12px 0 0}
+  .pcard > .head:hover{background:var(--color-surface)}
+  .pcard .head h3{font-size:16px;font-weight:600;margin:0}
+  .pcard .body{padding:12px 16px 16px;border-top:1px solid var(--color-border)}
+  .pcard.fresh{outline:2px solid var(--color-accent);outline-offset:2px}
+
+  /* fallback order, matching FallbackOrderPanel.tsx */
+  ol.fb{list-style:none;margin:0;padding:0}
+  ol.fb li{display:flex;align-items:center;gap:8px;font-size:14px;padding:2px 4px;margin:0 -4px;
+    border-radius:8px;border:1px solid transparent}
+  ol.fb li + li{margin-top:6px}
+  .grip{color:var(--color-text-tertiary);cursor:grab;user-select:none;padding:0 2px}
+  .num{width:20px;height:20px;border-radius:9999px;background:var(--color-accent-light);
+    color:var(--color-accent);display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:700;flex-shrink:0}
+
+  /* shelf tiles */
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  @media(max-width:900px){.tiles{grid-template-columns:repeat(2,1fr)}}
+  .tile{text-align:left;padding:10px 12px;border-radius:8px;cursor:pointer;
+    background:var(--color-background);border:1px solid var(--color-border);transition:all .15s}
+  .tile:hover:not(:disabled){border-color:var(--color-border-strong);background:var(--color-surface)}
+  .tile:disabled{opacity:.55;cursor:default}
+  .tile b{display:block;font-size:14px;font-weight:600}
+  .tile .meta{display:block;font-size:11px;color:var(--color-text-tertiary);margin-top:3px}
+  .tile.dashed{border-style:dashed}
+  .tile.live{border-color:rgba(26,174,57,.4)}
+  .tile.live .meta{color:var(--color-success);font-weight:600}
+  .tile.on{outline:2px solid var(--color-accent);outline-offset:1px}
+  .dot{display:inline-block;width:6px;height:6px;border-radius:9999px;background:var(--color-success);
+    margin-right:5px;vertical-align:middle}
+
+  /* segmented control */
+  .seg{display:inline-flex;padding:2px;background:var(--color-surface);border-radius:8px;
+    border:1px solid var(--color-border)}
+  .seg button{font:500 13px Inter,sans-serif;padding:5px 12px;border-radius:6px;border:0;cursor:pointer;
+    background:none;color:var(--color-text-secondary)}
+  .seg button.on{background:var(--color-background);color:var(--color-text-primary);font-weight:600;
+    box-shadow:0 1px 2px rgba(0,0,0,.06)}
+
+  label.ck{display:flex;gap:10px;align-items:flex-start;padding:8px 0;cursor:pointer;
+    border-top:1px solid var(--color-border)}
+  label.ck input{width:auto;margin:3px 0 0}
+  label.ck b{font-size:14px;font-weight:600}
+
+  .inset{background:var(--color-surface);border:1px solid var(--color-border);border-radius:8px;padding:14px}
+  .toast{padding:10px 12px;border-radius:8px;font-size:14px;border:1px solid var(--color-border)}
+  .toast.ok{background:rgba(26,174,57,.06);border-color:rgba(26,174,57,.25)}
+  .toast.no{background:rgba(224,62,62,.06);border-color:rgba(224,62,62,.25)}
+
+  /* prototype switcher — deliberately unlike the design system */
+  .switcher{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:100;
+    display:flex;align-items:center;gap:2px;padding:5px;border-radius:9999px;
+    background:#111;color:#fff;box-shadow:0 8px 28px rgba(0,0,0,.35);font:600 13px Inter,sans-serif}
+  .switcher button{background:none;border:0;color:#fff;cursor:pointer;font:700 15px Inter,sans-serif;
+    width:30px;height:30px;border-radius:9999px}
+  .switcher button:hover{background:rgba(255,255,255,.15)}
+  .switcher .lbl{padding:0 12px;white-space:nowrap}
+  .switcher .lbl em{font-style:normal;opacity:.55;font-weight:500}
+  .notes{border-left:3px solid var(--color-border-strong);padding:2px 0 2px 14px;
+    color:var(--color-text-secondary);font-size:14px}
+  .notes b{color:var(--color-text-primary)}
+</style>
+</head>
+<body>
+
+<header class="app">
+  <div class="container">
+    <div class="hdr">
+      <div class="hdr-left">
+        <h1 class="brand">Lightroom Tagger</h1>
+        <nav class="pills">
+          <a href="#">Insights</a><a href="#">Images</a><a href="#">Identity</a>
+          <a href="#" class="on">Processing</a>
+        </nav>
+      </div>
+      <button class="btn ghost" onclick="document.documentElement.classList.toggle('dark')">Theme</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="tabstrip">
+    <nav>
+      <button>Analyze</button><button>Perspectives</button><button>Cache</button>
+      <button>Jobs</button><button class="on">Providers</button><button>Settings</button>
+    </nav>
+  </div>
+
+  <div class="stack6">
+    <div>
+      <h3 class="sec">AI Model Providers</h3>
+      <p class="s2">Configure vision model providers and manage fallback order</p>
+    </div>
+    <div id="addSurface"></div>
+    <div class="stack3" id="cards"></div>
+    <div id="fallback"></div>
+    <div id="defaults"></div>
+    <div class="card p24">
+      <h4 class="card-h">What to compare</h4>
+      <p class="notes" style="margin-top:10px"><b>Where your eye lands first.</b> A leads with what it
+      found, B leads with a choice of three doors, C leads with the shelf and lets the scan decorate it.
+      Only one of those is right for someone opening this tab for the first time.</p>
+      <p class="notes" style="margin-top:12px"><b>Whether "Manual" should be a door or a tile.</b> In A and
+      C the plain form is the last resort at the edge of the surface. In B it is one of three equal
+      choices, which makes it easier to find and easier to land on by mistake.</p>
+      <p class="notes" style="margin-top:12px"><b>How a stopped server reads.</b> llama.cpp is not running
+      in this simulation. A omits it, B omits it from the scan but keeps it on the shelf, C keeps its tile
+      visible and greys it. Watch which one you would rather hit as a user who just forgot to start it.</p>
+      <p class="notes" style="margin-top:12px"><b>Paste is gone.</b> You did not pick it, so no variant
+      here has a paste box. If the company-proxy case matters, the plain form is the only thing that
+      covers it in all three.</p>
+    </div>
+  </div>
+</main>
+
+<div class="switcher" id="switcher"></div>
+
+<script>
+/* ==========================================================================
+   Simulated network — same world as the earlier prototypes.
+   ========================================================================== */
+const SERVERS = {
+  'http://localhost:11434/v1': { label: 'Ollama', up: true, auth: false, chat: true,
+    models: ['llama3.2-vision:11b', 'qwen2.5vl:7b', 'llama3.1:8b', 'nomic-embed-text'],
+    seeing: ['llama3.2-vision:11b', 'qwen2.5vl:7b'] },
+  'http://localhost:1234/v1': { label: 'LM Studio', up: true, auth: false, chat: true,
+    models: ['qwen2.5-vl-7b-instruct', 'gemma-3-12b-it'],
+    seeing: ['qwen2.5-vl-7b-instruct', 'gemma-3-12b-it'] },
+  'http://localhost:8000/v1': { label: 'vLLM', up: true, auth: false, chat: true,
+    models: ['Qwen/Qwen2.5-VL-7B-Instruct'], seeing: ['Qwen/Qwen2.5-VL-7B-Instruct'] },
+  'http://localhost:8080/v1': { label: 'llama.cpp', up: false, auth: false, chat: true,
+    models: ['gemma-3-4b-it'], seeing: ['gemma-3-4b-it'] },
+  'https://openrouter.ai/api/v1': { label: 'OpenRouter', up: true, auth: 'bearer', keys: ['sk-or-demo'],
+    chat: true, models: ['google/gemini-2.5-flash-lite', 'openai/gpt-4.1-nano',
+      'qwen/qwen3-vl-32b-instruct', 'deepseek/deepseek-r1'],
+    seeing: ['google/gemini-2.5-flash-lite', 'openai/gpt-4.1-nano', 'qwen/qwen3-vl-32b-instruct'] },
+  'https://api.groq.com/openai/v1': { label: 'Groq', up: true, auth: 'bearer', keys: ['gsk-demo'],
+    chat: true, models: ['meta-llama/llama-4-scout-17b-16e-instruct', 'llama-3.3-70b-versatile'],
+    seeing: ['meta-llama/llama-4-scout-17b-16e-instruct'] },
+  'https://integrate.api.nvidia.com/v1': { label: 'NVIDIA NIM', up: true, auth: 'bearer',
+    keys: ['nvapi-demo'], chat: true, models: ['microsoft/phi-4-multimodal-instruct'],
+    seeing: ['microsoft/phi-4-multimodal-instruct'] },
+  'https://models.acme-corp.internal/v1': { label: 'Acme proxy', up: true, auth: 'bearer',
+    keys: ['acme-token'], chat: true, models: ['gpt-4o-mini-2024-07-18'],
+    seeing: ['gpt-4o-mini-2024-07-18'] }
+};
+const ENV = { OPENROUTER_API_KEY: 'sk-or-demo', GROQ_API_KEY: 'gsk-demo' };
+
+function normalizeBaseUrl(raw) {
+  let t = String(raw == null ? '' : raw).trim().replace(/^["']|["']$/g, '');
+  if (!t) return { ok: false };
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) t = 'http://' + t;
+  try { const u = new URL(t);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return { ok: false };
+    return { ok: true, url: (u.origin + u.pathname).replace(/\/+$/, '') };
+  } catch (_) { return { ok: false }; }
+}
+const candidates = u => u.endsWith('/v1') ? [u] : [u + '/v1', u];
+
+function lookup(c) {
+  if (SERVERS[c]) return { server: SERVERS[c], exact: true };
+  const origin = c.split('/').slice(0, 3).join('/');
+  const sib = Object.keys(SERVERS).find(k => k.indexOf(origin + '/') === 0 || k === origin);
+  return { server: sib ? SERVERS[sib] : null, exact: false };
+}
+function authOk(s, a) {
+  if (!s.auth) return true;
+  const known = (s.keys || []).indexOf(a.secret) !== -1;
+  if (s.auth === 'bearer') return a.mode === 'bearer' && known;
+  return a.mode === 'header' && String(a.headerName || '').toLowerCase() === s.auth.split(':')[1] && known;
+}
+function callModels(c, a) {
+  const f = lookup(c);
+  if (!f.server) return { kind: 'network' };
+  if (!f.server.up) return { kind: 'down' };
+  if (!f.exact) return { kind: 'wrong-path' };
+  if (!authOk(f.server, a)) return { kind: 'unauthorized' };
+  return { kind: 'ok', models: f.server.models.slice() };
+}
+const canSee = (c, a, id) => {
+  const f = lookup(c);
+  return !!(f.server && f.server.up && f.exact && authOk(f.server, a) && f.server.chat &&
+    f.server.seeing.indexOf(id) !== -1);
+};
+
+/* ==========================================================================
+   Tab state. Seeded to look like a real machine mid-use.
+   ========================================================================== */
+const SHELF = [
+  { key: 'ollama', name: 'Ollama', hint: 'localhost:11434', url: 'http://localhost:11434', auth: null },
+  { key: 'lmstudio', name: 'LM Studio', hint: 'localhost:1234', url: 'http://localhost:1234', auth: null },
+  { key: 'vllm', name: 'vLLM', hint: 'localhost:8000', url: 'http://localhost:8000', auth: null },
+  { key: 'llamacpp', name: 'llama.cpp', hint: 'localhost:8080', url: 'http://localhost:8080', auth: null },
+  { key: 'openrouter', name: 'OpenRouter', hint: 'needs a key', url: 'https://openrouter.ai/api/v1', auth: 'bearer' },
+  { key: 'groq', name: 'Groq', hint: 'needs a key', url: 'https://api.groq.com/openai/v1', auth: 'bearer' },
+  { key: 'nvidia', name: 'NVIDIA NIM', hint: 'needs a key', url: 'https://integrate.api.nvidia.com/v1', auth: 'bearer' }
+];
+const SCAN_PORTS = ['http://localhost:11434', 'http://localhost:1234', 'http://localhost:8000',
+                    'http://localhost:8080', 'http://localhost:5000'];
+
+function seed() {
+  return {
+    providers: [
+      { id: 'ollama', name: 'Ollama (Local)', url: 'http://localhost:11434/v1', available: true,
+        reachable: true, models: [
+          { id: 'llama3.2-vision:11b', vision: true }, { id: 'qwen2.5vl:7b', vision: true },
+          { id: 'llama3.1:8b', vision: false }] },
+      { id: 'nvidia_nim', name: 'NVIDIA NIM', url: 'https://integrate.api.nvidia.com/v1',
+        available: false, reachable: false, unavailableWhy: '$NVIDIA_NIM_API_KEY is not set',
+        models: [{ id: 'microsoft/phi-4-multimodal-instruct', vision: true }] },
+      { id: 'openrouter', name: 'OpenRouter', url: 'https://openrouter.ai/api/v1', available: true,
+        reachable: true, models: [
+          { id: 'google/gemini-2.5-flash-lite', vision: true }, { id: 'openai/gpt-4.1-nano', vision: true }] }
+    ],
+    order: ['ollama', 'nvidia_nim', 'openrouter'],
+    expanded: null, freshId: null, toast: null,
+    scan: { ran: false, found: [], picked: {} },
+    shelfOpen: null, shelfKey: '',
+    manualOpen: false,
+    form: { name: '', url: '', authMode: 'none', headerName: '', secret: '' },
+    segment: 'machine'
+  };
+}
+let S = seed();
+
+const addedUrls = () => S.providers.map(p => p.url);
+const isAdded = url => {
+  const n = normalizeBaseUrl(url);
+  if (!n.ok) return false;
+  return candidates(n.url).some(c => addedUrls().indexOf(c) !== -1);
+};
+
+/** Check the address, list the models, send each a test image. Shared by every variant. */
+function addProvider(spec) {
+  const n = normalizeBaseUrl(spec.url);
+  if (!n.ok) { S.toast = { ok: false, text: 'That is not an address.' }; return false; }
+  const auth = spec.auth || { mode: 'none' };
+  let reached = null, raw = null;
+  for (const c of candidates(n.url)) { raw = callModels(c, auth); if (raw.kind === 'ok') { reached = c; break; } }
+  if (!reached) {
+    S.toast = { ok: false, text: {
+      network: 'Nothing answered at that address.',
+      down: 'Nothing answered — a local model server only listens while it is running.',
+      'wrong-path': 'The host is up, but there is no API there.',
+      unauthorized: auth.mode === 'none' ? 'That one needs a key.' : 'The key was rejected.'
+    }[raw.kind] };
+    return false;
+  }
+  if (isAdded(reached)) { S.toast = { ok: false, text: 'Already added.' }; return false; }
+  const models = raw.models.map(id => ({ id: id, vision: canSee(reached, auth, id) }));
+  const seeing = models.filter(m => m.vision);
+  let id = (spec.name || SERVERS[reached].label).toLowerCase().replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, ''), base = id, k = 2;
+  while (S.providers.some(p => p.id === id)) { id = base + '_' + k; k++; }
+  S.providers.push({ id: id, name: spec.name || SERVERS[reached].label, url: reached,
+    available: true, reachable: true, models: models });
+  S.order.push(id);
+  S.freshId = id;
+  S.expanded = id;
+  S.toast = { ok: true, text: (spec.name || SERVERS[reached].label) + ' added — ' + seeing.length +
+    ' of ' + models.length + ' models can read a photo' +
+    (seeing.length ? ', starting with ' + seeing[0].id + '.' : '. Nothing here accepts an image.') };
+  return true;
+}
+
+function runScan() {
+  const found = [];
+  for (const base of SCAN_PORTS) {
+    for (const c of candidates(base)) {
+      const r = callModels(c, { mode: 'none' });
+      if (r.kind === 'ok') {
+        found.push({ url: c, name: lookup(c).server.label, kind: 'local',
+          note: r.models.length + ' models, no key needed', added: isAdded(c) });
+        break;
+      }
+    }
+  }
+  const guesses = { OPENROUTER_API_KEY: 'https://openrouter.ai/api/v1',
+                    GROQ_API_KEY: 'https://api.groq.com/openai/v1' };
+  for (const name of Object.keys(ENV)) {
+    const url = guesses[name];
+    if (!url) continue;
+    const r = callModels(url, { mode: 'bearer', secret: ENV[name] });
+    if (r.kind === 'ok') {
+      found.push({ url: url, name: lookup(url).server.label, kind: 'env',
+        auth: { mode: 'bearer', secret: ENV[name] },
+        note: 'key already in your environment as $' + name, added: isAdded(url) });
+    }
+  }
+  S.scan = { ran: true, found: found, picked: {} };
+}
+
+/* ==========================================================================
+   Variants
+   ========================================================================== */
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function toastHtml() {
+  if (!S.toast) return '';
+  return '<div class="toast ' + (S.toast.ok ? 'ok' : 'no') + '" style="margin-top:14px">' +
+    esc(S.toast.text) + '</div>';
+}
+
+function manualForm(pad) {
+  const f = S.form;
+  const fld = (label, name, ph) => '<label class="fld"><span>' + label + '</span>' +
+    '<input class="in" data-field="' + name + '" value="' + esc(f[name]) + '" placeholder="' +
+    esc(ph) + '"></label>';
+  return '<div class="' + (pad ? 'inset' : '') + '">' +
+    '<div class="g2">' + fld('Name', 'name', 'The studio Mac') +
+      fld('Base URL', 'url', 'http://localhost:1234/v1') + '</div>' +
+    '<div class="g2" style="margin-top:12px">' +
+      '<label class="fld"><span>Authentication</span><select class="in" data-field="authMode">' +
+      [['none', 'None — a local server'], ['bearer', 'Authorization: Bearer'], ['header', 'Its own header']]
+        .map(o => '<option value="' + o[0] + '"' + (o[0] === f.authMode ? ' selected' : '') + '>' +
+          o[1] + '</option>').join('') + '</select></label>' +
+      (f.authMode === 'header' ? fld('Header name', 'headerName', 'x-api-key') : '<div></div>') +
+    '</div>' +
+    (f.authMode === 'none' ? '' : '<div style="margin-top:12px">' + fld('API key', 'secret', 'sk-…') + '</div>') +
+    '<div class="btns" style="margin-top:14px">' +
+      '<button class="btn primary" data-a="form-add"' + (f.url.trim() ? '' : ' disabled') +
+      '>Add provider</button>' +
+      '<span class="t3">Reaches anything on your network, including a company proxy.</span>' +
+    '</div></div>';
+}
+
+function shelfTiles(annotate) {
+  return '<div class="tiles">' + SHELF.map(p => {
+    const added = isAdded(p.url);
+    const live = annotate && S.scan.ran && S.scan.found.some(f =>
+      f.kind === 'local' && candidates(normalizeBaseUrl(p.url).url).indexOf(f.url) !== -1);
+    const envHit = annotate && S.scan.ran && S.scan.found.some(f => f.kind === 'env' && f.name === p.name);
+    const dead = annotate && S.scan.ran && !live && !envHit && !p.auth;
+    let meta = p.hint;
+    if (added) meta = 'already added';
+    else if (live) meta = '<span class="dot"></span>running now';
+    else if (envHit) meta = '<span class="dot"></span>key found in your environment';
+    else if (dead) meta = 'not running';
+    return '<button class="tile' + (live || envHit ? ' live' : '') +
+      (S.shelfOpen === p.key ? ' on' : '') + '"' + (added ? ' disabled' : '') +
+      ' data-a="shelf" data-k="' + p.key + '"><b>' + esc(p.name) + '</b>' +
+      '<span class="meta">' + meta + '</span></button>';
+  }).join('') +
+    '<button class="tile dashed' + (S.shelfOpen === '__manual' ? ' on' : '') +
+    '" data-a="shelf" data-k="__manual"><b>Anything else</b>' +
+    '<span class="meta">fill it in yourself</span></button></div>';
+}
+
+function shelfDrawer() {
+  if (!S.shelfOpen) return '';
+  if (S.shelfOpen === '__manual') return '<div style="margin-top:14px">' + manualForm(true) + '</div>';
+  const p = SHELF.find(x => x.key === S.shelfOpen);
+  if (!p) return '';
+  if (!p.auth) {
+    return '<div class="inset" style="margin-top:14px"><div class="between">' +
+      '<div><b class="s">' + esc(p.name) + '</b> <span class="t3">' + esc(p.url) + '</span>' +
+      '<p class="t3" style="margin-top:2px">On your own machine, so no key is needed.</p></div>' +
+      '<button class="btn primary" data-a="shelf-add">Add</button></div></div>';
+  }
+  const envName = { openrouter: 'OPENROUTER_API_KEY', groq: 'GROQ_API_KEY' }[p.key];
+  const envHas = envName && ENV[envName];
+  return '<div class="inset" style="margin-top:14px">' +
+    '<div class="s" style="margin-bottom:10px"><b>' + esc(p.name) + '</b> ' +
+    '<span class="t3">' + esc(p.url) + '</span></div>' +
+    (envHas ? '<p class="s2" style="margin-bottom:10px">A key is already in your environment as ' +
+      '<code>$' + envName + '</code> — leave this blank to use it.</p>' : '') +
+    '<label class="fld"><span>API key</span><input class="in" data-field="shelfKey" value="' +
+      esc(S.shelfKey) + '" placeholder="' + (envHas ? 'using $' + envName : 'sk-…') + '"></label>' +
+    '<div class="btns" style="margin-top:12px">' +
+      '<button class="btn primary" data-a="shelf-add"' +
+      (envHas || S.shelfKey.trim() ? '' : ' disabled') + '>Add ' + esc(p.name) + '</button></div></div>';
+}
+
+function scanList(compact) {
+  const f = S.scan;
+  if (!f.ran) return '';
+  const fresh = f.found.filter(x => !x.added);
+  if (!fresh.length) {
+    return '<div class="inset"><b class="s">Nothing new.</b>' +
+      '<p class="t3" style="margin-top:3px">Everything reachable is already configured. ' +
+      (compact ? '' : 'Use the shelf or the manual form for anything else.') + '</p></div>';
+  }
+  const picked = Object.keys(f.picked).filter(k => f.picked[k]);
+  return '<div>' + fresh.map((x, i) =>
+    '<label class="ck"><input type="checkbox" data-a="tick" data-i="' + f.found.indexOf(x) + '"' +
+    (f.picked[f.found.indexOf(x)] ? ' checked' : '') + '><span>' +
+    '<b>' + esc(x.name) + '</b> <span class="badge' + (x.kind === 'env' ? ' accent' : ' success') + '">' +
+    esc(x.note) + '</span>' +
+    '<span class="t3" style="display:block;font-family:ui-monospace,Menlo,monospace">' +
+    esc(x.url) + '</span></span></label>').join('') +
+    '<div class="btns" style="margin-top:14px">' +
+    '<button class="btn primary" data-a="scan-add"' + (picked.length ? '' : ' disabled') + '>Add ' +
+    (picked.length ? picked.length + ' selected' : 'selected') + '</button>' +
+    '<button class="btn" data-a="scan">Look again</button></div></div>';
+}
+
+const VARIANTS = [
+  {
+    key: 'A', name: 'Found-first, shelf beneath',
+    render() {
+      if (!S.scan.ran) runScan();
+      const fresh = S.scan.found.filter(x => !x.added);
+      return '<div class="card p24">' +
+        '<div class="between" style="margin-bottom:4px"><h4 class="card-h">Add a provider</h4>' +
+          '<button class="btn" data-a="scan">Look again</button></div>' +
+        '<p class="s2">' + (fresh.length
+          ? 'Found ' + fresh.length + ' on this machine that you have not added yet.'
+          : 'Nothing new on this machine.') + '</p>' +
+        '<div style="margin-top:14px">' + scanList(false) + '</div>' +
+        '<div class="hr" style="margin:20px 0"></div>' +
+        '<p class="s2" style="margin-bottom:12px">Or pick one yourself</p>' +
+        shelfTiles(false) + shelfDrawer() + toastHtml() + '</div>';
+    }
+  },
+  {
+    key: 'B', name: 'One card, three doors',
+    render() {
+      const seg = S.segment;
+      const pane = seg === 'machine'
+        ? (S.scan.ran ? scanList(true)
+          : '<div class="btns"><button class="btn primary" data-a="scan">Look for providers</button>' +
+            '<span class="t3">Checks ' + SCAN_PORTS.length + ' local ports and the keys in your environment.</span></div>')
+        : seg === 'known' ? shelfTiles(false) + shelfDrawer()
+        : manualForm(false);
+      return '<div class="card p24">' +
+        '<div class="between" style="margin-bottom:14px">' +
+          '<div><h4 class="card-h">Add a provider</h4>' +
+          '<p class="s2">Three ways in. They all end up in the same place.</p></div>' +
+          '<div class="seg">' +
+            [['machine', 'On this machine'], ['known', 'Known providers'], ['manual', 'Manual']]
+              .map(o => '<button class="' + (seg === o[0] ? 'on' : '') + '" data-a="seg" data-k="' +
+                o[0] + '">' + o[1] + '</button>').join('') +
+          '</div></div>' + pane + toastHtml() + '</div>';
+    }
+  },
+  {
+    key: 'C', name: 'One shelf the scan lights up',
+    render() {
+      const extras = S.scan.ran
+        ? S.scan.found.filter(x => !x.added && !SHELF.some(p =>
+            candidates(normalizeBaseUrl(p.url).url).indexOf(x.url) !== -1))
+        : [];
+      return '<div class="card p24">' +
+        '<div class="between" style="margin-bottom:4px"><h4 class="card-h">Add a provider</h4>' +
+          '<button class="btn" data-a="scan">' +
+          (S.scan.ran ? 'Scan again' : 'Scan this machine') + '</button></div>' +
+        '<p class="s2">' + (S.scan.ran
+          ? 'Anything running right now is marked. Everything else you can still add by hand.'
+          : 'Pick one, or scan to see which of these is already running.') + '</p>' +
+        '<div style="margin-top:14px">' + shelfTiles(true) + '</div>' +
+        (extras.length ? '<p class="t3" style="margin-top:10px">Also found, not on the shelf: ' +
+          extras.map(x => esc(x.name) + ' at ' + esc(x.url)).join(', ') + '</p>' : '') +
+        shelfDrawer() + toastHtml() + '</div>';
+    }
+  }
+];
+
+/* ==========================================================================
+   Render the rest of the tab — unchanged chrome the variants sit inside.
+   ========================================================================== */
+function renderCards() {
+  document.getElementById('cards').innerHTML = S.providers.map(p => {
+    const open = S.expanded === p.id;
+    const seeing = p.models.filter(m => m.vision);
+    return '<div class="pcard' + (S.freshId === p.id ? ' fresh' : '') + '">' +
+      '<button class="head" data-a="toggle" data-id="' + p.id + '">' +
+      '<div class="row" style="min-width:0">' +
+        '<h3>' + esc(p.name) + '</h3>' +
+        '<span class="badge' + (p.available ? ' success' : '') + '">' +
+          (p.available ? 'Available' : 'Unavailable') + '</span>' +
+        (p.reachable ? '<span class="badge success">Reachable</span>'
+                     : '<span class="badge error" title="' + esc(p.unavailableWhy || '') +
+                       '">Unreachable</span>') +
+      '</div><span class="t3">' + (open ? '&#9650;' : '&#9660;') + '</span></button>' +
+      (open ? '<div class="body">' +
+        '<h4 class="s" style="font-weight:500;margin:0 0 8px">Models</h4>' +
+        (p.models.length ? '<div class="stack3" style="font-size:14px">' + p.models.map(m =>
+          '<div class="between" style="font-size:13px"><span style="font-family:ui-monospace,Menlo,monospace">' +
+          esc(m.id) + '</span>' + (m.vision ? '<span class="badge success">reads photos</span>'
+            : '<span class="badge">text only</span>') + '</div>').join('') + '</div>'
+          : '<p class="t3">No models available</p>') +
+        '<p class="t3" style="margin-top:12px">' + seeing.length + ' of ' + p.models.length +
+        ' can accept an image &middot; <span style="font-family:ui-monospace,Menlo,monospace">' +
+        esc(p.url) + '</span></p>' +
+      '</div>' : '') + '</div>';
+  }).join('');
+}
+
+function renderFallback() {
+  document.getElementById('fallback').innerHTML = '<div class="card p16">' +
+    '<h4 class="card-h" style="font-weight:600">Fallback Order</h4>' +
+    '<p class="s2" style="margin-bottom:12px">When a provider fails, requests cascade in this order.</p>' +
+    '<ol class="fb">' + S.order.map((id, i) => {
+      const p = S.providers.find(x => x.id === id);
+      return '<li><span class="grip">&#8942;&#8942;</span><span class="num">' + (i + 1) + '</span>' +
+        '<span class="s" style="font-weight:500;flex:1;min-width:0">' + esc(p ? p.name : id) + '</span>' +
+        (p && !p.available ? '<span class="t3">(unavailable)</span>' : '') +
+        '<span class="btns" style="gap:2px">' +
+        '<button class="btn xs" data-a="up" data-id="' + id + '"' + (i === 0 ? ' disabled' : '') + '>&uarr;</button>' +
+        '<button class="btn xs" data-a="down" data-id="' + id + '"' +
+          (i === S.order.length - 1 ? ' disabled' : '') + '>&darr;</button></span></li>';
+    }).join('') + '</ol></div>';
+}
+
+function renderDefaults() {
+  const usable = S.providers.filter(p => p.available && p.models.some(m => m.vision));
+  document.getElementById('defaults').innerHTML = '<div class="card p24">' +
+    '<h4 class="card-h">Default models</h4>' +
+    '<p class="s" style="font-weight:500;margin:12px 0 12px">Descriptions</p>' +
+    '<div class="g2">' +
+      '<label class="fld"><span>Provider</span><select class="in">' +
+        usable.map(p => '<option>' + esc(p.name) + '</option>').join('') + '</select></label>' +
+      '<label class="fld"><span>Model</span><select class="in">' +
+        (usable[0] ? usable[0].models.filter(m => m.vision).map(m => '<option>' + esc(m.id) +
+          '</option>').join('') : '') + '</select></label>' +
+    '</div><div class="btns" style="margin-top:16px">' +
+    '<button class="btn primary">Save</button></div></div>';
+}
+
+let focused = null;
+function render() {
+  document.getElementById('addSurface').innerHTML = VARIANTS[variantIndex].render();
+  renderCards(); renderFallback(); renderDefaults(); renderSwitcher();
+  if (focused) {
+    const el = document.querySelector('[data-field="' + focused.field + '"]');
+    if (el) { el.focus();
+      if (el.setSelectionRange && focused.caret != null) {
+        try { el.setSelectionRange(focused.caret, focused.caret); } catch (_) {} } }
+  }
+}
+
+/* ---------- variant switcher ---------- */
+let variantIndex = (function () {
+  const k = new URLSearchParams(location.search).get('variant');
+  const i = VARIANTS.findIndex(v => v.key === String(k || '').toUpperCase());
+  return i === -1 ? 0 : i;
+})();
+
+function setVariant(i) {
+  variantIndex = (i + VARIANTS.length) % VARIANTS.length;
+  const u = new URL(location.href);
+  u.searchParams.set('variant', VARIANTS[variantIndex].key);
+  history.replaceState(null, '', u);
+  S = seed();
+  focused = null;
+  render();
+}
+
+function renderSwitcher() {
+  const v = VARIANTS[variantIndex];
+  document.getElementById('switcher').innerHTML =
+    '<button data-a="prev" aria-label="Previous variant">&#8249;</button>' +
+    '<span class="lbl">' + v.key + ' <em>&mdash; ' + esc(v.name) + '</em></span>' +
+    '<button data-a="next" aria-label="Next variant">&#8250;</button>';
+}
+
+document.addEventListener('keydown', e => {
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if (e.key === 'ArrowLeft') setVariant(variantIndex - 1);
+  if (e.key === 'ArrowRight') setVariant(variantIndex + 1);
+});
+
+document.addEventListener('input', e => {
+  const f = e.target.getAttribute && e.target.getAttribute('data-field');
+  if (!f) return;
+  focused = { field: f, caret: e.target.selectionStart };
+  if (f === 'shelfKey') S.shelfKey = e.target.value; else S.form[f] = e.target.value;
+  render();
+});
+document.addEventListener('change', e => {
+  const f = e.target.getAttribute && e.target.getAttribute('data-field');
+  if (!f || e.target.tagName !== 'SELECT') return;
+  focused = null;
+  S.form[f] = e.target.value;
+  render();
+});
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-a]');
+  if (!b) return;
+  const a = b.getAttribute('data-a');
+  if (a !== 'tick') focused = null;
+  if (a !== 'toggle' && a !== 'up' && a !== 'down') S.freshId = null;
+
+  if (a === 'prev') return setVariant(variantIndex - 1);
+  if (a === 'next') return setVariant(variantIndex + 1);
+  if (a === 'seg') { S.segment = b.getAttribute('data-k'); S.toast = null; S.shelfOpen = null; }
+  if (a === 'scan') { runScan(); S.toast = null; }
+  if (a === 'tick') {
+    const i = b.getAttribute('data-i');
+    S.scan.picked[i] = !S.scan.picked[i];
+  }
+  if (a === 'scan-add') {
+    const chosen = Object.keys(S.scan.picked).filter(k => S.scan.picked[k]).map(k => S.scan.found[k]);
+    let n = 0;
+    chosen.forEach(x => { if (addProvider({ name: x.name, url: x.url, auth: x.auth })) n++; });
+    if (n) S.toast = { ok: true, text: n + (n === 1 ? ' provider' : ' providers') +
+      ' added without you typing an address. See the cards below.' };
+    runScan();
+  }
+  if (a === 'shelf') {
+    const k = b.getAttribute('data-k');
+    S.shelfOpen = S.shelfOpen === k ? null : k;
+    S.shelfKey = ''; S.toast = null;
+  }
+  if (a === 'shelf-add') {
+    const p = SHELF.find(x => x.key === S.shelfOpen);
+    const envName = { openrouter: 'OPENROUTER_API_KEY', groq: 'GROQ_API_KEY' }[p.key];
+    const secret = S.shelfKey.trim() || (envName ? ENV[envName] : '');
+    const auth = p.auth ? { mode: 'bearer', secret: secret } : { mode: 'none' };
+    if (addProvider({ name: p.name, url: p.url, auth: auth })) { S.shelfOpen = null; S.shelfKey = ''; }
+    if (S.scan.ran) runScan();
+  }
+  if (a === 'form-add') {
+    const f = S.form;
+    const auth = f.authMode === 'none' ? { mode: 'none' }
+      : { mode: f.authMode, headerName: f.headerName.trim(), secret: f.secret.trim() };
+    if (addProvider({ name: f.name.trim(), url: f.url, auth: auth })) {
+      S.form = seed().form; S.shelfOpen = null;
+    }
+    if (S.scan.ran) runScan();
+  }
+  if (a === 'toggle') {
+    const id = b.getAttribute('data-id');
+    S.expanded = S.expanded === id ? null : id;
+  }
+  if (a === 'up' || a === 'down') {
+    const id = b.getAttribute('data-id');
+    const i = S.order.indexOf(id), j = a === 'up' ? i - 1 : i + 1;
+    if (j >= 0 && j < S.order.length) { S.order[i] = S.order[j]; S.order[j] = id; }
+  }
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
