@@ -25,6 +25,7 @@ import {
   supersedePreviousCurrentScores,
   type PerspectiveRow,
 } from '../db/library/scores.js';
+import { clearStaleScore, isScoreStale } from '../db/library/vision-stale.js';
 import { libraryWrite } from '../db/library/write.js';
 import { VIDEO_EXTENSIONS } from '../imaging/raw-decode.js';
 import type { ProviderRegistry } from '../providers/registry.js';
@@ -76,7 +77,8 @@ export async function scoreImageForPerspective(
   opts: ScoreOptions = {},
 ): Promise<VisionOpOutcome> {
   const imageType = opts.imageType ?? 'catalog';
-  const force = Boolean(opts.force);
+  // A score made from a since-turned cache image is replaced like a forced one.
+  const force = Boolean(opts.force) || isScoreStale(db, imageKey, perspectiveSlug);
 
   if (imageType !== 'catalog') {
     return new VisionOpOutcome('failed', `Invalid image_type: '${imageType}'`);
@@ -173,6 +175,7 @@ export async function scoreImageForPerspective(
               repaired_from_malformed: repaired ? 1 : 0,
               not_attempted: parsed.not_attempted ? 1 : 0,
             });
+            clearStaleScore(db, imageKey, perspectiveSlug);
           },
           { log: opts.logCallback ?? undefined },
         );

@@ -16,6 +16,8 @@ export interface VisionCacheRow {
   phash: string | null;
   compressed_at: string | null;
   original_mtime: number | null;
+  /** The code the JPEG was turned to; `NULL` on rows cached before turning existed. */
+  orientation: string | null;
 }
 
 /** The cached compressed-image row for a catalog key. */

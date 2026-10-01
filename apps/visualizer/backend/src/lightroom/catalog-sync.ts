@@ -25,9 +25,14 @@ import {
   getImageById,
   getKeywordsForFileId,
   listCatalogFileIds,
+  listCatalogOrientations,
   resolveCatalogLockingMode,
   type CatalogRecord,
 } from './reader.js';
+import {
+  refreshImageOrientations,
+  type OrientationRefreshResult,
+} from '../vision/orientation-refresh.js';
 
 export const CATALOG_LOCKED_MSG =
   'Cannot read Lightroom catalog: another process holds the catalog open. ' +
@@ -50,6 +55,10 @@ export interface CatalogSyncResult {
   missing_ids_count: number;
   /** Rows whose `images.keywords` were rewritten from the catalog. */
   keywords_backfilled: number;
+  /** Rows whose `images.orientation` changed. */
+  orientations_updated: number;
+  /** Of those, images whose outputs were marked stale and whose cache JPEG must be rebuilt. */
+  orientation_stale: number;
 }
 
 function isCatalogLockedError(e: unknown): boolean {
@@ -209,6 +218,17 @@ export async function syncCatalog(
 
     const added = records.length ? libraryWrite(libDb, () => storeImagesBatch(libDb, records)) : 0;
 
+    // Every run rather than only for new ids: a photo turned in Lightroom after it
+    // was synced has a stale cache JPEG and outputs made from it.
+    let orientation: OrientationRefreshResult = { updated: 0, stale: 0 };
+    if (!cancelled) {
+      orientation = await refreshImageOrientations(libDb, listCatalogOrientations(catalogConn));
+      log(
+        'info',
+        `[catalog-sync] orientation updated=${orientation.updated} stale=${orientation.stale}`,
+      );
+    }
+
     let keywordsBackfilled = 0;
     const forceKeywordBackfill = opts.backfillKeywords === true;
     const autoKeywordBackfill =
@@ -262,6 +282,8 @@ export async function syncCatalog(
         library_total: libraryIds.size,
         missing_ids_count: totalMissing,
         keywords_backfilled: keywordsBackfilled,
+        orientations_updated: orientation.updated,
+        orientation_stale: orientation.stale,
       },
       cancelled,
     };

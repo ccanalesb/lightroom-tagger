@@ -16,7 +16,10 @@ import { nowIsoUtc } from '../../utils/datetime.js';
 import { markdownMarksOptional } from './scores.js';
 
 /** `PRAGMA user_version` for a database created by this module. */
-export const LIBRARY_SCHEMA_VERSION = 9;
+export const LIBRARY_SCHEMA_VERSION = 10;
+
+/** The oldest version `upgradeLibrarySchema` can bring forward. */
+const OLDEST_UPGRADABLE_VERSION = 8;
 
 /** Set after the one-time Lightroom keyword backfill in `catalog_sync`. */
 export const KEYWORDS_BACKFILL_META_KEY = 'keywords_backfilled_v1';
@@ -30,6 +33,20 @@ export const KEYWORDS_BACKFILL_META_KEY = 'keywords_backfilled_v1';
  * Absent on a library synced before this key existed.
  */
 export const SYNCED_CATALOG_META_KEY = 'synced_catalog_path';
+
+/**
+ * Descriptions and scores made from a vision-cache image that has since been
+ * turned. `output` is `description` or `score:<perspective slug>`. A row keeps the
+ * old output on show while the describe and score jobs treat it as not done; the
+ * write that replaces it deletes the row.
+ */
+const VISION_STALE_SQL = `
+CREATE TABLE IF NOT EXISTS vision_stale (
+    image_key TEXT NOT NULL,
+    output TEXT NOT NULL,
+    PRIMARY KEY (image_key, output)
+);
+`;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS images (
@@ -63,7 +80,10 @@ CREATE TABLE IF NOT EXISTS images (
     analyzed_at TEXT,
     phash TEXT,
     exif TEXT,
-    catalog_path TEXT DEFAULT ''
+    catalog_path TEXT DEFAULT '',
+    -- Lightroom's Adobe_images.orientation. Last because version 10 added it with
+    -- ALTER TABLE, and column order is the key order of a SELECT * row.
+    orientation TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_images_filepath ON images(filepath);
@@ -76,8 +96,13 @@ CREATE TABLE IF NOT EXISTS vision_cache (
     compressed_path TEXT,
     phash TEXT,
     compressed_at TEXT,
-    original_mtime REAL
+    original_mtime REAL,
+    -- The orientation code the cached JPEG was turned to. NULL on rows cached
+    -- before version 10, which were never turned.
+    orientation TEXT
 );
+
+${VISION_STALE_SQL}
 
 CREATE TABLE IF NOT EXISTS image_descriptions (
     image_key TEXT PRIMARY KEY,
@@ -279,10 +304,10 @@ function userVersion(db: Db): number {
  */
 function assertNotLegacy(db: Db, path: string): void {
   const version = userVersion(db);
-  if (version >= LIBRARY_SCHEMA_VERSION) return;
+  if (version >= OLDEST_UPGRADABLE_VERSION) return;
   if (!tableExists(db, 'images')) return;
   throw new Error(
-    `${path} is at schema version ${version}, below the current ${LIBRARY_SCHEMA_VERSION}. ` +
+    `${path} is at schema version ${version}, below ${OLDEST_UPGRADABLE_VERSION}. ` +
       'The TypeScript CLI does not carry the upgrade migrations; run the Python ' +
       '`lightroom-tagger init` against it once first.',
   );
@@ -304,21 +329,40 @@ export function setLibraryMeta(db: Db, key: string, value: string): void {
   ).run(key, value);
 }
 
-/** Upgrade an existing `library.db` to the current schema version. Idempotent. */
+/** `ALTER TABLE … ADD COLUMN`, skipped when the table is absent or already has it. */
+function addColumnIfMissing(db: Db, table: string, columnDef: string): void {
+  if (!tableExists(db, table)) return;
+  const name = columnDef.split(' ')[0]!;
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (columns.some((c) => c.name === name)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${columnDef}`);
+}
+
+/**
+ * Upgrade an existing `library.db` to the current schema version. Idempotent, and
+ * a no-op on a database with no tables yet.
+ */
 export function upgradeLibrarySchema(db: Db): void {
   const version = userVersion(db);
   if (version >= LIBRARY_SCHEMA_VERSION) return;
-  if (version === 8) {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS library_meta (
-          key TEXT PRIMARY KEY,
-          value TEXT NOT NULL
-      );
-    `);
-    db.pragma(`user_version = ${LIBRARY_SCHEMA_VERSION}`);
-    return;
-  }
   assertNotLegacy(db, 'library.db');
+  if (version < OLDEST_UPGRADABLE_VERSION) return;
+  db.transaction(() => {
+    if (version < 9) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS library_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+      `);
+    }
+    if (version < 10) {
+      addColumnIfMissing(db, 'images', 'orientation TEXT');
+      addColumnIfMissing(db, 'vision_cache', 'orientation TEXT');
+      db.exec(VISION_STALE_SQL);
+    }
+    db.pragma(`user_version = ${LIBRARY_SCHEMA_VERSION}`);
+  })();
 }
 
 /** Create every table and index at the current version. Idempotent; seeds nothing. */
@@ -338,6 +382,8 @@ export function initLibraryDb(path: string): Db {
   const db = openLibraryDb(path);
   try {
     assertNotLegacy(db, path);
+    // Before the CREATEs: they would stamp the current version on old tables.
+    upgradeLibrarySchema(db);
     createLibrarySchema(db);
     seedPerspectivesFromPromptsDir(db);
   } catch (e) {

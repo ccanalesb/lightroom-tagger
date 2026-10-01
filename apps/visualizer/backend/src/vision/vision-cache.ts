@@ -12,15 +12,22 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve, sep } from 'node:path';
 import { config, loadLibraryConfig } from '../config.js';
 import type { Db } from '../db/connection.js';
-import { getCatalogImagesMissingCache } from '../db/library/catalog.js';
+import { getCatalogImagesMissingCache, getImageOrientation } from '../db/library/catalog.js';
 import {
   getVisionCachedImage,
   VISION_CACHE_OVERSIZED_SENTINEL,
+  type VisionCacheRow,
 } from '../db/library/vision-cache.js';
 import { libraryWrite } from '../db/library/write.js';
 import { nowIsoLocal } from '../utils/datetime.js';
 import { resolveCatalogPath } from '../utils/path-resolve.js';
 import { compressImage, getViewablePathManaged, isRawPath, isVideoPath } from '../imaging/image-prep.js';
+import {
+  normalizeOrientation,
+  remainingOrientation,
+  UPRIGHT,
+  type OrientationCode,
+} from '../imaging/orientation.js';
 import { phashFromFile } from '../imaging/phash-file.js';
 
 /**
@@ -76,22 +83,29 @@ function storeVisionCachedImage(
   compressedPath: string,
   phash: string | null,
   originalMtime: number,
+  orientation: OrientationCode,
 ): void {
   libraryWrite(db, () => {
     db.prepare(
       `
-      INSERT INTO vision_cache (key, compressed_path, phash, compressed_at, original_mtime)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO vision_cache (key, compressed_path, phash, compressed_at, original_mtime, orientation)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(key) DO UPDATE SET
           compressed_path=excluded.compressed_path, phash=excluded.phash,
-          compressed_at=excluded.compressed_at, original_mtime=excluded.original_mtime
+          compressed_at=excluded.compressed_at, original_mtime=excluded.original_mtime,
+          orientation=excluded.orientation
       `,
-    ).run(catalogKey, compressedPath, phash, nowIsoLocal(), originalMtime);
+    ).run(catalogKey, compressedPath, phash, nowIsoLocal(), originalMtime, orientation);
   });
 }
 
+/** Whether a cache row's JPEG is turned the way the photo currently shows in Lightroom. */
+function cacheOrientationCurrent(db: Db, catalogKey: string, cached: VisionCacheRow): boolean {
+  return normalizeOrientation(cached.orientation) === getImageOrientation(db, catalogKey);
+}
+
 /**
- * Whether the cached entry is still valid, by original mtime.
+ * Whether the cached entry is still valid, by orientation and original mtime.
  *
  * Three special cases, all of them earned. A video is never valid — it cannot be
  * described. A RAW whose cache path *is* the original means a failed conversion,
@@ -105,6 +119,7 @@ export async function isVisionCacheValid(
 ): Promise<boolean> {
   const cached = getVisionCachedImage(db, catalogKey);
   if (!cached) return false;
+  if (!cacheOrientationCurrent(db, catalogKey, cached)) return false;
   const comp = cached.compressed_path ?? '';
 
   if (isVideoPath(originalPath)) return false;
@@ -139,8 +154,9 @@ export async function getOrCreateCachedImage(
   originalPath: string,
 ): Promise<string | null> {
   const cfg = loadLibraryConfig(config.LT_CONFIG_YAML);
+  const orientation = getImageOrientation(db, catalogKey);
   // Cache disabled: compress on the fly and hand back a temp file.
-  if (!cfg.visionCacheEnabled) return compressImage(originalPath);
+  if (!cfg.visionCacheEnabled) return compressImage(originalPath, { orientation });
 
   const cacheDir = cfg.visionCacheDir;
   await mkdir(cacheDir, { recursive: true });
@@ -163,7 +179,9 @@ export async function getOrCreateCachedImage(
     const viewable = await getViewablePathManaged(originalPath);
     if (viewable.isTemp) tempFiles.add(viewable.path);
 
-    const compressed = await compressImage(viewable.path);
+    const compressed = await compressImage(viewable.path, {
+      orientation: remainingOrientation(orientation, viewable.orientation),
+    });
     if (compressed !== viewable.path) tempFiles.add(compressed);
 
     // Hashed from the *viewable* image, not the compressed one: the phash has to
@@ -181,10 +199,13 @@ export async function getOrCreateCachedImage(
           VISION_CACHE_OVERSIZED_SENTINEL,
           null,
           originalMtime,
+          orientation,
         );
         return null;
       }
-      storeVisionCachedImage(db, catalogKey, originalPath, phash, originalMtime);
+      // The original's own pixels, unturned: a turned photo stays invalid and is
+      // retried, rather than being described sideways.
+      storeVisionCachedImage(db, catalogKey, originalPath, phash, originalMtime, UPRIGHT);
       return originalPath;
     }
 
@@ -199,11 +220,12 @@ export async function getOrCreateCachedImage(
         VISION_CACHE_OVERSIZED_SENTINEL,
         null,
         originalMtime,
+        orientation,
       );
       return null;
     }
 
-    storeVisionCachedImage(db, catalogKey, targetPath, phash, originalMtime);
+    storeVisionCachedImage(db, catalogKey, targetPath, phash, originalMtime, orientation);
     return targetPath;
   } finally {
     for (const tf of tempFiles) {
@@ -236,6 +258,9 @@ export async function resolveVisionImage(
   const rec = getVisionCachedImage(db, catalogKey);
   const cachePath = rec?.compressed_path ?? null;
   if (
+    rec &&
+    // Turned the wrong way, it would be described sideways; wait for the NAS.
+    cacheOrientationCurrent(db, catalogKey, rec) &&
     cachePath &&
     cachePath !== VISION_CACHE_OVERSIZED_SENTINEL &&
     existsSync(cachePath)

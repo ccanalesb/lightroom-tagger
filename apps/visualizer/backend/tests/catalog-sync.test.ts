@@ -3,6 +3,8 @@
  * real `.lrcat` SQLite fixture.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import Database from 'better-sqlite3';
+import sharp from 'sharp';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -355,8 +357,9 @@ describe('syncCatalog', () => {
       [100, 'Catalog sync complete'],
     ]);
     expect(logs[0]).toContain('catalog_total=2 library_total=0 missing=2 stale=0');
-    expect(logs[1]).toContain('keyword_backfill mode=auto rows=2');
-    expect(logs[2]).toContain('complete added=2 stale=0 keywords_backfilled=2');
+    expect(logs[1]).toContain('orientation updated=0 stale=0');
+    expect(logs[2]).toContain('keyword_backfill mode=auto rows=2');
+    expect(logs[3]).toContain('complete added=2 stale=0 keywords_backfilled=2');
   });
 
   it('stops on cancellation and keeps what it already fetched', async () => {
@@ -484,5 +487,137 @@ describe('catalog_sync handler', () => {
     // Read-only open succeeds; SQLite's own error on first query, not the wrapped catalog message.
     expect(job.error).toBe('file is not a database');
     expect(job.error_severity).toBe('error');
+  });
+});
+
+describe('orientation refresh', () => {
+  const KEY = '2024-06-01_a';
+
+  const setCatalogOrientation = (code: string): void => {
+    const conn = new Database(lrcatPath);
+    conn.prepare('UPDATE Adobe_images SET orientation = ?').run(code);
+    conn.close();
+  };
+
+  /** A cache row plus a described, scored and embedded image, all made from that JPEG. */
+  const seedOutputs = (db: Db, cache: { path: string; orientation: string | null }): void => {
+    db.prepare(
+      `INSERT INTO vision_cache (key, compressed_path, phash, compressed_at, original_mtime, orientation)
+       VALUES (?, ?, NULL, '2026-01-01T00:00:00', 1, ?)`,
+    ).run(KEY, cache.path, cache.orientation);
+    db.prepare(
+      "INSERT INTO image_descriptions (image_key, image_type, summary) VALUES (?, 'catalog', 'sideways')",
+    ).run(KEY);
+    db.prepare(
+      `INSERT INTO image_scores (image_key, perspective_slug, score, prompt_version, scored_at)
+       VALUES (?, 'framing', 4, 'framing:v1', '2026-01-01T00:00:00+00:00')`,
+    ).run(KEY);
+    db.prepare('INSERT INTO image_clip_embeddings (embedding, image_key) VALUES (?, ?)').run(
+      Buffer.from(new Float32Array(512).fill(0.1).buffer),
+      KEY,
+    );
+  };
+
+  const staleOutputs = (db: Db): string[] =>
+    (
+      db.prepare('SELECT output FROM vision_stale WHERE image_key = ? ORDER BY output').all(KEY) as {
+        output: string;
+      }[]
+    ).map((r) => r.output);
+
+  const embedded = (db: Db): boolean =>
+    db.prepare('SELECT 1 FROM image_clip_embeddings WHERE image_key = ?').get(KEY) !== undefined;
+
+  const writeJpeg = async (name: string, width: number, height: number): Promise<string> => {
+    const path = join(dir, name);
+    await sharp({ create: { width, height, channels: 3, background: '#808080' } })
+      .jpeg()
+      .toFile(path);
+    return path;
+  };
+
+  it('stores each photo’s Lightroom code', async () => {
+    makeFakeCatalog(lrcatPath, [
+      { id: 1, baseName: 'a', orientation: 'BC' },
+      { id: 2, baseName: 'b' },
+    ]);
+
+    const { result } = await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
+
+    expect(fx.query('SELECT key, orientation FROM images ORDER BY key')).toEqual([
+      { key: '2024-06-01_a', orientation: 'BC' },
+      { key: '2024-06-01_b', orientation: 'AB' },
+    ]);
+    // Freshly added rows carry their code already; nothing changed under them.
+    expect(result.orientations_updated).toBe(0);
+  });
+
+  it('retires what was made from the old JPEG when a photo is turned in Lightroom', async () => {
+    makeFakeCatalog(lrcatPath, [{ id: 1, baseName: 'a' }]);
+    await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
+    const jpeg = await writeJpeg('a.jpg', 30, 20);
+    withLibrary((db) => seedOutputs(db, { path: jpeg, orientation: 'AB' }));
+
+    setCatalogOrientation('DA');
+    const { result } = await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
+
+    expect(result).toMatchObject({ orientations_updated: 1, orientation_stale: 1 });
+    withLibrary((db) => {
+      expect(staleOutputs(db)).toEqual(['description', 'score:framing']);
+      expect(embedded(db)).toBe(false);
+      // The old outputs stay on show until replaced.
+      expect(db.prepare('SELECT summary FROM image_descriptions').get()).toEqual({
+        summary: 'sideways',
+      });
+    });
+
+    // A second run sees no change and marks nothing again.
+    withLibrary((db) => db.prepare('DELETE FROM vision_stale').run());
+    const again = await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
+    expect(again.result).toMatchObject({ orientations_updated: 0, orientation_stale: 0 });
+    withLibrary((db) => expect(staleOutputs(db)).toEqual([]));
+  });
+
+  it('keeps a pre-orientation cache JPEG the decoder already turned upright', async () => {
+    makeFakeCatalog(lrcatPath, [{ id: 1, baseName: 'a', orientation: 'BC' }]);
+    await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
+    // Stored pixels are 6000×4000 (the fake catalog's size); turned upright they are tall.
+    const tall = await writeJpeg('a.jpg', 20, 30);
+    withLibrary((db) => {
+      db.prepare('UPDATE images SET orientation = NULL').run();
+      seedOutputs(db, { path: tall, orientation: null });
+    });
+
+    const { result } = await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
+
+    expect(result).toMatchObject({ orientations_updated: 1, orientation_stale: 0 });
+    withLibrary((db) => {
+      expect(staleOutputs(db)).toEqual([]);
+      expect(embedded(db)).toBe(true);
+      expect(db.prepare('SELECT orientation FROM vision_cache').get()).toEqual({
+        orientation: 'BC',
+      });
+    });
+  });
+
+  it('retires a pre-orientation cache JPEG stored sideways', async () => {
+    makeFakeCatalog(lrcatPath, [{ id: 1, baseName: 'a', orientation: 'BC' }]);
+    await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
+    const wide = await writeJpeg('a.jpg', 30, 20);
+    withLibrary((db) => {
+      db.prepare('UPDATE images SET orientation = NULL').run();
+      seedOutputs(db, { path: wide, orientation: null });
+    });
+
+    const { result } = await withLibraryAsync((db) => syncCatalog(lrcatPath, db));
+
+    expect(result).toMatchObject({ orientations_updated: 1, orientation_stale: 1 });
+    withLibrary((db) => {
+      expect(staleOutputs(db)).toEqual(['description', 'score:framing']);
+      expect(embedded(db)).toBe(false);
+      expect(db.prepare('SELECT orientation FROM vision_cache').get()).toEqual({
+        orientation: null,
+      });
+    });
   });
 });

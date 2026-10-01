@@ -6,6 +6,7 @@
  * `browser-shims.ts`.
  */
 import { readFile } from 'node:fs/promises';
+import { orientationFromLibrawFlip, type OrientationCode } from '../orientation.js';
 import { installBrowserShims } from './browser-shims.js';
 
 export interface DecodedRaw {
@@ -13,11 +14,14 @@ export interface DecodedRaw {
   width: number;
   height: number;
   channels: number;
+  /** The camera's orientation tag, which LibRaw has already applied to `data`. */
+  orientation: OrientationCode;
 }
 
 /** The slice of libraw-wasm's surface this module uses. */
 interface LibRawHandle {
   open(bytes: Uint8Array, opts?: Record<string, unknown>): Promise<unknown>;
+  metadata(): Promise<{ flip?: number } | undefined>;
   imageData(): Promise<
     | {
         width: number;
@@ -76,6 +80,7 @@ async function decodeWith(
     useCameraWb: true,
     outputBps: 8,
   });
+  const meta = await libraw.metadata();
   const image = await libraw.imageData();
   if (!image) throw new Error(`libraw returned no image data for ${rawPath}`);
 
@@ -93,5 +98,6 @@ async function decodeWith(
     width,
     height,
     channels: colors,
+    orientation: orientationFromLibrawFlip(meta?.flip),
   };
 }

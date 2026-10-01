@@ -18,6 +18,8 @@ export interface CatalogFile {
   gpsLatitude?: number | null;
   focalLength?: number | null;
   caption?: string | null;
+  /** `Adobe_images.orientation`; Lightroom writes `AB` for an unturned photo. */
+  orientation?: string | null;
 }
 
 export interface FakeCatalogOptions {
@@ -52,7 +54,8 @@ export function makeFakeCatalog(
     );
     CREATE TABLE Adobe_images (
       id_local INTEGER PRIMARY KEY, rootFile INTEGER, rating REAL, pick REAL,
-      colorLabels TEXT, fileWidth INTEGER, fileHeight INTEGER, captureTime TEXT
+      colorLabels TEXT, fileWidth INTEGER, fileHeight INTEGER, captureTime TEXT,
+      orientation TEXT
     );
     CREATE TABLE AgHarvestedExifMetadata (
       image INTEGER, aperture REAL, focalLength REAL, shutterSpeed REAL,
@@ -72,8 +75,8 @@ export function makeFakeCatalog(
   );
   const insertImage = db.prepare(
     `INSERT INTO Adobe_images
-       (id_local, rootFile, rating, pick, colorLabels, fileWidth, fileHeight, captureTime)
-     VALUES (?, ?, ?, ?, 'blue', 6000, 4000, ?)`,
+       (id_local, rootFile, rating, pick, colorLabels, fileWidth, fileHeight, captureTime, orientation)
+     VALUES (?, ?, ?, ?, 'blue', 6000, 4000, ?, ?)`,
   );
   const insertExif = db.prepare(
     `INSERT INTO AgHarvestedExifMetadata
@@ -97,6 +100,7 @@ export function makeFakeCatalog(
       f.rating ?? null,
       f.pick ?? null,
       f.captureTime === undefined ? '2024-06-01T12:00:00' : f.captureTime,
+      f.orientation === undefined ? 'AB' : f.orientation,
     );
     insertExif.run(imageId, f.focalLength ?? 35, f.gpsLatitude ?? 42.36);
     insertIptc.run(imageId, f.caption ?? null);

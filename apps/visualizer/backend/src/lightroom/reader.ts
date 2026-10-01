@@ -138,6 +138,8 @@ export interface CatalogRecord {
   width: number;
   height: number;
   file_size: number;
+  /** `Adobe_images.orientation`, e.g. `AB` (as stored) or `BC` (turned clockwise). */
+  orientation: string | null;
 }
 
 /**
@@ -158,6 +160,7 @@ const IMAGE_METADATA_SQL = `
         img.colorLabels as color_label,
         img.fileWidth as width,
         img.fileHeight as height,
+        img.orientation as orientation,
 
         img.captureTime as date_taken,
 
@@ -242,6 +245,7 @@ export function getImageById(conn: Db, imageId: number): CatalogRecord | null {
     width: (row['width'] as number) || 0,
     height: (row['height'] as number) || 0,
     file_size: 0,
+    orientation: (row['orientation'] as string | null) ?? null,
   };
   record.key = generateRecordKey(record);
   return record;
@@ -274,6 +278,17 @@ export function getImageRecords(conn: Db, limit?: number | null): CatalogRecord[
     if (record) records.push(record);
   }
   return records;
+}
+
+/** `Adobe_images.orientation` for every catalog file, in one query. */
+export function listCatalogOrientations(conn: Db): Map<number, string | null> {
+  const rows = conn
+    .prepare(
+      `SELECT f.id_local AS id, img.orientation AS orientation
+       FROM AgLibraryFile f LEFT JOIN Adobe_images img ON img.rootFile = f.id_local`,
+    )
+    .all() as { id: number; orientation: string | null }[];
+  return new Map(rows.map((r) => [Number(r.id), r.orientation ?? null]));
 }
 
 /** Every `AgLibraryFile.id_local` in the catalog — the set-difference input. */
