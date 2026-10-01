@@ -10,6 +10,7 @@ import { existsSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import sharp from 'sharp';
+import { applyOrientation, UPRIGHT, type OrientationCode } from './orientation.js';
 import { convertRawToJpg, isRawPath } from './raw-decode.js';
 
 export { RAW_EXTENSIONS, VIDEO_EXTENSIONS, isRawPath, isVideoPath } from './raw-decode.js';
@@ -45,7 +46,13 @@ export async function makeTempJpgPath(): Promise<string> {
  */
 export async function compressImage(
   inputPath: string,
-  opts: { maxSize?: number; quality?: number; silent?: boolean } = {},
+  opts: {
+    maxSize?: number;
+    quality?: number;
+    silent?: boolean;
+    /** Applied to the pixels as stored; sharp ignores the file's EXIF orientation. */
+    orientation?: OrientationCode;
+  } = {},
 ): Promise<string> {
   const maxSize = opts.maxSize ?? VISION_MAX_DIMENSION;
   const quality = opts.quality ?? VISION_COMPRESS_QUALITY;
@@ -54,10 +61,13 @@ export async function compressImage(
     const image = sharp(inputPath, { failOn: 'none' });
     const meta = await image.metadata();
 
-    const pipeline = image
-      // 16-bit and floating-point samples cannot be written as JPEG.
-      .removeAlpha()
-      .toColourspace('srgb');
+    const pipeline = applyOrientation(
+      image
+        // 16-bit and floating-point samples cannot be written as JPEG.
+        .removeAlpha()
+        .toColourspace('srgb'),
+      opts.orientation ?? UPRIGHT,
+    );
 
     // Only shrink. `withoutEnlargement` is a no-op when the image already fits.
     if ((meta.width ?? 0) > maxSize || (meta.height ?? 0) > maxSize) {
@@ -98,6 +108,8 @@ export async function compressImage(
 export interface ViewablePath {
   path: string;
   isTemp: boolean;
+  /** What has already been done to the stored pixels: LibRaw's camera turn, else nothing. */
+  orientation: OrientationCode;
 }
 
 /**
@@ -109,20 +121,20 @@ export interface ViewablePath {
  * other tools write `.jpg`.
  */
 export async function getViewablePathManaged(imagePath: string): Promise<ViewablePath> {
-  if (!isRawPath(imagePath)) return { path: imagePath, isTemp: false };
+  if (!isRawPath(imagePath)) return { path: imagePath, isTemp: false, orientation: UPRIGHT };
 
   const stem = imagePath.slice(0, imagePath.lastIndexOf('.'));
   for (const sidecar of [`${stem}.JPG`, `${stem}.jpg`]) {
-    if (existsSync(sidecar)) return { path: sidecar, isTemp: false };
+    if (existsSync(sidecar)) return { path: sidecar, isTemp: false, orientation: UPRIGHT };
   }
 
   const converted = await convertRawToJpg(imagePath, makeTempJpgPath);
-  if (converted) return { path: converted, isTemp: true };
+  if (converted) return { path: converted.path, isTemp: true, orientation: converted.orientation };
 
   // Decode failed: hand back the RAW. `compressImage` will fail on it and
   // return it unchanged, and the provider will reject it — a clear failure
   // rather than a silent skip.
-  return { path: imagePath, isTemp: false };
+  return { path: imagePath, isTemp: false, orientation: UPRIGHT };
 }
 
 /** The viewable path only, for callers that do not manage temp files. */

@@ -10,6 +10,7 @@
  */
 import type { JobLogLevel } from '../../db/jobs/jobs.js';
 import { getPerspectiveBySlug, listPerspectives } from '../../db/library/scores.js';
+import { staleScoreLabels } from '../../db/library/vision-stale.js';
 import type { CancelCheck } from '../../providers/retry.js';
 import { computePromptVersion, scoreImageForPerspective } from '../../vision/scoring-service.js';
 import { VisionOpOutcome } from '../../vision/vision-op.js';
@@ -305,12 +306,17 @@ export async function runScorePass(
     if (row) promptVersions.set(slug, computePromptVersion(row));
   }
 
+  // Made from a since-turned cache image: not done, whatever `image_scores` says.
+  const stale = staleScoreLabels(db);
+  const isDone = (done: Set<string>, [k, t, s]: [string, string, string]): boolean =>
+    done.has(tripletLabel(k, t, s)) && !stale.has(`${k}|${s}`);
+
   // A pre-filter in SQL rather than a skip per triple: on a catalog that is mostly
   // scored this turns tens of thousands of provider round-trips into none.
   if (!force && pending.length > 0 && promptVersions.size > 0) {
     const done = currentScoreLabels(db, promptVersions, null);
     const before = pending.length;
-    pending = pending.filter(([k, t, s]) => !done.has(tripletLabel(k, t, s)));
+    pending = pending.filter((triple) => !isDone(done, triple));
     const skippedByDb = before - pending.length;
     if (skippedByDb) {
       log('info', `Skipped ${skippedByDb} already-scored triplets (DB pre-filter)`);
@@ -320,7 +326,7 @@ export async function runScorePass(
   if (redoUnlessModel !== null && pending.length > 0 && promptVersions.size > 0) {
     const done = currentScoreLabels(db, promptVersions, redoUnlessModel);
     const before = pending.length;
-    pending = pending.filter(([k, t, s]) => !done.has(tripletLabel(k, t, s)));
+    pending = pending.filter((triple) => !isDone(done, triple));
     log(
       'info',
       `model-scoped re-do (redo_unless_model=${redoUnlessModel}): skipped ` +

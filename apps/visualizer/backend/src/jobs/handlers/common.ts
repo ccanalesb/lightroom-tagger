@@ -3,6 +3,7 @@
  */
 import { openLibraryDb, type Db } from '../../db/connection.js';
 import type { JobLogLevel } from '../../db/jobs/jobs.js';
+import { upgradeLibrarySchema } from '../../db/library/bootstrap.js';
 import { AuthenticationError, InvalidRequestError } from '../../providers/errors.js';
 import type { AnalyzeStage } from '../checkpoint.js';
 import { requireLibraryDb } from '../library-db.js';
@@ -32,6 +33,7 @@ export function resolveLibraryDbOrFail(runner: JobRunner, jobId: string): string
 export async function withLibraryDb<T>(path: string, fn: (db: Db) => Promise<T>): Promise<T> {
   const db = openLibraryDb(path);
   try {
+    upgradeLibrarySchema(db);
     return await fn(db);
   } finally {
     db.close();
@@ -287,10 +289,12 @@ export function selectCatalogKeys(
   const params: unknown[] = [];
   const conditions = [CATALOG_NOT_VIDEO_SQL];
 
+  // A description made from a since-turned cache image counts as undescribed.
   let sql = opts.undescribedOnly
     ? "SELECT i.key AS key FROM images i " +
       "LEFT JOIN image_descriptions d ON i.key = d.image_key AND d.image_type = 'catalog' " +
-      'WHERE d.image_key IS NULL'
+      'WHERE (d.image_key IS NULL OR EXISTS (SELECT 1 FROM vision_stale vs ' +
+      "WHERE vs.image_key = i.key AND vs.output = 'description'))"
     : 'SELECT i.key AS key FROM images i WHERE 1=1';
 
   if (opts.excludeVoidSubstance) conditions.push(VOID_SUBSTANCE_SCORING_EXCLUDE_SQL);

@@ -10,6 +10,7 @@ import { extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
 import { decodeRaw, type DecodedRaw } from './libraw/decode.js';
+import type { OrientationCode } from './orientation.js';
 
 export { decodeRaw };
 export type { DecodedRaw };
@@ -46,6 +47,12 @@ export const VIDEO_EXTENSIONS = new Set([
 /** Signature of `decodeRaw`, so a test can drive the retry policy without a RAW. */
 export type RawDecoder = (rawPath: string) => Promise<DecodedRaw>;
 
+/** A rendered RAW and the orientation the decoder already turned it by. */
+export interface ConvertedRaw {
+  path: string;
+  orientation: OrientationCode;
+}
+
 /**
  * Convert a RAW file to a temporary JPEG. Returns `null` when it cannot.
  *
@@ -55,18 +62,18 @@ export async function convertRawToJpg(
   rawPath: string,
   tempPathFactory: () => Promise<string>,
   decode: RawDecoder = decodeRaw,
-): Promise<string | null> {
+): Promise<ConvertedRaw | null> {
   if (!existsSync(rawPath)) return null;
 
   const maxRetries = 3;
   for (let attempt = 0; attempt < maxRetries; attempt += 1) {
     try {
-      const { data, width, height, channels } = await decode(rawPath);
+      const { data, width, height, channels, orientation } = await decode(rawPath);
       const jpgPath = await tempPathFactory();
       await sharp(data, { raw: { width, height, channels: channels as 3 | 4 } })
         .jpeg({ quality: 95 })
         .toFile(jpgPath);
-      return jpgPath;
+      return { path: jpgPath, orientation };
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       // "Too big" is not transient — the file exceeds LibRaw's limits.

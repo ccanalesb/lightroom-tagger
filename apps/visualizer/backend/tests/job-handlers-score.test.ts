@@ -571,6 +571,23 @@ describe('the batch_score handler', () => {
     expect(logMessages(job)).toContain('Skipped 2 already-scored triplets (DB pre-filter)');
   });
 
+  /** A score made from a cache image that was since turned upright is not done. */
+  it('re-scores a stale triple without force, and clears the mark', async () => {
+    await seedPhotos('a', 'b');
+    fx.addPerspectives({ slug: 'street' });
+    expect((await runBatch()).status).toBe('completed');
+    fx.exec("INSERT INTO vision_stale (image_key, output) VALUES ('a', 'score:street')");
+    requestBodies = [];
+    replies = [completion(scoreJson('street', 9))];
+
+    const job = await runBatch();
+
+    expect(batchResult(job)).toMatchObject({ scored: 1, total: 2 });
+    expect(requestBodies).toHaveLength(1);
+    expect(currentScores()).toEqual(['a|street', 'b|street']);
+    expect(fx.query('SELECT * FROM vision_stale')).toEqual([]);
+  });
+
   /** An edited rubric is a different question, so the answers stop counting. */
   it('re-scores when the perspective markdown changed', async () => {
     await seedPhotos('a');

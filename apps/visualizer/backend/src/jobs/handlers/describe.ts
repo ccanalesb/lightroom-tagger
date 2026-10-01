@@ -13,6 +13,7 @@ import { existsSync } from 'node:fs';
 import type { Db } from '../../db/connection.js';
 import { getImage } from '../../db/library/catalog.js';
 import { getImageDescription } from '../../db/library/descriptions.js';
+import { isDescriptionStale, staleDescriptionKeys } from '../../db/library/vision-stale.js';
 import { VIDEO_EXTENSIONS } from '../../imaging/raw-decode.js';
 import type { CancelCheck } from '../../providers/retry.js';
 import { resolveFilepath } from '../../utils/path-resolve.js';
@@ -56,7 +57,7 @@ export interface DescribeAttempt {
 /** A specific reason `describeMatchedImage` declined, for the job log. */
 export function diagnoseDescribeSkip(db: Db, key: string, force: boolean): string {
   try {
-    if (!force && getImageDescription(db, key)) {
+    if (!force && getImageDescription(db, key) && !isDescriptionStale(db, key)) {
       return 'Already described (use force to regenerate)';
     }
     const image = getImage(db, key);
@@ -343,6 +344,9 @@ export async function runDescribePass(
   const pairLabel = (key: string, itype: string): string => `${key}|${itype}`;
   let pending = selection.filter(([k, t]) => !processedPairs.has(pairLabel(k, t)));
 
+  // Made from a since-turned cache image: not done, whatever `image_descriptions` says.
+  const stale = staleDescriptionKeys(db);
+
   // A pre-filter in SQL rather than a skip per image: on a catalog that is mostly
   // described this turns 40,000 provider round-trips into none.
   if (!backfillVisualTags && !force && redoUnlessModel === null && pending.length > 0) {
@@ -352,7 +356,7 @@ export async function runDescribePass(
       ),
     );
     const before = pending.length;
-    pending = pending.filter(([k]) => !described.has(k));
+    pending = pending.filter(([k]) => !described.has(k) || stale.has(k));
     const skippedByDb = before - pending.length;
     if (skippedByDb) {
       log('info', `Skipped ${skippedByDb} already-described images (DB pre-filter)`);
@@ -365,7 +369,7 @@ export async function runDescribePass(
       .all(redoUnlessModel) as { image_key: string; image_type: string }[];
     const doneByTarget = new Set(rows.map((r) => pairLabel(r.image_key, r.image_type)));
     const before = pending.length;
-    pending = pending.filter(([k, t]) => !doneByTarget.has(pairLabel(k, t)));
+    pending = pending.filter(([k, t]) => !doneByTarget.has(pairLabel(k, t)) || stale.has(k));
     log(
       'info',
       `model-scoped re-do (redo_unless_model=${redoUnlessModel}): skipped ` +

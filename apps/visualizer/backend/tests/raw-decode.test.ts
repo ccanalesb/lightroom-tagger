@@ -30,6 +30,7 @@ const okDecoder: RawDecoder = async () => ({
   width: 2,
   height: 2,
   channels: 3,
+  orientation: 'BC',
 });
 
 describe('requestUrl', () => {
@@ -69,13 +70,16 @@ describe('fileUrlFetch', () => {
 });
 
 describe('convertRawToJpg', () => {
-  it('encodes the decoded pixels to the path the factory hands it', async () => {
+  it('encodes the decoded pixels to the path the factory hands it, with the turn LibRaw applied', async () => {
     const dir = await tempDir();
     const out = join(dir, 'out.jpg');
     const src = join(dir, 'in.arw');
     await writeFile(src, 'not really a raw');
 
-    expect(await convertRawToJpg(src, async () => out, okDecoder)).toBe(out);
+    expect(await convertRawToJpg(src, async () => out, okDecoder)).toEqual({
+      path: out,
+      orientation: 'BC',
+    });
     expect((await sharp(await readFile(out)).metadata()).width).toBe(2);
   });
 

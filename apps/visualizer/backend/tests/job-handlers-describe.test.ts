@@ -291,6 +291,22 @@ describe('the batch_describe handler', () => {
     ]);
   });
 
+  /** A description made from a cache image that was since turned upright is not done. */
+  it('re-describes a stale image without force, and clears the mark', async () => {
+    await seedPhotos('a', 'b');
+    reply = completion(JSON.stringify({ summary: 'First pass', subjects: ['bicycle'] }));
+    expect((await runBatch()).status).toBe('completed');
+    fx.exec("INSERT INTO vision_stale (image_key, output) VALUES ('a', 'description')");
+
+    reply = completion(JSON.stringify({ summary: 'Upright', subjects: ['canoe'] }));
+    const job = await runBatch();
+
+    expect((job.result as unknown as BatchResult).described).toBe(1);
+    expect(storedDescription('a')?.summary).toBe('Upright');
+    expect(storedDescription('b')?.summary).toBe('First pass');
+    expect(fx.query('SELECT * FROM vision_stale')).toEqual([]);
+  });
+
   it('re-describes everything when force is set', async () => {
     await seedPhotos('a');
     reply = completion(JSON.stringify({ summary: 'First pass', subjects: ['bicycle'] }));

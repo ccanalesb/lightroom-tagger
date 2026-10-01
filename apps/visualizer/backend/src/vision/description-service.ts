@@ -10,6 +10,7 @@ import type { CancelCheck, LogCallback } from '../providers/retry.js';
 import { buildDescriptionUserPrompt } from '../analyzer/prompt-builder.js';
 import { getImage } from '../db/library/catalog.js';
 import { getImageDescription, storeImageDescription } from '../db/library/descriptions.js';
+import { clearStaleDescription, isDescriptionStale } from '../db/library/vision-stale.js';
 import { libraryWrite } from '../db/library/write.js';
 import type { Db } from '../db/connection.js';
 import { resolveFilepath } from '../utils/path-resolve.js';
@@ -94,7 +95,7 @@ export function storeStructured(
 
   const hr = structured.has_repetition ?? null;
 
-  libraryWrite(db, () =>
+  libraryWrite(db, () => {
     storeImageDescription(db, {
       image_key: imageKey,
       image_type: imageType,
@@ -106,8 +107,9 @@ export function storeStructured(
       dominant_colors: dc,
       mood_tags: mt,
       has_repetition: hr,
-    }),
-  );
+    });
+    clearStaleDescription(db, imageKey);
+  });
 }
 
 export interface DescribeOptions {
@@ -131,7 +133,7 @@ export async function describeMatchedImage(
   catalogKey: string,
   opts: DescribeOptions = {},
 ): Promise<VisionOpOutcome> {
-  if (!opts.force && getImageDescription(db, catalogKey)) {
+  if (!opts.force && getImageDescription(db, catalogKey) && !isDescriptionStale(db, catalogKey)) {
     return new VisionOpOutcome('skipped', 'description exists');
   }
 

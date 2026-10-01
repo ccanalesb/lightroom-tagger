@@ -22,7 +22,11 @@ export async function phashFromFile(path: string): Promise<string | null> {
   // sidecar JPEG exists.
   const raw = isRawPath(path);
   let decodePath: string | null = path;
-  if (raw) decodePath = await convertRawToJpg(path, makeTempJpgPath).catch(() => null);
+  if (raw) {
+    decodePath = await convertRawToJpg(path, makeTempJpgPath)
+      .then((converted) => converted?.path ?? null)
+      .catch(() => null);
+  }
 
   try {
     if (decodePath === null) return null;

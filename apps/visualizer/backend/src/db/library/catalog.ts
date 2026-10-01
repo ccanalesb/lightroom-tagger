@@ -3,6 +3,7 @@
  */
 import { existsSync } from 'node:fs';
 import type { Db } from '../connection.js';
+import { normalizeOrientation, type OrientationCode } from '../../imaging/orientation.js';
 import { decodeJsonColumns, type Row } from './row-decode.js';
 
 export type { Row };
@@ -35,6 +36,14 @@ export function deserializeRow<T extends Row>(row: T): T {
 export function getImage(db: Db, key: string): Row | null {
   const row = db.prepare('SELECT * FROM images WHERE key = ?').get(key) as Row | undefined;
   return row ? deserializeRow(row) : null;
+}
+
+/** The Lightroom orientation an image's vision-cache JPEG should be turned to. */
+export function getImageOrientation(db: Db, key: string): OrientationCode {
+  const row = db.prepare('SELECT orientation FROM images WHERE key = ?').get(key) as
+    | { orientation: string | null }
+    | undefined;
+  return normalizeOrientation(row?.orientation);
 }
 
 /**
@@ -116,6 +125,7 @@ const IMAGE_COLUMNS = [
   'phash',
   'exif',
   'catalog_path',
+  'orientation',
 ] as const;
 
 const IMAGE_UPSERT_SQL =
@@ -210,7 +220,7 @@ export function updateImageKeywordsBatch(
  *
  * Two passes: anti-join for uncached rows, then filesystem check for rows whose
  * compressed file is gone (the cache directory is disposable while `vision_cache`
- * is not).
+ * is not) or was turned to another orientation than the photo's.
  */
 export function getCatalogImagesMissingCache(db: Db): Row[] {
   const uncached = db
@@ -227,7 +237,7 @@ export function getCatalogImagesMissingCache(db: Db): Row[] {
   const cached = db
     .prepare(
       `
-        SELECT i.*, vc.compressed_path FROM images i
+        SELECT i.*, vc.compressed_path, vc.orientation AS cache_orientation FROM images i
         INNER JOIN vision_cache vc ON i.key = vc.key
         WHERE vc.compressed_path IS NOT NULL
         `,
@@ -236,10 +246,12 @@ export function getCatalogImagesMissingCache(db: Db): Row[] {
 
   for (const row of cached) {
     const compressedPath = row['compressed_path'];
+    const turned =
+      normalizeOrientation(row['cache_orientation']) !== normalizeOrientation(row['orientation']);
     // The oversized sentinel is not a path; missing files re-offer the image each run.
-    if (typeof compressedPath === 'string' && compressedPath && !existsSync(compressedPath)) {
-      images.push(deserializeRow(row));
-    }
+    const missing =
+      typeof compressedPath === 'string' && compressedPath && !existsSync(compressedPath);
+    if (turned || missing) images.push(deserializeRow(row));
   }
 
   return images;

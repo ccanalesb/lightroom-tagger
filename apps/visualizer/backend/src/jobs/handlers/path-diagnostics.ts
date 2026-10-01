@@ -11,7 +11,9 @@
  */
 import { statSync } from 'node:fs';
 import type { Db } from '../../db/connection.js';
+import { getImageOrientation } from '../../db/library/catalog.js';
 import { VISION_CACHE_OVERSIZED_SENTINEL, getVisionCachedImage } from '../../db/library/vision-cache.js';
+import { normalizeOrientation } from '../../imaging/orientation.js';
 import { resolveFilepath } from '../../utils/path-resolve.js';
 import { getOrCreateCachedImage } from '../../vision/vision-cache.js';
 import type { JobRunner } from '../runner.js';
@@ -86,6 +88,8 @@ function isFile(path: string): boolean {
 export function tryVisionCache(db: Db, imageKey: string): string | null {
   const cached = getVisionCachedImage(db, imageKey);
   if (!cached) return null;
+  // Turned another way than the photo: rebuild it from the original instead.
+  if (normalizeOrientation(cached.orientation) !== getImageOrientation(db, imageKey)) return null;
   const comp = (cached.compressed_path ?? '').trim();
   if (!comp || comp === VISION_CACHE_OVERSIZED_SENTINEL) return null;
   if (!isFile(comp)) return null;

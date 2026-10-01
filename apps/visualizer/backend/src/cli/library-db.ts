@@ -3,7 +3,7 @@
  */
 import { existsSync } from 'node:fs';
 import { openLibraryDb, type Db } from '../db/connection.js';
-import { initLibraryDb } from '../db/library/bootstrap.js';
+import { initLibraryDb, upgradeLibrarySchema } from '../db/library/bootstrap.js';
 import type { CommandContext } from './registry.js';
 import { stringFlag } from './parse.js';
 
@@ -22,6 +22,19 @@ export function resolveLibraryDbPath(ctx: CommandContext, opts: { mustExist: boo
   return dbPath;
 }
 
+/** Open for a command. An existing database is brought up to the current schema. */
+function openForCommand(dbPath: string, mustExist: boolean): Db {
+  if (!mustExist) return initLibraryDb(dbPath);
+  const db = openLibraryDb(dbPath);
+  try {
+    upgradeLibrarySchema(db);
+  } catch (e) {
+    db.close();
+    throw e;
+  }
+  return db;
+}
+
 /**
  * Run `body` against an open library DB, closing it whatever happens.
  *
@@ -35,7 +48,7 @@ export function withLibraryDb<T>(
   body: (db: Db, dbPath: string) => T,
 ): T {
   const dbPath = resolveLibraryDbPath(ctx, opts);
-  const db = opts.mustExist ? openLibraryDb(dbPath) : initLibraryDb(dbPath);
+  const db = openForCommand(dbPath, opts.mustExist);
   try {
     return body(db, dbPath);
   } finally {
@@ -55,7 +68,7 @@ export async function withLibraryDbAsync<T>(
   body: (db: Db, dbPath: string) => Promise<T>,
 ): Promise<T> {
   const dbPath = resolveLibraryDbPath(ctx, opts);
-  const db = opts.mustExist ? openLibraryDb(dbPath) : initLibraryDb(dbPath);
+  const db = openForCommand(dbPath, opts.mustExist);
   try {
     return await body(db, dbPath);
   } finally {
